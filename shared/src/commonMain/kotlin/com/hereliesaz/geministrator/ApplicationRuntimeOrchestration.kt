@@ -126,12 +126,16 @@ internal suspend fun ApplicationRuntime.draftSwarm(
     val packet = swarmDraftPacket(prompt, staffable)
     if (packet.objective.isEmpty()) return SwarmDraftResult.Problem(SwarmDraftProblem.NoPrompt)
     if (packet.availableAgents.isEmpty()) return SwarmDraftResult.Problem(SwarmDraftProblem.NoRoles)
+    val notes = mutableListOf<String>()
     val plan = try {
-        orchestrationRuntime.plan(packet)
+        // Failover notes ("OpenAI is out of credit; continued with Claude.") ride back with the draft.
+        kotlinx.coroutines.withContext(com.hereliesaz.geministrator.workflow.FailoverNotes { notes += it }) {
+            orchestrationRuntime.plan(packet)
+        }
     } catch (cancelled: kotlinx.coroutines.CancellationException) {
         throw cancelled
     } catch (failure: Throwable) {
         return swarmDraftFailure(failure)
     }
-    return swarmDraftFromPlan(prompt, plan, staffable)
+    return swarmDraftFromPlan(prompt, plan, staffable).let { if (it is SwarmDraftResult.Ready) it.copy(notes = notes.toList()) else it }
 }

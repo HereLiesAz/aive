@@ -59,7 +59,7 @@ import kotlinx.coroutines.CancellationException
 import com.hereliesaz.geministrator.orchestration.OrchestrationQuestion
 import com.hereliesaz.geministrator.orchestration.PreferLocalOrchestrationAgentRuntime
 import com.hereliesaz.geministrator.providers.llm.TextGenerationOrchestrationAgentRuntime
-import com.hereliesaz.geministrator.providers.llm.configuredPlanningApi
+import com.hereliesaz.geministrator.providers.llm.configuredPlanningRuntime
 import com.hereliesaz.geministrator.providers.llm.memoryTextApi
 import com.hereliesaz.geministrator.memory.DesktopOrtMemorySessionManager
 import com.hereliesaz.geministrator.memory.HostedMemoryEngineProvider
@@ -266,7 +266,7 @@ fun main() {
                 }
                 // Linked cloud LLM plans; an installed local planner goes first and falls back to it.
                 val planningRuntime = remember(credentials, localPlannerStatus) {
-                    val cloud = configuredPlanningApi(credentials)?.let(::TextGenerationOrchestrationAgentRuntime)
+                    val cloud = configuredPlanningRuntime(credentials)
                     if (DesktopPlannerModel.ENABLED && localPlannerStatus == LocalPlannerStatus.Installed) {
                         PreferLocalOrchestrationAgentRuntime(
                             local = localPlanner,

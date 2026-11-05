@@ -307,6 +307,7 @@ class HallMonitorGovernanceService(
                         preferredProviderId = role.preferredProviderId,
                         requiredCapabilities = role.capabilitiesRequired,
                         repository = project.repository,
+                        failoverAllowed = role.preferredProviderId == null,
                     ),
                     taskRequest = reviewRequest,
                 ),

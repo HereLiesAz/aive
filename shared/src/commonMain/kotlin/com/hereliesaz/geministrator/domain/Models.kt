@@ -226,6 +226,12 @@ data class TaskRun(
     val keeperQuestion: String? = null,
     /** `AgentUi.questionKey` of the last question the keeper answered, so a replay of it stays answered. */
     val answeredKeeperQuestion: String? = null,
+    /**
+     * Providers this task already failed over from (their own failure: credit, key, rate limit,
+     * offline, timeout, 5xx). The next attempt skips them, so each is tried once, and a failover
+     * restart does not use up the task's retry budget.
+     */
+    val failedProviders: List<AgentProviderId> = emptyList(),
 ) {
     init {
         require(progress == null || progress in 0f..1f) { "Task progress must be normalized 0f..1f" }

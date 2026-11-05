@@ -95,6 +95,84 @@ class ProviderBackedManagedSessionGateway(
         selectProvider(selection, "No registered provider can satisfy this task").id
 
     override suspend fun createSession(request: ManagedSessionRequest): ManagedSessionHandle {
+        val selection = request.providerSelection
+        if (!selection.failoverAllowed || !providerRegistry.hasAlternatives()) return startSession(request, null)
+        // Auto provider with more than one connected: a failure that is the provider's own moves the
+        // same task to the next healthy one. Each provider is tried once; the bound is their number.
+        val tried = linkedSetOf<AgentProviderId>()
+        val failures = mutableListOf<ProviderFailure>()
+        var attempt = request
+        while (true) {
+            val chosen = try {
+                selectProvider(attempt.providerSelection.copy(repository = attempt.taskRequest.repository), "No registered provider can satisfy this task")
+            } catch (unavailable: ManagedSessionFailure.ProviderUnavailable) {
+                if (failures.isEmpty()) throw unavailable
+                throw ManagedSessionFailure.ProviderOperationFailed(
+                    ProviderFailover.allFailedMessage(failures),
+                    AllProvidersFailedException(failures),
+                )
+            }
+            tried += chosen.id
+            try {
+                val handle = startSession(attempt, chosen)
+                failures.lastOrNull()?.let { last ->
+                    val note = ProviderFailover.note(last, providerRegistry.displayName(handle.providerId))
+                    providerRegistry.recordFailoverNote(note)
+                    mutex.withLock {
+                        snapshots[handle]?.let { snapshots[handle] = it.copy(progress = ManagedSessionProgress(message = note)) }
+                    }
+                    activity.record(handle.activityKey(), SessionActivityKind.Progress, note)
+                }
+                return handle
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Throwable) {
+                val benched = providerRegistry.recordFailure(chosen.id, failure.providerFailureMessage("Unable to start provider session"))
+                    // Not the provider's own failure (a malformed request would fail anywhere): stop here.
+                    ?: throw failure
+                failures += benched
+                // Whatever the engine pinned this call to, the next pick is open again, minus those tried.
+                attempt = attempt.copy(
+                    providerSelection = attempt.providerSelection.copy(
+                        constraints = com.hereliesaz.geministrator.domain.ProviderConstraints.None,
+                        requiredCapabilities = attempt.providerSelection.requiredCapabilities +
+                            ((attempt.providerSelection.constraints as? com.hereliesaz.geministrator.domain.ProviderConstraints.RequireCapabilities)?.capabilities.orEmpty()),
+                        preferredProviderId = null,
+                        excludedProviderIds = tried.toSet(),
+                    ),
+                )
+            }
+        }
+    }
+
+    override suspend fun adviseFailover(
+        failedProviderId: AgentProviderId,
+        reason: String?,
+        selection: ProviderSelectionRequest,
+    ): FailoverAdvice {
+        val failure = providerRegistry.recordFailure(failedProviderId, reason) ?: return FailoverAdvice.NotApplicable
+        if (!providerRegistry.hasAlternatives()) return FailoverAdvice.NotApplicable
+        if (!selection.failoverAllowed) return FailoverAdvice.Stop(ProviderFailover.pinnedMessage(failure))
+        val tried = selection.excludedProviderIds + failedProviderId
+        val next = try {
+            providerRegistry.select(
+                selection.copy(
+                    constraints = com.hereliesaz.geministrator.domain.ProviderConstraints.None,
+                    preferredProviderId = null,
+                    excludedProviderIds = tried,
+                ),
+            )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Throwable) {
+            return FailoverAdvice.Stop(ProviderFailover.allFailedMessage(providerRegistry.failuresOf(tried)))
+        }
+        val note = ProviderFailover.note(failure, providerRegistry.displayName(next.id))
+        providerRegistry.recordFailoverNote(note)
+        return FailoverAdvice.Restart(note)
+    }
+
+    private suspend fun startSession(request: ManagedSessionRequest, chosen: AgentProvider?): ManagedSessionHandle {
         val requiredCapabilities = buildSet {
             addAll(request.providerSelection.requiredCapabilities)
             val constraints = request.providerSelection.constraints
@@ -105,7 +183,7 @@ class ProviderBackedManagedSessionGateway(
         val recalledRequest = request.taskRequest
             .copy(requiredCapabilities = requiredCapabilities)
             .withRecalledMemory()
-        val provider = selectProvider(
+        val provider = chosen ?: selectProvider(
             request.providerSelection.copy(repository = recalledRequest.repository),
             "No registered provider can satisfy this task",
         )
@@ -169,7 +247,8 @@ class ProviderBackedManagedSessionGateway(
                 InferenceTerminalStatus.Failed,
                 failure.providerFailureMessage("Unable to start provider session"),
             )
-            providerRegistry.recordOutcome(provider.id, success = false)
+            // Failure bookkeeping (and the bench) is the caller's: createSession classifies it.
+            if (chosen == null) providerRegistry.recordFailure(provider.id, failure.providerFailureMessage("Unable to start provider session"))
             throw failure
         }
     }
@@ -481,7 +560,7 @@ class ProviderBackedManagedSessionGateway(
                                 InferenceTerminalStatus.Failed,
                                 "Provider observation failed repeatedly",
                             )
-                            providerRegistry.recordOutcome(handle.providerId, success = false)
+                            providerRegistry.recordFailure(handle.providerId, failure.message)
                             recordMemory { memoryObserver.onSessionFinished(handle, ManagedSessionStatus.Failed) }
                 recordMemory { duplexAttachment?.onSessionFinished(handle, ManagedSessionStatus.Failed) }
                         }
@@ -693,7 +772,11 @@ class ProviderBackedManagedSessionGateway(
                 },
                 reason = (effectiveEvent as? AgentEvent.Failed)?.reason,
             )
-            providerRegistry.recordOutcome(handle.providerId, success = status == ManagedSessionStatus.Completed)
+            if (status == ManagedSessionStatus.Completed) {
+                providerRegistry.recordOutcome(handle.providerId, success = true)
+            } else {
+                providerRegistry.recordFailure(handle.providerId, (effectiveEvent as? AgentEvent.Failed)?.reason)
+            }
             recordMemory { memoryObserver.onSessionFinished(handle, status) }
             recordMemory { duplexAttachment?.onSessionFinished(handle, status) }
         }

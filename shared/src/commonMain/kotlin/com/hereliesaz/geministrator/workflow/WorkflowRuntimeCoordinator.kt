@@ -235,10 +235,29 @@ class WorkflowRuntimeCoordinator(
                 else -> RetryReason.ProviderFailure
             }
             // The executor's last status line; for provider sessions this is the provider's failure reason.
-            val failureReason = nextRun.taskRuns[taskId]?.progressMessage
+            var failureReason = nextRun.taskRuns[taskId]?.progressMessage
                 ?.takeIf { it.isNotBlank() }
                 ?.let { "Executor failed. Last status: $it" }
                 ?: "Executor failed"
+            // A provider's own failure (credit, key, rate limit, offline, 5xx) mid-task restarts the
+            // task on another provider when the keeper left the choice to the app; a pinned
+            // creature, or one with nothing left to switch to, fails with a message naming who and what to do.
+            if (retryReason == RetryReason.ProviderFailure) {
+                val failedProvider = state.handles[taskId]?.providerId ?: state.run.taskRuns[taskId]?.assignedProviderId
+                val selection = engine.selectionFor(project, definition, nextRun, taskId)
+                if (selection != null) {
+                    val failover = engine.failOver(
+                        run = nextRun,
+                        taskDefinitionId = taskId,
+                        failedProviderId = failedProvider,
+                        reason = nextRun.taskRuns[taskId]?.progressMessage,
+                        selection = selection,
+                        nowEpochMillis = nowEpochMillis,
+                    )
+                    failover.restarted?.let { nextRun = it; continue }
+                    failover.stopMessage?.let { failureReason = "Executor failed. $it" }
+                }
+            }
             nextRun = engine.handleFailure(
                 definition = definition,
                 run = nextRun,
