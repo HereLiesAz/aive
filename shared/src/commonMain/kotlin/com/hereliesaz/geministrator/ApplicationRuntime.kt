@@ -140,6 +140,8 @@ class ApplicationRuntime private constructor(
         val project: Project,
         val definition: WorkflowDefinition,
         val run: WorkflowRun,
+        /** The run's hive was deleted: [definition] is a read-only stand-in and is never saved. */
+        val deleted: Boolean = false,
     )
 
     private var current: Current? = null
@@ -161,9 +163,13 @@ class ApplicationRuntime private constructor(
                     return@withLock
                 }
 
+                // A run whose hive was deleted is history only: it is never resumed, so startup skips it.
+                val knownHives = persistence.definitions.all().mapTo(mutableSetOf()) { it.id }
                 val latestProjectRun = projects
                     .flatMap { project ->
-                        persistence.runs.byProject(project.id).map { run -> project to run }
+                        persistence.runs.byProject(project.id)
+                            .filter { it.workflowDefinitionId in knownHives }
+                            .map { run -> project to run }
                     }
                     .maxByOrNull { (_, run) -> run.updatedAtEpochMillis }
 
@@ -232,9 +238,8 @@ class ApplicationRuntime private constructor(
                     ?: error("Run ${runId.value} not found")
                 val project = persistence.projects.get(run.projectId)
                     ?: error("Project ${run.projectId.value} not found")
-                val definition = persistence.definitions.get(run.workflowDefinitionId)
-                    ?: error("Workflow definition ${run.workflowDefinitionId.value} not found")
-                viewingRun = ViewingRun(project, definition, run)
+                val stored = persistence.definitions.get(run.workflowDefinitionId)
+                viewingRun = ViewingRun(project, stored ?: deletedHiveStandIn(run), run, deleted = stored == null)
                 publishCurrent()
             } catch (failure: Throwable) {
                 publishFailure(failure)
@@ -796,7 +801,9 @@ class ApplicationRuntime private constructor(
             try {
                 val project = persistence.projects.get(projectId)
                     ?: error("Project ${projectId.value} was not found")
+                val knownHives = persistence.definitions.all().mapTo(mutableSetOf()) { it.id }
                 val run = persistence.runs.byProject(projectId)
+                    .filter { it.workflowDefinitionId in knownHives }
                     .maxByOrNull(WorkflowRun::updatedAtEpochMillis)
                 if (run == null) {
                     replaceCurrent(null)
@@ -893,7 +900,7 @@ class ApplicationRuntime private constructor(
             val viewed = viewingRun
             val base = when {
                 active?.definition?.id == workflowDefinitionId -> active.definition
-                viewed?.definition?.id == workflowDefinitionId -> viewed.definition
+                viewed != null && !viewed.deleted && viewed.definition.id == workflowDefinitionId -> viewed.definition
                 else -> persistence.definitions.get(workflowDefinitionId)
             } ?: error("Workflow definition " + workflowDefinitionId.value + " was not found")
 

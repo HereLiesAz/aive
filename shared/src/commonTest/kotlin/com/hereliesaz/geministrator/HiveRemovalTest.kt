@@ -14,6 +14,7 @@ import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.persistence.InMemoryWorkflowPersistence
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.cancel
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -158,10 +159,10 @@ class DeleteHiveTest {
     }
 
     @Test
-    fun refusesWhilePastRunsStillNeedTheHive() {
+    fun pastRunsDoNotBlockDeletion() {
         assertEquals(
-            HiveDeleteVerdict.Refused(HiveDeleteRefusal.HasRuns),
-            verdict(listOf(run(target, WorkflowRunStatus.Completed))),
+            HiveDeleteVerdict.Allowed,
+            verdict(listOf(run(target, WorkflowRunStatus.Completed), run(target, WorkflowRunStatus.Failed))),
         )
     }
 
@@ -237,5 +238,61 @@ class DeleteHiveTest {
 
         assertNotNull(memory.definitions.get(target.id))
         assertEquals(setOf(target.id, other.id), authored.all())
+    }
+}
+
+class DeletedHiveRunsTest {
+    private val gone = hive("gone", task("a"), task("b", "a"))
+    private val project = Project(ProjectId("p"), "p", createdAtEpochMillis = 0, updatedAtEpochMillis = 0)
+    private val pastRun = restingWorkflowRun(gone).copy(
+        id = WorkflowRunId("old"),
+        projectId = project.id,
+        status = WorkflowRunStatus.Completed,
+        taskRuns = mapOf(
+            TaskDefinitionId("a") to com.hereliesaz.geministrator.domain.TaskRun(
+                id = com.hereliesaz.geministrator.domain.TaskRunId("old-a"),
+                taskDefinitionId = TaskDefinitionId("a"),
+                status = com.hereliesaz.geministrator.domain.TaskRunStatus.Completed,
+                assignedRoleId = null,
+            ),
+        ),
+        updatedAtEpochMillis = 5,
+    )
+
+    // The hive was deleted: its definition is not stored, its run is.
+    private suspend fun persistenceWithOrphanRun() = InMemoryWorkflowPersistence().also {
+        it.projects.put(project)
+        it.runs.put(pastRun)
+    }
+
+    @Test
+    fun aRunOfADeletedHiveOpensReadOnlyInHistory() = kotlinx.coroutines.runBlocking<Unit> {
+        val persistence = persistenceWithOrphanRun()
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
+        try {
+            val runtime = ApplicationRuntime.create(providers = emptyList(), scope = scope, persistence = persistence)
+            runtime.switchToRun(pastRun.id)
+            val live = assertIs<ApplicationRuntimeState.Live>(runtime.state.value)
+            assertEquals(pastRun, live.presentation.run)
+            assertEquals(DELETED_HIVE_NAME, live.presentation.definition.name)
+            assertEquals(listOf("a"), live.presentation.definition.tasks.map { it.id.value })
+            // Viewing never brings the hive back.
+            assertNull(persistence.definitions.get(gone.id))
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun startupResumeSkipsARunWhoseHiveIsGone() = kotlinx.coroutines.runBlocking<Unit> {
+        val persistence = persistenceWithOrphanRun()
+        val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
+        try {
+            val runtime = ApplicationRuntime.create(providers = emptyList(), scope = scope, persistence = persistence)
+            runtime.loadLatest()
+            assertIs<ApplicationRuntimeState.NoRun>(runtime.state.value)
+        } finally {
+            scope.cancel()
+        }
     }
 }
