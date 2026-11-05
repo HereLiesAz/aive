@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import com.hereliesaz.conveyance.h2g2.H2g2WorkflowState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,6 +66,8 @@ internal fun GeministratorWorkflowTerrarium(
     beneathField: (@Composable (WorkflowDefinition, (TerrariumDependencyEditResult) -> Unit) -> Unit)? = null,
     /** On wide screens, the hive in one frame: controls bar, tissue, legend and feed bar (HiveWorkspace.kt). */
     frame: HiveFrame? = null,
+    /** Opens a new selection on this view instead of the first (screenshots and tests). */
+    startFocusLevel: FocusLevel? = null,
 ) {
     val scope = rememberCoroutineScope()
     val layoutStore = remember { SettingsTerrariumLayoutStore.createDefault() }
@@ -163,6 +166,63 @@ internal fun GeministratorWorkflowTerrarium(
 
     // Framed, the controls bar drives the field's zoom and focus; unframed, the field keeps its own.
     val camera = remember(definition.id) { TerrariumCamera() }
+    camera.driven = frame != null
+
+    // The semantic focus stack (TerrariumFocus.kt): what the camera shows follows the selection.
+    // A cluster being grouped counts as one focus; otherwise the selected creature.
+    val focusSelection: Set<String> = grouping?.takeIf { it.isNotEmpty() } ?: setOfNotNull(selectedTaskId)
+    val focusPositions = remember(projection) { projection.subjects.associate { it.node.id to it.position } }
+    val focusGraph = remember(stagedDefinition, focusPositions) {
+        val ids = stagedDefinition.tasks.map { it.id.value }.filterTo(linkedSetOf()) { it in focusPositions }
+        FocusGraph(ids, stagedDefinition.tasks.flatMap { t -> t.dependsOn.map { it.value to t.id.value } })
+    }
+    val orchestratorIds = remember(stagedDefinition, roles) {
+        stagedDefinition.tasks.filter { t -> roles.firstOrNull { it.id == t.roleId }?.name == "Orchestrator" }.map { it.id.value }
+    }
+    val activeIds = remember(projection, building) {
+        if (building) emptySet() else projection.subjects.filter { it.node.state == H2g2WorkflowState.Active }.mapTo(mutableSetOf()) { it.node.id }
+    }
+    val blockedIds = remember(projection, building) {
+        if (building) emptySet() else projection.subjects.filter {
+            it.node.state == H2g2WorkflowState.Gate || it.node.state == H2g2WorkflowState.Blocked || it.node.state == H2g2WorkflowState.Failed
+        }.mapTo(mutableSetOf()) { it.node.id }
+    }
+    val focusSteps = remember(focusGraph, focusSelection, orchestratorIds, activeIds, blockedIds) {
+        focusLevels(focusGraph, focusSelection, orchestratorIds, activeIds, blockedIds)
+    }
+    var stackSelection by remember(definition.id) { mutableStateOf<Set<String>?>(null) }
+    LaunchedEffect(focusSelection, focusSteps) {
+        val sameSelection = stackSelection == focusSelection
+        camera.stack = if (sameSelection) {
+            camera.stack.refreshed(focusSteps)
+        } else {
+            val fresh = camera.stack.selected(focusSteps)
+            val at = startFocusLevel?.let { level -> focusSteps.indexOfFirst { it.level == level } } ?: -1
+            if (at >= 0 && focusSelection.isNotEmpty()) fresh.copy(index = at) else fresh
+        }
+        if (!sameSelection) camera.free = false
+        stackSelection = focusSelection
+    }
+    val focusStep = camera.stack.current
+    var appliedView by remember(definition.id) { mutableStateOf<List<Any?>?>(null) }
+    LaunchedEffect(focusStep, focusSelection, camera.applyTick, camera.stack.index, focusPositions) {
+        // Once a finger has moved the view, only a deliberate change (a step, a new selection, recentre) puts it back.
+        val deliberate = listOf(focusStep.level, focusSelection, camera.applyTick, camera.stack.index)
+        if (camera.free && appliedView == deliberate) return@LaunchedEffect
+        appliedView = deliberate
+        val all = focusPositions.values
+        val overview = overviewFit(all)
+        val fit = if (focusStep.level == FocusLevel.Overview) {
+            overview
+        } else {
+            fitCamera(focusStep.nodes.mapNotNull(focusPositions::get), floorZoom = overview.zoom)
+        }
+        camera.zoom = fit.zoom
+        camera.focus = fit.focus
+        camera.free = false
+    }
+    // Back steps the view out a level before it does anything else, while the selection has somewhere to go.
+    PlatformBackHandler(enabled = focusSelection.isNotEmpty() && camera.stack.canStepOut) { camera.stepOut(null) }
     val undo = {
         val back = tide.undo()
         scope.launch {
@@ -253,8 +313,12 @@ internal fun GeministratorWorkflowTerrarium(
                 } else {
                     null
                 },
+                // Tapping the bare ground lets go of the selection, which returns the view to the whole hive.
+                onGroundTapped = {
+                    if (grouping == null) selectedTaskId?.let(onTaskSelected)
+                },
                 modifier = Modifier.fillMaxSize(),
-                camera = camera.takeIf { frame != null },
+                camera = camera,
             )
           }
             // An empty hive in Build says how it fills (mockup H6).
@@ -265,7 +329,7 @@ internal fun GeministratorWorkflowTerrarium(
                         style = AzphaltType.body.copy(fontWeight = FontWeight.Normal, textAlign = TextAlign.Center),
                         // The field is dark tissue whatever the ground: its text is Ink's opposite, softened.
                         color = Azphalt.Ink.onOpposite().copy(alpha = 0.78f),
-                        modifier = Modifier.align(Alignment.Center).padding(horizontal = 36.dp),
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(start = 36.dp, end = 36.dp, bottom = 28.dp),
                     )
                 }
             }

@@ -108,6 +108,36 @@ internal class TerrariumCamera {
     var zoom by mutableStateOf(1f)
     var focus by mutableStateOf(Offset(0.5f, 0.5f))
 
+    /** The semantic views of the selection (TerrariumFocus.kt); the camera is put on [FocusStack.current]. */
+    var stack by mutableStateOf(FocusStack())
+
+    /** True once a finger has pinched or panned away from the current view; recentring ends it. */
+    var free by mutableStateOf(false)
+
+    /** Bumped to have the current view applied again (recentre). */
+    var applyTick by mutableStateOf(0)
+
+    /** Whether the controls (a bar, not the field's own stepper) drive this camera. */
+    var driven by mutableStateOf(false)
+
+    /** In: back toward the creature through the levels already passed; with no selection, a plain zoom in. */
+    fun stepIn() {
+        if (stack.canStepIn) {
+            stack = stack.stepIn()
+            free = false
+            applyTick++
+        } else if (stack.steps.size <= 1) zoomIn()
+    }
+
+    /** Out: toward the whole hive; from the Overview (or with no selection at the widest view), [onSurface]. */
+    fun stepOut(onSurface: (() -> Unit)?) {
+        if (stack.canStepOut) {
+            stack = stack.stepOut()
+            free = false
+            applyTick++
+        } else if (stack.steps.size <= 1) zoomOut(onSurface) else onSurface?.invoke()
+    }
+
     fun zoomIn() {
         zoom = (zoom + ZOOM_STEP).coerceAtMost(MAX_ZOOM)
     }
@@ -121,6 +151,8 @@ internal class TerrariumCamera {
     fun centre() {
         zoom = 1f
         focus = Offset(0.5f, 0.5f)
+        free = false
+        applyTick++
     }
 
     companion object {
@@ -325,8 +357,8 @@ internal fun HiveControlsBar(
                 RoundGlyphButton(HiveGlyph.Redo, stringResource(Res.string.build_redo), enabled = canRedo, onClick = onRedo)
             }
             RoundGlyphButton(HiveGlyph.Target, stringResource(Res.string.hive_centre), onClick = camera::centre)
-            RoundGlyphButton(HiveGlyph.ZoomOut, stringResource(Res.string.terrarium_zoom_out), onClick = { camera.zoomOut(onSurface) })
-            RoundGlyphButton(HiveGlyph.ZoomIn, stringResource(Res.string.terrarium_zoom_in), onClick = camera::zoomIn)
+            RoundGlyphButton(HiveGlyph.ZoomOut, stringResource(Res.string.terrarium_zoom_out), onClick = { camera.stepOut(onSurface) })
+            RoundGlyphButton(HiveGlyph.ZoomIn, stringResource(Res.string.terrarium_zoom_in), onClick = camera::stepIn)
         }
     }
 }

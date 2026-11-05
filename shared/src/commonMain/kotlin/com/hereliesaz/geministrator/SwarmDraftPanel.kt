@@ -107,6 +107,10 @@ internal fun SwarmDraftBox(
 
     fun draft() {
         if (phase == DraftPhase.Working) return
+        if (prompt.isBlank()) {
+            scope.launch { phase = DraftPhase.Failed(problemMessage(SwarmDraftProblem.NoPrompt), null) }
+            return
+        }
         val asked = prompt
         phase = DraftPhase.Working
         scope.launch {
@@ -222,9 +226,9 @@ private fun DraftField(prompt: String, onPrompt: (String) -> Unit, busy: Boolean
                     }
                 },
             )
-            val ready = prompt.isNotBlank() && !busy
-            val fill = if (ready) azphaltStrong() else AzphaltLiftedInk
-            DraftCapsuleButton(label, label, fill, onClick = { if (ready) onDraft() })
+            // Draft is the primary action of a new hive: always the strong fill, quiet only while drafting.
+            val fill = if (busy) AzphaltLiftedInk else azphaltStrong()
+            DraftCapsuleButton(label, label, fill, onClick = { if (!busy) onDraft() })
         }
     }
 }
