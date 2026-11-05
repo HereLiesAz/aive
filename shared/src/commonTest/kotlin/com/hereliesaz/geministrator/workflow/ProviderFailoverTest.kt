@@ -92,6 +92,43 @@ class ProviderFailoverTest {
     }
 
     @Test
+    fun aReplyCutOffAtTheOutputLimitFailsOverButBenchesNobody() {
+        listOf(
+            "Compatible chat response was truncated because the provider reached its output-token limit",
+            "Claude response was truncated at the token limit; output is incomplete",
+            "Gemini response was truncated at the token limit; output is incomplete",
+            "OpenAI response was truncated at the output-token limit; output is incomplete",
+        ).forEach { raw ->
+            assertEquals(ErrorKind.OutputTooLong, classifyError(raw), raw)
+            assertTrue(ProviderFailover.shouldFailOver(raw), raw)
+        }
+        // Other early stops, and unrelated "truncated" text, are not this.
+        assertEquals(ErrorKind.Other, classifyError("Gemini response stopped early (SAFETY); output is incomplete"))
+        assertEquals(ErrorKind.Other, classifyError("[truncated at 4000 characters]"))
+        assertEquals(0L, ProviderFailover.cooldownMillis(ErrorKind.OutputTooLong))
+        val cut = ProviderFailover.failureOf("gemini", "Gemini", "Gemini response was truncated at the token limit")
+        assertEquals("Gemini ran out of room for its answer; continued with Claude.", ProviderFailover.note(cut, "Claude"))
+        val bench = ProviderBench { 0L }
+        bench.bench(cut)
+        assertFalse(bench.isBenched("gemini"))
+    }
+
+    @Test
+    fun everyProviderTruncatingGivesThePlainMessageNamingThem() {
+        val a = ProviderFailover.failureOf("gemini", "Gemini", "Gemini response was truncated at the token limit")
+        val b = ProviderFailover.failureOf("openai", "OpenAI", "OpenAI response was truncated at the output-token limit")
+        assertEquals(
+            "The plan was too long for the provider's output limit (tried Gemini, OpenAI). " +
+                "Try a shorter description, or a provider with a larger limit.",
+            ProviderFailover.allFailedMessage(listOf(a, b)),
+        )
+        // Mixed failures keep the per-provider wording.
+        val credit = ProviderFailover.failureOf("claude", "Claude", "HTTP 402")
+        val mixed = ProviderFailover.allFailedMessage(listOf(a, credit))
+        assertTrue("Gemini ran out of room" in mixed && "Claude is out of credit" in mixed, mixed)
+    }
+
+    @Test
     fun messagesAreCalmNameEveryProviderAndSayWhatToDo() {
         val credit = ProviderFailover.failureOf("openai", "OpenAI", "HTTP 402")
         assertEquals("OpenAI is out of credit; continued with Claude.", ProviderFailover.note(credit, "Claude"))

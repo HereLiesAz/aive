@@ -228,7 +228,7 @@ internal object AnthropicToolWire {
 
     fun turn(response: JsonObject): ToolTurn {
         when (response.str("stop_reason")) {
-            "max_tokens" -> error("Claude response was truncated at the token limit; output is incomplete")
+            "max_tokens" -> throw OutputTruncatedException("Claude response was truncated at the token limit; output is incomplete")
             "refusal" -> error("Claude declined this request")
         }
         val content = response["content"] as? JsonArray ?: JsonArray(emptyList())
@@ -287,7 +287,7 @@ internal object CompatibleToolWire {
         val choice = response["choices"].arrayOrEmpty().firstOrNull() as? JsonObject
             ?: error("Compatible chat response did not contain a choice")
         if (choice.str("finish_reason").equals("length", ignoreCase = true)) {
-            error("Compatible chat response was truncated because the provider reached its output-token limit")
+            throw OutputTruncatedException("Compatible chat response was truncated because the provider reached its output-token limit")
         }
         val message = choice["message"] as? JsonObject ?: JsonObject(emptyMap())
         val rawCalls = message["tool_calls"].arrayOrEmpty().mapNotNull { it as? JsonObject }
@@ -385,7 +385,7 @@ internal object GeminiToolWire {
             ?: error("Gemini response did not contain a candidate")
         when (val finish = candidate.str("finishReason")) {
             null, "STOP", "FINISH_REASON_UNSPECIFIED" -> Unit
-            "MAX_TOKENS" -> error("Gemini response was truncated at the token limit; output is incomplete")
+            "MAX_TOKENS" -> throw OutputTruncatedException("Gemini response was truncated at the token limit; output is incomplete")
             else -> error("Gemini response stopped early ($finish); output is incomplete")
         }
         val parts = ((candidate["content"] as? JsonObject)?.get("parts") as? JsonArray) ?: JsonArray(emptyList())
