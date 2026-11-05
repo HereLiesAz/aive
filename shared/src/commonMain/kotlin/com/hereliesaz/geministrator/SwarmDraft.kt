@@ -72,7 +72,9 @@ internal fun swarmDraftPacket(prompt: String, roles: Collection<RoleDefinition>)
             OrchestrationRole(id = role.id.value, name = role.name, authorities = role.authorities.map { it.name }.sorted())
         },
         instruction = "Propose the smallest dependency-correct swarm of creatures that can do this work, " +
-            "at most $SWARM_DRAFT_MAX_CREATURES, each with one bounded job. This is a proposal for a person to edit; nothing runs.",
+            "at most $SWARM_DRAFT_MAX_CREATURES (fewer is better), each with one bounded job in a single terse sentence. " +
+            "Group broad work into a few creatures rather than listing every detail. " +
+            "This is a proposal for a person to edit; nothing runs.",
     )
 
 /**

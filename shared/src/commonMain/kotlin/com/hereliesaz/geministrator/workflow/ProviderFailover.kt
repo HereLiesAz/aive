@@ -35,7 +35,8 @@ object ProviderFailover {
     /**
      * Whether a failure of [kind] is the provider's own, so another provider could do the same work.
      * Out of credit, a rejected key, rate limiting, being offline or timing out, and a provider-side
-     * 5xx all are. [ErrorKind.Other] is NOT: a malformed request, a refusal of this prompt's content
+     * 5xx all are, and so is a reply cut off at the provider's output limit
+     * ([ErrorKind.OutputTooLong]): another model may have a larger window. [ErrorKind.Other] is NOT: a malformed request, a refusal of this prompt's content
      * or any error we cannot place would fail the same way on every provider, and a retry elsewhere
      * would only spend the same content on a second service. [ErrorKind.NoAgent] is not a failure of
      * a provider at all (nothing connected can do the job).
@@ -47,6 +48,7 @@ object ProviderFailover {
         ErrorKind.Offline,
         ErrorKind.TimedOut,
         ErrorKind.ServerError,
+        ErrorKind.OutputTooLong,
         -> true
         ErrorKind.NoAgent, ErrorKind.Other -> false
     }
@@ -62,7 +64,8 @@ object ProviderFailover {
         ErrorKind.OutOfCredit, ErrorKind.KeyRejected -> 30 * MINUTE
         ErrorKind.ServerError -> 2 * MINUTE
         ErrorKind.RateLimited, ErrorKind.TimedOut, ErrorKind.Offline -> MINUTE
-        ErrorKind.NoAgent, ErrorKind.Other -> 0L
+        // The provider is healthy; this prompt was just too big for its window. No benching.
+        ErrorKind.NoAgent, ErrorKind.OutputTooLong, ErrorKind.Other -> 0L
     }
 
     private const val MINUTE = 60_000L
@@ -79,6 +82,7 @@ object ProviderFailover {
         ErrorKind.TimedOut -> "took too long to answer"
         ErrorKind.ServerError -> "is having trouble"
         ErrorKind.NoAgent -> "cannot do this work"
+        ErrorKind.OutputTooLong -> "ran out of room for its answer"
         ErrorKind.Other -> "failed"
     }
 
@@ -89,6 +93,7 @@ object ProviderFailover {
         ErrorKind.RateLimited -> "Wait a minute."
         ErrorKind.Offline -> "Check your internet connection."
         ErrorKind.TimedOut, ErrorKind.ServerError -> "Try again in a moment."
+        ErrorKind.OutputTooLong -> "Try a shorter description, or a provider with a larger limit."
         ErrorKind.NoAgent, ErrorKind.Other -> "Check it in Settings."
     }
 
@@ -99,6 +104,11 @@ object ProviderFailover {
     /** Every provider that failed, and the fixing action for each. */
     fun allFailedMessage(failures: List<ProviderFailure>): String {
         val distinct = failures.distinctBy { it.providerId }
+        if (distinct.isNotEmpty() && distinct.all { it.kind == ErrorKind.OutputTooLong }) {
+            return "The plan was too long for the provider's output limit (tried " +
+                distinct.joinToString(", ") { it.providerName } +
+                "). Try a shorter description, or a provider with a larger limit."
+        }
         val lines = distinct.joinToString(" ") { "${it.providerName} ${reasonPhrase(it.kind)}. ${fixFor(it.kind)}" }
         return "Every connected provider failed, so this stopped. $lines"
     }

@@ -69,7 +69,19 @@ interface TextGenerationApi {
     /** The prompt-cache mechanisms this API uses; none unless it says otherwise. */
     val promptCaching: PromptCacheCapabilities get() = PromptCacheCapabilities()
 
+    /**
+     * The most output tokens [generateWithBudget] may be given, as documented for this API's model;
+     * null when it takes no per-call budget (it then ignores one). See [PlanOutputBudget].
+     */
+    val outputTokenCap: Int? get() = null
+
     suspend fun generate(prompt: String): TextGenerationResult
+
+    /**
+     * Generates with an output limit of [maxOutputTokens] (callers pass [PlanOutputBudget] values,
+     * already clamped to [outputTokenCap]). An API without a budget option makes a plain [generate].
+     */
+    suspend fun generateWithBudget(prompt: String, maxOutputTokens: Int): TextGenerationResult = generate(prompt)
 
     /** Generates from a prefix-structured prompt; APIs without cache controls send [CacheablePrompt.text]. */
     suspend fun generate(prompt: CacheablePrompt): TextGenerationResult = generate(prompt.text)
@@ -139,16 +151,26 @@ class OpenAiResponsesApi(
     /** OpenAI caches long prompt prefixes automatically and reports `input_tokens_details.cached_tokens`. */
     override val promptCaching: PromptCacheCapabilities get() = IMPLICIT_PREFIX_CACHING
 
-    override suspend fun generate(prompt: String): TextGenerationResult {
+    override val outputTokenCap: Int get() = PlanOutputBudget.NATIVE_CAP
+
+    override suspend fun generate(prompt: String): TextGenerationResult = generate(prompt, maxOutputTokens = null)
+
+    override suspend fun generateWithBudget(prompt: String, maxOutputTokens: Int): TextGenerationResult =
+        generate(prompt, maxOutputTokens = minOf(maxOutputTokens, outputTokenCap))
+
+    private suspend fun generate(prompt: String, maxOutputTokens: Int?): TextGenerationResult {
         val response = client.post("$baseUrl/responses") {
             bearer(apiKeyProvider)
             contentType(ContentType.Application.Json)
-            setBody(OpenAiResponseRequest(model = model, input = prompt))
+            setBody(OpenAiResponseRequest(model = model, input = prompt, maxOutputTokens = maxOutputTokens))
         }
         response.requireSuccess("generate OpenAI response")
         val payload = response.body<OpenAiResponse>()
         // A response cut off by max_output_tokens (or a content filter) is `incomplete`: partial
         // text must never be promoted to a completed result.
+        if (payload.incompleteDetails?.reason == "max_output_tokens") {
+            throw OutputTruncatedException("OpenAI response was truncated at the output-token limit (max_output_tokens); output is incomplete")
+        }
         if (payload.status == "incomplete" || payload.status == "failed") {
             error(
                 "OpenAI response ${payload.status}: " +
@@ -213,7 +235,12 @@ class OpenAiResponsesApi(
                         usage = event.response?.usage
                         completed = true
                     }
-                    "response.failed", "response.incomplete" -> error(
+                    "response.incomplete" -> if (event.response?.incompleteDetails?.reason == "max_output_tokens") {
+                        throw OutputTruncatedException("OpenAI response was truncated at the output-token limit (max_output_tokens); output is incomplete")
+                    } else {
+                        error("OpenAI response incomplete: " + (event.response?.error?.message ?: event.response?.incompleteDetails?.reason ?: "no detail"))
+                    }
+                    "response.failed" -> error(
                         "OpenAI response ${event.type.substringAfter('.')}: " +
                             (event.response?.error?.message ?: event.response?.incompleteDetails?.reason ?: "no detail"),
                     )
@@ -247,7 +274,12 @@ class XaiResponsesApi(
 
     override val promptCaching: PromptCacheCapabilities get() = delegate.promptCaching
 
+    override val outputTokenCap: Int? get() = delegate.outputTokenCap
+
     override suspend fun generate(prompt: String): TextGenerationResult = delegate.generate(prompt)
+
+    override suspend fun generateWithBudget(prompt: String, maxOutputTokens: Int): TextGenerationResult =
+        delegate.generateWithBudget(prompt, maxOutputTokens)
 
     override suspend fun stream(prompt: String, onChunk: suspend (TextGenerationChunk) -> Unit): TextGenerationResult =
         delegate.stream(prompt, onChunk)
@@ -283,20 +315,27 @@ class AnthropicMessagesApi(
         reportsCacheUsage = true,
     )
 
+    override val outputTokenCap: Int get() = PlanOutputBudget.ANTHROPIC_CAP
+
     override suspend fun generate(prompt: String): TextGenerationResult = generate(CacheablePrompt(dynamicSuffix = prompt))
 
-    override suspend fun generate(prompt: CacheablePrompt): TextGenerationResult {
+    override suspend fun generateWithBudget(prompt: String, maxOutputTokens: Int): TextGenerationResult =
+        generate(CacheablePrompt(dynamicSuffix = prompt), minOf(maxOutputTokens, outputTokenCap))
+
+    override suspend fun generate(prompt: CacheablePrompt): TextGenerationResult = generate(prompt, DEFAULT_MAX_TOKENS)
+
+    private suspend fun generate(prompt: CacheablePrompt, maxTokens: Int): TextGenerationResult {
         val response = client.post("$baseUrl/messages") {
             val key = apiKeyProvider.requireKey("Anthropic")
             header("x-api-key", key)
             header("anthropic-version", "2023-06-01")
             contentType(ContentType.Application.Json)
-            setBody(messageRequest(prompt, maxTokens = 8_192))
+            setBody(messageRequest(prompt, maxTokens = maxTokens))
         }
         response.requireSuccess("generate Claude response")
         val payload = response.body<AnthropicMessageResponse>()
         if (payload.stopReason == "max_tokens") {
-            error("Claude response was truncated at the token limit; output is incomplete")
+            throw OutputTruncatedException("Claude response was truncated at the token limit; output is incomplete")
         }
         val text = payload.content
             .firstOrNull { it.type == "text" && !it.text.isNullOrBlank() }
@@ -416,7 +455,7 @@ class AnthropicMessagesApi(
         }
         requireStreamTerminated(stopped, "Claude")
         when (stopReason) {
-            "max_tokens" -> error("Claude response was truncated at the token limit; output is incomplete")
+            "max_tokens" -> throw OutputTruncatedException("Claude response was truncated at the token limit; output is incomplete")
             "refusal" -> error("Claude declined this request")
         }
         if (text.isBlank()) error("Claude response did not contain text")
@@ -431,6 +470,7 @@ class AnthropicMessagesApi(
 
     private companion object {
         const val STREAM_MAX_TOKENS = 32_000
+        const val DEFAULT_MAX_TOKENS = 8_192
         val THINKING_MODES = listOf(
             AnthropicThinking(type = "adaptive", display = "summarized"),
             AnthropicThinking(type = "enabled", budgetTokens = 8_000),
@@ -471,7 +511,14 @@ class GeminiGenerateContentApi(
         }
     }
 
-    override suspend fun generate(prompt: String): TextGenerationResult {
+    override val outputTokenCap: Int get() = PlanOutputBudget.NATIVE_CAP
+
+    override suspend fun generate(prompt: String): TextGenerationResult = generate(prompt, maxOutputTokens = null)
+
+    override suspend fun generateWithBudget(prompt: String, maxOutputTokens: Int): TextGenerationResult =
+        generate(prompt, maxOutputTokens = minOf(maxOutputTokens, outputTokenCap))
+
+    private suspend fun generate(prompt: String, maxOutputTokens: Int?): TextGenerationResult {
         val response = client.post("$baseUrl/models/$model:generateContent") {
             header("x-goog-api-key", apiKeyProvider.requireKey("Gemini"))
             contentType(ContentType.Application.Json)
@@ -480,6 +527,7 @@ class GeminiGenerateContentApi(
                     contents = listOf(
                         GeminiContent(parts = listOf(GeminiPart(text = prompt))),
                     ),
+                    generationConfig = maxOutputTokens?.let { GeminiGenerationConfig(maxOutputTokens = it) },
                 ),
             )
         }
@@ -582,6 +630,7 @@ private data class OpenAiResponseRequest(
     val input: String,
     val stream: Boolean? = null,
     val reasoning: OpenAiReasoning? = null,
+    @SerialName("max_output_tokens") val maxOutputTokens: Int? = null,
 )
 
 @Serializable
@@ -730,7 +779,10 @@ private data class GeminiGenerateContentRequest(
 )
 
 @Serializable
-private data class GeminiGenerationConfig(val thinkingConfig: GeminiThinkingConfig)
+private data class GeminiGenerationConfig(
+    val thinkingConfig: GeminiThinkingConfig? = null,
+    val maxOutputTokens: Int? = null,
+)
 
 @Serializable
 private data class GeminiThinkingConfig(val includeThoughts: Boolean)
@@ -766,7 +818,7 @@ private data class GeminiCandidate(
 private fun requireCompleteGeminiFinish(finishReason: String) {
     when (finishReason) {
         "STOP", "FINISH_REASON_UNSPECIFIED" -> Unit
-        "MAX_TOKENS" -> error("Gemini response was truncated at the token limit; output is incomplete")
+        "MAX_TOKENS" -> throw OutputTruncatedException("Gemini response was truncated at the token limit; output is incomplete")
         else -> error("Gemini response stopped early ($finishReason); output is incomplete")
     }
 }

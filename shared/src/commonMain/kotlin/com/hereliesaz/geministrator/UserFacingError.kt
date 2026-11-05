@@ -18,6 +18,7 @@ import com.hereliesaz.geministrator.resources.error_key_rejected
 import com.hereliesaz.geministrator.resources.error_no_agent
 import com.hereliesaz.geministrator.resources.error_offline
 import com.hereliesaz.geministrator.resources.error_other
+import com.hereliesaz.geministrator.resources.error_output_too_long
 import com.hereliesaz.geministrator.resources.error_out_of_credit
 import com.hereliesaz.geministrator.resources.error_rate_limited
 import com.hereliesaz.geministrator.resources.error_server_error
@@ -27,7 +28,7 @@ import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 
 /** Coarse cause of a raw failure message, enough to tell the user what to do next. */
-enum class ErrorKind { KeyRejected, OutOfCredit, RateLimited, Offline, TimedOut, ServerError, NoAgent, Other }
+enum class ErrorKind { KeyRejected, OutOfCredit, RateLimited, Offline, TimedOut, ServerError, NoAgent, OutputTooLong, Other }
 
 private val unauthorizedCode = Regex("""(^|[^0-9])40[13]([^0-9]|$)""")
 private val paymentRequiredCode = Regex("""(^|[^0-9])402([^0-9]|$)""")
@@ -43,6 +44,9 @@ fun classifyError(raw: String?): ErrorKind {
         "no agent provider satisfies" in text || "only inside a linked repository" in text ||
             "runs against a linked" in text || "cannot resume without its linked" in text ||
             "is not registered" in text -> ErrorKind.NoAgent
+
+        // A reply cut off at the provider's output limit: not a key, quota or outage problem.
+        "truncated" in text && "token" in text -> ErrorKind.OutputTooLong
 
         unauthorizedCode.containsMatchIn(text) ||
             "unauthorized" in text || "forbidden" in text || "invalid api key" in text ||
@@ -83,6 +87,7 @@ internal fun ErrorKind.messageResource(): StringResource = when (this) {
     ErrorKind.TimedOut -> Res.string.error_timed_out
     ErrorKind.ServerError -> Res.string.error_server_error
     ErrorKind.NoAgent -> Res.string.error_no_agent
+    ErrorKind.OutputTooLong -> Res.string.error_output_too_long
     ErrorKind.Other -> Res.string.error_other
 }
 
