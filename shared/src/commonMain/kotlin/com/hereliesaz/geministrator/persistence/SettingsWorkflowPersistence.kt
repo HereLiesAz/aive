@@ -61,6 +61,10 @@ class SettingsWorkflowPersistence(
             read().definitions.firstOrNull { it.id == id }
 
         override suspend fun all(): List<WorkflowDefinition> = read().definitions
+
+        override suspend fun delete(id: WorkflowDefinitionId) = update { snapshot ->
+            snapshot.copy(definitions = snapshot.definitions.filterNot { it.id == id })
+        }
     }
 
     override val runs: WorkflowRunRepository = object : WorkflowRunRepository {

@@ -162,6 +162,49 @@ internal fun detachTerrariumCreature(definition: WorkflowDefinition, taskId: Tas
     return TerrariumDependencyEditResult.Applied(candidate)
 }
 
+/**
+ * Remove (docs/Keepers-Room.md): take [taskIds] out of the hive in one edit. Each creature's task goes,
+ * and so does every strand touching it, as feeder or as fed; a knot that named a removed creature
+ * reverts to the plain one. A strand that ran THROUGH a removed creature is not bridged: what it fed
+ * is left without that feeder. The whole edit is one step on the tide, so one Undo brings back the
+ * creatures and their strands. The result is validated like every other edit; for example, taking out
+ * the approval ahead of a repository change is refused, never applied.
+ */
+internal fun removeTerrariumCreatures(definition: WorkflowDefinition, taskIds: Set<TaskDefinitionId>): TerrariumDependencyEditResult {
+    if (taskIds.isEmpty()) return TerrariumDependencyEditResult.NoChange
+    val known = definition.tasks.mapTo(mutableSetOf()) { it.id }
+    taskIds.firstOrNull { it !in known }?.let {
+        return TerrariumDependencyEditResult.Rejected("Unknown task '${it.value}'")
+    }
+    val candidate = definition.copy(
+        tasks = definition.tasks.filterNot { it.id in taskIds }.map { task ->
+            if (task.dependsOn.none { it in taskIds } && !task.condition.refersToAny(taskIds)) {
+                task
+            } else {
+                task.copy(
+                    dependsOn = task.dependsOn - taskIds,
+                    condition = task.condition.takeUnless { it.refersToAny(taskIds) }
+                        ?: com.hereliesaz.geministrator.domain.TaskCondition.Always,
+                )
+            }
+        },
+    )
+    val errors = WorkflowGraphValidator.validate(candidate)
+    if (errors.isNotEmpty()) return TerrariumDependencyEditResult.Rejected(errors.joinToString("\n") { it.humanReadable() })
+    return TerrariumDependencyEditResult.Applied(candidate)
+}
+
+/** Remove is for a hive at rest: while a run of it is live, the wiring is not to be reshaped. */
+internal fun terrariumRemoveBlocked(run: com.hereliesaz.geministrator.domain.WorkflowRun): Boolean =
+    run.status == com.hereliesaz.geministrator.domain.WorkflowRunStatus.Running ||
+        run.status == com.hereliesaz.geministrator.domain.WorkflowRunStatus.AwaitingHuman
+
+private fun com.hereliesaz.geministrator.domain.TaskCondition.refersToAny(taskIds: Set<TaskDefinitionId>): Boolean = when (this) {
+    is com.hereliesaz.geministrator.domain.TaskCondition.OnAnyOutcome -> ofTask in taskIds
+    is com.hereliesaz.geministrator.domain.TaskCondition.OnFailure -> ofTask in taskIds
+    com.hereliesaz.geministrator.domain.TaskCondition.Always -> false
+}
+
 private fun com.hereliesaz.geministrator.domain.TaskCondition.refersTo(taskId: TaskDefinitionId): Boolean = when (this) {
     is com.hereliesaz.geministrator.domain.TaskCondition.OnAnyOutcome -> ofTask == taskId
     is com.hereliesaz.geministrator.domain.TaskCondition.OnFailure -> ofTask == taskId
