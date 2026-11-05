@@ -71,7 +71,7 @@ import com.hereliesaz.geministrator.providers.llm.OpenAiProvider
 import com.hereliesaz.geministrator.providers.llm.OpenAiResponsesApi
 import com.hereliesaz.geministrator.providers.llm.TextGenerationApi
 import com.hereliesaz.geministrator.providers.llm.TextGenerationOrchestrationAgentRuntime
-import com.hereliesaz.geministrator.providers.llm.configuredPlanningApi
+import com.hereliesaz.geministrator.providers.llm.configuredPlanningRuntime
 import com.hereliesaz.geministrator.providers.llm.memoryTextApi
 import com.hereliesaz.geministrator.providers.llm.TextLlmProvider
 import com.hereliesaz.geministrator.providers.llm.XaiProvider
@@ -343,7 +343,7 @@ class MainActivity : ComponentActivity() {
                 }
                 // Planning runs on the linked cloud LLM; with none linked, App uses the starter workflow.
                 val planningRuntime = remember(credentials) {
-                    configuredPlanningApi(credentials)?.let(::TextGenerationOrchestrationAgentRuntime)
+                    configuredPlanningRuntime(credentials)
                 }
                 val roleSurfaceRuntime = remember {
                     RoleSurfaceRuntimeRegistry(
@@ -722,6 +722,7 @@ class MainActivity : ComponentActivity() {
             com.hereliesaz.geministrator.ErrorKind.RateLimited -> R.string.remote_problem_rate_limited
             com.hereliesaz.geministrator.ErrorKind.Offline -> R.string.remote_problem_offline
             com.hereliesaz.geministrator.ErrorKind.TimedOut -> R.string.remote_problem_timed_out
+            com.hereliesaz.geministrator.ErrorKind.ServerError -> R.string.remote_problem_server_error
             com.hereliesaz.geministrator.ErrorKind.NoAgent, com.hereliesaz.geministrator.ErrorKind.Other -> R.string.remote_problem_other
         },
     )

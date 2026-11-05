@@ -35,6 +35,17 @@ data class ProviderSelectionRequest(
      * Only a known size under the on-device provider's limit lets a task go to the device.
      */
     val estimatedInputTokens: Int? = null,
+    /**
+     * Providers already tried (and failed) for this piece of work; [AgentProviderRegistry.select]
+     * skips them unless a provider is required by id.
+     */
+    val excludedProviderIds: Set<AgentProviderId> = emptySet(),
+    /**
+     * True when the keeper left the provider to the app (no creature pinned to one): a failover-worthy
+     * failure then moves the work to another connected provider (ProviderFailover.kt). False for a
+     * pinned creature, which reports the failure instead of switching silently.
+     */
+    val failoverAllowed: Boolean = false,
 )
 
 class AgentProviderRegistry(
@@ -50,6 +61,8 @@ class AgentProviderRegistry(
      * the platform's durable store, opened only if a default is actually needed.
      */
     inferenceSettings: Settings? = null,
+    /** Which providers are passed over for now after a failover-worthy failure. */
+    private val bench: ProviderBench = ProviderBench(),
 ) {
     private val defaultSettings: Settings by lazy { inferenceSettings ?: durableInferenceSettings() }
 
@@ -72,12 +85,49 @@ class AgentProviderRegistry(
 
     /** Records how a provider run ended; feeds the router's circuit breaker and reliability. */
     suspend fun recordOutcome(id: AgentProviderId, success: Boolean) = healthMutex.withLock {
+        if (success) bench.clear(id.value)
         val current = health[id] ?: ProviderHealth()
         health[id] = ProviderHealth(
             consecutiveFailures = if (success) 0 else current.consecutiveFailures + 1,
             recent = (current.recent + success).takeLast(HEALTH_WINDOW),
         )
     }
+
+    private val _failoverNotes = kotlinx.coroutines.flow.MutableStateFlow<List<FailoverNote>>(emptyList())
+
+    /** The most recent notes saying work moved to another provider, oldest first, bounded. */
+    val failoverNotes: kotlinx.coroutines.flow.StateFlow<List<FailoverNote>> = _failoverNotes
+
+    @OptIn(kotlin.time.ExperimentalTime::class)
+    fun recordFailoverNote(text: String) {
+        _failoverNotes.value = (_failoverNotes.value + FailoverNote(text, kotlin.time.Clock.System.now().toEpochMilliseconds()))
+            .takeLast(MAX_FAILOVER_NOTES)
+    }
+
+    /** The keeper-facing name of a provider; the catalog's name when it has one. */
+    fun displayName(id: AgentProviderId): String =
+        com.hereliesaz.geministrator.ProviderCatalog.entry(id.value)?.displayName ?: id.value
+
+    /**
+     * Records a failed provider run with its [raw] reason. A failover-worthy reason (credit, key,
+     * rate limit, offline, timeout, 5xx) benches the provider for a cooldown; returns that failure,
+     * or null when the reason is not the provider's own and nothing is benched.
+     */
+    suspend fun recordFailure(id: AgentProviderId, raw: String?): ProviderFailure? {
+        recordOutcome(id, success = false)
+        val failure = ProviderFailover.failureOf(id.value, displayName(id), raw)
+        if (!ProviderFailover.shouldFailOver(failure.kind)) return null
+        healthMutex.withLock { bench.bench(failure) }
+        return failure
+    }
+
+    /** The last failover-worthy failure of each of [ids] that has one, for an all-failed message. */
+    suspend fun failuresOf(ids: Collection<AgentProviderId>): List<ProviderFailure> =
+        healthMutex.withLock { ids.mapNotNull { bench.lastFailure(it.value) } }
+
+    /** True when more than one provider could be chosen automatically, so failover can mean anything. */
+    fun hasAlternatives(): Boolean =
+        providersById.values.count { !it.explicitOnly && it !is OnDeviceTextAgentProvider } > 1
 
     private suspend fun healthOf(id: AgentProviderId): ProviderHealth = healthMutex.withLock { health[id] ?: ProviderHealth() }
 
@@ -153,11 +203,24 @@ class AgentProviderRegistry(
 
         val eligibleProviders = mutableListOf<Pair<AgentProvider, Set<AgentCapability>>>()
         for (provider in ordered) {
+            if (provider.id in request.excludedProviderIds) continue
             val capabilities = provider.capabilities().supported
             // Asked even without a repository: an agent that only works inside one (OpenCode on
             // GitHub, a local or GitLab workspace) says no to repository-less work.
             if (capabilities.containsAll(required) && provider.supportsRepository(request.repository)) {
                 eligibleProviders += provider to capabilities
+            }
+        }
+
+        // Providers on the bench (failed lately for a reason that is theirs) go last: the router sees
+        // only healthy ones while any exists, and the benched ones only when nothing else can do it.
+        if (eligibleProviders.size > 1) {
+            val (healthy, benched) = healthMutex.withLock {
+                eligibleProviders.partition { (provider, _) -> !bench.isBenched(provider.id.value) }
+            }
+            if (healthy.isNotEmpty() && benched.isNotEmpty()) {
+                eligibleProviders.clear()
+                eligibleProviders.addAll(healthy)
             }
         }
 
@@ -208,6 +271,7 @@ class AgentProviderRegistry(
 }
 
 private const val HEALTH_WINDOW = 20
+private const val MAX_FAILOVER_NOTES = 20
 
 /** The app's durable inference store (platform default [Settings]). */
 internal fun durableInferenceSettings(): Settings = chunkedInferenceSettings(Settings())

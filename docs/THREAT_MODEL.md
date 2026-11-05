@@ -72,7 +72,7 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 **Remaining gaps**
 - No automated scanning of provider-returned artifacts for prompt injection before they are used as context for downstream tasks.
 - No per-session content hash to detect fabricated or replayed provider responses.
-- Nothing stops confidential tasks from being routed to a keyless or free-tier provider. The only safeguard is the catalog description.
+- Nothing stops confidential tasks from being routed to a keyless or free-tier provider. Provider failover (docs/Orchestration_layer.md) can also move a task to a keyless provider the keeper linked when the others fail; it only ever picks linked providers, never changes approval gates, and leaves pinned creatures where they are. The only safeguard is the catalog description.
 
 ### GitHub Actions executor
 
