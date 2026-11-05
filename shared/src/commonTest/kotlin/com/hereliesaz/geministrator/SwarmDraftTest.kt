@@ -132,6 +132,27 @@ class SwarmDraftTest {
     }
 
     @Test
+    fun aTruncatedPlanIsAKnownKindNotTheGenericFailure() {
+        val raw = "Compatible chat response was truncated because the provider reached its output-token limit"
+        val single = assertIs<SwarmDraftResult.ProviderFailed>(swarmDraftFailure(IllegalStateException(raw)))
+        assertEquals(ErrorKind.OutputTooLong, classifyError(single.raw))
+        val all = com.hereliesaz.geministrator.workflow.AllProvidersFailedException(
+            listOf(
+                com.hereliesaz.geministrator.workflow.ProviderFailover.failureOf("a", "A", raw),
+                com.hereliesaz.geministrator.workflow.ProviderFailover.failureOf("b", "B", raw),
+            ),
+        )
+        val failed = assertIs<SwarmDraftResult.ProviderFailed>(swarmDraftFailure(all))
+        assertTrue("too long for the provider's output limit" in failed.summary.orEmpty() && "A, B" in failed.summary.orEmpty())
+    }
+
+    @Test
+    fun theDraftAsksForAFewTerseCreatures() {
+        val instruction = swarmDraftPacket("audit the repo", emptyList()).instruction
+        assertTrue("at most $SWARM_DRAFT_MAX_CREATURES" in instruction && "terse" in instruction, instruction)
+    }
+
+    @Test
     fun unreadableAnswersNeverCrash() {
         assertEquals(SwarmDraftProblem.Unreadable, problem(swarmDraftFailure(SerializationException("Unexpected JSON token"))))
         assertEquals(SwarmDraftProblem.Unreadable, problem(swarmDraftFailure(IllegalArgumentException("Planner returned an empty plan"))))

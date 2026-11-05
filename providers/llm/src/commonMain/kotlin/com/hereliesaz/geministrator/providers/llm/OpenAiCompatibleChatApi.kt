@@ -35,6 +35,8 @@ class OpenAiCompatibleChatApi(
     private val extraHeaders: Map<String, String> = emptyMap(),
     /** False for keyless free endpoints: a blank key then sends no Authorization header. */
     private val requireApiKey: Boolean = true,
+    /** The most output tokens a plan may ask this service for (its model's documented cap); see [PlanOutputBudget]. */
+    private val maxOutputTokenCap: Int = PlanOutputBudget.COMPATIBLE_CAP,
     client: HttpClient = openAiCompatibleClient(),
 ) : ToolCallingTextGenerationApi {
     private val baseUrl = baseUrl.trimEnd('/')
@@ -46,6 +48,8 @@ class OpenAiCompatibleChatApi(
      * when the response carries one.
      */
     override val promptCaching: PromptCacheCapabilities get() = IMPLICIT_PREFIX_CACHING
+
+    override val outputTokenCap: Int get() = maxOutputTokenCap
 
     init {
         require(model.isNotBlank()) { "model must not be blank" }
@@ -80,7 +84,12 @@ class OpenAiCompatibleChatApi(
         )
     }
 
-    override suspend fun generate(prompt: String): TextGenerationResult {
+    override suspend fun generate(prompt: String): TextGenerationResult = generate(prompt, maxOutputTokens = null)
+
+    override suspend fun generateWithBudget(prompt: String, maxOutputTokens: Int): TextGenerationResult =
+        generate(prompt, maxOutputTokens = minOf(maxOutputTokens, maxOutputTokenCap))
+
+    private suspend fun generate(prompt: String, maxOutputTokens: Int?): TextGenerationResult {
         val apiKey = sendableApiKey()
 
         val response = client.post("$baseUrl/chat/completions") {
@@ -91,6 +100,7 @@ class OpenAiCompatibleChatApi(
                 CompatibleChatRequest(
                     model = model,
                     messages = listOf(CompatibleChatMessage(role = "user", content = prompt)),
+                    maxTokens = maxOutputTokens,
                 ),
             )
         }
@@ -219,6 +229,7 @@ private data class CompatibleChatRequest(
     val messages: List<CompatibleChatMessage>,
     val stream: Boolean? = null,
     @SerialName("stream_options") val streamOptions: CompatibleStreamOptions? = null,
+    @SerialName("max_tokens") val maxTokens: Int? = null,
 )
 
 @Serializable

@@ -723,7 +723,10 @@ class MainActivity : ComponentActivity() {
             com.hereliesaz.geministrator.ErrorKind.Offline -> R.string.remote_problem_offline
             com.hereliesaz.geministrator.ErrorKind.TimedOut -> R.string.remote_problem_timed_out
             com.hereliesaz.geministrator.ErrorKind.ServerError -> R.string.remote_problem_server_error
-            com.hereliesaz.geministrator.ErrorKind.NoAgent, com.hereliesaz.geministrator.ErrorKind.Other -> R.string.remote_problem_other
+            com.hereliesaz.geministrator.ErrorKind.NoAgent,
+            com.hereliesaz.geministrator.ErrorKind.OutputTooLong,
+            com.hereliesaz.geministrator.ErrorKind.Other,
+            -> R.string.remote_problem_other
         },
     )
 

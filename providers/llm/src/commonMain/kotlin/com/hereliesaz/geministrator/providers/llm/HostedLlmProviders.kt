@@ -28,6 +28,8 @@ data class HostedLlmProviderSpec(
      * (Cloudflare Workers AI scopes its endpoint to an account).
      */
     val accountScoped: Boolean = false,
+    /** The most output tokens a plan may ask for; raise it only to this model's documented cap. */
+    val maxOutputTokens: Int = PlanOutputBudget.COMPATIBLE_CAP,
 )
 
 object HostedLlmProviders {
@@ -275,6 +277,7 @@ object HostedLlmProviders {
             baseUrl = baseUrl,
             extraHeaders = spec.extraHeaders,
             requireApiKey = !spec.keyOptional,
+            maxOutputTokenCap = spec.maxOutputTokens,
         )
     }
 
