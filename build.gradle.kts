@@ -19,6 +19,30 @@ buildscript {
                     }
                 }
             }
+            // Dependabot alerts #1-#4, #13, #16, #17, #19 (BC name-constraints and ASN.1 depth, bcpkix, JDOM XXE, jose4j JWE DoS,
+            // Kotlin Gradle plugin build-cache deserialization, commons-lang3 recursion, HttpClient XSS). All arrive only
+            // transitively; lift every older request to the fixed release. Pre-release suffixes compare by their numeric core.
+            val securityFloors = mapOf(
+                "org.bouncycastle:bcprov-jdk18on" to "1.86",
+                "org.bouncycastle:bcpkix-jdk18on" to "1.86",
+                "org.jdom:jdom2" to "2.0.6.1",
+                "org.bitbucket.b_c:jose4j" to "0.9.7",
+                "org.jetbrains.kotlin:kotlin-gradle-plugin" to "2.4.21",
+                "org.apache.commons:commons-lang3" to "3.21.0",
+                "org.apache.httpcomponents:httpclient" to "4.5.14",
+            )
+            securityFloors["${requested.group}:${requested.name}"]?.let { floor ->
+                fun core(v: String) = Regex("""\d+""").findAll(v.substringBefore('-')).map { it.value.toInt() }.toList()
+                val have = core(requested.version.orEmpty())
+                val want = core(floor)
+                val older = (0 until maxOf(have.size, want.size)).firstNotNullOfOrNull { n ->
+                    (have.getOrElse(n) { 0 }).compareTo(want.getOrElse(n) { 0 }).takeIf { it != 0 }
+                }?.let { it < 0 } ?: false
+                if (have.isNotEmpty() && older) {
+                    useVersion(floor)
+                    because("Dependabot security advisories fixed in $floor")
+                }
+            }
             if (requested.group == "com.google.guava" && requested.name == "guava") {
                 val version = requested.version.orEmpty()
                 val (major, minor, patch) = (Regex("""^(\d+)\.(\d+)(?:\.(\d+))?""").find(version)?.destructured
@@ -101,6 +125,30 @@ allprojects {
                         useVersion("2.22.4")
                         because("Jackson DoS and SSRF advisories fixed in 2.22.4")
                     }
+                }
+            }
+            // Dependabot alerts #1-#4, #13, #16, #17, #19 (BC name-constraints and ASN.1 depth, bcpkix, JDOM XXE, jose4j JWE DoS,
+            // Kotlin Gradle plugin build-cache deserialization, commons-lang3 recursion, HttpClient XSS). All arrive only
+            // transitively; lift every older request to the fixed release. Pre-release suffixes compare by their numeric core.
+            val securityFloors = mapOf(
+                "org.bouncycastle:bcprov-jdk18on" to "1.86",
+                "org.bouncycastle:bcpkix-jdk18on" to "1.86",
+                "org.jdom:jdom2" to "2.0.6.1",
+                "org.bitbucket.b_c:jose4j" to "0.9.7",
+                "org.jetbrains.kotlin:kotlin-gradle-plugin" to "2.4.21",
+                "org.apache.commons:commons-lang3" to "3.21.0",
+                "org.apache.httpcomponents:httpclient" to "4.5.14",
+            )
+            securityFloors["${requested.group}:${requested.name}"]?.let { floor ->
+                fun core(v: String) = Regex("""\d+""").findAll(v.substringBefore('-')).map { it.value.toInt() }.toList()
+                val have = core(requested.version.orEmpty())
+                val want = core(floor)
+                val older = (0 until maxOf(have.size, want.size)).firstNotNullOfOrNull { n ->
+                    (have.getOrElse(n) { 0 }).compareTo(want.getOrElse(n) { 0 }).takeIf { it != 0 }
+                }?.let { it < 0 } ?: false
+                if (have.isNotEmpty() && older) {
+                    useVersion(floor)
+                    because("Dependabot security advisories fixed in $floor")
                 }
             }
             if (requested.group == "com.google.guava" && requested.name == "guava") {
