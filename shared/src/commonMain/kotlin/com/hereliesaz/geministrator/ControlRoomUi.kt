@@ -902,6 +902,11 @@ private fun MainDestination(
                                 selectedTaskId = selectedTaskId,
                                 onTaskSelected = onTaskSelected,
                                 onSurface = onZoomOut,
+                                // A deleted hive is forgotten here, so the Hives pill never reopens it.
+                                onDeleted = {
+                                    restingHiveId = ""
+                                    onZoomOut()
+                                },
                             )
                             AzphaltPill(
                                 label = stringResource(Res.string.hive_more_editing),

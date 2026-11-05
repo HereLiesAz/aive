@@ -51,6 +51,10 @@ class InMemoryWorkflowPersistence : WorkflowPersistence {
 
         override suspend fun all(): List<WorkflowDefinition> =
             mutex.withLock { definitionItems.values.toList() }
+
+        override suspend fun delete(id: WorkflowDefinitionId) {
+            mutex.withLock { definitionItems.remove(id) }
+        }
     }
 
     override val runs: WorkflowRunRepository = object : WorkflowRunRepository {

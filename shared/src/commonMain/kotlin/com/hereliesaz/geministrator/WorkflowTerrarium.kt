@@ -65,6 +65,8 @@ internal fun GeministratorWorkflowTerrarium(
     beneathField: (@Composable (WorkflowDefinition, (TerrariumDependencyEditResult) -> Unit) -> Unit)? = null,
     /** On wide screens, the hive in one frame: controls bar, tissue, legend and feed bar (HiveWorkspace.kt). */
     frame: HiveFrame? = null,
+    /** A hive at rest can delete itself from its page (HiveDeletion.kt); null where that is not offered. */
+    hiveDeletion: HiveDeletionActions? = null,
 ) {
     val scope = rememberCoroutineScope()
     val layoutStore = remember { SettingsTerrariumLayoutStore.createDefault() }
@@ -306,10 +308,12 @@ internal fun GeministratorWorkflowTerrarium(
                 },
                 onEdit = ::applyEdit,
                 roles = roles,
+                removeBlocked = terrariumRemoveBlocked(liveRun),
                 onUndo = undo,
                 onRedo = redo,
                 modifier = Modifier.padding(top = 8.dp),
             )
+            hiveDeletion?.let { DeleteHiveControl(name = definition.name, creatures = stagedDefinition.tasks.size, actions = it, modifier = Modifier.padding(top = 8.dp)) }
         }
 
         authoringMessage?.let { message ->
