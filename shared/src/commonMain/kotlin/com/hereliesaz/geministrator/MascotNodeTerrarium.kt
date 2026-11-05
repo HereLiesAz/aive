@@ -13,6 +13,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.animation.core.snap
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -77,7 +79,16 @@ import com.hereliesaz.geministrator.resources.semantics_move_node_down
 import com.hereliesaz.geministrator.resources.semantics_move_node_left
 import com.hereliesaz.geministrator.resources.semantics_move_node_right
 import com.hereliesaz.geministrator.resources.semantics_move_node_up
-import com.hereliesaz.geministrator.resources.terrarium_reset_zoom
+import com.hereliesaz.geministrator.resources.focus_chain
+import com.hereliesaz.geministrator.resources.focus_creature
+import com.hereliesaz.geministrator.resources.focus_free
+import com.hereliesaz.geministrator.resources.focus_neighbours
+import com.hereliesaz.geministrator.resources.focus_overview
+import com.hereliesaz.geministrator.resources.focus_path_active
+import com.hereliesaz.geministrator.resources.focus_path_blocks
+import com.hereliesaz.geministrator.resources.focus_path_end
+import com.hereliesaz.geministrator.resources.focus_path_orchestrator
+import com.hereliesaz.geministrator.resources.focus_recentre
 import com.hereliesaz.geministrator.resources.terrarium_zoom_in
 import com.hereliesaz.geministrator.resources.terrarium_zoom_out
 import org.jetbrains.compose.resources.stringResource
@@ -106,6 +117,8 @@ internal fun PlatformNodeTerrarium(
     onTetherDrawn: ((String, String) -> Unit)? = null,
     onTetherSliced: ((String, String) -> Unit)? = null,
     onSurface: (() -> Unit)? = null,
+    /** A tap on bare ground (no drag): the hive lets go of its selection. */
+    onGroundTapped: (() -> Unit)? = null,
     /** Zoom and focus held outside, for a controls bar that drives them; its own zoom buttons hide. */
     camera: TerrariumCamera? = null,
 ) {
@@ -125,6 +138,7 @@ internal fun PlatformNodeTerrarium(
         onTetherDrawn = onTetherDrawn,
         onTetherSliced = onTetherSliced,
         onSurface = onSurface,
+        onGroundTapped = onGroundTapped,
         camera = camera,
     )
 }
@@ -146,6 +160,7 @@ private fun MascotNodeTerrarium(
     onTetherDrawn: ((String, String) -> Unit)?,
     onTetherSliced: ((String, String) -> Unit)?,
     onSurface: (() -> Unit)?,
+    onGroundTapped: (() -> Unit)?,
     camera: TerrariumCamera?,
 ) {
     if (subjects.isEmpty()) return
@@ -158,6 +173,8 @@ private fun MascotNodeTerrarium(
     var tetherFromId by remember { mutableStateOf<String?>(null) }
     var tetherEnd by remember { mutableStateOf(Offset.Zero) }
     var sliceTrail by remember { mutableStateOf<List<Offset>>(emptyList()) }
+    // True while a finger pans the ground: the camera then follows it at once instead of easing.
+    var panning by remember { mutableStateOf(false) }
     val ownCamera = remember { TerrariumCamera() }
     val view = camera ?: ownCamera
     var zoomTarget by view::zoom
@@ -166,26 +183,23 @@ private fun MascotNodeTerrarium(
     LaunchedEffect(subjectPositions) {
         if (draggingId == null) workingPositions = subjectPositions
     }
-    LaunchedEffect(selectedId, subjectPositions, compact) {
-        val selected = selectedId?.let(subjectPositions::get)
-        if (selected != null) {
-            focusTarget = Offset(selected.x, selected.y)
-        }
-    }
+    // The levelled view (TerrariumFocus.kt): creatures outside it are dimmed, its strands highlighted.
+    val focusStep = view.stack.current
+    val focusNodes = focusStep.nodes.takeIf { focusStep.level != FocusLevel.Overview }
 
     val zoom by animateFloatAsState(
         targetValue = zoomTarget,
-        animationSpec = tween(260),
+        animationSpec = if (AzphaltMotion.reduceMotion) snap() else tween(260),
         label = "terrarium-zoom",
     )
     val focusX by animateFloatAsState(
         targetValue = focusTarget.x,
-        animationSpec = tween(320),
+        animationSpec = if (panning || AzphaltMotion.reduceMotion) snap() else tween(320),
         label = "terrarium-focus-x",
     )
     val focusY by animateFloatAsState(
         targetValue = focusTarget.y,
-        animationSpec = tween(320),
+        animationSpec = if (panning || AzphaltMotion.reduceMotion) snap() else tween(320),
         label = "terrarium-focus-y",
     )
 
@@ -367,61 +381,102 @@ private fun MascotNodeTerrarium(
             .minByOrNull { it.second }
             ?.first
 
+        // Read afresh by the ground's gesture below, which must not restart as the camera moves under a finger.
+        val strandTouchPx = with(density) { STRAND_TOUCH_DP.dp.toPx() }
+        fun strandsOnScreen(): List<List<Offset>> = relationships
+            .filter { it.kind == H2g2TerrariumRelationshipKind.Dependency || it.kind == H2g2TerrariumRelationshipKind.Transfer }
+            .mapNotNull { relationshipEndpoints(it)?.let { (a, b) -> axonPolyline(a, b) } }
+        val canvasDragIntentNow by rememberUpdatedState<(Offset) -> CanvasDragIntent> { point ->
+            canvasDragIntent(
+                startedOnStrand = onTetherSliced != null && touchesStrand(point, strandsOnScreen(), strandTouchPx),
+                sliceAvailable = onTetherSliced != null,
+            )
+        }
+        val panByNow by rememberUpdatedState<(Offset) -> Unit> { drag ->
+            view.free = true
+            focusTarget = pannedTerrariumFocus(focusTarget, drag, widthPx, heightPx, zoomTarget, workingPositions.values)
+        }
+        val cutAcrossNow by rememberUpdatedState<(List<Offset>) -> Unit> { trail ->
+            // The cut follows each axon as drawn, bow and all.
+            relationships
+                .filter { it.kind == H2g2TerrariumRelationshipKind.Dependency || it.kind == H2g2TerrariumRelationshipKind.Transfer }
+                .filter { relationship ->
+                    val (a, b) = relationshipEndpoints(relationship) ?: return@filter false
+                    val axon = axonPolyline(a, b)
+                    trail.zipWithNext().any { (p, q) -> axon.zipWithNext().any { (u, v) -> segmentsCross(u, v, p, q) } }
+                }
+                .forEach { onTetherSliced?.invoke(it.from, it.to) }
+        }
+        val onSurfaceNow by rememberUpdatedState(onSurface)
+        val onGroundTappedNow by rememberUpdatedState(onGroundTapped)
+        val panningNow: (Boolean) -> Unit = { panning = it }
+
         Canvas(
             Modifier
                 .fillMaxSize()
-                .pointerInput(onSurface) {
-                    // Pinch: two fingers zoom the field; pinching out past the widest view surfaces to the district.
+                .pointerInput(Unit) {
+                    // One finger: on open ground it pans the camera; on a strand it cuts it (Build only).
+                    // Two fingers: pinch zooms (pinching out past the widest view surfaces to the district)
+                    // and the pair's drift pans. A strand is drawn from a creature's tail, not from here.
+                    val slop = viewConfiguration.touchSlop
                     awaitEachGesture {
-                        awaitFirstDown(requireUnconsumed = false)
-                        var previous: Float? = null
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val intent = canvasDragIntentNow(down.position)
+                        var travelled = Offset.Zero
+                        var mode: String? = null // null = not yet a drag, "pan", "slice", "pinch"
                         var surfaced = false
+                        var event0Multi = false
                         while (true) {
                             val event = awaitPointerEvent()
                             val pressed = event.changes.filter { it.pressed }
                             if (pressed.isEmpty()) break
-                            if (pressed.size < 2) {
-                                previous = null
-                                continue
-                            }
-                            val spread = (pressed[0].position - pressed[1].position).getDistance()
-                            previous?.let { last ->
+                            if (pressed.size >= 2) {
+                                event0Multi = true
+                                if (mode == "slice") sliceTrail = emptyList()
+                                mode = "pinch"
+                                panningNow(true)
+                                view.free = true
+                                val a = pressed[0]
+                                val b = pressed[1]
+                                val spread = (a.position - b.position).getDistance()
+                                val last = (a.previousPosition - b.previousPosition).getDistance()
                                 if (last > 0f) {
                                     val next = zoomTarget * (spread / last)
-                                    if (next < 0.6f && !surfaced && onSurface != null) {
+                                    if (next < 0.6f && !surfaced && onSurfaceNow != null) {
                                         surfaced = true
-                                        onSurface()
+                                        onSurfaceNow?.invoke()
                                     }
                                     zoomTarget = next.coerceIn(0.70f, 2.4f)
                                 }
+                                panByNow(((a.position - a.previousPosition) + (b.position - b.previousPosition)) / 2f)
+                                pressed.forEach { it.consume() }
+                                continue
                             }
-                            previous = spread
-                            pressed.forEach { it.consume() }
+                            val change = pressed[0]
+                            val delta = change.position - change.previousPosition
+                            if (mode == "pinch") mode = "pan" // one finger left: carry on panning with it
+                            if (mode == null) {
+                                travelled += delta
+                                if (travelled.getDistance() <= slop) continue
+                                mode = if (intent == CanvasDragIntent.Slice) "slice" else "pan"
+                                if (mode == "slice") sliceTrail = listOf(down.position)
+                                if (mode == "pan") {
+                                    panningNow(true)
+                                    panByNow(travelled)
+                                    change.consume()
+                                    continue
+                                }
+                            }
+                            if (mode == "slice") sliceTrail = sliceTrail + change.position else panByNow(delta)
+                            change.consume()
                         }
-                    }
-                }
-                .pointerInput(onTetherSliced, relationships, zoom, focusX, focusY) {
-                    // Slice: a swipe across open tissue cuts every tether it crosses.
-                    if (onTetherSliced == null) return@pointerInput
-                    detectDragGestures(
-                        onDragStart = { sliceTrail = listOf(it) },
-                        onDragCancel = { sliceTrail = emptyList() },
-                        onDragEnd = {
+                        if (mode == null && !event0Multi) onGroundTappedNow?.invoke()
+                        if (mode == "slice") {
                             val trail = sliceTrail
                             sliceTrail = emptyList()
-                            relationships
-                                .filter { it.kind == H2g2TerrariumRelationshipKind.Dependency || it.kind == H2g2TerrariumRelationshipKind.Transfer }
-                                .filter { relationship ->
-                                    val (a, b) = relationshipEndpoints(relationship) ?: return@filter false
-                                    // The cut follows the axon as drawn, bow and all.
-                                    val axon = axonPolyline(a, b)
-                                    trail.zipWithNext().any { (p, q) -> axon.zipWithNext().any { (u, v) -> segmentsCross(u, v, p, q) } }
-                                }
-                                .forEach { onTetherSliced(it.from, it.to) }
-                        },
-                    ) { change, _ ->
-                        change.consume()
-                        sliceTrail = sliceTrail + change.position
+                            cutAcrossNow(trail)
+                        }
+                        panningNow(false)
                     }
                 },
         ) {
@@ -469,6 +524,15 @@ private fun MascotNodeTerrarium(
                     reduceMotion = reduceMotion,
                 )
             }
+            if (focusNodes != null && focusNodes.size > 1) {
+                tendrilLinks.distinct().forEach { (from, to) ->
+                    if (from !in focusNodes || to !in focusNodes) return@forEach
+                    val (a, b) = linkEndpoints(from, to) ?: return@forEach
+                    axonPolyline(a, b).zipWithNext().forEach { (p, q) ->
+                        drawLine(Azphalt.Yellow.copy(alpha = 0.75f), p, q, strokeWidth = 3.dp.toPx() * zoom.coerceIn(0.7f, 1.4f), cap = StrokeCap.Round)
+                    }
+                }
+            }
             sliceTrail.zipWithNext().forEach { (p, q) ->
                 drawLine(Azphalt.Yellow.copy(alpha = 0.8f), p, q, strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round)
             }
@@ -496,6 +560,7 @@ private fun MascotNodeTerrarium(
                     .graphicsLayer {
                         scaleX = zoom
                         scaleY = zoom
+                        alpha = if (focusNodes != null && node.id !in focusNodes) 0.4f else 1f
                     }
                     .semantics(mergeDescendants = true) {
                         contentDescription = buildString {
@@ -745,17 +810,13 @@ private fun MascotNodeTerrarium(
             }
         }
 
-        if (camera == null) TerrariumZoomControls(
-            zoom = zoomTarget,
-            onZoomIn = { zoomTarget = (zoomTarget + 0.20f).coerceAtMost(2.4f) },
-            // Zooming out from the widest view surfaces, the rim-button equivalent of pinching out.
-            onZoomOut = {
-                if (zoomTarget <= 0.70f && onSurface != null) onSurface() else zoomTarget = (zoomTarget - 0.20f).coerceAtLeast(0.70f)
-            },
-            onReset = {
-                zoomTarget = 1f
-                focusTarget = Offset(0.5f, 0.5f)
-            },
+        TerrariumZoomControls(
+            label = if (view.free) stringResource(Res.string.focus_free) else focusStep.level.label(),
+            showStepper = !view.driven,
+            onZoomIn = view::stepIn,
+            // Out from the widest view surfaces, the rim-button equivalent of pinching out.
+            onZoomOut = { view.stepOut(onSurface) },
+            onRecentre = view::centre,
             modifier = Modifier.align(Alignment.TopStart).padding(10.dp),
         )
 
@@ -769,11 +830,31 @@ private fun MascotNodeTerrarium(
 }
 
 @Composable
+internal fun FocusLevel.label(): String = stringResource(
+    when (this) {
+        FocusLevel.Creature -> Res.string.focus_creature
+        FocusLevel.Neighbours -> Res.string.focus_neighbours
+        FocusLevel.PathToOrchestrator -> Res.string.focus_path_orchestrator
+        FocusLevel.PathToEnd -> Res.string.focus_path_end
+        FocusLevel.PathToActive -> Res.string.focus_path_active
+        FocusLevel.PathToBlocks -> Res.string.focus_path_blocks
+        FocusLevel.WholeChain -> Res.string.focus_chain
+        FocusLevel.Overview -> Res.string.focus_overview
+    },
+)
+
+/**
+ * The view's stepper: "+" back in, "−" out, and between them the name of what the view shows
+ * (tap it to snap back to that view). With [showStepper] false the hive's controls bar owns the
+ * buttons and only the name stays.
+ */
+@Composable
 private fun TerrariumZoomControls(
-    zoom: Float,
+    label: String,
+    showStepper: Boolean,
     onZoomIn: () -> Unit,
     onZoomOut: () -> Unit,
-    onReset: () -> Unit,
+    onRecentre: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -782,23 +863,20 @@ private fun TerrariumZoomControls(
             .background(Azphalt.Ink.copy(alpha = 0.86f)),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        val zoomPercent = "${(zoom * 100f).roundToInt()}%"
-        TerrariumZoomButton(
-            label = stringResource(Res.string.terrarium_zoom_in),
-            onClick = onZoomIn,
-        ) {
+        if (showStepper) TerrariumZoomButton(label = stringResource(Res.string.terrarium_zoom_in), onClick = onZoomIn) {
             Text(text = "+", style = AzphaltType.section, color = Azphalt.White, textAlign = TextAlign.Center)
         }
-        TerrariumZoomButton(
-            label = stringResource(Res.string.terrarium_reset_zoom, zoomPercent),
-            onClick = onReset,
-        ) {
-            Text(text = zoomPercent, style = AzphaltType.endCap, color = Azphalt.White, textAlign = TextAlign.Center)
+        TerrariumZoomButton(label = stringResource(Res.string.focus_recentre, label), onClick = onRecentre) {
+            Text(
+                text = label,
+                style = AzphaltType.endCap,
+                color = Azphalt.White,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                modifier = Modifier.widthIn(max = 112.dp),
+            )
         }
-        TerrariumZoomButton(
-            label = stringResource(Res.string.terrarium_zoom_out),
-            onClick = onZoomOut,
-        ) {
+        if (showStepper) TerrariumZoomButton(label = stringResource(Res.string.terrarium_zoom_out), onClick = onZoomOut) {
             Text(text = "−", style = AzphaltType.section, color = Azphalt.White, textAlign = TextAlign.Center)
         }
     }

@@ -180,7 +180,7 @@ class HiveScreenshotTest {
             )
         }
         // A new hive (mockup H6): empty, in Build, named and filled from under the field. A phone.
-        shoot("16-new-hive", 780, 1688) {
+        shoot("16-new-hive", 780, 2900) {
             val empty = WorkflowDefinition(id = WorkflowDefinitionId("hive-1"), name = "New hive", tasks = emptyList())
             GeministratorWorkflowTerrarium(
                 empty,
@@ -196,6 +196,30 @@ class HiveScreenshotTest {
                     // With a keeper linked, the bench also offers "Or describe it and let a keeper draft it".
                     NewHiveBench(staged, roles, onEdit = edit, onRename = {}, drafter = { SwarmDraftResult.Unavailable })
                 },
+            )
+        }
+        // The role tray names every role; the preview says what it is and what it connects to.
+        shoot("16c-role-preview", 780, 1500) {
+            Box(Modifier.fillMaxSize().background(Azphalt.Ink)) {
+                RolePreviewContent(
+                    BuiltInRoles.QaEngineer,
+                    RoleSuggestion(BuiltInRoles.QaEngineer, SuggestionReason.NothingTests, "Implement"),
+                    onAdd = {},
+                    onClose = {},
+                )
+            }
+        }
+        // The camera follows the selection: Overview (nothing selected), then Creature and a path level.
+        shoot("17-focus-overview", 900, 1400) {
+            GeministratorWorkflowTerrarium(definition, liveRun, roles, selectedTaskId = null, onTaskSelected = {}, onStageDefinition = { it })
+        }
+        shoot("17-focus-creature", 900, 1400) {
+            GeministratorWorkflowTerrarium(definition, liveRun, roles, selectedTaskId = "build", onTaskSelected = {}, onStageDefinition = { it })
+        }
+        shoot("17-focus-path", 900, 1400) {
+            GeministratorWorkflowTerrarium(
+                definition, liveRun, roles, selectedTaskId = "build", onTaskSelected = {}, onStageDefinition = { it },
+                startFocusLevel = FocusLevel.PathToOrchestrator,
             )
         }
         // An existing hive in Build offers Redraft under the field; it asks before replacing its creatures.

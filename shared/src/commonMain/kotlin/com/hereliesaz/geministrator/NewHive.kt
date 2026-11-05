@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -52,12 +53,15 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.build_build
 import com.hereliesaz.geministrator.resources.build_live
-import com.hereliesaz.geministrator.resources.hive_new_bring_in
+import com.hereliesaz.geministrator.resources.hive_new_build_help
+import com.hereliesaz.geministrator.resources.hive_new_build_title
+import com.hereliesaz.geministrator.resources.hive_new_build_title_only
+import com.hereliesaz.geministrator.resources.hive_new_draft_help
+import com.hereliesaz.geministrator.resources.hive_new_draft_title
 import com.hereliesaz.geministrator.resources.hive_new_name_field
 import com.hereliesaz.geministrator.resources.hive_new_save
 import com.hereliesaz.geministrator.resources.hive_new_saved
 import com.hereliesaz.geministrator.resources.hive_new_surface
-import com.hereliesaz.geministrator.resources.hive_new_tray
 import com.hereliesaz.geministrator.resources.terrarium_could_not_stage_workflow_edit
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
@@ -168,10 +172,27 @@ internal fun NewHiveBench(
     /** Drafts a swarm from a prompt (SwarmDraft.kt); null when no keeper is linked, and the field is not shown. */
     drafter: (suspend (String) -> SwarmDraftResult)? = null,
 ) {
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    val canDraft = drafter != null
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // The obvious way in: describe the work and a keeper drafts the roles and their links.
+        if (canDraft) {
+            BenchHeading(stringResource(Res.string.hive_new_draft_title), stringResource(Res.string.hive_new_draft_help))
+            SwarmDraftBox(definition, drafter, onEdit, redraft = false, onAdoptName = onRename)
+        }
         NewHiveNamer(key = definition.id.value, onRename = onRename)
+        BenchHeading(
+            stringResource(if (canDraft) Res.string.hive_new_build_title else Res.string.hive_new_build_title_only),
+            stringResource(Res.string.hive_new_build_help),
+        )
         NewHiveTray(definition, roles, onEdit)
-        SwarmDraftBox(definition, drafter, onEdit, redraft = false, onAdoptName = onRename)
+    }
+}
+
+@Composable
+private fun BenchHeading(title: String, help: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(title, style = AzphaltType.section, color = azphaltOnSurface(), modifier = Modifier.semantics { heading() })
+        Text(help, style = AzphaltType.body.copy(fontWeight = FontWeight.Normal), color = azphaltOnSurface())
     }
 }
 
@@ -249,50 +270,6 @@ internal fun NewHiveNamer(key: String, onRename: suspend (String) -> Unit, modif
         }
         message?.let {
             Text(it, style = AzphaltType.body, color = azphaltOnSurface(), modifier = Modifier.azphaltLiveRegion())
-        }
-    }
-}
-
-/** The swarm's roles as creatures in a row of Ink wells; a tap brings one into the hive, unwired. */
-@Composable
-internal fun NewHiveTray(
-    definition: WorkflowDefinition,
-    roles: Collection<RoleDefinition>,
-    onEdit: (TerrariumDependencyEditResult) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val addable = terrariumAddableRoles(roles)
-    if (addable.isEmpty()) return
-    val trayLabel = stringResource(Res.string.hive_new_tray)
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .semantics { contentDescription = trayLabel }
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        addable.forEach { role ->
-            val description = stringResource(Res.string.hive_new_bring_in, role.name)
-            Box(
-                modifier = Modifier
-                    .semantics(mergeDescendants = true) {
-                        this.role = Role.Button
-                        contentDescription = description
-                    }
-                    .size(52.dp)
-                    .clip(CircleShape)
-                    .background(Azphalt.Ink)
-                    .clickable { onEdit(addTerrariumCreature(definition, TerrariumNewcomer.FromRole(role))) },
-                contentAlignment = Alignment.Center,
-            ) {
-                NodeMascotSurface(
-                    roleLabel = role.name,
-                    hueSeed = role.id.value,
-                    state = H2g2WorkflowState.Pending,
-                    motionPhase = { 0f },
-                    modifier = Modifier.size(52.dp),
-                )
-            }
         }
     }
 }
