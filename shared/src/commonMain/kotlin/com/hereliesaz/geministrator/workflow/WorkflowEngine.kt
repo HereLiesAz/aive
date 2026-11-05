@@ -217,6 +217,8 @@ class WorkflowEngine(
                         constraints = task.providerConstraints,
                         repository = project.repository,
                         estimatedInputTokens = estimateTaskInputTokens(definition, nextRun, task, role),
+                        excludedProviderIds = taskRun.failedProviders.toSet(),
+                        failoverAllowed = isProviderAuto(role, task),
                     )
                     val providerId = sessionGateway.resolveProvider(selection)
                     val providerLimit = definition.concurrencyPolicy.perProviderLimits[providerId] ?: Int.MAX_VALUE
@@ -253,16 +255,24 @@ class WorkflowEngine(
                         } catch (failure: ManagedSessionFailure) {
                             // A provider refusal while drafting (HTTP 429, bad key) fails the task with
                             // the provider's reason and goes through the task's retry policy.
-                            val reason = failure.message?.takeIf(String::isNotBlank) ?: "Unable to draft a plan"
+                            var reason = failure.message?.takeIf(String::isNotBlank) ?: "Unable to draft a plan"
                             TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Failed)
                             eventSink.append(TaskFailed(nextRun.id, task.id, reason, nowEpochMillis))
+                            val failedRun = nextRun.copy(
+                                taskRuns = nextRun.taskRuns + (
+                                    task.id to taskRun.copy(status = TaskRunStatus.Failed, progressMessage = reason)
+                                ),
+                            )
+                            // The provider's own failure moves the draft to another provider (next cycle).
+                            val failover = failOver(failedRun, task.id, providerId, reason, selection, nowEpochMillis)
+                            if (failover.restarted != null) {
+                                nextRun = failover.restarted
+                                continue
+                            }
+                            failover.stopMessage?.let { reason = it }
                             nextRun = handleFailure(
                                 definition = definition,
-                                run = nextRun.copy(
-                                    taskRuns = nextRun.taskRuns + (
-                                        task.id to taskRun.copy(status = TaskRunStatus.Failed, progressMessage = reason)
-                                    ),
-                                ),
+                                run = failedRun,
                                 taskDefinitionId = task.id,
                                 retryReason = RetryReason.ProviderFailure,
                                 reason = "Executor failed. Last status: $reason",
@@ -657,6 +667,85 @@ class WorkflowEngine(
             eventSink.append(WorkflowCompleted(nextRun.id, nowEpochMillis))
         }
         return nextRun.copy(status = workflowStatus, updatedAtEpochMillis = nowEpochMillis)
+    }
+
+    /** True when the keeper left the provider to the app: no role preference and no provider required by id. */
+    fun isProviderAuto(role: RoleDefinition, task: TaskDefinition): Boolean =
+        role.preferredProviderId == null && task.providerConstraints !is ProviderConstraints.RequireProvider
+
+    /** The outcome of [failOver]: a [restarted] run, a [stopMessage] to fail with, or neither (not a failover case). */
+    data class FailoverResult(val restarted: WorkflowRun? = null, val stopMessage: String? = null)
+
+    /**
+     * A task whose provider failed for a reason that is the provider's own (credit, key, rate limit,
+     * offline, timeout, 5xx) is restarted from the start on another connected provider, without using
+     * up its retry budget; each provider is tried once. A pinned creature, or one with no provider
+     * left, is not restarted: [FailoverResult.stopMessage] says who failed and what to do.
+     * It changes only which provider answers; approval gates are untouched.
+     */
+    suspend fun failOver(
+        run: WorkflowRun,
+        taskDefinitionId: TaskDefinitionId,
+        failedProviderId: AgentProviderId?,
+        reason: String?,
+        selection: ProviderSelectionRequest,
+        nowEpochMillis: Long,
+    ): FailoverResult {
+        failedProviderId ?: return FailoverResult()
+        val taskRun = run.taskRuns[taskDefinitionId] ?: return FailoverResult()
+        return when (val advice = sessionGateway.adviseFailover(failedProviderId, reason, selection)) {
+            FailoverAdvice.NotApplicable -> FailoverResult()
+            is FailoverAdvice.Stop -> FailoverResult(stopMessage = advice.message)
+            is FailoverAdvice.Restart -> {
+                TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Retrying)
+                val attempt = taskRun.attempt + 1
+                eventSink.append(RetryScheduled(run.id, taskDefinitionId, attempt, advice.note, nowEpochMillis))
+                FailoverResult(
+                    restarted = run.copy(
+                        status = WorkflowRunStatus.Running,
+                        taskRuns = run.taskRuns + (
+                            taskDefinitionId to taskRun.copy(
+                                status = TaskRunStatus.Retrying,
+                                attempt = attempt,
+                                failedProviders = (taskRun.failedProviders + failedProviderId).distinct(),
+                                assignedProviderId = null,
+                                providerRunId = null,
+                                externalRunId = null,
+                                artifacts = emptyList(),
+                                blockingReason = null,
+                                progress = null,
+                                progressMessage = advice.note,
+                                providerPlan = null,
+                                keeperQuestion = null,
+                            )
+                        ),
+                        updatedAtEpochMillis = nowEpochMillis,
+                    ),
+                )
+            }
+        }
+    }
+
+    /** The selection [taskDefinitionId] was or would be dispatched with, for failover decisions. */
+    fun selectionFor(
+        project: Project,
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        taskDefinitionId: TaskDefinitionId,
+    ): ProviderSelectionRequest? {
+        val task = definition.tasks.firstOrNull { it.id == taskDefinitionId } ?: return null
+        val taskRun = run.taskRuns[taskDefinitionId] ?: return null
+        val executor = taskRun.executor ?: task.effectiveExecutor()
+        val roleId = (executor as? TaskExecutor.RoleAgent)?.roleId ?: return null
+        val role = roleDefinition(run, roleId) ?: return null
+        return ProviderSelectionRequest(
+            preferredProviderId = role.preferredProviderId,
+            requiredCapabilities = role.capabilitiesRequired,
+            constraints = task.providerConstraints,
+            repository = project.repository,
+            excludedProviderIds = taskRun.failedProviders.toSet(),
+            failoverAllowed = isProviderAuto(role, task),
+        )
     }
 
     suspend fun handleFailure(

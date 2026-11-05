@@ -63,7 +63,7 @@ import org.jetbrains.compose.resources.stringResource
 private sealed interface DraftPhase {
     data object Idle : DraftPhase
     data object Working : DraftPhase
-    data class Done(val creatures: Int) : DraftPhase
+    data class Done(val creatures: Int, val notes: List<String> = emptyList()) : DraftPhase
     data class Review(val ready: SwarmDraftResult.Ready) : DraftPhase
     data class Failed(val message: String, val raw: String?) : DraftPhase
     data object Kept : DraftPhase
@@ -101,7 +101,7 @@ internal fun SwarmDraftBox(
                 runCatching { onAdoptName(ready.suggestedName) }
             }
             onEdit(TerrariumDependencyEditResult.Applied(redraftedHive(definition, ready)))
-            phase = DraftPhase.Done(ready.tasks.size)
+            phase = DraftPhase.Done(ready.tasks.size, ready.notes)
         }
     }
 
@@ -123,7 +123,7 @@ internal fun SwarmDraftBox(
                     if (redraftReplaces(definition) == 0) apply(result) else phase = DraftPhase.Review(result)
                 is SwarmDraftResult.Problem -> phase = DraftPhase.Failed(problemMessage(result.problem), null)
                 is SwarmDraftResult.ProviderFailed ->
-                    phase = DraftPhase.Failed(friendlyErrorMessageOutsideComposition(result.raw), result.raw)
+                    phase = DraftPhase.Failed(result.summary ?: friendlyErrorMessageOutsideComposition(result.raw), result.raw)
                 SwarmDraftResult.Unavailable -> phase = DraftPhase.Failed(getString(Res.string.hive_draft_unavailable), null)
             }
         }
@@ -147,10 +147,14 @@ internal fun SwarmDraftBox(
         when (val now = phase) {
             DraftPhase.Idle -> Unit
             DraftPhase.Working -> Status(stringResource(Res.string.hive_draft_working))
-            is DraftPhase.Done -> Status(stringResource(Res.string.hive_draft_done, now.creatures))
+            is DraftPhase.Done -> {
+                Status(stringResource(Res.string.hive_draft_done, now.creatures))
+                now.notes.forEach { Status(it) }
+            }
             DraftPhase.Kept -> Status(stringResource(Res.string.hive_draft_kept))
             is DraftPhase.Review -> {
                 Status(stringResource(Res.string.hive_draft_review, now.ready.tasks.size, redraftReplaces(definition)))
+                now.ready.notes.forEach { Status(it) }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AzphaltThemedSurface(Azphalt.Ink) {
                         val replace = stringResource(Res.string.hive_draft_replace)

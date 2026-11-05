@@ -37,12 +37,17 @@ internal enum class SwarmDraftProblem { NoPrompt, NoRoles, Empty, TooMany, Unkno
 
 internal sealed interface SwarmDraftResult {
     /** [tasks] are the proposed creatures, wired; [suggestedName] names a hive that has no name yet. */
-    data class Ready(val tasks: List<TaskDefinition>, val suggestedName: String) : SwarmDraftResult
+    data class Ready(
+        val tasks: List<TaskDefinition>,
+        val suggestedName: String,
+        /** Plain notes that the planner moved to another provider; not errors. */
+        val notes: List<String> = emptyList(),
+    ) : SwarmDraftResult
 
     data class Problem(val problem: SwarmDraftProblem) : SwarmDraftResult
 
     /** The linked provider failed; [raw] goes through [classifyError] to say what to do next. */
-    data class ProviderFailed(val raw: String?) : SwarmDraftResult
+    data class ProviderFailed(val raw: String?, val summary: String? = null) : SwarmDraftResult
 
     /** No planner is linked on this device. */
     data object Unavailable : SwarmDraftResult
@@ -150,6 +155,9 @@ internal fun swarmDraftName(prompt: String): String {
 internal fun swarmDraftFailure(failure: Throwable): SwarmDraftResult {
     val message = failure.message
     return when {
+        // Every connected provider failed: the message names each one and what to do.
+        failure is com.hereliesaz.geministrator.workflow.AllProvidersFailedException ->
+            SwarmDraftResult.ProviderFailed(message, summary = message)
         failure is SerializationException -> SwarmDraftResult.Problem(SwarmDraftProblem.Unreadable)
         message != null && "unavailable on this platform" in message -> SwarmDraftResult.Unavailable
         classifyError(message) != ErrorKind.Other -> SwarmDraftResult.ProviderFailed(message)

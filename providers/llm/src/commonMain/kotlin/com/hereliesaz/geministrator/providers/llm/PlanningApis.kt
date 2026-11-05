@@ -1,6 +1,9 @@
 package com.hereliesaz.geministrator.providers.llm
 
 import com.hereliesaz.geministrator.ProviderCatalog
+import com.hereliesaz.geministrator.orchestration.FailoverOrchestrationAgentRuntime
+import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
+import com.hereliesaz.geministrator.orchestration.PlannerCandidate
 
 /**
  * The linked cloud LLM used for workflow planning: the first configured of Gemini, OpenAI, Claude,
@@ -20,6 +23,38 @@ fun configuredPlanningApi(credentials: Map<String, String>): TextGenerationApi? 
         }
     }
 }
+
+/** A linked LLM that can plan: its catalog id, its name for the keeper, and its text API. */
+class PlanningApiEntry(val id: String, val name: String, val api: TextGenerationApi)
+
+/**
+ * Every linked cloud LLM that can plan, in the order [configuredPlanningApi] prefers them (keyless
+ * last). The planner fails over down this list.
+ */
+fun configuredPlanningApis(linked: Map<String, String>): List<PlanningApiEntry> {
+    fun key(id: String): LlmApiKeyProvider? =
+        linked[id]?.trim()?.takeIf(String::isNotEmpty)?.let { value -> LlmApiKeyProvider { value } }
+    fun name(id: String) = ProviderCatalog.entry(id)?.displayName ?: id
+    return buildList {
+        key(ProviderCatalog.GEMINI_ID)?.let { add(PlanningApiEntry(ProviderCatalog.GEMINI_ID, name(ProviderCatalog.GEMINI_ID), GeminiGenerateContentApi(it))) }
+        key(ProviderCatalog.OPENAI_ID)?.let { add(PlanningApiEntry(ProviderCatalog.OPENAI_ID, name(ProviderCatalog.OPENAI_ID), OpenAiResponsesApi(it))) }
+        key(ProviderCatalog.ANTHROPIC_ID)?.let { add(PlanningApiEntry(ProviderCatalog.ANTHROPIC_ID, name(ProviderCatalog.ANTHROPIC_ID), AnthropicMessagesApi(it))) }
+        key(ProviderCatalog.XAI_ID)?.let { add(PlanningApiEntry(ProviderCatalog.XAI_ID, name(ProviderCatalog.XAI_ID), XaiResponsesApi(it))) }
+        HostedLlmProviders.entries.forEach { spec ->
+            linked[spec.id]?.trim()?.takeIf(String::isNotEmpty)?.let { secret ->
+                runCatching { HostedLlmProviders.textApi(spec, secret) }.getOrNull()
+                    ?.let { add(PlanningApiEntry(spec.id, name(spec.id), it)) }
+            }
+        }
+    }
+}
+
+/** The planner for the linked LLMs: fails over from one to the next; null when none is linked. */
+fun configuredPlanningRuntime(linked: Map<String, String>): OrchestrationAgentRuntime? =
+    configuredPlanningApis(linked)
+        .map { PlannerCandidate(it.id, it.name, TextGenerationOrchestrationAgentRuntime(it.api)) }
+        .takeIf { it.isNotEmpty() }
+        ?.let(::FailoverOrchestrationAgentRuntime)
 
 /**
  * The text API a hosted memory stage should use: [providerId] (a ProviderCatalog id) with an optional
