@@ -73,6 +73,9 @@ class SqlWorkflowPersistence(
             locked { queries.definition(id.value).awaitAsOneOrNull()?.decode(WorkflowDefinition.serializer()) }
         override suspend fun all(): List<WorkflowDefinition> =
             locked { queries.allDefinitions().awaitAsList().mapNotNull { it.decode(WorkflowDefinition.serializer()) } }
+        override suspend fun delete(id: WorkflowDefinitionId) {
+            locked { queries.deleteDefinition(id.value) }
+        }
     }
 
     override val runs: WorkflowRunRepository = object : WorkflowRunRepository {

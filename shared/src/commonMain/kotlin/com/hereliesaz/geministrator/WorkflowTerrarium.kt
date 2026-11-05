@@ -68,6 +68,8 @@ internal fun GeministratorWorkflowTerrarium(
     frame: HiveFrame? = null,
     /** Opens a new selection on this view instead of the first (screenshots and tests). */
     startFocusLevel: FocusLevel? = null,
+    /** A hive at rest can delete itself from its page (HiveDeletion.kt); null where that is not offered. */
+    hiveDeletion: HiveDeletionActions? = null,
 ) {
     val scope = rememberCoroutineScope()
     val layoutStore = remember { SettingsTerrariumLayoutStore.createDefault() }
@@ -186,6 +188,19 @@ internal fun GeministratorWorkflowTerrarium(
         if (building) emptySet() else projection.subjects.filter {
             it.node.state == H2g2WorkflowState.Gate || it.node.state == H2g2WorkflowState.Blocked || it.node.state == H2g2WorkflowState.Failed
         }.mapTo(mutableSetOf()) { it.node.id }
+    }
+    // Removing the selected creature (or grouped ones) lets go of them: the view falls back to the whole hive.
+    var knownTaskIds by remember(definition.id) { mutableStateOf(stagedDefinition.tasks.map { it.id.value }.toSet()) }
+    LaunchedEffect(stagedDefinition.tasks) {
+        val remaining = stagedDefinition.tasks.map { it.id.value }.toSet()
+        if (remaining != knownTaskIds) {
+            selectedTaskId?.takeIf { it in knownTaskIds && it !in remaining }?.let(onTaskSelected)
+            grouping?.let { gathered ->
+                val kept = selectionAfterRemoval(gathered, remaining)
+                if (kept != gathered) grouping = kept
+            }
+            knownTaskIds = remaining
+        }
     }
     val focusSteps = remember(focusGraph, focusSelection, orchestratorIds, activeIds, blockedIds) {
         focusLevels(focusGraph, focusSelection, orchestratorIds, activeIds, blockedIds)
@@ -370,10 +385,12 @@ internal fun GeministratorWorkflowTerrarium(
                 },
                 onEdit = ::applyEdit,
                 roles = roles,
+                removeBlocked = terrariumRemoveBlocked(liveRun),
                 onUndo = undo,
                 onRedo = redo,
                 modifier = Modifier.padding(top = 8.dp),
             )
+            hiveDeletion?.let { DeleteHiveControl(name = definition.name, creatures = stagedDefinition.tasks.size, actions = it, modifier = Modifier.padding(top = 8.dp)) }
         }
 
         authoringMessage?.let { message ->

@@ -74,6 +74,8 @@ definition:
 SELECT payload FROM definition WHERE id = ?;
 allDefinitions:
 SELECT payload FROM definition ORDER BY rowid;
+deleteDefinition:
+DELETE FROM definition WHERE id = ?;
 deleteDefinitions:
 DELETE FROM definition;
 

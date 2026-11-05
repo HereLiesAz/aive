@@ -130,6 +130,31 @@ class WorkflowLibraryHost(
         authoredStore.remove(id)
     }
 
+    /** Whether the hive [id] may be deleted now; see [hiveDeleteVerdict]. Reads only. */
+    internal suspend fun hiveDeleteVerdict(id: WorkflowDefinitionId): HiveDeleteVerdict {
+        val runs = persistence.projects.all().flatMap { persistence.runs.byProject(it.id) }
+        val packageIds = storeService?.installed().orEmpty()
+            .filter { it.kind == "workflow" }
+            .flatMap { it.workflowDefinitionIds }
+            .toSet()
+        return hiveDeleteVerdict(id, persistence.definitions.all(), runs, packageIds)
+    }
+
+    /**
+     * Deletes the one hive [id], re-checking the guard first. Removes its definition and its place in
+     * the authored list, and its remembered creature positions; no run, event, memory, role,
+     * repository or other hive is touched. Returns the verdict; the hive is gone only when Allowed.
+     */
+    internal suspend fun deleteHive(id: WorkflowDefinitionId): HiveDeleteVerdict {
+        val verdict = hiveDeleteVerdict(id)
+        if (verdict is HiveDeleteVerdict.Allowed) {
+            persistence.definitions.delete(id)
+            authoredStore.remove(id)
+            runCatching { SettingsTerrariumLayoutStore.createDefault().clear(id) }
+        }
+        return verdict
+    }
+
     /** [repository] null keeps the current project's repository. */
     suspend fun run(
         definition: WorkflowDefinition,

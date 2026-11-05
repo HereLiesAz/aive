@@ -182,6 +182,8 @@ internal fun RestingHive(
     onTaskSelected: (String) -> Unit,
     onSurface: () -> Unit,
     modifier: Modifier = Modifier,
+    /** The hive was deleted from its page: leave it for the hives list. */
+    onDeleted: () -> Unit = onSurface,
 ) {
     val host = LocalWorkflowLibraryHost.current
     // The hive as opened: the field's tide starts from it, so saving an edit never resets undo.
@@ -217,6 +219,12 @@ internal fun RestingHive(
                 { candidate -> h.saveAuthored(candidate.copy(name = (latest ?: start).name)).also { latest = it } }
             },
             onSurface = onSurface,
+            hiveDeletion = host?.let { h ->
+                HiveDeletionActions(
+                    check = { h.hiveDeleteVerdict(start.id) },
+                    delete = { h.deleteHive(start.id).also { if (it is HiveDeleteVerdict.Allowed) onDeleted() } },
+                )
+            },
             startInBuild = fresh,
             heading = if (fresh) {
                 { NewHiveCrumb(name = current.name, onSurface = onSurface) }

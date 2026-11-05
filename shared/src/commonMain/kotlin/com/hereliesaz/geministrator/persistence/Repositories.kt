@@ -27,6 +27,9 @@ interface WorkflowDefinitionRepository {
     suspend fun put(definition: WorkflowDefinition)
     suspend fun get(id: WorkflowDefinitionId): WorkflowDefinition?
     suspend fun all(): List<WorkflowDefinition>
+
+    /** Removes this one definition and nothing else: runs, events and roles are left as they are. */
+    suspend fun delete(id: WorkflowDefinitionId)
 }
 
 interface WorkflowRunRepository {

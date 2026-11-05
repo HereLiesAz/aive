@@ -5,6 +5,7 @@
     <string name="error_rate_limited">Rate limited. Wait a minute, or switch to another provider.</string>
     <string name="error_offline">Can't reach the service. Check your internet connection, then retry.</string>
     <string name="error_timed_out">The service took too long to answer. Retry, or switch to another provider.</string>
+    <string name="error_server_error">The service is having trouble right now. Retry in a moment, or switch to another provider.</string>
     <string name="error_no_agent">No connected agent can do this work. Connect an AI provider, or give the hive a repository its agent works in.</string>
     <string name="error_other">Something went wrong. Retry, or check your provider in Settings.</string>
     <string name="error_details_label">Details</string>

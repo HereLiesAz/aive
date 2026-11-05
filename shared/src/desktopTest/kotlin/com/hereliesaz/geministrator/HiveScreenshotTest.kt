@@ -154,8 +154,30 @@ class HiveScreenshotTest {
                 onStageDefinition = { it },
             )
         }
-        shoot("2-hive-build", 900, 2600) {
-            GeministratorWorkflowTerrarium(definition, liveRun, roles, selectedTaskId = "build", onTaskSelected = {}, onStageDefinition = { it }, startInBuild = true)
+        shoot("2-hive-build", 900, 3000) {
+            GeministratorWorkflowTerrarium(
+                definition,
+                restingWorkflowRun(definition),
+                roles,
+                selectedTaskId = "build",
+                onTaskSelected = {},
+                onStageDefinition = { it },
+                startInBuild = true,
+                // A hive at rest also offers Delete hive under the wiring; Remove sits beside Duplicate.
+                hiveDeletion = HiveDeletionActions(check = { HiveDeleteVerdict.Allowed }, delete = { HiveDeleteVerdict.Allowed }),
+            )
+        }
+        // While a run of the hive is live, Remove is not offered and the reason is shown.
+        shoot("2b-hive-build-live", 900, 2600) {
+            GeministratorWorkflowTerrarium(
+                definition,
+                liveRun.copy(status = com.hereliesaz.geministrator.domain.WorkflowRunStatus.Running),
+                roles,
+                selectedTaskId = "build",
+                onTaskSelected = {},
+                onStageDefinition = { it },
+                startInBuild = true,
+            )
         }
         // A new hive (mockup H6): empty, in Build, named and filled from under the field. A phone.
         shoot("16-new-hive", 780, 2900) {

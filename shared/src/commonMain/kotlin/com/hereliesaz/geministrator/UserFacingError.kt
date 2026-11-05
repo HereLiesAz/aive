@@ -20,17 +20,19 @@ import com.hereliesaz.geministrator.resources.error_offline
 import com.hereliesaz.geministrator.resources.error_other
 import com.hereliesaz.geministrator.resources.error_out_of_credit
 import com.hereliesaz.geministrator.resources.error_rate_limited
+import com.hereliesaz.geministrator.resources.error_server_error
 import com.hereliesaz.geministrator.resources.error_timed_out
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 
 /** Coarse cause of a raw failure message, enough to tell the user what to do next. */
-enum class ErrorKind { KeyRejected, OutOfCredit, RateLimited, Offline, TimedOut, NoAgent, Other }
+enum class ErrorKind { KeyRejected, OutOfCredit, RateLimited, Offline, TimedOut, ServerError, NoAgent, Other }
 
 private val unauthorizedCode = Regex("""(^|[^0-9])40[13]([^0-9]|$)""")
 private val paymentRequiredCode = Regex("""(^|[^0-9])402([^0-9]|$)""")
 private val rateLimitCode = Regex("""(^|[^0-9])429([^0-9]|$)""")
+private val serverErrorCode = Regex("""(^|[^0-9])(500|502|503|504|529)([^0-9]|$)""")
 
 /** Pure classifier from a raw exception or HTTP error message to an [ErrorKind]. */
 fun classifyError(raw: String?): ErrorKind {
@@ -57,6 +59,11 @@ fun classifyError(raw: String?): ErrorKind {
             "rate limit" in text || "rate-limit" in text || "ratelimit" in text ||
             "too many requests" in text || "quota" in text || "resource_exhausted" in text -> ErrorKind.RateLimited
 
+        // A provider that is up but failing: failing over to another one is the right answer (ProviderFailover.kt).
+        serverErrorCode.containsMatchIn(text) ||
+            "internal server error" in text || "bad gateway" in text || "service unavailable" in text ||
+            "overloaded" in text || "server error" in text -> ErrorKind.ServerError
+
         "timeout" in text || "timed out" in text || "deadline exceeded" in text -> ErrorKind.TimedOut
 
         "unable to resolve host" in text || "unknownhost" in text || "unknown host" in text ||
@@ -74,6 +81,7 @@ internal fun ErrorKind.messageResource(): StringResource = when (this) {
     ErrorKind.RateLimited -> Res.string.error_rate_limited
     ErrorKind.Offline -> Res.string.error_offline
     ErrorKind.TimedOut -> Res.string.error_timed_out
+    ErrorKind.ServerError -> Res.string.error_server_error
     ErrorKind.NoAgent -> Res.string.error_no_agent
     ErrorKind.Other -> Res.string.error_other
 }

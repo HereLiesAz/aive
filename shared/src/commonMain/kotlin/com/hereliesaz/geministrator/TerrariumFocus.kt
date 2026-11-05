@@ -180,3 +180,6 @@ internal fun fitCamera(
 /** The Overview's fit: the whole hive, never closer than 1.3x or farther than the old widest view. */
 internal fun overviewFit(positions: Collection<H2g2TerrariumPosition>): CameraFit =
     fitCamera(positions, maxZoom = 1.3f)
+
+/** The selection that survives removing creatures: only ids still in the hive, so no focus is left on a removed creature. */
+internal fun selectionAfterRemoval(selection: Set<String>, remaining: Set<String>): Set<String> = selection.filterTo(linkedSetOf()) { it in remaining }

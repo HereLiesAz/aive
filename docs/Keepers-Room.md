@@ -152,6 +152,12 @@ the run's end                       -> every open bar ends; otherwise they run t
 ProviderUsageRecorded               -> added to the attempt it fell in
 ~~~
 
+## Removing a creature and deleting a hive
+
+**Remove** (Build, with a creature selected, beside Duplicate; with Cluster on, **Remove N creatures**) takes the creature's task out of the hive together with every strand touching it, as feeder or as fed. A knot that named it goes back to the plain one. It is one step on the Undo history, so one Undo brings back the creatures and their strands. Strands that ran through a removed creature are not bridged: what it fed is left without that feeder, and you wire it again if you want. An edit that would break the hive is refused and nothing changes; taking out the approval ahead of a repository change is one. Removing the last creature leaves an empty hive. While a run of the hive is live, Remove is not offered and the page says why.
+
+**Delete hive** (a red pill under the wiring on a hive that has not run) asks first, naming the hive, and says it cannot be undone. It deletes only that hive from this device. It is refused, with a plain reason and nothing deleted, while a run of it is live, when it has any past runs (they open through the hive, so deleting it would leave them unopenable), when another hive uses it as a circuit, and when it came from a package (remove the package in the Store). Your memory, repositories, runs and other hives are never touched, and no repository operation is involved. Afterwards the app returns to the hives list.
+
 ## Consolidation plan
 
 1. **Stage 1 (done):** the Keeper's room; calm controls (`BRANDING.md`, Controls); Memory as a swarm in the hive; programmatic work as the neuron.

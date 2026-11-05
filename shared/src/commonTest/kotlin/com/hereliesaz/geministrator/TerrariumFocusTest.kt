@@ -123,4 +123,15 @@ class TerrariumFocusTest {
         assertTrue(sub.zoom >= all.zoom)
         assertEquals(1f, fitCamera(emptyList()).zoom)
     }
+
+    @Test
+    fun removingTheFocusedCreatureClearsTheFocus() {
+        val remaining = ids - "b"
+        assertEquals(emptySet(), selectionAfterRemoval(setOf("b"), remaining))
+        assertEquals(setOf("a"), selectionAfterRemoval(setOf("a", "b"), remaining))
+        val without = FocusGraph(remaining, listOf("o" to "a", "c" to "end"))
+        val after = focusLevels(without, setOf("b"), listOf("o"), emptySet(), emptySet())
+        assertEquals(listOf(FocusLevel.Overview), after.map { it.level })
+        assertEquals(remaining, after.single().nodes)
+    }
 }

@@ -59,7 +59,29 @@ sealed class ManagedSessionFailure(message: String, cause: Throwable? = null) : 
     class ProviderOperationFailed(message: String, cause: Throwable? = null) : ManagedSessionFailure(message, cause)
 }
 
+/** What to do with a task whose provider failed (ProviderFailover.kt). */
+sealed interface FailoverAdvice {
+    /** Restart the task on another provider; [note] tells the keeper, in plain words. */
+    data class Restart(val note: String) : FailoverAdvice
+
+    /** Do not switch: [message] says who failed and what to do (every provider failed, or the creature is pinned). */
+    data class Stop(val message: String) : FailoverAdvice
+
+    /** Not a failover case (a failure that would repeat anywhere, or only one provider is connected). */
+    data object NotApplicable : FailoverAdvice
+}
+
 interface ManagedSessionGateway {
+    /**
+     * Where a task goes after its provider [failedProviderId] failed with [reason], given the
+     * [selection] it was dispatched with. The default does not fail over.
+     */
+    suspend fun adviseFailover(
+        failedProviderId: AgentProviderId,
+        reason: String?,
+        selection: ProviderSelectionRequest,
+    ): FailoverAdvice = FailoverAdvice.NotApplicable
+
     suspend fun resolveProvider(selection: ProviderSelectionRequest): AgentProviderId
 
     suspend fun createSession(request: ManagedSessionRequest): ManagedSessionHandle

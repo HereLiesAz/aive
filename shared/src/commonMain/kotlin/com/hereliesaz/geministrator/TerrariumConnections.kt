@@ -43,6 +43,9 @@ import com.hereliesaz.geministrator.resources.build_knot_on_success
 import com.hereliesaz.geministrator.resources.build_live
 import com.hereliesaz.geministrator.resources.build_pick_a_creature
 import com.hereliesaz.geministrator.resources.build_redo
+import com.hereliesaz.geministrator.resources.build_remove
+import com.hereliesaz.geministrator.resources.build_remove_blocked
+import com.hereliesaz.geministrator.resources.build_remove_cluster
 import com.hereliesaz.geministrator.resources.build_rehearse
 import com.hereliesaz.geministrator.resources.build_undo
 import org.jetbrains.compose.resources.stringResource
@@ -98,6 +101,8 @@ internal fun TerrariumConnections(
     onFold: (Set<String>) -> Unit = {},
     /** The swarm's roles, offered by Add creature. */
     roles: Collection<RoleDefinition> = emptyList(),
+    /** A run of this hive is live: creatures cannot be removed, and the reason is shown instead. */
+    removeBlocked: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     // Add creature: open, it lists what can join; a pick joins unwired and closes the list.
@@ -132,6 +137,22 @@ internal fun TerrariumConnections(
         }
         if (grouping != null) {
             Text(stringResource(Res.string.build_group_hint), style = AzphaltType.body, color = azphaltOnSurface())
+            // Remove the gathered creatures in one edit; one Undo brings them back with their strands.
+            if (grouping.isNotEmpty()) {
+                if (removeBlocked) {
+                    Text(stringResource(Res.string.build_remove_blocked), style = AzphaltType.body, color = azphaltOnSurface())
+                } else {
+                    AzphaltPill(
+                        label = stringResource(Res.string.build_remove_cluster, grouping.size),
+                        seed = "remove-cluster",
+                        tone = PillTone.Danger,
+                        onClick = {
+                            onEdit(removeTerrariumCreatures(definition, grouping.mapTo(mutableSetOf(), ::TaskDefinitionId)))
+                            onGroupingChange(emptySet())
+                        },
+                    )
+                }
+            }
             return@Column
         }
         val selected = definition.tasks.firstOrNull { it.id.value == selectedTaskId }
@@ -159,7 +180,18 @@ internal fun TerrariumConnections(
                 seed = "bud-${selected.id.value}",
                 onClick = { onEdit(budTerrariumCreature(definition, selected.id)) },
             )
+            if (!removeBlocked) {
+                AzphaltPill(
+                    label = stringResource(Res.string.build_remove),
+                    seed = "remove-${selected.id.value}",
+                    tone = PillTone.Danger,
+                    onClick = { onEdit(removeTerrariumCreatures(definition, setOf(selected.id))) },
+                )
+            }
             addPill()
+        }
+        if (removeBlocked) {
+            Text(stringResource(Res.string.build_remove_blocked), style = AzphaltType.body, color = azphaltOnSurface())
         }
         if (adding) TerrariumAddCreature(definition, roles, onEdit = { onEdit(it); adding = false })
         Text(stringResource(Res.string.build_fed_by, selected.name), style = AzphaltType.eyebrow, color = azphaltOnSurface())

@@ -20,7 +20,9 @@ object FailurePolicyEvaluator {
         escalationPolicy: EscalationPolicy,
         reason: RetryReason,
     ): FailureDecision {
-        val retryAllowed = reason in retryPolicy.retryOn && taskRun.attempt < retryPolicy.maxAttempts
+        // A restart on another provider after that provider's own failure is not a retry of the work.
+        val used = (taskRun.attempt - taskRun.failedProviders.size).coerceAtLeast(1)
+        val retryAllowed = reason in retryPolicy.retryOn && used < retryPolicy.maxAttempts
         if (retryAllowed) return FailureDecision.Retry(taskRun.attempt + 1)
 
         return when (escalationPolicy) {
@@ -28,7 +30,7 @@ object FailurePolicyEvaluator {
             EscalationPolicy.RequireHumanDecision -> FailureDecision.RequireHumanDecision
             // Reassignment is one more attempt past the retry budget, not an open-ended loop: once
             // the reassigned attempt has failed too, the workflow fails.
-            is EscalationPolicy.Reassign -> if (taskRun.attempt <= retryPolicy.maxAttempts) {
+            is EscalationPolicy.Reassign -> if (used <= retryPolicy.maxAttempts) {
                 FailureDecision.Reassign(escalationPolicy.roleId)
             } else {
                 FailureDecision.FailWorkflow
