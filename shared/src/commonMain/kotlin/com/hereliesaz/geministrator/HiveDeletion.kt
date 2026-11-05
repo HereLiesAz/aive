@@ -19,7 +19,6 @@ import com.hereliesaz.geministrator.resources.hive_delete_keep
 import com.hereliesaz.geministrator.resources.hive_delete_refused_circuit
 import com.hereliesaz.geministrator.resources.hive_delete_refused_live
 import com.hereliesaz.geministrator.resources.hive_delete_refused_package
-import com.hereliesaz.geministrator.resources.hive_delete_refused_runs
 import com.hereliesaz.geministrator.resources.hive_delete_refused_unknown
 import com.hereliesaz.geministrator.resources.hive_delete_title
 import kotlinx.coroutines.launch
@@ -36,9 +35,6 @@ import com.hereliesaz.geministrator.workflow.withoutPlacement
 internal enum class HiveDeleteRefusal {
     /** A run of the hive is live. */
     LiveRun,
-
-    /** The hive has run before: its past runs open through the hive, so it stays while they exist. */
-    HasRuns,
 
     /** Another hive uses it as a circuit. */
     UsedAsCircuit,
@@ -77,7 +73,6 @@ internal fun hiveDeleteVerdict(
     if (own.any { it.status == WorkflowRunStatus.Running || it.status == WorkflowRunStatus.AwaitingHuman }) {
         return HiveDeleteVerdict.Refused(HiveDeleteRefusal.LiveRun)
     }
-    if (own.isNotEmpty()) return HiveDeleteVerdict.Refused(HiveDeleteRefusal.HasRuns)
     if (id.value in packageDefinitionIds) return HiveDeleteVerdict.Refused(HiveDeleteRefusal.FromPackage)
     val usedAsCircuit = definitions.any { other ->
         other.id != id && other.tasks.any { task ->
@@ -106,7 +101,6 @@ internal fun DeleteHiveControl(
         getString(
             when (reason) {
                 HiveDeleteRefusal.LiveRun -> Res.string.hive_delete_refused_live
-                HiveDeleteRefusal.HasRuns -> Res.string.hive_delete_refused_runs
                 HiveDeleteRefusal.UsedAsCircuit -> Res.string.hive_delete_refused_circuit
                 HiveDeleteRefusal.FromPackage -> Res.string.hive_delete_refused_package
                 HiveDeleteRefusal.Unknown -> Res.string.hive_delete_refused_unknown
@@ -154,3 +148,25 @@ internal fun DeleteHiveControl(
         )
     }
 }
+
+/**
+ * What a run of a deleted hive is shown against, read-only: the run's own recorded tasks (name is
+ * the task id; role and executor as recorded), no strands, nothing saved. The hive's name is gone,
+ * so the title says so plainly.
+ */
+internal fun deletedHiveStandIn(run: WorkflowRun): WorkflowDefinition = WorkflowDefinition(
+    id = run.workflowDefinitionId,
+    name = DELETED_HIVE_NAME,
+    description = "This hive was deleted. Its runs stay in history and can be viewed, not resumed.",
+    tasks = run.taskRuns.values.map { taskRun ->
+        com.hereliesaz.geministrator.domain.TaskDefinition(
+            id = taskRun.taskDefinitionId,
+            name = taskRun.taskDefinitionId.value,
+            objective = "",
+            roleId = taskRun.assignedRoleId,
+            executor = taskRun.executor,
+        )
+    },
+)
+
+internal const val DELETED_HIVE_NAME = "Deleted hive"
