@@ -529,7 +529,8 @@ internal fun CustomCompanyProviderScreen(
                         style = AzphaltType.body,
                         color = azphaltOnSurface(),
                     )
-                    CompanyProviderChoiceRow(
+                    ProviderChoiceRow(
+                        seedPrefix = "company-provider",
                         selectedProviderId = roleProviderDraft,
                         connectedProviderIds = connectedProviderIds,
                         onSelected = { roleProviderDraftValue = it.orEmpty() },
@@ -922,7 +923,8 @@ internal fun CustomCompanyProviderScreen(
                         }
                         if (role.executionSource is RoleExecutionSource.Agent) {
                             Text(stringResource(Res.string.swarm_provider_routing), style = AzphaltType.eyebrow, color = azphaltOnSurface())
-                            CompanyProviderChoiceRow(
+                            ProviderChoiceRow(
+                                seedPrefix = "company-provider",
                                 selectedProviderId = assigned,
                                 connectedProviderIds = connectedProviderIds,
                                 onSelected = { selected ->
@@ -996,32 +998,6 @@ internal fun CustomCompanyProviderScreen(
                 endCap = definition.promptReusePolicy.name,
             )
         }
-    }
-}
-
-@Composable
-private fun CompanyProviderChoiceRow(
-    selectedProviderId: String?,
-    connectedProviderIds: Set<String>,
-    onSelected: (String?) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        AzphaltPill(
-            label = stringResource(Res.string.swarm_auto),
-            seed = "company-provider-auto-${selectedProviderId.orEmpty()}",
-            selected = selectedProviderId == null,
-            onClick = { onSelected(null) },
-        )
-        ProviderCatalog.entries
-            .filter { it.id in connectedProviderIds }
-            .forEach { entry ->
-                AzphaltPill(
-                    label = entry.displayName,
-                    seed = "company-provider-${entry.id}-${selectedProviderId.orEmpty()}",
-                    selected = selectedProviderId == entry.id,
-                    onClick = { onSelected(entry.id) },
-                )
-            }
     }
 }
 

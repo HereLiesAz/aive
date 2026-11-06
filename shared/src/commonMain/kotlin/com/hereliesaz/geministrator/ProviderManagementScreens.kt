@@ -438,32 +438,6 @@ internal fun CompanyProviderScreen(
 }
 
 @Composable
-private fun ProviderChoiceRow(
-    selectedProviderId: String?,
-    connectedProviderIds: Set<String>,
-    onSelected: (String?) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        AzphaltPill(
-            label = "Auto",
-            seed = "provider-choice-auto-${selectedProviderId.orEmpty()}",
-            selected = selectedProviderId == null,
-            onClick = { onSelected(null) },
-        )
-        ProviderCatalog.entries
-            .filter { it.id in connectedProviderIds }
-            .forEach { entry ->
-                AzphaltPill(
-                    label = entry.displayName,
-                    seed = "provider-choice-${entry.id}-${selectedProviderId.orEmpty()}",
-                    selected = selectedProviderId == entry.id,
-                    onClick = { onSelected(entry.id) },
-                )
-            }
-    }
-}
-
-@Composable
 internal fun ProviderSettingsScreen(
     connectedProviderIds: Set<String> = emptySet(),
     onCheckProviderHealth: suspend () -> Map<String, String> = { emptyMap() },

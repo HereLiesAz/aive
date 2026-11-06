@@ -287,7 +287,10 @@ internal fun GeministratorWorkflowTerrarium(
         }
         val field: @Composable () -> Unit = {
           // Programmatic steps, local or remote, wear the neuron: the swarm reads as a flowchart.
-          androidx.compose.runtime.CompositionLocalProvider(LocalProgrammaticNodes provides projection.programmaticNodeIds) {
+          androidx.compose.runtime.CompositionLocalProvider(
+              LocalProgrammaticNodes provides projection.programmaticNodeIds,
+              LocalProviderBadges provides projection.providerBadges,
+          ) {
             PlatformNodeTerrarium(
                 subjects = projection.subjects,
                 relationships = animatedRelationships,
