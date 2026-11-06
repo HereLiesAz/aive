@@ -161,6 +161,27 @@ fun main() {
     // Agent2Agent server (docs/A2A.md): on unless the keeper turned it off; loopback unless the
     // keeper opens it to the network, where callers also need to be allowed.
     val a2aServer = DesktopA2aServer()
+    // Control API for the standalone MCP bridge (docs/MCP.md): off unless the keeper turns it on,
+    // loopback only, token in a file only this user can read. Approvals are never reachable from it.
+    val controlRuntime = java.util.concurrent.atomic.AtomicReference<ApplicationRuntime?>(null)
+    val controlDrafter = java.util.concurrent.atomic.AtomicReference<(suspend (String) -> com.hereliesaz.geministrator.control.ControlDraftOutcome)?>(null)
+    val controlApi = DesktopControlApi()
+    controlApi.attachHost(
+        com.hereliesaz.geministrator.control.RuntimeControlHost(
+            runtime = controlRuntime::get,
+            authoredStore = com.hereliesaz.geministrator.azphalt.SettingsAuthoredWorkflowStore(),
+            drafter = controlDrafter::get,
+            appVersion = System.getProperty("jpackage.app-version")?.takeIf(String::isNotBlank) ?: "dev",
+            settingsView = {
+                kotlinx.serialization.json.buildJsonObject {
+                    put("a2aServerEnabled", kotlinx.serialization.json.JsonPrimitive(a2aServer.enabledPreference))
+                    put("a2aServerOpenToNetwork", kotlinx.serialization.json.JsonPrimitive(a2aServer.lanPreference))
+                    put("controlApiAddress", kotlinx.serialization.json.JsonPrimitive(controlApi.baseUrl))
+                }
+            },
+        ),
+    )
+    controlApi.startIfEnabled()
 
     try {
         application {
@@ -548,7 +569,11 @@ fun main() {
                             val shown = (state as? ApplicationRuntimeState.Live)?.presentation?.run?.id?.value
                             uiScope.launch { a2aServer.core.runtimeShowsRun(shown) }
                         },
-                        onRuntimeAvailable = a2aServer::attachRuntime,
+                        onRuntimeAvailable = { active ->
+                            a2aServer.attachRuntime(active)
+                            controlRuntime.set(active)
+                        },
+                        onSwarmDrafterAvailable = { drafter -> controlDrafter.set(drafter) },
                         localOrchestrationSpecialistSetting = localOrchestrationSetting,
                         onDeviceSmallTaskSetting = OnDeviceSmallTaskSetting(
                             enabled = onDeviceSmallTasksEnabled,
@@ -591,6 +616,7 @@ fun main() {
     } finally {
         testRunner.close()
         runCatching { a2aServer.stop() }
+        runCatching { controlApi.stop() }
         memoryLayer.detach()
         memoryScope.cancel()
         memorySessions.close()

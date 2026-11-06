@@ -494,6 +494,38 @@ The Aive delegates a role's task to a remote A2A agent, and on desktop can accep
 - Describing providers is a small disclosure: anyone who can read the card learns which provider kinds are linked and which roles use them. It is on by default only while loopback only (readable by local processes, which can already find the port) and off by default on the network; a keeper who switches it on explicitly accepts it there.
 - A hive card shared by a keeper carries role and provider ids, strands and, if asked, one-line objectives, which can reveal what the work is about; the keeper chooses to send it and objectives are off by default. An imported card can still name roles and a hive shape the keeper did not intend; it needs a keeper to create and launch it, and every gate stays.
 
+### Control API and MCP bridge (desktop, opt-in)
+
+External agents (Claude Desktop, Claude Code, any MCP client) can read and steer a running desktop app through a standalone bridge process, `mcpBridge`, which speaks MCP over stdio and calls the app's control API. Behavior and tool list: `docs/MCP.md`.
+
+**Assets**
+- The control token (a file in `~/.aive/control`, readable only by the user). Whoever holds it can read hives, runs and logs, edit authored hives and start or stop runs on the user's linked providers.
+- Run text (objectives, progress, artifacts, logs), which can hold anything a provider produced.
+
+**Threats**
+- A web page in the user's browser reaches the loopback server (CSRF, DNS rebinding).
+- A local process without the token probes the port; one with the token acts as a full client.
+- An external agent tries to approve its own work: by an approve endpoint, by a tool, or by removing or relaxing a gate in a hive and then running it.
+- An external agent authors a hive that changes a repository, runs a script or deploys, and starts it.
+- A key or the token itself is carried out in a result (a pasted log, an error).
+- Objective text from an agent is prompt injection for the creatures that read it.
+
+**Mitigations in place**
+- Off by default. It is turned on with `AIVE_CONTROL_API=on` or the preference `enabled`, and listens only on `127.0.0.1` (default port 41242). It refuses a caller that is not loopback, any request with an `Origin` header, and any `Host` that is not a loopback name. It sends no CORS headers.
+- Every call needs `Authorization: Bearer <token>`, compared in constant time. The token is 32 random bytes made once per install, written to a file created with mode 0600 in a 0700 folder. It is never logged, shown, placed in `control.json` (the discovery file, which holds only the address and the token file path), in a result, or in the docs. Every answer is scrubbed of the token and of the common key shapes (`ControlRedaction`). The bridge reads the token per call, sends it only to a loopback address, and refuses any other.
+- **No approval is reachable.** The route table has no route that approves, rejects, releases or delegates a gate, lifts a spend stop, or reads a key store, and the host interface has no member that could. `GET /approvals` lists what waits, read-only. Tests enumerate the route table and the tool list, hit every route and method plus approval-shaped paths, check that a pending gate stays pending, and scan the control sources for calls that decide a gate (`ControlApprovalBoundaryTest`, `RuntimeControlHostTest`, `ControlApiTest`, `BridgeAgainstControlApiTest`).
+- **Invariant 4 holds.** A hive can be authored over this interface from only two kinds of creature: an agent working as a switched-on role, and a human-approval gate. Scripts, deployments, GitHub actions, nested workflows and repository operations cannot be authored, and the fields that would carry an executor are refused. Every save runs `WorkflowGraphValidator`, so a repository mutation already in a hive keeps its human-approval ancestor. A creature that waits for a person, or whose approval is human, cannot be removed or relaxed here; a creature that is not an agent or a gate cannot be changed here.
+- Only hives made in the app (the authored list) can be changed or deleted, never while a run of them is live, and never one that came from a package or is used as a circuit by another hive.
+- Starting a run uses the same launch path as the launch form, only for a saved hive, and is refused while a run is unfinished. A run started this way waits at every gate for the person at the app. Stopping a run cancels it like a replaced run; it decides nothing.
+- Role provider assignment uses the same save as the Swarm screen's picker (`preferredProviderId`), and only to a provider that is linked. Provider listings show connection state and the kind of failure, never a key or a provider's own message.
+- Bodies are capped at 256 KB, strings in answers at 4,000 characters.
+
+**Residual risks**
+- Anyone holding the token is a full client until the file is deleted and the app restarted; there is no per-client identity, rate limit or spend cap. A process that already runs as the user can read the token file.
+- An objective, hive or creature text written by an agent is external content to the creatures that read it. Invariant 7 still applies: a creature that can change something waits at a context-taint gate for a person. Authored hives are not scanned for injected instructions.
+- An agent can add creatures with a role that has broad authorities, and start a run that spends the user's provider credit. Each run still waits at its gates, and spend caps still stop it.
+- The pause, resume, spend-stop and Hall Monitor controls are not offered over this interface.
+
 ### Remote access and relay (Android)
 
 The Aive can be driven from IDEaz on another device through a relay Worker (`relay/`), or by IDEaz on the same device through the bound service. Protocol: `docs/Remote-API.md`.
@@ -577,6 +609,7 @@ The following invariants must hold regardless of the integration used:
 
 Invariant 4, together with the gate-decider, approval-policy and add-on permission checks, is decided by the in-process policy decision point ([`architecture/POLICY.md`](architecture/POLICY.md)). Its denials and approval requirements are recorded on the run timeline. A policy rule may add a gate but must never relax an invariant.
 7. An agent's question to the keeper is drawn only from the host catalog in `AgentUi`; anything outside it is shown as plain text, and no part of it is executed, fetched or rendered as markup.
+8. No remote or local-agent interface (MCP bridge, control API, A2A server) can approve, reject or release a gate, lift a spend stop, or remove a human approval. Those decisions are made only in the app, by the person.
 
 ## Open Items
 

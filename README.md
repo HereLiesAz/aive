@@ -63,6 +63,7 @@ Start with [`docs/README.md`](docs/README.md).
 - [Prompt caching](docs/architecture/PROMPT_CACHING.md)
 - [Remote API (Android)](docs/Remote-API.md)
 - [A2A (Agent2Agent)](docs/A2A.md)
+- [MCP server (bridge and control API)](docs/MCP.md)
 - [Branding](docs/BRANDING.md)
 - [Privacy policy](docs/PRIVACY.md)
 

@@ -163,3 +163,5 @@ The product name is **The Aive**. Technical artifact names may use `haive`. The 
 
 [`architecture/MCP_HOST.md`](architecture/MCP_HOST.md) defines the MCP host: keeper-configured MCP servers, the dual-era client, the tool-use loop for function-calling providers, and per-server, per-run consent.
 [`A2A.md`](A2A.md) defines The Aive's Agent2Agent support: remote A2A agents as explicit-only providers, and the opt-in, loopback, token-protected desktop A2A server that launches workflows.
+
+[`MCP.md`](MCP.md) describes the standalone MCP bridge and the desktop control API behind it: what an external agent can read and author, how runs are controlled, and why approvals stay in the app.
