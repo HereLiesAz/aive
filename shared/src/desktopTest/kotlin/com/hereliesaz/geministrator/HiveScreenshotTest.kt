@@ -40,14 +40,20 @@ import kotlin.test.assertTrue
 class HiveScreenshotTest {
     private val out = File("build/hive-screens").apply { mkdirs() }
 
-    private fun shoot(name: String, width: Int, height: Int, content: @androidx.compose.runtime.Composable () -> Unit) {
+    private fun shoot(name: String, width: Int, height: Int, content: @androidx.compose.runtime.Composable () -> Unit) =
+        shootSettled(name, width, height, 900, content)
+
+    /** [settleMillis] past 900 renders further frames, 100 ms apart, for a shot that waits on an animation. */
+    private fun shootSettled(name: String, width: Int, height: Int, settleMillis: Int, content: @androidx.compose.runtime.Composable () -> Unit) {
         ImageComposeScene(width = width, height = height, density = Density(2f)) {
             LoadAzphaltFonts()
             Box(Modifier.fillMaxSize().background(Azphalt.currentGround.page).padding(12.dp)) { content() }
         }.use { scene ->
             scene.render(0L)
             scene.render(400_000_000L)
-            val bytes = scene.render(900_000_000L).encodeToData()!!.bytes
+            var image = scene.render(900_000_000L)
+            for (ms in 1_000..settleMillis step 100) image = scene.render(ms * 1_000_000L)
+            val bytes = image.encodeToData()!!.bytes
             assertTrue(bytes.size > 10_000, "$name looks blank")
             File(out, "$name.png").writeBytes(bytes)
         }
@@ -726,6 +732,31 @@ class HiveScreenshotTest {
         val names = definition.tasks.associate { it.id to it.name }
         shoot("35-waterfall", 900, 1100) {
             RunWaterfallChart(waterfall, taskName = { names[it] ?: it.value }, selectedTaskId = "build", onTaskSelected = {})
+        }
+    }
+
+    /** The Timeline's row (Overview, Waterfall, Events, Memory) at a phone's width, Waterfall then Memory open. */
+    @Test
+    fun shootsTheTimelineRow() {
+        val runId = WorkflowRunId("run-timeline-row")
+        val events = listOf(
+            com.hereliesaz.geministrator.events.TaskStarted(runId, TaskDefinitionId("contract"), 1, 0),
+            com.hereliesaz.geministrator.events.TaskCompleted(runId, TaskDefinitionId("contract"), 90_000),
+        )
+        try {
+            for ((view, name) in listOf("waterfall" to "36-timeline-row", "memory" to "37-timeline-memory")) {
+                DurableUiState.store.putString("overview.timeline.view", view)
+                shootSettled(name, 780, 900, 2_500) {
+                    RunTimeline(
+                        runKey = "run-timeline-row",
+                        onLoadTimeline = { events },
+                        onShowHive = {},
+                        memoryContent = { MemoryLayerScreen(controller = null, connectedProviderIds = emptySet(), compact = true) },
+                    )
+                }
+            }
+        } finally {
+            DurableUiState.store.putString("overview.timeline.view", "waterfall")
         }
     }
 
