@@ -518,6 +518,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_stop_cancel">Keep running</string>
     <string name="timeline_view_waterfall">Waterfall</string>
     <string name="timeline_view_events">Events</string>
+    <string name="timeline_view_memory">Memory</string>
     <string name="waterfall_empty">No creature has started yet.</string>
     <string name="waterfall_span">Over %1$s</string>
     <string name="waterfall_hint">Hover or tap a bar to see its phases and usage. Tapping opens its creature.</string>

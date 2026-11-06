@@ -729,6 +729,24 @@ class HiveScreenshotTest {
         }
     }
 
+    /** The Timeline's own row: Overview, Waterfall, Events, and Memory last, on a phone's width. */
+    @Test
+    fun shootsTheTimelineRow() {
+        val runId = WorkflowRunId("run-timeline-row")
+        val events = listOf(
+            com.hereliesaz.geministrator.events.TaskStarted(runId, TaskDefinitionId("contract"), 1, 0),
+            com.hereliesaz.geministrator.events.TaskCompleted(runId, TaskDefinitionId("contract"), 90_000),
+        )
+        shoot("36-timeline-row", 390, 420) {
+            RunTimeline(
+                runKey = "run-timeline-row",
+                onLoadTimeline = { events },
+                onShowHive = {},
+                onOpenMemory = {},
+            )
+        }
+    }
+
     /** The neuron, the body of programmatic work, in its states. */
     @Test
     fun shootsTheNeuron() {

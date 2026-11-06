@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- **Memory** is now the last item in the Timeline's row (Overview, Waterfall, Events, Memory) and opens the Memory swarm. It leaves the hive's row of places, so a phone reaches it from a live hive's Timeline; the wide rail keeps its Memory place.
 - Closing a creature's panel no longer zooms the hive back out: dismissing the sheet (or the dock's close, or Back) sets the panel aside and leaves the creature selected, so the field keeps its zoom level and the other levels stay a step away. Tap the creature again to reopen it; tap bare ground to let it go.
 - A live hive has a **Stop** pill, shown while its run is unfinished: it asks, then cancels every unfinished creature and provider session. Finished work is kept.
 - The Timeline's way back is now **Overview**, and sits on one row with **Waterfall** and **Events** instead of a row of its own.

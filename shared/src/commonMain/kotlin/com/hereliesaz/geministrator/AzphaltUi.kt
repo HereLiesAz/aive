@@ -349,6 +349,8 @@ internal fun AzphaltTabs(
     modifier: Modifier = Modifier,
     /** A control that rides at the row's start (a way back, say) and is not itself a tab. */
     leading: (@Composable () -> Unit)? = null,
+    /** A control that rides at the row's end (a way on to another place) and is not itself a tab. */
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier = modifier
@@ -369,6 +371,7 @@ internal fun AzphaltTabs(
                 stateDescription = stringResource(Res.string.tab_position, index + 1, tabs.size),
             )
         }
+        trailing?.invoke()
     }
 }
 

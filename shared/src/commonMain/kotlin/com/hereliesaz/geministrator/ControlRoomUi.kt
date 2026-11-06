@@ -698,7 +698,10 @@ private fun OverviewSectionTabs(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (places) leading()
+        // The Memory swarm is not a pill here: it is the last item of a live hive's Timeline row
+        // (RunTimeline's onOpenMemory). The index stays the section's own, so the others keep their colours.
         if (places) ControlRoomDestination.OverviewSections.forEachIndexed { index, section ->
+            if (section == ControlRoomDestination.Memory) return@forEachIndexed
             AzphaltPill(
                 label = section.label,
                 seed = "overview-section-$index-${section.name}",
@@ -1011,6 +1014,7 @@ private fun MainDestination(
                                     selectedTaskId = selectedTaskId,
                                     onTaskSelected = onTaskSelected,
                                     onShowHive = { showTimeline = false },
+                                    onOpenMemory = { onDestinationSelected(ControlRoomDestination.Memory) },
                                 )
                             } else {
         MindMapRunScreen(

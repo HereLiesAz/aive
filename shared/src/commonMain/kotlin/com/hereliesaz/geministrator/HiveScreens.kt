@@ -32,6 +32,7 @@ import com.hereliesaz.geministrator.resources.hive_show_hive
 import com.hereliesaz.geministrator.resources.hive_timeline
 import com.hereliesaz.geministrator.resources.hive_timeline_empty
 import com.hereliesaz.geministrator.resources.timeline_view_events
+import com.hereliesaz.geministrator.resources.timeline_view_memory
 import com.hereliesaz.geministrator.resources.timeline_view_waterfall
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -125,6 +126,8 @@ internal fun RunTimeline(
     selectedTaskId: String? = null,
     onTaskSelected: (String) -> Unit = {},
     onShowHive: (() -> Unit)? = null,
+    /** Opens the Memory swarm; its pill is the last one in the row of views. Null leaves it out. */
+    onOpenMemory: (() -> Unit)? = null,
 ) {
     var events by remember(runKey) { mutableStateOf<List<WorkflowEvent>?>(null) }
     // Reload on every change of the run, but keep showing the last events meanwhile: only a different
@@ -138,9 +141,15 @@ internal fun RunTimeline(
         val overview: (@Composable () -> Unit)? = onShowHive?.let { show ->
             { AzphaltPill(label = stringResource(Res.string.hive_show_hive), seed = "timeline-show-hive", onClick = show) }
         }
+        val memory: (@Composable () -> Unit)? = onOpenMemory?.let { open ->
+            { AzphaltPill(label = stringResource(Res.string.timeline_view_memory), seed = "timeline-memory", onClick = open) }
+        }
         val list = events
         if (list == null || list.isEmpty()) {
-            overview?.invoke()
+            Row(horizontalArrangement = Arrangement.spacedBy(AzphaltSpacing.s)) {
+                overview?.invoke()
+                memory?.invoke()
+            }
             if (list != null) Text(stringResource(Res.string.hive_timeline_empty), style = AzphaltType.body, color = azphaltOnSurface())
             return@Column
         }
@@ -153,6 +162,7 @@ internal fun RunTimeline(
             onSelected = { view = it },
             seedPrefix = "timeline-view",
             leading = overview,
+            trailing = memory,
         )
         if (view != TIMELINE_EVENTS) {
             var now by remember(runKey) { mutableStateOf(Clock.System.now().toEpochMilliseconds()) }
