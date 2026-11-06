@@ -24,6 +24,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -349,13 +355,29 @@ internal fun AzphaltTabs(
     modifier: Modifier = Modifier,
     /** A control that rides at the row's start (a way back, say) and is not itself a tab. */
     leading: (@Composable () -> Unit)? = null,
-    /** A control that rides at the row's end (a way on to another place) and is not itself a tab. */
-    trailing: (@Composable () -> Unit)? = null,
+    /** Scrolls the selected tab into view when it changes, so a row that overflows never hides where you are. */
+    keepSelectedInView: Boolean = false,
 ) {
+    val scroll = rememberScrollState()
+    var viewport by remember { mutableStateOf(0) }
+    // Each tab's span along the row, so a selection that overflows can be scrolled into view.
+    val spans = remember { mutableStateMapOf<String, IntRange>() }
+    if (keepSelectedInView) {
+        val span = spans[selectedKey]
+        LaunchedEffect(selectedKey, span, viewport) {
+            span ?: return@LaunchedEffect
+            val edge = 16
+            when {
+                span.last + edge > scroll.value + viewport -> scroll.animateScrollTo(span.last + edge - viewport)
+                span.first - edge < scroll.value -> scroll.animateScrollTo((span.first - edge).coerceAtLeast(0))
+            }
+        }
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
+            .onSizeChanged { viewport = it.width }
+            .horizontalScroll(scroll)
             .selectableGroup(),
         horizontalArrangement = Arrangement.spacedBy(AzphaltSpacing.s),
     ) {
@@ -367,11 +389,15 @@ internal fun AzphaltTabs(
                 selected = tab.key == selectedKey,
                 endCap = tab.endCap,
                 onClick = { onSelected(tab.key) },
+                modifier = if (keepSelectedInView) {
+                    Modifier.onPlaced { spans[tab.key] = it.positionInParent().x.toInt().let { x -> x..(x + it.size.width) } }
+                } else {
+                    Modifier
+                },
                 role = Role.Tab,
                 stateDescription = stringResource(Res.string.tab_position, index + 1, tabs.size),
             )
         }
-        trailing?.invoke()
     }
 }
 

@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -126,71 +127,80 @@ internal fun RunTimeline(
     selectedTaskId: String? = null,
     onTaskSelected: (String) -> Unit = {},
     onShowHive: (() -> Unit)? = null,
-    /** Opens the Memory swarm; its pill is the last one in the row of views. Null leaves it out. */
-    onOpenMemory: (() -> Unit)? = null,
+    /**
+     * The Memory swarm's own screen, shown in place as the row's last view. It scrolls itself, so it
+     * is given the room under the row. Null leaves the Memory view out.
+     */
+    memoryContent: (@Composable () -> Unit)? = null,
 ) {
     var events by remember(runKey) { mutableStateOf<List<WorkflowEvent>?>(null) }
     // Reload on every change of the run, but keep showing the last events meanwhile: only a different
     // run (runKey) starts blank, so the viewer's scroll position and tab survive live updates.
     LaunchedEffect(runKey, refreshKey) { events = onLoadTimeline() }
     var view by rememberDurableStringState("overview.timeline.view", TIMELINE_WATERFALL)
-    Column(modifier = modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    val shown = if (view == TIMELINE_MEMORY && memoryContent == null) TIMELINE_WATERFALL else view
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(Res.string.hive_timeline), style = AzphaltType.eyebrow, color = azphaltOnSurface())
         // The way back to the hive, always in view: the places row it also lives in scrolls off a phone.
-        // It rides at the start of the views' own row, so the three sit side by side.
+        // It rides at the start of the views' own row: Overview, Waterfall, Events, Memory.
         val overview: (@Composable () -> Unit)? = onShowHive?.let { show ->
             { AzphaltPill(label = stringResource(Res.string.hive_show_hive), seed = "timeline-show-hive", onClick = show) }
         }
-        val memory: (@Composable () -> Unit)? = onOpenMemory?.let { open ->
-            { AzphaltPill(label = stringResource(Res.string.timeline_view_memory), seed = "timeline-memory", onClick = open) }
-        }
-        val list = events
-        if (list == null || list.isEmpty()) {
-            Row(horizontalArrangement = Arrangement.spacedBy(AzphaltSpacing.s)) {
-                overview?.invoke()
-                memory?.invoke()
-            }
-            if (list != null) Text(stringResource(Res.string.hive_timeline_empty), style = AzphaltType.body, color = azphaltOnSurface())
-            return@Column
-        }
         AzphaltTabs(
-            tabs = listOf(
-                AzphaltTabItem(TIMELINE_WATERFALL, stringResource(Res.string.timeline_view_waterfall)),
-                AzphaltTabItem(TIMELINE_EVENTS, stringResource(Res.string.timeline_view_events)),
-            ),
-            selectedKey = view,
+            tabs = buildList {
+                add(AzphaltTabItem(TIMELINE_WATERFALL, stringResource(Res.string.timeline_view_waterfall)))
+                add(AzphaltTabItem(TIMELINE_EVENTS, stringResource(Res.string.timeline_view_events)))
+                if (memoryContent != null) add(AzphaltTabItem(TIMELINE_MEMORY, stringResource(Res.string.timeline_view_memory)))
+            },
+            selectedKey = shown,
             onSelected = { view = it },
             seedPrefix = "timeline-view",
             leading = overview,
-            trailing = memory,
+            keepSelectedInView = true,
         )
-        if (view != TIMELINE_EVENTS) {
-            var now by remember(runKey) { mutableStateOf(Clock.System.now().toEpochMilliseconds()) }
-            val waterfall = remember(list, now) { runWaterfall(list, now) }
-            val reduceMotion = AzphaltMotion.reduceMotion
-            LaunchedEffect(runKey, waterfall.live, reduceMotion) {
-                while (waterfall.live && !reduceMotion) {
-                    delay(1_000)
-                    now = Clock.System.now().toEpochMilliseconds()
-                }
-            }
-            RunWaterfallChart(waterfall, taskName, selectedTaskId, onTaskSelected)
+        // Memory scrolls itself; the timeline's own views share one scrolling body under the fixed row.
+        if (shown == TIMELINE_MEMORY) {
+            Box(Modifier.weight(1f).fillMaxWidth()) { memoryContent?.invoke() }
             return@Column
         }
-        list.sortedBy { it.occurredAtEpochMillis }.forEach { event ->
-            AzphaltRecord(
-                seed = "event-${event.occurredAtEpochMillis}-${event::class.simpleName}",
-                eyebrow = workflowEventTaskId(event)?.value?.takeLast(12) ?: "workflow",
-                title = workflowEventLabel(event),
-                body = workflowEventDetail(event),
-                endCap = null,
-            )
+        Column(
+            modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            val list = events ?: return@Column
+            if (list.isEmpty()) {
+                Text(stringResource(Res.string.hive_timeline_empty), style = AzphaltType.body, color = azphaltOnSurface())
+                return@Column
+            }
+            if (shown != TIMELINE_EVENTS) {
+                var now by remember(runKey) { mutableStateOf(Clock.System.now().toEpochMilliseconds()) }
+                val waterfall = remember(list, now) { runWaterfall(list, now) }
+                val reduceMotion = AzphaltMotion.reduceMotion
+                LaunchedEffect(runKey, waterfall.live, reduceMotion) {
+                    while (waterfall.live && !reduceMotion) {
+                        delay(1_000)
+                        now = Clock.System.now().toEpochMilliseconds()
+                    }
+                }
+                RunWaterfallChart(waterfall, taskName, selectedTaskId, onTaskSelected)
+                return@Column
+            }
+            list.sortedBy { it.occurredAtEpochMillis }.forEach { event ->
+                AzphaltRecord(
+                    seed = "event-${event.occurredAtEpochMillis}-${event::class.simpleName}",
+                    eyebrow = workflowEventTaskId(event)?.value?.takeLast(12) ?: "workflow",
+                    title = workflowEventLabel(event),
+                    body = workflowEventDetail(event),
+                    endCap = null,
+                )
+            }
         }
     }
 }
 
 private const val TIMELINE_WATERFALL = "waterfall"
 private const val TIMELINE_EVENTS = "events"
+private const val TIMELINE_MEMORY = "memory"
 
 /**
  * A hive that has never run (mockups H2, H6): its workflow at rest, editable in Build, with the
