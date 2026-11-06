@@ -21,6 +21,9 @@ Plan of record: three PRs, in order. Rules: no dice, no drift (docs/Ecology-and-
 
 ## PR 2: role-bound creatures that roam (own approval first)
 ## PR 3: orchestrator's first egg is a plan reviewer (own approval first)
+Revised by the keeper: a workflow saved in Build is a *rough design*. The orchestrator still decides exactly how best to execute it, at run time. So the reviewer is not a static insertion into the saved graph: the first thing the orchestrator makes, when it turns the rough design into its real plan, is a reviewer of *that* plan.
+- [ ] Map how (and whether) an orchestrator can materialise or refine tasks in a running run. Not yet read: `WorkflowRunFactory.create`, the expanders, `SwarmDraft`, `EnginePlanGate`.
+- [ ] Consequence for PR 1: the field draws `stagedDefinition`. If the orchestrator adds tasks at run time, the births and eggs must come from the run's materialised plan, not the Build design. Decide before PR 1's wiring lands.
 
 ## Review
 (filled in as each PR lands)
