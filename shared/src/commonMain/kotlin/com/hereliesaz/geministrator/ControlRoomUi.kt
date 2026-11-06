@@ -299,6 +299,11 @@ fun ControlRoom(
         enabled = destination == ControlRoomDestination.Overview && !district.value && !inspectorVisible &&
             (liveWorkflow != null || restingHive.value.isNotBlank()),
     ) { zoomOut() }
+    // On a live hive's Timeline, Back returns to the hive itself before it zooms out to the district.
+    PlatformBackHandler(
+        enabled = destination == ControlRoomDestination.Overview && !district.value && !inspectorVisible &&
+            liveWorkflow != null && restingHive.value.isBlank() && showTimeline.value,
+    ) { showTimeline.value = false }
     val crumbs = shellCrumbs(
         destination = destination,
         inDistrict = district.value,
@@ -312,6 +317,9 @@ fun ControlRoom(
         },
         creatureName = selectedTaskId?.takeIf { inspectorVisible }?.let { id -> creatureCrumb(id, liveWorkflow, restingDefinition) },
         creatureTab = creatureTab.takeIf { inspectorVisible }?.label(),
+        timelineName = stringResource(Res.string.hive_show_timeline).takeIf {
+            showTimeline.value && liveWorkflow != null && !restingShown
+        },
         keeperPart = KeeperSection.entries.firstOrNull { it.name == keeperSectionName.value }
             ?.takeIf { !compact || keeperOpen.value }?.let { stringResource(it.title) },
         onOpenDistrict = {
@@ -324,6 +332,7 @@ fun ControlRoom(
         },
         onOpenHive = {
             if (inspectorVisible) selectedTaskId?.let(onTaskSelected)
+            showTimeline.value = false
             district.value = false
             onDestinationSelected(ControlRoomDestination.Overview)
         },
@@ -545,6 +554,7 @@ private fun shellCrumbs(
     hiveName: String?,
     creatureName: String?,
     creatureTab: String?,
+    timelineName: String?,
     keeperPart: String?,
     onOpenDistrict: () -> Unit,
     onOpenHive: () -> Unit,
@@ -556,6 +566,7 @@ private fun shellCrumbs(
         destination == ControlRoomDestination.Overview -> {
             if (inDistrict) return@buildList
             hiveName?.takeIf(String::isNotBlank)?.let { add(ShellCrumb(it, "crumb-a-hive", onOpenHive)) }
+            if (creatureName == null) timelineName?.let { add(ShellCrumb(it, "crumb-timeline", null)) }
             creatureName?.let { add(ShellCrumb(it, "crumb-creature", onCloseCreature)) }
             if (creatureName != null) creatureTab?.let { add(ShellCrumb(it, "crumb-creature-tab", null)) }
         }
@@ -956,6 +967,7 @@ private fun MainDestination(
                                     taskName = { id -> live.definition.tasks.firstOrNull { it.id == id }?.name ?: id.value },
                                     selectedTaskId = selectedTaskId,
                                     onTaskSelected = onTaskSelected,
+                                    onShowHive = { showTimeline = false },
                                 )
                             } else {
         MindMapRunScreen(

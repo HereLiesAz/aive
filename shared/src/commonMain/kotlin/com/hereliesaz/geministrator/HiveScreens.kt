@@ -28,6 +28,7 @@ import com.hereliesaz.geministrator.resources.hive_launch_failed
 import com.hereliesaz.geministrator.resources.hive_new_name
 import com.hereliesaz.geministrator.resources.hive_objective
 import com.hereliesaz.geministrator.resources.hive_repository
+import com.hereliesaz.geministrator.resources.hive_show_hive
 import com.hereliesaz.geministrator.resources.hive_timeline
 import com.hereliesaz.geministrator.resources.hive_timeline_empty
 import com.hereliesaz.geministrator.resources.timeline_view_events
@@ -122,12 +123,17 @@ internal fun RunTimeline(
     taskName: (TaskDefinitionId) -> String = { it.value },
     selectedTaskId: String? = null,
     onTaskSelected: (String) -> Unit = {},
+    onShowHive: (() -> Unit)? = null,
 ) {
     var events by remember(runKey) { mutableStateOf<List<WorkflowEvent>?>(null) }
     LaunchedEffect(runKey) { events = onLoadTimeline() }
     var view by rememberDurableStringState("overview.timeline.view", TIMELINE_WATERFALL)
     Column(modifier = modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(Res.string.hive_timeline), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+        // The way back to the hive, always in view: the places row it also lives in scrolls off a phone.
+        onShowHive?.let { show ->
+            AzphaltPill(label = stringResource(Res.string.hive_show_hive), seed = "timeline-show-hive", onClick = show)
+        }
         val list = events ?: return@Column
         if (list.isEmpty()) {
             Text(stringResource(Res.string.hive_timeline_empty), style = AzphaltType.body, color = azphaltOnSurface())
