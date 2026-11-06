@@ -34,7 +34,7 @@ sqldelight = "2.4.1"
 # MCP code execution on desktop (docs/architecture/MCP_HOST.md): QuickJS compiled to WebAssembly,
 # run by Endive (formerly Chicory), a pure-JVM WebAssembly runtime: no native code, no JNI, and a
 # guest with no filesystem, network or environment. Pulls run.endive 1.0.0 and jackson-databind.
-quickjs4j = "0.1.0"
+quickjs4j = "0.1.1"
 
 [libraries]
 quickjs4j = { module = "io.roastedroot:quickjs4j", version.ref = "quickjs4j" }
