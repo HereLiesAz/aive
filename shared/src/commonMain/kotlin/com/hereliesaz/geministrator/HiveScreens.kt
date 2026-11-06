@@ -110,7 +110,7 @@ internal fun hiveRepository(locator: String): com.hereliesaz.geministrator.domai
 /**
  * A comb's timeline (mockup H3): the run as a waterfall of its creatures' attempts
  * ([runWaterfall], [RunWaterfallChart]), or its events in order, what the Runs tab used to list.
- * The choice is remembered. While the run lives, unfinished bars grow to now, once a second;
+ * The choice is remembered. New events replace the list in place; the view never blanks or scrolls back. While the run lives, unfinished bars grow to now, once a second;
  * with reduced motion they move only when new events arrive.
  */
 @OptIn(ExperimentalTime::class)
@@ -119,12 +119,15 @@ internal fun RunTimeline(
     runKey: String,
     onLoadTimeline: suspend () -> List<WorkflowEvent>,
     modifier: Modifier = Modifier,
+    refreshKey: Any = runKey,
     taskName: (TaskDefinitionId) -> String = { it.value },
     selectedTaskId: String? = null,
     onTaskSelected: (String) -> Unit = {},
 ) {
     var events by remember(runKey) { mutableStateOf<List<WorkflowEvent>?>(null) }
-    LaunchedEffect(runKey) { events = onLoadTimeline() }
+    // Reload on every change of the run, but keep showing the last events meanwhile: only a different
+    // run (runKey) starts blank, so the viewer's scroll position and tab survive live updates.
+    LaunchedEffect(runKey, refreshKey) { events = onLoadTimeline() }
     var view by rememberDurableStringState("overview.timeline.view", TIMELINE_WATERFALL)
     Column(modifier = modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(Res.string.hive_timeline), style = AzphaltType.eyebrow, color = azphaltOnSurface())
