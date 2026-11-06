@@ -133,6 +133,8 @@ fun App(
     onRunTimelineChanged: ((List<com.hereliesaz.geministrator.events.WorkflowEvent>) -> Unit)? = null,
     /** The runtime once it exists (null while it is replaced), for hosts outside the UI (the desktop A2A server). */
     onRuntimeAvailable: (ApplicationRuntime?) -> Unit = {},
+    /** The linked planner's swarm draft (null while there is none), for hosts outside the UI (the desktop control API, docs/MCP.md). */
+    onSwarmDrafterAvailable: ((suspend (String) -> com.hereliesaz.geministrator.control.ControlDraftOutcome)?) -> Unit = {},
     /** Credential stores for the setup file; null leaves credentials out of it. */
     setupSecretStore: SetupSecretStore? = null,
     /** The MCP host and its approval gate (docs/architecture/MCP_HOST.md); null where there is none. */
@@ -384,6 +386,20 @@ fun App(
         observer(timeline)
     }
     LaunchedEffect(runtime) { onRuntimeAvailable(runtime) }
+    LaunchedEffect(runtime, orchestrationRuntime) {
+        onSwarmDrafterAvailable(
+            orchestrationRuntime?.let { planner ->
+                { prompt: String ->
+                    val active = runtime
+                    if (active == null) {
+                        com.hereliesaz.geministrator.control.controlDraftOutcome(SwarmDraftResult.Unavailable)
+                    } else {
+                        com.hereliesaz.geministrator.control.controlDraftOutcome(active.draftSwarm(prompt, planner))
+                    }
+                }
+            },
+        )
+    }
 
     // Requests whose launch finished here. The host drops them from its queue asynchronously, so
     // this keeps a finished request from being launched twice in the meantime.
