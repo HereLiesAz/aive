@@ -111,6 +111,26 @@ Under the A2A server row, **Open to this network** is off by default, even thoug
 
 **Authority.** The server cannot approve a plan, task or gate, choose a provider, or touch a repository. A run it starts waits at its gates for the person at The Aive, like any other run.
 
+### Describing providers
+
+The card can also say which providers the swarm can use, so another agent can see what a multi-provider hive is made of. **Keeper's room > This device > A2A server > Describe my providers in the card** controls it (desktop only; Android and web have no server).
+
+- **What is added.** One skill `provider:<id>` per provider that is linked here (the live provider registry holds only those), up to 24, sorted by id. Each has the name the app shows, the description "Linked provider. Reports: plan generation, research." built from its capability names, and tags `provider` plus the capability names. Each `role:<id>` skill gains the tag `provider:<id>` of its preferred provider (while that provider is linked) or `provider:auto`, and a clause "Provider: ..." in its description. A remote A2A agent shows as `provider:a2a-<hash>` named "Remote A2A agent", never by host.
+- **What is never added.** Keys, tokens, base URLs, account names or emails, model names, balances, anything from the secret stores. Only id, shown name and capabilities are read.
+- **Default (the rule).** If the keeper never pressed the switch, providers are described while the server is on this computer only, and left out as soon as **Open to this network** is on, since the card is then readable by the whole network. Once pressed, the choice is kept as set, on or off, on any network (`a2aDescribeProviders`, key `describe-providers` in the server's preferences). Loopback only is already limited to this computer's processes; the network is a wider audience, so it needs a deliberate yes.
+
+## Hive cards
+
+A hive card is a portable record of one hive: which role each creature has and which provider it runs on, plus its strands. It works on every platform and needs no server. It is an A2A 1.0 Agent Card (`A2aCodec.encodeCard`) whose skills are the creatures (`creature:<id>`, tagged `role:<id>` and `provider:<id>` or `provider:auto`), with the record itself in one `capabilities.extensions` entry, URI `urn:aive:a2a:ext:hive-card:v1`, `required: false`. It describes a hive and serves nothing, so it lists no interface. Code: `a2a/A2aHiveCard.kt`.
+
+The record (`params`): `format: "aive-hive-card"`, `version: 1`, `hive.name`, `includesObjectives`, and `creatures` (at most 12), each with `id`, `name`, `kind` (`role`, `approval` or `other`), `role` (role id), `assignment` (`pin` with `provider`, or `auto`), optional `cardUrl` (only for a pinned `a2a:` provider, and only an http(s) address without user info, query or fragment), `dependsOn` (strands) and, only if asked, a one-line `objective`.
+
+- **Sharing.** **Share hive card** appears on a hive (the resting hive in Build, and as a pill on a live hive). **Include each objective** is OFF by default: an objective can say what the work is about, so the default card carries names and roles only. **Copy hive card** puts the text on the clipboard (there is no separate platform share sheet). A pin is a task's required provider, or a role's preferred provider. Conditions on strands are not recorded.
+- **Never included.** Keys, tokens, repository paths or URLs, memory, prompts or role instructions, scripts, executors.
+- **Importing.** **Import hive card** (Hives list) takes pasted text, reads it, shows what it will do in plain words, and **Create this hive** makes a NEW hive (a free `hive-N` id; nothing is overwritten). Creatures whose role is in this swarm keep that role, with the executor taken from this device's role. A pin to a provider that is linked here is kept; a pin to one that is not becomes auto and the summary says "Needs X". It connects nothing and fetches nothing. For an `a2a:` provider that is not linked, the card's address is shown as text, to bring in by hand through **Bring in a drifter**. Creatures whose role is missing are left out with a note; steps of other kinds (scripts, actions, deployments, repository operations, nested workflows) are always left out and counted; human approval steps come back as plain human approvals. Strands to a left-out creature are dropped and counted.
+- **Validation.** At most 256 KB, nesting depth 16, 12 creatures; version must be 1; ids are 1 to 64 of `A-Za-z0-9._:-`; duplicate ids, unknown strands, bad kinds and assignments are refused; names and objectives are cut to one line. The result goes through `WorkflowGraphValidator` like an authored hive (cycles refused). Errors are plain sentences; nothing throws.
+- **Tests.** `A2aHiveCardTest` (round trip, missing provider and role, hostile input, nothing private) and `A2aProviderCardsTest` (provider skills, the default and network rule, bounds, no secrets from a registry of fake providers).
+
 **Android and web.** There is no A2A server on Android or the web. The client works on every platform. On the web, the remote agent must allow the page's origin (CORS).
 
 ## Tests

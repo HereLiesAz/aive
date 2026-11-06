@@ -766,6 +766,8 @@ private fun MainDestination(
 ) {
     // Held above the places row: a live hive's own pills (Timeline, More editing) ride in it.
     var showTimeline by showTimelineState
+    // A live hive's Share hive card panel is open (HiveCardSharePanel).
+    var sharingHiveCard by remember { mutableStateOf(false) }
     // The hive edge's "Bring in a drifter" form is open (A2aDrifterShelf).
     var bringingInDrifter by rememberDurableBooleanState("hive-edge.bringing-in")
     val hiveHost = LocalWorkflowLibraryHost.current
@@ -807,6 +809,12 @@ private fun MainDestination(
                         seed = "hive-timeline",
                         selected = showTimeline,
                         onClick = { showTimeline = !showTimeline },
+                    )
+                    AzphaltPill(
+                        label = hiveCardShareLabel(),
+                        seed = "hive-card-share",
+                        selected = sharingHiveCard,
+                        onClick = { sharingHiveCard = !sharingHiveCard },
                     )
                     // Combine, Save as and the rest live in Workflows, opened on this hive's workflow.
                     AzphaltPill(
@@ -853,6 +861,18 @@ private fun MainDestination(
                                         inDistrict = false
                                     }
                                 }
+                            },
+                            importCard = { cardOpen, onCardOpenChange ->
+                                HiveCardImportPanel(
+                                    open = cardOpen,
+                                    onOpenChange = onCardOpenChange,
+                                    connectedProviderIds = connectedProviderIds,
+                                    onLoadDefinitions = onLoadWorkflowDefinitions,
+                                    onCreated = { hive ->
+                                        restingHiveId = hive.id.value
+                                        inDistrict = false
+                                    },
+                                )
                             },
                             // Escorts to the hive's edge, where a drifter is brought in (docs/Swarm-OS.md).
                             onImportAgent = { bringingInDrifter = true },
@@ -917,6 +937,9 @@ private fun MainDestination(
                     } else {
                         Column(Modifier.fillMaxSize()) {
                             val live = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
+                            if (live != null && sharingHiveCard) {
+                                HiveCardSharePanel(live.definition, Modifier.padding(horizontal = hiveGutter(compact), vertical = 8.dp))
+                            }
                             live?.let {
                                 // The hive's combs: its finished swarms. Opening one switches to it.
                                 RunScars(

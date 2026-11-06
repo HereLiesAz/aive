@@ -407,6 +407,7 @@ fun main() {
                 var a2aStatus by remember { mutableStateOf<A2aServerStatus>(A2aServerStatus.Off) }
                 var a2aTokenTemporary by remember { mutableStateOf(false) }
                 var a2aLan by remember { mutableStateOf(a2aServer.lanPreference) }
+                var a2aDescribeChoice by remember { mutableStateOf(a2aServer.describeProvidersChoice) }
                 var a2aAllowedClients by remember { mutableStateOf(a2aServer.allowedClients().sorted()) }
                 val a2aWaitingClients by a2aServer.core.waitingClients.collectAsState()
                 // Applied off the UI thread: reading or creating the keychain token runs a tool
@@ -456,6 +457,14 @@ fun main() {
                         onForgetClient = { address ->
                             a2aServer.forgetClient(address)
                             a2aAllowedClients = a2aServer.allowedClients().sorted()
+                        },
+                    ),
+                    providerCard = A2aProviderCardSetting(
+                        described = a2aDescribeProviders(a2aDescribeChoice, a2aLan),
+                        explicit = a2aDescribeChoice != null,
+                        onChange = { described ->
+                            a2aServer.describeProvidersChoice = described
+                            a2aDescribeChoice = described
                         },
                     ),
                 )

@@ -33,6 +33,12 @@ interface A2aWorkflowHost {
 
     /** The swarm's roles, listed as skills on the Agent Card. */
     suspend fun roles(): List<RoleDefinition>
+
+    /**
+     * The providers linked here, for the Agent Card (A2aProviderCards.kt). Only id, name and
+     * capabilities; empty by default and whenever the runtime is not awake.
+     */
+    suspend fun providers(): List<A2aProviderInfo> = emptyList()
 }
 
 data class A2aHttpResponse(
@@ -77,6 +83,11 @@ class A2aServer(
     /** Whether a non-loopback client address (normalized) is on the keeper's allowlist. */
     private val isAllowedClient: (address: String) -> Boolean = { false },
     private val sendLimiter: A2aRateLimiter = A2aRateLimiter(),
+    /**
+     * Whether the card describes the linked providers (docs/A2A.md): the host decides from the
+     * keeper's setting and whether the server is open to the network ([a2aDescribeProviders]).
+     */
+    private val describeProviders: () -> Boolean = { false },
 ) {
     private class Record(
         val taskId: String,
@@ -157,6 +168,11 @@ class A2aServer(
     suspend fun card(lanHost: String? = null): A2aAgentCard {
         val base = lanHost?.let(lanBaseUrl) ?: baseUrl()
         val roles = runCatching { host.roles() }.getOrDefault(emptyList()).filter { it.enabled }
+        val providers = if (describeProviders()) {
+            runCatching { host.providers() }.getOrDefault(emptyList())
+        } else {
+            null
+        }
         return A2aAgentCard(
             name = "The Aive",
             description = "Runs a governed hive of AI agents on an objective. Send the objective as text; " +
@@ -173,13 +189,15 @@ class A2aServer(
                     examples = listOf("Write a short design note for offline sync"),
                 ),
             ) + roles.map { role ->
+                val assignment = providers?.let { A2aProviderCards.roleAssignment(role, it) }
                 A2aSkill(
                     id = "role:${role.id.value}",
                     name = role.name,
-                    description = role.description.ifBlank { role.name },
-                    tags = listOf("role") + role.capabilitiesRequired.map { it.name.lowercase() }.sorted(),
+                    description = role.description.ifBlank { role.name } + (assignment?.let { " ${it.second}" } ?: ""),
+                    tags = listOf("role") + role.capabilitiesRequired.map { it.name.lowercase() }.sorted() +
+                        listOfNotNull(assignment?.first),
                 )
-            },
+            } + providers.orEmpty().let(A2aProviderCards::skills),
             defaultInputModes = listOf("text/plain"),
             defaultOutputModes = listOf("text/plain", "text/markdown"),
             bearerAuth = true,
