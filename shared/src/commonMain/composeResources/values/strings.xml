@@ -572,6 +572,12 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="job_then_ask">it asks you</string>
     <string name="job_then_reassign">another creature takes over</string>
     <string name="job_runs_on">Runs on</string>
+    <string name="creature_provider_label">PROVIDER</string>
+    <string name="creature_provider_auto_note">Auto: if its provider fails, this creature moves to another connected provider and carries on.</string>
+    <string name="creature_provider_pinned_note">Pinned to %1$s: this creature never switches providers silently. If %1$s fails, it stops and tells you.</string>
+    <string name="creature_provider_role_scope">The provider belongs to the %1$s role, so every creature wearing that role follows it. It changes who answers, never who must approve.</string>
+    <string name="creature_provider_badge_pinned">Pinned: %1$s</string>
+    <string name="creature_provider_badge_auto">Auto</string>
     <string name="job_runs_here">This device</string>
     <string name="job_runs_any">Any paired device</string>
     <string name="job_runs_chosen">A chosen device</string>

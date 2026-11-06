@@ -400,6 +400,16 @@ internal fun TechnicalInspector(
                     titled = false,
                     remoteAvailable = computeAvailable,
                 )
+                // Which provider answers for it: Auto, or pinned. Saved on its role, like the Mind's.
+                role?.let { agentRole ->
+                    CreatureProviderRow(
+                        role = agentRole,
+                        task = jobTask,
+                        roles = liveWorkflow.roles.filter { it.enabled && it.id.value != ROLE_COLLECTION_MARKER_ID },
+                        connectedProviderIds = connectedProviderIds,
+                        onSaveRoleCollection = onSaveRoleCollection,
+                    )
+                }
                 jobStatus?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface(), modifier = Modifier.azphaltLiveRegion()) }
                 // What it is doing, live: its own thinking and steps, apart from what you tell it.
                 CreatureActivity(taskRun, activity)

@@ -744,6 +744,23 @@ private fun MascotNodeTerrarium(
                 // Appearance). The full state is always in the semantics.
                 // The creature carrying the egg wears it on top, so the egg has its tail tip to itself.
                 val carriesEgg = tissue?.egg?.feederIds?.lastOrNull() == node.id
+                // Which provider answers for it: Pinned never switches; Auto fails over. Ink and Yellow only.
+                LocalProviderBadges.current[node.id]?.let { badge ->
+                    val pinned = badge.routing is CreatureProviderRouting.Pinned
+                    Text(
+                        text = creatureProviderBadgeText(badge.routing, badge.pinnedName),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = AzphaltType.endCap,
+                        color = if (pinned) Azphalt.Yellow.contrastingText else Azphalt.Ink.onOpposite(),
+                        modifier = Modifier
+                            .align(if (carriesEgg) Alignment.TopEnd else Alignment.TopCenter)
+                            .widthIn(max = creatureSize)
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(if (pinned) Azphalt.Yellow else Azphalt.Ink.copy(alpha = 0.82f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
                 if (creatureWearsLabel(isSelected, subjects.size, CreatureLabels.alwaysShow)) Text(
                     text = taskLabel.ifEmpty { node.label },
                     maxLines = 1,

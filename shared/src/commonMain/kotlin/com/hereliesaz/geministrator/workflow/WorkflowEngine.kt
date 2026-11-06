@@ -671,7 +671,7 @@ class WorkflowEngine(
 
     /** True when the keeper left the provider to the app: no role preference and no provider required by id. */
     fun isProviderAuto(role: RoleDefinition, task: TaskDefinition): Boolean =
-        role.preferredProviderId == null && task.providerConstraints !is ProviderConstraints.RequireProvider
+        com.hereliesaz.geministrator.isProviderAuto(role, task)
 
     /** The outcome of [failOver]: a [restarted] run, a [stopMessage] to fail with, or neither (not a failover case). */
     data class FailoverResult(val restarted: WorkflowRun? = null, val stopMessage: String? = null)

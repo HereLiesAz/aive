@@ -37,6 +37,8 @@ internal data class WorkflowTerrariumProjection(
      * agent and a programmatic step can share a role, and so a label.
      */
     val programmaticNodeIds: Set<String> = emptySet(),
+    /** Which provider answers for each agent creature, by task id: Auto or Pinned (a badge on the creature). */
+    val providerBadges: Map<String, CreatureProviderBadge> = emptyMap(),
 )
 
 /**
@@ -196,6 +198,9 @@ internal fun projectWorkflowTerrarium(
         programmaticNodeIds = agentTasks
             .filterNot { task -> (run.taskRuns[task.id]?.executor ?: task.effectiveExecutor()).isAgent() }
             .mapTo(hashSetOf()) { it.id.value },
+        providerBadges = creatureProviderBadges(agentTasks) { task ->
+            run.taskRuns[task.id]?.assignedRoleId?.let(rolesById::get) ?: task.roleId?.let(rolesById::get)
+        },
     )
 }
 
