@@ -33,6 +33,8 @@ object WorkflowRunFactory {
     const val APPROVAL_NOT_GRANTED = "APPROVAL_NOT_GRANTED"
     /** A task skipped because its condition was not met: a branch not taken, not a failure. */
     const val CONDITION_NOT_MET = "CONDITION_NOT_MET"
+    /** A task not yet released: something it depends on has not settled. */
+    const val WAITING_FOR_DEPENDENCIES = "WAITING_FOR_DEPENDENCIES"
 
     fun create(
         definition: WorkflowDefinition,
@@ -66,7 +68,7 @@ object WorkflowRunFactory {
                 executor = task.effectiveExecutor(task.roleId?.let(rolesById::get)),
                 blockingReason = if (status == TaskRunStatus.Blocked) {
                     BlockingReason(
-                        code = "WAITING_FOR_DEPENDENCIES",
+                        code = WAITING_FOR_DEPENDENCIES,
                         message = "Waiting for task dependencies.",
                     )
                 } else {
