@@ -737,7 +737,7 @@ class HiveScreenshotTest {
             com.hereliesaz.geministrator.events.TaskStarted(runId, TaskDefinitionId("contract"), 1, 0),
             com.hereliesaz.geministrator.events.TaskCompleted(runId, TaskDefinitionId("contract"), 90_000),
         )
-        shoot("36-timeline-row", 390, 420) {
+        shoot("36-timeline-row", 780, 360) {
             RunTimeline(
                 runKey = "run-timeline-row",
                 onLoadTimeline = { events },
