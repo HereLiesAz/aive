@@ -147,6 +147,17 @@ data class A2aAgentInterface(
     }
 }
 
+/**
+ * One entry of a card's `capabilities.extensions` (A2A 1.0 `AgentExtension`): a URI naming the
+ * extension, a description, whether a client must understand it, and free-form [params].
+ */
+data class A2aCardExtension(
+    val uri: String,
+    val description: String = "",
+    val required: Boolean = false,
+    val params: JsonObject? = null,
+)
+
 data class A2aAgentCard(
     val name: String,
     val description: String,
@@ -162,6 +173,8 @@ data class A2aAgentCard(
     val providerOrganization: String? = null,
     val providerUrl: String? = null,
     val documentationUrl: String? = null,
+    /** `capabilities.extensions`; The Aive's hive card (A2aHiveCard.kt) carries its record here. */
+    val extensions: List<A2aCardExtension> = emptyList(),
 ) {
     /** The first JSON-RPC interface (the card lists the preferred one first) and its version. */
     fun jsonRpcEndpoint(): Pair<String, A2aVersion>? = interfaces
@@ -443,6 +456,21 @@ object A2aCodec {
                 put("streaming", card.streaming)
                 put("pushNotifications", card.pushNotifications)
                 put("extendedAgentCard", false)
+                if (card.extensions.isNotEmpty()) {
+                    put(
+                        "extensions",
+                        JsonArray(
+                            card.extensions.map { extension ->
+                                buildJsonObject {
+                                    put("uri", extension.uri)
+                                    if (extension.description.isNotEmpty()) put("description", extension.description)
+                                    put("required", extension.required)
+                                    extension.params?.let { put("params", it) }
+                                }
+                            },
+                        ),
+                    )
+                }
             },
         )
         if (card.bearerAuth) {
@@ -530,6 +558,15 @@ object A2aCodec {
             providerOrganization = provider?.string("organization"),
             providerUrl = provider?.string("url"),
             documentationUrl = obj.string("documentationUrl"),
+            extensions = (capabilities?.get("extensions") as? JsonArray)?.mapNotNull { entry ->
+                val item = entry as? JsonObject ?: return@mapNotNull null
+                A2aCardExtension(
+                    uri = item.string("uri") ?: return@mapNotNull null,
+                    description = item.string("description").orEmpty(),
+                    required = (item["required"] as? JsonPrimitive)?.content == "true",
+                    params = item["params"] as? JsonObject,
+                )
+            }.orEmpty(),
         )
     }
 

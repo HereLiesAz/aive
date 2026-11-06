@@ -56,6 +56,10 @@ import com.hereliesaz.geministrator.resources.settings_a2a_lan_no_address
 import com.hereliesaz.geministrator.resources.settings_a2a_lan_none_allowed
 import com.hereliesaz.geministrator.resources.settings_a2a_lan_off
 import com.hereliesaz.geministrator.resources.settings_a2a_lan_on
+import com.hereliesaz.geministrator.resources.settings_a2a_providers_automatic
+import com.hereliesaz.geministrator.resources.settings_a2a_providers_explicit
+import com.hereliesaz.geministrator.resources.settings_a2a_providers_off
+import com.hereliesaz.geministrator.resources.settings_a2a_providers_on
 import com.hereliesaz.geministrator.resources.settings_a2a_lan_remove
 import com.hereliesaz.geministrator.resources.settings_a2a_lan_waiting
 import com.hereliesaz.geministrator.resources.settings_a2a_lan_warning
@@ -892,6 +896,22 @@ internal fun ProviderSettingsScreen(
                 }
             }
             setting.lan?.takeIf { setting.enabled }?.let { lan -> A2aLanControls(lan) }
+            setting.providerCard?.takeIf { setting.enabled }?.let { card ->
+                AzphaltPill(
+                    if (card.described) stringResource(Res.string.settings_a2a_providers_on) else stringResource(Res.string.settings_a2a_providers_off),
+                    "a2a-providers-toggle",
+                    selected = card.described,
+                    onClick = { card.onChange(!card.described) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    stringResource(
+                        if (card.explicit) Res.string.settings_a2a_providers_explicit else Res.string.settings_a2a_providers_automatic,
+                    ),
+                    style = AzphaltType.body,
+                    color = azphaltOnSurface(),
+                )
+            }
         }
 
         localPlannerSetting?.let { setting ->

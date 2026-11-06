@@ -82,6 +82,8 @@ internal fun DistrictScreen(
     onEnterNeighbourhood: (Neighbourhood) -> Unit,
     onImportAgent: () -> Unit,
     onNewHive: () -> Unit = {},
+    /** Import hive card (HiveCardPanels.kt): given whether its panel is open and a way to change that; null shows none. */
+    importCard: (@Composable (open: Boolean, onOpenChange: (Boolean) -> Unit) -> Unit)? = null,
     roles: Collection<RoleDefinition> = emptyList(),
     onAdopt: (RoleDefinition) -> Unit = {},
     /** The hive's edge: what the Store offers (HiveEdge), shown as a sheet over the district. */
@@ -91,6 +93,7 @@ internal fun DistrictScreen(
     edgeOpenAtStart: Boolean = false,
 ) {
     var edgeOpen by remember { mutableStateOf(edgeOpenAtStart) }
+    var cardImportOpen by remember { mutableStateOf(false) }
     var district by remember { mutableStateOf<List<Neighbourhood>?>(null) }
     var projectOfRun by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var loadFailure by remember { mutableStateOf<String?>(null) }
@@ -133,6 +136,7 @@ internal fun DistrictScreen(
             loadFailure?.let { message ->
                 Text(stringResource(Res.string.district_load_failed, message), style = AzphaltType.body, color = azphaltOnSurface())
             }
+            importCard?.invoke(cardImportOpen) { cardImportOpen = it }
             val neighbourhoods = district ?: run {
                 if (loadFailure == null) {
                     Text(stringResource(Res.string.district_loading), style = AzphaltType.body, color = azphaltOnSurface())
