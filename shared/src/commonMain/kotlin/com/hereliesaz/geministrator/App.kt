@@ -56,6 +56,7 @@ import com.hereliesaz.geministrator.resources.app_escalation_decision_failed
 import com.hereliesaz.geministrator.resources.app_import_failed
 import com.hereliesaz.geministrator.resources.app_plan_rejection_failed
 import com.hereliesaz.geministrator.resources.app_lift_spend_stop_failed
+import com.hereliesaz.geministrator.resources.app_stop_run_failed
 import com.hereliesaz.geministrator.resources.app_provider_message_failed
 import com.hereliesaz.geministrator.resources.app_reachable_capabilities
 import com.hereliesaz.geministrator.resources.app_recovery_failed
@@ -641,6 +642,17 @@ fun App(
                                     throw failure
                                 } catch (failure: Exception) {
                                     runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_lift_spend_stop_failed))
+                                }
+                            }
+                        },
+                        onStopRun = { runId ->
+                            scope.launch {
+                                try {
+                                    runtime?.cancelActiveRun(runId)
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_stop_run_failed))
                                 }
                             }
                         },

@@ -3,6 +3,11 @@ package com.hereliesaz.geministrator
 import com.hereliesaz.geministrator.resources.hive_show_timeline
 import com.hereliesaz.geministrator.resources.hive_more_editing
 import com.hereliesaz.geministrator.resources.hive_show_hive
+import com.hereliesaz.geministrator.resources.hive_stop_cancel
+import com.hereliesaz.geministrator.resources.hive_stop_confirm
+import com.hereliesaz.geministrator.resources.hive_stop_run
+import com.hereliesaz.geministrator.resources.hive_stop_text
+import com.hereliesaz.geministrator.resources.hive_stop_title
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.verticalScroll
@@ -150,6 +155,8 @@ fun ControlRoom(
     onRejectPlan: (String) -> Unit,
     onResolveEscalation: (String, Boolean) -> Unit,
     onLiftSpendStop: () -> Unit = {},
+    /** Stops the active run: every unfinished creature and provider session. */
+    onStopRun: (WorkflowRunId) -> Unit = {},
     onMessageAgent: suspend (String, String) -> String? = { _, _ -> "Messaging is unavailable" },
     /** Runs a finished run again from one of its creatures; returns why it could not, or null. */
     onRerunFromTask: suspend (WorkflowRunId, TaskRerunRequest) -> String? = { _, _ -> "Running again is unavailable" },
@@ -243,6 +250,10 @@ fun ControlRoom(
             onTaskSelected(id)
         }
     }
+    // Closing the panel (sheet dismissed, dock's close, Back) only sets it aside: the creature stays
+    // selected, so the field keeps the zoom level it showed and its other levels stay one step away.
+    // Tapping the creature again reopens it; tapping bare ground or another creature lets it go.
+    val closePanel: (String) -> Unit = { id -> panelSetAside = id }
     val inspectorVisible = selectedTaskId != null &&
         selectedTaskId != panelSetAside &&
         liveWorkflow != null &&
@@ -363,13 +374,13 @@ fun ControlRoom(
                     showTimeline.value = true
                     panelSetAside = taskId
                 },
-                onClose = if (docked) ({ onTaskSelected(taskId) }) else null,
+                onClose = if (docked) ({ closePanel(taskId) }) else null,
                 modifier = panelModifier,
             )
         }
     }
     // A docked panel has no sheet to dismiss: Back closes it first.
-    PlatformBackHandler(enabled = inspectorVisible && !compact) { selectedTaskId?.let(onTaskSelected) }
+    PlatformBackHandler(enabled = inspectorVisible && !compact) { selectedTaskId?.let(closePanel) }
     // An objective queued in the feed bar starts once its swarm finishes, wherever the keeper is.
     QueuedFeedLauncher(liveWorkflow, onLaunchWorkflow)
 
@@ -442,6 +453,7 @@ fun ControlRoom(
                 onRejectPlan = onRejectPlan,
                 onResolveEscalation = onResolveEscalation,
                 onLiftSpendStop = onLiftSpendStop,
+                onStopRun = onStopRun,
                 onMessageAgent = onMessageAgent,
                 onRecoverFromCorruption = onRecoverFromCorruption,
                 onRetryRuntime = onRetryRuntime,
@@ -522,7 +534,7 @@ fun ControlRoom(
         if (inspectorVisible && compact) {
             selectedTaskId?.let { taskId ->
                 ModalBottomSheet(
-                    onDismissRequest = { onTaskSelected(taskId) },
+                    onDismissRequest = { closePanel(taskId) },
                     containerColor = Azphalt.Ink,
                     contentColor = Azphalt.Ink.onOpposite(),
                     dragHandle = { BottomSheetDefaults.DragHandle(color = Azphalt.Ink.mutedOnOpposite()) },
@@ -711,6 +723,7 @@ private fun MainDestination(
     onRejectPlan: (String) -> Unit,
     onResolveEscalation: (String, Boolean) -> Unit,
     onLiftSpendStop: () -> Unit,
+    onStopRun: (WorkflowRunId) -> Unit,
     onMessageAgent: suspend (String, String) -> String?,
     onRecoverFromCorruption: () -> Unit,
     onRetryRuntime: () -> Unit,
@@ -783,6 +796,8 @@ private fun MainDestination(
     var bringingInDrifter by rememberDurableBooleanState("hive-edge.bringing-in")
     val hiveHost = LocalWorkflowLibraryHost.current
     val hiveScope = rememberCoroutineScope()
+    // Stop run's confirmation: stopping cancels every unfinished creature, so it asks first.
+    var confirmingStopRun by remember { mutableStateOf(false) }
     Column(modifier.fillMaxSize()) {
         // A first launch is one step: no places to wander off to until there is a hive. A stopped or
         // waking hive keeps the row, so every hive, the Stable and the Store stay reachable.
@@ -792,6 +807,18 @@ private fun MainDestination(
         // Wide windows have the rail; the row stays only for a live hive's own pills.
         if (destination.navigationItem == ControlRoomDestination.Overview && !firstLaunch && (compact || liveHive != null)) {
             val inDistrictNow = destination == ControlRoomDestination.Overview && district.value
+            // Only while the run is unfinished; red, since it ends the work. It leads the row on a phone,
+            // where the hive's own pills scroll off the end, and heads them on a wide window.
+            val stopPill: @Composable () -> Unit = {
+                liveHive?.takeUnless { it.run.status.isFinished() }?.let {
+                    AzphaltPill(
+                        label = stringResource(Res.string.hive_stop_run),
+                        seed = "hive-stop-run",
+                        tone = PillTone.Danger,
+                        onClick = { confirmingStopRun = true },
+                    )
+                }
+            }
             OverviewSectionTabs(
                 compact,
                 destination,
@@ -811,9 +838,11 @@ private fun MainDestination(
                             }
                         },
                     )
+                    if (compact) stopPill()
                 },
             ) {
                 // One row of places: the hive's own come after Swarm, Memory swarm and the Store.
+                if (!compact) stopPill()
                 liveHive?.let { live ->
                     AzphaltPill(
                         label = stringResource(if (showTimeline) Res.string.hive_show_hive else Res.string.hive_show_timeline),
@@ -844,6 +873,19 @@ private fun MainDestination(
                     )
                 }
             }
+        }
+        if (confirmingStopRun) {
+            AzphaltAlertDialog(
+                title = stringResource(Res.string.hive_stop_title),
+                text = stringResource(Res.string.hive_stop_text),
+                confirmLabel = stringResource(Res.string.hive_stop_confirm),
+                dismissLabel = stringResource(Res.string.hive_stop_cancel),
+                onDismissRequest = { confirmingStopRun = false },
+                onConfirm = {
+                    confirmingStopRun = false
+                    liveHive?.let { onStopRun(it.run.id) }
+                },
+            )
         }
         AzphaltPlaceTransition(target = destination, modifier = Modifier.weight(1f).fillMaxWidth()) { place ->
             when (place) {
