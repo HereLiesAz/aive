@@ -18,6 +18,20 @@ data class A2aServerSetting(
     val onResetToken: () -> Unit,
     /** **Open to this network**; null where the platform cannot offer it. */
     val lan: A2aLanSetting? = null,
+    /** **Describe my providers in the card**; null where the platform cannot offer it. */
+    val providerCard: A2aProviderCardSetting? = null,
+)
+
+/**
+ * **Describe my providers in the card** (docs/A2A.md): whether the public Agent Card lists which
+ * kinds of provider are linked (name and capabilities only) and each role's provider. [described]
+ * is what the card does now, from [a2aDescribeProviders]; [explicit] is whether the keeper ever
+ * pressed the switch. Until then it follows the network: on while loopback only, off while open.
+ */
+data class A2aProviderCardSetting(
+    val described: Boolean,
+    val explicit: Boolean,
+    val onChange: (Boolean) -> Unit,
 )
 
 /**
@@ -65,6 +79,15 @@ const val A2A_SERVER_ENABLED_BY_DEFAULT: Boolean = true
  * explicit on opens it. Turning the server on never opens it to the network.
  */
 fun a2aServerOpenToNetwork(storedChoice: Boolean?): Boolean = storedChoice ?: false
+
+/**
+ * Whether the Agent Card describes the linked providers (docs/A2A.md, "Describing providers").
+ * [storedChoice] is the keeper's explicit switch, null when never pressed. Never pressed: described
+ * while the server is on this computer only, and left out as soon as it is **Open to this
+ * network** (the card is then readable by the whole network, so which providers are linked is not
+ * offered unless the keeper said so). An explicit choice, on or off, always wins.
+ */
+fun a2aDescribeProviders(storedChoice: Boolean?, openToNetwork: Boolean): Boolean = storedChoice ?: !openToNetwork
 
 /** Reads a stored switch value written as `true`/`false`; anything else counts as never chosen. */
 fun parseA2aServerChoice(stored: String?): Boolean? = when (stored?.trim()?.lowercase()) {

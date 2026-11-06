@@ -251,6 +251,17 @@ internal fun RestingHive(
         )
         // An empty hive has nothing to launch yet; the launch bar comes with its first creature.
         if (!fresh || current.tasks.isNotEmpty()) HiveLaunchBar(current)
+        // A hive with creatures can be written down as a hive card (HiveCardPanels.kt).
+        if (current.tasks.isNotEmpty()) {
+            var sharing by remember(current.id) { mutableStateOf(false) }
+            AzphaltPill(
+                label = hiveCardShareLabel(),
+                seed = "hive-card-share",
+                selected = sharing,
+                onClick = { sharing = !sharing },
+            )
+            if (sharing) HiveCardSharePanel(current)
+        }
     }
 }
 

@@ -3,6 +3,8 @@ package com.hereliesaz.geministrator
 import com.hereliesaz.geministrator.a2a.A2aCaller
 import com.hereliesaz.geministrator.a2a.A2aCodec
 import com.hereliesaz.geministrator.a2a.A2aHttpResponse
+import com.hereliesaz.geministrator.a2a.A2aProviderInfo
+import com.hereliesaz.geministrator.a2a.a2aProviderInfos
 import com.hereliesaz.geministrator.a2a.A2aServer
 import com.hereliesaz.geministrator.a2a.A2aWorkflowHost
 import com.hereliesaz.geministrator.a2a.normalizeA2aClientAddress
@@ -104,6 +106,10 @@ internal class DesktopA2aServer(
                 val active = runtime.get() ?: return emptyList()
                 return activeRoles(resolveRoleCollection(active.persistence.roles.all()))
             }
+
+            // The registry holds only the providers linked here. Id, name and capabilities, nothing else.
+            override suspend fun providers(): List<A2aProviderInfo> =
+                runtime.get()?.providerRegistry?.a2aProviderInfos().orEmpty()
         },
         token = { token.get() },
         baseUrl = { baseUrl },
@@ -114,6 +120,7 @@ internal class DesktopA2aServer(
         lanHosts = { if (openToNetwork) lanHosts() else emptySet() },
         lanBaseUrl = { host -> "http://$host:$boundPort".takeIf { openToNetwork && host in lanHosts() } },
         isAllowedClient = { address -> address in allowedClients() },
+        describeProviders = { describesProviders },
     )
 
     /**
@@ -138,6 +145,22 @@ internal class DesktopA2aServer(
                 preferences.flush()
             }
         }
+
+    /** The keeper's explicit **Describe my providers in the card** choice; null until the switch is pressed. */
+    var describeProvidersChoice: Boolean?
+        get() = parseA2aServerChoice(runCatching { preferences.get(DESCRIBE_PROVIDERS_KEY, null) }.getOrNull())
+        set(value) {
+            runCatching {
+                if (value == null) preferences.remove(DESCRIBE_PROVIDERS_KEY) else preferences.putBoolean(DESCRIBE_PROVIDERS_KEY, value)
+                preferences.flush()
+            }
+        }
+
+    /**
+     * Whether the card describes the linked providers now ([a2aDescribeProviders]): the explicit
+     * choice, else on while the server is loopback only and off while it is open to the network.
+     */
+    val describesProviders: Boolean get() = a2aDescribeProviders(describeProvidersChoice, openToNetwork)
 
     /** Network clients the keeper allowed, as normalized addresses. */
     fun allowedClients(): Set<String> = allowed ?: runCatching {
@@ -309,6 +332,7 @@ internal class DesktopA2aServer(
         private const val ENABLED_KEY = "enabled"
         private const val LAN_KEY = "lan"
         private const val ALLOWED_KEY = "lan-allowed"
+        private const val DESCRIBE_PROVIDERS_KEY = "describe-providers"
         private const val ADDRESS_CACHE_NANOS = 30_000_000_000L
         private val random = SecureRandom()
 
