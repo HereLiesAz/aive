@@ -134,12 +134,14 @@ internal fun RunTimeline(
     Column(modifier = modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(Res.string.hive_timeline), style = AzphaltType.eyebrow, color = azphaltOnSurface())
         // The way back to the hive, always in view: the places row it also lives in scrolls off a phone.
-        onShowHive?.let { show ->
-            AzphaltPill(label = stringResource(Res.string.hive_show_hive), seed = "timeline-show-hive", onClick = show)
+        // It rides at the start of the views' own row, so the three sit side by side.
+        val overview: (@Composable () -> Unit)? = onShowHive?.let { show ->
+            { AzphaltPill(label = stringResource(Res.string.hive_show_hive), seed = "timeline-show-hive", onClick = show) }
         }
-        val list = events ?: return@Column
-        if (list.isEmpty()) {
-            Text(stringResource(Res.string.hive_timeline_empty), style = AzphaltType.body, color = azphaltOnSurface())
+        val list = events
+        if (list == null || list.isEmpty()) {
+            overview?.invoke()
+            if (list != null) Text(stringResource(Res.string.hive_timeline_empty), style = AzphaltType.body, color = azphaltOnSurface())
             return@Column
         }
         AzphaltTabs(
@@ -150,6 +152,7 @@ internal fun RunTimeline(
             selectedKey = view,
             onSelected = { view = it },
             seedPrefix = "timeline-view",
+            leading = overview,
         )
         if (view != TIMELINE_EVENTS) {
             var now by remember(runKey) { mutableStateOf(Clock.System.now().toEpochMilliseconds()) }

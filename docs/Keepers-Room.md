@@ -69,6 +69,8 @@ Once there is a hive, resting or live, one row holds its places: its Swarm, the 
 
 Titles are set in Archivo Black and everything else in DM Sans, both bundled (`composeResources/font`, SIL Open Font License 1.1, see `THIRD_PARTY_NOTICES.md`) and mapped in `AzphaltType`.
 
+While a live hive's run is unfinished, a red **Stop** pill leads that row on a phone (it heads the hive's own pills on a wide window); it asks first (**Stop run** / **Keep running**), then cancels every unfinished creature and provider session through `ApplicationRuntime.cancelActiveRun`, and what had finished is kept.
+
 On a phone, once there is a hive, one row holds its places: Hives (the district: every hive, New hive, the Stable and drifters at the edge), its Swarm, the Stable, the Memory swarm and the Store. It is hidden only on a first launch; a waking or stopped hive keeps it, so nothing is out of reach while the hive is in trouble. The Store is also the district's edge. Runs are the hive's combs, and Workflows opens from a hive's More editing.
 
 ## A creature's panel
@@ -95,7 +97,7 @@ The panel's Needs holds only decisions; messages to its agent sit with its Work.
 
 The activity comes from `SessionActivityFeeds` (`workflow/SessionActivityFeeds.kt`): the provider-backed session gateway records each session's `AgentEvent.Thinking` and non-blank `AgentEvent.Progress` there, keyed by task run and provider run (a retry starts a fresh feed). It is in memory only and bounded (60 lines a session, 32 sessions, 600 characters a line); it is never written into workflow state or the event journal (memory banks thinking on its own) and never sent to the duplex peer (`architecture/DUPLEX_MCP.md`). Messages to and from the agent never enter it. On the hive, under **Jump to active**, one short line reads what the active creature is doing now: its newest thought or step, then the creatures waiting on its output, named by role ("· feeds Implementation Engineer"). A creature waits on it while it depends on the active one and has not started; when none does, the line ends at the step (`creaturesWaitingOn`, `CreatureFeeds.kt`). Reject plan and Stop workflow stay quiet; the confirmation is where red appears (`BRANDING.md`).
 
-Back closes the creature panel, then returns through the places opened off the hive, then zooms from a hive out to the district, then leaves the app. Reaching the hive clears the way back.
+Closing the creature panel (the sheet dismissed, the dock's close, Back) only sets it aside: the creature stays selected, so the field keeps the zoom level it showed and the other levels stay a step away; tapping the creature again reopens the panel, and tapping bare ground or another creature lets it go. Back closes the creature panel, then returns through the places opened off the hive, then zooms from a hive out to the district, then leaves the app. Reaching the hive clears the way back.
 
 `ControlRoomDestination.Settings` is the Keeper's room; `Compute` opens its Compute part. The gear opens the room itself (its list, on a phone). Runs, Artifacts and Repositories no longer exist as destinations.
 
@@ -139,7 +141,7 @@ A new hive (the district's **New hive**, mockup H6) opens empty and in Build (`R
 
 ## The hive's timeline
 
-A live hive's **Timeline** pill swaps the hive for its run's timeline, in two views (remembered, `overview.timeline.view`):
+A live hive's **Timeline** pill swaps the hive for its run's timeline, in two views (remembered, `overview.timeline.view`). **Overview**, the way back to the hive, **Waterfall** and **Events** share one row (`AzphaltTabs(leading = …)`):
 
 - **Waterfall** (the default): one row per creature, one bar per attempt, on a shared time axis, so work running in parallel overlaps. Each bar is coloured by phase: Planning, Waiting on you (drawn as a thin pause line: a gate), Running, Verifying, Retrying. A white tick ends a finished attempt, a red one a failed attempt; a bar still going runs to now. Hovering or tapping a bar shows its phases and usage (tokens, cost); tapping also selects its creature. Each bar is one labelled button for screen readers. The bars unroll once on arrival and, while the run lives, grow once a second; with reduced motion they do neither and move only when new events arrive.
 - **Events:** the run's events in order.

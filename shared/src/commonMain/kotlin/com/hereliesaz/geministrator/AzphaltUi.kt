@@ -347,6 +347,8 @@ internal fun AzphaltTabs(
     onSelected: (String) -> Unit,
     seedPrefix: String,
     modifier: Modifier = Modifier,
+    /** A control that rides at the row's start (a way back, say) and is not itself a tab. */
+    leading: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier = modifier
@@ -355,6 +357,7 @@ internal fun AzphaltTabs(
             .selectableGroup(),
         horizontalArrangement = Arrangement.spacedBy(AzphaltSpacing.s),
     ) {
+        leading?.invoke()
         tabs.forEachIndexed { index, tab ->
             AzphaltPill(
                 label = tab.label,

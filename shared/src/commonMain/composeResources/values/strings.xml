@@ -20,6 +20,7 @@
     <string name="app_rerun_failed">Couldn't run it again</string>
     <string name="app_import_failed">Import failed</string>
     <string name="app_lift_spend_stop_failed">Lifting the spend stop failed</string>
+    <string name="app_stop_run_failed">Stopping the run failed</string>
     <string name="app_launch_already_in_progress">Another workflow is launching. Try again when it has started.</string>
     <string name="app_plan_rejection_failed">Plan rejection failed</string>
     <string name="app_provider_message_failed">Provider message failed</string>
@@ -509,7 +510,12 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_timeline">TIMELINE</string>
     <string name="hive_timeline_empty">Nothing has happened in this swarm yet.</string>
     <string name="hive_show_timeline">Timeline</string>
-    <string name="hive_show_hive">The hive</string>
+    <string name="hive_show_hive">Overview</string>
+    <string name="hive_stop_run">Stop</string>
+    <string name="hive_stop_title">Stop this run?</string>
+    <string name="hive_stop_text">Every creature still working stops and its provider sessions close. What has finished is kept.</string>
+    <string name="hive_stop_confirm">Stop run</string>
+    <string name="hive_stop_cancel">Keep running</string>
     <string name="timeline_view_waterfall">Waterfall</string>
     <string name="timeline_view_events">Events</string>
     <string name="waterfall_empty">No creature has started yet.</string>

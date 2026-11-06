@@ -4,6 +4,9 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- Closing a creature's panel no longer zooms the hive back out: dismissing the sheet (or the dock's close, or Back) sets the panel aside and leaves the creature selected, so the field keeps its zoom level and the other levels stay a step away. Tap the creature again to reopen it; tap bare ground to let it go.
+- A live hive has a **Stop** pill, shown while its run is unfinished: it asks, then cancels every unfinished creature and provider session. Finished work is kept.
+- The Timeline's way back is now **Overview**, and sits on one row with **Waterfall** and **Events** instead of a row of its own.
 - The Timeline always has a way back to the hive: a "The hive" button at its top, a Timeline step in the breadcrumb whose hive name leads back, and Back, which returns to the hive before it zooms out to the district.
 - The live run timeline no longer flashes or jumps back to the top on every update: new events replace the list in place, and only opening a different run starts blank.
 - Desktop: external agents can use The Aive through MCP. A standalone bridge (`mcpBridge`, stdio) talks to a new, off-by-default control API on `127.0.0.1` that needs a per-install token kept in a file only you can read. Agents can read hives, creatures, roles, runs, steps, logs, providers and what waits for approval; draft, create, edit and delete hives made in the app; choose a role's provider; and start or stop a run. Approvals can never be decided over MCP: they are listed read-only and decided in the app, and a hive made this way can only hold agents and human-approval gates. See docs/MCP.md and the threat model.
