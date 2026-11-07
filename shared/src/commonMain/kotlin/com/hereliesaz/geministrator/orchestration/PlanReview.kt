@@ -75,12 +75,15 @@ suspend fun reviewUntilApproved(
     instructions: String,
     pinnedProviderId: String?,
     maxRounds: Int = MAX_PLAN_REVIEW_ROUNDS,
+    /** Told where the loop is as it goes, so the field can show it: the phase, the plan in hand, the round under way. */
+    onStage: suspend (PlanningPhase, OrchestrationPlan, Int) -> Unit = { _, _, _ -> },
 ): PlanReviewOutcome {
     require(maxRounds > 0) { "maxRounds must be positive" }
     var plan = firstPlan
     val rounds = mutableListOf<PlanReviewRound>()
     for (round in 1..maxRounds) {
         reportLaunchProgress("$reviewerName is reviewing the plan (round $round of $maxRounds)…")
+        onStage(PlanningPhase.Reviewing, plan, round)
         val verdict = try {
             reviewer.review(PlanReviewRequest(packet, plan, reviewerName, instructions, pinnedProviderId))
         } catch (cancelled: CancellationException) {
@@ -98,6 +101,7 @@ suspend fun reviewUntilApproved(
             return PlanReviewOutcome(plan, rounds)
         }
         reportLaunchProgress("$reviewerName asked for changes. Reworking the plan…")
+        onStage(PlanningPhase.Reworking, plan, round + 1)
         plan = try {
             planner.repair(reworkPacket(packet, plan, verdict.reasons, round))
         } catch (cancelled: CancellationException) {

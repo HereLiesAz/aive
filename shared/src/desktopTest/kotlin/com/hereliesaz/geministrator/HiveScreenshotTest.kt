@@ -1,5 +1,7 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.orchestration.PlanningPhase
+import androidx.compose.runtime.Composable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -874,32 +876,51 @@ class HiveScreenshotTest {
         }
     }
 
-    /** The keeper's final say on a reviewed plan: approved after rework, and never approved. */
+    /**
+     * The launch while its plan is made: the planner's egg growing, the reviewer hatching from it, the first
+     * step's egg gestated by both, the keeper's decision (approved, and never approved), and the hatch.
+     */
     @Test
-    fun shootsThePlanDecision() {
+    fun shootsThePlanning() {
+        runBlocking { CreatureRigMapping.allSlugs.forEach { CreatureRigCache.get(it) } }
+        fun stage(phase: PlanningPhase, round: Int, withPlan: Boolean = true, verdict: com.hereliesaz.geministrator.orchestration.PlanningVerdict? = null) =
+            com.hereliesaz.geministrator.orchestration.PlanningStage(
+                phase = phase,
+                planner = BuiltInRoles.Orchestrator,
+                reviewer = BuiltInRoles.AdversarialReviewer,
+                firstStepRole = engineer.takeIf { withPlan },
+                firstStepName = "Implement".takeIf { withPlan },
+                round = round,
+                verdict = verdict,
+            )
         fun step(id: String, name: String, after: String? = null, approval: Boolean = false) = com.hereliesaz.geministrator.orchestration.OrchestrationPlanStep(
-            id, name, "Do $name carefully, then hand it on.", "architect", listOfNotNull(after), approval,
+            id, name, "Do $name carefully, then hand it on.", "implementation-engineer", listOfNotNull(after), approval,
         )
         val plan = com.hereliesaz.geministrator.orchestration.OrchestrationPlan(
             listOf(step("a", "Define scope"), step("b", "Implement", "a"), step("c", "Ship", "b", approval = true)),
         )
         val reject = { why: String -> com.hereliesaz.geministrator.orchestration.PlanReviewRound(plan, com.hereliesaz.geministrator.orchestration.PlanVerdict.Reject(why)) }
         val approve = com.hereliesaz.geministrator.orchestration.PlanReviewRound(plan, com.hereliesaz.geministrator.orchestration.PlanVerdict.Approve("The tests now come before the code."))
-        val names = mapOf("architect" to "Architect")
-        shoot("48-plan-decision-approved", 900, 1100) {
-            PlanDecisionOverlay(
-                decision = com.hereliesaz.geministrator.orchestration.PlanDecision(
+        val names = mapOf("implementation-engineer" to "Implementation Engineer")
+        val overlay: @Composable (com.hereliesaz.geministrator.orchestration.PlanningStage, com.hereliesaz.geministrator.orchestration.PlanDecision?) -> Unit = { st, decision ->
+            PlanningOverlay(stage = st, decision = decision, onStart = {}, onDecline = {}, stepRows = emptyList(), maxRows = 5)
+        }
+        shootSettled("48-planning-drafting", 900, 1300, 2_500) { overlay(stage(PlanningPhase.Planning, 0, withPlan = false), null) }
+        shootSettled("49-planning-reviewing", 900, 1300, 2_500) { overlay(stage(PlanningPhase.Reviewing, 1), null) }
+        shootSettled("50-planning-keeper-approved", 900, 1700, 2_500) {
+            overlay(
+                stage(PlanningPhase.AwaitingKeeper, 2, verdict = com.hereliesaz.geministrator.orchestration.PlanningVerdict.Approved),
+                com.hereliesaz.geministrator.orchestration.PlanDecision(
                     "Ship it", "Adversarial Reviewer",
                     com.hereliesaz.geministrator.orchestration.PlanReviewOutcome(plan, listOf(reject("There is no test step before the code."), approve)),
                     names,
                 ),
-                onStart = {},
-                onDecline = {},
             )
         }
-        shoot("49-plan-decision-not-approved", 900, 1100) {
-            PlanDecisionOverlay(
-                decision = com.hereliesaz.geministrator.orchestration.PlanDecision(
+        shootSettled("51-planning-keeper-not-approved", 900, 1700, 2_500) {
+            overlay(
+                stage(PlanningPhase.AwaitingKeeper, 3, verdict = com.hereliesaz.geministrator.orchestration.PlanningVerdict.NotApproved),
+                com.hereliesaz.geministrator.orchestration.PlanDecision(
                     "Ship it", "Adversarial Reviewer",
                     com.hereliesaz.geministrator.orchestration.PlanReviewOutcome(
                         plan,
@@ -907,10 +928,9 @@ class HiveScreenshotTest {
                     ),
                     names,
                 ),
-                onStart = {},
-                onDecline = {},
             )
         }
+        shootSettled("52-planning-started", 900, 1300, 2_500) { overlay(stage(PlanningPhase.Started, 2), null) }
     }
 
     /** An egg hatching: shown full, then released. The creature arrives over the transition, not all at once. */

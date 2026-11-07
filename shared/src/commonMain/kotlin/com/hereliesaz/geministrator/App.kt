@@ -35,6 +35,10 @@ import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
 import com.hereliesaz.geministrator.orchestration.PlanReviewer
+import com.hereliesaz.geministrator.orchestration.PlanningPhase
+import com.hereliesaz.geministrator.orchestration.PlanningStage
+import com.hereliesaz.geministrator.orchestration.PlanningStages
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.CompletableDeferred
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
 import com.hereliesaz.geministrator.providers.AgentProvider
@@ -168,6 +172,9 @@ fun App(
     val launchStepRows by launchSteps.rows.collectAsState()
     // A reviewed plan waiting on the keeper's final say: the run does not exist until it is answered.
     var planDecision by remember { mutableStateOf<PendingPlanDecision?>(null) }
+    // Where the planning of a reviewed launch has got to: the field shows the planner's egg, the reviewer, the first step.
+    var planningStage by remember { mutableStateOf<PlanningStage?>(null) }
+    val reduceMotion = AzphaltMotion.reduceMotion
     var projectIdToOpenAfterReload by remember { mutableStateOf<String?>(null) }
     var automaticProjectRestoreAttempted by remember(projectFileService) { mutableStateOf(false) }
 
@@ -313,7 +320,7 @@ fun App(
         launching = true
         launchError = null
         launchSteps.clear()
-        scope.launch(LaunchProgress(launchSteps::push)) {
+        scope.launch(LaunchProgress(launchSteps::push) + PlanningStages { planningStage = it }) {
             try {
                 appLog(
                     "AiveLaunch",
@@ -349,6 +356,8 @@ fun App(
                         continuesWorkflowRunIds = continuesWorkflowRunIds,
                     )
                 }
+                // The first step's egg hatches as the run starts; hold the field long enough to see it.
+                if (planningStage?.phase == PlanningPhase.Started && !reduceMotion) delay(HATCH_HOLD_MILLIS)
                 onFinished(null)
             } catch (failure: CancellationException) {
                 throw failure
@@ -361,6 +370,7 @@ fun App(
                 onFinished(failure)
             } finally {
                 launching = false
+                planningStage = null
             }
         }
     }
@@ -963,11 +973,15 @@ fun App(
                 }
                 if (launching) {
                     val pending = planDecision
-                    if (pending != null) {
-                        PlanDecisionOverlay(
-                            decision = pending.decision,
-                            onStart = { pending.answer.complete(true) },
-                            onDecline = { pending.answer.complete(false) },
+                    val stage = planningStage
+                    if (stage != null) {
+                        PlanningOverlay(
+                            stage = stage,
+                            decision = pending?.decision,
+                            onStart = { pending?.answer?.complete(true) },
+                            onDecline = { pending?.answer?.complete(false) },
+                            stepRows = launchStepRows,
+                            maxRows = launchSteps.maxRows,
                         )
                     } else {
                         LaunchStepsOverlay(rows = launchStepRows, maxRows = launchSteps.maxRows)
@@ -1020,3 +1034,6 @@ private class PendingPlanDecision(
     val decision: com.hereliesaz.geministrator.orchestration.PlanDecision,
     val answer: kotlinx.coroutines.CompletableDeferred<Boolean>,
 )
+
+/** How long the field stays on screen after the keeper starts a reviewed plan, so the first step's egg is seen to hatch. */
+private const val HATCH_HOLD_MILLIS = 1_400L

@@ -12,7 +12,15 @@ import com.hereliesaz.geministrator.domain.resolveRoleCollection
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
 import com.hereliesaz.geministrator.orchestration.OrchestrationPacket
 import com.hereliesaz.geministrator.orchestration.OrchestrationRole
+import com.hereliesaz.geministrator.domain.BuiltInRoles
+import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.orchestration.OrchestrationPlan
 import com.hereliesaz.geministrator.orchestration.PlanDecision
+import com.hereliesaz.geministrator.orchestration.PlanningPhase
+import com.hereliesaz.geministrator.orchestration.PlanningStage
+import com.hereliesaz.geministrator.orchestration.PlanningVerdict
+import com.hereliesaz.geministrator.orchestration.firstStep
+import com.hereliesaz.geministrator.orchestration.reportPlanningStage
 import com.hereliesaz.geministrator.orchestration.PlanReviewer
 import com.hereliesaz.geministrator.orchestration.planReviewNotes
 import com.hereliesaz.geministrator.orchestration.planReviewerRole
@@ -92,9 +100,25 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
         instruction = "Create the minimal executable dependency-correct workflow DAG needed to satisfy the objective.",
     )
     reportLaunchProgress("Asking the planner for a workflow (${plannerRoles.size} roles available)…")
+    // Only a launch that will be reviewed has a planning field: the planner's egg, the reviewer who hatches from it.
+    val review = reviewRole(planReviewer, confirmPlan, launchRoles)
+    val planner = BuiltInRoles.Orchestrator
+    fun stage(phase: PlanningPhase, plan: OrchestrationPlan?, round: Int, reviewerRole: RoleDefinition, verdict: PlanningVerdict? = null): PlanningStage {
+        val first = plan?.firstStep()
+        return PlanningStage(
+            phase = phase,
+            planner = launchRoles.firstOrNull { it.id == planner.id } ?: planner,
+            reviewer = reviewerRole,
+            firstStepRole = first?.let { step -> launchRoles.firstOrNull { it.id.value == step.roleId } },
+            firstStepName = first?.name,
+            round = round,
+            verdict = verdict,
+        )
+    }
+    review?.let { (_, role) -> reportPlanningStage(stage(PlanningPhase.Planning, null, 0, role)) }
     val firstPlan = orchestrationRuntime.plan(packet)
     var plan = firstPlan
-    reviewRole(planReviewer, confirmPlan, launchRoles)?.let { (reviewer, role) ->
+    review?.let { (reviewer, role) ->
         val outcome = reviewUntilApproved(
             packet = packet,
             firstPlan = firstPlan,
@@ -103,13 +127,21 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
             reviewerName = role.name,
             instructions = role.instructions,
             pinnedProviderId = role.preferredProviderId?.value,
+            onStage = { phase, current, round -> reportPlanningStage(stage(phase, current, round, role)) },
         )
         plan = outcome.plan
+        val verdict = when {
+            outcome.problem != null -> PlanningVerdict.Unreachable
+            outcome.approved -> PlanningVerdict.Approved
+            else -> PlanningVerdict.NotApproved
+        }
+        reportPlanningStage(stage(PlanningPhase.AwaitingKeeper, plan, outcome.rounds.size, role, verdict))
         reportLaunchProgress("Waiting for your decision on the plan…")
         if (!checkNotNull(confirmPlan)(PlanDecision(cleanObjective, role.name, outcome, packet.availableAgents.associate { it.id to it.name }))) {
             reportLaunchProgress("The plan was not started")
             return
         }
+        reportPlanningStage(stage(PlanningPhase.Started, plan, outcome.rounds.size, role))
     }
     reportLaunchProgress("Planner returned ${plan.steps.size} step${if (plan.steps.size == 1) "" else "s"}")
     reportLaunchProgress("Assembling workflow…")
