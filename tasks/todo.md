@@ -5,7 +5,7 @@ Plan of record: three PRs, in order. Rules: no dice, no drift (docs/Ecology-and-
 ## Step 0: a working build
 - [x] Sandbox: Maven Central 429s through the egress proxy. A local Gradle init script (`~/.gradle/init.d/central-mirror.gradle`, not committed) routes Central through Google's mirror and puts Google Maven ahead of the Plugin Portal.
 - [x] Sandbox: `vendor/conveyance-h2g2` (b17d8d9) and `vendor/conveyance-h2g2/vendor/Conveyance` (214e43e) cloned at CI's pinned commits. Both are gitignored.
-- [ ] Baseline `:shared:desktopTest --tests '*TissueProjectionTest'` passes.
+- [x] Baseline `:shared:desktopTest` passes (full suite green, 1437 tests, most recently with saved-hive planning).
 
 ## PR 1: eggs, birth gating, growth, colour (one creature per task, no engine change)
 - [x] `CreatureBirth.kt`: pure `projectBirths` (Hidden, Egg, Withered; absent = born).
@@ -17,7 +17,7 @@ Plan of record: three PRs, in order. Rules: no dice, no drift (docs/Ecology-and-
 - [x] `MascotNodeTerrarium.kt`: draw egg / withered egg (`CreatureEgg.kt`), hatch transition, tap selects the task, semantics label.
 - [x] Screenshot tests: eggs (chain, joined, withered) and the hatch. (Gallery row and a Rehearse sequence not done.)
 - [x] Docs: Node-Creatures.md, Swarm-OS.md, Ecology-and-the-Swarm.md, CHANGELOG.md.
-- [ ] `:shared:desktopTest` green; look at the screenshots.
+- [x] `:shared:desktopTest` green; screenshots looked at.
 
 ## Setup / Swarm (added to PR 1, from the keeper)
 - [x] A shared `SetupSwarmSwitch`. Hive: Setup (flowchart kept simple, next-generation eggs) and Swarm (every creature at once), under the controls bar outside Build, remembered (`hive.view.swarm`). Memory swarm: its Simple / Technical switch is now Setup / Swarm.
@@ -45,7 +45,7 @@ Findings (read-only survey of the code):
 Decision (keeper: "both"): ship the launch-time reviewer first, then build run-time orchestration in stages, carrying the reviewer into it.
 - [x] 3a (built, as the keeper chose: option α + a three-review cap): the planner's plan is reviewed and reworked before the run exists, then shown to the keeper for the final say (`orchestration/PlanReview.kt`, `PlanDecisionOverlay.kt`, `TextGenerationPlanReviewer`); also on a drafted hive (notes). Then, as the keeper described: while the plan is made the field shows the planner's egg growing, the reviewer hatching from it, and the first step's egg gestated by both and held until the keeper starts the run (`PlanningStage`, `PlanningScene.kt`, `PlanningOverlay.kt`; a stand-in three-task hive drawn by the existing eggs and births, so no engine change was needed). Not done and flagged: a saved hive's launch has no planner step, so nothing is reviewed; the pending decision is now persisted across a restart (`ReviewedPlanStore`, fingerprint of everything prior). Keeper's rule: reusing a workflow is a new run with fresh planning, review and approval; only resuming keeps a decision. No approval is ever carried between runs. Original 3a text, superseded:
 - [ ] (superseded) 3a. Launch-time reviewer: a step in `WorkflowDefinitionPreparer.prepare` inserts a reviewer-kind task that every task with no dependencies waits on, so its egg is the first one visible. Reconcile with `EnginePlanGate`, `PlanRejectionService` and the Hall Monitor (define what a rejection does; THREAT_MODEL invariant 4: an agent reviewer decides no approval gate). Pure function plus tests.
-- [ ] 3b. A run-owned copy of the workflow (also stops launch overwriting the Build design); the terrarium and `projectBirths` read it.
+- [ ] (not built: planning before the run covers it; revisit only on request) 3b. A run-owned copy of the workflow (also stops launch overwriting the Build design); the terrarium and `projectBirths` read it.
 - [ ] 3c. An engine call that amends a started run (validate with `WorkflowGraphValidator`, never touch terminal or running tasks, create the `TaskRun`s, `refreshReadiness`, persist atomically), new events, policy checks for injected tasks.
 - [ ] 3d. The trigger: the Orchestrator's task returns a plan the coordinator applies through 3c, reviewer first. Move the reviewer from 3a into it.
 Each step gets its own design approval.
@@ -57,12 +57,17 @@ Decided: unborn creatures beyond the next generation stay hidden (no ghost nodes
 - [x] `ApplicationRuntimeOrchestration.kt`: shared `planAndDecide`; `launchPlannedSavedWorkflow`; pending decision carries `savedDefinitionId` + `supplementalRoles`; fingerprint includes the design.
 - [x] `launchSavedWorkflow(planner, planReviewer, confirmPlan, planStore)`; App library-host launch passes them and installs LaunchProgress + PlanningStages.
 - [x] `SavedHivePlanningTest` (11).
-- [ ] Known: a package hive whose definition is not in persistence cannot resume a pending decision after restart (dropped, asked afresh).
+- [x] A package hive that is not in the library resumes a pending decision from the design kept with the plan (`PendingPlanLaunch.design`); a library hive is read again so an edit is seen.
+
+## Hive options (keeper: long-press a hive in the district for a list of options, particularly delete)
+- [x] `HiveActionsMenu.kt` (Open, Delete hive, Close), `HiveDeleteRequest` (check, ask, delete, or say why not), `DistrictScreen(hiveDeletion)`, wired in `ControlRoomUi`.
+- [x] `HiveMenuTest` (long press vs tap, delete checked first and never before confirming, refusal says why); screenshots 40, 41.
+- [ ] Not offered yet: rename, duplicate, share hive card from the menu (each needs its own design); say which you want.
 
 ## Unpinning h2g2 and Conveyance (keeper: h2g2 must not pin; everything updated as soon as possible)
 - [x] aive: CI checks out h2g2 and Conveyance at their latest `main` (no `ref:`), and the Gradle dependency is `main-SNAPSHOT`, not a commit hash.
-- [ ] HereLiesAz/Conveyance#80 and HereLiesAz/conveyance-h2g2#17: AGP 9.5.1 (Gradle refuses two AGP versions in one composite). Verified locally with all three on 9.5.1. h2g2#17 also adds Dependabot (h2g2 had none).
-- [ ] Merge those two, then rebase and merge aive#648 (AGP) and aive#650 (tokenizers, awaiting Dependabot's rebase).
+- [x] (aive is on AGP 9.5.1 in `gradle/libs.versions.toml`) HereLiesAz/Conveyance#80 and HereLiesAz/conveyance-h2g2#17: AGP 9.5.1 (Gradle refuses two AGP versions in one composite). Verified locally with all three on 9.5.1. h2g2#17 also adds Dependabot (h2g2 had none).
+- [x] aive#650 (tokenizers) merged; #648 closed, its change already in main.
 - [x] (done: catalog entry `conveyance`, aive reads it from the checkout) Decide h2g2's own pin: `build.gradle.kts` hard-codes `conveyanceRevision = "0.5.0"` (comment: a floating main-SNAPSHOT can resolve stale per-target publications through JitPack). Dependabot cannot track it. aive's root `build.gradle.kts` mirrors it (`conveyanceRevision`) and must follow.
 
 ## Log tab (keeper: a Log tab on the Timeline row; the full log; switch between every log source)

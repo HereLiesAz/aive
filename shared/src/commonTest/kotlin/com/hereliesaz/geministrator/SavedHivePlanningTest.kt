@@ -259,6 +259,31 @@ class SavedHivePlanningTest {
     }
 
     @Test
+    fun aHiveThatIsNotInTheLibraryResumesFromTheDesignKeptWithThePlan() = runBlocking {
+        val persistence = InMemoryWorkflowPersistence()
+        val settings = InMemorySettings()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            // A package's hive: launched from the Store, never saved to the library.
+            val first = ApplicationRuntime.create(providers = emptyList(), scope = scope, persistence = persistence)
+            assertFailsWith<CancellationException> {
+                launch(first, CountingPlanner(onePlan), ReviewedPlanStore(settings)) { throw CancellationException("closed") }
+            }
+            assertNull(persistence.definitions.get(roughHive.id))
+
+            val second = ApplicationRuntime.create(providers = emptyList(), scope = scope, persistence = persistence)
+            var shown: PlanDecision? = null
+            val offered = second.resumePendingPlanLaunch(ReviewedPlanStore(settings)) { shown = it; true }
+
+            assertTrue(offered)
+            assertEquals("Spec it", shown?.outcome?.plan?.steps?.single()?.name)
+            assertEquals(1, persistence.definitions.all().count { it.id.value.startsWith("saved-hive--planned-") })
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
     fun aSavedHiveEditedWhileTheAppWasClosedDropsTheOldDecision() = runBlocking {
         val persistence = InMemoryWorkflowPersistence()
         val settings = InMemorySettings()
