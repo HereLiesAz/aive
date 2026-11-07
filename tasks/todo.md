@@ -11,12 +11,12 @@ Plan of record: three PRs, in order. Rules: no dice, no drift (docs/Ecology-and-
 - [x] `CreatureBirth.kt`: pure `projectBirths` (Hidden, Egg, Withered; absent = born).
 - [x] `WorkflowRunFactory.WAITING_FOR_DEPENDENCIES` constant.
 - [x] `CreatureBirthTest`.
-- [ ] `TissueScene.births` (defaulted).
-- [ ] Soma colour sampling per rig; egg tint blend; seeded base tint.
-- [ ] `WorkflowTerrarium.kt`: call `projectBirths`, skip in Build, filter Hidden subjects and their relationships.
-- [ ] `MascotNodeTerrarium.kt`: draw egg / withered egg, hatch transition, tap selects the task, semantics label.
-- [ ] Gallery row, screenshot test (Rehearse sequence).
-- [ ] Docs: Node-Creatures.md, Swarm-OS.md, Ecology-and-the-Swarm.md, CHANGELOG.md.
+- [x] `TissueScene.births` (defaulted).
+- [x] Soma colour sampling per rig; egg tint blend (OKLab); seeded base tint. (`CreatureColour.kt`)
+- [x] `WorkflowTerrarium.kt`: call `projectBirths`, skip in Build; `MascotNodeTerrarium.kt` hides Hidden creatures and their strands.
+- [x] `MascotNodeTerrarium.kt`: draw egg / withered egg (`CreatureEgg.kt`), hatch transition, tap selects the task, semantics label.
+- [x] Screenshot tests: eggs (chain, joined, withered) and the hatch. (Gallery row and a Rehearse sequence not done.)
+- [x] Docs: Node-Creatures.md, Swarm-OS.md, Ecology-and-the-Swarm.md, CHANGELOG.md.
 - [ ] `:shared:desktopTest` green; look at the screenshots.
 
 ## PR 2: role-bound creatures that roam (own approval first)

@@ -74,6 +74,8 @@ import kotlin.math.roundToInt
 import com.hereliesaz.geministrator.puppet.PuppetPoseBuffer
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.creature_egg_action
+import com.hereliesaz.geministrator.resources.creature_egg_withered
 import com.hereliesaz.geministrator.resources.semantics_capillary
 import com.hereliesaz.geministrator.resources.semantics_move_node_down
 import com.hereliesaz.geministrator.resources.semantics_move_node_left
@@ -166,6 +168,13 @@ private fun MascotNodeTerrarium(
     if (subjects.isEmpty()) return
 
     val subjectPositions = subjects.associate { it.node.id to it.position }
+    // Who is not simply born (CreatureBirth.kt). A hidden creature is not drawn, and neither is a strand to it;
+    // an egg or withered egg is drawn in place of its rig. Absent means born; empty shows everyone.
+    val births = tissue?.births.orEmpty()
+    val hiddenIds = remember(births) { births.filterValues { it is CreatureBirth.Hidden }.keys }
+    val links = remember(relationships, hiddenIds) {
+        if (hiddenIds.isEmpty()) relationships else relationships.filter { it.from !in hiddenIds && it.to !in hiddenIds }
+    }
     var workingPositions by remember(subjectPositions) { mutableStateOf(subjectPositions) }
     var draggingId by remember { mutableStateOf<String?>(null) }
     var dropTargetId by remember { mutableStateOf<String?>(null) }
@@ -249,9 +258,9 @@ private fun MascotNodeTerrarium(
         val tendrilMaxPx = creatureSizePx * 0.95f
         val bodyGapPx = creatureSizePx * 0.9f
         val linkedGapPx = creatureSizePx * 0.7f
-        val tendrilLinks = remember(relationships) {
+        val tendrilLinks = remember(links) {
             // Only task-to-task links clasp; the orchestrator is the hive itself and joins nothing.
-            relationships
+            links
                 .filter { it.kind == H2g2TerrariumRelationshipKind.Dependency || it.kind == H2g2TerrariumRelationshipKind.Transfer }
                 .map { it.from to it.to }
         }
@@ -288,8 +297,10 @@ private fun MascotNodeTerrarium(
         }
         val rigBuffers = remember { HashMap<String, PuppetPoseBuffer>() }
         val rigPoses = HashMap<String, Pair<LoadedCreatureRig, PuppetPoseBuffer>>()
-        if (relationships.isNotEmpty()) {
+        if (links.isNotEmpty()) {
             subjects.forEach { subject ->
+                // An egg has no rig to evaluate: its strands meet the shell's edge.
+                if (subject.node.id in births) return@forEach
                 val loaded = rigSlugs[subject.node.id]?.let(CreatureRigCache::peek) ?: return@forEach
                 val compiled = loaded.compiled
                 val buffer = rigBuffers[subject.node.id]
@@ -336,9 +347,13 @@ private fun MascotNodeTerrarium(
         fun relationshipEndpoints(relationship: H2g2TerrariumRelationship): Pair<Offset, Offset>? =
             linkEndpoints(relationship.from, relationship.to)
 
+        // An egg is not blocked or working, whatever its task's status says: strands read it as at rest.
+        fun stateOf(id: String): H2g2WorkflowState? =
+            if (id in births) H2g2WorkflowState.Pending else subjectById[id]?.node?.state
+
         fun claspOf(from: String, to: String): Clasp {
-            val up = subjectById[from]?.node?.state ?: return Clasp(ClaspOutcome.None, ClaspFlow.Still)
-            val down = subjectById[to]?.node?.state ?: return Clasp(ClaspOutcome.None, ClaspFlow.Still)
+            val up = stateOf(from) ?: return Clasp(ClaspOutcome.None, ClaspFlow.Still)
+            val down = stateOf(to) ?: return Clasp(ClaspOutcome.None, ClaspFlow.Still)
             return clasp(up, down)
         }
 
@@ -375,7 +390,7 @@ private fun MascotNodeTerrarium(
         }
 
         fun creatureAt(point: Offset, except: String?): String? = subjects.asSequence()
-            .filter { it.node.id != except }
+            .filter { it.node.id != except && it.node.id !in hiddenIds }
             .map { it.node.id to (screenCenter(workingPositions[it.node.id] ?: it.position) - point).getDistance() }
             .filter { (_, distance) -> distance <= creatureSizePx * zoom * 0.45f }
             .minByOrNull { it.second }
@@ -383,7 +398,7 @@ private fun MascotNodeTerrarium(
 
         // Read afresh by the ground's gesture below, which must not restart as the camera moves under a finger.
         val strandTouchPx = with(density) { STRAND_TOUCH_DP.dp.toPx() }
-        fun strandsOnScreen(): List<List<Offset>> = relationships
+        fun strandsOnScreen(): List<List<Offset>> = links
             .filter { it.kind == H2g2TerrariumRelationshipKind.Dependency || it.kind == H2g2TerrariumRelationshipKind.Transfer }
             .mapNotNull { relationshipEndpoints(it)?.let { (a, b) -> axonPolyline(a, b) } }
         val canvasDragIntentNow by rememberUpdatedState<(Offset) -> CanvasDragIntent> { point ->
@@ -398,7 +413,7 @@ private fun MascotNodeTerrarium(
         }
         val cutAcrossNow by rememberUpdatedState<(List<Offset>) -> Unit> { trail ->
             // The cut follows each axon as drawn, bow and all.
-            relationships
+            links
                 .filter { it.kind == H2g2TerrariumRelationshipKind.Dependency || it.kind == H2g2TerrariumRelationshipKind.Transfer }
                 .filter { relationship ->
                     val (a, b) = relationshipEndpoints(relationship) ?: return@filter false
@@ -512,7 +527,7 @@ private fun MascotNodeTerrarium(
             val axonScale = (creatureSizePx / 128.dp.toPx()).coerceIn(0.6f, 1.25f) * zoom
             tendrilLinks.distinct().forEach { (from, to) ->
                 val (a, b) = linkEndpoints(from, to) ?: return@forEach
-                val downstream = subjectById[to]?.node?.state ?: return@forEach
+                val downstream = stateOf(to) ?: return@forEach
                 drawAxon(
                     a = a,
                     b = b,
@@ -540,12 +555,24 @@ private fun MascotNodeTerrarium(
 
         subjects.forEach { subject ->
             val node = subject.node
+            val birth = births[node.id]
+            // Its feeders have not begun: nothing of it is drawn yet.
+            if (birth is CreatureBirth.Hidden) return@forEach
             val position = workingPositions[node.id] ?: subject.position
             val center = screenCenter(position)
             val isSelected = selectedId == node.id
             val isDropTarget = dropTargetId == node.id
-            val stateColor = node.state.mascotStateColor()
-            val action = mascotActivityLabel(node.label, node.state)
+            // An egg is neither working nor blocked: it wears the quiet colour, whatever its task's status.
+            val stateColor = (if (birth != null) H2g2WorkflowState.Pending else node.state).mascotStateColor()
+            val action = when (birth) {
+                is CreatureBirth.Egg -> stringResource(
+                    Res.string.creature_egg_action,
+                    birth.gestators.count { it.contribution >= 1f },
+                    birth.gestators.size,
+                )
+                CreatureBirth.Withered -> stringResource(Res.string.creature_egg_withered)
+                else -> mascotActivityLabel(node.label, node.state)
+            }
             val taskLabel = node.subtitle?.trim().orEmpty()
 
             Box(
@@ -649,7 +676,7 @@ private fun MascotNodeTerrarium(
                             // Without a drop handler, bodies only arrange: no creature is ever a drop target.
                             if (onNodeDroppedOn == null) return@detectDragGestures
                             dropTargetId = subjects.asSequence()
-                                .filter { it.node.id != node.id }
+                                .filter { it.node.id != node.id && it.node.id !in hiddenIds }
                                 .map { candidate ->
                                     val candidatePosition = workingPositions[candidate.node.id] ?: candidate.position
                                     val candidatePx = screenCenter(candidatePosition)
@@ -723,20 +750,43 @@ private fun MascotNodeTerrarium(
                     }
                 }
 
-                NodeMascotSurface(
-                    roleLabel = node.label,
-                    hueSeed = subject.identitySeed,
-                    state = node.state,
-                    motionPhase = { motionPhase() },
-                    modifier = Modifier.fillMaxSize(),
-                    reach = { tendrilReach(node.id) },
-                    rigOverride = rigOverrideFor(node.id, LocalProgrammaticNodes.current),
-                )
-                H2g2SwarmAdornmentLayer(
-                    adornments = adornments[node.id].orEmpty(),
-                    hueSeed = subject.identitySeed,
-                    modifier = Modifier.fillMaxSize(),
-                )
+                // Unborn: the egg its feeders gestate, in their colours as each begins. Born: the creature,
+                // arriving from the egg it hatched from when it has just been released.
+                key(node.id) {
+                    BirthTransition(
+                        unborn = birth != null,
+                        egg = {
+                            if (birth != null) {
+                                CreatureEgg(
+                                    birth = birth,
+                                    seed = subject.identitySeed,
+                                    contributions = (birth as? CreatureBirth.Egg)?.gestators.orEmpty().mapNotNull { gestator ->
+                                        val slug = rigSlugs[gestator.taskId] ?: return@mapNotNull null
+                                        val colour = CreatureRigCache.peek(slug)?.let(::somaColour) ?: return@mapNotNull null
+                                        colour to gestator.contribution
+                                    },
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
+                        },
+                        born = {
+                            NodeMascotSurface(
+                                roleLabel = node.label,
+                                hueSeed = subject.identitySeed,
+                                state = node.state,
+                                motionPhase = { motionPhase() },
+                                modifier = Modifier.fillMaxSize(),
+                                reach = { tendrilReach(node.id) },
+                                rigOverride = rigOverrideFor(node.id, LocalProgrammaticNodes.current),
+                            )
+                            H2g2SwarmAdornmentLayer(
+                                adornments = adornments[node.id].orEmpty(),
+                                hueSeed = subject.identitySeed,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        },
+                    )
+                }
 
                 // Every creature wears its job (docs/Node-Creatures.md: labelled with its task and state),
                 // on its state's colour; only a crowded hive keeps names for the one tapped, so packed
@@ -745,7 +795,7 @@ private fun MascotNodeTerrarium(
                 // The creature carrying the egg wears it on top, so the egg has its tail tip to itself.
                 val carriesEgg = tissue?.egg?.feederIds?.lastOrNull() == node.id
                 // Which provider answers for it: Pinned never switches; Auto fails over. Ink and Yellow only.
-                LocalProviderBadges.current[node.id]?.let { badge ->
+                LocalProviderBadges.current[node.id]?.takeIf { birth == null }?.let { badge ->
                     val pinned = badge.routing is CreatureProviderRouting.Pinned
                     Text(
                         text = creatureProviderBadgeText(badge.routing, badge.pinnedName),

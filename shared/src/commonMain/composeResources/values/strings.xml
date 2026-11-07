@@ -511,6 +511,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_timeline_empty">Nothing has happened in this swarm yet.</string>
     <string name="hive_show_timeline">Timeline</string>
     <string name="hive_show_hive">Overview</string>
+    <string name="creature_egg_action">Egg, %1$d of %2$d feeders done</string>
+    <string name="creature_egg_withered">Withered egg</string>
     <string name="hive_stop_run">Stop</string>
     <string name="hive_stop_title">Stop this run?</string>
     <string name="hive_stop_text">Every creature still working stops and its provider sessions close. What has finished is kept.</string>

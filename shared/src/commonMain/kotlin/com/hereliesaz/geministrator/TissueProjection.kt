@@ -32,6 +32,8 @@ internal data class TissueScene(
     val held: Set<String> = emptySet(),
     /** Creatures gathered for a circuit while grouping in Build. */
     val gathered: Set<String> = emptySet(),
+    /** Creatures not simply born (CreatureBirth.kt): eggs, withered eggs, hidden. Absent means born; empty shows all. */
+    val births: Map<String, CreatureBirth> = emptyMap(),
 )
 
 /** A provider, drawn as a band across the field in normalised coordinates. */

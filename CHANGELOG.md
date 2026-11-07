@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- **Creatures are born.** Only the next generation of a running hive is drawn, as eggs: each is gestated by the creatures that feed it (a producer alone, a producer and its reviewer together, parallel work joining), grows as they work, and takes on their colours as each begins. An egg hatches when the engine releases its task, the creature arriving from the shell; a failed feeder withers the egg. Build and a hive that has never run still show every creature. See docs/Node-Creatures.md, Birth.
 - **Memory** is now the last view in the Timeline's row (Overview, Waterfall, Events, Memory) and holds the whole Memory swarm screen in place. It leaves the hive's row of places, so a phone reaches it from a live hive's Timeline; the wide rail keeps its Memory place. The row stays fixed while the view under it scrolls, and scrolls the selected view into sight.
 - Closing a creature's panel no longer zooms the hive back out: dismissing the sheet (or the dock's close, or Back) sets the panel aside and leaves the creature selected, so the field keeps its zoom level and the other levels stay a step away. Tap the creature again to reopen it; tap bare ground to let it go.
 - A live hive has a **Stop** pill, shown while its run is unfinished: it asks, then cancels every unfinished creature and provider session. Finished work is kept.

@@ -118,6 +118,8 @@ internal fun GeministratorWorkflowTerrarium(
     val tissue = remember(projection, stagedDefinition, run) {
         projectTissue(stagedDefinition, run, projection.subjects.associate { it.node.id to it.position }, roles)
     }
+    // Who is born and who is still an egg, from the run's task statuses; Build shows every creature.
+    val births = remember(stagedDefinition, run) { projectBirths(stagedDefinition, run) }
     val animatedRelationships = remember(projection.relationships, run) {
         projection.relationships.map { relationship ->
             if (relationship.kind != H2g2TerrariumRelationshipKind.Dependency) {
@@ -299,7 +301,10 @@ internal fun GeministratorWorkflowTerrarium(
                 editable = true,
                 compact = compact,
                 tissue = (if (building && rehearsal == null) tissue.copy(egg = null) else tissue)
-                    .copy(gathered = grouping.orEmpty()),
+                    .copy(
+                        gathered = grouping.orEmpty(),
+                        births = if (building && rehearsal == null) emptyMap() else births,
+                    ),
                 selectedId = selectedTaskId,
                 onNodeSelected = { node ->
                     grouping?.let { gathered ->

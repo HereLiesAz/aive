@@ -33,7 +33,7 @@ Each `TaskRunStatus` is a physiological state, so a person can read the run with
 
 | Status | What the agent is doing | What the creature does, and why |
 |---|---|---|
-| `Created` | nothing yet; unborn | Not yet hatched: it sits inside its parent's egg. You can see it curled there. |
+| `Created` | nothing yet; unborn | Not yet hatched: an **egg** (`CreatureEgg`), its body alone, no eyes, tails or tendrils. Only the next generation is drawn, so a creature whose feeders have not begun is not shown at all. A `Blocked` task waiting on its dependencies is the same egg; one held for a spent budget or cap was already born. |
 | `Blocked` | waiting on an input or a resolvable condition | Dendrites reach toward the missing input; that branch's bead stays dark. Reaching **is** the escort to the gate: the dark branch points at what it's waiting for. |
 | `Ready` | all inputs in, threshold reached | Every bead lit, body brightening: about to fire. |
 | `Planning` | drafting its approach | Slow, deep pulses in the soma with no output yet; the nucleus works. |
@@ -60,6 +60,10 @@ The neuron only connects. It takes its place in the swarm, wired to what feeds i
 ## Birth, breeding, mutation, death
 
 - **Birth.** A phase is born from the egg the previous phase gestated. When the Orchestrator plans new tasks during a run, they hatch from its bulb, which is why the Orchestrator's tail is the longest.
+  - **An egg is gestated by whoever feeds it** (`CreatureBirth.kt`): a producer's downstream egg has one gestator, a producer and its reviewer give the egg of what they feed two, and every parallel feeder of one join gestates that join's egg together. It hatches exactly when the engine releases its task (`WorkflowRunFactory.refreshReadiness`), never before.
+  - **It grows as they work**, from their statuses (Completed 1, Verifying 0.8, Running 0.5, Planning or Retrying 0.25, else 0; the mean over gestators), one pip under it per gestator (solid when done, dim while working, an outline before it begins). Its shell begins with a pale tint set by its own task, the same every time, and takes on each gestator's body colour as that one begins to work, in proportion to its contribution. The colour of a creature is the average of its rig's soma.
+  - **A failed gestator withers it** (grey, cracked), as does a run that ends before it hatched. A branch not taken is skipped, never withered. Build and a hive that has never run show every creature.
+  - On hatching the creature arrives from the egg over a short transition, a ring spreading where the shell was; reduced motion snaps it in.
 - **Breeding.** Combining two workflows mates two bowls: their creatures meet at shared synapses. That's the Combine action, made physical.
 - **Budding.** A duplicate creature of the same role buds off the parent: the same species, its own task, running in parallel.
 - **Mutation.** Forking a role is a mutation: the nucleus divides and the creature's colour shifts slightly, so it's visibly kin but its own line.
