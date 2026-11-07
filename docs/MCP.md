@@ -82,7 +82,7 @@ The words are the app's: a **hive** is a workflow, a **creature** is one of its 
 | `aive_create_hive` | Saves a hive of up to 24 creatures. Not run. |
 | `aive_update_hive` | Renames a hive or changes its description. |
 | `aive_add_creature`, `aive_update_creature` | Add a creature; change its name, objective, role, dependencies, criteria or label. |
-| `aive_set_role_provider` | Sets a role's `preferredProviderId` (or `null` to leave the choice to the app), with the same save as the provider picker in the Swarm screen. Only to a linked provider. |
+| `aive_set_role_provider` | Sets a role's `preferredProviderId` (or `null` to leave the choice to the app), with the same save as the provider picker in the Roster. Only to a linked provider. |
 | `aive_delete_hive` | **Destructive.** Deletes a hive; its past runs stay. |
 | `aive_remove_creature` | **Destructive.** Removes an agent creature and the strands touching it. |
 

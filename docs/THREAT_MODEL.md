@@ -398,7 +398,7 @@ Every platform runs `NestedWorkflow` nodes through `WorkflowRunNestedWorkflowCli
 - Imported SQLite documents and network spreadsheets can be oversized or malformed.
 
 **Mitigations in place**
-- Surfaces are opt-in per role and named explicitly in the Swarm editor.
+- Surfaces are opt-in per role and named explicitly in the Roster editor.
 - HTTPS is required for network spreadsheet sources.
 - Snapshot row counts and spreadsheet byte sizes are bounded.
 - Only app-owned SQLite databases may execute returned SQL mutations. Imported SQLite documents are query-only.
@@ -517,7 +517,7 @@ External agents (Claude Desktop, Claude Code, any MCP client) can read and steer
 - **Invariant 4 holds.** A hive can be authored over this interface from only two kinds of creature: an agent working as a switched-on role, and a human-approval gate. Scripts, deployments, GitHub actions, nested workflows and repository operations cannot be authored, and the fields that would carry an executor are refused. Every save runs `WorkflowGraphValidator`, so a repository mutation already in a hive keeps its human-approval ancestor. A creature that waits for a person, or whose approval is human, cannot be removed or relaxed here; a creature that is not an agent or a gate cannot be changed here.
 - Only hives made in the app (the authored list) can be changed or deleted, never while a run of them is live, and never one that came from a package or is used as a circuit by another hive.
 - Starting a run uses the same launch path as the launch form, only for a saved hive, and is refused while a run is unfinished. A run started this way waits at every gate for the person at the app. Stopping a run cancels it like a replaced run; it decides nothing.
-- Role provider assignment uses the same save as the Swarm screen's picker (`preferredProviderId`), and only to a provider that is linked. Provider listings show connection state and the kind of failure, never a key or a provider's own message.
+- Role provider assignment uses the same save as the Roster's picker (`preferredProviderId`), and only to a provider that is linked. Provider listings show connection state and the kind of failure, never a key or a provider's own message.
 - Bodies are capped at 256 KB, strings in answers at 4,000 characters.
 
 **Residual risks**

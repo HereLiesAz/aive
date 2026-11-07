@@ -232,4 +232,52 @@ class CreatureBirthTest {
         )
         assertEquals(CreatureBirth.Withered, unborn["build"])
     }
+
+    @Test
+    fun anEggHatchesExactlyWhenTheEngineReleasesItsTask() {
+        val pair = definition(task("build"), task("review", "build"), task("release", "build", "review"))
+        var run = WorkflowRunFactory.create(
+            definition = pair,
+            workflowRunId = WorkflowRunId("engine"),
+            projectId = ProjectId("project"),
+            objective = "Be born",
+            nowEpochMillis = 1L,
+            taskRunIdFactory = { TaskRunId(it.value) },
+        ).copy(status = WorkflowRunStatus.Running)
+
+        fun assertBornExactlyWhereReleased(step: String) {
+            val births = projectBirths(pair, run)
+            for (task in pair.tasks) {
+                val released = run.taskRuns.getValue(task.id).status !in setOf(TaskRunStatus.Created, TaskRunStatus.Blocked)
+                assertEquals(released, task.id.value !in births, "$step: ${task.id.value}")
+            }
+        }
+
+        assertBornExactlyWhereReleased("launch")
+        run = run.copy(taskRuns = run.taskRuns + (TaskDefinitionId("build") to run.taskRuns.getValue(TaskDefinitionId("build")).copy(status = TaskRunStatus.Completed, assignedProviderId = AgentProviderId("a"))))
+        run = WorkflowRunFactory.refreshReadiness(pair, run, 2L)
+        assertBornExactlyWhereReleased("build done")
+        assertFalse("review" in projectBirths(pair, run), "review is released once build is done")
+        assertTrue("release" in projectBirths(pair, run), "release still waits on its reviewer")
+
+        run = run.copy(taskRuns = run.taskRuns + (TaskDefinitionId("review") to run.taskRuns.getValue(TaskDefinitionId("review")).copy(status = TaskRunStatus.Completed, assignedProviderId = AgentProviderId("a"))))
+        run = WorkflowRunFactory.refreshReadiness(pair, run, 3L)
+        assertBornExactlyWhereReleased("review done")
+        assertFalse("release" in projectBirths(pair, run), "both parents done: it hatches")
+    }
+
+    @Test
+    fun aBlockedTaskThatSaysNothingIsStillWaiting() {
+        val births = projectBirths(
+            chain,
+            run(
+                WorkflowRunStatus.Running,
+                taskRun("plan", TaskRunStatus.Running, started = true),
+                taskRun("build", TaskRunStatus.Blocked, BlockingReason("", "")).copy(blockingReason = null),
+                taskRun("review", TaskRunStatus.Blocked).copy(blockingReason = null),
+            ),
+        )
+        assertIs<CreatureBirth.Egg>(births["build"])
+        assertEquals(CreatureBirth.Hidden, births["review"])
+    }
 }

@@ -111,12 +111,14 @@ private fun TaskRun.isSkippedBranch(): Boolean =
 
 /**
  * Born once the engine has released it. Not born: not yet created, still waiting on what it depends
- * on, or cancelled before it ever started. A task held for another reason (a spent budget, a spend
- * cap) was released first, so it is born.
+ * on (the engine always says so; a Blocked task that says nothing is read the same), or cancelled
+ * before it ever started. A task held for another reason (a spent budget, a spend cap) was released
+ * first, so it is born.
  */
 private fun TaskRun.isBorn(): Boolean = when (status) {
     TaskRunStatus.Created -> false
-    TaskRunStatus.Blocked -> blockingReason?.code != WorkflowRunFactory.WAITING_FOR_DEPENDENCIES
+    // Blocked with no recorded reason is waiting too; only a different reason (a spent budget, a spend cap) means released.
+    TaskRunStatus.Blocked -> blockingReason?.code.let { it != null && it != WorkflowRunFactory.WAITING_FOR_DEPENDENCIES }
     TaskRunStatus.Cancelled -> hasStarted()
     else -> true
 }

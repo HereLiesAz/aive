@@ -640,6 +640,13 @@ class HiveScreenshotTest {
             }
         }
         shoot("36-workspace-live", 2880, 1800) { page(null)() }
+        // The same hive in the Swarm view: every creature drawn at once, the unborn included.
+        DurableUiState.store.putBoolean("hive.view.swarm", true)
+        try {
+            shoot("36b-workspace-swarm", 2880, 1800) { page(null)() }
+        } finally {
+            DurableUiState.store.putBoolean("hive.view.swarm", false)
+        }
         shoot("37-workspace-creature-needs", 2880, 1800) { page("build", CreatureTab.Needs)() }
         shoot("38-workspace-creature-mind", 2880, 1800) { page("build", CreatureTab.Mind)() }
         shoot("39-workspace-creature-gated", 1900, 1500) { page("review", CreatureTab.Needs)() }
@@ -733,6 +740,111 @@ class HiveScreenshotTest {
         shoot("35-waterfall", 900, 1100) {
             RunWaterfallChart(waterfall, taskName = { names[it] ?: it.value }, selectedTaskId = "build", onTaskSelected = {})
         }
+    }
+
+    /**
+     * Birth on the field: only the next generation is drawn, as eggs gestated by whoever feeds them.
+     * Left: a plan in flight (Implement working, Review an egg with one gestator, Ship not yet shown).
+     * Middle: parallel work joining (Ship's egg has two gestators, one of them an egg itself).
+     * Right: a failed gestator withers the egg it was feeding.
+     */
+    @Test
+    fun shootsTheEggs() {
+        runBlocking { CreatureRigMapping.allSlugs.forEach { CreatureRigCache.get(it) } }
+        val chain = definition
+        val joined = WorkflowDefinition(
+            id = WorkflowDefinitionId("joined"),
+            name = "Joined",
+            tasks = listOf(
+                task("plan", "Plan", architect),
+                task("build", "Implement", engineer, "plan"),
+                task("test", "Test", qa, "plan"),
+                task("review", "Review", qa, "build"),
+                task("ship", "Ship", engineer, "review", "test"),
+            ),
+        )
+        shootSettled("38-eggs-chain", 900, 1400, 2_500) {
+            GeministratorWorkflowTerrarium(
+                chain,
+                run(
+                    chain,
+                    WorkflowRunStatus.Running,
+                    Triple("contract", TaskRunStatus.Completed, "claude"),
+                    Triple("build", TaskRunStatus.Running, "claude"),
+                    Triple("review", TaskRunStatus.Blocked, "gemini"),
+                    Triple("ship", TaskRunStatus.Blocked, "claude"),
+                ),
+                roles,
+                selectedTaskId = null,
+                onTaskSelected = {},
+                onStageDefinition = { it },
+            )
+        }
+        shootSettled("39-eggs-joined", 900, 1400, 2_500) {
+            GeministratorWorkflowTerrarium(
+                joined,
+                run(
+                    joined,
+                    WorkflowRunStatus.Running,
+                    Triple("plan", TaskRunStatus.Completed, "claude"),
+                    Triple("build", TaskRunStatus.Running, "claude"),
+                    Triple("test", TaskRunStatus.Planning, "gemini"),
+                    Triple("review", TaskRunStatus.Blocked, "gemini"),
+                    Triple("ship", TaskRunStatus.Blocked, "claude"),
+                ),
+                roles,
+                selectedTaskId = null,
+                onTaskSelected = {},
+                onStageDefinition = { it },
+            )
+        }
+        shootSettled("40-eggs-withered", 900, 1400, 2_500) {
+            GeministratorWorkflowTerrarium(
+                chain,
+                run(
+                    chain,
+                    WorkflowRunStatus.Running,
+                    Triple("contract", TaskRunStatus.Completed, "claude"),
+                    Triple("build", TaskRunStatus.Failed, "claude"),
+                    Triple("review", TaskRunStatus.Blocked, "gemini"),
+                    Triple("ship", TaskRunStatus.Blocked, "claude"),
+                ),
+                roles,
+                selectedTaskId = null,
+                onTaskSelected = {},
+                onStageDefinition = { it },
+            )
+        }
+    }
+
+    /** An egg hatching: shown full, then released. The creature arrives over the transition, not all at once. */
+    @Test
+    fun shootsTheHatch() {
+        val unborn = androidx.compose.runtime.mutableStateOf(true)
+        val egg = CreatureBirth.Egg(1f, listOf(EggGestator("a", 1f), EggGestator("b", 1f)))
+        val frames = mutableMapOf<String, ByteArray>()
+        ImageComposeScene(width = 600, height = 600, density = Density(2f)) {
+            LoadAzphaltFonts()
+            Box(Modifier.fillMaxSize().background(Azphalt.Ink)) {
+                Box(Modifier.size(140.dp)) {
+                    BirthTransition(
+                        unborn = unborn.value,
+                        egg = { CreatureEgg(egg, "hatch", listOf(androidx.compose.ui.graphics.Color(0xFF2060D0) to 1f), Modifier.fillMaxSize()) },
+                        born = { Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFF2060D0))) },
+                    )
+                }
+            }
+        }.use { scene ->
+            scene.render(0L)
+            frames["egg"] = scene.render(1_000_000_000L).encodeToData()!!.bytes
+            unborn.value = false
+            scene.render(1_100_000_000L)
+            frames["mid"] = scene.render(1_350_000_000L).encodeToData()!!.bytes
+            frames["born"] = scene.render(3_000_000_000L).encodeToData()!!.bytes
+        }
+        frames.forEach { (name, bytes) -> File(out, "41-hatch-$name.png").writeBytes(bytes) }
+        assertTrue(!frames.getValue("egg").contentEquals(frames.getValue("mid")), "released: the egg is gone from the first frame")
+        assertTrue(!frames.getValue("mid").contentEquals(frames.getValue("born")), "the creature is still arriving mid-transition")
     }
 
     /** The Timeline's row (Overview, Waterfall, Events, Memory) at a phone's width, Waterfall then Memory open. */

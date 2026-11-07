@@ -69,7 +69,7 @@ import com.hereliesaz.geministrator.resources.rail_label
 import com.hereliesaz.geministrator.resources.rail_memory
 import com.hereliesaz.geministrator.resources.rail_stable
 import com.hereliesaz.geministrator.resources.rail_store
-import com.hereliesaz.geministrator.resources.rail_swarm
+import com.hereliesaz.geministrator.resources.rail_roster
 import com.hereliesaz.geministrator.resources.rail_unread
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -89,7 +89,7 @@ internal enum class ShellRailPlace(val label: StringResource, val icon: ShellIco
     /** The hive on screen, or the district when there is none open. */
     Hive(Res.string.rail_hive, ShellIcon.Hive),
     Inbox(Res.string.rail_inbox, ShellIcon.Inbox),
-    Swarm(Res.string.rail_swarm, ShellIcon.Swarm),
+    Swarm(Res.string.rail_roster, ShellIcon.Swarm),
     Stable(Res.string.rail_stable, ShellIcon.Stable),
     Memory(Res.string.rail_memory, ShellIcon.Memory),
     Store(Res.string.rail_store, ShellIcon.Store),

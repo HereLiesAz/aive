@@ -4,7 +4,7 @@
 
 ## The binding rule
 
-**Nothing happens in the creatures' world unless something happened in the swarm, and nothing happens in the swarm without the creatures showing it.** The life layer is not a simulation running beside the work; it's the work's telemetry given a body. No dice: no random strokes, no random hatch rolls, no drift for its own sake. Ambient animation (breathing, idle sway) is allowed only because it changes nothing and means nothing; every change of state, position, health, wiring, birth or death has a recorded cause in a run.
+**Nothing happens in the creatures' world unless something happened in the swarm, and nothing happens in the swarm without the creatures showing it.** The life layer is not a simulation running beside the work; it's the work's telemetry given a body. No dice: no random strokes, no random hatch rolls, no drift for its own sake. Ambient animation (breathing, idle sway) is allowed only because it changes nothing and means nothing; every change of state, position, health, wiring, birth or death has a recorded cause in a run. (An egg's starting tint is the one apparent exception: it is set by a hash of its own task, so it looks varied and is the same every time.)
 
 The full ledger:
 

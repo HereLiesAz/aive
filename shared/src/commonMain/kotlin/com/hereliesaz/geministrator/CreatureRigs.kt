@@ -188,7 +188,7 @@ internal object CreatureRigMapping {
     /** All slugs the mapping can produce. */
     val allSlugs: Set<String> get() = bySlugKind.values.toSet() + NAMED_ONLY_SLUGS + GENERIC_SLUGS + PROGRAMMATIC_RIG
 
-    private fun stableHash(value: String): Int {
+    internal fun stableHash(value: String): Int {
         var hash = 0x45D9F3B
         value.forEach { char -> hash = (hash * 31) xor char.code }
         return hash

@@ -347,7 +347,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="rail_brand_aive">AIVE</string>
     <string name="rail_hive">Hive</string>
     <string name="rail_inbox">Inbox</string>
-    <string name="rail_swarm">Swarm</string>
+    <string name="rail_roster">Roster</string>
     <string name="rail_stable">Stable</string>
     <string name="rail_memory">Memory</string>
     <string name="rail_store">Azphalt Store</string>
@@ -495,7 +495,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_draft_kept">Kept your hive as it is.</string>
     <string name="hive_draft_retry">Try again</string>
     <string name="hive_draft_problem_no_prompt">Say what the swarm is for first.</string>
-    <string name="hive_draft_problem_no_roles">No creatures are switched on to draft with. Switch some on in the Swarm.</string>
+    <string name="hive_draft_problem_no_roles">No creatures are switched on to draft with. Switch some on in the Roster.</string>
     <string name="hive_draft_problem_empty">The keeper came back with nothing. Try again, or say a little more.</string>
     <string name="hive_draft_problem_too_many">The keeper proposed more than %1$d creatures. Try a smaller job, or draft it in parts.</string>
     <string name="hive_draft_problem_unknown_role">The keeper chose a creature this swarm does not have. Try again.</string>
@@ -511,6 +511,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_timeline_empty">Nothing has happened in this swarm yet.</string>
     <string name="hive_show_timeline">Timeline</string>
     <string name="hive_show_hive">Overview</string>
+    <string name="creature_egg_action">Egg, %1$d of %2$d feeders done</string>
+    <string name="creature_egg_withered">Withered egg</string>
     <string name="hive_stop_run">Stop</string>
     <string name="hive_stop_title">Stop this run?</string>
     <string name="hive_stop_text">Every creature still working stops and its provider sessions close. What has finished is kept.</string>
@@ -757,8 +759,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="memory_consolidate_now_paused">Consolidation is paused. Resume it below to consolidate now.</string>
     <string name="memory_consolidate_now_off">Memory is off. Turn it on below to consolidate now.</string>
     <string name="memory_view_label">Memory view</string>
-    <string name="memory_view_simple">Simple</string>
-    <string name="memory_view_technical">Technical</string>
+    <string name="view_setup">Setup</string>
+    <string name="view_swarm">Swarm</string>
+    <string name="hive_view_label">Hive view</string>
     <string name="memory_simple_bank">Memory bank</string>
     <string name="memory_simple_stage_observe">Observe</string>
     <string name="memory_simple_stage_section">Section</string>
