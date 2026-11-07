@@ -59,6 +59,7 @@ import kotlinx.coroutines.CancellationException
 import com.hereliesaz.geministrator.orchestration.OrchestrationQuestion
 import com.hereliesaz.geministrator.orchestration.PreferLocalOrchestrationAgentRuntime
 import com.hereliesaz.geministrator.providers.llm.TextGenerationOrchestrationAgentRuntime
+import com.hereliesaz.geministrator.providers.llm.configuredPlanReviewer
 import com.hereliesaz.geministrator.providers.llm.configuredPlanningRuntime
 import com.hereliesaz.geministrator.providers.llm.memoryTextApi
 import com.hereliesaz.geministrator.memory.DesktopOrtMemorySessionManager
@@ -298,6 +299,8 @@ fun main() {
                         cloud
                     }
                 }
+                // The plan is read by a reviewer before a run exists; the keeper then has the final say.
+                val planReviewer = remember(credentials) { configuredPlanReviewer(credentials) }
                 LaunchedEffect(credentials) {
                     memoryEngines.hostedTextGenerator = { providerId, model, prompt ->
                         val api = memoryTextApi(credentials, providerId, model)
@@ -557,6 +560,7 @@ fun main() {
                             computeToken = null
                         },
                         orchestrationRuntime = planningRuntime,
+                        planReviewer = planReviewer,
                         localPlannerSetting = localPlannerSetting.takeIf { DesktopPlannerModel.ENABLED },
                         a2aServerSetting = a2aServerSetting,
                         externalWorkflowLaunchRequests = a2aPendingLaunches,

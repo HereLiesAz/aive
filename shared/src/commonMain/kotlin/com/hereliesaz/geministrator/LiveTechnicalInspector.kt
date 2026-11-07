@@ -84,6 +84,8 @@ import com.hereliesaz.geministrator.workflow.attemptsOf
 import com.hereliesaz.geministrator.log.formatLogTime
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.inspector_activity
+import com.hereliesaz.geministrator.resources.inspector_shared_creature
+import com.hereliesaz.geministrator.resources.inspector_shared_creature_here
 import com.hereliesaz.geministrator.resources.inspector_activity_attempt
 import com.hereliesaz.geministrator.resources.inspector_activity_step
 import com.hereliesaz.geministrator.resources.inspector_activity_thinking
@@ -186,6 +188,8 @@ internal fun TechnicalInspector(
     onClose: (() -> Unit)? = null,
     /** Paired devices exist, so its job may be sent off this device (the Compute place is open). */
     computeAvailable: Boolean = false,
+    /** Opens another task's creature from this one's panel: a shared creature does several tasks (CreatureRoam.kt). */
+    onSelectTask: (String) -> Unit = {},
 ) {
     if (liveWorkflow == null) {
         EmptyTechnicalInspector(stringResource(Res.string.inspector_no_run_is_loaded), modifier)
@@ -393,6 +397,8 @@ internal fun TechnicalInspector(
                 }
             }
             CreatureTab.Work -> {
+                // A creature that does several tasks of its role says so, and leads to the others.
+                SharedCreatureTasks(liveWorkflow, selectedTaskId, onSelectTask)
                 // Its job: objective, acceptance criteria, approval, retries, where it runs.
                 HiveJobEditor(
                     definition = jobDefinition,
@@ -640,6 +646,30 @@ private fun TaskExecutor.reference(): String = when (this) {
     is TaskExecutor.ExternalService -> listOfNotNull(service, operation).joinToString(" · ")
     is TaskExecutor.NestedWorkflow -> workflowDefinitionId.value
     is TaskExecutor.Distributed -> label ?: (stringResource(Res.string.inspector_remote) + delegate.displayName())
+}
+
+/**
+ * The other tasks of a creature that does several (CreatureRoam.kt): each a pill that opens that task.
+ * Nothing is drawn for a creature that does one.
+ */
+@Composable
+private fun SharedCreatureTasks(liveWorkflow: LiveWorkflowPresentation, taskId: String, onSelectTask: (String) -> Unit) {
+    val group = remember(liveWorkflow.definition, liveWorkflow.run) {
+        projectRoaming(liveWorkflow.definition, liveWorkflow.run).groupOf(taskId)
+    } ?: return
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(Res.string.inspector_shared_creature), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+        group.members.filter { it != taskId }.forEach { other ->
+            val name = liveWorkflow.definition.tasks.firstOrNull { it.id.value == other }?.name?.ifBlank { null } ?: other
+            AzphaltPill(
+                label = name,
+                seed = "shared-creature-$taskId-$other",
+                endCap = if (other == group.rider) stringResource(Res.string.inspector_shared_creature_here) else null,
+                onClick = { onSelectTask(other) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
 }
 
 /**

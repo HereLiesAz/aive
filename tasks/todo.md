@@ -23,12 +23,17 @@ Plan of record: three PRs, in order. Rules: no dice, no drift (docs/Ecology-and-
 - [x] A shared `SetupSwarmSwitch`. Hive: Setup (flowchart kept simple, next-generation eggs) and Swarm (every creature at once), under the controls bar outside Build, remembered (`hive.view.swarm`). Memory swarm: its Simple / Technical switch is now Setup / Swarm.
 - [x] The place that was "Swarm" (role list) is now the **Roster** (destination, rail, a hint string, current-behaviour docs). Historical docs and old changelog entries keep the old name.
 
-## PR 2: role-bound creatures that roam (own approval first)
+## PR 2: role-bound creatures that roam (approved by the keeper; built)
 Revised by the keeper: one creature per role is the **default**, not a rule. A workflow that genuinely needs several creatures of a role, or a keeper who explicitly sets same-role tasks side by side (two independent reviews of the same thing), gets separate creatures.
 - Proposed line: same-role tasks that are **ordered** (one depends, directly or through others, on the other) share one creature, which moves between their sites; same-role tasks that can run **concurrently** (no path either way: parallel siblings, Mixture-of-Agents proposers, a deliberate second review) each keep their own creature.
 - Consequence: no engine change. Ordered tasks already run one after another, so no per-role lock is needed, and the Mixture-of-Agents question goes away. PR 2 becomes a projection layer plus roaming.
 - Grouping: walk the tasks in dependency order; a task joins the first creature of its role whose every task is an ancestor of it, else it starts a new creature.
 - Open: an explicit "own creature" switch in Build for a keeper who wants separate creatures for ordered tasks? Not in scope unless asked.
+Built as agreed (grouping: ordered share, concurrent separate; the creature walks along its places; Build and Swarm unchanged), with two narrowings the keeper should know about:
+- [x] `CreatureRoam.kt` (`projectRoaming`, `RoamGroup`, `CreatureRoam.Rider/Site`, `rememberRides`), `RoamSite.kt`, wired through `TissueScene.roaming`; `CreatureRoamTest`; screenshots 46/47.
+- [x] Selection stays per task: tapping the creature opens its current task, tapping a place opens that task, and the panel's Work tab lists the creature's other tasks (instead of one merged panel).
+- [ ] Timeline rows are still per task, not grouped per creature (the waterfall has a row per task and the route to it is unchanged). Group them only if it proves confusing.
+
 ## PR 3: orchestrator's first egg is a plan reviewer (own approval first)
 Revised by the keeper: a workflow saved in Build is a *rough design*. The orchestrator still decides exactly how best to execute it, at run time. So the reviewer is not a static insertion into the saved graph: the first thing the orchestrator makes, when it turns the rough design into its real plan, is a reviewer of *that* plan.
 
@@ -38,7 +43,8 @@ Findings (read-only survey of the code):
 - PR 1 therefore has no hole today: every task exists when the run starts.
 
 Decision (keeper: "both"): ship the launch-time reviewer first, then build run-time orchestration in stages, carrying the reviewer into it.
-- [ ] 3a. Launch-time reviewer: a step in `WorkflowDefinitionPreparer.prepare` inserts a reviewer-kind task that every task with no dependencies waits on, so its egg is the first one visible. Reconcile with `EnginePlanGate`, `PlanRejectionService` and the Hall Monitor (define what a rejection does; THREAT_MODEL invariant 4: an agent reviewer decides no approval gate). Pure function plus tests.
+- [x] 3a (built, as the keeper chose: option α + a three-review cap): the planner's plan is reviewed and reworked before the run exists, then shown to the keeper for the final say (`orchestration/PlanReview.kt`, `PlanDecisionOverlay.kt`, `TextGenerationPlanReviewer`); also on a drafted hive (notes). Not done and flagged: the reviewer is not a creature or egg on the field (no pre-run terrarium state exists; the launch overlay shows its rounds as progress lines); a saved hive's launch has no planner step, so nothing is reviewed; the decision is not persisted across a restart. Original 3a text, superseded:
+- [ ] (superseded) 3a. Launch-time reviewer: a step in `WorkflowDefinitionPreparer.prepare` inserts a reviewer-kind task that every task with no dependencies waits on, so its egg is the first one visible. Reconcile with `EnginePlanGate`, `PlanRejectionService` and the Hall Monitor (define what a rejection does; THREAT_MODEL invariant 4: an agent reviewer decides no approval gate). Pure function plus tests.
 - [ ] 3b. A run-owned copy of the workflow (also stops launch overwriting the Build design); the terrarium and `projectBirths` read it.
 - [ ] 3c. An engine call that amends a started run (validate with `WorkflowGraphValidator`, never touch terminal or running tasks, create the `TaskRun`s, `refreshReadiness`, persist atomically), new events, policy checks for injected tasks.
 - [ ] 3d. The trigger: the Orchestrator's task returns a plan the coordinator applies through 3c, reviewer first. Move the reviewer from 3a into it.

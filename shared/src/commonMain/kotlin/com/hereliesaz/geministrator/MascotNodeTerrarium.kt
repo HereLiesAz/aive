@@ -233,6 +233,13 @@ private fun MascotNodeTerrarium(
     )
     // Reduced motion (system animator scale 0 / prefers-reduced-motion) freezes both clocks.
     val reduceMotion = AzphaltMotion.reduceMotion
+    // Shared creatures (CreatureRoam.kt): the rider is drawn at the task it works on, and walks from the one
+    // before when the run moves it on; the other tasks of that creature are drawn as places it works.
+    val roam = tissue?.roaming?.roam.orEmpty()
+    val rides = rememberRides(
+        riders = roam.mapNotNull { (id, share) -> (share as? CreatureRoam.Rider)?.from?.let { from -> id to from } }.toMap(),
+        reduceMotion = reduceMotion,
+    )
     val moveLeftLabel = stringResource(Res.string.semantics_move_node_left)
     val moveRightLabel = stringResource(Res.string.semantics_move_node_right)
     val moveUpLabel = stringResource(Res.string.semantics_move_node_up)
@@ -559,7 +566,24 @@ private fun MascotNodeTerrarium(
             // Its feeders have not begun: nothing of it is drawn yet.
             if (birth is CreatureBirth.Hidden) return@forEach
             val position = workingPositions[node.id] ?: subject.position
-            val center = screenCenter(position)
+            val share = roam[node.id]
+            if (share is CreatureRoam.Site) {
+                // A place the shared creature works at, not a creature: tapping it opens that task.
+                RoamSite(
+                    node = node,
+                    center = screenCenter(position),
+                    sizePx = creatureSizePx * zoom * ROAM_SITE_SCALE,
+                    selected = selectedId == node.id,
+                    dimmed = focusNodes != null && node.id !in focusNodes,
+                    onClick = { onNodeSelected(node) },
+                )
+                return@forEach
+            }
+            val homeCenter = screenCenter(position)
+            // A rider that has just been moved on walks from the place it worked at to this one.
+            val walkFrom = (share as? CreatureRoam.Rider)?.from?.takeIf { (rides[node.id] ?: 0f) > 0f }
+                ?.let { from -> (workingPositions[from] ?: subjectById[from]?.position)?.let(::screenCenter) }
+            val center = if (walkFrom == null) homeCenter else lerpOffset(homeCenter, walkFrom, rides.getValue(node.id))
             val isSelected = selectedId == node.id
             val isDropTarget = dropTargetId == node.id
             // An egg is neither working nor blocked: it wears the quiet colour, whatever its task's status.
@@ -964,7 +988,7 @@ private fun TerrariumZoomButton(label: String, onClick: () -> Unit, content: @Co
     }
 }
 
-private fun H2g2WorkflowState.mascotStateColor() = when (this) {
+internal fun H2g2WorkflowState.mascotStateColor() = when (this) {
     H2g2WorkflowState.Blocked, H2g2WorkflowState.Failed -> GeministratorColors.error
     H2g2WorkflowState.Complete -> Azphalt.hues[2]
     H2g2WorkflowState.Active -> Azphalt.Ink

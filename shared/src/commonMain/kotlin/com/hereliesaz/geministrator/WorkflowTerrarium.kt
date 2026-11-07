@@ -123,6 +123,8 @@ internal fun GeministratorWorkflowTerrarium(
     // Who is born and who is still an egg, from the run's task statuses. Build shows every creature, and
     // so does the Swarm view, the whole swarm at once; Setup is the flowchart kept simple.
     val births = remember(stagedDefinition, run) { projectBirths(stagedDefinition, run) }
+    // Who shares a creature: ordered tasks of one role. Build and the Swarm view keep one creature per task.
+    val roaming = remember(stagedDefinition, run) { projectRoaming(stagedDefinition, run) }
     val swarmView = rememberDurableBooleanState("hive.view.swarm")
     val animatedRelationships = remember(projection.relationships, run) {
         projection.relationships.map { relationship ->
@@ -320,6 +322,7 @@ internal fun GeministratorWorkflowTerrarium(
                     .copy(
                         gathered = grouping.orEmpty(),
                         births = if ((building && rehearsal == null) || swarmView.value) emptyMap() else births,
+                        roaming = if ((building && rehearsal == null) || swarmView.value) RoamPlan() else roaming,
                     ),
                 selectedId = selectedTaskId,
                 onNodeSelected = { node ->

@@ -12,6 +12,11 @@ import com.hereliesaz.geministrator.domain.resolveRoleCollection
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
 import com.hereliesaz.geministrator.orchestration.OrchestrationPacket
 import com.hereliesaz.geministrator.orchestration.OrchestrationRole
+import com.hereliesaz.geministrator.orchestration.PlanDecision
+import com.hereliesaz.geministrator.orchestration.PlanReviewer
+import com.hereliesaz.geministrator.orchestration.planReviewNotes
+import com.hereliesaz.geministrator.orchestration.planReviewerRole
+import com.hereliesaz.geministrator.orchestration.reviewUntilApproved
 import com.hereliesaz.geministrator.orchestration.reportLaunchProgress
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
 import com.hereliesaz.geministrator.workflow.OrchestratedWorkflowFactory
@@ -29,6 +34,13 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
     existingProject: Project? = null,
     /** Runs the new run continues (one) or merges (several); empty starts a new root lineage. */
     continuesWorkflowRunIds: List<WorkflowRunId> = emptyList(),
+    /**
+     * Reads the planner's plan before a run exists and sends it back for rework until it approves (see
+     * [reviewUntilApproved]). It reviews only together with [confirmPlan]: the keeper always has the final say.
+     */
+    planReviewer: PlanReviewer? = null,
+    /** Shows the keeper the reviewed plan and the reviewer's reasons; true starts the run, false does not. */
+    confirmPlan: (suspend (PlanDecision) -> Boolean)? = null,
 ) {
     val parents = requireKnownParentRuns(continuesWorkflowRunIds)
     val cleanProjectName = projectName.trim()
@@ -80,7 +92,25 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
         instruction = "Create the minimal executable dependency-correct workflow DAG needed to satisfy the objective.",
     )
     reportLaunchProgress("Asking the planner for a workflow (${plannerRoles.size} roles available)…")
-    val plan = orchestrationRuntime.plan(packet)
+    val firstPlan = orchestrationRuntime.plan(packet)
+    var plan = firstPlan
+    reviewRole(planReviewer, confirmPlan, launchRoles)?.let { (reviewer, role) ->
+        val outcome = reviewUntilApproved(
+            packet = packet,
+            firstPlan = firstPlan,
+            planner = orchestrationRuntime,
+            reviewer = reviewer,
+            reviewerName = role.name,
+            instructions = role.instructions,
+            pinnedProviderId = role.preferredProviderId?.value,
+        )
+        plan = outcome.plan
+        reportLaunchProgress("Waiting for your decision on the plan…")
+        if (!checkNotNull(confirmPlan)(PlanDecision(cleanObjective, role.name, outcome, packet.availableAgents.associate { it.id to it.name }))) {
+            reportLaunchProgress("The plan was not started")
+            return
+        }
+    }
     reportLaunchProgress("Planner returned ${plan.steps.size} step${if (plan.steps.size == 1) "" else "s"}")
     reportLaunchProgress("Assembling workflow…")
     val definition = OrchestratedWorkflowFactory.create(
@@ -117,6 +147,8 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
 internal suspend fun ApplicationRuntime.draftSwarm(
     prompt: String,
     orchestrationRuntime: OrchestrationAgentRuntime,
+    /** Reviews the draft before it is shown; what it said is added to the draft's notes. Null drafts unreviewed. */
+    planReviewer: PlanReviewer? = null,
 ): SwarmDraftResult {
     val roles = activeRoles(resolveRoleCollection(persistence.roles.all()))
     // Only roles a linked provider can staff, as at launch; with none, offer them all so the failure names the gap.
@@ -137,5 +169,36 @@ internal suspend fun ApplicationRuntime.draftSwarm(
     } catch (failure: Throwable) {
         return swarmDraftFailure(failure)
     }
-    return swarmDraftFromPlan(prompt, plan, staffable).let { if (it is SwarmDraftResult.Ready) it.copy(notes = notes.toList()) else it }
+    var chosen = plan
+    reviewRole(planReviewer, planReviewer, roles)?.let { (reviewer, role) ->
+        val outcome = try {
+            kotlinx.coroutines.withContext(com.hereliesaz.geministrator.workflow.FailoverNotes { notes += it }) {
+                reviewUntilApproved(packet, plan, orchestrationRuntime, reviewer, role.name, role.instructions, role.preferredProviderId?.value)
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        }
+        notes += planReviewNotes(role.name, outcome)
+        // A rework that cannot be drafted (too many creatures, say) must not cost the draft the keeper already had.
+        if (swarmDraftFromPlan(prompt, outcome.plan, staffable) is SwarmDraftResult.Ready) {
+            chosen = outcome.plan
+        } else if (outcome.plan !== plan) {
+            notes += "The reworked draft could not be used, so this is the first draft."
+        }
+    }
+    return swarmDraftFromPlan(prompt, chosen, staffable).let { if (it is SwarmDraftResult.Ready) it.copy(notes = notes.toList()) else it }
+}
+
+/**
+ * The reviewer and the role it speaks as, when a review should happen: a reviewer exists, a role may review
+ * plans, and (for a launch) a keeper decision exists to show it to. Otherwise the plan goes ahead as it always did.
+ */
+private fun reviewRole(
+    reviewer: PlanReviewer?,
+    keeperDecision: Any?,
+    roles: List<com.hereliesaz.geministrator.domain.RoleDefinition>,
+): Pair<PlanReviewer, com.hereliesaz.geministrator.domain.RoleDefinition>? {
+    if (reviewer == null || keeperDecision == null) return null
+    val role = planReviewerRole(roles) ?: return null
+    return reviewer to role
 }

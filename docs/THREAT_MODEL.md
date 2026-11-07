@@ -610,6 +610,7 @@ The following invariants must hold regardless of the integration used:
 Invariant 4, together with the gate-decider, approval-policy and add-on permission checks, is decided by the in-process policy decision point ([`architecture/POLICY.md`](architecture/POLICY.md)). Its denials and approval requirements are recorded on the run timeline. A policy rule may add a gate but must never relax an invariant.
 7. An agent's question to the keeper is drawn only from the host catalog in `AgentUi`; anything outside it is shown as plain text, and no part of it is executed, fetched or rendered as markup.
 8. No remote or local-agent interface (MCP bridge, control API, A2A server) can approve, reject or release a gate, lift a spend stop, or remove a human approval. Those decisions are made only in the app, by the person.
+9. The plan reviewer (`orchestration/PlanReview.kt`) is advisory. It reads a plan before a run exists and returns words; it decides no approval gate, relaxes no invariant, and the reworked plan passes `OrchestrationPlan.validateAgainst` and the workflow graph validator like any plan, so invariant 4 still holds for it. The reviewer's text and the plan are model text (the reviewer reads step objectives a model wrote; the planner reads the reviewer's objections back): both are shown as plain text only, and a plan reaches a run only when the keeper starts it in the app (invariant 8).
 
 ## Open Items
 
