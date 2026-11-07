@@ -874,6 +874,45 @@ class HiveScreenshotTest {
         }
     }
 
+    /** The keeper's final say on a reviewed plan: approved after rework, and never approved. */
+    @Test
+    fun shootsThePlanDecision() {
+        fun step(id: String, name: String, after: String? = null, approval: Boolean = false) = com.hereliesaz.geministrator.orchestration.OrchestrationPlanStep(
+            id, name, "Do $name carefully, then hand it on.", "architect", listOfNotNull(after), approval,
+        )
+        val plan = com.hereliesaz.geministrator.orchestration.OrchestrationPlan(
+            listOf(step("a", "Define scope"), step("b", "Implement", "a"), step("c", "Ship", "b", approval = true)),
+        )
+        val reject = { why: String -> com.hereliesaz.geministrator.orchestration.PlanReviewRound(plan, com.hereliesaz.geministrator.orchestration.PlanVerdict.Reject(why)) }
+        val approve = com.hereliesaz.geministrator.orchestration.PlanReviewRound(plan, com.hereliesaz.geministrator.orchestration.PlanVerdict.Approve("The tests now come before the code."))
+        val names = mapOf("architect" to "Architect")
+        shoot("48-plan-decision-approved", 900, 1100) {
+            PlanDecisionOverlay(
+                decision = com.hereliesaz.geministrator.orchestration.PlanDecision(
+                    "Ship it", "Adversarial Reviewer",
+                    com.hereliesaz.geministrator.orchestration.PlanReviewOutcome(plan, listOf(reject("There is no test step before the code."), approve)),
+                    names,
+                ),
+                onStart = {},
+                onDecline = {},
+            )
+        }
+        shoot("49-plan-decision-not-approved", 900, 1100) {
+            PlanDecisionOverlay(
+                decision = com.hereliesaz.geministrator.orchestration.PlanDecision(
+                    "Ship it", "Adversarial Reviewer",
+                    com.hereliesaz.geministrator.orchestration.PlanReviewOutcome(
+                        plan,
+                        listOf(reject("No rollback."), reject("Still no rollback."), reject("Rollback is still missing.")),
+                    ),
+                    names,
+                ),
+                onStart = {},
+                onDecline = {},
+            )
+        }
+    }
+
     /** An egg hatching: shown full, then released. The creature arrives over the transition, not all at once. */
     @Test
     fun shootsTheHatch() {

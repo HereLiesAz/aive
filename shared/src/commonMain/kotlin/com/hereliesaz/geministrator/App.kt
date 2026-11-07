@@ -34,6 +34,8 @@ import com.hereliesaz.geministrator.distributed.ComputeDelegationTarget
 import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
+import com.hereliesaz.geministrator.orchestration.PlanReviewer
+import kotlinx.coroutines.CompletableDeferred
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.OnDeviceTextAgentProvider
@@ -86,6 +88,8 @@ fun App(
     executorIntegrations: TaskExecutorIntegrationRegistry = TaskExecutorIntegrationRegistry.Empty,
     roleSurfaceRuntime: RoleSurfaceRuntimeRegistry = RoleSurfaceRuntimeRegistry.Empty,
     orchestrationRuntime: OrchestrationAgentRuntime? = null,
+    /** Reviews the planner's plan before a run exists, with the keeper's final say (orchestration/PlanReview.kt); null skips review. */
+    planReviewer: PlanReviewer? = null,
     persistence: WorkflowPersistence? = null,
     projectFileService: ProjectFileService? = null,
     azphaltStoreService: AzphaltStoreService? = null,
@@ -162,6 +166,8 @@ fun App(
     val providerReach by produceState(ProviderReach.Unknown, providers) { value = providerReach(providers) }
     val launchSteps = remember { LiveStepsFeedModel(maxRows = 5) }
     val launchStepRows by launchSteps.rows.collectAsState()
+    // A reviewed plan waiting on the keeper's final say: the run does not exist until it is answered.
+    var planDecision by remember { mutableStateOf<PendingPlanDecision?>(null) }
     var projectIdToOpenAfterReload by remember { mutableStateOf<String?>(null) }
     var automaticProjectRestoreAttempted by remember(projectFileService) { mutableStateOf(false) }
 
@@ -322,6 +328,16 @@ fun App(
                         repository = repository,
                         existingProject = existingProject,
                         continuesWorkflowRunIds = continuesWorkflowRunIds,
+                        planReviewer = planReviewer,
+                        confirmPlan = { decision ->
+                            val answer = CompletableDeferred<Boolean>()
+                            planDecision = PendingPlanDecision(decision, answer)
+                            try {
+                                answer.await()
+                            } finally {
+                                planDecision = null
+                            }
+                        },
                     )
                 } else {
                     launchSteps.push("Starting the starter workflow…")
@@ -552,7 +568,7 @@ fun App(
         ).also { host ->
             // Drafting a swarm only proposes; it needs the linked planner and a live runtime.
             host.swarmDrafter = orchestrationRuntime?.let { planner ->
-                { prompt: String -> runtime?.draftSwarm(prompt, planner) ?: SwarmDraftResult.Unavailable }
+                { prompt: String -> runtime?.draftSwarm(prompt, planner, planReviewer) ?: SwarmDraftResult.Unavailable }
             }
         }
 
@@ -946,7 +962,16 @@ fun App(
                     )
                 }
                 if (launching) {
-                    LaunchStepsOverlay(rows = launchStepRows, maxRows = launchSteps.maxRows)
+                    val pending = planDecision
+                    if (pending != null) {
+                        PlanDecisionOverlay(
+                            decision = pending.decision,
+                            onStart = { pending.answer.complete(true) },
+                            onDecline = { pending.answer.complete(false) },
+                        )
+                    } else {
+                        LaunchStepsOverlay(rows = launchStepRows, maxRows = launchSteps.maxRows)
+                    }
                 }
               }
             }
@@ -989,3 +1014,9 @@ internal object ControlRoomSession {
 internal fun startupControlRoomDestination(
     hasConfiguredProvider: Boolean,
 ): ControlRoomDestination = ControlRoomDestination.Overview
+
+/** A reviewed plan waiting for the keeper, and the answer that lets the launch go on (true) or end (false). */
+private class PendingPlanDecision(
+    val decision: com.hereliesaz.geministrator.orchestration.PlanDecision,
+    val answer: kotlinx.coroutines.CompletableDeferred<Boolean>,
+)

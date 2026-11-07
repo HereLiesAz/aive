@@ -71,6 +71,7 @@ import com.hereliesaz.geministrator.providers.llm.OpenAiProvider
 import com.hereliesaz.geministrator.providers.llm.OpenAiResponsesApi
 import com.hereliesaz.geministrator.providers.llm.TextGenerationApi
 import com.hereliesaz.geministrator.providers.llm.TextGenerationOrchestrationAgentRuntime
+import com.hereliesaz.geministrator.providers.llm.configuredPlanReviewer
 import com.hereliesaz.geministrator.providers.llm.configuredPlanningRuntime
 import com.hereliesaz.geministrator.providers.llm.memoryTextApi
 import com.hereliesaz.geministrator.providers.llm.TextLlmProvider
@@ -345,6 +346,8 @@ class MainActivity : ComponentActivity() {
                 val planningRuntime = remember(credentials) {
                     configuredPlanningRuntime(credentials)
                 }
+                // The plan is read by a reviewer before a run exists; the keeper then has the final say.
+                val planReviewer = remember(credentials) { configuredPlanReviewer(credentials) }
                 val roleSurfaceRuntime = remember {
                     RoleSurfaceRuntimeRegistry(
                         listOf(AndroidRoleSurfaceIntegration(this, repositoryHttpClient)),
@@ -510,6 +513,7 @@ class MainActivity : ComponentActivity() {
                         orchestrationUtilities = orchestrationUtilities,
                         roleSurfaceRuntime = roleSurfaceRuntime,
                         orchestrationRuntime = planningRuntime,
+                        planReviewer = planReviewer,
                         persistence = azphaltHost.persistence,
                         projectFileService = projectFileService,
                         azphaltStoreService = azphaltHost.service,
