@@ -372,6 +372,7 @@ fun ControlRoom(
                 connectedProviderIds = connectedProviderIds,
                 roleSurfaceFilePicker = roleSurfaceFilePicker,
                 computeAvailable = ControlRoomDestination.Compute in destinations,
+                onSelectTask = onTaskSelected,
                 // Closes the panel onto the hive's Timeline, this creature still selected there.
                 onOpenTrace = {
                     showTimeline.value = true

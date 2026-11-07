@@ -817,6 +817,63 @@ class HiveScreenshotTest {
         }
     }
 
+    /**
+     * One creature doing several tasks of its role. The engineer does Implement, then Ship: left, it is at
+     * Implement and Ship is a place it will work; right, it has walked on to Ship and Implement is the place
+     * it worked. The two QA tasks run side by side, so each keeps a creature of its own.
+     */
+    @Test
+    fun shootsTheSharedCreature() {
+        runBlocking { CreatureRigMapping.allSlugs.forEach { CreatureRigCache.get(it) } }
+        val joined = WorkflowDefinition(
+            id = WorkflowDefinitionId("shared"),
+            name = "Shared",
+            tasks = listOf(
+                task("plan", "Plan", architect),
+                task("build", "Implement", engineer, "plan"),
+                task("test", "Test", qa, "plan"),
+                task("review", "Review", qa, "build"),
+                task("ship", "Ship", engineer, "review", "test"),
+            ),
+        )
+        shootSettled("46-shared-creature-at-first-task", 900, 1400, 2_500) {
+            GeministratorWorkflowTerrarium(
+                joined,
+                run(
+                    joined,
+                    WorkflowRunStatus.Running,
+                    Triple("plan", TaskRunStatus.Completed, "claude"),
+                    Triple("build", TaskRunStatus.Running, "claude"),
+                    Triple("test", TaskRunStatus.Running, "gemini"),
+                    Triple("review", TaskRunStatus.Blocked, "gemini"),
+                    Triple("ship", TaskRunStatus.Blocked, "claude"),
+                ),
+                roles,
+                selectedTaskId = null,
+                onTaskSelected = {},
+                onStageDefinition = { it },
+            )
+        }
+        shootSettled("47-shared-creature-at-second-task", 900, 1400, 2_500) {
+            GeministratorWorkflowTerrarium(
+                joined,
+                run(
+                    joined,
+                    WorkflowRunStatus.Running,
+                    Triple("plan", TaskRunStatus.Completed, "claude"),
+                    Triple("build", TaskRunStatus.Completed, "claude"),
+                    Triple("test", TaskRunStatus.Completed, "gemini"),
+                    Triple("review", TaskRunStatus.Completed, "gemini"),
+                    Triple("ship", TaskRunStatus.Running, "claude"),
+                ),
+                roles,
+                selectedTaskId = null,
+                onTaskSelected = {},
+                onStageDefinition = { it },
+            )
+        }
+    }
+
     /** An egg hatching: shown full, then released. The creature arrives over the transition, not all at once. */
     @Test
     fun shootsTheHatch() {

@@ -39,6 +39,7 @@ Pinch moves between distances; double-tap dives one level, two-finger tap surfac
 
 ## Everything has a place in the tissue
 
+- **One creature does a role's ordered tasks** (`Node-Creatures.md`, Roaming): it walks between their places as the run moves on; tasks that can run side by side keep a creature each. Setup shows it; Build and the Swarm view keep one creature per task.
 - **Unborn creatures are eggs too** (`Node-Creatures.md`, Birth): only the next generation is drawn, each gestated by the creatures that feed it, hatching when the engine releases its task. **Runs are eggs.** A launched run grows one egg fed by the tail of every creature working on it, and it swells as tasks finish. It hatches a new agent when the run clears; it withers when the run fails. Finished runs leave a **comb** where the egg was: tap it to replay the run, ghosted, in place. *(Replaces Runs.)*
 - **The inbox is a creature at the surface.** A creature that needs you (a gate, an approval, an escalation) rises toward the viewer and pulses. From any distance its hive shows the pulse. Tap to answer, in place. *(Replaces Inbox.)*
 - **Artifacts are what a creature leaves along its synapses**: tap a synapse to see what crossed it. Contaminated work shows as the stain it already is. *(Replaces Artifacts.)*

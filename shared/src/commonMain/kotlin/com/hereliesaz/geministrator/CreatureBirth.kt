@@ -97,7 +97,7 @@ internal fun projectBirths(
 }
 
 /** The tasks that gestate this one: what it depends on, and the task its condition waits on. */
-private fun TaskDefinition.feeders(): List<String> {
+internal fun TaskDefinition.feeders(): List<String> {
     val conditionTask = when (val c = condition) {
         TaskCondition.Always -> null
         is TaskCondition.OnAnyOutcome -> c.ofTask
@@ -115,7 +115,7 @@ private fun TaskRun.isSkippedBranch(): Boolean =
  * before it ever started. A task held for another reason (a spent budget, a spend cap) was released
  * first, so it is born.
  */
-private fun TaskRun.isBorn(): Boolean = when (status) {
+internal fun TaskRun.isBorn(): Boolean = when (status) {
     TaskRunStatus.Created -> false
     // Blocked with no recorded reason is waiting too; only a different reason (a spent budget, a spend cap) means released.
     TaskRunStatus.Blocked -> blockingReason?.code.let { it != null && it != WorkflowRunFactory.WAITING_FOR_DEPENDENCIES }

@@ -267,6 +267,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inspector_approve_task">Approve task</string>
     <string name="inspector_artifact">ARTIFACT %1$s · %2$s</string>
     <string name="inspector_artifacts">ARTIFACTS</string>
+    <string name="inspector_shared_creature">THE SAME CREATURE, OTHER TASKS</string>
+    <string name="inspector_shared_creature_here">HERE</string>
     <string name="inspector_activity">WHAT IT'S DOING</string>
     <string name="inspector_activity_thinking">THINKING</string>
     <string name="inspector_activity_step">STEP</string>
@@ -511,6 +513,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_timeline_empty">Nothing has happened in this swarm yet.</string>
     <string name="hive_show_timeline">Timeline</string>
     <string name="hive_show_hive">Overview</string>
+    <string name="creature_site">%1$s, a place the shared creature works at: %2$s</string>
     <string name="creature_egg_action">Egg, %1$d of %2$d feeders done</string>
     <string name="creature_egg_withered">Withered egg</string>
     <string name="hive_stop_run">Stop</string>
