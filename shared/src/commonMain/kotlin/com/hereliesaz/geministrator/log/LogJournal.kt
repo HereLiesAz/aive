@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.log
 
 import com.hereliesaz.geministrator.control.ControlRedaction
+import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -129,7 +130,10 @@ private fun unescapeLog(text: String): String = buildString(text.length) {
 object AppLog {
     const val SETTINGS_KEY = "aive.app-log.v1"
 
-    val Shared: LogJournal by lazy { LogJournal(settings = Settings(), storageKey = SETTINGS_KEY) }
+    /** Desktop's Preferences reject a value over 8,192 characters; 500 lines far exceed it, so the journal is chunked. */
+    internal fun journalSettings(base: Settings): Settings = ChunkedStringSettings(base, setOf(SETTINGS_KEY))
+
+    val Shared: LogJournal by lazy { LogJournal(settings = journalSettings(Settings()), storageKey = SETTINGS_KEY) }
 
     fun record(tag: String, message: String) = Shared.record(tag, message)
 }

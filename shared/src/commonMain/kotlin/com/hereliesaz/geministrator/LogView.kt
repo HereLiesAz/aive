@@ -80,7 +80,7 @@ internal fun RunLogView(
     val memory = sources.memory?.collectAsState()?.value.orEmpty()
     val lines = when (source) {
         LogSource.Run -> remember(events) { runEventLines(events, taskName) }
-        LogSource.Agents -> remember(agents) { agentActivityLines(agents, sources.agentScope) }
+        LogSource.Agents -> remember(agents, sources.agentScope) { agentActivityLines(agents, sources.agentScope) }
         LogSource.App -> app
         LogSource.Memory -> memory
     }
@@ -104,15 +104,28 @@ internal fun RunLogView(
             val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return@LaunchedEffect
             if (last >= lines.lastIndex - 2) listState.scrollToItem(lines.lastIndex)
         }
+        // A line keeps its identity when older ones are evicted, so the reader's place holds while the journal turns over.
+        val keys = remember(lines) { stableLogKeys(lines) }
         SelectionContainer(Modifier.weight(1f).fillMaxWidth()) {
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                items(lines.size) { index -> LogRow(lines[index]) }
+                items(count = lines.size, key = { keys[it] }) { index -> LogRow(lines[index]) }
             }
         }
+    }
+}
+
+/** One identity per line: its time, scope and text, with a count to tell identical lines apart. */
+internal fun stableLogKeys(lines: List<LogLine>): List<String> {
+    val seen = HashMap<String, Int>()
+    return lines.map { line ->
+        val base = "${line.atEpochMillis}|${line.scope}|${line.text.hashCode()}"
+        val n = seen.getOrElse(base) { 0 }
+        seen[base] = n + 1
+        "$base|$n"
     }
 }
 

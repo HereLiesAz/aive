@@ -59,6 +59,33 @@ class LogJournalTest {
     }
 
     @Test
+    fun theAppLogSurvivesDesktopsValueLimit() {
+        // java.util.prefs refuses a value over 8,192 characters; a full journal is far larger.
+        val inner = InMemorySettings()
+        val limited = object : com.russhwolf.settings.Settings by inner {
+            override fun putString(key: String, value: String) {
+                require(value.length <= 8_192) { "Value too long" }
+                inner.putString(key, value)
+            }
+        }
+        val store = AppLog.journalSettings(limited)
+        val first = LogJournal(settings = store, storageKey = AppLog.SETTINGS_KEY)
+        repeat(60) { first.record("tag", "line $it " + "x".repeat(400)) }
+
+        val second = LogJournal(settings = store, storageKey = AppLog.SETTINGS_KEY)
+        assertEquals(60, second.lines.value.size)
+        assertTrue(second.lines.value.last().text.startsWith("line 59"))
+    }
+
+    @Test
+    fun aLineKeepsItsKeyWhenOlderOnesAreEvicted() {
+        val lines = (1..5).map { LogLine(it.toLong(), "s", "t") } + LogLine(5L, "s", "t")
+        val keys = com.hereliesaz.geministrator.stableLogKeys(lines)
+        assertEquals(keys.size, keys.toSet().size)
+        assertEquals(keys.drop(2), com.hereliesaz.geministrator.stableLogKeys(lines.drop(2)))
+    }
+
+    @Test
     fun aDamagedStoreIsSkippedLineByLine() {
         val settings = InMemorySettings()
         settings.putString("log", "not a line\n5\tscope\tgood\nx\ty\tz")
