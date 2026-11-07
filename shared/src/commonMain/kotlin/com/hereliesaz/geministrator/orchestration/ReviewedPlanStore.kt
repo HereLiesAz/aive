@@ -51,6 +51,12 @@ data class PendingPlanLaunch(
     val savedDefinitionId: String? = null,
     /** Roles a package brought with that saved hive: part of what the plan was made from. */
     val supplementalRoles: List<RoleDefinition> = emptyList(),
+    /**
+     * The rough design as it was planned from, kept for a hive that is not in the library (one a package brought):
+     * with nothing saved to read it from again, a restart resumes from this. A saved hive is read from the library
+     * instead, so an edit to it is seen.
+     */
+    val design: WorkflowDefinition? = null,
 )
 
 /** Settings-backed store for the one [PendingPlanLaunch]. Unreadable state is no state: the keeper is simply asked afresh. */
@@ -84,6 +90,8 @@ class ReviewedPlanStore(settings: Settings) {
         private val json = Json {
             encodeDefaults = true
             ignoreUnknownKeys = true
+            // A kept design holds a map keyed by a class (per-provider limits), which JSON writes as a flat array.
+            allowStructuredMapKeys = true
         }
     }
 }

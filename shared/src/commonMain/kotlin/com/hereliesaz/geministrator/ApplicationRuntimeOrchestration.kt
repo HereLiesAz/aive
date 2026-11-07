@@ -269,6 +269,7 @@ private suspend fun ApplicationRuntime.planAndDecide(
             createdAtEpochMillis = Clock.System.now().toEpochMilliseconds(),
             savedDefinitionId = inputs.design?.id?.value,
             supplementalRoles = inputs.supplementalRoles,
+            design = inputs.design,
         ),
     )
     val start = checkNotNull(confirmPlan)(PlanDecision(inputs.objective, role.name, outcome, inputs.packet.availableAgents.associate { it.id to it.name }))
@@ -364,7 +365,8 @@ suspend fun ApplicationRuntime.resumePendingPlanLaunch(
     val pending = planStore.pending(Clock.System.now().toEpochMilliseconds()) ?: return false
     val inputs = try {
         val saved = pending.savedDefinitionId?.let { id ->
-            val definition = persistence.definitions.get(WorkflowDefinitionId(id)) ?: error("The saved hive is gone")
+            // A hive in the library is read again, so an edit to it is seen; one a package brought is not saved, so the plan's own copy is used.
+            val definition = persistence.definitions.get(WorkflowDefinitionId(id)) ?: pending.design ?: error("The saved hive is gone")
             definition to (savedHiveRoughDesign(definition) ?: error("The saved hive is no longer a rough design"))
         }
         planInputs(
