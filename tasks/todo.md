@@ -46,5 +46,14 @@ Each step gets its own design approval.
 
 Decided: unborn creatures beyond the next generation stay hidden (no ghost nodes).
 
+## Unpinning h2g2 and Conveyance (keeper: h2g2 must not pin; everything updated as soon as possible)
+- [x] aive: CI checks out h2g2 and Conveyance at their latest `main` (no `ref:`), and the Gradle dependency is `main-SNAPSHOT`, not a commit hash.
+- [ ] HereLiesAz/Conveyance#80 and HereLiesAz/conveyance-h2g2#17: AGP 9.5.1 (Gradle refuses two AGP versions in one composite). Verified locally with all three on 9.5.1. h2g2#17 also adds Dependabot (h2g2 had none).
+- [ ] Merge those two, then rebase and merge aive#648 (AGP) and aive#650 (tokenizers, awaiting Dependabot's rebase).
+- [ ] Decide h2g2's own pin: `build.gradle.kts` hard-codes `conveyanceRevision = "0.5.0"` (comment: a floating main-SNAPSHOT can resolve stale per-target publications through JitPack). Dependabot cannot track it. aive's root `build.gradle.kts` mirrors it (`conveyanceRevision`) and must follow.
+
+## Ideas (not scheduled)
+- **Free creatures sort memory.** When a creature is free (idle, nothing waiting on it), it helps sort the memories and gives each a weight from its own role's perspective only (keeper, in passing). Notes: a free creature is a recorded state, so it fits "every change has a cause"; the memory clerks organise but never rule on truth, so a weight is relevance to that role, not correctness; it spends tokens, so it must be opt-in and under the role budgets and spend caps; pairs with PR 2's roaming (a free creature walks to the memory field). Needs a design and your approval before any build.
+
 ## Review
 (filled in as each PR lands)

@@ -95,7 +95,7 @@ if (useMavenLocalH2g2) {
     allprojects {
         configurations.configureEach {
             resolutionStrategy.dependencySubstitution {
-                substitute(module("com.github.HereLiesAz:conveyance-h2g2:b17d8d9b46f8aeb399321c10199f0d0d0a0cfaaa"))
+                substitute(module("com.github.HereLiesAz:conveyance-h2g2:main-SNAPSHOT"))
                     .using(module("com.hereliesaz.conveyance:conveyance-h2g2:$h2g2Local"))
                 substitute(module("com.github.HereLiesAz.Conveyance:conveyance-core:$conveyanceRevision"))
                     .using(module("com.hereliesaz.conveyance:conveyance-core:$conveyanceLocal"))
