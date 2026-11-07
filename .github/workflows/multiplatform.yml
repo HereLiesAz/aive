@@ -66,18 +66,16 @@ jobs:
           environment-variable: AIVE_VERSION
 
 
-      - name: Check out pinned h2g2
+      - name: Check out h2g2
         uses: actions/checkout@v7.0.1
         with:
           repository: HereLiesAz/conveyance-h2g2
-          ref: b17d8d9b46f8aeb399321c10199f0d0d0a0cfaaa
           path: vendor/conveyance-h2g2
 
-      - name: Check out pinned Conveyance
+      - name: Check out Conveyance
         uses: actions/checkout@v7.0.1
         with:
           repository: HereLiesAz/Conveyance
-          ref: 214e43e2e871c8f1a5ca6f7e7dbb158177b5914c
           path: vendor/conveyance-h2g2/vendor/Conveyance
 
       - name: Set up JDK 21
@@ -225,13 +223,13 @@ jobs:
           done
           exit $bad
 
-      - name: Publish pinned Conveyance for isolated web builds
+      - name: Publish Conveyance for isolated web builds
         run: |
           ./gradlew -p vendor/conveyance-h2g2/vendor/Conveyance \
             :conveyance-core:publishToMavenLocal \
             :conveyance-compose:publishToMavenLocal
 
-      - name: Publish pinned h2g2 for isolated web builds
+      - name: Publish h2g2 for isolated web builds
         run: ./gradlew -p vendor/conveyance-h2g2 publishToMavenLocal
 
       # Three builds (root 4g, Conveyance 3g, h2g2 2g heaps) leave their Gradle and Kotlin
@@ -396,18 +394,16 @@ jobs:
           echo "AIVE_VERSION=$AIVE_VERSION" >> "$GITHUB_ENV"
           echo "Aive build version: $AIVE_VERSION"
 
-      - name: Check out pinned h2g2
+      - name: Check out h2g2
         uses: actions/checkout@v7.0.1
         with:
           repository: HereLiesAz/conveyance-h2g2
-          ref: b17d8d9b46f8aeb399321c10199f0d0d0a0cfaaa
           path: vendor/conveyance-h2g2
 
-      - name: Check out pinned Conveyance
+      - name: Check out Conveyance
         uses: actions/checkout@v7.0.1
         with:
           repository: HereLiesAz/Conveyance
-          ref: 214e43e2e871c8f1a5ca6f7e7dbb158177b5914c
           path: vendor/conveyance-h2g2/vendor/Conveyance
 
       - name: Set up JDK 21
@@ -439,14 +435,14 @@ jobs:
             fi
           done
 
-      - name: Publish pinned Conveyance to Maven Local
+      - name: Publish Conveyance to Maven Local
         shell: bash
         run: |
           ./gradlew -p vendor/conveyance-h2g2/vendor/Conveyance \
             :conveyance-core:publishToMavenLocal \
             :conveyance-compose:publishToMavenLocal
 
-      - name: Publish pinned h2g2 to Maven Local
+      - name: Publish h2g2 to Maven Local
         shell: bash
         run: ./gradlew -p vendor/conveyance-h2g2 publishToMavenLocal
 

@@ -35,18 +35,16 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7.0.1
 
-      - name: Check out pinned h2g2
+      - name: Check out h2g2
         uses: actions/checkout@v7.0.1
         with:
           repository: HereLiesAz/conveyance-h2g2
-          ref: b17d8d9b46f8aeb399321c10199f0d0d0a0cfaaa
           path: vendor/conveyance-h2g2
 
-      - name: Check out pinned Conveyance
+      - name: Check out Conveyance
         uses: actions/checkout@v7.0.1
         with:
           repository: HereLiesAz/Conveyance
-          ref: 214e43e2e871c8f1a5ca6f7e7dbb158177b5914c
           path: vendor/conveyance-h2g2/vendor/Conveyance
 
       - name: Install stable Rust

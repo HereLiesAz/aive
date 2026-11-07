@@ -847,7 +847,7 @@ class HiveScreenshotTest {
         assertTrue(!frames.getValue("mid").contentEquals(frames.getValue("born")), "the creature is still arriving mid-transition")
     }
 
-    /** The Timeline's row (Overview, Waterfall, Events, Memory) at a phone's width, Waterfall then Memory open. */
+    /** The Timeline's row (Overview, Waterfall, Events, Memory, Log) at a phone's width, Waterfall, Memory then Log open. */
     @Test
     fun shootsTheTimelineRow() {
         val runId = WorkflowRunId("run-timeline-row")
@@ -856,19 +856,34 @@ class HiveScreenshotTest {
             com.hereliesaz.geministrator.events.TaskCompleted(runId, TaskDefinitionId("contract"), 90_000),
         )
         try {
-            for ((view, name) in listOf("waterfall" to "36-timeline-row", "memory" to "37-timeline-memory")) {
+            val appLines = kotlinx.coroutines.flow.MutableStateFlow(
+                listOf(
+                    com.hereliesaz.geministrator.log.LogLine(1_794_055_860_000L, "AiveLaunch", "Launch blocked: no repository chosen"),
+                    com.hereliesaz.geministrator.log.LogLine(1_794_055_863_412L, "AzphaltStore", "Store step 'catalog' failed: timeout"),
+                ),
+            )
+            val sources = RunLogSources(
+                agents = kotlinx.coroutines.flow.MutableStateFlow(emptyMap()),
+                agentScope = { null },
+                app = appLines,
+                memory = kotlinx.coroutines.flow.MutableStateFlow(emptyList()),
+            )
+            for ((view, name) in listOf("waterfall" to "36-timeline-row", "memory" to "37-timeline-memory", "log" to "38-timeline-log")) {
                 DurableUiState.store.putString("overview.timeline.view", view)
+                DurableUiState.store.putString("overview.timeline.log.source", if (view == "log") "App" else "Run")
                 shootSettled(name, 780, 900, 2_500) {
                     RunTimeline(
                         runKey = "run-timeline-row",
                         onLoadTimeline = { events },
                         onShowHive = {},
                         memoryContent = { MemoryLayerScreen(controller = null, connectedProviderIds = emptySet(), compact = true) },
+                        logSources = sources,
                     )
                 }
             }
         } finally {
             DurableUiState.store.putString("overview.timeline.view", "waterfall")
+            DurableUiState.store.putString("overview.timeline.log.source", "Run")
         }
     }
 

@@ -31,6 +31,7 @@ Depending on how you use the app, The Aive may store:
 - progress and status information
 - approval gates and decisions
 - workflow events
+- the app's own diagnostic log: the newest 500 lines (launch refusals and failures, settings and store-step failures, with stack traces), dated, with keys scrubbed before they are kept, in the same settings store as the app's other preferences (`aive.app-log.v1`); the Log tab shows it, and clearing the app's data removes it. It is never sent anywhere: it is not part of crash reports or trace export
 - artifacts and references to artifacts
 - provider/executor run identifiers needed to resume work
 - settings, such as distributed-compute configuration and whether crash reporting, the Gemini bridge, Remote access or trace export is enabled (with the trace collector's address and headers)

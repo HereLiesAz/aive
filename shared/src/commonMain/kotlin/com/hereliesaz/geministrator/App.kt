@@ -301,7 +301,7 @@ fun App(
         onFinished: (Throwable?) -> Unit = {},
     ) {
         if (launching) {
-            platformDebugLog("AiveLaunch", "Launch ignored: a launch is already in progress")
+            appLog("AiveLaunch", "Launch ignored: a launch is already in progress")
             return
         }
         launching = true
@@ -309,7 +309,7 @@ fun App(
         launchSteps.clear()
         scope.launch(LaunchProgress(launchSteps::push)) {
             try {
-                platformDebugLog(
+                appLog(
                     "AiveLaunch",
                     "Launch started: orchestrated=${orchestrationRuntime != null} runtime=${runtime != null}",
                 )
@@ -340,7 +340,7 @@ fun App(
                 // Catch Throwable, not Exception: on-device model failures such as
                 // OutOfMemoryError are Errors and previously escaped this handler,
                 // leaving the launch button silently doing nothing.
-                platformDebugLog("AiveLaunch", "Launch failed: ${failure::class.simpleName}: ${failure.message}")
+                appLog("AiveLaunch", "Launch failed: ${failure::class.simpleName}: ${failure.message}")
                 launchError = failure.message?.takeIf(String::isNotBlank) ?: getString(Res.string.app_workflow_launch_failed)
                 onFinished(failure)
             } finally {
@@ -544,7 +544,7 @@ fun App(
                             )
                         }
                         if (!started) {
-                            platformDebugLog("AiveLaunch", "Node character generation skipped: a launch is already in progress")
+                            appLog("AiveLaunch", "Node character generation skipped: a launch is already in progress")
                         }
                     }
                 }

@@ -236,7 +236,7 @@ internal fun MindMapRunScreen(
             },
             onFailure = { failure ->
                 // The raw reply (an HTTP body) is no help here: say what still works.
-                platformDebugLog("AiveLaunch", "Repository search failed: ${failure.message}")
+                appLog("AiveLaunch", "Repository search failed: ${failure.message}")
                 repositorySearchError = getString(Res.string.overview_repository_search_unavailable)
             },
         )
@@ -636,7 +636,7 @@ internal fun MindMapRunScreen(
                         // A gated Feed it escorts to what is missing rather than starting work no agent can take.
                         if (gate != FeedGate.Open) {
                             launchFieldsError = gateMessage
-                            platformDebugLog("AiveLaunch", "Launch gated: $gate")
+                            appLog("AiveLaunch", "Launch gated: $gate")
                             return@AzphaltPill
                         }
                         val locator = repositoryLocator.trim()
@@ -647,7 +647,7 @@ internal fun MindMapRunScreen(
                         }
                         // Permanent diagnostic: distinguishes "tap never arrived" from "tap arrived
                         // but launch failed" in any future "nothing happens" report.
-                        platformDebugLog(
+                        appLog(
                             "AiveLaunch",
                             "CREATE PROJECT + START RUN tapped: project=$name " +
                                 "repo=${locator.ifEmpty { "<none>" }} objectiveChars=${objective.trim().length}",
@@ -660,12 +660,12 @@ internal fun MindMapRunScreen(
                                 name.isBlank() -> missingNameMessage
                                 else -> missingObjectiveMessage
                             }
-                            platformDebugLog("AiveLaunch", "Launch blocked: $launchFieldsError")
+                            appLog("AiveLaunch", "Launch blocked: $launchFieldsError")
                             return@AzphaltPill
                         }
                         lineage.validationError?.let { message ->
                             launchFieldsError = message
-                            platformDebugLog("AiveLaunch", "Launch blocked: $message")
+                            appLog("AiveLaunch", "Launch blocked: $message")
                             return@AzphaltPill
                         }
                         val parents = lineage.continuesWorkflowRunIds
@@ -689,7 +689,7 @@ internal fun MindMapRunScreen(
                                 onFailure = { failure ->
                                     repositoryError = failure.message ?: invalidRepositoryMessage
                                     optionsOpen = true
-                                    platformDebugLog("AiveLaunch", "Launch blocked: invalid repository: $repositoryError")
+                                    appLog("AiveLaunch", "Launch blocked: invalid repository: $repositoryError")
                                 },
                             )
                         }

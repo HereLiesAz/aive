@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /** What one line of a creature's live activity is: its reasoning, or a tool/progress step. */
 enum class SessionActivityKind { Thinking, Progress }
@@ -16,6 +18,8 @@ data class SessionActivityLine(
     val id: Long,
     val kind: SessionActivityKind,
     val text: String,
+    /** When the line was recorded; 0 for a line made without a clock. The Log tab orders by it. */
+    val atEpochMillis: Long = 0L,
 )
 
 /** One provider session of one task attempt: a retry is a new provider run, so a new feed. */
@@ -32,14 +36,17 @@ fun ManagedSessionHandle.activityKey(): SessionActivityKey = SessionActivityKey(
  *
  * In memory only and bounded: at most [maxLinesPerSession] lines per session (the oldest drop
  * first), at most [maxSessions] sessions (the least recently active drops first), each line at most
- * [maxLineChars]. Nothing here is persisted or exported: workflow state never holds thinking (the
+ * [maxLineChars], each stamped with when it was recorded (the Log tab reads them all, in time order).
+ * Nothing here is persisted or exported: workflow state never holds thinking (the
  * memory layer banks it on its own), and the duplex peer never receives it (docs/architecture/DUPLEX_MCP.md).
  * Messages to and from the agent are not activity; they never enter a feed.
  */
+@OptIn(ExperimentalTime::class)
 class SessionActivityFeeds(
     val maxLinesPerSession: Int = DEFAULT_MAX_LINES,
     val maxSessions: Int = DEFAULT_MAX_SESSIONS,
     val maxLineChars: Int = DEFAULT_MAX_LINE_CHARS,
+    private val nowEpochMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) {
     init {
         require(maxLinesPerSession > 0) { "maxLinesPerSession must be positive" }
@@ -78,7 +85,7 @@ class SessionActivityFeeds(
             val feed = current[key] ?: Feed(nextId = 0L, lines = emptyList())
             val newest = feed.lines.lastOrNull()
             if (newest != null && newest.kind == kind && newest.text == clean) return@update current
-            val lines = (feed.lines + SessionActivityLine(feed.nextId, kind, clean)).takeLast(maxLinesPerSession)
+            val lines = (feed.lines + SessionActivityLine(feed.nextId, kind, clean, nowEpochMillis())).takeLast(maxLinesPerSession)
             val next = LinkedHashMap<SessionActivityKey, Feed>()
             current.forEach { (k, v) -> if (k != key) next[k] = v }
             next[key] = Feed(feed.nextId + 1, lines)
@@ -110,7 +117,7 @@ class SessionActivityFeeds(
     }
 
     companion object {
-        const val DEFAULT_MAX_LINES = 60
+        const val DEFAULT_MAX_LINES = 300
         const val DEFAULT_MAX_SESSIONS = 32
         const val DEFAULT_MAX_LINE_CHARS = 600
 
@@ -119,20 +126,21 @@ class SessionActivityFeeds(
     }
 }
 
-/**
- * How a panel shows a feed: the newest [visible] lines, with the older ones collapsed into a
- * count unless [expanded].
- */
-data class SessionActivityWindow(
-    val shown: List<SessionActivityLine>,
-    val collapsed: Int,
+/** One attempt of a creature: the feed of one provider session. */
+data class CreatureActivityAttempt(
+    val key: SessionActivityKey,
+    val lines: List<SessionActivityLine>,
 )
 
-fun List<SessionActivityLine>.activityWindow(visible: Int, expanded: Boolean): SessionActivityWindow {
-    require(visible > 0) { "visible must be positive" }
-    if (expanded || size <= visible) return SessionActivityWindow(this, collapsed = 0)
-    return SessionActivityWindow(takeLast(visible), collapsed = size - visible)
-}
+/**
+ * Every retained attempt of [taskRunId] (a retry is a new provider session), the earliest first, so
+ * a creature's panel can list everything it did. Feeds are in memory and bounded
+ * ([SessionActivityFeeds]); what has dropped out is gone.
+ */
+fun Map<SessionActivityKey, List<SessionActivityLine>>.attemptsOf(taskRunId: TaskRunId): List<CreatureActivityAttempt> =
+    entries.filter { (key, lines) -> key.taskRunId == taskRunId && lines.isNotEmpty() }
+        .map { (key, lines) -> CreatureActivityAttempt(key, lines) }
+        .sortedWith(compareBy({ it.lines.first().atEpochMillis }, { it.key.providerRunId.value }))
 
 /** One short line for the hive's "doing now": whitespace flattened, at most [maxChars]. */
 fun SessionActivityLine.doingNowText(maxChars: Int = 120): String {

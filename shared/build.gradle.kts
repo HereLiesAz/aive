@@ -56,7 +56,9 @@ kotlin {
             implementation(compose.material3)
             implementation(compose.ui)
             implementation(compose.components.resources)
-            implementation("com.github.HereLiesAz:conveyance-h2g2:b17d8d9b46f8aeb399321c10199f0d0d0a0cfaaa")
+            // Tracks h2g2's main (JitPack main-SNAPSHOT), never a commit. Builds that have the checkout under
+            // vendor/conveyance-h2g2 (CI, and local builds with it cloned) include it instead (settings.gradle.kts).
+            implementation("com.github.HereLiesAz:conveyance-h2g2:main-SNAPSHOT")
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.multiplatform.settings.no.arg)
