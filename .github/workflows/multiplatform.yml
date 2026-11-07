@@ -36,7 +36,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
       - name: Resolve four-part build version
         id: version
         # TODO: pin HereLiesAz/workflows to a specific commit SHA instead of @main
@@ -52,7 +52,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
       - name: Resolve four-part build version
@@ -67,14 +67,14 @@ jobs:
 
 
       - name: Check out pinned h2g2
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           repository: HereLiesAz/conveyance-h2g2
           ref: b17d8d9b46f8aeb399321c10199f0d0d0a0cfaaa
           path: vendor/conveyance-h2g2
 
       - name: Check out pinned Conveyance
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           repository: HereLiesAz/Conveyance
           ref: 214e43e2e871c8f1a5ca6f7e7dbb158177b5914c
@@ -385,7 +385,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
       - name: Use central four-part build version
         shell: bash
         env:
@@ -397,14 +397,14 @@ jobs:
           echo "Aive build version: $AIVE_VERSION"
 
       - name: Check out pinned h2g2
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           repository: HereLiesAz/conveyance-h2g2
           ref: b17d8d9b46f8aeb399321c10199f0d0d0a0cfaaa
           path: vendor/conveyance-h2g2
 
       - name: Check out pinned Conveyance
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           repository: HereLiesAz/Conveyance
           ref: 214e43e2e871c8f1a5ca6f7e7dbb158177b5914c
@@ -500,7 +500,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
 
@@ -614,7 +614,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Verify standalone puppet-rig
         shell: bash
