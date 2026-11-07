@@ -43,17 +43,17 @@ any associated documentation shall at all times remain with
 Princeton University and LICENSEE agrees to preserve same.
 ~~~
 
-## Fonts: Archivo Black and DM Sans
+## Font: Azrienoch
 
-Bundled as `shared/src/commonMain/composeResources/font/archivo_black_regular.ttf` (titles) and
-`shared/src/commonMain/composeResources/font/dm_sans_*.ttf` (everything else; the static Regular, Medium,
-SemiBold, Bold, ExtraBold and Black instances Google Fonts serves), mapped in `AzphaltType`. Both are
-licensed under the SIL Open Font License, Version 1.1; the fonts are unmodified and are not sold on
-their own.
+Bundled as `shared/src/commonMain/composeResources/font/azrienoch_vf.ttf`, the variable build from
+https://github.com/HereLiesAz/azrienoch (`fonts/variable/Azrienoch-VF.ttf`, unmodified), for titles and
+everything else, mapped in `AzphaltType`. It is a Modified Version of Jost (with `c`, `e` and `s` derived from
+Arimo), licensed under the SIL Open Font License, Version 1.1; the font is not sold on its own.
 
 ~~~
-Copyright 2017 The Archivo Black Project Authors (https://github.com/Omnibus-Type/ArchivoBlack)
-Copyright 2014 The DM Sans Project Authors (https://github.com/googlefonts/dm-fonts)
+Copyright 2020 The Jost Project Authors (https://github.com/indestructible-type)
+Copyright 2020 The Arimo Project Authors (https://github.com/googlefonts/arimo)
+Copyright 2026 The Azrienoch Project Authors
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

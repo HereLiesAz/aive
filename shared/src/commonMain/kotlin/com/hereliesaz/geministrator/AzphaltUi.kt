@@ -43,19 +43,14 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.hereliesaz.geministrator.resources.Res
-import com.hereliesaz.geministrator.resources.archivo_black_regular
-import com.hereliesaz.geministrator.resources.dm_sans_black
-import com.hereliesaz.geministrator.resources.dm_sans_bold
-import com.hereliesaz.geministrator.resources.dm_sans_extrabold
-import com.hereliesaz.geministrator.resources.dm_sans_medium
-import com.hereliesaz.geministrator.resources.dm_sans_regular
-import com.hereliesaz.geministrator.resources.dm_sans_semibold
+import com.hereliesaz.geministrator.resources.azrienoch_vf
 import org.jetbrains.compose.resources.Font
 import com.hereliesaz.geministrator.resources.tab_position
 import org.jetbrains.compose.resources.stringResource
@@ -187,25 +182,29 @@ internal object AzphaltFonts {
     }
 }
 
+@Composable
+private fun azrienoch(weight: FontWeight): androidx.compose.ui.text.font.Font =
+    Font(Res.font.azrienoch_vf, weight, variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight)))
+
 /** Loads the bundled faces into [AzphaltFonts]. Call once near the root of each window. */
 @Composable
 internal fun LoadAzphaltFonts() {
-    // Archivo Black has one weight; it is registered as Black so a Black title matches it exactly
-    // and is never given a synthesised bold on top.
-    val display = FontFamily(Font(Res.font.archivo_black_regular, FontWeight.Black))
+    // Azrienoch is one variable font (wght 100-900; width, serif and grade stay at their defaults), so each
+    // weight the type scale names is an instance of the same file rather than a separate face.
+    val display = FontFamily(azrienoch(FontWeight.Black))
     val text = FontFamily(
-        Font(Res.font.dm_sans_regular, FontWeight.Normal),
-        Font(Res.font.dm_sans_medium, FontWeight.Medium),
-        Font(Res.font.dm_sans_semibold, FontWeight.SemiBold),
-        Font(Res.font.dm_sans_bold, FontWeight.Bold),
-        Font(Res.font.dm_sans_extrabold, FontWeight.ExtraBold),
-        Font(Res.font.dm_sans_black, FontWeight.Black),
+        azrienoch(FontWeight.Normal),
+        azrienoch(FontWeight.Medium),
+        azrienoch(FontWeight.SemiBold),
+        azrienoch(FontWeight.Bold),
+        azrienoch(FontWeight.ExtraBold),
+        azrienoch(FontWeight.Black),
     )
     SideEffect { AzphaltFonts.use(display, text) }
 }
 
 internal object AzphaltType {
-    /** A page's big title (Archivo Black). */
+    /** A page's big title (Azrienoch Black). */
     val hero get() = TextStyle(
         fontFamily = AzphaltFonts.display,
         fontWeight = FontWeight.Black,
