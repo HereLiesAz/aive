@@ -46,5 +46,25 @@ Each step gets its own design approval.
 
 Decided: unborn creatures beyond the next generation stay hidden (no ghost nodes).
 
+## Unpinning h2g2 and Conveyance (keeper: h2g2 must not pin; everything updated as soon as possible)
+- [x] aive: CI checks out h2g2 and Conveyance at their latest `main` (no `ref:`), and the Gradle dependency is `main-SNAPSHOT`, not a commit hash.
+- [ ] HereLiesAz/Conveyance#80 and HereLiesAz/conveyance-h2g2#17: AGP 9.5.1 (Gradle refuses two AGP versions in one composite). Verified locally with all three on 9.5.1. h2g2#17 also adds Dependabot (h2g2 had none).
+- [ ] Merge those two, then rebase and merge aive#648 (AGP) and aive#650 (tokenizers, awaiting Dependabot's rebase).
+- [ ] Decide h2g2's own pin: `build.gradle.kts` hard-codes `conveyanceRevision = "0.5.0"` (comment: a floating main-SNAPSHOT can resolve stale per-target publications through JitPack). Dependabot cannot track it. aive's root `build.gradle.kts` mirrors it (`conveyanceRevision`) and must follow.
+
+## Log tab (keeper: a Log tab on the Timeline row; the full log; switch between every log source)
+Decided with the keeper: App log is persisted (newest 500, scrubbed, on device); Memory layer log is recorded as it happens (in memory, this launch); Agent activity is timestamped and its cap raised (60 -> 300 a session).
+- [x] `log/LogJournal.kt`: bounded, scrubbed, optionally persisted journal; `AppLog.Shared`; UTC `formatLogTime`.
+- [x] `appLog()` wraps `platformDebugLog` and records; all 12 call sites use it.
+- [x] `MemoryLayerController.journal` + `MemoryConsolidationResult.logText()`, written in `drain`.
+- [x] `SessionActivityLine.atEpochMillis`, cap 300.
+- [x] `log/RunLog.kt` (`runEventLines`, `agentActivityLines`), `LogView.kt` (`RunLogView`), `RunTimeline(logSources)`, wired in `ControlRoomUi`.
+- [x] `LogJournalTest`; screenshot `38-timeline-log`.
+- [x] Docs: Keepers-Room.md, PRIVACY.md, CHANGELOG.md.
+- [ ] Known and left alone: `loadRunTimeline()` returns the active run's events, so Events and Log > Run events show the active run even when a past run is opened (pre-existing; needs `persistence.events.forRun(viewedRun)`).
+
+## Ideas (not scheduled)
+- **Free creatures sort memory.** When a creature is free (idle, nothing waiting on it), it helps sort the memories and gives each a weight from its own role's perspective only (keeper, in passing). Notes: a free creature is a recorded state, so it fits "every change has a cause"; the memory clerks organise but never rule on truth, so a weight is relevance to that role, not correctness; it spends tokens, so it must be opt-in and under the role budgets and spend caps; pairs with PR 2's roaming (a free creature walks to the memory field). Needs a design and your approval before any build.
+
 ## Review
 (filled in as each PR lands)

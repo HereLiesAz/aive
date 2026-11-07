@@ -1557,7 +1557,7 @@ private suspend fun <T> settingsActionOrNull(label: String, action: suspend () -
 } catch (failure: CancellationException) {
     throw failure
 } catch (failure: Exception) {
-    platformDebugLog("AiveSettings", "$label failed: ${failure::class.simpleName}: ${failure.message}")
+    appLog("AiveSettings", "$label failed: ${failure::class.simpleName}: ${failure.message}")
     null
 }
 

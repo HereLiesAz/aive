@@ -39,6 +39,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.produceState
+import com.hereliesaz.geministrator.log.AppLog
+import com.hereliesaz.geministrator.log.sessionScope
+import com.hereliesaz.geministrator.workflow.SessionActivityFeeds
 import com.hereliesaz.geministrator.workflow.ProgressiveDelegationStore
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -1014,6 +1017,17 @@ private fun MainDestination(
                                     selectedTaskId = selectedTaskId,
                                     onTaskSelected = onTaskSelected,
                                     onShowHive = { showTimeline = false },
+                                    logSources = remember(live.run.id, live.definition, memoryLayer) {
+                                        val taskRunNames = live.run.taskRuns.values.associate { taskRun ->
+                                            taskRun.id to (live.definition.tasks.firstOrNull { it.id == taskRun.taskDefinitionId }?.name ?: taskRun.taskDefinitionId.value)
+                                        }
+                                        RunLogSources(
+                                            agents = SessionActivityFeeds.Shared.feeds,
+                                            agentScope = sessionScope(taskRunNames),
+                                            app = AppLog.Shared.lines,
+                                            memory = memoryLayer?.journal?.lines,
+                                        )
+                                    },
                                     memoryContent = {
                                         MemoryLayerScreen(
                                             controller = memoryLayer,

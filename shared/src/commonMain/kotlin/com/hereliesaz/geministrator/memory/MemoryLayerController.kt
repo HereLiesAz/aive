@@ -17,6 +17,7 @@ import com.hereliesaz.geministrator.workflow.ManagedSessionStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import com.hereliesaz.geministrator.log.LogJournal
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -128,6 +129,13 @@ class MemoryLayerController(
 
     private val mutableActivity = MutableStateFlow(MemoryActivity())
     val activity: StateFlow<MemoryActivity> = mutableActivity.asStateFlow()
+
+    /**
+     * What consolidation did, line by line: one dated line per packet it worked on or failed, with the
+     * workflow it was for. The Log tab's Memory source. In memory only (the newest 500), starting
+     * with this launch: nothing durable records when a queue entry finished (see [MemoryActivity]).
+     */
+    val journal: LogJournal = LogJournal()
 
     /** One memory layer per workflow, over its lineage bank; rebuilt after a settings change. */
     private val layers = HashMap<String, AgentMemoryLayer>()
@@ -356,6 +364,7 @@ class MemoryLayerController(
                     lastAtEpochMillis = nowEpochMillis(),
                     lastConsolidatedAtEpochMillis = if (result.consolidatedSomething) nowEpochMillis() else mutableActivity.value.lastConsolidatedAtEpochMillis,
                 )
+                result.logText()?.let { journal.record(workflow, it) }
                 publish()
                 if (result == MemoryConsolidationResult.Idle) break
             }
