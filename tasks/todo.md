@@ -52,6 +52,13 @@ Each step gets its own design approval.
 
 Decided: unborn creatures beyond the next generation stay hidden (no ghost nodes).
 
+## Saved-hive planning (keeper: "okay, do it")
+- [x] `SavedHivePlanning.kt`: `savedHiveRoughDesign`, `plannedHiveDefinition`.
+- [x] `ApplicationRuntimeOrchestration.kt`: shared `planAndDecide`; `launchPlannedSavedWorkflow`; pending decision carries `savedDefinitionId` + `supplementalRoles`; fingerprint includes the design.
+- [x] `launchSavedWorkflow(planner, planReviewer, confirmPlan, planStore)`; App library-host launch passes them and installs LaunchProgress + PlanningStages.
+- [x] `SavedHivePlanningTest` (11).
+- [ ] Known: a package hive whose definition is not in persistence cannot resume a pending decision after restart (dropped, asked afresh).
+
 ## Unpinning h2g2 and Conveyance (keeper: h2g2 must not pin; everything updated as soon as possible)
 - [x] aive: CI checks out h2g2 and Conveyance at their latest `main` (no `ref:`), and the Gradle dependency is `main-SNAPSHOT`, not a commit hash.
 - [ ] HereLiesAz/Conveyance#80 and HereLiesAz/conveyance-h2g2#17: AGP 9.5.1 (Gradle refuses two AGP versions in one composite). Verified locally with all three on 9.5.1. h2g2#17 also adds Dependabot (h2g2 had none).

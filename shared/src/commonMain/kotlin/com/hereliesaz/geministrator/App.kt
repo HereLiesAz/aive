@@ -54,6 +54,7 @@ import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestratio
 import com.hereliesaz.geministrator.orchestration.LaunchProgress
 import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamily
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.app_approval_failed
 import com.hereliesaz.geministrator.resources.app_unreachable
@@ -410,11 +411,17 @@ fun App(
             else -> null
         }
         launching = true
+        launchError = null
         launchSteps.clear()
         try {
-            block(activeRuntime, existingProject)
+            // The same progress and planning field as the launch form: a saved rough design is planned and reviewed too.
+            withContext(LaunchProgress(launchSteps::push) + PlanningStages { planningStage = it }) {
+                block(activeRuntime, existingProject)
+                if (planningStage?.phase == PlanningPhase.Started && !reduceMotion) delay(HATCH_HOLD_MILLIS)
+            }
         } finally {
             launching = false
+            planningStage = null
         }
         return true
     }
@@ -548,6 +555,10 @@ fun App(
                         objective = objective ?: definition.description ?: definition.name,
                         repository = repository ?: existingProject?.repository,
                         supplementalRoles = packageRoles,
+                        planner = orchestrationRuntime,
+                        planReviewer = planReviewer,
+                        confirmPlan = askKeeper,
+                        planStore = planStore,
                     )
                 }
                 if (!started) error(getString(Res.string.app_launch_already_in_progress))
