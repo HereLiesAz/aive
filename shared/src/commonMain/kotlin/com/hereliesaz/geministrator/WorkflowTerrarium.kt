@@ -27,8 +27,10 @@ import com.hereliesaz.geministrator.domain.WorkflowRun
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.hive_view_label
 import com.hereliesaz.geministrator.resources.hive_new_empty
 import com.hereliesaz.geministrator.resources.terrarium_could_not_stage_workflow_edit
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.Alignment
@@ -118,8 +120,10 @@ internal fun GeministratorWorkflowTerrarium(
     val tissue = remember(projection, stagedDefinition, run) {
         projectTissue(stagedDefinition, run, projection.subjects.associate { it.node.id to it.position }, roles)
     }
-    // Who is born and who is still an egg, from the run's task statuses; Build shows every creature.
+    // Who is born and who is still an egg, from the run's task statuses. Build shows every creature, and
+    // so does the Swarm view, the whole swarm at once; Setup is the flowchart kept simple.
     val births = remember(stagedDefinition, run) { projectBirths(stagedDefinition, run) }
+    val swarmView = rememberDurableBooleanState("hive.view.swarm")
     val animatedRelationships = remember(projection.relationships, run) {
         projection.relationships.map { relationship ->
             if (relationship.kind != H2g2TerrariumRelationshipKind.Dependency) {
@@ -286,6 +290,18 @@ internal fun GeministratorWorkflowTerrarium(
                 onUndo = undo,
                 onRedo = redo,
             )
+            // Setup, the flowchart kept simple, or Swarm, the whole swarm at once. Build always shows all of it.
+            if (!building) {
+                AzphaltThemedSurface(Azphalt.Ink) {
+                    Row(Modifier.fillMaxWidth().background(Azphalt.Ink).padding(start = 8.dp, end = 8.dp, bottom = 10.dp)) {
+                        SetupSwarmSwitch(
+                            swarm = swarmView.value,
+                            onSwarmChange = { swarmView.value = it },
+                            label = stringResource(Res.string.hive_view_label),
+                        )
+                    }
+                }
+            }
         }
         val field: @Composable () -> Unit = {
           // Programmatic steps, local or remote, wear the neuron: the swarm reads as a flowchart.
@@ -303,7 +319,7 @@ internal fun GeministratorWorkflowTerrarium(
                 tissue = (if (building && rehearsal == null) tissue.copy(egg = null) else tissue)
                     .copy(
                         gathered = grouping.orEmpty(),
-                        births = if (building && rehearsal == null) emptyMap() else births,
+                        births = if ((building && rehearsal == null) || swarmView.value) emptyMap() else births,
                     ),
                 selectedId = selectedTaskId,
                 onNodeSelected = { node ->

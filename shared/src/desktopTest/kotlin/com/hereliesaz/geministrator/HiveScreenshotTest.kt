@@ -640,6 +640,13 @@ class HiveScreenshotTest {
             }
         }
         shoot("36-workspace-live", 2880, 1800) { page(null)() }
+        // The same hive in the Swarm view: every creature drawn at once, the unborn included.
+        DurableUiState.store.putBoolean("hive.view.swarm", true)
+        try {
+            shoot("36b-workspace-swarm", 2880, 1800) { page(null)() }
+        } finally {
+            DurableUiState.store.putBoolean("hive.view.swarm", false)
+        }
         shoot("37-workspace-creature-needs", 2880, 1800) { page("build", CreatureTab.Needs)() }
         shoot("38-workspace-creature-mind", 2880, 1800) { page("build", CreatureTab.Mind)() }
         shoot("39-workspace-creature-gated", 1900, 1500) { page("review", CreatureTab.Needs)() }

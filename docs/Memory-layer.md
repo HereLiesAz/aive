@@ -595,11 +595,13 @@ records when a queue entry finished (entries carry only `createdAtEpochMillis`),
 store holds choices, not activity. While memory is off or consolidation is paused, the button gives
 way to the reason and points at the switch below; nothing is consolidated (`consolidateNowState`).
 
-### Simple and Technical views
+### Setup and Swarm views
 
-The Memory swarm has two views, switched by **SIMPLE / TECHNICAL** beside its lead and remembered on
-this device (`MemoryView`, durable UI state key `memory.view`). **Simple** is the default; **Technical**
-is the page described above, unchanged. The switch applies at every width; the Simple layout adapts
+The Memory swarm has two views, switched by **SETUP / SWARM** beside its lead (`SetupSwarmSwitch`, shared
+with the hive) and remembered on this device (`MemoryView`, durable UI state key `memory.view`).
+**Setup** (`MemoryView.Simple`, the memory flowchart kept simple) is the default; **Swarm**
+(`MemoryView.Technical`, every control) is the page described above, unchanged. The code and this
+section's later words still call them Simple and Technical. The switch applies at every width; the Simple layout adapts
 (stages along one strand from 700dp of field width, two by two below; figures and notes stack under
 560dp).
 

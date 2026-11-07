@@ -85,8 +85,6 @@ import com.hereliesaz.geministrator.resources.memory_status_last_just_now
 import com.hereliesaz.geministrator.resources.memory_status_last_minutes
 import com.hereliesaz.geministrator.resources.memory_status_last_none
 import com.hereliesaz.geministrator.resources.memory_view_label
-import com.hereliesaz.geministrator.resources.memory_view_simple
-import com.hereliesaz.geministrator.resources.memory_view_technical
 import com.hereliesaz.geministrator.resources.tab_position
 import kotlinx.coroutines.delay
 import kotlin.time.Clock
@@ -100,45 +98,17 @@ private val MemoryFieldNarrow: Dp = 560.dp
 private val MemoryFieldStrand: Dp = 700.dp
 
 /**
- * The SIMPLE / TECHNICAL switch at the top of the Memory swarm: an Ink capsule whose selected half
- * is Yellow. A tab row to screen readers, with 48dp halves.
+ * The Setup / Swarm switch at the top of the Memory swarm ([SetupSwarmSwitch]): Setup is the memory
+ * field kept simple ([MemoryView.Simple]), Swarm is every control ([MemoryView.Technical]).
  */
 @Composable
 internal fun MemoryViewToggle(view: MemoryView, onView: (MemoryView) -> Unit, modifier: Modifier = Modifier) {
-    val label = stringResource(Res.string.memory_view_label)
-    Row(
-        modifier = modifier
-            .semantics { contentDescription = label }
-            .clip(RoundedCornerShape(999.dp))
-            .background(Azphalt.Ink)
-            .padding(4.dp)
-            .selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        AzphaltSurface(Azphalt.Ink) {
-            MemoryView.entries.forEachIndexed { index, option ->
-                val selected = option == view
-                val fill = if (selected) Azphalt.Yellow else Azphalt.Ink
-                val position = stringResource(Res.string.tab_position, index + 1, MemoryView.entries.size)
-                Box(
-                    modifier = Modifier
-                        .defaultMinSize(minWidth = AzphaltMinTouchTarget, minHeight = AzphaltMinTouchTarget)
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(fill)
-                        .selectable(selected = selected, role = Role.Tab, onClick = { onView(option) })
-                        .semantics { stateDescription = position }
-                        .padding(horizontal = 18.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    val text = when (option) {
-                        MemoryView.Simple -> stringResource(Res.string.memory_view_simple)
-                        MemoryView.Technical -> stringResource(Res.string.memory_view_technical)
-                    }
-                    Text(text.uppercase(), style = AzphaltType.capsule, color = fill.onOpposite())
-                }
-            }
-        }
-    }
+    SetupSwarmSwitch(
+        swarm = view == MemoryView.Technical,
+        onSwarmChange = { onView(if (it) MemoryView.Technical else MemoryView.Simple) },
+        label = stringResource(Res.string.memory_view_label),
+        modifier = modifier,
+    )
 }
 
 /**

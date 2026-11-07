@@ -97,7 +97,7 @@ internal object ControlRoomBreakpoints {
 enum class ControlRoomDestination(val label: String) {
     Overview("Overview"),
     Workflows("Workflows"),
-    Company("Swarm"),
+    Company("Roster"),
     Stable("Stable"),
     Inbox("Inbox"),
     Compute("Compute"),

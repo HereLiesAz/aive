@@ -19,6 +19,10 @@ Plan of record: three PRs, in order. Rules: no dice, no drift (docs/Ecology-and-
 - [x] Docs: Node-Creatures.md, Swarm-OS.md, Ecology-and-the-Swarm.md, CHANGELOG.md.
 - [ ] `:shared:desktopTest` green; look at the screenshots.
 
+## Setup / Swarm (added to PR 1, from the keeper)
+- [x] A shared `SetupSwarmSwitch`. Hive: Setup (flowchart kept simple, next-generation eggs) and Swarm (every creature at once), under the controls bar outside Build, remembered (`hive.view.swarm`). Memory swarm: its Simple / Technical switch is now Setup / Swarm.
+- [x] The place that was "Swarm" (role list) is now the **Roster** (destination, rail, a hint string, current-behaviour docs). Historical docs and old changelog entries keep the old name.
+
 ## PR 2: role-bound creatures that roam (own approval first)
 Revised by the keeper: one creature per role is the **default**, not a rule. A workflow that genuinely needs several creatures of a role, or a keeper who explicitly sets same-role tasks side by side (two independent reviews of the same thing), gets separate creatures.
 - Proposed line: same-role tasks that are **ordered** (one depends, directly or through others, on the other) share one creature, which moves between their sites; same-role tasks that can run **concurrently** (no path either way: parallel siblings, Mixture-of-Agents proposers, a deliberate second review) each keep their own creature.
