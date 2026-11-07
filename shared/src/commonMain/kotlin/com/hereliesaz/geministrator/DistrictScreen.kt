@@ -2,7 +2,8 @@ package com.hereliesaz.geministrator
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,6 +59,7 @@ import com.hereliesaz.geministrator.resources.district_state_gestating
 import com.hereliesaz.geministrator.resources.district_state_hatched
 import com.hereliesaz.geministrator.resources.district_state_idle
 import com.hereliesaz.geministrator.resources.district_state_withered
+import com.hereliesaz.geministrator.resources.hive_menu_options
 import com.hereliesaz.geministrator.resources.district_your_swarm
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
@@ -82,6 +84,11 @@ internal fun DistrictScreen(
     onEnterNeighbourhood: (Neighbourhood) -> Unit,
     onImportAgent: () -> Unit,
     onNewHive: () -> Unit = {},
+    /**
+     * What deleting a hive does, for the long-press menu on each hive (HiveActionsMenu.kt); null offers no Delete.
+     * The hive is asked about first and only then deleted, and the district is read again once it is.
+     */
+    hiveDeletion: ((Neighbourhood) -> HiveDeletionActions)? = null,
     /** Import hive card (HiveCardPanels.kt): given whether its panel is open and a way to change that; null shows none. */
     importCard: (@Composable (open: Boolean, onOpenChange: (Boolean) -> Unit) -> Unit)? = null,
     roles: Collection<RoleDefinition> = emptyList(),
@@ -97,7 +104,11 @@ internal fun DistrictScreen(
     var district by remember { mutableStateOf<List<Neighbourhood>?>(null) }
     var projectOfRun by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var loadFailure by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(Unit) {
+    // The hive whose long-press menu is open, and the one being asked about deleting; the district is read again after a delete.
+    var menuFor by remember { mutableStateOf<Neighbourhood?>(null) }
+    var deleting by remember { mutableStateOf<Neighbourhood?>(null) }
+    var reads by remember { mutableStateOf(0) }
+    LaunchedEffect(reads) {
         // A store that cannot be read says so here rather than taking the whole screen down.
         runCatching {
             val byProject = onLoadRuns()
@@ -160,7 +171,11 @@ internal fun DistrictScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         hives.forEach { neighbourhood ->
-                            NeighbourhoodCell(neighbourhood, onClick = { onEnterNeighbourhood(neighbourhood) })
+                            NeighbourhoodCell(
+                                neighbourhood,
+                                onClick = { onEnterNeighbourhood(neighbourhood) },
+                                onLongClick = { menuFor = neighbourhood },
+                            )
                         }
                     }
                 }
@@ -169,11 +184,31 @@ internal fun DistrictScreen(
         }
     }
     if (edgeOpen) HiveEdgeSheet(onClose = { edgeOpen = false }) { edge() }
+    menuFor?.let { hive ->
+        HiveActionsMenu(
+            name = hive.name,
+            onOpen = { onEnterNeighbourhood(hive) },
+            onDelete = hiveDeletion?.let { { deleting = hive } },
+            onDismiss = { menuFor = null },
+        )
+    }
+    deleting?.let { hive ->
+        val actions = hiveDeletion?.invoke(hive)
+        if (actions == null) {
+            deleting = null
+        } else {
+            HiveDeleteRequest(hive.name, hive.creatures, actions) { deleted ->
+                deleting = null
+                if (deleted) reads += 1
+            }
+        }
+    }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun NeighbourhoodCell(neighbourhood: Neighbourhood, onClick: () -> Unit) {
+private fun NeighbourhoodCell(neighbourhood: Neighbourhood, onClick: () -> Unit, onLongClick: () -> Unit) {
     val ring = when (neighbourhood.state) {
         NeighbourhoodState.Idle -> Withered
         NeighbourhoodState.Gestating -> Azphalt.Yellow
@@ -190,6 +225,7 @@ private fun NeighbourhoodCell(neighbourhood: Neighbourhood, onClick: () -> Unit)
     )
     val creatures = pluralStringResource(Res.plurals.district_creatures, neighbourhood.creatures, neighbourhood.creatures)
     val needsYou = if (neighbourhood.needsYou > 0) stringResource(Res.string.district_needs_you) else null
+    val hiveOptionsLabel = stringResource(Res.string.hive_menu_options)
     val scars = if (neighbourhood.scars > 0) pluralStringResource(Res.plurals.district_scars, neighbourhood.scars, neighbourhood.scars) else null
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -197,7 +233,12 @@ private fun NeighbourhoodCell(neighbourhood: Neighbourhood, onClick: () -> Unit)
         modifier = Modifier
             .size(width = 150.dp, height = 214.dp)
             .clip(RoundedCornerShape(24.dp))
-            .clickable(role = Role.Button, onClick = onClick)
+            .combinedClickable(
+                role = Role.Button,
+                onLongClickLabel = hiveOptionsLabel,
+                onLongClick = onLongClick,
+                onClick = onClick,
+            )
             .semantics(mergeDescendants = true) {
                 contentDescription = listOfNotNull(neighbourhood.name, stateLabel, creatures, needsYou, scars).joinToString(", ")
             }

@@ -913,6 +913,15 @@ private fun MainDestination(
                                 }
                                 inDistrict = false
                             },
+                            hiveDeletion = hiveHost?.let { host ->
+                                { hive ->
+                                    val id = com.hereliesaz.geministrator.domain.WorkflowDefinitionId(hive.definitionId)
+                                    HiveDeletionActions(
+                                        check = { host.hiveDeleteVerdict(id) },
+                                        delete = { host.deleteHive(id) },
+                                    )
+                                }
+                            },
                             onNewHive = {
                                 hiveHost?.let { host ->
                                     hiveScope.launch {

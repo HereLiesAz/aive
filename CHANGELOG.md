@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- **Long-press a hive** in your hives list for its options: **Open**, **Delete hive** (asks first, naming the hive, and says why when it cannot) and **Close**. A tap still opens the hive. See docs/Keepers-Room.md.
 - Azrienoch is updated to its newer build (915 glyphs: Latin Extended-B and Additional with Vietnamese, more Cyrillic, symbols, math and logic marks, four Greek letters; its width axis now reaches a monospaced setting, which the app leaves at the default).
 - A plan waiting for your decision on a hive a package brought (not saved in your library) now also survives a restart; before, only saved hives did.
 - The whole app is now set in **Azrienoch**, your variable font, in place of Archivo Black and DM Sans (which are no longer bundled). See docs/Keepers-Room.md and THIRD_PARTY_NOTICES.md.

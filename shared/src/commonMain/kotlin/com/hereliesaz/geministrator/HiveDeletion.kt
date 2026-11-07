@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -21,6 +22,7 @@ import com.hereliesaz.geministrator.resources.hive_delete_refused_live
 import com.hereliesaz.geministrator.resources.hive_delete_refused_package
 import com.hereliesaz.geministrator.resources.hive_delete_refused_unknown
 import com.hereliesaz.geministrator.resources.hive_delete_title
+import com.hereliesaz.geministrator.resources.hive_delete_understood
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
@@ -145,6 +147,80 @@ internal fun DeleteHiveControl(
                         .onFailure { message = getString(Res.string.hive_delete_failed) }
                 }
             },
+        )
+    }
+}
+
+/**
+ * Delete hive, asked for from somewhere other than the hive's own page (the district's long-press menu): it looks
+ * first, then asks with the same dialog naming the hive, or says in a plain line why it cannot and deletes nothing.
+ * [onFinished] says whether the hive was deleted; it is called once, when the dialog closes.
+ */
+@Composable
+internal fun HiveDeleteRequest(
+    name: String,
+    creatures: Int,
+    actions: HiveDeletionActions,
+    onFinished: (deleted: Boolean) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    var confirming by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    val refusalText: suspend (HiveDeleteRefusal) -> String = { reason ->
+        getString(
+            when (reason) {
+                HiveDeleteRefusal.LiveRun -> Res.string.hive_delete_refused_live
+                HiveDeleteRefusal.UsedAsCircuit -> Res.string.hive_delete_refused_circuit
+                HiveDeleteRefusal.FromPackage -> Res.string.hive_delete_refused_package
+                HiveDeleteRefusal.Unknown -> Res.string.hive_delete_refused_unknown
+            },
+        )
+    }
+    LaunchedEffect(Unit) {
+        runCatching { actions.check() }
+            .onSuccess { verdict ->
+                when (verdict) {
+                    HiveDeleteVerdict.Allowed -> confirming = true
+                    is HiveDeleteVerdict.Refused -> message = refusalText(verdict.reason)
+                }
+            }
+            .onFailure { failure ->
+                if (failure is kotlinx.coroutines.CancellationException) throw failure
+                message = getString(Res.string.hive_delete_failed)
+            }
+    }
+    if (confirming) {
+        AzphaltAlertDialog(
+            title = stringResource(Res.string.hive_delete_title, name),
+            text = stringResource(Res.string.hive_delete_body, creatures),
+            confirmLabel = stringResource(Res.string.hive_delete),
+            dismissLabel = stringResource(Res.string.hive_delete_keep),
+            onDismissRequest = { confirming = false; onFinished(false) },
+            onConfirm = {
+                confirming = false
+                scope.launch {
+                    runCatching { actions.delete() }
+                        .onSuccess { verdict ->
+                            when (verdict) {
+                                HiveDeleteVerdict.Allowed -> onFinished(true)
+                                is HiveDeleteVerdict.Refused -> message = refusalText(verdict.reason)
+                            }
+                        }
+                        .onFailure { failure ->
+                            if (failure is kotlinx.coroutines.CancellationException) throw failure
+                            message = getString(Res.string.hive_delete_failed)
+                        }
+                }
+            },
+        )
+    }
+    message?.let { text ->
+        AzphaltAlertDialog(
+            title = name,
+            text = text,
+            confirmLabel = stringResource(Res.string.hive_delete_understood),
+            onDismissRequest = { message = null; onFinished(false) },
+            onConfirm = { message = null; onFinished(false) },
         )
     }
 }

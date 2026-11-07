@@ -59,6 +59,11 @@ Decided: unborn creatures beyond the next generation stay hidden (no ghost nodes
 - [x] `SavedHivePlanningTest` (11).
 - [x] A package hive that is not in the library resumes a pending decision from the design kept with the plan (`PendingPlanLaunch.design`); a library hive is read again so an edit is seen.
 
+## Hive options (keeper: long-press a hive in the district for a list of options, particularly delete)
+- [x] `HiveActionsMenu.kt` (Open, Delete hive, Close), `HiveDeleteRequest` (check, ask, delete, or say why not), `DistrictScreen(hiveDeletion)`, wired in `ControlRoomUi`.
+- [x] `HiveMenuTest` (long press vs tap, delete checked first and never before confirming, refusal says why); screenshots 40, 41.
+- [ ] Not offered yet: rename, duplicate, share hive card from the menu (each needs its own design); say which you want.
+
 ## Unpinning h2g2 and Conveyance (keeper: h2g2 must not pin; everything updated as soon as possible)
 - [x] aive: CI checks out h2g2 and Conveyance at their latest `main` (no `ref:`), and the Gradle dependency is `main-SNAPSHOT`, not a commit hash.
 - [x] (aive is on AGP 9.5.1 in `gradle/libs.versions.toml`) HereLiesAz/Conveyance#80 and HereLiesAz/conveyance-h2g2#17: AGP 9.5.1 (Gradle refuses two AGP versions in one composite). Verified locally with all three on 9.5.1. h2g2#17 also adds Dependabot (h2g2 had none).
