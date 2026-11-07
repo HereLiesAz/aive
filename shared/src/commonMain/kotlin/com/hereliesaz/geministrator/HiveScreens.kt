@@ -33,6 +33,7 @@ import com.hereliesaz.geministrator.resources.hive_show_hive
 import com.hereliesaz.geministrator.resources.hive_timeline
 import com.hereliesaz.geministrator.resources.hive_timeline_empty
 import com.hereliesaz.geministrator.resources.timeline_view_events
+import com.hereliesaz.geministrator.resources.timeline_view_log
 import com.hereliesaz.geministrator.resources.timeline_view_memory
 import com.hereliesaz.geministrator.resources.timeline_view_waterfall
 import kotlinx.coroutines.delay
@@ -132,13 +133,19 @@ internal fun RunTimeline(
      * is given the room under the row. Null leaves the Memory view out.
      */
     memoryContent: (@Composable () -> Unit)? = null,
+    /** The logs behind the Log tab, last in the row. Null leaves the Log view out. */
+    logSources: RunLogSources? = null,
 ) {
     var events by remember(runKey) { mutableStateOf<List<WorkflowEvent>?>(null) }
     // Reload on every change of the run, but keep showing the last events meanwhile: only a different
     // run (runKey) starts blank, so the viewer's scroll position and tab survive live updates.
     LaunchedEffect(runKey, refreshKey) { events = onLoadTimeline() }
     var view by rememberDurableStringState("overview.timeline.view", TIMELINE_WATERFALL)
-    val shown = if (view == TIMELINE_MEMORY && memoryContent == null) TIMELINE_WATERFALL else view
+    val shown = when {
+        view == TIMELINE_MEMORY && memoryContent == null -> TIMELINE_WATERFALL
+        view == TIMELINE_LOG && logSources == null -> TIMELINE_WATERFALL
+        else -> view
+    }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(Res.string.hive_timeline), style = AzphaltType.eyebrow, color = azphaltOnSurface())
         // The way back to the hive, always in view: the places row it also lives in scrolls off a phone.
@@ -151,6 +158,7 @@ internal fun RunTimeline(
                 add(AzphaltTabItem(TIMELINE_WATERFALL, stringResource(Res.string.timeline_view_waterfall)))
                 add(AzphaltTabItem(TIMELINE_EVENTS, stringResource(Res.string.timeline_view_events)))
                 if (memoryContent != null) add(AzphaltTabItem(TIMELINE_MEMORY, stringResource(Res.string.timeline_view_memory)))
+                if (logSources != null) add(AzphaltTabItem(TIMELINE_LOG, stringResource(Res.string.timeline_view_log)))
             },
             selectedKey = shown,
             onSelected = { view = it },
@@ -161,6 +169,16 @@ internal fun RunTimeline(
         // Memory scrolls itself; the timeline's own views share one scrolling body under the fixed row.
         if (shown == TIMELINE_MEMORY) {
             Box(Modifier.weight(1f).fillMaxWidth()) { memoryContent?.invoke() }
+            return@Column
+        }
+        // The Log lists itself (it scrolls its own long list), so it too is given the room under the row.
+        if (shown == TIMELINE_LOG && logSources != null) {
+            RunLogView(
+                events = events.orEmpty(),
+                taskName = taskName,
+                sources = logSources,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+            )
             return@Column
         }
         Column(
@@ -201,6 +219,7 @@ internal fun RunTimeline(
 private const val TIMELINE_WATERFALL = "waterfall"
 private const val TIMELINE_EVENTS = "events"
 private const val TIMELINE_MEMORY = "memory"
+private const val TIMELINE_LOG = "log"
 
 /**
  * A hive that has never run (mockups H2, H6): its workflow at rest, editable in Build, with the

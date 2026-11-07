@@ -1,6 +1,6 @@
 package com.hereliesaz.geministrator.azphalt
 
-import com.hereliesaz.geministrator.platformDebugLog
+import com.hereliesaz.geministrator.appLog
 import kotlinx.coroutines.CancellationException
 
 /** The phases of loading the Store screen, so a failure can say which one it was. */
@@ -64,7 +64,7 @@ suspend fun <T> storeStep(step: AzphaltStoreStep, block: suspend () -> T): T = t
 } catch (failure: Throwable) {
     // Logging must never mask the failure it reports (android.util.Log is absent in unit tests).
     runCatching {
-        platformDebugLog(
+        appLog(
             "AzphaltStore",
             "Store step '${step.name}' failed: ${describeStoreFailure(failure)}\n${failure.stackTraceToString()}",
         )
