@@ -27,8 +27,20 @@ Revised by the keeper: one creature per role is the **default**, not a rule. A w
 - Open: an explicit "own creature" switch in Build for a keeper who wants separate creatures for ordered tasks? Not in scope unless asked.
 ## PR 3: orchestrator's first egg is a plan reviewer (own approval first)
 Revised by the keeper: a workflow saved in Build is a *rough design*. The orchestrator still decides exactly how best to execute it, at run time. So the reviewer is not a static insertion into the saved graph: the first thing the orchestrator makes, when it turns the rough design into its real plan, is a reviewer of *that* plan.
-- [ ] Map how (and whether) an orchestrator can materialise or refine tasks in a running run. Not yet read: `WorkflowRunFactory.create`, the expanders, `SwarmDraft`, `EnginePlanGate`.
-- [ ] Consequence for PR 1: the field draws `stagedDefinition`. If the orchestrator adds tasks at run time, the births and eggs must come from the run's materialised plan, not the Build design. Decide before PR 1's wiring lands.
+
+Findings (read-only survey of the code):
+- Nothing adds tasks to a run once it has started. The plan is made once, before the run exists (`launchOrchestratedWorkflow` runs a planner utility model, then `WorkflowRunFactory.create`); the Orchestrator creature plays no part in it. `RoleAuthority.ProposePlan` has no consumer. Docs claiming tasks "hatch from the Orchestrator's bulb" are not backed by code.
+- A run has no copy of its workflow, and launching overwrites the saved Build workflow with the expanded one (added test, environment, Mixture-of-Agents tasks).
+- PR 1 therefore has no hole today: every task exists when the run starts.
+
+Decision (keeper: "both"): ship the launch-time reviewer first, then build run-time orchestration in stages, carrying the reviewer into it.
+- [ ] 3a. Launch-time reviewer: a step in `WorkflowDefinitionPreparer.prepare` inserts a reviewer-kind task that every task with no dependencies waits on, so its egg is the first one visible. Reconcile with `EnginePlanGate`, `PlanRejectionService` and the Hall Monitor (define what a rejection does; THREAT_MODEL invariant 4: an agent reviewer decides no approval gate). Pure function plus tests.
+- [ ] 3b. A run-owned copy of the workflow (also stops launch overwriting the Build design); the terrarium and `projectBirths` read it.
+- [ ] 3c. An engine call that amends a started run (validate with `WorkflowGraphValidator`, never touch terminal or running tasks, create the `TaskRun`s, `refreshReadiness`, persist atomically), new events, policy checks for injected tasks.
+- [ ] 3d. The trigger: the Orchestrator's task returns a plan the coordinator applies through 3c, reviewer first. Move the reviewer from 3a into it.
+Each step gets its own design approval.
+
+Decided: unborn creatures beyond the next generation stay hidden (no ghost nodes).
 
 ## Review
 (filled in as each PR lands)
