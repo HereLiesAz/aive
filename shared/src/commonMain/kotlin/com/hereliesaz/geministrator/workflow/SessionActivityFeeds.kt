@@ -126,20 +126,21 @@ class SessionActivityFeeds(
     }
 }
 
-/**
- * How a panel shows a feed: the newest [visible] lines, with the older ones collapsed into a
- * count unless [expanded].
- */
-data class SessionActivityWindow(
-    val shown: List<SessionActivityLine>,
-    val collapsed: Int,
+/** One attempt of a creature: the feed of one provider session. */
+data class CreatureActivityAttempt(
+    val key: SessionActivityKey,
+    val lines: List<SessionActivityLine>,
 )
 
-fun List<SessionActivityLine>.activityWindow(visible: Int, expanded: Boolean): SessionActivityWindow {
-    require(visible > 0) { "visible must be positive" }
-    if (expanded || size <= visible) return SessionActivityWindow(this, collapsed = 0)
-    return SessionActivityWindow(takeLast(visible), collapsed = size - visible)
-}
+/**
+ * Every retained attempt of [taskRunId] (a retry is a new provider session), the earliest first, so
+ * a creature's panel can list everything it did. Feeds are in memory and bounded
+ * ([SessionActivityFeeds]); what has dropped out is gone.
+ */
+fun Map<SessionActivityKey, List<SessionActivityLine>>.attemptsOf(taskRunId: TaskRunId): List<CreatureActivityAttempt> =
+    entries.filter { (key, lines) -> key.taskRunId == taskRunId && lines.isNotEmpty() }
+        .map { (key, lines) -> CreatureActivityAttempt(key, lines) }
+        .sortedWith(compareBy({ it.lines.first().atEpochMillis }, { it.key.providerRunId.value }))
 
 /** One short line for the hive's "doing now": whitespace flattened, at most [maxChars]. */
 fun SessionActivityLine.doingNowText(maxChars: Int = 120): String {

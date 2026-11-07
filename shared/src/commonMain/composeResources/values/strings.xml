@@ -270,7 +270,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inspector_activity">WHAT IT'S DOING</string>
     <string name="inspector_activity_thinking">THINKING</string>
     <string name="inspector_activity_step">STEP</string>
-    <string name="inspector_activity_show_fewer">Show only the latest</string>
+    <string name="inspector_activity_attempt">Attempt %1$d</string>
     <string name="inspector_attempt">ATTEMPT</string>
     <string name="inspector_blocked">BLOCKED</string>
     <string name="inspector_checkpoint">CHECKPOINT</string>
@@ -1620,10 +1620,6 @@ What the server returns is treated as outside content, not instructions.</string
     <plurals name="job_tries">
         <item quantity="one">%1$d try</item>
         <item quantity="other">%1$d tries</item>
-    </plurals>
-    <plurals name="inspector_activity_earlier">
-        <item quantity="one">Show %1$d earlier line</item>
-        <item quantity="other">Show %1$d earlier lines</item>
     </plurals>
     <plurals name="swarm_in_hives">
         <item quantity="one">in %1$d hive</item>

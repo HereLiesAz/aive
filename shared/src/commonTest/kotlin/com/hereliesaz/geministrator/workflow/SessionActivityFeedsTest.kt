@@ -106,21 +106,21 @@ class SessionActivityFeedsTest {
     }
 
     @Test
-    fun olderLinesCollapseBehindTheNewest() {
-        val lines = (0L until 9L).map { SessionActivityLine(it, SessionActivityKind.Thinking, "line $it") }
+    fun aCreatureListsEveryAttemptEarliestFirst() {
+        var clock = 0L
+        val feeds = SessionActivityFeeds(nowEpochMillis = { clock++ })
+        val first = SessionActivityKey(TaskRunId("t"), ProviderRunId("p-a"))
+        val retry = SessionActivityKey(TaskRunId("t"), ProviderRunId("p-b"))
+        val other = SessionActivityKey(TaskRunId("other"), ProviderRunId("p-c"))
+        feeds.record(first, SessionActivityKind.Thinking, "first try")
+        feeds.record(other, SessionActivityKind.Progress, "elsewhere")
+        feeds.record(retry, SessionActivityKind.Progress, "second try")
+        feeds.record(first, SessionActivityKind.Progress, "failed")
 
-        val collapsed = lines.activityWindow(visible = 4, expanded = false)
-        assertEquals(5, collapsed.collapsed)
-        assertEquals(listOf("line 5", "line 6", "line 7", "line 8"), collapsed.shown.map { it.text })
-
-        val expanded = lines.activityWindow(visible = 4, expanded = true)
-        assertEquals(0, expanded.collapsed)
-        assertEquals(lines, expanded.shown)
-
-        val short = lines.take(3).activityWindow(visible = 4, expanded = false)
-        assertEquals(0, short.collapsed)
-        assertEquals(3, short.shown.size)
-        assertFailsWith<IllegalArgumentException> { lines.activityWindow(visible = 0, expanded = false) }
+        val attempts = feeds.feeds.value.attemptsOf(TaskRunId("t"))
+        assertEquals(listOf(first, retry), attempts.map { it.key })
+        assertEquals(listOf("first try", "failed"), attempts[0].lines.map { it.text })
+        assertEquals(emptyList(), feeds.feeds.value.attemptsOf(TaskRunId("nobody")))
     }
 
     @Test
