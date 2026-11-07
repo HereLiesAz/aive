@@ -90,8 +90,13 @@ if (useMavenLocalH2g2) {
     }
     val h2g2Local = localVersion("vendor/conveyance-h2g2")
     val conveyanceLocal = localVersion("vendor/conveyance-h2g2/vendor/Conveyance")
-    // The Conveyance coordinate h2g2 requests (its build.gradle.kts: conveyanceRevision).
-    val conveyanceRevision = "0.5.0"
+    // The Conveyance release h2g2 requests: its gradle/libs.versions.toml (`conveyance`), which Dependabot bumps
+    // there. Read from the checkout so the two never drift; "0.5.0" is what h2g2 asked for before it had the entry.
+    val conveyanceRevision = file("vendor/conveyance-h2g2/gradle/libs.versions.toml")
+        .takeIf { it.isFile }
+        ?.readLines()
+        ?.firstNotNullOfOrNull { line -> Regex("^conveyance\\s*=\\s*\"([^\"]+)\"").find(line.trim())?.groupValues?.get(1) }
+        ?: "0.5.0"
     allprojects {
         configurations.configureEach {
             resolutionStrategy.dependencySubstitution {

@@ -15,6 +15,14 @@ import com.hereliesaz.geministrator.orchestration.OrchestrationRole
 import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.orchestration.OrchestrationPlan
+import com.hereliesaz.geministrator.orchestration.PendingPlanLaunch
+import com.hereliesaz.geministrator.orchestration.PlanReviewOutcome
+import com.hereliesaz.geministrator.orchestration.PlanReviewRound
+import com.hereliesaz.geministrator.orchestration.PlanVerdict
+import com.hereliesaz.geministrator.orchestration.ReviewedPlanStore
+import com.hereliesaz.geministrator.orchestration.StoredPlanRound
+import com.hereliesaz.geministrator.orchestration.planInputsFingerprint
+import com.hereliesaz.geministrator.orchestration.validateAgainst
 import com.hereliesaz.geministrator.orchestration.PlanDecision
 import com.hereliesaz.geministrator.orchestration.PlanningPhase
 import com.hereliesaz.geministrator.orchestration.PlanningStage
@@ -33,53 +41,39 @@ import com.hereliesaz.geministrator.workflow.WorkflowLaunchService
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
-@OptIn(ExperimentalTime::class)
-suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
+/** What a launch's plan is made from, read once so a plan, its review and its fingerprint all see the same. */
+private class PlanInputs(
+    val projectName: String,
+    val objective: String,
+    val repository: RepositoryRef?,
+    val existingProject: Project?,
+    val parentRunIds: List<WorkflowRunId>,
+    val launchRoles: List<RoleDefinition>,
+    val plannerRoles: List<RoleDefinition>,
+    val packet: OrchestrationPacket,
+) {
+    fun fingerprint(reviewer: RoleDefinition): String = planInputsFingerprint(
+        objective = objective,
+        repository = repository,
+        parentRunIds = parentRunIds.map { it.value },
+        plannerRoles = plannerRoles,
+        reviewer = reviewer,
+    )
+}
+
+private suspend fun ApplicationRuntime.planInputs(
     projectName: String,
     objective: String,
-    orchestrationRuntime: OrchestrationAgentRuntime,
-    repository: RepositoryRef? = null,
-    existingProject: Project? = null,
-    /** Runs the new run continues (one) or merges (several); empty starts a new root lineage. */
-    continuesWorkflowRunIds: List<WorkflowRunId> = emptyList(),
-    /**
-     * Reads the planner's plan before a run exists and sends it back for rework until it approves (see
-     * [reviewUntilApproved]). It reviews only together with [confirmPlan]: the keeper always has the final say.
-     */
-    planReviewer: PlanReviewer? = null,
-    /** Shows the keeper the reviewed plan and the reviewer's reasons; true starts the run, false does not. */
-    confirmPlan: (suspend (PlanDecision) -> Boolean)? = null,
-) {
+    repository: RepositoryRef?,
+    existingProject: Project?,
+    continuesWorkflowRunIds: List<WorkflowRunId>,
+): PlanInputs {
     val parents = requireKnownParentRuns(continuesWorkflowRunIds)
     val cleanProjectName = projectName.trim()
     val cleanObjective = objective.trim()
     require(cleanProjectName.isNotEmpty()) { "Project name is required" }
     require(cleanObjective.isNotEmpty()) { "Objective is required" }
-    reportLaunchProgress("Reading your objective…")
-
-    parseHallMonitorTrialLaunchObjective(cleanObjective)?.let { trial ->
-        testHallMonitorSolution(
-            findingId = trial.findingId,
-            solutionIndex = trial.solutionIndex,
-            orchestrationRuntime = orchestrationRuntime,
-        )
-        return
-    }
-
     val normalizedRepository = repository?.normalized()
-    val now = Clock.System.now().toEpochMilliseconds()
-    val project = existingProject?.copy(
-        name = cleanProjectName,
-        repository = normalizedRepository ?: existingProject.repository,
-        updatedAtEpochMillis = now,
-    ) ?: Project(
-        id = ProjectId("project-$now"),
-        name = cleanProjectName,
-        repository = normalizedRepository,
-        createdAtEpochMillis = now,
-        updatedAtEpochMillis = now,
-    )
-
     reportLaunchProgress("Gathering available agent roles…")
     val launchRoles = activeRoles(resolveRoleCollection(persistence.roles.all()))
     // Offer the planner only roles a linked provider can staff: a step for any other role could
@@ -99,77 +93,212 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
         },
         instruction = "Create the minimal executable dependency-correct workflow DAG needed to satisfy the objective.",
     )
-    reportLaunchProgress("Asking the planner for a workflow (${plannerRoles.size} roles available)…")
-    // Only a launch that will be reviewed has a planning field: the planner's egg, the reviewer who hatches from it.
-    val review = reviewRole(planReviewer, confirmPlan, launchRoles)
-    val planner = BuiltInRoles.Orchestrator
-    fun stage(phase: PlanningPhase, plan: OrchestrationPlan?, round: Int, reviewerRole: RoleDefinition, verdict: PlanningVerdict? = null): PlanningStage {
-        val first = plan?.firstStep()
-        return PlanningStage(
-            phase = phase,
-            planner = launchRoles.firstOrNull { it.id == planner.id } ?: planner,
-            reviewer = reviewerRole,
-            firstStepRole = first?.let { step -> launchRoles.firstOrNull { it.id.value == step.roleId } },
-            firstStepName = first?.name,
-            round = round,
-            verdict = verdict,
-        )
-    }
-    review?.let { (_, role) -> reportPlanningStage(stage(PlanningPhase.Planning, null, 0, role)) }
-    val firstPlan = orchestrationRuntime.plan(packet)
-    var plan = firstPlan
-    review?.let { (reviewer, role) ->
-        val outcome = reviewUntilApproved(
-            packet = packet,
-            firstPlan = firstPlan,
-            planner = orchestrationRuntime,
-            reviewer = reviewer,
-            reviewerName = role.name,
-            instructions = role.instructions,
-            pinnedProviderId = role.preferredProviderId?.value,
-            onStage = { phase, current, round -> reportPlanningStage(stage(phase, current, round, role)) },
-        )
-        plan = outcome.plan
-        val verdict = when {
-            outcome.problem != null -> PlanningVerdict.Unreachable
-            outcome.approved -> PlanningVerdict.Approved
-            else -> PlanningVerdict.NotApproved
-        }
-        reportPlanningStage(stage(PlanningPhase.AwaitingKeeper, plan, outcome.rounds.size, role, verdict))
-        reportLaunchProgress("Waiting for your decision on the plan…")
-        if (!checkNotNull(confirmPlan)(PlanDecision(cleanObjective, role.name, outcome, packet.availableAgents.associate { it.id to it.name }))) {
-            reportLaunchProgress("The plan was not started")
-            return
-        }
-        reportPlanningStage(stage(PlanningPhase.Started, plan, outcome.rounds.size, role))
-    }
+    return PlanInputs(cleanProjectName, cleanObjective, normalizedRepository, existingProject, parents, launchRoles, plannerRoles, packet)
+}
+
+/** Makes the run from an approved [plan]: the workflow, the project, the run. */
+@OptIn(ExperimentalTime::class)
+private suspend fun ApplicationRuntime.startPlannedWorkflow(inputs: PlanInputs, plan: OrchestrationPlan) {
+    val now = Clock.System.now().toEpochMilliseconds()
+    val project = inputs.existingProject?.copy(
+        name = inputs.projectName,
+        repository = inputs.repository ?: inputs.existingProject.repository,
+        updatedAtEpochMillis = now,
+    ) ?: Project(
+        id = ProjectId("project-$now"),
+        name = inputs.projectName,
+        repository = inputs.repository,
+        createdAtEpochMillis = now,
+        updatedAtEpochMillis = now,
+    )
     reportLaunchProgress("Planner returned ${plan.steps.size} step${if (plan.steps.size == 1) "" else "s"}")
     reportLaunchProgress("Assembling workflow…")
     val definition = OrchestratedWorkflowFactory.create(
         id = WorkflowDefinitionId("workflow-$now"),
-        objective = cleanObjective,
+        objective = inputs.objective,
         plan = plan,
-        packet = packet,
-        roles = launchRoles,
+        packet = inputs.packet,
+        roles = inputs.launchRoles,
     )
     val launchService = WorkflowLaunchService(
-        preparer = WorkflowDefinitionPreparer(providerRegistry, launchRoles),
+        preparer = WorkflowDefinitionPreparer(providerRegistry, inputs.launchRoles),
         persistence = persistence,
         eventSink = RepositoryWorkflowEventSink(persistence.events),
-        roles = launchRoles,
+        roles = inputs.launchRoles,
     )
     reportLaunchProgress("Saving project and starting run…")
     launchService.launch(
         project = project,
         definition = definition,
         workflowRunId = WorkflowRunId("run-$now"),
-        objective = cleanObjective,
+        objective = inputs.objective,
         nowEpochMillis = now,
         taskRunIdFactory = { id -> TaskRunId("run-$now-${id.value}") },
-        parentWorkflowRunIds = parents,
+        parentWorkflowRunIds = inputs.parentRunIds,
     )
     reportLaunchProgress("Loading the new run…")
     loadLatest()
+}
+
+/** The planning stage for the field, from the roles in hand. */
+private fun planningStage(
+    inputs: PlanInputs,
+    phase: PlanningPhase,
+    plan: OrchestrationPlan?,
+    round: Int,
+    reviewer: RoleDefinition,
+    verdict: PlanningVerdict? = null,
+): PlanningStage {
+    val planner = BuiltInRoles.Orchestrator
+    val first = plan?.firstStep()
+    return PlanningStage(
+        phase = phase,
+        planner = inputs.launchRoles.firstOrNull { it.id == planner.id } ?: planner,
+        reviewer = reviewer,
+        firstStepRole = first?.let { step -> inputs.launchRoles.firstOrNull { it.id.value == step.roleId } },
+        firstStepName = first?.name,
+        round = round,
+        verdict = verdict,
+    )
+}
+
+private fun PlanReviewOutcome.verdict(): PlanningVerdict = when {
+    problem != null -> PlanningVerdict.Unreachable
+    approved -> PlanningVerdict.Approved
+    else -> PlanningVerdict.NotApproved
+}
+
+@OptIn(ExperimentalTime::class)
+suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
+    projectName: String,
+    objective: String,
+    orchestrationRuntime: OrchestrationAgentRuntime,
+    repository: RepositoryRef? = null,
+    existingProject: Project? = null,
+    /** Runs the new run continues (one) or merges (several); empty starts a new root lineage. */
+    continuesWorkflowRunIds: List<WorkflowRunId> = emptyList(),
+    /**
+     * Reads the planner's plan before a run exists and sends it back for rework until it approves (see
+     * [reviewUntilApproved]). It reviews only together with [confirmPlan]: the keeper always has the final say.
+     */
+    planReviewer: PlanReviewer? = null,
+    /** Shows the keeper the reviewed plan and the reviewer's reasons; true starts the run, false does not. */
+    confirmPlan: (suspend (PlanDecision) -> Boolean)? = null,
+    /** Keeps a reviewed plan that waits for the keeper across a restart (see [resumePendingPlanLaunch]). */
+    planStore: ReviewedPlanStore? = null,
+) {
+    reportLaunchProgress("Reading your objective…")
+    val cleanObjective = objective.trim()
+    parseHallMonitorTrialLaunchObjective(cleanObjective)?.let { trial ->
+        testHallMonitorSolution(
+            findingId = trial.findingId,
+            solutionIndex = trial.solutionIndex,
+            orchestrationRuntime = orchestrationRuntime,
+        )
+        return
+    }
+
+    val inputs = planInputs(projectName, objective, repository, existingProject, continuesWorkflowRunIds)
+    reportLaunchProgress("Asking the planner for a workflow (${inputs.plannerRoles.size} roles available)…")
+    // Only a launch that will be reviewed has a planning field: the planner's egg, the reviewer who hatches from it.
+    val review = reviewRole(planReviewer, confirmPlan, inputs.launchRoles)
+    review?.let { (_, role) -> reportPlanningStage(planningStage(inputs, PlanningPhase.Planning, null, 0, role)) }
+    val firstPlan = orchestrationRuntime.plan(inputs.packet)
+    var plan = firstPlan
+    review?.let { (reviewer, role) ->
+        val outcome = reviewUntilApproved(
+            packet = inputs.packet,
+            firstPlan = firstPlan,
+            planner = orchestrationRuntime,
+            reviewer = reviewer,
+            reviewerName = role.name,
+            instructions = role.instructions,
+            pinnedProviderId = role.preferredProviderId?.value,
+            onStage = { phase, current, round -> reportPlanningStage(planningStage(inputs, phase, current, round, role)) },
+        )
+        plan = outcome.plan
+        reportPlanningStage(planningStage(inputs, PlanningPhase.AwaitingKeeper, plan, outcome.rounds.size, role, outcome.verdict()))
+        reportLaunchProgress("Waiting for your decision on the plan…")
+        // Kept while the keeper decides, so a restart does not cost them the plan or the reviewer's reasons.
+        planStore?.setPending(
+            PendingPlanLaunch(
+                fingerprint = inputs.fingerprint(role),
+                objective = inputs.objective,
+                projectName = inputs.projectName,
+                existingProjectId = inputs.existingProject?.id?.value,
+                repository = inputs.repository,
+                parentRunIds = inputs.parentRunIds.map { it.value },
+                packet = inputs.packet,
+                plan = plan,
+                rounds = outcome.rounds.map { StoredPlanRound(it.plan, it.verdict is PlanVerdict.Approve, it.verdict.reasons) },
+                problem = outcome.problem,
+                reviewerRoleId = role.id.value,
+                reviewerName = role.name,
+                createdAtEpochMillis = Clock.System.now().toEpochMilliseconds(),
+            ),
+        )
+        val start = checkNotNull(confirmPlan)(PlanDecision(inputs.objective, role.name, outcome, inputs.packet.availableAgents.associate { it.id to it.name }))
+        planStore?.clearPending()
+        if (!start) {
+            reportLaunchProgress("The plan was not started")
+            return
+        }
+        reportPlanningStage(planningStage(inputs, PlanningPhase.Started, plan, outcome.rounds.size, role))
+    }
+    startPlannedWorkflow(inputs, plan)
+}
+
+/**
+ * Offers again the reviewed plan a restart interrupted, if there is one and nothing it was made from has
+ * changed: the same objective, repository, runs it continues, planner roles and reviewer. The keeper is
+ * resuming the decision they were looking at; if anything differs, or the plan has gone stale, it is dropped
+ * and they start afresh. Returns true when a decision was offered (and answered). Starting it is still the
+ * keeper's Start in the app, through [confirmPlan].
+ */
+@OptIn(ExperimentalTime::class)
+suspend fun ApplicationRuntime.resumePendingPlanLaunch(
+    planStore: ReviewedPlanStore,
+    confirmPlan: suspend (PlanDecision) -> Boolean,
+): Boolean {
+    val pending = planStore.pending(Clock.System.now().toEpochMilliseconds()) ?: return false
+    val inputs = try {
+        planInputs(
+            projectName = pending.projectName,
+            objective = pending.objective,
+            repository = pending.repository,
+            existingProject = pending.existingProjectId?.let { persistence.projects.get(ProjectId(it)) ?: error("The project is gone") },
+            continuesWorkflowRunIds = pending.parentRunIds.map(::WorkflowRunId),
+        )
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        throw cancelled
+    } catch (_: Throwable) {
+        planStore.clearPending()
+        return false
+    }
+    val role = planReviewerRole(inputs.launchRoles)
+    val stillValid = role != null && role.id.value == pending.reviewerRoleId &&
+        inputs.fingerprint(role) == pending.fingerprint &&
+        runCatching { pending.plan.validateAgainst(inputs.packet) }.isSuccess
+    if (!stillValid || role == null) {
+        planStore.clearPending()
+        return false
+    }
+    val outcome = PlanReviewOutcome(
+        plan = pending.plan,
+        rounds = pending.rounds.map { PlanReviewRound(it.plan, if (it.approved) PlanVerdict.Approve(it.reasons) else PlanVerdict.Reject(it.reasons)) },
+        problem = pending.problem,
+    )
+    reportPlanningStage(planningStage(inputs, PlanningPhase.AwaitingKeeper, pending.plan, outcome.rounds.size, role, outcome.verdict()))
+    reportLaunchProgress("Waiting for your decision on the plan…")
+    val start = confirmPlan(PlanDecision(inputs.objective, pending.reviewerName, outcome, inputs.packet.availableAgents.associate { it.id to it.name }))
+    planStore.clearPending()
+    if (!start) {
+        reportLaunchProgress("The plan was not started")
+        return true
+    }
+    reportPlanningStage(planningStage(inputs, PlanningPhase.Started, pending.plan, outcome.rounds.size, role))
+    startPlannedWorkflow(inputs, pending.plan)
+    return true
 }
 
 /**

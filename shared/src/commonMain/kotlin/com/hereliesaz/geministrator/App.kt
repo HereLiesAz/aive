@@ -158,6 +158,8 @@ fun App(
     val workflowPersistence = remember(persistence) { persistence ?: com.hereliesaz.geministrator.persistence.WorkflowPersistenceFactory.durable }
     // The keeper's spend caps (Keeper's room, This device), read by the runtime every cycle.
     val spendCapStore = remember { SpendCapStore(com.russhwolf.settings.Settings()) }
+    // A reviewed plan waiting for the keeper, kept across a restart; outside workflow persistence and every export.
+    val planStore = remember { com.hereliesaz.geministrator.orchestration.ReviewedPlanStore(com.russhwolf.settings.Settings()) }
     // The keeper's approval habits, on this device only (workflow/ProgressiveDelegation.kt).
     val delegations = remember { com.hereliesaz.geministrator.workflow.ProgressiveDelegationStore.createDefault() }
     var runtimeState by remember { mutableStateOf<ApplicationRuntimeState>(ApplicationRuntimeState.Loading) }
@@ -300,19 +302,22 @@ fun App(
         }
     }
 
+    // The keeper's answer to a reviewed plan: shown over the planning field, held until they press Start or Do not start.
+    val askKeeper: suspend (com.hereliesaz.geministrator.orchestration.PlanDecision) -> Boolean = { decision ->
+        val answer = CompletableDeferred<Boolean>()
+        planDecision = PendingPlanDecision(decision, answer)
+        try {
+            answer.await()
+        } finally {
+            planDecision = null
+        }
+    }
+
     /**
-     * Launches [objective] the way the launch form does; ignored while a launch is in progress.
-     * [onFinished] receives null once the workflow started, or the failure; it is not called
-     * when the launch is cancelled.
+     * Runs [body] under the launch guard and overlay; ignored while a launch is in progress. [onFinished]
+     * receives null once it finished, or the failure; it is not called when the launch is cancelled.
      */
-    fun launchObjective(
-        projectName: String,
-        objective: String,
-        repository: RepositoryRef?,
-        continuesWorkflowRunIds: List<WorkflowRunId>,
-        existingProject: Project?,
-        onFinished: (Throwable?) -> Unit = {},
-    ) {
+    fun runLaunch(onFinished: (Throwable?) -> Unit = {}, body: suspend (ApplicationRuntime) -> Unit) {
         if (launching) {
             appLog("AiveLaunch", "Launch ignored: a launch is already in progress")
             return
@@ -326,36 +331,7 @@ fun App(
                     "AiveLaunch",
                     "Launch started: orchestrated=${orchestrationRuntime != null} runtime=${runtime != null}",
                 )
-                val activeRuntime = runtime ?: error(getString(Res.string.app_runtime_is_unavailable))
-                if (orchestrationRuntime != null) {
-                    activeRuntime.launchOrchestratedWorkflow(
-                        projectName = projectName,
-                        objective = objective,
-                        orchestrationRuntime = orchestrationRuntime,
-                        repository = repository,
-                        existingProject = existingProject,
-                        continuesWorkflowRunIds = continuesWorkflowRunIds,
-                        planReviewer = planReviewer,
-                        confirmPlan = { decision ->
-                            val answer = CompletableDeferred<Boolean>()
-                            planDecision = PendingPlanDecision(decision, answer)
-                            try {
-                                answer.await()
-                            } finally {
-                                planDecision = null
-                            }
-                        },
-                    )
-                } else {
-                    launchSteps.push("Starting the starter workflow…")
-                    activeRuntime.launchStarterWorkflow(
-                        projectName = projectName,
-                        objective = objective,
-                        repository = repository,
-                        existingProject = existingProject,
-                        continuesWorkflowRunIds = continuesWorkflowRunIds,
-                    )
-                }
+                body(runtime ?: error(getString(Res.string.app_runtime_is_unavailable)))
                 // The first step's egg hatches as the run starts; hold the field long enough to see it.
                 if (planningStage?.phase == PlanningPhase.Started && !reduceMotion) delay(HATCH_HOLD_MILLIS)
                 onFinished(null)
@@ -372,6 +348,51 @@ fun App(
                 launching = false
                 planningStage = null
             }
+        }
+    }
+
+    /**
+     * Launches [objective] the way the launch form does; ignored while a launch is in progress.
+     * [onFinished] receives null once the workflow started, or the failure; it is not called
+     * when the launch is cancelled.
+     */
+    fun launchObjective(
+        projectName: String,
+        objective: String,
+        repository: RepositoryRef?,
+        continuesWorkflowRunIds: List<WorkflowRunId>,
+        existingProject: Project?,
+        onFinished: (Throwable?) -> Unit = {},
+    ) = runLaunch(onFinished) { activeRuntime ->
+        if (orchestrationRuntime != null) {
+            activeRuntime.launchOrchestratedWorkflow(
+                projectName = projectName,
+                objective = objective,
+                orchestrationRuntime = orchestrationRuntime,
+                repository = repository,
+                existingProject = existingProject,
+                continuesWorkflowRunIds = continuesWorkflowRunIds,
+                planReviewer = planReviewer,
+                confirmPlan = askKeeper,
+                planStore = planStore,
+            )
+        } else {
+            launchSteps.push("Starting the starter workflow…")
+            activeRuntime.launchStarterWorkflow(
+                projectName = projectName,
+                objective = objective,
+                repository = repository,
+                existingProject = existingProject,
+                continuesWorkflowRunIds = continuesWorkflowRunIds,
+            )
+        }
+    }
+
+    // A reviewed plan the keeper was deciding on when the app last closed comes back, if nothing it was made from
+    // has changed; otherwise it is dropped (ApplicationRuntime.resumePendingPlanLaunch).
+    LaunchedEffect(runtime, planReviewer) {
+        if (runtime != null && planReviewer != null && !launching && planStore.hasPending()) {
+            runLaunch { activeRuntime -> activeRuntime.resumePendingPlanLaunch(planStore, askKeeper) }
         }
     }
 

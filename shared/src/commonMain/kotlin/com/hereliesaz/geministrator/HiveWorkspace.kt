@@ -120,6 +120,9 @@ internal class TerrariumCamera {
     /** Whether the controls (a bar, not the field's own stepper) drive this camera. */
     var driven by mutableStateOf(false)
 
+    /** Leaves out the field's own zoom controls and level caption: a field that only watches (the planning field). */
+    var controlsHidden by mutableStateOf(false)
+
     /** In: back toward the creature through the levels already passed; with no selection, a plain zoom in. */
     fun stepIn() {
         if (stack.canStepIn) {
