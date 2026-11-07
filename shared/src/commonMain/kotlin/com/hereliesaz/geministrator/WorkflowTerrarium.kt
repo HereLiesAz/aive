@@ -182,6 +182,7 @@ internal fun GeministratorWorkflowTerrarium(
     // Framed, the controls bar drives the field's zoom and focus; unframed, the field keeps its own.
     val camera = remember(definition.id) { TerrariumCamera() }
     camera.driven = frame != null || readOnly
+    camera.controlsHidden = readOnly
 
     // The semantic focus stack (TerrariumFocus.kt): what the camera shows follows the selection.
     // A cluster being grouped counts as one focus; otherwise the selected creature.

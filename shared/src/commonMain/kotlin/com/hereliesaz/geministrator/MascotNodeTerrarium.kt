@@ -901,7 +901,7 @@ private fun MascotNodeTerrarium(
             }
         }
 
-        TerrariumZoomControls(
+        if (!view.controlsHidden) TerrariumZoomControls(
             label = if (view.free) stringResource(Res.string.focus_free) else focusStep.level.label(),
             showStepper = !view.driven,
             onZoomIn = view::stepIn,

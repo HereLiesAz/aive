@@ -31,6 +31,7 @@ Depending on how you use the app, The Aive may store:
 - progress and status information
 - approval gates and decisions
 - workflow events
+- a reviewed plan you have not yet decided on (its objective, the plan, the reviewer's reasons and the repository you named), kept for up to a week so a restart does not lose it (`aive.plan-review.pending.v1`); it is removed when you start or decline the plan, is never exported, and is cleared by clearing the app's data
 - the app's own diagnostic log: the newest 500 lines (launch refusals and failures, settings and store-step failures, with stack traces), dated, with keys scrubbed before they are kept, in the same settings store as the app's other preferences (`aive.app-log.v1`); the Log tab shows it, and clearing the app's data removes it. It is never sent anywhere: it is not part of crash reports or trace export
 - artifacts and references to artifacts
 - provider/executor run identifiers needed to resume work
