@@ -25,7 +25,7 @@ onnxruntime = "1.31.1"
 # has its own version; bump it only to a published, non-dev onnxruntime-web release.
 onnxruntime-web = "1.30.0"
 commons-compress = "1.28.0"
-djl = "0.39.0"
+djl = "0.40.0"
 kmp-zip = "2.1.0"
 cryptography = "0.6.0"
 # cryptography-provider-jdk-bc 0.6.0 pulls bcprov 1.83 (GHSA-574f/9pwp/c3fc/p93r/qp49); pinned to a fixed release.
