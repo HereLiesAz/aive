@@ -6,3 +6,11 @@ When the keeper describes a design as "should", it is a default with room for ex
 
 - Before adding an enforcement mechanism (a lock, a validation, a limit), ask what the legitimate exception looks like and whether the rule can be a projection or a default instead.
 - Prefer the structure the workflow already has (here: dependency order) over a new constraint.
+
+## Reply on the thread, then resolve
+
+I fixed review findings, pushed, and resolved the threads without writing on them. One summary comment on the PR covered some, and the rest got nothing. The reviewer (and the keeper) could not see, from the thread, that it was read, what changed, or in which commit.
+
+- For every review thread I act on: reply on that thread first (the verdict, the commit, how it was checked, and what was not checked), then resolve it. Resolving alone is not an answer.
+- A summary comment on the PR does not replace the replies.
+- Do this in the same pass as the fix, not as a later cleanup.
