@@ -9,6 +9,10 @@ import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.activeRoles
 import com.hereliesaz.geministrator.domain.normalized
 import com.hereliesaz.geministrator.domain.resolveRoleCollection
+import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
+import com.hereliesaz.geministrator.orchestration.PlanDecision
+import com.hereliesaz.geministrator.orchestration.PlanReviewer
+import com.hereliesaz.geministrator.orchestration.ReviewedPlanStore
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
 import com.hereliesaz.geministrator.workflow.WorkflowDefinitionPreparer
 import com.hereliesaz.geministrator.workflow.WorkflowLaunchService
@@ -25,7 +29,32 @@ suspend fun ApplicationRuntime.launchSavedWorkflow(
     supplementalRoles: Collection<com.hereliesaz.geministrator.domain.RoleDefinition> = emptyList(),
     /** Runs the new run continues (one) or merges (several); empty starts a new root lineage. */
     continuesWorkflowRunIds: List<WorkflowRunId> = emptyList(),
+    /**
+     * With all four, a saved hive that holds an Orchestrator (a rough design: see SavedHivePlanning.kt) is planned,
+     * reviewed and decided by the keeper before any run exists, as for [launchOrchestratedWorkflow]. Without them,
+     * and for every other saved hive, it launches as drawn. A remote interface passes none: it cannot be the keeper.
+     */
+    planner: OrchestrationAgentRuntime? = null,
+    planReviewer: PlanReviewer? = null,
+    confirmPlan: (suspend (PlanDecision) -> Boolean)? = null,
+    planStore: ReviewedPlanStore? = null,
 ) {
+    if (planner != null && planReviewer != null && confirmPlan != null) {
+        val planned = launchPlannedSavedWorkflow(
+            definition = definition,
+            projectName = projectName,
+            objective = objective,
+            repository = repository,
+            existingProject = existingProject,
+            supplementalRoles = supplementalRoles.toList(),
+            continuesWorkflowRunIds = continuesWorkflowRunIds,
+            orchestrationRuntime = planner,
+            planReviewer = planReviewer,
+            confirmPlan = confirmPlan,
+            planStore = planStore,
+        )
+        if (planned) return
+    }
     val parents = requireKnownParentRuns(continuesWorkflowRunIds)
     val cleanProjectName = projectName.trim()
     val cleanObjective = objective.trim()

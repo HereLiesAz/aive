@@ -3,6 +3,7 @@ package com.hereliesaz.geministrator.orchestration
 import com.hereliesaz.geministrator.Sha256
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.russhwolf.settings.Settings
 import kotlinx.serialization.Serializable
@@ -46,6 +47,10 @@ data class PendingPlanLaunch(
     val reviewerRoleId: String,
     val reviewerName: String,
     val createdAtEpochMillis: Long,
+    /** The saved hive whose rough design this plan is made from; null for an objective typed into Feed it. */
+    val savedDefinitionId: String? = null,
+    /** Roles a package brought with that saved hive: part of what the plan was made from. */
+    val supplementalRoles: List<RoleDefinition> = emptyList(),
 )
 
 /** Settings-backed store for the one [PendingPlanLaunch]. Unreadable state is no state: the keeper is simply asked afresh. */
@@ -101,6 +106,8 @@ fun planInputsFingerprint(
     parentRunIds: List<String>,
     plannerRoles: List<RoleDefinition>,
     reviewer: RoleDefinition,
+    /** The saved hive's rough design, when the plan is made from one: any change to it is a change to the inputs. */
+    design: WorkflowDefinition? = null,
 ): String {
     val element = buildJsonObject {
         put("version", PLAN_FINGERPRINT_VERSION)
@@ -114,11 +121,14 @@ fun planInputsFingerprint(
             ),
         )
         put("reviewer", canonical(fingerprintJson.encodeToJsonElement(RoleDefinition.serializer(), reviewer)))
+        // Written in the order it was drawn: a design with a map keyed by a class encodes it as a flat array, whose pairs sorting would scramble.
+        put("design", design?.let { designJson.encodeToJsonElement(WorkflowDefinition.serializer(), it) } ?: JsonPrimitive(null as String?))
     }
     return Sha256.hex(element.toString().encodeToByteArray())
 }
 
 private val fingerprintJson = Json { encodeDefaults = true }
+private val designJson = Json { encodeDefaults = true; allowStructuredMapKeys = true }
 
 /** [element] with object keys and array members in a fixed order, so equal data always writes the same bytes. */
 private fun canonical(element: JsonElement): JsonElement = when (element) {
