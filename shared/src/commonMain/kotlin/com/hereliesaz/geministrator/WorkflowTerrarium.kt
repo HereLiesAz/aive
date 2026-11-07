@@ -72,6 +72,11 @@ internal fun GeministratorWorkflowTerrarium(
     startFocusLevel: FocusLevel? = null,
     /** A hive at rest can delete itself from its page (HiveDeletion.kt); null where that is not offered. */
     hiveDeletion: HiveDeletionActions? = null,
+    /**
+     * Only watches: no Live/Build toggle, and the keeper's Swarm view does not apply. The planning field
+     * (PlanningScene.kt) is drawn this way, so a keeper whose hives show every creature still sees eggs.
+     */
+    readOnly: Boolean = false,
 ) {
     val scope = rememberCoroutineScope()
     val layoutStore = remember { SettingsTerrariumLayoutStore.createDefault() }
@@ -176,7 +181,7 @@ internal fun GeministratorWorkflowTerrarium(
 
     // Framed, the controls bar drives the field's zoom and focus; unframed, the field keeps its own.
     val camera = remember(definition.id) { TerrariumCamera() }
-    camera.driven = frame != null
+    camera.driven = frame != null || readOnly
 
     // The semantic focus stack (TerrariumFocus.kt): what the camera shows follows the selection.
     // A cluster being grouped counts as one focus; otherwise the selected creature.
@@ -266,7 +271,9 @@ internal fun GeministratorWorkflowTerrarium(
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
-        if (frame == null) {
+        if (readOnly) {
+            // It only watches: no controls above the field.
+        } else if (frame == null) {
             if (heading == null) {
                 TerrariumModeToggle(building = building, onBuildingChange = { building = it })
             } else {
@@ -321,8 +328,8 @@ internal fun GeministratorWorkflowTerrarium(
                 tissue = (if (building && rehearsal == null) tissue.copy(egg = null) else tissue)
                     .copy(
                         gathered = grouping.orEmpty(),
-                        births = if ((building && rehearsal == null) || swarmView.value) emptyMap() else births,
-                        roaming = if ((building && rehearsal == null) || swarmView.value) RoamPlan() else roaming,
+                        births = if ((building && rehearsal == null) || (swarmView.value && !readOnly)) emptyMap() else births,
+                        roaming = if ((building && rehearsal == null) || (swarmView.value && !readOnly)) RoamPlan() else roaming,
                     ),
                 selectedId = selectedTaskId,
                 onNodeSelected = { node ->

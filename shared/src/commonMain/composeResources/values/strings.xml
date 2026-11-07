@@ -513,6 +513,12 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_timeline_empty">Nothing has happened in this swarm yet.</string>
     <string name="hive_show_timeline">Timeline</string>
     <string name="hive_show_hive">Overview</string>
+    <string name="planning_title">THE PLAN IS BEING MADE</string>
+    <string name="planning_drafting">%1$s is drafting the plan.</string>
+    <string name="planning_reviewing">%1$s is reading the plan, round %2$d of %3$d.</string>
+    <string name="planning_reworking">%1$s is reworking the plan, round %2$d of %3$d.</string>
+    <string name="planning_awaiting">The review is over. The run waits for you.</string>
+    <string name="planning_started">Starting the run.</string>
     <string name="plan_decision_title">THE PLAN, REVIEWED</string>
     <string name="plan_decision_approved_first">%1$s approved the plan.</string>
     <string name="plan_decision_approved_after">%1$s approved the plan after %2$d rounds.</string>
