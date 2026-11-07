@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -98,14 +99,17 @@ internal fun RunLogView(
             return@Column
         }
         val listState = rememberLazyListState()
-        // Follow the foot only when the reader is already at it; a new log opens at its foot.
-        LaunchedEffect(source) { listState.scrollToItem(lines.lastIndex) }
-        LaunchedEffect(lines.size) {
-            val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return@LaunchedEffect
-            if (last >= lines.lastIndex - 2) listState.scrollToItem(lines.lastIndex)
-        }
         // A line keeps its identity when older ones are evicted, so the reader's place holds while the journal turns over.
         val keys = remember(lines) { stableLogKeys(lines) }
+        // Follow the foot only when the reader is already at it, and a new log opens at its foot. The
+        // trigger is the newest line, not the count: a full journal evicts as it grows, so its size holds still.
+        val newest = keys.last()
+        var previousNewest by remember(source) { mutableStateOf<String?>(null) }
+        LaunchedEffect(source, newest) {
+            val atFoot = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.key == previousNewest
+            if (previousNewest == null || atFoot) listState.scrollToItem(lines.lastIndex)
+            previousNewest = newest
+        }
         SelectionContainer(Modifier.weight(1f).fillMaxWidth()) {
             LazyColumn(
                 state = listState,
