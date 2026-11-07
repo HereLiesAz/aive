@@ -67,7 +67,7 @@ Once there is a hive, resting or live, one row holds its places: its Roster and 
 - **The header**: THE AIVE / the breadcrumb as words (earlier steps go back up, the last is where you are), the hive's state with a still dot, and the Inbox. The gear lives on the rail.
 - **Page titles** (`AzphaltPageTitle`): a small eyebrow, the big title, one line under it and an optional action at the right.
 
-Titles are set in Archivo Black and everything else in DM Sans, both bundled (`composeResources/font`, SIL Open Font License 1.1, see `THIRD_PARTY_NOTICES.md`) and mapped in `AzphaltType`.
+Everything is set in Azrienoch, one variable font bundled (`composeResources/font`, SIL Open Font License 1.1, see `THIRD_PARTY_NOTICES.md`) and mapped in `AzphaltType`: titles at weight 900, the rest at the weights the type scale names. Its width, serif and grade axes stay at their defaults.
 
 While a live hive's run is unfinished, a red **Stop** pill leads that row on a phone (it heads the hive's own pills on a wide window); it asks first (**Stop run** / **Keep running**), then cancels every unfinished creature and provider session through `ApplicationRuntime.cancelActiveRun`, and what had finished is kept.
 
