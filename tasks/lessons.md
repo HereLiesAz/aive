@@ -47,3 +47,15 @@ I wrote `toSortedMap()` in commonMain, twice, in two PRs. It compiles on the JVM
 - JVM-only calls to avoid in common code: `toSortedMap`, `toSortedSet`, `String.format`, anything under `java.`. Sort entries and rebuild an ordered map with `associate`.
 - A "not checked locally" line in a PR body is a task still to do, not a disclosure that finishes it.
 
+
+## One callback must not carry two meanings
+
+The creature sheet came back on any tap after it was closed. The field's "tap bare ground" called `onTaskSelected(selectedId)`, which the shell uses to toggle selection, but the shell's `selectCreature` also reads "the id whose panel was set aside" as "open it again". Two intents, one callback: ground taps reopened the panel. It had a doc sentence promising the opposite ("tapping bare ground lets it go") and no test.
+
+- When a callback is reused for a new gesture, ask what else the receiver does with the same arguments.
+- Give a gesture its own callback (here `LocalReleaseCreature`), and write the promise in the docs as a test or a screenshot step, not only a sentence.
+- When a keeper reports a bug in a flow that a doc sentence describes, the sentence was not verified: check the sentence, not only the code.
+
+## A saved edit is not a live edit
+
+A creature's job saved from its panel was written to the library and then written over about once a second by the runtime's own copy of the definition, while the panel said it "takes effect from its next run". Where state is held twice (a library, a running copy), say which one a save changes, and route it through the owner.
