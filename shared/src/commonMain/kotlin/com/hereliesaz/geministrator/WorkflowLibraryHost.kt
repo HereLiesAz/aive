@@ -152,6 +152,7 @@ class WorkflowLibraryHost(
                         objective = suggestion.objective,
                         cadence = suggestion.cadence,
                         enabled = false,
+                        withEvidence = suggestion.withEvidence,
                         createdAtEpochMillis = nowEpochMillis,
                     ),
                 )

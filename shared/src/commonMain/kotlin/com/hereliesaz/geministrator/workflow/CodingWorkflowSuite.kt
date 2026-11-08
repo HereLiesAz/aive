@@ -13,10 +13,11 @@ import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TestDesignPolicy
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
+import com.hereliesaz.geministrator.workflow.improvement.SelfImprovementLoop
 import com.hereliesaz.geministrator.workflow.schedule.ScheduleCadence
 
 /** What a suite hive suggests when a keeper puts it on a schedule: how often, and what to ask of it. */
-data class SuggestedSchedule(val cadence: ScheduleCadence, val objective: String)
+data class SuggestedSchedule(val cadence: ScheduleCadence, val objective: String, val withEvidence: Boolean = false)
 
 /** One hive of the suite; [schedule] is set on the ones meant to run by themselves. */
 data class CodingSuiteEntry(
@@ -57,7 +58,7 @@ object CodingWorkflowSuite {
         featureDelivery(), bugFix(), codeReview(), safeRefactor(), testCoverage(), dependencyUpdate(),
         securityAudit(), docsSync(), releasePrep(), incidentHotfix(), codebaseMap(),
         nightlyDependencyAudit(), dailyCiTriage(), weeklyTestHealth(), weeklySecurityScan(),
-        weeklyDocsDrift(), weeklyTechDebt(),
+        weeklyDocsDrift(), weeklyTechDebt(), selfImprovement(),
     )
 
     fun definitions(): List<WorkflowDefinition> = all().map { it.definition }
@@ -457,6 +458,17 @@ object CodingWorkflowSuite {
             "report", "Write the report", BuiltInRoles.ProductManager, RoleAuthority.ProposePlan,
             "Recommend the one or two debts worth paying down first, each with the smallest first step.",
             after = listOf("survey"),
+        ),
+    )
+
+    /** The self-improvement loop (docs/architecture/SELF_IMPROVEMENT.md): read-only, so it may run on its own. */
+    private fun selfImprovement() = CodingSuiteEntry(
+        SelfImprovementLoop.definition(),
+        CodingSuiteEntry.Kind.Reports,
+        SuggestedSchedule(
+            ScheduleCadence.weekly(dayOfWeek = 7, hourUtc = 10),
+            "Run a self-improvement cycle: examine how the swarm has been doing, and examine this loop itself.",
+            withEvidence = true,
         ),
     )
 
