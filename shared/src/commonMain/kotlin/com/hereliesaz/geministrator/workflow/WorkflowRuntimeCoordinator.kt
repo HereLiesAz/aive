@@ -97,9 +97,18 @@ class WorkflowRuntimeCoordinator(
             throw cancellation
         } catch (_: Exception) {
         }
+        // A decision a model wrote about a habit becomes a Deliberation receipt, unless the task had
+        // untrusted content in front of it; it never affects the run.
+        try {
+            habitDecisions.observe(project, definition, state.run)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+        }
     }
 
     private val procedureVerifications = ProcedureVerificationObserver { MemoryRuntimeBridge.procedureTraceSink }
+    private val habitDecisions = HabitDecisionObserver { MemoryRuntimeBridge.procedureTraceSink }
     private val habitFlags = HabitFlagObserver { MemoryRuntimeBridge.procedureTraceSink }
 
     suspend fun resume(workflowRunId: WorkflowRunId): WorkflowRuntimeState {
