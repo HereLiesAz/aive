@@ -839,6 +839,33 @@ class MemoryLayerController(
     }
 
     /**
+     * A task someone may add to a workflow to do what a formed habit does, or a refusal. It runs
+     * nothing: the result is an ordinary task that asks for a person's approval first and is then
+     * run, or not, by the workflow engine under its own gates (see HabitInvocation).
+     */
+    suspend fun proposeHabitTask(
+        workflowId: String,
+        operation: String,
+        taskId: String,
+        ref: String? = null,
+        inputs: Map<String, String> = emptyMap(),
+    ): com.hereliesaz.geministrator.memory.procedural.HabitInvocation.Result {
+        val habit = formedHabits(workflowId).firstOrNull { it.operation == operation }
+            ?: return com.hereliesaz.geministrator.memory.procedural.HabitInvocation.Result.Refused(
+                "No habit has formed for that operation.",
+            )
+        if (taskId.isBlank()) {
+            return com.hereliesaz.geministrator.memory.procedural.HabitInvocation.Result.Refused("A task needs an id.")
+        }
+        return com.hereliesaz.geministrator.memory.procedural.HabitInvocation.propose(
+            habit,
+            com.hereliesaz.geministrator.domain.TaskDefinitionId(taskId),
+            ref,
+            inputs,
+        )
+    }
+
+    /**
      * The text of a "Habits" prompt block for a task that states [objective], or null. Only habits
      * already offered (three uses) whose operation the objective names appear, at most a few, as
      * counts and facts. Null while memory or procedural capture is off, or on any read failure.
