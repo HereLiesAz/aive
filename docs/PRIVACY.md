@@ -137,6 +137,10 @@ Trace export sends a trace of each finished run to an OpenTelemetry collector yo
 - **Delivery.** Failed sends are retried a few times with backoff and then dropped. Nothing is kept for later.
 - **Turning it off.** Turn off Trace export at any time; sending stops at once. Data already received by your collector is governed by that collector's operator.
 
+## Refinement-ladder training data (off by default)
+
+A workflow can be set to work a task in gated refinement levels (see [Compound inference](architecture/COMPOUND_INFERENCE.md#refinement-ladder)). If you switch dataset capture on (`ladder.dataset.capture.enabled`, which has no screen yet), the app keeps on this device, per level, the level's objective, the level's answer, whether the answer fits the documented structure, and what its gate decided; and, per ladder, how it ended. Text is scrubbed of the common shapes of keys and cut to 6,000 characters, and the newest 200 records are kept. Nothing is sent anywhere: the records leave the device only when you export them, and clearing the app's data removes them. Because they hold the text of your tasks and their answers, treat an export like the work it came from.
+
 ## Remote access (Android)
 
 Remote access lets IDEaz on another device of yours run prompts on your linked AI providers and start workflows on this device. It exists in both Android flavors and is **off by default**: nothing runs, connects or is created until you turn on **Settings → Remote Access**.
