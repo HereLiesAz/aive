@@ -784,6 +784,48 @@ class MemoryLayerController(
     }
 
     /**
+     * A written decision about a habit, by the keeper (`author` "keeper") or by a model (its role id):
+     * the habit stands, or it is superseded and a new version begins. It answers a contrast; it never
+     * edits the habit, which is a set of receipts. Recorded as a Deliberation receipt, bounded and
+     * scrubbed. Returns false when capture is off, the operation is not a plain operation name, or the
+     * text or author is empty.
+     */
+    suspend fun deliberateHabit(
+        workflowId: String,
+        operation: String,
+        outcome: com.hereliesaz.geministrator.memory.procedural.ProcedureDeliberationOutcome,
+        author: String,
+        text: String,
+    ): Boolean {
+        if (!active || !settings.value.proceduralTraceCaptureEnabled) return false
+        if (!operation.matches(com.hereliesaz.geministrator.memory.procedural.ProcedureTrace.OPERATION)) return false
+        val quote = com.hereliesaz.geministrator.control.ControlRedaction.scrub(text.trim())
+            .take(com.hereliesaz.geministrator.memory.procedural.ProcedureTraceFlag.MAX_TEXT)
+        if (quote.isBlank() || author.isBlank() || author.length > 128) return false
+        val project = lineage.projectOf(workflowId) ?: return false
+        procedureTraceSink.record(
+            com.hereliesaz.geministrator.memory.procedural.ProcedureTrace(
+                workflowId = workflowId,
+                projectId = project,
+                taskRunId = "deliberation",
+                taskDefinitionId = "habit-deliberation",
+                attempt = 0,
+                phase = com.hereliesaz.geministrator.memory.procedural.ProcedureTracePhase.Deliberation,
+                executorKind = "Deliberation",
+                outcome = com.hereliesaz.geministrator.memory.procedural.ProcedureTraceOutcome.Running,
+                recordedAtEpochMillis = nowEpochMillis(),
+                operation = operation,
+                deliberation = com.hereliesaz.geministrator.memory.procedural.ProcedureTraceDeliberation(
+                    outcome = outcome,
+                    author = author.trim(),
+                    text = quote,
+                ),
+            ),
+        )
+        return true
+    }
+
+    /**
      * The text of a "Habits" prompt block for a task that states [objective], or null. Only habits
      * already offered (three uses) whose operation the objective names appear, at most a few, as
      * counts and facts. Null while memory or procedural capture is off, or on any read failure.

@@ -59,9 +59,21 @@ data class HabitFlags(
 }
 
 /**
- * What repeated runs of one named operation add up to. The frame is the executor and the
- * operation; the slots are the fillers that varied. Nothing here judges: the counts are facts, and
- * strength says only how often the habit has been used.
+ * A contrast within one habit: the same operation with the same configured values has both
+ * completed and been failed or turned back. It is a fact, not a ruling; only a deliberation answers it.
+ */
+data class HabitContrast(
+    /** The configured values the two sides share, as `name=value; ...`, or `(no values)`. */
+    val signature: String,
+    val completed: Int,
+    val turnedBack: Int,
+)
+
+/**
+ * What repeated runs of one named operation add up to. The frame is the named operation; the slots
+ * are the fillers that varied. Nothing here judges: the counts are facts, and strength says only how
+ * often the habit has been used. Every count is of the current version; what was done before a
+ * superseding deliberation is [earlierUses], history.
  */
 data class FormedHabit(
     val executorKind: String,
@@ -81,6 +93,13 @@ data class FormedHabit(
     val recentUses: Int = 0,
     val recentFailedUses: Int = 0,
     val flags: HabitFlags = HabitFlags(),
+    /** 1, plus one for each deliberation that superseded the habit. */
+    val version: Int = 1,
+    /** Uses from before the latest superseding deliberation: history, not counted above. */
+    val earlierUses: Int = 0,
+    val openContrasts: List<HabitContrast> = emptyList(),
+    /** The newest deliberation about this habit, of either outcome. */
+    val lastDeliberation: ProcedureTraceDeliberation? = null,
 ) {
     val offered: Boolean get() = strength != HabitStrength.Forming
 
@@ -91,6 +110,7 @@ data class FormedHabit(
 object HabitFormation {
     const val MAX_HABITS = 64
     const val MAX_VALUES_PER_SLOT = 8
+    const val MAX_CONTRASTS = 4
 
     /** How many of the newest uses make up a habit's recent outcomes. */
     const val RECENT = 3
@@ -104,22 +124,36 @@ object HabitFormation {
         val verification: ProcedureTraceVerification,
         val slots: List<ProcedureTraceSlot>,
         val atEpochMillis: Long,
-    )
+    ) {
+        /** Failed, or completed but turned back by a reviewer. */
+        val turnedBack: Boolean get() = failed || verification == ProcedureTraceVerification.Rejected
+
+        val signature: String
+            get() = slots.sortedBy { it.name }.joinToString("; ") { "${it.name}=${it.value}" }
+                .ifEmpty { "(no values)" }
+    }
+
+    private val notExecutions = setOf(ProcedureTracePhase.Flag, ProcedureTracePhase.Deliberation)
 
     /**
      * The habits [traces] add up to. A use is one execution (a task run attempt) that finished,
      * however many receipts it left. An execution that only reported Running is not a use yet.
-     * Receipts with no named operation cannot form a habit: there is no frame to repeat.
+     * Receipts with no named operation cannot form a habit: there is no frame to repeat. Flags and
+     * deliberations are about a habit and are never uses.
      */
     fun form(traces: List<ProcedureTrace>, settings: HabitSettings = HabitSettings()): List<FormedHabit> {
         val named = traces.filter { it.operation != null }
         val uses = named
-            .filter { it.phase != ProcedureTracePhase.Flag }
+            .filter { it.phase !in notExecutions }
             .groupBy { UseKey(it.workflowId, it.taskRunId, it.attempt) }
             .values
             .mapNotNull(::useOf)
         val flagsByOperation = named
             .filter { it.phase == ProcedureTracePhase.Flag }
+            .distinctBy { it.receiptKey }
+            .groupBy { it.operation }
+        val deliberationsByOperation = named
+            .filter { it.phase == ProcedureTracePhase.Deliberation }
             .distinctBy { it.receiptKey }
             .groupBy { it.operation }
 
@@ -130,9 +164,10 @@ object HabitFormation {
                 habitOf(
                     executorKind = group.minBy { it.atEpochMillis }.executorKind,
                     operation = operation,
-                    uses = group,
+                    allUses = group,
                     settings = settings,
                     flags = flagsOf(flagsByOperation[operation].orEmpty()),
+                    deliberations = deliberationsByOperation[operation].orEmpty(),
                 )
             }
             .sortedWith(compareByDescending<FormedHabit> { it.uses }.thenBy { it.operation })
@@ -178,12 +213,24 @@ object HabitFormation {
     private fun habitOf(
         executorKind: String,
         operation: String,
-        uses: List<Use>,
+        allUses: List<Use>,
         settings: HabitSettings,
         flags: HabitFlags,
+        deliberations: List<ProcedureTrace>,
     ): FormedHabit {
+        val decided = deliberations.mapNotNull { trace -> trace.deliberation?.let { trace.recordedAtEpochMillis to it } }
+            .sortedBy { it.first }
+        // A superseding deliberation closes a version: what came before it is history, and the
+        // habit starts again from what is done after it.
+        val superseded = decided.filter { it.second.outcome == ProcedureDeliberationOutcome.Superseded }
+        val boundary = superseded.maxOfOrNull { it.first }
+        val uses = if (boundary == null) allUses else allUses.filter { it.atEpochMillis > boundary }
+        val lastStands = decided.filter { it.second.outcome == ProcedureDeliberationOutcome.Stands }
+            .maxOfOrNull { it.first }
+
         val failedUses = uses.count { it.failed }
         val recent = uses.sortedByDescending { it.atEpochMillis }.take(RECENT)
+        val timed = uses.ifEmpty { allUses }
         return FormedHabit(
             executorKind = executorKind,
             operation = operation,
@@ -193,14 +240,33 @@ object HabitFormation {
             verifiedUses = uses.count { it.verification == ProcedureTraceVerification.Verified },
             rejectedUses = uses.count { it.verification == ProcedureTraceVerification.Rejected },
             slots = slotsOf(uses),
-            firstUsedAtEpochMillis = uses.minOf { it.atEpochMillis },
-            lastUsedAtEpochMillis = uses.maxOf { it.atEpochMillis },
+            firstUsedAtEpochMillis = timed.minOf { it.atEpochMillis },
+            lastUsedAtEpochMillis = timed.maxOf { it.atEpochMillis },
             strength = if (uses.size >= settings.offerAtUses) HabitStrength.Low else HabitStrength.Forming,
             recentUses = recent.size,
             recentFailedUses = recent.count { it.failed },
             flags = flags,
+            version = 1 + superseded.size,
+            earlierUses = allUses.size - uses.size,
+            openContrasts = contrastsOf(uses, lastStands),
+            lastDeliberation = decided.lastOrNull()?.second,
         )
     }
+
+    /**
+     * Where the same configured values have both completed and been turned back. A deliberation that
+     * let the habit stand answers the contrast: it reopens only when something is turned back after it.
+     */
+    private fun contrastsOf(uses: List<Use>, lastStands: Long?): List<HabitContrast> =
+        uses.groupBy { it.signature }
+            .mapNotNull { (signature, group) ->
+                val good = group.count { !it.turnedBack }
+                val bad = group.count { it.turnedBack }
+                val newBad = group.count { it.turnedBack && (lastStands == null || it.atEpochMillis > lastStands) }
+                if (good > 0 && newBad > 0) HabitContrast(signature, completed = good, turnedBack = bad) else null
+            }
+            .sortedWith(compareByDescending<HabitContrast> { it.completed + it.turnedBack }.thenBy { it.signature })
+            .take(MAX_CONTRASTS)
 
     private fun slotsOf(uses: List<Use>): List<HabitSlot> =
         uses.flatMap { use -> use.slots.map { slot -> slot to use.atEpochMillis } }

@@ -88,6 +88,24 @@ object HabitOffers {
             append("\n  ").append(slot.name).append(" has been ")
                 .append(slot.values.joinToString(", ") { "${it.value} (${it.count})" }).append(".")
         }
+        if (habit.version > 1) {
+            append("\n  Version ").append(habit.version).append(": ").append(habit.earlierUses)
+                .append(if (habit.earlierUses == 1) " earlier use is" else " earlier uses are")
+                .append(" history and not counted above.")
+        }
+        habit.openContrasts.forEach { contrast ->
+            append("\n  Open contrast: with ").append(contrast.signature).append(", it has completed ")
+                .append(contrast.completed).append(if (contrast.completed == 1) " time" else " times")
+                .append(" and been failed or turned back ").append(contrast.turnedBack)
+                .append(if (contrast.turnedBack == 1) " time." else " times.")
+        }
+        habit.lastDeliberation?.let { decision ->
+            append("\n  Latest decision (").append(decision.outcome.name.lowercase()).append(", ")
+                .append(decision.author).append("): \"").append(quoted(decision.text)).append("\"")
+        }
+        if (habit.openContrasts.isNotEmpty() && habit.lastDeliberation == null) {
+            append("\n  No decision about it has been written.")
+        }
         val flags = habit.flags
         if (flags.total == 0) {
             append("\n  Flags: none yet.")
