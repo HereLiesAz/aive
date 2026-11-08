@@ -47,6 +47,7 @@ object ImprovementApplier {
                 else -> Plan.HiveStepObjective(hiveId, taskId, task.objective, proposal.newText)
             }
         }
+        ImprovementKind.HabitTask -> Plan.Manual("Choose the hive to add it to.")
         ImprovementKind.Schedule, ImprovementKind.EvidenceRule, ImprovementKind.Other ->
             Plan.Manual("The app does not apply this kind by itself; it is recorded as noted, and you change it by hand.")
     }

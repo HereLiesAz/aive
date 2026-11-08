@@ -125,6 +125,22 @@ object SwarmEvidence {
                 }
                 appendLine("- \"${p.summary.take(120)}\" (${p.kind.label}, ${p.target})$effect. It said: ${p.expectedEffect.take(160)}")
             }
+            // The other mechanisms' proposals are in the same ledger: what each has noticed, and what the keeper made of it.
+            appendLine("Proposals by the mechanism that noticed them (the loop reads the others' as evidence, so it does not repeat them):")
+            ImprovementSource.entries.forEach { source ->
+                val mine = state.proposals.filter { it.source == source }
+                val label = when (source) {
+                    ImprovementSource.Loop -> "the loop"
+                    ImprovementSource.RoleHistory -> "run-history heuristics (role instructions)"
+                    ImprovementSource.Habit -> "habits"
+                }
+                val judged = mine.filter { it.status == ProposalStatus.Dismissed }.takeLast(3).joinToString("; ") { "\"${it.summary.take(70)}\"" }
+                appendLine(
+                    "- $label: ${mine.count { it.status == ProposalStatus.Proposed }} waiting, ${mine.count { it.status == ProposalStatus.Adopted }} adopted, " +
+                        "${mine.count { it.status == ProposalStatus.Dismissed }} dismissed, ${mine.count { it.status == ProposalStatus.Reverted }} reverted" +
+                        (if (judged.isNotEmpty()) "; recently dismissed: $judged" else ""),
+                )
+            }
             val pending = state.proposals.count { it.status == ProposalStatus.Proposed }
             val dismissed = state.proposals.filter { it.status == ProposalStatus.Dismissed }.takeLast(5)
             appendLine("Proposals still waiting on the keeper: $pending. Recently dismissed (the keeper judged these not worth it): " +

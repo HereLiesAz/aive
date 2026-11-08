@@ -74,4 +74,26 @@ class SwarmEvidenceTest {
         assertTrue("qa-engineer fail rate 0% over 3 steps before, 67% over 3 steps after" in text, text)
         assertTrue("It said: fewer retries" in text, "what it promised is next to what happened")
     }
+
+    @Test
+    fun theLoopReadsWhatTheOtherMechanismsNoticedAndWhatTheKeeperMadeOfIt() {
+        fun p(id: String, source: ImprovementSource, status: ProposalStatus, summary: String) = ImprovementProposal(
+            id = id, cycleRunId = "c", kind = ImprovementKind.Other, target = "t", summary = summary, newText = "", expectedEffect = "e",
+            undo = "u", meta = false, status = status, createdAtEpochMillis = 1L, source = source,
+        )
+        val state = ImprovementState(
+            proposals = listOf(
+                p("1", ImprovementSource.RoleHistory, ProposalStatus.Proposed, "Add 2 lessons to qa-engineer"),
+                p("2", ImprovementSource.RoleHistory, ProposalStatus.Dismissed, "Add a lesson to architect"),
+                p("3", ImprovementSource.Habit, ProposalStatus.Adopted, "Make github-action:ci.yml a step"),
+            ),
+        )
+
+        val text = SwarmEvidence.of(runs, listOf(qa), state, now, loopText)
+
+        assertTrue("run-history heuristics (role instructions): 1 waiting, 0 adopted, 1 dismissed" in text, text)
+        assertTrue("recently dismissed: \"Add a lesson to architect\"" in text, text)
+        assertTrue("- habits: 0 waiting, 1 adopted" in text, text)
+        assertTrue("- the loop: 0 waiting" in text, text)
+    }
 }

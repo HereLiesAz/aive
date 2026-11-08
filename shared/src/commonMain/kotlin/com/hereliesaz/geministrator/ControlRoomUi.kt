@@ -1247,6 +1247,7 @@ private fun MainDestination(
                                         KeeperSection.Improvement -> {
                                             val roleHost = LocalWorkflowLibraryHost.current
                                             ImprovementPart(
+                                                memoryLayer = memoryLayer,
                                                 onSaveRoleInstructions = { roleId, instructions ->
                                                     val all = roleHost?.installedRoles().orEmpty()
                                                     onSaveRoleCollection(all.map { if (it.id.value == roleId) it.copy(instructions = instructions) else it })

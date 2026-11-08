@@ -21,6 +21,14 @@ import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.log.formatLogTime
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.improvement_adopt
+import com.hereliesaz.geministrator.resources.improvement_add_to_hive
+import com.hereliesaz.geministrator.resources.improvement_source_habit
+import com.hereliesaz.geministrator.resources.improvement_source_loop
+import com.hereliesaz.geministrator.resources.improvement_source_role
+import com.hereliesaz.geministrator.resources.improvement_status_superseded
+import com.hereliesaz.geministrator.resources.improvement_habit_added
+import com.hereliesaz.geministrator.resources.improvement_habit_no_memory
+import com.hereliesaz.geministrator.resources.improvement_stale
 import com.hereliesaz.geministrator.resources.improvement_body
 import com.hereliesaz.geministrator.resources.improvement_cannot
 import com.hereliesaz.geministrator.resources.improvement_dismiss
@@ -41,7 +49,14 @@ import com.hereliesaz.geministrator.resources.improvement_status_adopted
 import com.hereliesaz.geministrator.resources.improvement_status_dismissed
 import com.hereliesaz.geministrator.resources.improvement_status_proposed
 import com.hereliesaz.geministrator.resources.improvement_status_reverted
+import com.hereliesaz.geministrator.domain.WorkflowDefinition
+import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
+import com.hereliesaz.geministrator.memory.MemoryLayerController
+import com.hereliesaz.geministrator.memory.procedural.RoleInstructionApproval
 import com.hereliesaz.geministrator.workflow.improvement.ImprovementApplier
+import com.hereliesaz.geministrator.workflow.improvement.ImprovementKind
+import com.hereliesaz.geministrator.workflow.improvement.ImprovementSource
+import com.hereliesaz.geministrator.workflow.improvement.ProposalMirrors
 import com.hereliesaz.geministrator.workflow.improvement.ImprovementProposal
 import com.hereliesaz.geministrator.workflow.improvement.ImprovementState
 import com.hereliesaz.geministrator.workflow.improvement.ImprovementStore
@@ -65,6 +80,8 @@ internal val LocalImprovementStore = compositionLocalOf<ImprovementStore?> { nul
  */
 @Composable
 internal fun ImprovementPart(
+    /** The habits layer, whose formed habits are offered here as steps for a hive; null where there is none. */
+    memoryLayer: MemoryLayerController? = null,
     /** Replaces the instructions of one installed role (the Mind's save path); true when it was saved. */
     onSaveRoleInstructions: suspend (roleId: String, instructions: String) -> Unit,
 ) {
@@ -74,12 +91,16 @@ internal fun ImprovementPart(
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf(ImprovementState()) }
     var roles by remember { mutableStateOf<List<RoleDefinition>>(emptyList()) }
+    var authored by remember { mutableStateOf<List<WorkflowDefinition>>(emptyList()) }
     var hasLoop by remember { mutableStateOf(true) }
     var message by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableStateOf(0) }
     LaunchedEffect(reload) {
+        // The other two mechanisms are mirrored into the one ledger, so all three are read and decided here.
+        syncSources(store, memoryLayer)
         state = store.state()
         roles = host?.installedRoles().orEmpty()
+        authored = host?.entries()?.filter { it.origin == WorkflowLibraryOrigin.Authored }?.map { it.definition }.orEmpty()
         hasLoop = host?.entries()?.any { it.definition.id.value == SelfImprovementLoop.HIVE_ID } ?: true
     }
     LaunchedEffect(Unit) {
@@ -118,14 +139,23 @@ internal fun ImprovementPart(
         state.proposals.sortedByDescending { it.createdAtEpochMillis }.forEach { proposal ->
             ProposalCard(
                 proposal = proposal,
+                hives = authored,
                 onAdopt = {
                     scope.launch {
                         message = adopt(proposal, store, host, roles, onSaveRoleInstructions)
                         reload += 1
                     }
                 },
+                onAddToHive = { hive ->
+                    scope.launch {
+                        message = adoptHabit(proposal, hive, store, host, memoryLayer)
+                        reload += 1
+                    }
+                },
                 onDismiss = {
                     scope.launch {
+                        // A proposal from run history is dismissed there too, so its lines are never offered again.
+                        if (proposal.source == ImprovementSource.RoleHistory) proposal.sourceRef?.let { RoleInstructionProposalsHost.ledger.dismiss(it) }
                         store.decide(proposal.id) { it.copy(status = ProposalStatus.Dismissed, decidedAtEpochMillis = currentEpochMillis()) }
                         reload += 1
                     }
@@ -156,6 +186,25 @@ private suspend fun adopt(
 ): String {
     val hives = host?.entries()?.filter { it.origin == WorkflowLibraryOrigin.Authored }?.map { it.definition }.orEmpty()
     val now = currentEpochMillis()
+    if (proposal.source == ImprovementSource.RoleHistory && proposal.sourceRef != null) {
+        // Decided by the mechanism that made it: its own check that the role is still as it was drafted against.
+        val before = roles.firstOrNull { it.id.value == proposal.target }?.instructions
+        return when (val result = RoleInstructionProposalsHost.ledger.approve(proposal.sourceRef!!, roles)) {
+            is RoleInstructionApproval.Applied -> {
+                saveRole(proposal.target, result.role.instructions)
+                store.decide(proposal.id) {
+                    it.copy(status = ProposalStatus.Adopted, decidedAtEpochMillis = now, appliedBefore = before, appliedAfter = result.role.instructions)
+                }
+                appLog("Improvement", "Adopted: ${proposal.summary}")
+                ""
+            }
+            RoleInstructionApproval.Stale -> {
+                store.decide(proposal.id) { it.copy(status = ProposalStatus.Superseded, decidedAtEpochMillis = now, note = "The role changed since it was drafted.") }
+                getString(Res.string.improvement_stale)
+            }
+            RoleInstructionApproval.NotFound -> getString(Res.string.improvement_stale)
+        }
+    }
     return when (val plan = ImprovementApplier.plan(proposal, roles, hives)) {
         is ImprovementApplier.Plan.RoleInstructions -> {
             saveRole(plan.roleId, plan.after)
@@ -213,17 +262,67 @@ private suspend fun revert(
     return ""
 }
 
+/** Mirrors the role-instruction proposals and the formed habits into the one ledger. Reading only: nothing is decided. */
+private suspend fun syncSources(store: ImprovementStore, memoryLayer: MemoryLayerController?) {
+    val now = currentEpochMillis()
+    store.merge { ProposalMirrors.roleHistory(it, RoleInstructionProposalsHost.ledger.state.value, now) }
+    val banks = memoryLayer?.knownBanks?.value.orEmpty()
+    val habits = banks.flatMap { bank ->
+        runCatching { memoryLayer!!.formedHabits(bank) }.getOrDefault(emptyList()).map { bank to it }
+    }
+    if (habits.isNotEmpty()) store.merge { ProposalMirrors.habits(it, habits, now) }
+}
+
+/** A habit becomes a step in the chosen hive, behind its own approval step (WorkflowCompositionService.addProposedTasks). */
+private suspend fun adoptHabit(
+    proposal: ImprovementProposal,
+    hive: WorkflowDefinition,
+    store: ImprovementStore,
+    host: WorkflowLibraryHost?,
+    memoryLayer: MemoryLayerController?,
+): String {
+    if (host == null || memoryLayer == null || proposal.sourceRef == null) return getString(Res.string.improvement_habit_no_memory)
+    val taskId = "habit-" + proposal.target.filter { it.isLetterOrDigit() }.take(24).ifEmpty { "step" }
+    return when (val result = memoryLayer.proposeHabitTask(proposal.sourceRef!!, proposal.target, taskId)) {
+        is com.hereliesaz.geministrator.memory.procedural.HabitInvocation.Result.Proposed -> {
+            val saved = runCatching { host.addProposedTasks(hive.id, listOf(result.task)) }
+            saved.exceptionOrNull()?.let { return it.message ?: getString(Res.string.improvement_habit_no_memory) }
+            store.decide(proposal.id) {
+                it.copy(status = ProposalStatus.Adopted, decidedAtEpochMillis = currentEpochMillis(), note = "Added to ${hive.name}, behind its own approval step.")
+            }
+            appLog("Improvement", "Adopted: ${proposal.summary} (into ${hive.id.value})")
+            getString(Res.string.improvement_habit_added, hive.name)
+        }
+        is com.hereliesaz.geministrator.memory.procedural.HabitInvocation.Result.Refused -> result.reason
+    }
+}
+
 @Composable
-private fun ProposalCard(proposal: ImprovementProposal, onAdopt: () -> Unit, onDismiss: () -> Unit, onRevert: () -> Unit) {
+private fun ProposalCard(
+    proposal: ImprovementProposal,
+    hives: List<WorkflowDefinition>,
+    onAdopt: () -> Unit,
+    onAddToHive: (WorkflowDefinition) -> Unit,
+    onDismiss: () -> Unit,
+    onRevert: () -> Unit,
+) {
     val status = stringResource(
         when (proposal.status) {
             ProposalStatus.Proposed -> Res.string.improvement_status_proposed
             ProposalStatus.Adopted -> Res.string.improvement_status_adopted
             ProposalStatus.Dismissed -> Res.string.improvement_status_dismissed
             ProposalStatus.Reverted -> Res.string.improvement_status_reverted
+            ProposalStatus.Superseded -> Res.string.improvement_status_superseded
         },
     )
-    val eyebrow = status + " · " + proposal.kind.label + " · " + proposal.target + if (proposal.meta) " · " + stringResource(Res.string.improvement_meta) else ""
+    val source = stringResource(
+        when (proposal.source) {
+            ImprovementSource.Loop -> Res.string.improvement_source_loop
+            ImprovementSource.RoleHistory -> Res.string.improvement_source_role
+            ImprovementSource.Habit -> Res.string.improvement_source_habit
+        },
+    )
+    val eyebrow = status + " · " + source + " · " + proposal.kind.label + " · " + proposal.target + if (proposal.meta) " · " + stringResource(Res.string.improvement_meta) else ""
     AzphaltRecord(
         seed = "improvement-${proposal.id}",
         eyebrow = eyebrow,
@@ -231,12 +330,22 @@ private fun ProposalCard(proposal: ImprovementProposal, onAdopt: () -> Unit, onD
         body = stringResource(
             Res.string.improvement_body,
             proposal.expectedEffect, proposal.undo, proposal.newText.ifBlank { "-" }, formatLogTime(proposal.createdAtEpochMillis),
-        ),
-        well = {
+        ) + (proposal.evidence.takeIf { it.isNotBlank() }?.let { "\nEvidence: $it" } ?: "") + (proposal.note?.let { "\n$it" } ?: ""),
+        well = if (proposal.status != ProposalStatus.Proposed && !(proposal.status == ProposalStatus.Adopted && proposal.appliedBefore != null)) null else {
+            {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 when (proposal.status) {
                     ProposalStatus.Proposed -> {
-                        AzphaltPill(stringResource(Res.string.improvement_adopt), "improvement-adopt-${proposal.id}", tone = PillTone.Primary, onClick = onAdopt)
+                        if (proposal.kind == ImprovementKind.HabitTask) {
+                            hives.forEach { hive ->
+                                AzphaltPill(
+                                    stringResource(Res.string.improvement_add_to_hive, hive.name), "improvement-habit-${proposal.id}-${hive.id.value}",
+                                    tone = PillTone.Primary, onClick = { onAddToHive(hive) },
+                                )
+                            }
+                        } else {
+                            AzphaltPill(stringResource(Res.string.improvement_adopt), "improvement-adopt-${proposal.id}", tone = PillTone.Primary, onClick = onAdopt)
+                        }
                         AzphaltPill(stringResource(Res.string.improvement_dismiss), "improvement-dismiss-${proposal.id}", onClick = onDismiss)
                     }
                     ProposalStatus.Adopted -> if (proposal.appliedBefore != null) {
@@ -244,6 +353,7 @@ private fun ProposalCard(proposal: ImprovementProposal, onAdopt: () -> Unit, onD
                     }
                     else -> Unit
                 }
+            }
             }
         },
     )

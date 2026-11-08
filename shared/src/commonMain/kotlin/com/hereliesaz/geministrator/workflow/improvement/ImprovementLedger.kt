@@ -13,6 +13,8 @@ enum class ImprovementKind(val label: String) {
     Schedule("schedule"),
     LoopDefinition("loop-definition"),
     EvidenceRule("evidence-rule"),
+    /** A habit the swarm formed, offered as a governed step in a hive (from the habits layer). */
+    HabitTask("habit-task"),
     Other("other"),
     ;
 
@@ -22,7 +24,20 @@ enum class ImprovementKind(val label: String) {
 }
 
 @Serializable
-enum class ProposalStatus { Proposed, Adopted, Dismissed, Reverted }
+enum class ProposalStatus { Proposed, Adopted, Dismissed, Reverted, Superseded }
+
+/** Which mechanism noticed it. All of them end up in the one ledger and are decided in the one place. */
+@Serializable
+enum class ImprovementSource {
+    /** The self-improvement cycle (a model, challenged twice). */
+    Loop,
+
+    /** Deterministic heuristics over run history: repeated failures, fixes, the keeper's corrections. */
+    RoleHistory,
+
+    /** The habits layer: an operation the swarm did often enough to be a habit. */
+    Habit,
+}
 
 /**
  * One thing the loop proposes. It is only a record: nothing in it changes a role, a hive or a schedule
@@ -47,6 +62,11 @@ data class ImprovementProposal(
     val appliedBefore: String? = null,
     val appliedAfter: String? = null,
     val note: String? = null,
+    val source: ImprovementSource = ImprovementSource.Loop,
+    /** The id in the mechanism that made it (a role-instruction proposal id, a memory bank), to decide it there too. */
+    val sourceRef: String? = null,
+    /** The evidence the mechanism gave, bounded and quoted. */
+    val evidence: String = "",
 )
 
 /** What one finished cycle left: how many proposals, and whether it examined the loop (the clause). */
@@ -146,6 +166,9 @@ interface ImprovementStore {
     suspend fun ingest(cycle: CycleRecord, proposals: List<ImprovementProposal>): Boolean
 
     suspend fun decide(id: String, update: (ImprovementProposal) -> ImprovementProposal)
+
+    /** Replaces the state with [update] of it, under the store's lock. For mirroring the other mechanisms. */
+    suspend fun merge(update: (ImprovementState) -> ImprovementState)
 }
 
 class SettingsImprovementStore(
@@ -167,6 +190,12 @@ class SettingsImprovementStore(
     override suspend fun decide(id: String, update: (ImprovementProposal) -> ImprovementProposal) = mutex.withLock {
         val now = read()
         write(now.copy(proposals = now.proposals.map { if (it.id == id) update(it) else it }))
+    }
+
+    override suspend fun merge(update: (ImprovementState) -> ImprovementState) = mutex.withLock {
+        val now = read()
+        val next = update(now)
+        if (next != now) write(next.copy(proposals = next.proposals.takeLast(500)))
     }
 
     private fun read(): ImprovementState = settings.getStringOrNull(key)
@@ -193,6 +222,7 @@ class InMemoryImprovementStore : ImprovementStore {
     override suspend fun decide(id: String, update: (ImprovementProposal) -> ImprovementProposal) {
         state = state.copy(proposals = state.proposals.map { if (it.id == id) update(it) else it })
     }
+    override suspend fun merge(update: (ImprovementState) -> ImprovementState) { state = update(state) }
 }
 
 /** Reads a finished cycle into a record and proposals, ready for [ImprovementStore.ingest]. */

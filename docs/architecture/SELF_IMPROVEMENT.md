@@ -23,7 +23,19 @@ None of it ran. Nothing started a Hall Monitor review, nothing gave it data (it 
 
 The evidence is put in the run's objective at start (`SwarmEvidence`, deterministic, computed from the run history on the device): per role, workflow and provider, the runs, steps, completions, failures, escalations, retries, tokens, cost, and the change since the last window, plus what was adopted since the last cycle and what it did to the numbers, plus a section **"The loop, as it is now"**: the loop's own steps and the Hall Monitor's instructions, so the loop always sees itself.
 
-## 3. Proposals, and who decides
+## 3. One ledger for every mechanism that proposes
+
+Three things notice what could be better, and they share one ledger and one screen (`ImprovementLedger`, Keeper's room › Improvement). Each keeps making its own proposals; each is mirrored in (`ProposalMirrors`), labelled with its `ImprovementSource`, and decided in the same place:
+
+| Source | Notices | Proposes | Adoption |
+|---|---|---|---|
+| **The loop** | A model reading the swarm's evidence, and the loop itself | Any kind (role instruction, hive step, schedule, evidence, loop definition) | Role instruction and hive-step objective applied by the app; other kinds noted |
+| **Run history** | Deterministic heuristics: the same failure twice, a fix after failures, the keeper's repeated corrections | Lines added to a role's instructions (`RoleInstructionProposalLedger`) | The mechanism's own `approve`, which refuses a role that changed since the draft |
+| **Habits** | An operation done often enough to be a habit | A step for a hive (`HabitInvocation`) | You choose the hive; it is added behind its own approval step |
+
+A decision made on a creature's Mind tab is followed here, and one made here is made there, so the two never disagree. The loop **reads the other two as evidence**: the evidence lists, per mechanism, what is waiting, adopted, dismissed and reverted, and what you dismissed recently, so it does not propose again what you already turned down. Adopted run-history proposals get the same before-and-after fail rate as the loop's own. The substrate (evidence, ledger, mirrors, applier) is code and deliberately thin; every judgment is data the loop may propose to change.
+
+## 3a. Proposals, and who decides
 
 The last step's text holds proposal lines (`IMPROVEMENT | kind | target | summary | new text | expected effect, measurable | how to undo`). The app parses them into a ledger (`ImprovementLedger`), nothing else. **A proposal changes nothing.** It reaches a role, a hive or a schedule only when the keeper approves that exact change in **Keeper's room › Improvement** (invariants 4 and 8 hold: no agent, no scheduled run and no remote interface adopts a proposal). Agent text is untrusted (invariant 3 and the role-instruction rule): it is bounded, quoted, shown with its evidence, and applied as text only.
 

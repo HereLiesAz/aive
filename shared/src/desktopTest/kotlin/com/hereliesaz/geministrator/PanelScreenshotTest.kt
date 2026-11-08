@@ -239,9 +239,31 @@ class PanelScreenshotTest {
             """.trimIndent()
             val (cycle, proposals) = com.hereliesaz.geministrator.workflow.improvement.readCycle("run-cycle-1", text, now)
             store.ingest(cycle, proposals)
+            store.merge { st ->
+                val role = com.hereliesaz.geministrator.memory.procedural.RoleInstructionProposal(
+                    id = "rip-1", roleId = BuiltInRoles.QaEngineer.id, baseInstructions = "Verify carefully.",
+                    proposedInstructions = "Verify carefully.\n\nLearned from past work:\n- When a check fails, quote the failing command.",
+                    changes = listOf(
+                        com.hereliesaz.geministrator.memory.procedural.RoleInstructionChange(
+                            "- When a check fails, quote the failing command.",
+                            com.hereliesaz.geministrator.memory.procedural.RoleInstructionEvidenceKind.RepeatedFailure, emptyList(),
+                        ),
+                    ),
+                    createdAtEpochMillis = now,
+                )
+                val withRole = com.hereliesaz.geministrator.workflow.improvement.ProposalMirrors.roleHistory(
+                    st, com.hereliesaz.geministrator.memory.procedural.RoleInstructionProposalState(proposals = listOf(role)), now,
+                )
+                val habit = com.hereliesaz.geministrator.memory.procedural.FormedHabit(
+                    executorKind = "GitHubAction", operation = "github-action:ci.yml", uses = 5, completedUses = 4, failedUses = 1,
+                    verifiedUses = 0, rejectedUses = 0, slots = emptyList(), firstUsedAtEpochMillis = 1L, lastUsedAtEpochMillis = 2L,
+                    strength = com.hereliesaz.geministrator.memory.procedural.HabitStrength.Low,
+                )
+                com.hereliesaz.geministrator.workflow.improvement.ProposalMirrors.habits(withRole, listOf("bank" to habit), now)
+            }
             store.decide(proposals[2].id) { it.copy(status = com.hereliesaz.geministrator.workflow.improvement.ProposalStatus.Adopted, decidedAtEpochMillis = now, note = "by hand") }
         }
-        shoot("55-improvement", 780, 1500) {
+        shoot("55-improvement", 780, 2600) {
             androidx.compose.runtime.CompositionLocalProvider(LocalImprovementStore provides store) {
                 ImprovementPart(onSaveRoleInstructions = { _, _ -> })
             }

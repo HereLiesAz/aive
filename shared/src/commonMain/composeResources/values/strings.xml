@@ -551,6 +551,14 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="improvement_revert_conflict">It cannot be reverted: it was edited after it was adopted (or is no longer here). Put it back by hand.</string>
     <string name="improvement_manual_noted">Noted. The app does not apply this kind by itself; do it by hand.</string>
     <string name="improvement_cannot">It cannot be applied as written: %1$s</string>
+    <string name="improvement_source_loop">from the loop</string>
+    <string name="improvement_source_role">from run history</string>
+    <string name="improvement_source_habit">from a habit</string>
+    <string name="improvement_status_superseded">Superseded</string>
+    <string name="improvement_add_to_hive">Add to %1$s</string>
+    <string name="improvement_habit_added">Added to %1$s, behind its own approval step.</string>
+    <string name="improvement_habit_no_memory">The habits layer is not available, so this cannot be added to a hive.</string>
+    <string name="improvement_stale">The role changed since this was drafted, so it was set aside. A new one will be drafted from the evidence.</string>
     <string name="improvement_status_proposed">Proposed</string>
     <string name="improvement_status_adopted">Adopted</string>
     <string name="improvement_status_dismissed">Dismissed</string>
