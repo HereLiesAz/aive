@@ -12,6 +12,8 @@ import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.VerificationPolicy
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.effectiveExecutor
+import com.hereliesaz.geministrator.workflow.refinement.LadderArtifactContract
+import com.hereliesaz.geministrator.workflow.refinement.RefinementLadderIds
 
 /**
  * Materializes a refinement ladder into the ordinary workflow DAG:
@@ -64,15 +66,19 @@ object RefinementLadderExpander {
                 }
                 val verifierRole = task.skeletonVerifierRole(activeRoles, rolesById, LABEL)
 
-                fun reserve(suffix: String, what: String): TaskDefinitionId =
-                    TaskDefinitionId("${task.id.value}--rl-$suffix").also { id ->
-                        require(reservedIds.add(id)) { "Cannot inject $LABEL $what because ${id.value} already exists" }
+                fun reserve(id: String, what: String): TaskDefinitionId =
+                    TaskDefinitionId(id).also {
+                        require(reservedIds.add(it)) { "Cannot inject $LABEL $what because ${it.value} already exists" }
                     }
 
                 val total = policy.levels.size
-                val levelIds = policy.levels.indices.map { reserve("level-${it + 1}", "level ${it + 1}") }
-                val gateIds = policy.levels.indices.map { reserve("gate-${it + 1}", "gate ${it + 1}") }
-                val verifierId = reserve("verifier", "verifier")
+                val levelIds = policy.levels.indices.map {
+                    reserve(RefinementLadderIds.level(task.id.value, it + 1), "level ${it + 1}")
+                }
+                val gateIds = policy.levels.indices.map {
+                    reserve(RefinementLadderIds.gate(task.id.value, it + 1), "gate ${it + 1}")
+                }
+                val verifierId = reserve(RefinementLadderIds.verifier(task.id.value), "verifier")
                 verifierByOriginal[task.id] = verifierId
 
                 policy.levels.forEachIndexed { index, level ->
@@ -91,7 +97,12 @@ object RefinementLadderExpander {
                                 if (index < total - 1) {
                                     append("Leave finer levels undecided; make the next level's work narrower. ")
                                 }
-                                append("Produce a bounded TaskPlan artifact stating assumptions and unresolved uncertainty. Stay within the original authority. Do not mutate the repository or claim verification.")
+                                if (level.structured) {
+                                    append(LadderArtifactContract.instruction(index + 1, total))
+                                } else {
+                                    append("Produce a bounded TaskPlan artifact stating assumptions and unresolved uncertainty. ")
+                                }
+                                append("Stay within the original authority. Do not mutate the repository or claim verification.")
                             },
                             roleId = levelRoles[index].id,
                             dependsOn = task.dependsOn + earlier,
@@ -115,7 +126,12 @@ object RefinementLadderExpander {
                             objective = buildString {
                                 append("Review refinement level ${index + 1} of $total for this objective: ")
                                 append(task.objective)
-                                append(". Approve only if the level decides what it was asked to (${level.focus}), is consistent with every coarser approved level, and leaves the finer work narrower rather than wider. Reject otherwise so no finer level is spent on it. Do not decide the finer levels or mutate the repository.")
+                                append(". Approve only if the level decides what it was asked to (${level.focus}), is consistent with every coarser approved level, and leaves the finer work narrower rather than wider. Reject otherwise so no finer level is spent on it. ")
+                                if (level.structured) {
+                                    append("The level must be a valid aive.ladder.level.v1 document that covers every decision of the coarser level. ")
+                                }
+                                append(ArtifactVerdicts.INSTRUCTION)
+                                append(" Do not decide the finer levels or mutate the repository.")
                             },
                             roleId = gateReviewer.id,
                             dependsOn = task.dependsOn + earlier + levelIds[index],
