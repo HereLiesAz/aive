@@ -28,18 +28,7 @@ object ProcedureTraceRedactor {
             TaskRunStatus.Failed -> ProcedureTraceOutcome.Failed
             else -> error("Unsupported task-executor status")
         }
-        val kind = when (val executor = context.executor) {
-            is TaskExecutor.Script -> "Script-${executor.language.name}"
-            is TaskExecutor.TestRunner -> "TestRunner"
-            is TaskExecutor.GitHubAction -> "GitHubAction"
-            is TaskExecutor.Deployment -> "Deployment"
-            is TaskExecutor.RepositoryOperation -> "RepositoryOperation"
-            is TaskExecutor.ExternalService -> "ExternalService"
-            is TaskExecutor.NestedWorkflow -> "NestedWorkflow"
-            is TaskExecutor.Distributed -> "Distributed"
-            is TaskExecutor.RoleAgent -> "RoleAgent"
-            is TaskExecutor.HumanApproval -> "HumanApproval"
-        }
+        val kind = kindOf(context.executor)
         return ProcedureTrace(
             workflowId = context.run.id.value,
             projectId = context.project.id.value,
@@ -55,6 +44,20 @@ object ProcedureTraceRedactor {
             operation = operationOf(context.executor),
             slots = slotsOf(context.executor),
         )
+    }
+
+    /** The executor's kind as a receipt names it. */
+    fun kindOf(executor: TaskExecutor): String = when (executor) {
+        is TaskExecutor.Script -> "Script-${executor.language.name}"
+        is TaskExecutor.TestRunner -> "TestRunner"
+        is TaskExecutor.GitHubAction -> "GitHubAction"
+        is TaskExecutor.Deployment -> "Deployment"
+        is TaskExecutor.RepositoryOperation -> "RepositoryOperation"
+        is TaskExecutor.ExternalService -> "ExternalService"
+        is TaskExecutor.NestedWorkflow -> "NestedWorkflow"
+        is TaskExecutor.Distributed -> "Distributed"
+        is TaskExecutor.RoleAgent -> "RoleAgent"
+        is TaskExecutor.HumanApproval -> "HumanApproval"
     }
 
     /**

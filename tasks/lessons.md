@@ -14,3 +14,7 @@ I fixed review findings, pushed, and resolved the threads without writing on the
 - For every review thread I act on: reply on that thread first (the verdict, the commit, how it was checked, and what was not checked), then resolve it. Resolving alone is not an answer.
 - A summary comment on the PR does not replace the replies.
 - Do this in the same pass as the fix, not as a later cleanup.
+
+## Keep moving
+
+When a piece of work is done, start the next one without asking. A decision I would have asked about gets a sensible default, written into the design note as an open decision, and is fixed later if the keeper disagrees. Stopping to ask whether to continue costs more than a default that turns out wrong.

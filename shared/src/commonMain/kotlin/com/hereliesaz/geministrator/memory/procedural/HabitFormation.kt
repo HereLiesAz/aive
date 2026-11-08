@@ -42,6 +42,23 @@ data class HabitSlot(
 )
 
 /**
+ * The flags written about a habit, counted by who wrote them, with the newest quoted. These are
+ * counts and quotes, not a score: nothing divides them or ranks a habit by them.
+ */
+data class HabitFlags(
+    val used: Int = 0,
+    val handled: Int = 0,
+    val keeper: Int = 0,
+    val newest: List<ProcedureTraceFlag> = emptyList(),
+) {
+    val total: Int get() = used + handled + keeper
+
+    companion object {
+        const val NEWEST = 3
+    }
+}
+
+/**
  * What repeated runs of one named operation add up to. The frame is the executor and the
  * operation; the slots are the fillers that varied. Nothing here judges: the counts are facts, and
  * strength says only how often the habit has been used.
@@ -60,13 +77,23 @@ data class FormedHabit(
     val firstUsedAtEpochMillis: Long,
     val lastUsedAtEpochMillis: Long,
     val strength: HabitStrength,
+    /** Of the newest [recentUses] uses (at most [HabitFormation.RECENT]), how many failed. */
+    val recentUses: Int = 0,
+    val recentFailedUses: Int = 0,
+    val flags: HabitFlags = HabitFlags(),
 ) {
     val offered: Boolean get() = strength != HabitStrength.Forming
+
+    /** Uses no reviewing task has approved or turned back. */
+    val unreviewedUses: Int get() = uses - verifiedUses - rejectedUses
 }
 
 object HabitFormation {
     const val MAX_HABITS = 64
     const val MAX_VALUES_PER_SLOT = 8
+
+    /** How many of the newest uses make up a habit's recent outcomes. */
+    const val RECENT = 3
 
     private data class UseKey(val workflowId: String, val taskRunId: String, val attempt: Int)
 
@@ -85,14 +112,29 @@ object HabitFormation {
      * Receipts with no named operation cannot form a habit: there is no frame to repeat.
      */
     fun form(traces: List<ProcedureTrace>, settings: HabitSettings = HabitSettings()): List<FormedHabit> {
-        val uses = traces
-            .filter { it.operation != null }
+        val named = traces.filter { it.operation != null }
+        val uses = named
+            .filter { it.phase != ProcedureTracePhase.Flag }
             .groupBy { UseKey(it.workflowId, it.taskRunId, it.attempt) }
             .values
             .mapNotNull(::useOf)
+        val flagsByOperation = named
+            .filter { it.phase == ProcedureTracePhase.Flag }
+            .distinctBy { it.receiptKey }
+            .groupBy { it.operation }
 
-        return uses.groupBy { it.executorKind to it.operation }
-            .map { (frame, group) -> habitOf(frame.first, frame.second, group, settings) }
+        // The frame is the named operation: a placement choice (a Distributed executor) is not a
+        // different thing being done.
+        return uses.groupBy { it.operation }
+            .map { (operation, group) ->
+                habitOf(
+                    executorKind = group.minBy { it.atEpochMillis }.executorKind,
+                    operation = operation,
+                    uses = group,
+                    settings = settings,
+                    flags = flagsOf(flagsByOperation[operation].orEmpty()),
+                )
+            }
             .sortedWith(compareByDescending<FormedHabit> { it.uses }.thenBy { it.operation })
             .take(MAX_HABITS)
     }
@@ -123,13 +165,25 @@ object HabitFormation {
         )
     }
 
+    private fun flagsOf(receipts: List<ProcedureTrace>): HabitFlags {
+        val flags = receipts.mapNotNull { trace -> trace.flag?.let { trace.recordedAtEpochMillis to it } }
+        return HabitFlags(
+            used = flags.count { it.second.source == ProcedureFlagSource.Used },
+            handled = flags.count { it.second.source == ProcedureFlagSource.Handled },
+            keeper = flags.count { it.second.source == ProcedureFlagSource.Keeper },
+            newest = flags.sortedByDescending { it.first }.take(HabitFlags.NEWEST).map { it.second },
+        )
+    }
+
     private fun habitOf(
         executorKind: String,
         operation: String,
         uses: List<Use>,
         settings: HabitSettings,
+        flags: HabitFlags,
     ): FormedHabit {
         val failedUses = uses.count { it.failed }
+        val recent = uses.sortedByDescending { it.atEpochMillis }.take(RECENT)
         return FormedHabit(
             executorKind = executorKind,
             operation = operation,
@@ -142,6 +196,9 @@ object HabitFormation {
             firstUsedAtEpochMillis = uses.minOf { it.atEpochMillis },
             lastUsedAtEpochMillis = uses.maxOf { it.atEpochMillis },
             strength = if (uses.size >= settings.offerAtUses) HabitStrength.Low else HabitStrength.Forming,
+            recentUses = recent.size,
+            recentFailedUses = recent.count { it.failed },
+            flags = flags,
         )
     }
 

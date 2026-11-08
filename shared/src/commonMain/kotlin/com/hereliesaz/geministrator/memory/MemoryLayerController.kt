@@ -748,6 +748,60 @@ class MemoryLayerController(
         )
     }
 
+    /**
+     * The keeper's own flag on a habit (docs/architecture/HABITS_AS_MEMORY.md, 5.4). It needs no
+     * window and no clerk: it is recorded as the keeper wrote it, bounded and scrubbed, as a flag
+     * receipt beside the habit's others. Returns false when capture is off, the operation is not a
+     * plain operation name, or the text is empty.
+     */
+    suspend fun flagHabit(workflowId: String, operation: String, text: String): Boolean {
+        if (!active || !settings.value.proceduralTraceCaptureEnabled) return false
+        if (!operation.matches(com.hereliesaz.geministrator.memory.procedural.ProcedureTrace.OPERATION)) return false
+        val quote = com.hereliesaz.geministrator.control.ControlRedaction.scrub(text.trim())
+            .take(com.hereliesaz.geministrator.memory.procedural.ProcedureTraceFlag.MAX_TEXT)
+        if (quote.isBlank()) return false
+        val project = lineage.projectOf(workflowId) ?: return false
+        procedureTraceSink.record(
+            com.hereliesaz.geministrator.memory.procedural.ProcedureTrace(
+                workflowId = workflowId,
+                projectId = project,
+                taskRunId = "keeper",
+                taskDefinitionId = "keeper-flag",
+                attempt = 0,
+                phase = com.hereliesaz.geministrator.memory.procedural.ProcedureTracePhase.Flag,
+                executorKind = "Keeper",
+                outcome = com.hereliesaz.geministrator.memory.procedural.ProcedureTraceOutcome.Running,
+                recordedAtEpochMillis = nowEpochMillis(),
+                operation = operation,
+                flag = com.hereliesaz.geministrator.memory.procedural.ProcedureTraceFlag(
+                    source = com.hereliesaz.geministrator.memory.procedural.ProcedureFlagSource.Keeper,
+                    author = "keeper",
+                    text = quote,
+                ),
+            ),
+        )
+        return true
+    }
+
+    /**
+     * The text of a "Habits" prompt block for a task that states [objective], or null. Only habits
+     * already offered (three uses) whose operation the objective names appear, at most a few, as
+     * counts and facts. Null while memory or procedural capture is off, or on any read failure.
+     */
+    suspend fun habitOfferText(workflowId: String, objective: String): String? {
+        val habits = try {
+            formedHabits(workflowId)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            return null
+        }
+        return com.hereliesaz.geministrator.memory.procedural.HabitOffers.render(
+            com.hereliesaz.geministrator.memory.procedural.HabitOffers.select(habits, objective),
+            nowEpochMillis(),
+        )
+    }
+
     val promptContextProvider: MemoryPromptContextProvider = object : MemoryPromptContextProvider {
         override suspend fun recallFor(request: AgentTaskRequest, queryPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan): MemoryPromptRecall =
             recallForPrompt(request, queryPlan)
@@ -949,6 +1003,9 @@ class MemoryLayerController(
             if (pending.isNotEmpty()) {
                 add(PromptContextBlock("Recalled on request", pending.joinToString("\n\n") { it.removePrefix(MEMORY_MESSAGE_MARKER).trim() }.take(MAX_RECALL_CHARS)))
             }
+            // Habits already formed from earlier runs that this task names: counts and facts, offer only.
+            runCatching { habitOfferText(memoryWorkflowOf(request), request.objective) }.getOrNull()
+                ?.let { add(PromptContextBlock("Habits", it)) }
             if (relevant.isNotEmpty()) {
                 add(
                     PromptContextBlock(

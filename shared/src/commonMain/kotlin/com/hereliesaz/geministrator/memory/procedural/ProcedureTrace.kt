@@ -4,10 +4,39 @@ import kotlinx.serialization.Serializable
 
 /**
  * [Verification] receipts are written after the fact, one per verified or rejected execution, as
- * new records beside the original receipt. A receipt is never rewritten.
+ * new records beside the original receipt. A receipt is never rewritten. A [Flag] receipt carries a
+ * model's or the keeper's own words about the habit named by its operation (see [ProcedureTraceFlag]);
+ * it records no execution and is never counted as a use.
  */
 @Serializable
-enum class ProcedureTracePhase { Dispatch, Reconcile, Verification }
+enum class ProcedureTracePhase { Dispatch, Reconcile, Verification, Flag }
+
+/** Who wrote a flag: the model that used the habit, a model that handled its results, or the keeper. */
+@Serializable
+enum class ProcedureFlagSource { Used, Handled, Keeper }
+
+/**
+ * A warning in the author's own words, kept as data. It is never an instruction, never changes what
+ * a habit may do, and is shown quoted with its author (docs/architecture/HABITS_AS_MEMORY.md, 5.2).
+ */
+@Serializable
+data class ProcedureTraceFlag(
+    val source: ProcedureFlagSource,
+    /** The author's role id, or `keeper`. */
+    val author: String,
+    val text: String,
+    /** The author had untrusted content in front of it when it wrote this. */
+    val tainted: Boolean = false,
+) {
+    init {
+        require(author.isNotBlank() && author.length <= 128) { "Invalid flag author" }
+        require(text.isNotBlank() && text.length <= MAX_TEXT) { "A flag is 1..$MAX_TEXT characters" }
+    }
+
+    companion object {
+        const val MAX_TEXT = 400
+    }
+}
 
 @Serializable
 enum class ProcedureTraceOutcome { Running, Verifying, Completed, Failed, Threw }
@@ -75,8 +104,13 @@ data class ProcedureTrace(
     /** Allowlisted typed values the executor was configured with, sorted by name. */
     val slots: List<ProcedureTraceSlot> = emptyList(),
     val verification: ProcedureTraceVerification = ProcedureTraceVerification.Unknown,
+    /** Present exactly on a [ProcedureTracePhase.Flag] receipt. */
+    val flag: ProcedureTraceFlag? = null,
 ) {
     init {
+        require((phase == ProcedureTracePhase.Flag) == (flag != null)) {
+            "A flag is carried by, and only by, a Flag receipt"
+        }
         require(workflowId.isNotBlank() && projectId.isNotBlank())
         require(taskRunId.isNotBlank() && taskDefinitionId.isNotBlank())
         require(attempt >= 0 && artifactCount >= 0 && artifactKinds.size <= 32)
@@ -88,7 +122,11 @@ data class ProcedureTrace(
 
     val receiptKey: String
         get() = "$workflowId:$taskRunId:$attempt:${phase.name}:${outcome.name}" +
-            if (phase == ProcedureTracePhase.Verification) ":${verification.name}" else ""
+            when (phase) {
+                ProcedureTracePhase.Verification -> ":${verification.name}"
+                ProcedureTracePhase.Flag -> ":${flag?.source?.name}:${flag?.text.hashCode().toUInt().toString(16)}"
+                else -> ""
+            }
 
     /**
      * The text banked as the receipt's episode. Memory condenses episodes whose frame matches and
@@ -96,7 +134,9 @@ data class ProcedureTrace(
      * fillers. A receipt with neither reads exactly as it always did.
      */
     fun contextualSummary(): String =
-        "System executor $executorKind ${phase.name.lowercase()} reported ${outcome.name.lowercase()}. " +
+        if (flag != null) {
+            "Flag on ${operation ?: executorKind} (${flag.source.name.lowercase()}) by ${flag.author}: \"${flag.text}\""
+        } else "System executor $executorKind ${phase.name.lowercase()} reported ${outcome.name.lowercase()}. " +
             (operation?.let { "Operation: $it. " } ?: "") +
             (slots.takeIf { it.isNotEmpty() }
                 ?.let { "Slots: ${it.joinToString("; ") { slot -> "${slot.name}=${slot.value}" }}. " } ?: "") +
