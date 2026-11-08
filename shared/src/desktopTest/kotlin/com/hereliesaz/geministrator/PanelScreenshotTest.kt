@@ -226,5 +226,26 @@ class PanelScreenshotTest {
             androidx.compose.runtime.CompositionLocalProvider(LocalWorkflowScheduleStore provides store) { SchedulesPart(compact = true) }
         }
     }
+
+    @Test
+    fun improvementPanel() {
+        val store = com.hereliesaz.geministrator.workflow.improvement.InMemoryImprovementStore()
+        val now = 20_765L * 86_400_000L
+        runBlocking {
+            val text = """
+                IMPROVEMENT | role-instruction | qa-engineer | Quote the failing command | Always quote the exact command that failed. | Fewer retries for qa-engineer; measure retried steps over the next seven days | Revert removes the added line
+                IMPROVEMENT | loop-definition | suite-self-improvement/examine-loop | Start the loop's self-examination from retried steps | Begin from the steps with attempt above one, then the rest. | The loop's findings cite retry counts; measure the share that do | Revert restores the old objective
+                IMPROVEMENT | schedule | schedule-suite-self-improvement | Run the cycle twice a week | - | More cycles inside the same weeks; measure cycles per month | Set it back to weekly
+            """.trimIndent()
+            val (cycle, proposals) = com.hereliesaz.geministrator.workflow.improvement.readCycle("run-cycle-1", text, now)
+            store.ingest(cycle, proposals)
+            store.decide(proposals[2].id) { it.copy(status = com.hereliesaz.geministrator.workflow.improvement.ProposalStatus.Adopted, decidedAtEpochMillis = now, note = "by hand") }
+        }
+        shoot("55-improvement", 780, 1500) {
+            androidx.compose.runtime.CompositionLocalProvider(LocalImprovementStore provides store) {
+                ImprovementPart(onSaveRoleInstructions = { _, _ -> })
+            }
+        }
+    }
 }
 

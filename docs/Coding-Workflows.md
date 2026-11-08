@@ -1,6 +1,6 @@
 # The coding suite
 
-Seventeen hives for working on code, shipped as plain definitions (`CodingWorkflowSuite`, `workflow/CodingWorkflowSuite.kt`). **Keeper's room › Schedules › Add the coding suite** puts them on the device as hives you authored and can edit; a hive already there is left alone, so your edits survive. They use only the built-in roles, agent steps and a person's approval: no provider, no repository operation, no executor that needs a desktop. They run on whatever you connected.
+Eighteen hives for working on code, shipped as plain definitions (`CodingWorkflowSuite`, `workflow/CodingWorkflowSuite.kt`). **Keeper's room › Schedules › Add the coding suite** puts them on the device as hives you authored and can edit; a hive already there is left alone, so your edits survive. They use only the built-in roles, agent steps and a person's approval: no provider, no repository operation, no executor that needs a desktop. They run on whatever you connected.
 
 Two rules shape all of them:
 
@@ -42,6 +42,9 @@ Each comes with a suggested schedule, off until you turn it on (see [Scheduled w
 | Weekly security scan | Tuesday, 08:00 |
 | Weekly docs drift | Wednesday, 08:00 |
 | Weekly tech-debt report | Friday, 08:00 |
+| Self-improvement cycle | Sunday, 10:00; its objective is followed by the swarm's evidence |
+
+The self-improvement cycle is described in [Self-improvement](architecture/SELF_IMPROVEMENT.md): it examines the swarm from its run history, examines itself, and ends in proposals only you can adopt.
 
 ## Open decisions
 
