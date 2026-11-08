@@ -70,6 +70,35 @@ sealed interface CompoundInferencePolicy {
     }
 
     /**
+     * Authorizes a governed refinement ladder: the task is worked coarse to fine, and every
+     * reasoning level must pass an independent gate before the next, finer level (and finally the
+     * original task) is spent. A coarse plan the gate rejects stops the run before any finer work
+     * is paid for.
+     *
+     * Levels are reasoning-only. The original task stays the final level so its durable identity,
+     * authority, output contract, and downstream dependencies are preserved. One [gateReviewerRoleId]
+     * reviews every level and must be distinct from every level role and the final role.
+     */
+    @Serializable
+    data class RefinementLadder(
+        val levels: List<RefinementLevel>,
+        val gateReviewerRoleId: RoleDefinitionId,
+        val finalRoleId: RoleDefinitionId,
+    ) : CompoundInferencePolicy {
+        init {
+            require(levels.size in 1..MAX_REFINEMENT_LEVELS) {
+                "Refinement ladder requires 1..$MAX_REFINEMENT_LEVELS reasoning levels"
+            }
+            require(levels.none { it.roleId == gateReviewerRoleId }) {
+                "Refinement ladder gate review must use a role distinct from every level role"
+            }
+            require(gateReviewerRoleId != finalRoleId) {
+                "Refinement ladder gate review must be distinct from the final role"
+            }
+        }
+    }
+
+    /**
      * Authorizes bounded automatic selection between Single and centralized MoA.
      *
      * At least one resource ceiling is required. If the runtime lacks enough measured history for
@@ -108,6 +137,25 @@ sealed interface CompoundInferencePolicy {
 
     companion object {
         const val MAX_PROPOSERS: Int = 8
+        const val MAX_REFINEMENT_LEVELS: Int = 4
+    }
+}
+
+/** One reasoning level of a [CompoundInferencePolicy.RefinementLadder], ordered coarse to fine. */
+@Serializable
+data class RefinementLevel(
+    val roleId: RoleDefinitionId,
+    /** What this level decides, e.g. "intent and responsibilities" or "executor and parameter bindings". */
+    val focus: String,
+) {
+    init {
+        require(focus.isNotBlank() && focus.length <= MAX_FOCUS_LENGTH) {
+            "Refinement level focus must be 1..$MAX_FOCUS_LENGTH characters"
+        }
+    }
+
+    companion object {
+        const val MAX_FOCUS_LENGTH: Int = 512
     }
 }
 

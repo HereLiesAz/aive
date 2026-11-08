@@ -14,6 +14,7 @@ enum class CompoundInferenceStrategy {
     Single,
     CentralizedMixtureOfAgents,
     SkeletonOfThought,
+    RefinementLadder,
     ParallelIndependent,
     SequentialPipeline,
     Escalate,

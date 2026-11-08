@@ -48,8 +48,12 @@ class WorkflowDefinitionPreparer(
             withSelectedInferenceTopology,
             activeRoles,
         )
-        val withCompoundInference = SkeletonOfThoughtExpander.expand(
+        val withSkeletonOfThought = SkeletonOfThoughtExpander.expand(
             withCentralizedInference,
+            activeRoles,
+        )
+        val withCompoundInference = RefinementLadderExpander.expand(
+            withSkeletonOfThought,
             activeRoles,
         )
         val originalIds = withCompoundInference.tasks.mapTo(mutableSetOf()) { it.id }

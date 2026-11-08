@@ -235,27 +235,28 @@ object SkeletonOfThoughtExpander {
     }
 }
 
-private fun requireReasoningOnly(role: RoleDefinition, stage: String) {
+internal fun requireReasoningOnly(role: RoleDefinition, stage: String, strategy: String = "Skeleton-of-Thought") {
     val reasonOnly = InProcessPolicyDecisionPoint.decideRole(role, PolicyAction.ReasonOnly)
     require(reasonOnly.code != PolicyCodes.HOLDS_IMPLEMENT_AUTHORITY) {
-        "Skeleton-of-Thought $stage role ${role.name} may not hold implementation authority"
+        "$strategy $stage role ${role.name} may not hold implementation authority"
     }
     require(reasonOnly.code != PolicyCodes.REQUIRES_REPOSITORY_WRITE) {
-        "Skeleton-of-Thought $stage role ${role.name} may not require repository-write capability"
+        "$strategy $stage role ${role.name} may not require repository-write capability"
     }
 }
 
-private fun TaskDefinition.skeletonVerifierRole(
+internal fun TaskDefinition.skeletonVerifierRole(
     activeRoles: Collection<RoleDefinition>,
     rolesById: Map<RoleDefinitionId, RoleDefinition>,
+    strategy: String = "Skeleton-of-Thought",
 ): RoleDefinition {
     val explicitVerifier = (verificationPolicy as? VerificationPolicy.Required)?.verifierRoleId
     if (explicitVerifier != null) {
         val role = requireNotNull(rolesById[explicitVerifier]) {
-            "Skeleton-of-Thought verifier role ${explicitVerifier.value} is not registered and enabled"
+            "$strategy verifier role ${explicitVerifier.value} is not registered and enabled"
         }
         require(InProcessPolicyDecisionPoint.decideRole(role, PolicyAction.ExerciseAuthority(RoleAuthority.Verify)).isAllowed) {
-            "Skeleton-of-Thought verifier ${role.name} does not have Verify authority"
+            "$strategy verifier ${role.name} does not have Verify authority"
         }
         return role
     }
@@ -263,5 +264,5 @@ private fun TaskDefinition.skeletonVerifierRole(
     val eligible = activeRoles.filter { RoleAuthority.Verify in it.authorities }
     return eligible.firstOrNull { it.id == BuiltInRoles.QaEngineer.id }
         ?: eligible.firstOrNull()
-        ?: error("Skeleton-of-Thought requires an enabled role with Verify authority")
+        ?: error("$strategy requires an enabled role with Verify authority")
 }

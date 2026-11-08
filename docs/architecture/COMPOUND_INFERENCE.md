@@ -62,11 +62,12 @@ The default provider invocation remains `Single`. The contract also defines stra
 
 - `CentralizedMixtureOfAgents`
 - `SkeletonOfThought`
+- `RefinementLadder`
 - `ParallelIndependent`
 - `SequentialPipeline`
 - `Escalate`
 
-At the workflow-authoring layer, `TaskDefinition.compoundInferencePolicy` can authorize ordinary single execution, explicit centralized MoA materialization, explicit Skeleton-of-Thought materialization, or bounded resource-aware selection. `CompoundInferencePolicy.ResourceAware` never grants additional role authority. It authorizes a specific proposer set plus aggregator and requires at least one measurable resource ceiling. The resolver may select only an implemented safe topology: `Single` or centralized MoA.
+At the workflow-authoring layer, `TaskDefinition.compoundInferencePolicy` can authorize ordinary single execution, explicit centralized MoA materialization, explicit Skeleton-of-Thought materialization, explicit refinement-ladder materialization, or bounded resource-aware selection. `CompoundInferencePolicy.ResourceAware` never grants additional role authority. It authorizes a specific proposer set plus aggregator and requires at least one measurable resource ceiling. The resolver may select only an implemented safe topology: `Single` or centralized MoA.
 
 Resource-aware selection is deliberately conservative. It considers task complexity, provider availability, and persisted provider cost/latency history. Missing history, unavailable participants, insufficient task complexity, or a projected budget overrun falls back to `Single`. Centralized-MoA latency is estimated as the slowest parallel proposer plus aggregator plus verifier.
 
@@ -324,6 +325,29 @@ The skeleton, independence-review, and expansion roles are reasoning-only: they 
 
 The strategy therefore reuses normal workflow concurrency, persistence, retries, escalation, provider selection, artifact ancestry, stream telemetry, and verification instead of creating a second scheduler.
 
+## Refinement ladder
+
+The refinement ladder generalizes Skeleton-of-Thought from one skeleton level to N gated levels, worked coarse to fine:
+
+```text
+objective
+   -> level 1 (coarsest) -> gate 1
+   -> level 2            -> gate 2
+   -> ...
+   -> original task (finest) -> verification
+```
+
+`CompoundInferencePolicy.RefinementLadder` names the ordered reasoning levels (each a role and a `focus`: what that level alone decides, such as "intent and responsibilities", then "decomposition and acceptance criteria", then "executor and parameter bindings"), one gate reviewer, and the final role. `RefinementLadderExpander` materializes the ladder into ordinary durable tasks before execution, after the Skeleton-of-Thought pass.
+
+- **Gate before spend.** Every level is followed by an independent gate. A level and everything finer waits on the gates of the levels above it, so a coarse plan the gate rejects stops the run before any finer level is paid for. The cost is the extra level and gate tasks; whether that pays is measured per workflow, not assumed.
+- **Coarse artifacts reach finer levels.** Each level and the original task depend on every coarser level and gate, so approved artifacts carry down. A level is told not to reopen coarser decisions and to leave finer ones undecided.
+- **Authority is unchanged.** Level roles and the gate reviewer are reasoning-only (no implementation authority, no repository-write requirement). The gate reviewer must differ from every level role and from the final role. The original task keeps its identity, authority, output contract and downstream dependencies as the finest level, and an independent verifier follows it, exactly as for Skeleton-of-Thought.
+- **Bounds.** 1 to `MAX_REFINEMENT_LEVELS` (4) levels; a level's focus is 1 to 512 characters.
+- **Memory stays non-epistemic.** The ladder is orchestration. Gates judge plans; memory clerks keep filing and linking what each level produced and never decide which level was right.
+- **Runtime truth.** Levels are tasks in the workflow DAG. No second scheduler or state machine is introduced, and the UI projects levels from the runtime like any other task.
+
+Procedures captured as procedural memory fit the same shape: the coarse levels are a procedure's skeleton, and the finest level supplies its typed parameter bindings.
+
 ## Implementation sequence
 
 1. Compound inference + direct genealogy foundation — implemented.
@@ -336,6 +360,7 @@ The strategy therefore reuses normal workflow concurrency, persistence, retries,
 8. Local orchestration utility family — all nine deterministic utilities are wired into production memory/context preparation, provider/executor routing, and provider handoff/control context. `ApplicationRuntime.create` exposes a single injectable utility-family seam; trained specialist releases still remain.
 9. Ternary/BitNet experiments — deployment-readiness assessment, BITCOS codec, native packaging, and capability-gated artifact support exist; task-equivalent BitNet-vs-Qwen benchmarking, production model-family execution, and optimized kernels remain experimental.
 10. Skeleton-of-Thought governed DAG execution — implemented.
+11. Refinement ladder (N gated reasoning levels before the original task) — implemented as a DAG expansion; per-workflow measurement of gate savings remains.
 
 ## Current implementation status
 
@@ -362,13 +387,16 @@ Implemented and called by production runtime:
 - `CompoundInferencePolicy.CentralizedMixtureOfAgents`
 - `CompoundInferencePolicy.ResourceAware`
 - `CompoundInferencePolicy.SkeletonOfThought`
+- `CompoundInferencePolicy.RefinementLadder`
 - `ResourceAwareCompoundInferencePolicyResolver`
 - `CentralizedMixtureOfAgentsExpander`
 - `SkeletonOfThoughtExpander`
+- `RefinementLadderExpander`
 - `GenealogyGovernanceExecutorIntegration`
 - centralized runtime registration of the genealogy gate
 - explicit proposer → governance → aggregator → verifier DAG execution
 - explicit skeleton → independence review → parallel expansion → aggregator → verifier DAG execution
+- explicit gated level → … → original task → verifier DAG execution (refinement ladder)
 - advisory false-consensus detection without blocking legitimate shared-input synthesis
 - resource-aware selection using persisted cost/latency history with conservative `Single` fallback
 - `LocalModelArtifactDescriptor`, `LocalModelSpecialistDescriptor`, and `LocalModelRuntimeCapabilities`
