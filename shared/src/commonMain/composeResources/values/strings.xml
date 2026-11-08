@@ -903,6 +903,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="memory_habits_alternative_operation">The alternative as an operation, if it has a name (optional)</string>
     <string name="memory_habits_recorded">Recorded.</string>
     <string name="memory_habits_not_recorded">Not recorded: check the words and the operation name.</string>
+    <string name="memory_habits_stats">%1$s habits (%2$s offered), %3$s uses, %4$s failed. Flags: %5$s by models that used one, %6$s by models that handled results, %7$s by you. %8$s with an open contrast and no decision, %9$s with a standing override, %10$s replaced, %11$s sequences.</string>
     <string name="memory_habits_propose">Propose a task</string>
     <string name="memory_habits_proposed">Would be a task, "%1$s": %2$s It is not added to any workflow. When it is, a person approves it before it runs.</string>
     <string name="memory_habits_refused">No task proposed: %1$s</string>

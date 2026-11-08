@@ -91,6 +91,38 @@ object HabitOffers {
             ).joinToString("\n").take(MAX_CHARS)
     }
 
+    /**
+     * What the habits add up to, as counts only, so the keeper can see whether the machinery is doing
+     * anything and where it is not: nothing here ranks or scores a habit.
+     */
+    data class Stats(
+        val habits: Int,
+        val offered: Int,
+        val uses: Int,
+        val failedUses: Int,
+        val flagsUsed: Int,
+        val flagsHandled: Int,
+        val flagsKeeper: Int,
+        val openContrastsUnanswered: Int,
+        val activeOverrides: Int,
+        val superseded: Int,
+        val sequences: Int,
+    )
+
+    fun stats(habits: List<FormedHabit>, sequences: List<FormedSequence> = emptyList()): Stats = Stats(
+        habits = habits.size,
+        offered = habits.count { it.offered },
+        uses = habits.sumOf { it.uses },
+        failedUses = habits.sumOf { it.failedUses },
+        flagsUsed = habits.sumOf { it.flags.used },
+        flagsHandled = habits.sumOf { it.flags.handled },
+        flagsKeeper = habits.sumOf { it.flags.keeper },
+        openContrastsUnanswered = habits.count { it.openContrasts.isNotEmpty() && it.lastDeliberation == null },
+        activeOverrides = habits.count { it.activeOverride != null },
+        superseded = habits.count { it.version > 1 },
+        sequences = sequences.size,
+    )
+
     /** One habit as the facts the offer states, for a screen that lists habits. */
     fun describe(habit: FormedHabit, nowEpochMillis: Long): String = entry(habit, nowEpochMillis)
 

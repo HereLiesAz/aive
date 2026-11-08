@@ -10,6 +10,7 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.isUntrustedContext
 import com.hereliesaz.geministrator.domain.releasedDependencies
+import com.hereliesaz.geministrator.memory.procedural.CautionClerk
 import com.hereliesaz.geministrator.memory.procedural.CautionRecognizer
 import com.hereliesaz.geministrator.memory.procedural.HabitOffers
 import com.hereliesaz.geministrator.memory.procedural.ProcedureFlagSource
@@ -36,6 +37,7 @@ import com.hereliesaz.geministrator.memory.procedural.ProcedureTraceSink
  * its handler.
  */
 class HabitFlagObserver(
+    private val clerk: () -> CautionClerk? = { null },
     private val sink: () -> ProcedureTraceSink,
 ) {
     private val reported = mutableSetOf<String>()
@@ -95,7 +97,24 @@ class HabitFlagObserver(
         source: ProcedureFlagSource,
     ) {
         val operation = ProcedureTraceRedactor.operationOf(executor) ?: return
-        val cautions = CautionRecognizer.recognize(window, HabitOffers.cuesOf(operation))
+        val cues = HabitOffers.cuesOf(operation)
+        var cautions = CautionRecognizer.recognize(window, cues)
+        // The recognizer is conservative on purpose. A clerk, when the app has one, may add to what it
+        // kept by labelling the sentences it set aside; it never rewrites one.
+        if (cautions.isEmpty()) {
+            val labeller = clerk()
+            if (labeller != null) {
+                cautions = CautionRecognizer.candidates(window, cues).filter { sentence ->
+                    try {
+                        labeller.isCaution(sentence, operation)
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        false
+                    }
+                }.take(CautionRecognizer.MAX_SENTENCES)
+            }
+        }
         if (cautions.isEmpty()) return
         val key = "${source.name}:${run.id.value}:${agentRun.id.value}:${agentRun.attempt}:$operation"
         if (!reported.add(key)) return

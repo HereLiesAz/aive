@@ -59,4 +59,28 @@ class HabitEnvironmentTest {
         assertTrue("Environment: acme/web." in with)
         assertFalse("Environment" in without)
     }
+
+    @Test
+    fun theStatsAreCountsOfWhatTheHabitsAddUpTo() {
+        fun ev(run: String, at: Long, operation: String, outcome: ProcedureTraceOutcome = ProcedureTraceOutcome.Completed) = ProcedureTrace(
+            workflowId = run, projectId = "p", taskRunId = "tr-$run-$operation", taskDefinitionId = "t", attempt = 1,
+            phase = ProcedureTracePhase.Reconcile, executorKind = "GitHubAction",
+            outcome = outcome, recordedAtEpochMillis = at, operation = operation,
+        )
+        val a = "github-action:ci.yml"
+        val b = "deployment:production"
+        val habits = HabitFormation.form(
+            // The same configured values (none) completed and failed: an open contrast, no decision.
+            listOf(ev("1", 1, a), ev("2", 2, a), ev("3", 3, a, ProcedureTraceOutcome.Failed), ev("1", 4, b)),
+        )
+        val stats = HabitOffers.stats(habits)
+        assertEquals(2, stats.habits)
+        assertEquals(1, stats.offered)
+        assertEquals(4, stats.uses)
+        assertEquals(1, stats.failedUses)
+        assertEquals(1, stats.openContrastsUnanswered)
+        assertEquals(0, stats.activeOverrides)
+        assertEquals(HabitOffers.Stats(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), HabitOffers.stats(emptyList()))
+    }
 }
+

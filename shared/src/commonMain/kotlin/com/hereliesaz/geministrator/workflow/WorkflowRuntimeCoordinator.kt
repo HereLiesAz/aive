@@ -109,7 +109,7 @@ class WorkflowRuntimeCoordinator(
 
     private val procedureVerifications = ProcedureVerificationObserver { MemoryRuntimeBridge.procedureTraceSink }
     private val habitDecisions = HabitDecisionObserver { MemoryRuntimeBridge.procedureTraceSink }
-    private val habitFlags = HabitFlagObserver { MemoryRuntimeBridge.procedureTraceSink }
+    private val habitFlags = HabitFlagObserver(clerk = { MemoryRuntimeBridge.cautionClerk }, sink = { MemoryRuntimeBridge.procedureTraceSink })
 
     suspend fun resume(workflowRunId: WorkflowRunId): WorkflowRuntimeState {
         val run = requireNotNull(persistence.runs.get(workflowRunId)) {

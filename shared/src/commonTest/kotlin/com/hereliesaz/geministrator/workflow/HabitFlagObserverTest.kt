@@ -18,6 +18,8 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
+import com.hereliesaz.geministrator.memory.procedural.CautionClerk
+import com.hereliesaz.geministrator.memory.procedural.CautionRecognizer
 import com.hereliesaz.geministrator.memory.procedural.HabitFormation
 import com.hereliesaz.geministrator.memory.procedural.ProcedureFlagSource
 import com.hereliesaz.geministrator.memory.procedural.ProcedureTrace
@@ -205,6 +207,34 @@ class HabitFlagObserverTest {
         ).single()
         assertEquals(1, habit.flags.used)
         assertEquals(0, habit.flags.handled)
+    }
+
+    @Test
+    fun aClerkAddsRecallForASentenceTheRecognizerSetAsideAndNeverRewritesIt() {
+        val def = definition(TaskExecutor.GitHubAction("ci.yml"))
+        // No warning cue the recognizer keeps: it is a plain remark about the run.
+        val report = run(def, "The build ran against the old fixtures. Everything else went as planned.")
+        assertTrue(observe(def, report).isEmpty())
+
+        val asked = mutableListOf<String>()
+        val seen = mutableListOf<ProcedureTrace>()
+        runBlocking {
+            HabitFlagObserver(
+                sink = { ProcedureTraceSink { seen += it } },
+                clerk = { CautionClerk { sentence, _ -> asked += sentence; "old fixtures" in sentence } },
+            ).observe(project, def, report)
+        }
+        assertEquals("The build ran against the old fixtures.", seen.single().flag?.text)
+        assertTrue(asked.isNotEmpty())
+
+        // A clerk that fails is as good as none, and a calm outcome is never put to it.
+        val failing = mutableListOf<ProcedureTrace>()
+        runBlocking {
+            HabitFlagObserver(clerk = { CautionClerk { _, _ -> error("down") } }, sink = { ProcedureTraceSink { failing += it } })
+                .observe(project, def, report)
+        }
+        assertTrue(failing.isEmpty())
+        assertTrue(CautionRecognizer.candidates("The build passed with no errors.", listOf("ci")).isEmpty())
     }
 }
 

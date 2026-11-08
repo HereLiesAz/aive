@@ -45,6 +45,7 @@ import com.hereliesaz.geministrator.resources.memory_habits_recorded
 import com.hereliesaz.geministrator.resources.memory_habits_replace
 import com.hereliesaz.geministrator.resources.memory_habits_sequence_line
 import com.hereliesaz.geministrator.resources.memory_habits_sequences
+import com.hereliesaz.geministrator.resources.memory_habits_stats
 import com.hereliesaz.geministrator.resources.memory_habits_stands
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
@@ -91,6 +92,19 @@ internal fun MemoryHabitsSection(controller: MemoryLayerController, settings: Me
 
     if (habits.isEmpty()) {
         Text(stringResource(Res.string.memory_habits_none), style = AzphaltType.body, color = azphaltOnSurface())
+    } else {
+        val stats = HabitOffers.stats(habits, sequences)
+        Text(
+            stringResource(
+                Res.string.memory_habits_stats,
+                stats.habits.toString(), stats.offered.toString(), stats.uses.toString(), stats.failedUses.toString(),
+                stats.flagsUsed.toString(), stats.flagsHandled.toString(), stats.flagsKeeper.toString(),
+                stats.openContrastsUnanswered.toString(), stats.activeOverrides.toString(),
+                stats.superseded.toString(), stats.sequences.toString(),
+            ),
+            style = AzphaltType.body,
+            color = azphaltOnSurface(),
+        )
     }
     habits.forEach { habit ->
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
