@@ -1,7 +1,8 @@
 # Refinement-level training
 
-Status: **begun.** The corpus builder and its tests exist. Training, gating and release do not, and
-they wait on data (see Gates).
+Status: **corpus builder and a per-level trainer exist; release does not.** The trainer was built without
+data and its torch path has not been run (no GPU or ML libraries in the place it was written); the readiness
+check, scoring, baselines and dry run are tested. The first real run is what finds out whether it works.
 
 A refinement ladder ([COMPOUND_INFERENCE.md](../../docs/architecture/COMPOUND_INFERENCE.md#refinement-ladder))
 works a task coarse to fine, one gated level at a time. The idea here is one small specialist per level
@@ -12,6 +13,8 @@ trained to produce the structure of its level and to build on the structure the 
 |---|---|
 | `build_corpus.py` | Turns an exported ladder dataset into per-level corpora, configs and an immutable manifest |
 | `test_build_corpus.py` | Its tests (`python3 -m unittest discover -s tools/refinement_training -p 'test_*.py'`) |
+| `train_level.py` | Trains one level's LoRA adapter and judges it against the shortcut baselines; `--dry-run` checks readiness and prints the baselines to beat without loading a model |
+| `test_train_level.py` | Its tests (readiness, scoring, baselines, the noise margin) |
 
 ## 1. Where the data comes from
 
@@ -72,3 +75,23 @@ these baselines on held-out ladders by more than noise.
   check regenerates every notebook, so it is added there, never by hand), a Kotlin catalog and
   installers (`OrchestrationSpecialistCatalog` allows only its own ids), and a comparison against the
   single-model ladder at equal cost, which decides whether one model per level helps at all.
+
+## 5. Training one level
+
+~~~
+python3 tools/refinement_training/train_level.py --corpus build/refinement-corpus --level 2 --dry-run
+python3 tools/refinement_training/train_level.py --corpus build/refinement-corpus --level 2 --out build/refinement-adapters
+~~~
+
+- A level the manifest does not call `ready` is refused (exit 2). `--allow-unready` trains it anyway and the
+  result carries `ready: false`, so it can never read as a pass.
+- It writes `refinement-level-N.result.json` beside the adapter: the model's exact-match rate on the
+  held-out ladders, the **copy** and **constant** baselines on the same rows, the noise margin (two
+  standard errors, at least one row), `beats_baselines`, `meets_min_test_score` and `passed`. Exit 0 only
+  when passed, 1 when trained but not passed.
+- **What would show it is wrong:** a level that trains to a high score but does not beat the best baseline by
+  more than the margin (the labels are a rule it learned); a `passed` level whose answers fail
+  `ProcedureStep` or `WorkflowGraphValidator` when the finest level is checked exactly (the reviewer's
+  verdicts are not the truth); or a result that moves a lot between runs with the same corpus (too few rows).
+- Not done, and not needed to find out: ONNX export, the `make_notebook.py` family, a Kotlin catalog and
+  installers. They come after a level passes.
