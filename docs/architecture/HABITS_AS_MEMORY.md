@@ -9,6 +9,7 @@ A habit is a memory. It forms the way memories form, it is corrected the way mem
 Two things stay as they are:
 
 - **Memory organizes; it does not judge.** The clerks fold repeated episodes together and mark where they differ. Which version is right is decided by a deliberation written by the conscious layer (an agent, or the keeper).
+- **A flag informs; it does not forbid.** A habit's offer can carry flags that say what memory knows about it (a recent failure, an unresolved contrast, a decision someone made about it). The flag never says not to use the habit. The agent or keeper reads it and decides.
 - **Strength decides what is offered. Policy decides what runs.** A habit that has become strong is recalled first. Whether any step may run is still decided by the task and executor layer: mutating and privileged steps keep their approval gates however strong the habit is. Recall never executes.
 
 ## 2. Formation
@@ -59,15 +60,33 @@ accident ─▶ correction ─▶ anticipation ─▶ controlled occurrence ─�
 | Accident | The habit was offered or run and the outcome was wrong. | Recorded as an episode; paired with the habit by the divergence marker. |
 | Correction | A deliberation: this habit is wrong in this cue. | Written by an agent or the keeper. A keeper's "stop doing that" is a deliberation the same way. |
 | Anticipation | An **override**: the deliberation scoped to the habit and its cue, with the alternative (do X, or ask me). | The cue is checked at **planning and recall time, before dispatch**, so the moment is met ahead of time, not after the habit has fired. |
-| Controlled occurrence | At the cue, the habit is not offered as a default. The offer is replaced by a flag: the habit would fire here, and you decided to control it, with the deliberation text. | Control passes to the conscious layer for that occurrence. The habit does not run. |
-| Repetition | Each controlled occurrence is an episode: what was decided and how it turned out. | Counted. A lapse (the habit ran anyway, or the controlled pass failed) is a new accident and starts the loop again, with the count kept. |
+| Controlled occurrence | At the cue, the offer is **tagged** with an `Overridden` flag (§5.1) that quotes the deliberation, who wrote it, and the alternative. The habit is not hidden and not blocked. | The conscious layer is made to decide this occurrence knowingly, which is the control. It may follow the alternative or use the habit; either way the choice is an episode. |
+| Repetition | Each controlled occurrence is an episode: what was decided and how it turned out. | Counted when the flag was read and the decision was made on purpose. A lapse (the habit ran without the flag being read, or a controlled pass failed) is a new accident and starts the loop again, with the count kept. |
 | New habit | After enough controlled passes without a lapse, the alternative condenses into a habit of its own (§2) and the override can retire. The old habit fades from default recall and stays as history. | The threshold is a setting, not a constant of the design. |
 
-An override can only **restrict or redirect**. It never grants authority, never makes a step runnable, and never lifts an approval gate. It is memory and cannot run anything.
+An override can only **flag or redirect**. It never grants authority, never makes a step runnable, and never lifts an approval gate. It is memory and cannot run anything.
+
+### 5.1 Flags on an offer
+
+The swarm gets a leg up by tagging the habit where it is offered, programmatically, with what memory already holds about it. The tag is a warning and a pointer. It does not say not to use the habit.
+
+| Flag | Set when | Carries |
+| --- | --- | --- |
+| `UnresolvedContrast` | A `Diverges` marker pairs the habit with a differing execution and no deliberation has resolved it. | Both sides' memory ids, the counts on each side, the pair summary. |
+| `RecentFailure` | The last executions of the habit in this cue ended failed or were turned back. | How many of how many, when, memory ids of the episodes. |
+| `Overridden` | A deliberation scoped to this habit and cue exists (§5). | The deliberation's text and author (agent or keeper), its date, the alternative, and the controlled-pass count so far. |
+| `Unverified` | The habit's runs were only reported complete, never independently verified. | The proportion verified. |
+| `Drifted` | The environment the habit was formed in differs from this one (tool or platform version, repository shape). | What differs. |
+| `Fading` | The habit has not been used for a long while. | The last use. |
+
+- **Set by the engine from memory state**, as `Diverges` is, not written by a clerk. Setting a flag is noticing, not ruling.
+- **Wording is factual.** A flag the engine writes uses no judging word (correct, wrong, better, outdated), the rule already applied to divergence pair summaries. A flag that carries a judgment quotes a deliberation and names who made it; the judgment is theirs, not the memory layer's.
+- **Offer, not block.** The habit stays in the offer with its flags. Several flags can stack. A flag never removes the habit, lowers its authority, or changes what policy requires to run it.
+- **It teaches by repetition.** The agent that keeps meeting `RecentFailure` and `Overridden` on a habit starts deciding on purpose, which is the controlled occurrence of §5. A flag the agent reads and sets aside is still a decision made knowingly, and is recorded as one.
 
 ## 6. Boundaries
 
-- **Clerks never judge.** Folding, marking, summarizing and cue extraction are clerk work. Choosing a version, writing an override, and deciding that a controlled pass succeeded are the conscious layer's.
+- **Clerks never judge.** Folding, marking, summarizing, cue extraction and setting a factual flag are clerk or engine work. Choosing a version, writing an override, and deciding that a controlled pass succeeded are the conscious layer's.
 - **Sidecar for bodies.** Executable content is content-addressed in the procedure sidecar. A memory node holds the skeleton summary, the cue and the address. Nothing executable enters `MemorySnapshot`, and `MODEL_WRITABLE_RELATIONS` does not widen.
 - **Privacy and erasure are unchanged.** Capture stays opt-in and structural. Forgetting a source episode removes habits that depended on it, as procedures are removed now.
 - **Popularity risk.** Condensation lets the most common behaviour become the strongest. The guards are the divergence marker, outcome-weighted strength, and the rule that repetition is evidence, not truth.
@@ -91,12 +110,12 @@ An override can only **restrict or redirect**. It never grants authority, never 
 
 1. This note, and the trace additions (operation identity, slots, outcome). Nothing forms without them.
 2. Lineage-scoped formation: condense receipts into habit memories; per-step slots. Fix the parameter-merge and version-identity bugs here.
-3. Recall of habits by strength, offer only. No execution.
+3. Recall of habits by strength, offer only, with the flags that need only the divergence marker and the receipts (`UnresolvedContrast`, `RecentFailure`, `Unverified`, `Drifted`, `Fading`). No execution.
 4. Correction: `Diverges` pairing of habits with differing executions, deliberation records scoped to a habit, absorption into a new version.
-5. Overcoming: overrides, anticipation at planning and recall time, controlled-pass counting, consolidation of the alternative.
+5. Overcoming: overrides and the `Overridden` flag, anticipation at planning and recall time, controlled-pass counting, consolidation of the alternative.
 6. Governed reflex invocation, then the habit runner, behind the existing gates.
 
-Each step is testable without the next. Acceptance for the whole: a habit forms from repeated runs without any promotion step; a differing execution surfaces beside it; a deliberation produces a new version and keeps the old as history; after an override, the cue yields a flag instead of the habit, and enough controlled passes consolidate the alternative; no step ever runs without the task layer's own approval.
+Each step is testable without the next. Acceptance for the whole: a habit forms from repeated runs without any promotion step; a differing execution surfaces beside it; a deliberation produces a new version and keeps the old as history; after an override, the cue yields the habit's offer tagged `Overridden` (not hidden, not blocked), and enough knowing passes consolidate the alternative; no step ever runs without the task layer's own approval.
 
 ## 9. Open decisions for the keeper
 
@@ -105,3 +124,4 @@ Each step is testable without the next. Acceptance for the whole: a habit forms 
 - Where anticipation runs first: the planner, the Context Packer, or both.
 - Whether a keeper's override carries more weight than an agent's, and how long an override lives with no cue match.
 - How fast an unused habit fades, and whether fading differs for mutating habits.
+- Whether any flag ever becomes a required acknowledgement before a step runs (for example `Overridden` on a mutating habit), or flags stay purely informational.
