@@ -72,6 +72,25 @@ object HabitOffers {
         return (listOf(header) + entries).joinToString("\n")
     }
 
+    /** The sequences whose first step a task names, at most two. */
+    fun selectSequences(sequences: List<FormedSequence>, objective: String): List<FormedSequence> {
+        val taskWords = words(objective).toSet()
+        return sequences.filter { sequence -> cuesOf(sequence.operations.first()).any { it in taskWords } }.take(2)
+    }
+
+    /** Sequences as text for a prompt, or null. The order is observed, not a dependency. */
+    fun renderSequences(sequences: List<FormedSequence>, nowEpochMillis: Long): String? {
+        if (sequences.isEmpty()) return null
+        return (
+            listOf("Done together, in this order, in earlier runs (the order is observed, not a dependency):") +
+                sequences.map { sequence ->
+                    "- " + sequence.operations.joinToString(", then ") + ": in " + sequence.runs + " runs, " +
+                        sequence.cleanRuns + " of them with every step clean. Last seen " +
+                        ago(sequence.lastSeenAtEpochMillis, nowEpochMillis) + "."
+                }
+            ).joinToString("\n").take(MAX_CHARS)
+    }
+
     private fun entry(habit: FormedHabit, nowEpochMillis: Long): String = buildString {
         append("- ").append(habit.operation).append(": used ").append(habit.uses)
             .append(if (habit.uses == 1) " time" else " times")

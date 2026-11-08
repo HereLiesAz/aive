@@ -878,9 +878,37 @@ class MemoryLayerController(
         } catch (_: Exception) {
             return null
         }
-        return com.hereliesaz.geministrator.memory.procedural.HabitOffers.render(
+        val now = nowEpochMillis()
+        val habitText = com.hereliesaz.geministrator.memory.procedural.HabitOffers.render(
             com.hereliesaz.geministrator.memory.procedural.HabitOffers.select(habits, objective),
-            nowEpochMillis(),
+            now,
+        )
+        val sequenceText = com.hereliesaz.geministrator.memory.procedural.HabitOffers.renderSequences(
+            com.hereliesaz.geministrator.memory.procedural.HabitOffers.selectSequences(
+                formedSequences(workflowId),
+                objective,
+            ),
+            now,
+        )
+        return listOfNotNull(habitText, sequenceText).joinToString("\n").ifBlank { null }
+    }
+
+    /**
+     * The sequences of operations [workflowId] has seen repeat in the same order across runs, from the
+     * same reach as [formedHabits]. Empty while memory or procedural capture is off.
+     */
+    suspend fun formedSequences(
+        workflowId: String,
+        habitSettings: com.hereliesaz.geministrator.memory.procedural.HabitSettings =
+            com.hereliesaz.geministrator.memory.procedural.HabitSettings(),
+    ): List<com.hereliesaz.geministrator.memory.procedural.FormedSequence> {
+        if (!active || !settings.value.proceduralTraceCaptureEnabled || memoryBankKey(workflowId) == null) {
+            return emptyList()
+        }
+        val catalog = procedureCatalog ?: return emptyList()
+        return com.hereliesaz.geministrator.memory.procedural.HabitSequences.form(
+            catalog.habitTraces(workflowId),
+            habitSettings,
         )
     }
 

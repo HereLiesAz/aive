@@ -141,6 +141,7 @@ object HabitFormation {
     private data class UseKey(val workflowId: String, val taskRunId: String, val attempt: Int)
 
     private data class Use(
+        val workflowId: String,
         val operation: String,
         val executorKind: String,
         val failed: Boolean,
@@ -199,6 +200,21 @@ object HabitFormation {
             .take(MAX_HABITS)
     }
 
+    /** One finished execution of a named operation, for readers that look across a run (sequences). */
+    internal data class Execution(
+        val workflowId: String,
+        val operation: String,
+        val failed: Boolean,
+        val atEpochMillis: Long,
+    )
+
+    internal fun executions(traces: List<ProcedureTrace>): List<Execution> =
+        traces.filter { it.operation != null && it.phase !in notExecutions }
+            .groupBy { UseKey(it.workflowId, it.taskRunId, it.attempt) }
+            .values
+            .mapNotNull(::useOf)
+            .map { Execution(it.workflowId, it.operation, it.turnedBack, it.atEpochMillis) }
+
     private fun useOf(receipts: List<ProcedureTrace>): Use? {
         val execution = receipts.filter { it.phase != ProcedureTracePhase.Verification }
         val failed = execution.any {
@@ -216,6 +232,7 @@ object HabitFormation {
         }
         val named = receipts.first()
         return Use(
+            workflowId = named.workflowId,
             operation = checkNotNull(named.operation),
             executorKind = named.executorKind,
             failed = failed,

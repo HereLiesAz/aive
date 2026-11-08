@@ -58,6 +58,37 @@ object HabitInvocation {
         )
     }
 
+    /**
+     * A sequence as ordinary tasks, each depending on the one before so they run in the order they
+     * were seen, each asking for a person's approval first. Refused if any step cannot be rebuilt or
+     * was placed on another node. No refs or inputs are carried: edit the tasks after adding them.
+     */
+    fun proposeSequence(
+        sequence: FormedSequence,
+        habits: List<FormedHabit>,
+        idPrefix: String,
+    ): SequenceResult {
+        if (idPrefix.isBlank()) return SequenceResult.Refused("Tasks need an id prefix.")
+        val tasks = mutableListOf<TaskDefinition>()
+        for ((index, operation) in sequence.operations.withIndex()) {
+            val habit = habits.firstOrNull { it.operation == operation }
+                ?: return SequenceResult.Refused("No habit has formed for $operation.")
+            when (val step = propose(habit, TaskDefinitionId("$idPrefix-${index + 1}"))) {
+                is Result.Refused -> return SequenceResult.Refused(step.reason)
+                is Result.Proposed -> tasks += step.task.copy(
+                    name = "Habit step ${index + 1} of ${sequence.operations.size}: $operation",
+                    dependsOn = tasks.lastOrNull()?.let { setOf(it.id) } ?: emptySet(),
+                )
+            }
+        }
+        return SequenceResult.Proposed(tasks)
+    }
+
+    sealed interface SequenceResult {
+        data class Proposed(val tasks: List<TaskDefinition>) : SequenceResult
+        data class Refused(val reason: String) : SequenceResult
+    }
+
     private fun executorOf(operation: String, ref: String?, inputs: Map<String, String>): TaskExecutor? {
         val kind = operation.substringBefore(':')
         val rest = operation.substringAfter(':', "")
