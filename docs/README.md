@@ -55,7 +55,7 @@ uses Code Reviewer; Antagonist is available in the roster for explicit assignmen
 
 ### Four-pillar memory: procedural reflexes and habits (proposed)
 
-[`architecture/PROCEDURAL_MEMORY.md`](architecture/PROCEDURAL_MEMORY.md) defines the planned fourth-pillar architecture: recollection, consolidation, reflexes and habits, combining lineage-scoped contextual recall with a governed versioned macro library and agent-neutral duplex MCP collaboration. [`architecture/PROCEDURAL_MEMORY_IMPLEMENTATION_PLAN.md`](architecture/PROCEDURAL_MEMORY_IMPLEMENTATION_PLAN.md) details the staged implementation, source-file integration points, acceptance tests, roll-out controls and dependency gates. These documents describe a **proposal**, not a currently shipped macro executor.
+[`architecture/PROCEDURAL_MEMORY.md`](architecture/PROCEDURAL_MEMORY.md) defines the planned fourth-pillar architecture: recollection, consolidation, reflexes and habits, combining lineage-scoped contextual recall with a governed versioned macro library and agent-neutral duplex MCP collaboration. [`architecture/PROCEDURAL_MEMORY_IMPLEMENTATION_PLAN.md`](architecture/PROCEDURAL_MEMORY_IMPLEMENTATION_PLAN.md) details the staged implementation, source-file integration points, acceptance tests, roll-out controls and dependency gates. [`architecture/HABITS_AS_MEMORY.md`](architecture/HABITS_AS_MEMORY.md) amends them: a habit forms, is corrected and is overcome the way a memory is. These documents describe a **proposal**, not a currently shipped macro executor.
 
 ### Memory banking and attention
 
