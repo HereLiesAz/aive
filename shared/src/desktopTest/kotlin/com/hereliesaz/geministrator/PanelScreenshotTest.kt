@@ -1,0 +1,182 @@
+package com.hereliesaz.geministrator
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.ImageComposeScene
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.use
+import com.hereliesaz.geministrator.domain.AgentProviderId
+import com.hereliesaz.geministrator.domain.BuiltInRoles
+import com.hereliesaz.geministrator.domain.ProjectId
+import com.hereliesaz.geministrator.domain.ProviderRunId
+import com.hereliesaz.geministrator.domain.TaskDefinition
+import com.hereliesaz.geministrator.domain.TaskDefinitionId
+import com.hereliesaz.geministrator.domain.TaskExecutor
+import com.hereliesaz.geministrator.domain.TaskRun
+import com.hereliesaz.geministrator.domain.TaskRunId
+import com.hereliesaz.geministrator.domain.TaskRunStatus
+import com.hereliesaz.geministrator.domain.WorkflowDefinition
+import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
+import com.hereliesaz.geministrator.domain.WorkflowRun
+import com.hereliesaz.geministrator.domain.WorkflowRunId
+import com.hereliesaz.geministrator.domain.WorkflowRunStatus
+import com.hereliesaz.geministrator.domain.TaskCondition
+import com.hereliesaz.geministrator.events.TaskCompleted
+import com.hereliesaz.geministrator.events.TaskStarted
+import com.hereliesaz.geministrator.workflow.SessionActivityKey
+import com.hereliesaz.geministrator.workflow.SessionActivityKind
+import com.hereliesaz.geministrator.workflow.SessionActivityLine
+import com.hereliesaz.geministrator.workflow.WorkflowFlowchart
+import com.hereliesaz.geministrator.workflow.refinement.LadderDatasetBridge
+import com.hereliesaz.geministrator.workflow.refinement.LadderDatasetRecord
+import com.hereliesaz.geministrator.workflow.refinement.SettingsLadderDatasetStore
+import com.russhwolf.settings.MapSettings
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.runBlocking
+import java.io.File
+import kotlin.test.Test
+import kotlin.test.assertTrue
+
+/** Screenshots of the panels added for the keeper's logs, activity, flowchart and data, for checking by eye. */
+class PanelScreenshotTest {
+    private val out = File("build/hive-screens").apply { mkdirs() }
+
+    private fun shoot(name: String, width: Int, height: Int, content: @Composable () -> Unit) {
+        ImageComposeScene(width = width, height = height, density = Density(2f)) {
+            LoadAzphaltFonts()
+            Box(Modifier.fillMaxSize().background(Azphalt.currentGround.page).padding(12.dp)) { content() }
+        }.use { scene ->
+            scene.render(0L)
+            scene.render(400_000_000L)
+            var image = scene.render(900_000_000L)
+            for (ms in 1_000..2_000 step 100) image = scene.render(ms * 1_000_000L)
+            val bytes = image.encodeToData()!!.bytes
+            assertTrue(bytes.size > 10_000, "$name looks blank")
+            File(out, "$name.png").writeBytes(bytes)
+        }
+    }
+
+    private fun agent(id: String, name: String, role: com.hereliesaz.geministrator.domain.RoleDefinition, vararg deps: String) = TaskDefinition(
+        id = TaskDefinitionId(id), name = name, objective = name, roleId = role.id,
+        dependsOn = deps.map(::TaskDefinitionId).toSet(), executor = TaskExecutor.RoleAgent(role.id),
+    )
+
+    private val definition = WorkflowDefinition(
+        id = WorkflowDefinitionId("ship"),
+        name = "Ship",
+        tasks = listOf(
+            agent("plan", "Plan the release", BuiltInRoles.Architect),
+            agent("build", "Implement", BuiltInRoles.ImplementationEngineer, "plan"),
+            TaskDefinition(
+                TaskDefinitionId("ci"), "Run CI", "Run CI", null, dependsOn = setOf(TaskDefinitionId("build")),
+                executor = TaskExecutor.GitHubAction("ci.yml"),
+            ),
+            agent("review", "Review", BuiltInRoles.QaEngineer, "ci"),
+            agent(
+                "fix", "Fix what CI found", BuiltInRoles.ImplementationEngineer, "ci",
+            ).copy(condition = TaskCondition.OnFailure(TaskDefinitionId("ci"))),
+            TaskDefinition(
+                TaskDefinitionId("approve"), "Approve the release", "Approve", null, dependsOn = setOf(TaskDefinitionId("review")),
+                executor = TaskExecutor.HumanApproval(),
+            ),
+            TaskDefinition(
+                TaskDefinitionId("deploy"), "Deploy", "Deploy", null, dependsOn = setOf(TaskDefinitionId("approve")),
+                executor = TaskExecutor.Deployment("production"),
+            ),
+        ),
+    )
+
+    private val run = WorkflowRun(
+        id = WorkflowRunId("run-1"), projectId = ProjectId("aive"), workflowDefinitionId = definition.id,
+        objective = "Ship 2.4.0", status = WorkflowRunStatus.Running,
+        taskRuns = listOf(
+            "plan" to TaskRunStatus.Completed, "build" to TaskRunStatus.Completed, "ci" to TaskRunStatus.Completed,
+            "review" to TaskRunStatus.Running, "fix" to TaskRunStatus.Cancelled, "approve" to TaskRunStatus.Blocked,
+            "deploy" to TaskRunStatus.Blocked,
+        ).associate { (id, status) ->
+            val task = definition.tasks.first { it.id.value == id }
+            task.id to TaskRun(TaskRunId("r-$id"), task.id, status, assignedRoleId = task.roleId, assignedProviderId = AgentProviderId("claude"))
+        },
+        createdAtEpochMillis = 1, updatedAtEpochMillis = 2,
+    )
+
+    @Test
+    fun shootsTheWorkflowFlowchart() {
+        val flow = WorkflowFlowchart.of(definition, run)
+        shoot("50-flowchart", 2900, 760) {
+            WorkflowFlowchartView(flow, selectedTaskId = "review", onTaskSelected = {}, emptyText = "none", modifier = Modifier.fillMaxSize())
+        }
+    }
+
+    @Test
+    fun shootsTheActivityLogByRole() {
+        val runId = WorkflowRunId("run-1")
+        val events = listOf(
+            TaskStarted(runId, TaskDefinitionId("plan"), 1, 1_794_055_860_000L),
+            TaskCompleted(runId, TaskDefinitionId("plan"), 1_794_055_900_000L),
+            TaskStarted(runId, TaskDefinitionId("build"), 1, 1_794_055_905_000L),
+            TaskStarted(runId, TaskDefinitionId("review"), 1, 1_794_055_990_000L),
+        )
+        fun key(task: String) = SessionActivityKey(TaskRunId("r-$task"), ProviderRunId("p-$task"))
+        val feeds = mapOf(
+            key("plan") to listOf(SessionActivityLine(1, SessionActivityKind.Thinking, "Weighing the contract options", 1_794_055_870_000L)),
+            key("build") to listOf(
+                SessionActivityLine(1, SessionActivityKind.Progress, "Edits WorkflowCompositionService.kt", 1_794_055_920_000L),
+                SessionActivityLine(2, SessionActivityKind.Progress, "Runs the desktop tests", 1_794_055_950_000L),
+            ),
+            key("review") to listOf(SessionActivityLine(1, SessionActivityKind.Thinking, "Reading the diff", 1_794_056_000_000L)),
+        )
+        val names = definition.tasks.associate { it.id to it.name }
+        val roles = run.taskRuns.values.mapNotNull { r -> r.assignedRoleId?.let { r.taskDefinitionId to it.value } }.toMap()
+        val sources = RunLogSources(
+            agents = MutableStateFlow(feeds),
+            agentScope = { names[run.taskRuns.values.first { r -> r.id == it.taskRunId }.taskDefinitionId] },
+            app = MutableStateFlow(emptyList()),
+            memory = null,
+            roleOfTask = { roles[it] },
+            roleOfSession = { key -> roles[run.taskRuns.values.first { r -> r.id == key.taskRunId }.taskDefinitionId] },
+        )
+        DurableUiState.store.putString("overview.timeline.log.source", "Activity")
+        try {
+            shoot("51-activity-by-role", 780, 900) {
+                RunLogView(events = events, taskName = { names[it] ?: it.value }, sources = sources, modifier = Modifier.fillMaxSize())
+            }
+        } finally {
+            DurableUiState.store.putString("overview.timeline.log.source", "Run")
+        }
+    }
+
+    @Test
+    fun shootsTheRefinementDataPanel() = runBlocking {
+        val settings = MapSettings()
+        val capture = LadderDatasetBridge.attach(settings)
+        try {
+            capture.enabled = true
+            val store = SettingsLadderDatasetStore(settings)
+            fun level(i: Int, level: Int, gate: String) = LadderDatasetRecord(
+                id = "l$i", kind = LadderDatasetRecord.KIND_LEVEL, ladder = "run${i % 3}/plan", taskId = "t$level", level = level,
+                total = 3, objective = "o", artifact = "{}", structured = true, valid = true, gateVerdict = gate,
+                capturedAtEpochMillis = 1_794_055_860_000L + i * 60_000,
+            )
+            store.append(
+                (1..14).map { level(it, 1 + it % 3, if (it % 5 == 0) "reject" else "approve") } +
+                    LadderDatasetRecord(
+                        id = "o1", kind = LadderDatasetRecord.KIND_OUTCOME, ladder = "run1/plan", taskId = "t", finalStatus = "Completed",
+                        verifierVerdict = "approve", capturedAtEpochMillis = 1_794_056_900_000L,
+                    ),
+            )
+            shoot("52-refinement-data", 780, 1100) {
+                androidx.compose.foundation.layout.Column(
+                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+                ) { MemoryRefinementDataSection() }
+            }
+        } finally {
+            LadderDatasetBridge.reset()
+        }
+    }
+}

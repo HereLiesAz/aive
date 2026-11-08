@@ -42,12 +42,14 @@ fun runEventLines(
     events: List<WorkflowEvent>,
     taskName: (TaskDefinitionId) -> String,
     scrub: (String) -> String = com.hereliesaz.geministrator.control.ControlRedaction::scrub,
+    roleOf: (TaskDefinitionId) -> String? = { null },
 ): List<LogLine> = events.sortedBy { it.occurredAtEpochMillis }.map { event ->
     val task = event.taskOrNull()
     LogLine(
         atEpochMillis = event.occurredAtEpochMillis,
         scope = task?.let(taskName) ?: "workflow",
         text = scrub(event.logText()),
+        role = task?.let(roleOf),
     )
 }
 
@@ -118,11 +120,13 @@ internal fun WorkflowEvent.logText(): String = when (this) {
 fun agentActivityLines(
     feeds: Map<SessionActivityKey, List<SessionActivityLine>>,
     scopeOf: (SessionActivityKey) -> String?,
+    roleOf: (SessionActivityKey) -> String? = { null },
 ): List<LogLine> = feeds.flatMap { (key, lines) ->
     val scope = scopeOf(key) ?: return@flatMap emptyList()
+    val role = roleOf(key)
     lines.map { line ->
         val mark = if (line.kind == SessionActivityKind.Thinking) "thinking" else "step"
-        Triple(line, key, LogLine(line.atEpochMillis, scope, "[$mark] ${line.text}"))
+        Triple(line, key, LogLine(line.atEpochMillis, scope, "[$mark] ${line.text}", role))
     }
 }.sortedWith(compareBy({ it.first.atEpochMillis }, { it.second.providerRunId.value }, { it.first.id }))
     .map { it.third }
@@ -131,3 +135,27 @@ fun agentActivityLines(
 fun sessionScope(
     taskRunToName: Map<TaskRunId, String>,
 ): (SessionActivityKey) -> String? = { key -> taskRunToName[key.taskRunId] }
+
+/**
+ * Everything that happened in the run, in one list: its events and what its agents thought and did,
+ * interleaved by time (events first when they fall in the same millisecond). Nothing is dropped or
+ * reworded; each line keeps the role it was about.
+ */
+fun allActivityLines(events: List<LogLine>, agents: List<LogLine>): List<LogLine> =
+    (events.asSequence().map { 0 to it } + agents.asSequence().map { 1 to it })
+        .sortedWith(compareBy({ it.second.atEpochMillis }, { it.first }))
+        .map { it.second }
+        .toList()
+
+/** The roles that appear in [lines], in the order they first act. */
+fun rolesIn(lines: List<LogLine>): List<String> = lines.mapNotNull { it.role }.distinct()
+
+/** The lines about [role]; all of them when it is null. */
+fun linesForRole(lines: List<LogLine>, role: String?): List<LogLine> =
+    if (role == null) lines else lines.filter { it.role == role }
+
+/** The role of each task run of a run, by session, for [agentActivityLines]. */
+fun sessionRole(
+    taskRunToRole: Map<TaskRunId, String>,
+): (SessionActivityKey) -> String? = { key -> taskRunToRole[key.taskRunId] }
+

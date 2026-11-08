@@ -10,14 +10,16 @@ import kotlinx.coroutines.flow.update
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
-/** The four logs the Log tab can show (docs/Keepers-Room.md). */
-enum class LogSource { Run, Agents, App, Memory }
+/** The logs the Log tab can show (docs/Keepers-Room.md). [Activity] is the run's events and its agents' own steps, together. */
+enum class LogSource { Activity, Run, Agents, App, Memory }
 
 /** One dated line. [scope] says whose it is: a task, a tag, a workflow. */
 data class LogLine(
     val atEpochMillis: Long,
     val scope: String,
     val text: String,
+    /** The role whose work this line is about, when it is a step of the run; null for the rest. */
+    val role: String? = null,
 )
 
 /**

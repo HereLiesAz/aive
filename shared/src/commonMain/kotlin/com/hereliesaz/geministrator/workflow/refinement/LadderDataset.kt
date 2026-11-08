@@ -261,7 +261,7 @@ fun LadderDatasetRecord.line(): String {
     } else {
         "ladder $ladder ended ${finalStatus ?: "unknown"}" + (verifierVerdict?.let { ", verifier $it" } ?: "")
     }
-    return "$capturedAtEpochMillis  $what"
+    return "${com.hereliesaz.geministrator.log.formatLogTime(capturedAtEpochMillis)}  $what"
 }
 
 object LadderDatasetExporter {

@@ -25,17 +25,24 @@ import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.log.LogLine
 import com.hereliesaz.geministrator.log.LogSource
 import com.hereliesaz.geministrator.log.agentActivityLines
+import com.hereliesaz.geministrator.log.allActivityLines
+import com.hereliesaz.geministrator.log.linesForRole
+import com.hereliesaz.geministrator.log.rolesIn
 import com.hereliesaz.geministrator.log.formatLogTime
 import com.hereliesaz.geministrator.log.runEventLines
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.log_empty_activity
 import com.hereliesaz.geministrator.resources.log_empty_agents
 import com.hereliesaz.geministrator.resources.log_empty_app
 import com.hereliesaz.geministrator.resources.log_empty_memory
 import com.hereliesaz.geministrator.resources.log_empty_run
+import com.hereliesaz.geministrator.resources.log_note_activity
 import com.hereliesaz.geministrator.resources.log_note_agents
+import com.hereliesaz.geministrator.resources.log_roles_all
 import com.hereliesaz.geministrator.resources.log_note_app
 import com.hereliesaz.geministrator.resources.log_note_memory
 import com.hereliesaz.geministrator.resources.log_note_run
+import com.hereliesaz.geministrator.resources.log_source_activity
 import com.hereliesaz.geministrator.resources.log_source_agents
 import com.hereliesaz.geministrator.resources.log_source_app
 import com.hereliesaz.geministrator.resources.log_source_memory
@@ -55,9 +62,14 @@ internal class RunLogSources(
     val agentScope: (SessionActivityKey) -> String?,
     val app: StateFlow<List<LogLine>>,
     val memory: StateFlow<List<LogLine>>?,
+    /** The role doing a task, for the role filter; null when none is. */
+    val roleOfTask: (TaskDefinitionId) -> String? = { null },
+    /** The role whose session a feed is; null when none is. */
+    val roleOfSession: (SessionActivityKey) -> String? = { null },
 )
 
 private const val LOG_SOURCE_KEY = "overview.timeline.log.source"
+private const val ALL_ROLES = "\u0000all-roles"
 
 /**
  * The Log tab (docs/Keepers-Room.md): one log at a time, picked from a row of pills, oldest line
@@ -79,12 +91,22 @@ internal fun RunLogView(
     val agents by sources.agents.collectAsState()
     val app by sources.app.collectAsState()
     val memory = sources.memory?.collectAsState()?.value.orEmpty()
-    val lines = when (source) {
-        LogSource.Run -> remember(events) { runEventLines(events, taskName) }
-        LogSource.Agents -> remember(agents, sources.agentScope) { agentActivityLines(agents, sources.agentScope) }
+    val runLines = remember(events, sources.roleOfTask) { runEventLines(events, taskName, roleOf = sources.roleOfTask) }
+    val agentLines = remember(agents, sources.agentScope, sources.roleOfSession) {
+        agentActivityLines(agents, sources.agentScope, sources.roleOfSession)
+    }
+    val sourceLines = when (source) {
+        LogSource.Activity -> remember(runLines, agentLines) { allActivityLines(runLines, agentLines) }
+        LogSource.Run -> runLines
+        LogSource.Agents -> agentLines
         LogSource.App -> app
         LogSource.Memory -> memory
     }
+    // The role filter applies to what is about a run's steps; the app and memory logs are not.
+    var role by remember { mutableStateOf<String?>(null) }
+    val roles = remember(sourceLines) { rolesIn(sourceLines) }
+    val roleShown = role?.takeIf { it in roles }
+    val lines = remember(sourceLines, roleShown) { linesForRole(sourceLines, roleShown) }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         AzphaltTabs(
             tabs = available.map { AzphaltTabItem(it.name, logSourceLabel(it)) },
@@ -94,6 +116,16 @@ internal fun RunLogView(
             keepSelectedInView = true,
         )
         Text(logSourceNote(source), style = AzphaltType.endCap, color = azphaltOnSurface())
+        if (roles.isNotEmpty()) {
+            AzphaltTabs(
+                tabs = listOf(AzphaltTabItem(ALL_ROLES, stringResource(Res.string.log_roles_all))) +
+                    roles.map { AzphaltTabItem(it, it) },
+                selectedKey = roleShown ?: ALL_ROLES,
+                onSelected = { role = it.takeIf { key -> key != ALL_ROLES } },
+                seedPrefix = "log-role",
+                keepSelectedInView = true,
+            )
+        }
         if (lines.isEmpty()) {
             Text(logSourceEmpty(source), style = AzphaltType.body, color = azphaltOnSurface())
             return@Column
@@ -137,7 +169,8 @@ internal fun stableLogKeys(lines: List<LogLine>): List<String> {
 private fun LogRow(line: LogLine) {
     Column(Modifier.fillMaxWidth()) {
         Text(
-            text = formatLogTime(line.atEpochMillis) + if (line.scope.isEmpty()) "" else "  ·  ${line.scope}",
+            text = formatLogTime(line.atEpochMillis) + if (line.scope.isEmpty()) "" else "  ·  ${line.scope}" +
+                (line.role?.let { "  ·  $it" } ?: ""),
             style = AzphaltType.endCap,
             color = azphaltOnSurface(),
         )
@@ -152,6 +185,7 @@ private fun LogRow(line: LogLine) {
 @Composable
 private fun logSourceLabel(source: LogSource): String = stringResource(
     when (source) {
+        LogSource.Activity -> Res.string.log_source_activity
         LogSource.Run -> Res.string.log_source_run
         LogSource.Agents -> Res.string.log_source_agents
         LogSource.App -> Res.string.log_source_app
@@ -162,6 +196,7 @@ private fun logSourceLabel(source: LogSource): String = stringResource(
 @Composable
 private fun logSourceNote(source: LogSource): String = stringResource(
     when (source) {
+        LogSource.Activity -> Res.string.log_note_activity
         LogSource.Run -> Res.string.log_note_run
         LogSource.Agents -> Res.string.log_note_agents
         LogSource.App -> Res.string.log_note_app
@@ -172,6 +207,7 @@ private fun logSourceNote(source: LogSource): String = stringResource(
 @Composable
 private fun logSourceEmpty(source: LogSource): String = stringResource(
     when (source) {
+        LogSource.Activity -> Res.string.log_empty_activity
         LogSource.Run -> Res.string.log_empty_run
         LogSource.Agents -> Res.string.log_empty_agents
         LogSource.App -> Res.string.log_empty_app

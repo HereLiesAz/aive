@@ -543,6 +543,12 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="timeline_view_events">Events</string>
     <string name="timeline_view_memory">Memory</string>
     <string name="timeline_view_log">Log</string>
+    <string name="timeline_view_flowchart">Flowchart</string>
+    <string name="flowchart_empty">This workflow has no steps yet.</string>
+    <string name="log_source_activity">All activity</string>
+    <string name="log_note_activity">Everything in this swarm in one list: its events and what its agents thought and did, by time. Pick a role to see only its steps. Agent lines are kept in memory, this launch only. Times are UTC.</string>
+    <string name="log_empty_activity">Nothing has happened in this swarm yet.</string>
+    <string name="log_roles_all">All roles</string>
     <string name="log_source_run">Run events</string>
     <string name="log_source_agents">Agents</string>
     <string name="log_source_app">App</string>
@@ -923,9 +929,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="memory_refinement_learning">Refinement data: keeping</string>
     <string name="memory_refinement_off">Refinement data: off</string>
     <string name="memory_refinement_empty">Nothing has been kept yet. A ladder has to run with this switched on.</string>
-    <string name="memory_refinement_counts">%1$s records from %2$s ladders. %3$s levels fit the documented structure, %4$s were turned back by their gate, %5$s ladders have an ending recorded.</string>
+    <string name="memory_refinement_counts">Records kept: %1$s, from %2$s ladder(s). Levels that fit the documented structure: %3$s. Turned back by their gate: %4$s. Ladders with an ending recorded: %5$s.</string>
     <string name="memory_refinement_level">Level %1$s: %2$s usable rows of the %3$s wanted before it is worth training.</string>
-    <string name="memory_refinement_recent">Newest records (time in milliseconds since 1970)</string>
+    <string name="memory_refinement_recent">Newest records (times are UTC)</string>
     <string name="memory_refinement_copy">Copy as JSONL</string>
     <string name="memory_refinement_copied">Copied. This is the corpus builder's input.</string>
     <string name="memory_refinement_copy_failed">Could not copy.</string>
