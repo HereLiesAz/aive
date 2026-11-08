@@ -164,7 +164,7 @@ class LadderDatasetTest {
     }
 
     @Test
-    fun captureRecordsOnlyWhenSwitchedOnAndKeepsEachRecordOnce() = runBlocking {
+    fun captureRecordsOnlyWhenSwitchedOnAndKeepsEachRecordOnce(): Unit = runBlocking {
         val capture = LadderDatasetCapture(MapSettings())
         capture.observe(definition, finished)
         assertEquals("", capture.exportJsonl())
@@ -181,7 +181,7 @@ class LadderDatasetTest {
     }
 
     @Test
-    fun storesDropTheOldestPastCapacityAndReadCorruptionAsEmpty() = runBlocking {
+    fun storesDropTheOldestPastCapacityAndReadCorruptionAsEmpty(): Unit = runBlocking {
         val store = InMemoryLadderDatasetStore(capacity = 2)
         fun record(id: String) =
             LadderDatasetRecord(id = id, kind = "level", ladder = "l", taskId = "t", capturedAtEpochMillis = 1L)
