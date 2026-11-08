@@ -68,7 +68,7 @@ An override can only **flag or redirect**. It never grants authority, never make
 
 ### 5.1 Flags on an offer
 
-The swarm gets a leg up by tagging the habit where it is offered, programmatically, with what memory already holds about it. The tag is a warning and a pointer. It does not say not to use the habit.
+The swarm gets a leg up by tagging the habit where it is offered, programmatically, with what memory already holds about it. The tag is a warning and a pointer. It does not say not to use the habit. Flags have two sources: the engine (this section) and the models that use the habit (§5.2).
 
 | Flag | Set when | Carries |
 | --- | --- | --- |
@@ -84,6 +84,17 @@ The swarm gets a leg up by tagging the habit where it is offered, programmatical
 - **Offer, not block.** The habit stays in the offer with its flags. Several flags can stack. A flag never removes the habit, lowers its authority, or changes what policy requires to run it.
 - **The habit can always be chosen.** As with a bad habit, nothing in memory takes the choice away. Choosing a flagged habit knowingly is allowed and is recorded as a decision, with the flags that were shown. If it goes well, that is evidence against the flag or the override that warned: it pairs with the deliberation as a contrast and can be deliberated in turn, so flags are corrected the way habits are. If it goes badly, the next offer carries a stronger `RecentFailure`. The only thing that can stop a step is the task layer's own approval policy, which exists without memory and is not changed by it.
 - **It teaches by repetition.** The agent that keeps meeting `RecentFailure` and `Overridden` on a habit starts deciding on purpose, which is the controlled occurrence of §5. A flag the agent reads and sets aside is still a decision made knowingly, and is recorded as one.
+
+### 5.2 Flags written by the models that use a habit
+
+A model that uses a habit either adds its own flag or does not. Nothing makes it. What the next model sees is the record of both.
+
+- **The flag.** A short, bounded note on a habit version and cue, saying what the model hit (for example "step 3 assumes a clean tree"). It is a warning, never a prohibition. It is written through a typed action offered with the habit, not as a free edge in the memory graph, so `MODEL_WRITABLE_RELATIONS` does not widen. It is stored as a memory linked to the habit, attributed to its author (role, provider, task run), and scrubbed and bounded like any memory text.
+- **The counts.** Every offer shows two raw numbers beside the habit and its flags: **how many times it has been used** (the habit memory's occurrence count, with how many of those were independently verified) and **how many flags it carries** (by kind, with the newest few quoted). There is no score. The memory layer does not divide one by the other or rank by the result; the model reading the offer starts forming its own judgment from the numbers, which is the point.
+- **Silence is not approval.** A use with no flag counts as a use. It does not count as an endorsement, and it weighs less than a verified outcome.
+- **Flags are memories.** Identical flags from different runs condense into one with an occurrence count. A flag that conflicts with another flag, or with a later deliberation, is a contrast and is handled by §4. A flag is never deleted by the habit's later success: success is counted as a verified use beside it (§5.1).
+- **Data, not instruction.** A flag's text is recalled and shown as quoted, attributed data. It is never an instruction the memory layer or the offer gives the reader. A flag from a remote peer is marked untrusted until locally accepted. Authors are deduplicated per run so one run cannot stack flags.
+- **No special path to authority.** A flag, however many a habit has, cannot hide the habit, block it, or change what policy requires to run it.
 
 ## 6. Boundaries
 
@@ -105,13 +116,15 @@ The swarm gets a leg up by tagging the habit where it is offered, programmatical
 | Version identity | `max + 1`, reusable after a delete. | `Supersedes` lineage plus digest. |
 | Import | Digest and source checks only. | Check the definition against its artifact; validate operation ids and bindings; scan free text. |
 | Recall | None. | A procedural lane offering a few habits by strength, and anticipation checking overrides before dispatch. |
+| Offer | None. | Each offered habit shows uses, verified uses and flag counts, the engine flags, and the newest quoted model flags. |
+| Flag action | None. | A typed action to add a flag to a habit version and cue, attributed and bounded, written by the engine on the model's behalf. |
 | Duplex | None. | Unchanged in this note. |
 
 ## 8. Order of work
 
 1. This note, and the trace additions (operation identity, slots, outcome). Nothing forms without them.
 2. Lineage-scoped formation: condense receipts into habit memories; per-step slots. Fix the parameter-merge and version-identity bugs here.
-3. Recall of habits by strength, offer only, with the flags that need only the divergence marker and the receipts (`UnresolvedContrast`, `RecentFailure`, `Unverified`, `Drifted`, `Fading`). No execution.
+3. Recall of habits by strength, offer only, with the counts (uses, verified uses, flags) and the flags that need only the divergence marker and the receipts (`UnresolvedContrast`, `RecentFailure`, `Unverified`, `Drifted`, `Fading`). Uses are the habit's occurrences from formation, so they need no invocation. The typed action for a model to add its own flag ships here too. No execution.
 4. Correction: `Diverges` pairing of habits with differing executions, deliberation records scoped to a habit, absorption into a new version.
 5. Overcoming: overrides and the `Overridden` flag, anticipation at planning and recall time, controlled-pass counting, consolidation of the alternative.
 6. Governed reflex invocation, then the habit runner, behind the existing gates.
@@ -129,3 +142,5 @@ Each step is testable without the next. Acceptance for the whole: a habit forms 
 - Where anticipation runs first: the planner, the Context Packer, or both.
 - Whether a keeper's override carries more weight than an agent's, and how long an override lives with no cue match.
 - How fast an unused habit fades, and whether fading differs for mutating habits.
+- How many model flags an offer quotes, the length limit of a flag, and whether flags from peers show at all before they are accepted.
+- Whether the offer shows flag counts only for the current cue or also across all cues.
