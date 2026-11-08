@@ -4,10 +4,92 @@ import kotlinx.serialization.Serializable
 
 /**
  * [Verification] receipts are written after the fact, one per verified or rejected execution, as
- * new records beside the original receipt. A receipt is never rewritten.
+ * new records beside the original receipt. A receipt is never rewritten. A [Flag] receipt carries a
+ * model's or the keeper's own words about the habit named by its operation (see [ProcedureTraceFlag]);
+ * it records no execution and is never counted as a use. A [Deliberation] receipt is the conscious
+ * layer's written decision about a habit (see [ProcedureTraceDeliberation]); it too is never a use.
  */
 @Serializable
-enum class ProcedureTracePhase { Dispatch, Reconcile, Verification }
+enum class ProcedureTracePhase { Dispatch, Reconcile, Verification, Flag, Deliberation }
+
+/** Who wrote a flag: the model that used the habit, a model that handled its results, or the keeper. */
+@Serializable
+enum class ProcedureFlagSource { Used, Handled, Keeper }
+
+/** What a deliberation decided about a habit. */
+@Serializable
+enum class ProcedureDeliberationOutcome {
+    /** The habit stands. The contrast that prompted this is answered, and only new evidence reopens it. */
+    Stands,
+
+    /** The habit is replaced. What was done before is history; a new version begins. */
+    Superseded,
+
+    /**
+     * The habit stays, and wherever its cue appears the offer shows this decision and its
+     * alternative first. It only informs and redirects; it never hides or blocks the habit
+     * (docs/architecture/HABITS_AS_MEMORY.md, section 5). When the alternative names an operation,
+     * three uses of that operation make it a habit of its own and retire the override.
+     */
+    Overrides,
+}
+
+/**
+ * A model's or the keeper's written decision about a habit, in its own words and kept as data. It
+ * is how a contrast is answered (docs/architecture/HABITS_AS_MEMORY.md, section 4): nothing
+ * answers one without it, and it never edits the habit in place.
+ */
+@Serializable
+data class ProcedureTraceDeliberation(
+    val outcome: ProcedureDeliberationOutcome,
+    /** The author's role id, or `keeper`. */
+    val author: String,
+    val text: String,
+    /** What to do instead, in the author's words. Required for [ProcedureDeliberationOutcome.Overrides]. */
+    val alternative: String? = null,
+    /** The alternative as a named operation, when it is one (for example `github-action:ci-v2.yml`). */
+    val alternativeOperation: String? = null,
+) {
+    init {
+        require(author.isNotBlank() && author.length <= 128) { "Invalid deliberation author" }
+        require(text.isNotBlank() && text.length <= ProcedureTraceFlag.MAX_TEXT) {
+            "A deliberation is 1..${ProcedureTraceFlag.MAX_TEXT} characters"
+        }
+        if (outcome == ProcedureDeliberationOutcome.Overrides) {
+            require(!alternative.isNullOrBlank() && alternative.length <= ProcedureTraceFlag.MAX_TEXT) {
+                "An override names its alternative in 1..${ProcedureTraceFlag.MAX_TEXT} characters"
+            }
+            require(alternativeOperation == null || alternativeOperation.matches(ProcedureTrace.OPERATION)) {
+                "Invalid alternative operation"
+            }
+        } else {
+            require(alternative == null && alternativeOperation == null) { "Only an override has an alternative" }
+        }
+    }
+}
+
+/**
+ * A warning in the author's own words, kept as data. It is never an instruction, never changes what
+ * a habit may do, and is shown quoted with its author (docs/architecture/HABITS_AS_MEMORY.md, 5.2).
+ */
+@Serializable
+data class ProcedureTraceFlag(
+    val source: ProcedureFlagSource,
+    /** The author's role id, or `keeper`. */
+    val author: String,
+    val text: String,
+    /** The author had untrusted content in front of it when it wrote this. */
+    val tainted: Boolean = false,
+) {
+    init {
+        require(author.isNotBlank() && author.length <= 128) { "Invalid flag author" }
+        require(text.isNotBlank() && text.length <= MAX_TEXT) { "A flag is 1..$MAX_TEXT characters" }
+    }
+
+    companion object {
+        const val MAX_TEXT = 400
+    }
+}
 
 @Serializable
 enum class ProcedureTraceOutcome { Running, Verifying, Completed, Failed, Threw }
@@ -75,8 +157,18 @@ data class ProcedureTrace(
     /** Allowlisted typed values the executor was configured with, sorted by name. */
     val slots: List<ProcedureTraceSlot> = emptyList(),
     val verification: ProcedureTraceVerification = ProcedureTraceVerification.Unknown,
+    /** Present exactly on a [ProcedureTracePhase.Flag] receipt. */
+    val flag: ProcedureTraceFlag? = null,
+    /** Present exactly on a [ProcedureTracePhase.Deliberation] receipt. */
+    val deliberation: ProcedureTraceDeliberation? = null,
 ) {
     init {
+        require((phase == ProcedureTracePhase.Flag) == (flag != null)) {
+            "A flag is carried by, and only by, a Flag receipt"
+        }
+        require((phase == ProcedureTracePhase.Deliberation) == (deliberation != null)) {
+            "A deliberation is carried by, and only by, a Deliberation receipt"
+        }
         require(workflowId.isNotBlank() && projectId.isNotBlank())
         require(taskRunId.isNotBlank() && taskDefinitionId.isNotBlank())
         require(attempt >= 0 && artifactCount >= 0 && artifactKinds.size <= 32)
@@ -88,7 +180,13 @@ data class ProcedureTrace(
 
     val receiptKey: String
         get() = "$workflowId:$taskRunId:$attempt:${phase.name}:${outcome.name}" +
-            if (phase == ProcedureTracePhase.Verification) ":${verification.name}" else ""
+            when (phase) {
+                ProcedureTracePhase.Verification -> ":${verification.name}"
+                ProcedureTracePhase.Flag -> ":${flag?.source?.name}:${flag?.text.hashCode().toUInt().toString(16)}"
+                ProcedureTracePhase.Deliberation ->
+                    ":${deliberation?.outcome?.name}:${deliberation?.text.hashCode().toUInt().toString(16)}"
+                else -> ""
+            }
 
     /**
      * The text banked as the receipt's episode. Memory condenses episodes whose frame matches and
@@ -96,7 +194,13 @@ data class ProcedureTrace(
      * fillers. A receipt with neither reads exactly as it always did.
      */
     fun contextualSummary(): String =
-        "System executor $executorKind ${phase.name.lowercase()} reported ${outcome.name.lowercase()}. " +
+        if (flag != null) {
+            "Flag on ${operation ?: executorKind} (${flag.source.name.lowercase()}) by ${flag.author}: \"${flag.text}\""
+        } else if (deliberation != null) {
+            "Deliberation on ${operation ?: executorKind} (${deliberation.outcome.name.lowercase()}) by " +
+                "${deliberation.author}: \"${deliberation.text}\"" +
+                (deliberation.alternative?.let { " Instead: \"$it\"" } ?: "")
+        } else "System executor $executorKind ${phase.name.lowercase()} reported ${outcome.name.lowercase()}. " +
             (operation?.let { "Operation: $it. " } ?: "") +
             (slots.takeIf { it.isNotEmpty() }
                 ?.let { "Slots: ${it.joinToString("; ") { slot -> "${slot.name}=${slot.value}" }}. " } ?: "") +

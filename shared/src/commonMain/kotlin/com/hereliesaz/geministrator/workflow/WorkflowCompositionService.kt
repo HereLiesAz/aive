@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
+import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
@@ -98,6 +99,30 @@ class WorkflowCompositionService(
                 roleOverrides = roleOverrides,
             ),
         )
+    }
+
+    /**
+     * Adds tasks a habit proposed (see HabitInvocation) to [definition]: the first of them may wait on
+     * [connectFrom], the rest keep the dependencies they came with. Task ids must be new. The result is
+     * validated and returned, not saved, like every other method here; the proposal's own approval
+     * policy is untouched, so each added task still asks a person before it runs.
+     */
+    fun addProposedTasks(
+        definition: WorkflowDefinition,
+        tasks: List<TaskDefinition>,
+        connectFrom: Set<TaskDefinitionId> = emptySet(),
+    ): WorkflowDefinition {
+        require(tasks.isNotEmpty()) { "There is nothing to add." }
+        val taken = definition.tasks.map { it.id }.toSet()
+        val clashes = tasks.map { it.id }.filter { it in taken }
+        require(clashes.isEmpty()) { "Task ids already in use: ${clashes.joinToString { it.value }}" }
+        require(tasks.map { it.id }.distinct().size == tasks.size) { "Proposed task ids repeat." }
+        val missing = connectFrom.filter { it !in taken }
+        require(missing.isEmpty()) { "Cannot follow undefined tasks: ${missing.joinToString { it.value }}" }
+        val added = tasks.mapIndexed { index, task ->
+            if (index == 0) task.copy(dependsOn = task.dependsOn + connectFrom) else task
+        }
+        return validated(definition.copy(tasks = definition.tasks + added))
     }
 
     suspend fun saveAs(

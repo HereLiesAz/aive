@@ -748,6 +748,170 @@ class MemoryLayerController(
         )
     }
 
+    /**
+     * The keeper's own flag on a habit (docs/architecture/HABITS_AS_MEMORY.md, 5.4). It needs no
+     * window and no clerk: it is recorded as the keeper wrote it, bounded and scrubbed, as a flag
+     * receipt beside the habit's others. Returns false when capture is off, the operation is not a
+     * plain operation name, or the text is empty.
+     */
+    suspend fun flagHabit(workflowId: String, operation: String, text: String): Boolean {
+        if (!active || !settings.value.proceduralTraceCaptureEnabled) return false
+        if (!operation.matches(com.hereliesaz.geministrator.memory.procedural.ProcedureTrace.OPERATION)) return false
+        val quote = com.hereliesaz.geministrator.control.ControlRedaction.scrub(text.trim())
+            .take(com.hereliesaz.geministrator.memory.procedural.ProcedureTraceFlag.MAX_TEXT)
+        if (quote.isBlank()) return false
+        val project = lineage.projectOf(workflowId) ?: return false
+        procedureTraceSink.record(
+            com.hereliesaz.geministrator.memory.procedural.ProcedureTrace(
+                workflowId = workflowId,
+                projectId = project,
+                taskRunId = "keeper",
+                taskDefinitionId = "keeper-flag",
+                attempt = 0,
+                phase = com.hereliesaz.geministrator.memory.procedural.ProcedureTracePhase.Flag,
+                executorKind = "Keeper",
+                outcome = com.hereliesaz.geministrator.memory.procedural.ProcedureTraceOutcome.Running,
+                recordedAtEpochMillis = nowEpochMillis(),
+                operation = operation,
+                flag = com.hereliesaz.geministrator.memory.procedural.ProcedureTraceFlag(
+                    source = com.hereliesaz.geministrator.memory.procedural.ProcedureFlagSource.Keeper,
+                    author = "keeper",
+                    text = quote,
+                ),
+            ),
+        )
+        return true
+    }
+
+    /**
+     * A written decision about a habit, by the keeper (`author` "keeper") or by a model (its role id):
+     * the habit stands, or it is superseded and a new version begins. It answers a contrast; it never
+     * edits the habit, which is a set of receipts. Recorded as a Deliberation receipt, bounded and
+     * scrubbed. Returns false when capture is off, the operation is not a plain operation name, or the
+     * text or author is empty.
+     */
+    suspend fun deliberateHabit(
+        workflowId: String,
+        operation: String,
+        outcome: com.hereliesaz.geministrator.memory.procedural.ProcedureDeliberationOutcome,
+        author: String,
+        text: String,
+        alternative: String? = null,
+        alternativeOperation: String? = null,
+    ): Boolean {
+        if (!active || !settings.value.proceduralTraceCaptureEnabled) return false
+        if (!operation.matches(com.hereliesaz.geministrator.memory.procedural.ProcedureTrace.OPERATION)) return false
+        val quote = com.hereliesaz.geministrator.control.ControlRedaction.scrub(text.trim())
+            .take(com.hereliesaz.geministrator.memory.procedural.ProcedureTraceFlag.MAX_TEXT)
+        if (quote.isBlank() || author.isBlank() || author.length > 128) return false
+        val isOverride = outcome == com.hereliesaz.geministrator.memory.procedural.ProcedureDeliberationOutcome.Overrides
+        val instead = alternative?.let {
+            com.hereliesaz.geministrator.control.ControlRedaction.scrub(it.trim())
+                .take(com.hereliesaz.geministrator.memory.procedural.ProcedureTraceFlag.MAX_TEXT)
+        }?.takeIf { it.isNotBlank() }
+        if (isOverride != (instead != null)) return false
+        if (alternativeOperation != null &&
+            (!isOverride || !alternativeOperation.matches(com.hereliesaz.geministrator.memory.procedural.ProcedureTrace.OPERATION))
+        ) return false
+        val project = lineage.projectOf(workflowId) ?: return false
+        procedureTraceSink.record(
+            com.hereliesaz.geministrator.memory.procedural.ProcedureTrace(
+                workflowId = workflowId,
+                projectId = project,
+                taskRunId = "deliberation",
+                taskDefinitionId = "habit-deliberation",
+                attempt = 0,
+                phase = com.hereliesaz.geministrator.memory.procedural.ProcedureTracePhase.Deliberation,
+                executorKind = "Deliberation",
+                outcome = com.hereliesaz.geministrator.memory.procedural.ProcedureTraceOutcome.Running,
+                recordedAtEpochMillis = nowEpochMillis(),
+                operation = operation,
+                deliberation = com.hereliesaz.geministrator.memory.procedural.ProcedureTraceDeliberation(
+                    outcome = outcome,
+                    author = author.trim(),
+                    text = quote,
+                    alternative = instead,
+                    alternativeOperation = alternativeOperation,
+                ),
+            ),
+        )
+        return true
+    }
+
+    /**
+     * A task someone may add to a workflow to do what a formed habit does, or a refusal. It runs
+     * nothing: the result is an ordinary task that asks for a person's approval first and is then
+     * run, or not, by the workflow engine under its own gates (see HabitInvocation).
+     */
+    suspend fun proposeHabitTask(
+        workflowId: String,
+        operation: String,
+        taskId: String,
+        ref: String? = null,
+        inputs: Map<String, String> = emptyMap(),
+    ): com.hereliesaz.geministrator.memory.procedural.HabitInvocation.Result {
+        val habit = formedHabits(workflowId).firstOrNull { it.operation == operation }
+            ?: return com.hereliesaz.geministrator.memory.procedural.HabitInvocation.Result.Refused(
+                "No habit has formed for that operation.",
+            )
+        if (taskId.isBlank()) {
+            return com.hereliesaz.geministrator.memory.procedural.HabitInvocation.Result.Refused("A task needs an id.")
+        }
+        return com.hereliesaz.geministrator.memory.procedural.HabitInvocation.propose(
+            habit,
+            com.hereliesaz.geministrator.domain.TaskDefinitionId(taskId),
+            ref,
+            inputs,
+        )
+    }
+
+    /**
+     * The text of a "Habits" prompt block for a task that states [objective], or null. Only habits
+     * already offered (three uses) whose operation the objective names appear, at most a few, as
+     * counts and facts. Null while memory or procedural capture is off, or on any read failure.
+     */
+    suspend fun habitOfferText(workflowId: String, objective: String): String? {
+        val habits = try {
+            formedHabits(workflowId)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            return null
+        }
+        val now = nowEpochMillis()
+        val habitText = com.hereliesaz.geministrator.memory.procedural.HabitOffers.render(
+            com.hereliesaz.geministrator.memory.procedural.HabitOffers.select(habits, objective),
+            now,
+        )
+        val sequenceText = com.hereliesaz.geministrator.memory.procedural.HabitOffers.renderSequences(
+            com.hereliesaz.geministrator.memory.procedural.HabitOffers.selectSequences(
+                formedSequences(workflowId),
+                objective,
+            ),
+            now,
+        )
+        return listOfNotNull(habitText, sequenceText).joinToString("\n").ifBlank { null }
+    }
+
+    /**
+     * The sequences of operations [workflowId] has seen repeat in the same order across runs, from the
+     * same reach as [formedHabits]. Empty while memory or procedural capture is off.
+     */
+    suspend fun formedSequences(
+        workflowId: String,
+        habitSettings: com.hereliesaz.geministrator.memory.procedural.HabitSettings =
+            com.hereliesaz.geministrator.memory.procedural.HabitSettings(),
+    ): List<com.hereliesaz.geministrator.memory.procedural.FormedSequence> {
+        if (!active || !settings.value.proceduralTraceCaptureEnabled || memoryBankKey(workflowId) == null) {
+            return emptyList()
+        }
+        val catalog = procedureCatalog ?: return emptyList()
+        return com.hereliesaz.geministrator.memory.procedural.HabitSequences.form(
+            catalog.habitTraces(workflowId),
+            habitSettings,
+        )
+    }
+
     val promptContextProvider: MemoryPromptContextProvider = object : MemoryPromptContextProvider {
         override suspend fun recallFor(request: AgentTaskRequest, queryPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan): MemoryPromptRecall =
             recallForPrompt(request, queryPlan)
@@ -949,6 +1113,9 @@ class MemoryLayerController(
             if (pending.isNotEmpty()) {
                 add(PromptContextBlock("Recalled on request", pending.joinToString("\n\n") { it.removePrefix(MEMORY_MESSAGE_MARKER).trim() }.take(MAX_RECALL_CHARS)))
             }
+            // Habits already formed from earlier runs that this task names: counts and facts, offer only.
+            runCatching { habitOfferText(memoryWorkflowOf(request), request.objective) }.getOrNull()
+                ?.let { add(PromptContextBlock("Habits", it)) }
             if (relevant.isNotEmpty()) {
                 add(
                     PromptContextBlock(

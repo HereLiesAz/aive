@@ -91,6 +91,24 @@ class HabitFormationTest {
     }
 
     @Test
+    fun recentOutcomesLookAtTheNewestThreeUsesOnly() {
+        val habit = HabitFormation.form(
+            listOf(
+                receipt("a", 1, outcome = ProcedureTraceOutcome.Failed),
+                receipt("b", 2),
+                receipt("c", 3, outcome = ProcedureTraceOutcome.Failed),
+                receipt("d", 4),
+                receipt("e", 5),
+            ),
+        ).single()
+        assertEquals(HabitFormation.RECENT, habit.recentUses)
+        // The newest three are c (failed), d, e.
+        assertEquals(1, habit.recentFailedUses)
+        assertEquals(2, habit.failedUses)
+        assertEquals(5 - 0 - 0, habit.unreviewedUses)
+    }
+
+    @Test
     fun verificationReceiptsCountApartAndARejectionOutweighsAnApproval() {
         val habit = HabitFormation.form(
             listOf(
