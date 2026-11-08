@@ -22,6 +22,7 @@ import com.hereliesaz.geministrator.memory.MemoryLayerController
 import com.hereliesaz.geministrator.memory.MemoryLayerSettings
 import com.hereliesaz.geministrator.memory.procedural.FormedHabit
 import com.hereliesaz.geministrator.memory.procedural.FormedSequence
+import com.hereliesaz.geministrator.memory.procedural.HabitInvocation
 import com.hereliesaz.geministrator.memory.procedural.HabitOffers
 import com.hereliesaz.geministrator.memory.procedural.ProcedureDeliberationOutcome
 import com.hereliesaz.geministrator.resources.Res
@@ -37,6 +38,9 @@ import com.hereliesaz.geministrator.resources.memory_habits_not_recorded
 import com.hereliesaz.geministrator.resources.memory_habits_note
 import com.hereliesaz.geministrator.resources.memory_habits_off
 import com.hereliesaz.geministrator.resources.memory_habits_override
+import com.hereliesaz.geministrator.resources.memory_habits_propose
+import com.hereliesaz.geministrator.resources.memory_habits_proposed
+import com.hereliesaz.geministrator.resources.memory_habits_refused
 import com.hereliesaz.geministrator.resources.memory_habits_recorded
 import com.hereliesaz.geministrator.resources.memory_habits_replace
 import com.hereliesaz.geministrator.resources.memory_habits_sequence_line
@@ -94,11 +98,28 @@ internal fun MemoryHabitsSection(controller: MemoryLayerController, settings: Me
                 Text(HabitOffers.describe(habit, now), style = AzphaltType.body, color = azphaltOnSurface())
             }
             if (open != habit.operation) {
-                AzphaltPill(
-                    stringResource(Res.string.memory_habits_flag),
-                    "memory-habit-open-${habit.operation}",
-                    onClick = { open = habit.operation; message = null },
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AzphaltPill(
+                        stringResource(Res.string.memory_habits_flag),
+                        "memory-habit-open-${habit.operation}",
+                        onClick = { open = habit.operation; message = null },
+                    )
+                    AzphaltPill(
+                        stringResource(Res.string.memory_habits_propose),
+                        "memory-habit-propose-${habit.operation}",
+                        onClick = {
+                            scope.launch {
+                                val taskId = "habit-" + habit.operation.replace(Regex("[^A-Za-z0-9-]"), "-")
+                                message = when (val result = controller.proposeHabitTask(bank, habit.operation, taskId)) {
+                                    is HabitInvocation.Result.Proposed ->
+                                        getString(Res.string.memory_habits_proposed, result.task.name, result.task.objective)
+                                    is HabitInvocation.Result.Refused ->
+                                        getString(Res.string.memory_habits_refused, result.reason)
+                                }
+                            }
+                        },
+                    )
+                }
             } else {
                 HabitWordsEditor(
                     onRecord = { kind, note, alternative, alternativeOperation ->
