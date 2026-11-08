@@ -184,5 +184,11 @@ Each step is testable without the next. Acceptance for the whole: a habit forms 
 - Whether `caution` extends the `CategoryClassifier` (suggested) or becomes its own clerk, and how wide the window after a use is.
 - How many model flags an offer quotes, the length limit of a flag, and whether flags from peers show at all before they are accepted.
 - Whether the offer shows flag counts only for the current cue or also across all cues.
+- What is left of the order of work, and why each waits (none is started):
+  - *Writing a habit into the memory graph* as a condensed memory with `CondensedFrom` edges, and a `Diverges` edge for an open contrast. Habits are computed from receipts and already reach prompts, so this adds a second source of the same facts, and it touches consolidation and engine-owned edges (`Supersedes` is the engine's alone). Recommended: wait until receipts-only recall is shown to miss something a graph memory would catch.
+  - *The use window.* Waits on a model that uses a habit, which only exists once a person has put a proposal into a workflow and run it.
+  - *The environment fact.* Needs a tool fingerprint (a version of the workflow file or the tool) that no receipt carries yet.
+  - *A clerk model for `caution`.* The programmatic recognizer is conservative on purpose; a model is worth adding when real flags show what it misses.
+  - *Refinement-level adapters* (`tools/refinement_training`). Waits on hundreds of real ladder runs, as that README says.
 - Where a proposed task goes: which workflow, after which tasks. As built the panel only shows the proposal, because the Memory screen has no handle on a workflow; the service that would add it (`WorkflowCompositionService.addProposedTasks`) exists and is tested. The default to try first is a picker of the project's installed workflows.
 - Whether a model's decision should require that it was offered the habit (as built, any task without untrusted content may decide about any named operation), and whether `HabitDecisions.INSTRUCTION` should be added to a task's objective by default when its offer carries an open contrast (as built, nothing adds it).
