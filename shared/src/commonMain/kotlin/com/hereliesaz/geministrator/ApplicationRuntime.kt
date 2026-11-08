@@ -349,6 +349,13 @@ class ApplicationRuntime private constructor(
      */
     suspend fun rerunFromTask(sourceRunId: WorkflowRunId, request: TaskRerunRequest) {
         runtimeMutex.withLock {
+            // Rewinding a run that is still live: it is cancelled first (what had finished keeps its
+            // result and carries over; what was running starts again in the new run), then forked.
+            var cancelledLive = false
+            current?.takeIf { it.state.run.id == sourceRunId && !it.state.run.status.isTerminal() }?.let { live ->
+                coordinator.cancel(live.project, live.definition, live.state, nowEpochMillis())
+                cancelledLive = true
+            }
             val source = persistence.runs.get(sourceRunId)
                 ?: error("Run ${sourceRunId.value} was not found")
             val storedProject = persistence.projects.get(source.projectId)
@@ -384,7 +391,7 @@ class ApplicationRuntime private constructor(
 
             // As with a launch, one run is active at a time: a live one being replaced is cancelled,
             // best effort, rather than left Running with its sessions still open.
-            current?.takeUnless { it.state.run.status.isTerminal() }?.let { previous ->
+            current?.takeUnless { cancelledLive || it.state.run.status.isTerminal() }?.let { previous ->
                 try {
                     coordinator.cancel(previous.project, previous.definition, previous.state, now)
                 } catch (cancellation: CancellationException) {

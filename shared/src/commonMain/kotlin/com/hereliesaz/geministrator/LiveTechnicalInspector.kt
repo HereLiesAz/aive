@@ -564,7 +564,8 @@ internal fun TechnicalInspector(
                     )
                 }
                 // Time travel (docs/Keepers-Room.md): a finished run runs again from this creature.
-                if (liveWorkflow.run.status.isFinished()) {
+                // Also while the run is live: it is stopped and continued from here, finished work kept.
+                if (liveWorkflow.run.status.isFinished() || taskRun.status !in setOf(TaskRunStatus.Created, TaskRunStatus.Blocked, TaskRunStatus.Ready)) {
                     val runId = liveWorkflow.run.id
                     val hasDependents = liveWorkflow.definition.tasks.any { other ->
                         taskId in other.dependsOn || other.condition.conditionTargetOrNull() == taskId
