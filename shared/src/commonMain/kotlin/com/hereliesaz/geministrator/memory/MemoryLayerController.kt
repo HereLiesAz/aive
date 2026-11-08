@@ -749,6 +749,27 @@ class MemoryLayerController(
     }
 
     /**
+     * The receipts behind the habits of [workflowId], one line each, newest first (all named operations,
+     * or just [operation]). The same reach as [formedHabits], read-only. Empty while memory or
+     * procedural capture is off.
+     */
+    suspend fun habitLog(
+        workflowId: String,
+        operation: String? = null,
+        limit: Int = com.hereliesaz.geministrator.memory.procedural.HabitLog.DEFAULT_LIMIT,
+    ): List<com.hereliesaz.geministrator.memory.procedural.HabitLogEntry> {
+        if (!active || !settings.value.proceduralTraceCaptureEnabled || memoryBankKey(workflowId) == null) {
+            return emptyList()
+        }
+        val catalog = procedureCatalog ?: return emptyList()
+        return com.hereliesaz.geministrator.memory.procedural.HabitLog.entries(
+            catalog.habitTraces(workflowId),
+            operation,
+            limit,
+        )
+    }
+
+    /**
      * The keeper's own flag on a habit (docs/architecture/HABITS_AS_MEMORY.md, 5.4). It needs no
      * window and no clerk: it is recorded as the keeper wrote it, bounded and scrubbed, as a flag
      * receipt beside the habit's others. Returns false when capture is off, the operation is not a

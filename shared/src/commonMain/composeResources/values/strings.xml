@@ -909,6 +909,15 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="memory_habits_add_failed">Not added: %1$s</string>
     <string name="memory_habits_no_authored">No workflow of yours to add it to yet.</string>
     <string name="memory_habits_propose_sequence">Propose these in order</string>
+    <string name="memory_habits_find">Find a habit (by its name or a word in a flag or decision)</string>
+    <string name="memory_habits_no_match">No habit matches.</string>
+    <string name="memory_habits_log_show">Show log</string>
+    <string name="memory_habits_log_hide">Hide log</string>
+    <string name="memory_habits_log_recent">Recent activity, newest first</string>
+    <string name="memory_habits_log_empty">Nothing has been recorded yet.</string>
+    <string name="memory_habits_log_copy">Copy log</string>
+    <string name="memory_habits_log_copied">Copied.</string>
+    <string name="memory_habits_log_copy_failed">Could not copy.</string>
     <string name="memory_habits_propose">Propose a task</string>
     <string name="memory_habits_proposed">Would be a task, "%1$s": %2$s It is not added to any workflow. When it is, a person approves it before it runs.</string>
     <string name="memory_habits_refused">No task proposed: %1$s</string>
