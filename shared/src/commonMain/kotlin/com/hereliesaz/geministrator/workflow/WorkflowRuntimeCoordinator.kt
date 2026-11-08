@@ -31,6 +31,7 @@ import com.hereliesaz.geministrator.policy.PolicyRequest
 import com.hereliesaz.geministrator.policy.PolicyResource
 import com.hereliesaz.geministrator.policy.PolicySubject
 import com.hereliesaz.geministrator.providers.ProviderArtifact
+import com.hereliesaz.geministrator.workflow.refinement.LadderDatasetBridge
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
@@ -71,6 +72,14 @@ class WorkflowRuntimeCoordinator(
         persistence.definitions.put(definition)
         persistence.runs.put(state.run)
         persistArtifacts(state.run)
+        // Refinement-ladder training data, only while the keeper has switched capture on; it never
+        // affects the run (workflow/refinement/LadderDataset.kt).
+        try {
+            LadderDatasetBridge.sink.observe(definition, state.run)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+        }
     }
 
     suspend fun resume(workflowRunId: WorkflowRunId): WorkflowRuntimeState {

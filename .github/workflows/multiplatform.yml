@@ -142,6 +142,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tools/orchestration_training -p 'test_*.py'
+          python3 -m unittest discover -s tools/refinement_training -p 'test_*.py'
           python3 tools/orchestration_training/make_notebook.py
           git diff --exit-code -- \
             aive_orchestration_specialists.ipynb \

@@ -147,6 +147,12 @@ data class RefinementLevel(
     val roleId: RoleDefinitionId,
     /** What this level decides, e.g. "intent and responsibilities" or "executor and parameter bindings". */
     val focus: String,
+    /**
+     * Opt-in output contract: the level answers with the `aive.ladder.level.v1` JSON document
+     * (workflow/refinement/LadderArtifact.kt) instead of prose, so its structure can be checked
+     * against the coarser level it refines. Off by default.
+     */
+    val structured: Boolean = false,
 ) {
     init {
         require(focus.isNotBlank() && focus.length <= MAX_FOCUS_LENGTH) {

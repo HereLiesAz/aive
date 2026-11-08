@@ -2,6 +2,8 @@
 
 Status: **Architecture proposed; non-executable procedure definitions, contextual provenance filtering, opt-in redacted executor receipts, durable per-workflow SQL storage (`SqlProcedureStore`, wired on Android, desktop and web, with an in-memory fallback in the browser) and keeper-gated role-instruction proposals (§10), and provenance-checked provisional reflex/habit candidate extraction with typed symbolic operation binding implemented.** Execution, promotion, automatic recall and duplex procedure exchange are not implemented. This design extends the normative [Memory-layer](../Memory-layer.md), [Memory Banking and Attention](MEMORY_BANKING_AND_ATTENTION.md), [GRIP](GRIP.md), [Role Execution Sources](ROLE_EXECUTION_SOURCES.md), and [Duplex MCP](DUPLEX_MCP.md) contracts. It does not change their existing authority boundaries.
 
+> **Amended by [HABITS_AS_MEMORY.md](HABITS_AS_MEMORY.md).** Habits form by consolidation, are corrected through contrast and deliberation, and are overcome by anticipation, instead of being proposed, validated and promoted (§5 and §6 below describe the earlier shape).
+
 ## 1. The four pillars
 
 | Pillar | Responsibility | Output |

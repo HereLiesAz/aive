@@ -1058,6 +1058,8 @@ class ApplicationRuntime private constructor(
         ): ApplicationRuntime {
             val runtimeJob = SupervisorJob(scope.coroutineContext[Job])
             val runtimeScope = CoroutineScope(scope.coroutineContext + runtimeJob)
+            // Refinement-ladder training data: attached here, recording only once capture is switched on.
+            com.hereliesaz.geministrator.workflow.refinement.LadderDatasetBridge.attach(persistence.inferenceSettings)
             val registry = providerRegistry ?: AgentProviderRegistry(
                 providers = providers,
                 inferenceSettings = persistence.inferenceSettings,

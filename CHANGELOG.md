@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- **A reviewing task can turn work back.** A task that must produce a Verification artifact now fails when that artifact states `VERDICT: reject` (or `revise`) on its first line, so the work after it waits instead of running on what the reviewer rejected. A review that states no verdict behaves as before. The refinement ladder and Skeleton-of-Thought reviewers now ask for the line. See docs/architecture/COMPOUND_INFERENCE.md.
 - **Long-press a hive** in your hives list for its options: **Open**, **Delete hive** (asks first, naming the hive, and says why when it cannot) and **Close**. A tap still opens the hive. See docs/Keepers-Room.md.
 - Azrienoch is updated to its newer build (915 glyphs: Latin Extended-B and Additional with Vietnamese, more Cyrillic, symbols, math and logic marks, four Greek letters; its width axis now reaches a monospaced setting, which the app leaves at the default).
 - A plan waiting for your decision on a hive a package brought (not saved in your library) now also survives a restart; before, only saved hives did.

@@ -102,6 +102,28 @@ class RefinementLadderTest {
     }
 
     @Test
+    fun gatesAskForAVerdictAndStructuredLevelsCarryTheContract() {
+        val structured = CompoundInferencePolicy.RefinementLadder(
+            levels = listOf(
+                RefinementLevel(BuiltInRoles.ProductManager.id, "intent", structured = true),
+                RefinementLevel(BuiltInRoles.Architect.id, "steps"),
+            ),
+            gateReviewerRoleId = BuiltInRoles.AdversarialReviewer.id,
+            finalRoleId = BuiltInRoles.ImplementationEngineer.id,
+        )
+        val byId = RefinementLadderExpander.expand(definition(structured), BuiltInRoles.all)
+            .tasks.associateBy(TaskDefinition::id)
+        val levelOne = byId.getValue(TaskDefinitionId("work--rl-level-1")).objective
+        val levelTwo = byId.getValue(TaskDefinitionId("work--rl-level-2")).objective
+        assertTrue("aive.ladder.level.v1" in levelOne)
+        assertTrue("aive.ladder.level.v1" !in levelTwo)
+        listOf("work--rl-gate-1", "work--rl-gate-2").forEach { gate ->
+            assertTrue("VERDICT: approve" in byId.getValue(TaskDefinitionId(gate)).objective)
+        }
+        assertTrue("aive.ladder.level.v1" in byId.getValue(TaskDefinitionId("work--rl-gate-1")).objective)
+    }
+
+    @Test
     fun definitionWithoutALadderIsReturnedUnchanged() {
         val plain = definition(CompoundInferencePolicy.Single)
         assertEquals(plain, RefinementLadderExpander.expand(plain, BuiltInRoles.all))
