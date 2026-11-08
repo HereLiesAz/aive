@@ -59,8 +59,8 @@ data class WorkflowFlowchart(
 
             val order = tasks.withIndex().associate { it.value.id to it.index }
             val rowOf = HashMap<TaskDefinitionId, Int>()
-            val columns = tasks.groupBy { level.getValue(it.id) }.toSortedMap()
-            for ((_, column) in columns) {
+            val columns = tasks.groupBy { level.getValue(it.id) }
+            for ((_, column) in columns.entries.sortedBy { it.key }) {
                 val sorted = column.sortedWith(
                     compareBy(
                         { task ->
