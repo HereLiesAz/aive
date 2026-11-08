@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.ApprovalPolicy
+import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
@@ -39,7 +40,7 @@ class AddProposedTasksTest {
         tasks = listOf(
             TaskDefinition(
                 id = TaskDefinitionId("prepare"), name = "Prepare", objective = "Prepare",
-                roleId = null, executor = TaskExecutor.HumanApproval(),
+                roleId = BuiltInRoles.QaEngineer.id, executor = TaskExecutor.RoleAgent(BuiltInRoles.QaEngineer.id),
             ),
         ),
     )
@@ -51,12 +52,19 @@ class AddProposedTasksTest {
     }
 
     @Test
-    fun proposedStepsJoinTheWorkflowAfterTheTasksChosenAndStillAskForApproval() {
+    fun everyProposedStepWaitsOnAnApprovalTaskThatWaitsOnTheStepBeforeIt() {
         val merged = service.addProposedTasks(base, proposed(), connectFrom = setOf(TaskDefinitionId("prepare")))
-        assertEquals(listOf("prepare", "habit-1", "habit-2"), merged.tasks.map { it.id.value })
-        assertEquals(setOf(TaskDefinitionId("prepare")), merged.tasks[1].dependsOn)
-        assertEquals(setOf(TaskDefinitionId("habit-1")), merged.tasks[2].dependsOn)
-        assertTrue(merged.tasks.drop(1).all { it.approvalPolicy == ApprovalPolicy.HumanApproval })
+        assertEquals(
+            listOf("prepare", "habit-1-approval", "habit-1", "habit-2-approval", "habit-2"),
+            merged.tasks.map { it.id.value },
+        )
+        val byId = merged.tasks.associateBy { it.id.value }
+        assertEquals(setOf(TaskDefinitionId("prepare")), byId.getValue("habit-1-approval").dependsOn)
+        assertEquals(setOf(TaskDefinitionId("habit-1-approval")), byId.getValue("habit-1").dependsOn)
+        assertEquals(setOf(TaskDefinitionId("habit-1")), byId.getValue("habit-2-approval").dependsOn)
+        assertEquals(setOf(TaskDefinitionId("habit-2-approval")), byId.getValue("habit-2").dependsOn)
+        assertTrue(byId.filterKeys { it.endsWith("-approval") }.values.all { it.executor is TaskExecutor.HumanApproval })
+        assertTrue(listOf("habit-1", "habit-2").all { byId.getValue(it).approvalPolicy == ApprovalPolicy.HumanApproval })
     }
 
     @Test
@@ -67,5 +75,24 @@ class AddProposedTasksTest {
             service.addProposedTasks(base, proposed(), connectFrom = setOf(TaskDefinitionId("nothing")))
         }
         assertFailsWith<IllegalArgumentException> { service.addProposedTasks(base, emptyList()) }
+    }
+
+    @Test
+    fun aProposedRepositoryStepIsAcceptedByTheGraphBecauseItsApprovalTaskPrecedesIt() {
+        val merge = "repository:merge"
+        val runs = listOf("r1", "r2", "r3").flatMap { listOf(step(it, 10, a), step(it, 11, merge)) }
+        val sequence = HabitSequences.form(runs).single()
+        val tasks = assertIs<HabitInvocation.SequenceResult.Proposed>(
+            HabitInvocation.proposeSequence(sequence, HabitFormation.form(runs), "habit"),
+        ).tasks
+
+        val merged = service.addProposedTasks(base, tasks, connectFrom = setOf(TaskDefinitionId("prepare")))
+
+        assertEquals(emptyList(), WorkflowGraphValidator.validate(merged))
+        val mergeTask = merged.tasks.single { it.executor is TaskExecutor.RepositoryOperation }
+        val gate = merged.tasks.single { it.id in mergeTask.dependsOn && it.executor is TaskExecutor.HumanApproval }
+        assertEquals(setOf(TaskDefinitionId("habit-1")), gate.dependsOn)
+        assertEquals(setOf(gate.id), mergeTask.dependsOn)
+        assertEquals(ApprovalPolicy.HumanApproval, mergeTask.approvalPolicy)
     }
 }

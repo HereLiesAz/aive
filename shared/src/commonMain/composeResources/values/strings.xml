@@ -903,6 +903,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="memory_habits_alternative_operation">The alternative as an operation, if it has a name (optional)</string>
     <string name="memory_habits_recorded">Recorded.</string>
     <string name="memory_habits_not_recorded">Not recorded: check the words and the operation name.</string>
+    <string name="memory_habits_propose">Propose a task</string>
+    <string name="memory_habits_proposed">Would be a task, "%1$s": %2$s It is not added to any workflow. When it is, a person approves it before it runs.</string>
+    <string name="memory_habits_refused">No task proposed: %1$s</string>
     <string name="memory_summaries">Summaries</string>
     <string name="memory_summaries_categories_and_associations_that_agents">summaries, categories and associations that agents recall. Tap a creature to choose what runs it.</string>
     <string name="memory_summarizer">Summarizer</string>

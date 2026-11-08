@@ -840,7 +840,8 @@ class MemoryLayerController(
 
     /**
      * A task someone may add to a workflow to do what a formed habit does, or a refusal. It runs
-     * nothing: the result is an ordinary task that asks for a person's approval first and is then
+     * nothing: the result is an ordinary task that a person's approval gates once it is added to a workflow
+     * (WorkflowCompositionService.addProposedTasks puts an approval task in front of it) and is then
      * run, or not, by the workflow engine under its own gates (see HabitInvocation).
      */
     suspend fun proposeHabitTask(
