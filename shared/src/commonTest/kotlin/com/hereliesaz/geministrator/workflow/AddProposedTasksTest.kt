@@ -52,12 +52,19 @@ class AddProposedTasksTest {
     }
 
     @Test
-    fun proposedStepsJoinTheWorkflowAfterTheTasksChosenAndStillAskForApproval() {
+    fun everyProposedStepWaitsOnAnApprovalTaskThatWaitsOnTheStepBeforeIt() {
         val merged = service.addProposedTasks(base, proposed(), connectFrom = setOf(TaskDefinitionId("prepare")))
-        assertEquals(listOf("prepare", "habit-1", "habit-2"), merged.tasks.map { it.id.value })
-        assertEquals(setOf(TaskDefinitionId("prepare")), merged.tasks[1].dependsOn)
-        assertEquals(setOf(TaskDefinitionId("habit-1")), merged.tasks[2].dependsOn)
-        assertTrue(merged.tasks.drop(1).all { it.approvalPolicy == ApprovalPolicy.HumanApproval })
+        assertEquals(
+            listOf("prepare", "habit-1-approval", "habit-1", "habit-2-approval", "habit-2"),
+            merged.tasks.map { it.id.value },
+        )
+        val byId = merged.tasks.associateBy { it.id.value }
+        assertEquals(setOf(TaskDefinitionId("prepare")), byId.getValue("habit-1-approval").dependsOn)
+        assertEquals(setOf(TaskDefinitionId("habit-1-approval")), byId.getValue("habit-1").dependsOn)
+        assertEquals(setOf(TaskDefinitionId("habit-1")), byId.getValue("habit-2-approval").dependsOn)
+        assertEquals(setOf(TaskDefinitionId("habit-2-approval")), byId.getValue("habit-2").dependsOn)
+        assertTrue(byId.filterKeys { it.endsWith("-approval") }.values.all { it.executor is TaskExecutor.HumanApproval })
+        assertTrue(listOf("habit-1", "habit-2").all { byId.getValue(it).approvalPolicy == ApprovalPolicy.HumanApproval })
     }
 
     @Test
@@ -71,7 +78,7 @@ class AddProposedTasksTest {
     }
 
     @Test
-    fun aProposedRepositoryStepGetsItsOwnApprovalTaskBeforeIt() {
+    fun aProposedRepositoryStepIsAcceptedByTheGraphBecauseItsApprovalTaskPrecedesIt() {
         val merge = "repository:merge"
         val runs = listOf("r1", "r2", "r3").flatMap { listOf(step(it, 10, a), step(it, 11, merge)) }
         val sequence = HabitSequences.form(runs).single()
@@ -87,7 +94,5 @@ class AddProposedTasksTest {
         assertEquals(setOf(TaskDefinitionId("habit-1")), gate.dependsOn)
         assertEquals(setOf(gate.id), mergeTask.dependsOn)
         assertEquals(ApprovalPolicy.HumanApproval, mergeTask.approvalPolicy)
-        // A step that does not change the repository gets no extra task.
-        assertEquals(1, merged.tasks.count { it.executor is TaskExecutor.HumanApproval })
     }
 }

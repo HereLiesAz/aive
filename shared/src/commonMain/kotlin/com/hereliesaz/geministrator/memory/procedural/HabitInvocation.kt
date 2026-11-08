@@ -10,7 +10,10 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
  * Turns a habit into a task someone may add to a workflow. This is invocation in its governed form:
  * it runs nothing and has no executor of its own. The result is an ordinary [TaskDefinition], so
  * the workflow engine, its executor integrations, its approval gates and its context-taint gate
- * decide whether and how it runs. The proposed task always asks for a person's approval first.
+ * decide whether and how it runs. The task carries a human-approval policy, but the engine reads that
+ * policy only to let an agent proceed past its plan, so it does not hold a system step. What holds it is
+ * the human-approval task that WorkflowCompositionService.addProposedTasks puts in front of every
+ * step when the proposal is added to a workflow; a proposal run any other way is not gated by this.
  *
  * Only what a receipt can name is rebuilt. The workflow, environment, operation or service comes from
  * the habit's operation; the git ref and any inputs come from the caller and must be the same kind of
@@ -60,7 +63,7 @@ object HabitInvocation {
 
     /**
      * A sequence as ordinary tasks, each depending on the one before so they run in the order they
-     * were seen, each asking for a person's approval first. Refused if any step cannot be rebuilt or
+     * were seen. Each step is gated by an approval task only when added through addProposedTasks. Refused if any step cannot be rebuilt or
      * was placed on another node. No refs or inputs are carried: edit the tasks after adding them.
      */
     fun proposeSequence(

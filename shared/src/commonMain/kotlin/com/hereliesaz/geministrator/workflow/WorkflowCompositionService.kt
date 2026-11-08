@@ -105,8 +105,9 @@ class WorkflowCompositionService(
      * Adds tasks a habit proposed (see HabitInvocation) to [definition]: the first of them may wait on
      * [connectFrom], the rest keep the dependencies they came with. Task ids must be new. The result is
      * validated and returned, not saved, like every other method here; the proposal's own approval
-     * policy is untouched, so each added task still asks a person before it runs. A step that changes
-     * the repository also gets its own human-approval task right before it, which the graph requires.
+     * policy is untouched, but the engine honors that policy only for an agent's plan, so every added
+     * step also gets its own human-approval task right before it. Nothing proposed runs until a person
+     * completes that task.
      */
     fun addProposedTasks(
         definition: WorkflowDefinition,
@@ -123,13 +124,6 @@ class WorkflowCompositionService(
         val added = mutableListOf<TaskDefinition>()
         tasks.forEachIndexed { index, proposed ->
             val task = if (index == 0) proposed.copy(dependsOn = proposed.dependsOn + connectFrom) else proposed
-            val mutation = (task.executor.withoutPlacement() as? TaskExecutor.RepositoryOperation)?.isMutation() == true
-            if (!mutation) {
-                added += task
-                return@forEachIndexed
-            }
-            // A repository mutation needs a human-approval task ahead of it (the graph validator's rule),
-            // so the gate is added beside it, in the open, rather than assumed from the task's own policy.
             val gateId = TaskDefinitionId("${task.id.value}-approval")
             require(gateId !in taken && added.none { it.id == gateId } && tasks.none { it.id == gateId }) {
                 "Task id already in use: ${gateId.value}"
@@ -137,7 +131,7 @@ class WorkflowCompositionService(
             added += TaskDefinition(
                 id = gateId,
                 name = "Approve: ${task.name}",
-                objective = "A person approves before ${task.name} changes the repository.",
+                objective = "A person approves before ${task.name} runs.",
                 roleId = null,
                 executor = TaskExecutor.HumanApproval(),
                 dependsOn = task.dependsOn,
