@@ -1,6 +1,16 @@
 package com.hereliesaz.geministrator.memory.procedural
 
 import com.hereliesaz.geministrator.domain.RepositoryRef
+import com.hereliesaz.geministrator.memory.InMemoryMemoryStore
+import com.hereliesaz.geministrator.memory.MemoryBanks
+import com.hereliesaz.geministrator.memory.MemoryEngineProvider
+import com.hereliesaz.geministrator.memory.MemoryLayerController
+import com.hereliesaz.geministrator.memory.MemoryLayerSettingsStore
+import com.hereliesaz.geministrator.memory.MemoryLineage
+import com.russhwolf.settings.MapSettings
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -81,6 +91,35 @@ class HabitEnvironmentTest {
         assertEquals(1, stats.openContrastsUnanswered)
         assertEquals(0, stats.activeOverrides)
         assertEquals(HabitOffers.Stats(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), HabitOffers.stats(emptyList()))
+    }
+
+    @Test
+    fun receiptsFlagsAndDecisionsReachMemoryAsEpisodesWithTheirEnvironmentAndWords(): Unit = runBlocking {
+        val store = InMemoryMemoryStore()
+        val lineage = MemoryLineage()
+        val controller = MemoryLayerController(
+            banks = MemoryBanks.inMemory(mapOf("w1" to store, "w2" to InMemoryMemoryStore(), "w3" to InMemoryMemoryStore())),
+            procedureCatalog = ProcedureBankCatalog(lineage),
+            lineage = lineage,
+            settingsStore = MemoryLayerSettingsStore(MapSettings()),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            nowEpochMillis = { 100L },
+        )
+        controller.updateSettings { it.copy(proceduralTraceCaptureEnabled = true, consolidationPaused = true) }
+        listOf("w1", "w2", "w3").forEachIndexed { index, run ->
+            controller.procedureTraceSink.record(use(run, 10L + index, "acme/web"))
+        }
+        assertTrue(controller.flagHabit("w1", op, "It assumed a clean tree."))
+        assertTrue(
+            controller.deliberateHabit("w1", op, ProcedureDeliberationOutcome.Stands, "keeper", "The runner changed.")
+        )
+        controller.drain()
+
+        val episodes = store.read().episodes.map { it.userPrompt }
+        assertTrue(episodes.any { "Environment: acme/web." in it && "Operation: $op." in it }, episodes.toString())
+        assertTrue(episodes.any { "Flag on $op (keeper)" in it && "It assumed a clean tree." in it }, episodes.toString())
+        assertTrue(episodes.any { "Deliberation on $op (stands)" in it && "The runner changed." in it }, episodes.toString())
     }
 }
 
