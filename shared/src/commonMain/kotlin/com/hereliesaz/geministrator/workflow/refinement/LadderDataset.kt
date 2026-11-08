@@ -242,7 +242,8 @@ data class LadderDatasetSummary(
                 ladders = records.map { it.ladder }.distinct().size,
                 usablePerLevel = levels
                     .filter { it.level != null && it.structured && it.valid && it.gateVerdict == "approve" }
-                    .groupingBy { it.level!! }.eachCount().toSortedMap(),
+                    .groupingBy { it.level!! }.eachCount()
+                    .entries.sortedBy { it.key }.associate { it.key to it.value },
                 structured = levels.count { it.structured },
                 turnedBack = levels.count { it.gateVerdict == "reject" || it.gateVerdict == "revise" },
                 outcomes = records.count { it.kind == LadderDatasetRecord.KIND_OUTCOME },
@@ -261,7 +262,7 @@ fun LadderDatasetRecord.line(): String {
     } else {
         "ladder $ladder ended ${finalStatus ?: "unknown"}" + (verifierVerdict?.let { ", verifier $it" } ?: "")
     }
-    return "$capturedAtEpochMillis  $what"
+    return "${com.hereliesaz.geministrator.log.formatLogTime(capturedAtEpochMillis)}  $what"
 }
 
 object LadderDatasetExporter {

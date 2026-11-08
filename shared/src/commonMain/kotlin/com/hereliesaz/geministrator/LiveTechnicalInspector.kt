@@ -69,6 +69,7 @@ import com.hereliesaz.geministrator.resources.job_not_saved
 import com.hereliesaz.geministrator.resources.job_saved
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.clickable
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.ROLE_COLLECTION_MARKER_ID
 import com.hereliesaz.geministrator.domain.TaskRun
@@ -286,7 +287,17 @@ internal fun TechnicalInspector(
             ),
             style = AzphaltType.eyebrow,
             color = azphaltOnSurface(),
-            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            // A link: its state and provider are on Work, where the provider can be changed.
+            textDecoration = if (tab != CreatureTab.Work) androidx.compose.ui.text.style.TextDecoration.Underline else null,
+            modifier = Modifier
+                .semantics { liveRegion = LiveRegionMode.Polite }
+                .then(
+                    if (tab != CreatureTab.Work) {
+                        Modifier.clickable(role = Role.Button) { onTabChange(CreatureTab.Work) }
+                    } else {
+                        Modifier
+                    },
+                ),
         )
         }
         // Work holds its objective in its job, below.

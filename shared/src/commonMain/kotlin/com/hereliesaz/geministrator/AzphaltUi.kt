@@ -510,12 +510,15 @@ internal fun AzphaltNote(
     label: String,
     value: String,
     modifier: Modifier = Modifier,
+    /** Set, the note is a link: it takes the keeper to where what it says can be acted on. */
+    onClick: (() -> Unit)? = null,
 ) {
     val hue = recordFill(selected = false)
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
             .background(hue)
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
             .padding(horizontal = 14.dp, vertical = 11.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {

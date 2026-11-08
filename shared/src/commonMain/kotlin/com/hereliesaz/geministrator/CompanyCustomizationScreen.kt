@@ -27,6 +27,7 @@ import com.hereliesaz.geministrator.domain.IntegrationPolicy
 import com.hereliesaz.geministrator.domain.PromptReusePolicy
 import com.hereliesaz.geministrator.domain.ROLE_COLLECTION_MARKER_ID
 import com.hereliesaz.geministrator.domain.RoleAuthority
+import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.FlowchartLanguage
@@ -40,6 +41,7 @@ import com.hereliesaz.geministrator.domain.ScriptRunner
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.TestDesignPolicy
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
+import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.workflow.MermaidFlowchartParser
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.SetSerializer
@@ -192,6 +194,11 @@ import com.hereliesaz.geministrator.resources.swarm_filter_all
 import com.hereliesaz.geministrator.resources.swarm_filter_producers
 import com.hereliesaz.geministrator.resources.swarm_filter_reviewers
 import com.hereliesaz.geministrator.resources.swarm_filter_none
+import com.hereliesaz.geministrator.resources.swarm_activity_hide
+import com.hereliesaz.geministrator.resources.swarm_activity_no_cost
+import com.hereliesaz.geministrator.resources.swarm_activity_none
+import com.hereliesaz.geministrator.resources.swarm_activity_show
+import com.hereliesaz.geministrator.resources.swarm_activity_summary
 import com.hereliesaz.geministrator.resources.swarm_in_hives
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
@@ -212,6 +219,8 @@ internal fun CustomCompanyProviderScreen(
     focusRole: RoleDefinitionId? = null,
     /** The saved hives, read to show how many use each role; null shows no count. */
     onLoadWorkflowDefinitions: (suspend () -> List<WorkflowDefinition>)? = null,
+    /** Every run of every project, read to show what a role has done; null leaves out the Activity view. */
+    onLoadRunHistory: (suspend () -> List<Pair<Project, List<WorkflowRun>>>)? = null,
 ) {
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
     val runtimeRoles = liveWorkflow?.roles
@@ -274,6 +283,23 @@ internal fun CustomCompanyProviderScreen(
             .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
     }
     val roleSurfacePickerScope = rememberCoroutineScope()
+    // What one role has done across every run, read when the keeper asks for it.
+    var activityFor by remember { mutableStateOf<RoleDefinitionId?>(null) }
+    var activity by remember { mutableStateOf<com.hereliesaz.geministrator.workflow.RoleActivity?>(null) }
+    val loadHistory by rememberUpdatedState(onLoadRunHistory)
+    LaunchedEffect(activityFor, runtimeState::class) {
+        val role = activityFor
+        val history = loadHistory
+        activity = if (role == null || history == null) {
+            null
+        } else {
+            runCatching {
+                val runs = history().flatMap { it.second }
+                val definitions = loadDefinitions?.invoke().orEmpty()
+                com.hereliesaz.geministrator.workflow.RoleActivities.of(role, definitions, runs)
+            }.getOrNull()
+        }
+    }
 
     LaunchedEffect(visibleRoles, draftRoles, showRoleForm) {
         if (!showRoleForm && draftRoles == visibleRoles) {
@@ -901,6 +927,15 @@ internal fun CustomCompanyProviderScreen(
                                 },
                                 tone = PillTone.Danger,
                             )
+                        }
+                        if (onLoadRunHistory != null) {
+                            AzphaltPill(
+                                label = stringResource(if (activityFor == role.id) Res.string.swarm_activity_hide else Res.string.swarm_activity_show),
+                                seed = "company-activity-${role.id.value}",
+                                selected = activityFor == role.id,
+                                onClick = { activityFor = if (activityFor == role.id) null else role.id },
+                            )
+                            if (activityFor == role.id) RoleActivityView(activity)
                         }
                         // The order is the whole swarm's, so it moves only while every role is shown.
                         if (roleFilter == SwarmRoleFilter.All) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1589,3 +1624,30 @@ private fun <T> List<T>.move(from: Int, to: Int): List<T> {
 
 private fun String.humanizeEnumName(): String =
     replace(Regex("([a-z0-9])([A-Z])"), "$1 $2")
+
+/** What a role has done across every run: its counts, then its steps newest first, as plain selectable lines. */
+@Composable
+internal fun RoleActivityView(activity: com.hereliesaz.geministrator.workflow.RoleActivity?) {
+    if (activity == null || activity.steps == 0) {
+        Text(stringResource(Res.string.swarm_activity_none), style = AzphaltType.body, color = azphaltOnSurface())
+        return
+    }
+    Text(
+        stringResource(
+            Res.string.swarm_activity_summary,
+            activity.steps.toString(), activity.runs.toString(), activity.completed.toString(),
+            activity.failed.toString(), activity.tokens.toString(),
+            activity.costUsd?.let { "$" + it } ?: stringResource(Res.string.swarm_activity_no_cost),
+        ),
+        style = AzphaltType.body,
+        color = azphaltOnSurface(),
+    )
+    androidx.compose.foundation.text.selection.SelectionContainer {
+        Text(
+            activity.entries.joinToString("\n") { it.line() },
+            style = AzphaltType.endCap,
+            color = azphaltOnSurface(),
+        )
+    }
+}
+

@@ -33,6 +33,7 @@ import com.hereliesaz.geministrator.resources.hive_show_hive
 import com.hereliesaz.geministrator.resources.hive_timeline
 import com.hereliesaz.geministrator.resources.hive_timeline_empty
 import com.hereliesaz.geministrator.resources.timeline_view_events
+import com.hereliesaz.geministrator.resources.timeline_view_flowchart
 import com.hereliesaz.geministrator.resources.timeline_view_log
 import com.hereliesaz.geministrator.resources.timeline_view_memory
 import com.hereliesaz.geministrator.resources.timeline_view_waterfall
@@ -135,6 +136,8 @@ internal fun RunTimeline(
     memoryContent: (@Composable () -> Unit)? = null,
     /** The logs behind the Log tab, last in the row. Null leaves the Log view out. */
     logSources: RunLogSources? = null,
+    /** The workflow as boxes and arrows with the run's states, shown in place. Null leaves it out. */
+    flowchartContent: (@Composable () -> Unit)? = null,
 ) {
     var events by remember(runKey) { mutableStateOf<List<WorkflowEvent>?>(null) }
     // Reload on every change of the run, but keep showing the last events meanwhile: only a different
@@ -144,6 +147,7 @@ internal fun RunTimeline(
     val shown = when {
         view == TIMELINE_MEMORY && memoryContent == null -> TIMELINE_WATERFALL
         view == TIMELINE_LOG && logSources == null -> TIMELINE_WATERFALL
+        view == TIMELINE_FLOWCHART && flowchartContent == null -> TIMELINE_WATERFALL
         else -> view
     }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -155,6 +159,7 @@ internal fun RunTimeline(
         }
         AzphaltTabs(
             tabs = buildList {
+                if (flowchartContent != null) add(AzphaltTabItem(TIMELINE_FLOWCHART, stringResource(Res.string.timeline_view_flowchart)))
                 add(AzphaltTabItem(TIMELINE_WATERFALL, stringResource(Res.string.timeline_view_waterfall)))
                 add(AzphaltTabItem(TIMELINE_EVENTS, stringResource(Res.string.timeline_view_events)))
                 if (memoryContent != null) add(AzphaltTabItem(TIMELINE_MEMORY, stringResource(Res.string.timeline_view_memory)))
@@ -169,6 +174,11 @@ internal fun RunTimeline(
         // Memory scrolls itself; the timeline's own views share one scrolling body under the fixed row.
         if (shown == TIMELINE_MEMORY) {
             Box(Modifier.weight(1f).fillMaxWidth()) { memoryContent?.invoke() }
+            return@Column
+        }
+        // The flowchart scrolls itself in both directions, so it too is given the room under the row.
+        if (shown == TIMELINE_FLOWCHART && flowchartContent != null) {
+            Box(Modifier.weight(1f).fillMaxWidth()) { flowchartContent.invoke() }
             return@Column
         }
         // The Log lists itself (it scrolls its own long list), so it too is given the room under the row.
@@ -220,6 +230,7 @@ private const val TIMELINE_WATERFALL = "waterfall"
 private const val TIMELINE_EVENTS = "events"
 private const val TIMELINE_MEMORY = "memory"
 private const val TIMELINE_LOG = "log"
+private const val TIMELINE_FLOWCHART = "flowchart"
 
 /**
  * A hive that has never run (mockups H2, H6): its workflow at rest, editable in Build, with the
