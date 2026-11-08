@@ -18,6 +18,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.memory.MemoryLayerController
 import com.hereliesaz.geministrator.memory.MemoryLayerSettings
 import com.hereliesaz.geministrator.memory.procedural.FormedHabit
@@ -27,6 +28,11 @@ import com.hereliesaz.geministrator.memory.procedural.HabitOffers
 import com.hereliesaz.geministrator.memory.procedural.ProcedureDeliberationOutcome
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.memory_habits
+import com.hereliesaz.geministrator.resources.memory_habits_add_failed
+import com.hereliesaz.geministrator.resources.memory_habits_add_to
+import com.hereliesaz.geministrator.resources.memory_habits_added
+import com.hereliesaz.geministrator.resources.memory_habits_no_authored
+import com.hereliesaz.geministrator.resources.memory_habits_propose_sequence
 import com.hereliesaz.geministrator.resources.memory_habits_alternative
 import com.hereliesaz.geministrator.resources.memory_habits_alternative_operation
 import com.hereliesaz.geministrator.resources.memory_habits_close
@@ -89,6 +95,17 @@ internal fun MemoryHabitsSection(controller: MemoryLayerController, settings: Me
     val now = Clock.System.now().toEpochMilliseconds()
     var open by remember { mutableStateOf<String?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
+    // A proposal the keeper is looking at, and the workflows of their own it could be added to.
+    var proposal by remember { mutableStateOf<List<TaskDefinition>?>(null) }
+    val host = LocalWorkflowLibraryHost.current
+    var authored by remember { mutableStateOf<List<WorkflowLibraryEntry>>(emptyList()) }
+    LaunchedEffect(proposal, host) {
+        authored = if (proposal == null || host == null) {
+            emptyList()
+        } else {
+            runCatching { host.entries() }.getOrDefault(emptyList()).filter { it.origin == WorkflowLibraryOrigin.Authored }
+        }
+    }
 
     if (habits.isEmpty()) {
         Text(stringResource(Res.string.memory_habits_none), style = AzphaltType.body, color = azphaltOnSurface())
@@ -125,10 +142,14 @@ internal fun MemoryHabitsSection(controller: MemoryLayerController, settings: Me
                             scope.launch {
                                 val taskId = "habit-" + habit.operation.replace(Regex("[^A-Za-z0-9-]"), "-")
                                 message = when (val result = controller.proposeHabitTask(bank, habit.operation, taskId)) {
-                                    is HabitInvocation.Result.Proposed ->
+                                    is HabitInvocation.Result.Proposed -> {
+                                        proposal = listOf(result.task)
                                         getString(Res.string.memory_habits_proposed, result.task.name, result.task.objective)
-                                    is HabitInvocation.Result.Refused ->
+                                    }
+                                    is HabitInvocation.Result.Refused -> {
+                                        proposal = null
                                         getString(Res.string.memory_habits_refused, result.reason)
+                                    }
                                 }
                             }
                         },
@@ -176,9 +197,59 @@ internal fun MemoryHabitsSection(controller: MemoryLayerController, settings: Me
                 style = AzphaltType.body,
                 color = azphaltOnSurface(),
             )
+            AzphaltPill(
+                stringResource(Res.string.memory_habits_propose_sequence),
+                "memory-sequence-propose-${sequence.operations.first()}",
+                onClick = {
+                    message = null
+                    when (val result = HabitInvocation.proposeSequence(sequence, habits, "habit")) {
+                        is HabitInvocation.SequenceResult.Proposed -> {
+                            proposal = result.tasks
+                            scope.launch {
+                                message = getString(
+                                    Res.string.memory_habits_proposed,
+                                    result.tasks.joinToString(", then ") { it.name },
+                                    result.tasks.first().objective,
+                                )
+                            }
+                        }
+                        is HabitInvocation.SequenceResult.Refused -> {
+                            proposal = null
+                            scope.launch { message = getString(Res.string.memory_habits_refused, result.reason) }
+                        }
+                    }
+                },
+            )
         }
     }
     message?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface()) }
+    val shown = proposal
+    if (shown != null && host != null) {
+        if (authored.isEmpty()) {
+            Text(stringResource(Res.string.memory_habits_no_authored), style = AzphaltType.body, color = azphaltOnSurface())
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            authored.forEach { entry ->
+                AzphaltPill(
+                    stringResource(Res.string.memory_habits_add_to, entry.definition.name),
+                    "memory-habit-add-${entry.definition.id.value}",
+                    onClick = {
+                        scope.launch {
+                            message = try {
+                                host.addProposedTasks(entry.definition.id, shown)
+                                proposal = null
+                                getString(Res.string.memory_habits_added, shown.size.toString(), entry.definition.name)
+                            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                throw cancelled
+                            } catch (error: Exception) {
+                                getString(Res.string.memory_habits_add_failed, error.message ?: error::class.simpleName.orEmpty())
+                            }
+                        }
+                    },
+                )
+            }
+        }
+    }
 }
 
 private enum class HabitWords { Flag, Stands, Replace, Override }
