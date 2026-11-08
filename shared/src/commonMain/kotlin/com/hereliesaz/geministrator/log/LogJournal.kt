@@ -20,6 +20,8 @@ data class LogLine(
     val text: String,
     /** The role whose work this line is about, when it is a step of the run; null for the rest. */
     val role: String? = null,
+    /** The creature (task id) this line is about, when it is a run event: a link to it. */
+    val taskId: String? = null,
 )
 
 /**

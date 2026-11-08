@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -82,6 +83,8 @@ internal fun RunLogView(
     taskName: (TaskDefinitionId) -> String,
     sources: RunLogSources,
     modifier: Modifier = Modifier,
+    /** Opens the creature a run-event row is about; rows with a creature are links when set. */
+    onTaskSelected: ((String) -> Unit)? = null,
 ) {
     var picked by rememberDurableStringState(LOG_SOURCE_KEY, LogSource.Run.name)
     val available = remember(sources.memory) {
@@ -148,7 +151,7 @@ internal fun RunLogView(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                items(count = lines.size, key = { keys[it] }) { index -> LogRow(lines[index]) }
+                items(count = lines.size, key = { keys[it] }) { index -> LogRow(lines[index], onTaskSelected) }
             }
         }
     }
@@ -166,8 +169,17 @@ internal fun stableLogKeys(lines: List<LogLine>): List<String> {
 }
 
 @Composable
-private fun LogRow(line: LogLine) {
-    Column(Modifier.fillMaxWidth()) {
+private fun LogRow(line: LogLine, onTaskSelected: ((String) -> Unit)?) {
+    val taskId = line.taskId
+    Column(
+        Modifier.fillMaxWidth().then(
+            if (taskId != null && onTaskSelected != null) {
+                Modifier.clickable(role = androidx.compose.ui.semantics.Role.Button) { onTaskSelected(taskId) }
+            } else {
+                Modifier
+            },
+        ),
+    ) {
         Text(
             text = formatLogTime(line.atEpochMillis) + if (line.scope.isEmpty()) "" else "  ·  ${line.scope}" +
                 (line.role?.let { "  ·  $it" } ?: ""),

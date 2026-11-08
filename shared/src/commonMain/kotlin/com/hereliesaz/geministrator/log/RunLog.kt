@@ -50,6 +50,7 @@ fun runEventLines(
         scope = task?.let(taskName) ?: "workflow",
         text = scrub(event.logText()),
         role = task?.let(roleOf),
+        taskId = task?.value,
     )
 }
 

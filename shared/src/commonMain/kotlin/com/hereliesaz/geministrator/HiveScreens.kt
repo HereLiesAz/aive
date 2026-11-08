@@ -188,6 +188,7 @@ internal fun RunTimeline(
                 taskName = taskName,
                 sources = logSources,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
+                onTaskSelected = onTaskSelected,
             )
             return@Column
         }
