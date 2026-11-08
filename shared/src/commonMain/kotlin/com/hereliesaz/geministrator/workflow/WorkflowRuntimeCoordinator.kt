@@ -31,6 +31,7 @@ import com.hereliesaz.geministrator.policy.PolicyRequest
 import com.hereliesaz.geministrator.policy.PolicyResource
 import com.hereliesaz.geministrator.policy.PolicySubject
 import com.hereliesaz.geministrator.providers.ProviderArtifact
+import com.hereliesaz.geministrator.memory.MemoryRuntimeBridge
 import com.hereliesaz.geministrator.workflow.refinement.LadderDatasetBridge
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -80,7 +81,17 @@ class WorkflowRuntimeCoordinator(
             throw cancellation
         } catch (_: Exception) {
         }
+        // A reviewer's verdict on a system executor's work becomes a verification receipt, written
+        // through the same opt-in sink as the rest; it never affects the run.
+        try {
+            procedureVerifications.observe(project, definition, state.run)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+        }
     }
+
+    private val procedureVerifications = ProcedureVerificationObserver { MemoryRuntimeBridge.procedureTraceSink }
 
     suspend fun resume(workflowRunId: WorkflowRunId): WorkflowRuntimeState {
         val run = requireNotNull(persistence.runs.get(workflowRunId)) {

@@ -57,6 +57,23 @@ object ProcedureTraceRedactor {
         )
     }
 
+    /**
+     * The receipt written after an independent reviewer approved or turned back an execution that
+     * completed. It repeats the execution's operation and slots so it can be read alone, and it
+     * never replaces the original receipt.
+     */
+    fun captureVerification(
+        context: TaskExecutorContext,
+        verification: ProcedureTraceVerification,
+    ): ProcedureTrace {
+        require(verification != ProcedureTraceVerification.Unknown) { "Unknown is not a verification" }
+        return capture(
+            context,
+            ProcedureTracePhase.Verification,
+            result = TaskExecutorExecution(TaskRunStatus.Completed),
+        ).copy(verification = verification)
+    }
+
     /** The executor wrapped by a placement choice; placement is not what the task does. */
     private fun semantic(executor: TaskExecutor): TaskExecutor =
         if (executor is TaskExecutor.Distributed) executor.delegate else executor

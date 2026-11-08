@@ -155,8 +155,8 @@ The keeper can go back at any time, find a habit, and flag it themselves, in the
 
 ## 8. Order of work
 
-1. This note, and the trace additions (operation identity, slots, outcome). Nothing forms without them. **Built:** the receipt carries `operation`, typed `slots` and a `verification` field, and `ProcedureVerifications.of` derives verified or rejected from a reviewing task's verdict. **Next within this step:** record the derived verification into the bank (a receipt is written once, so this is an update the store does not yet have), and give scripts and test commands a name through a host-supplied descriptor.
-2. Lineage-scoped formation: condense receipts into habit memories; per-step slots. Fix the parameter-merge and version-identity bugs here.
+1. This note, and the trace additions (operation identity, slots, outcome). Nothing forms without them. **Built:** the receipt carries `operation`, typed `slots` and a `verification` field, and `ProcedureVerifications.of` derives verified or rejected from a reviewing task's verdict. **Also built:** a verification is recorded as a new receipt beside the original (`ProcedureTracePhase.Verification`, written by `ProcedureVerificationObserver` through the same opt-in sink), never as a rewrite. **Still open in this step:** give scripts and test commands a name through a host-supplied descriptor.
+2. Formation from receipts. **Built (single-operation habits):** `HabitFormation.form` turns receipts into habits. The frame is the executor and the named operation; a use is one finished execution; the slots keep a register of every value they took; failed, verified and rejected uses are counted apart. A habit is offered at three uses, at `Low` strength (§9). `MemoryLayerController.formedHabits` reads the receipts of the workflow's lineage and the other runs of its project, read-only, so it pools only what memory recall already reaches. It runs nothing and writes nothing. **Not yet:** habits of several steps (an ordered sequence repeating across runs), writing a habit into the memory graph as a condensed memory with `CondensedFrom` edges, and per-step slots. The older explicit-proposal path (`ProcedureCandidateProposalService`) is unchanged and still has the two bugs found in review (a required parameter becoming optional when steps are merged, and a version number being reused after a delete); they are fixed when that path is replaced by formation, not patched twice.
 3. Recall of habits by strength, offer only, with the counts (uses, verified uses, flags) and the facts that need only the divergence marker and the receipts (open contrast, recent outcomes, verification, environment, last used). Uses are the habit's occurrences from formation, so they need no invocation. The use window, the results window (direct consumers) and the programmatic `caution` recognizer ship here too. No execution.
 4. Correction: `Diverges` pairing of habits with differing executions, deliberation records scoped to a habit, absorption into a new version.
 5. Overcoming: overrides and their place among the facts, anticipation at planning and recall time, controlled-pass counting, consolidation of the alternative.
@@ -168,9 +168,14 @@ Each step is testable without the next. Acceptance for the whole: a habit forms 
 
 - Models write flags in their own words, and a clerk recognizes that a reaction is one (§5.3). The keeper can always go back, find a habit and flag it themselves (§5.4). The engine states facts; a keeper's decision to change what models do is a deliberation. Flags and facts are informational: none becomes a required acknowledgement or a block, and the habit can always be chosen (§5.1). Approval gates on mutating and privileged steps are the task layer's and are unchanged.
 
+- A habit is offered at **three uses**, at **low** strength. There is no higher level yet; more are added when the data shows where one habit differs from another.
+- An alternative to a habit consolidates after **three** knowing passes, the same number, because the alternative is just a new habit (`HabitSettings`).
+- Recording a verification is folded into formation: it is a receipt, not an update.
+
 ## 10. Open decisions for the keeper
 
-- The recurrence and strength levels at which a habit is offered, and the number of controlled passes that consolidates an alternative.
+- Strength levels above low, and what moves a habit up or down them.
+- Whether habits should form across all of a project's runs (as built, read-only) or only along a run's own lineage.
 - Whether read-only reflexes may ever be offered by strength alone, without a person choosing.
 - Where anticipation runs first: the planner, the Context Packer, or both.
 - Whether a keeper's override carries more weight than an agent's, and how long an override lives with no cue match.
