@@ -95,4 +95,24 @@ class AddProposedTasksTest {
         assertEquals(setOf(gate.id), mergeTask.dependsOn)
         assertEquals(ApprovalPolicy.HumanApproval, mergeTask.approvalPolicy)
     }
+
+    @Test
+    fun aProposalCanBeAddedTwiceBecauseTheSecondGetsFreshIdsThatKeepTheirOrder() {
+        val first = service.addProposedTasks(base, service.withFreshIds(base, proposed()), connectFrom = setOf(TaskDefinitionId("prepare")))
+        // No clash on the first: the ids are the proposal's own.
+        assertEquals(base.tasks.size + 4, first.tasks.size)
+        assertTrue(first.tasks.any { it.id.value == "habit-1" })
+
+        val again = service.withFreshIds(first, proposed())
+        assertEquals(listOf("habit-1-2", "habit-2-2"), again.map { it.id.value })
+        assertEquals(setOf(TaskDefinitionId("habit-1-2")), again[1].dependsOn, "the second step still follows the first")
+
+        val tails = setOf(TaskDefinitionId("habit-2"))
+        val second = service.addProposedTasks(first, again, connectFrom = tails)
+        assertEquals(WorkflowGraphValidator.validate(second), emptyList())
+        assertEquals(base.tasks.size + 8, second.tasks.size)
+        // A third time clears the suffix again.
+        assertEquals(listOf("habit-1-3", "habit-2-3"), service.withFreshIds(second, proposed()).map { it.id.value })
+    }
 }
+
