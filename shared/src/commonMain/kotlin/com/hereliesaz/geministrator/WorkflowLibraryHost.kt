@@ -1,5 +1,8 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.workflow.CodingWorkflowSuite
+import com.hereliesaz.geministrator.workflow.schedule.WorkflowSchedule
+import com.hereliesaz.geministrator.workflow.schedule.WorkflowScheduleStore
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.hereliesaz.geministrator.azphalt.AuthoredWorkflowStore
 import com.hereliesaz.geministrator.azphalt.AzphaltStoreService
@@ -122,6 +125,39 @@ class WorkflowLibraryHost(
         val tails = definition.tasks.map { it.id }.filter { it !in waitedOn }.toSet()
         val fresh = composition.withFreshIds(definition, tasks)
         return saveAuthored(composition.addProposedTasks(definition, fresh, connectFrom = tails))
+    }
+
+    /**
+     * Adds the coding suite ([CodingWorkflowSuite]) to this device's hives, each as one you authored and
+     * can edit. A hive already on the device is left as it is, so your edits survive; each of the
+     * suite's scheduled hives also gets a schedule, off until you turn it on. Returns how many hives
+     * were added.
+     */
+    suspend fun installCodingSuite(schedules: WorkflowScheduleStore, nowEpochMillis: Long): Int {
+        val present = persistence.definitions.all().map { it.id }.toSet()
+        var added = 0
+        for (entry in CodingWorkflowSuite.all()) {
+            if (entry.definition.id !in present) {
+                saveAuthored(entry.definition)
+                added += 1
+            }
+            val suggestion = entry.schedule ?: continue
+            val id = "schedule-${entry.definition.id.value}"
+            if (schedules.all().none { it.id == id }) {
+                schedules.put(
+                    WorkflowSchedule(
+                        id = id,
+                        workflowId = entry.definition.id.value,
+                        name = entry.definition.name,
+                        objective = suggestion.objective,
+                        cadence = suggestion.cadence,
+                        enabled = false,
+                        createdAtEpochMillis = nowEpochMillis,
+                    ),
+                )
+            }
+        }
+        return added
     }
 
     suspend fun saveAuthoredAs(
