@@ -18,7 +18,7 @@ trained to produce the structure of its level and to build on the structure the 
 
 ## 1. Where the data comes from
 
-Real ladder runs, not a generator. With capture switched on (`ladder.dataset.capture.enabled`; see
+Real ladder runs, not a generator. With capture switched on (the **Refinement data** switch on the Memory screen, which shows what has been kept and how many usable rows each level has; `ladder.dataset.capture.enabled`; see
 [privacy](../../docs/PRIVACY.md#refinement-ladder-training-data-off-by-default)), the app records each finished
 level (`LadderDatasetRecord`: the objective as the agent was given it, its answer, whether the answer
 fits `aive.ladder.level.v1` and refines the level above, and its gate's verdict) and how each ladder ended.

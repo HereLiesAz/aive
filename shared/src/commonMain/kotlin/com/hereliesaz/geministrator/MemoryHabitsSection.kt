@@ -17,6 +17,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.memory.MemoryLayerController
@@ -24,10 +26,21 @@ import com.hereliesaz.geministrator.memory.MemoryLayerSettings
 import com.hereliesaz.geministrator.memory.procedural.FormedHabit
 import com.hereliesaz.geministrator.memory.procedural.FormedSequence
 import com.hereliesaz.geministrator.memory.procedural.HabitInvocation
+import com.hereliesaz.geministrator.memory.procedural.HabitLog
+import com.hereliesaz.geministrator.memory.procedural.HabitLogEntry
 import com.hereliesaz.geministrator.memory.procedural.HabitOffers
 import com.hereliesaz.geministrator.memory.procedural.ProcedureDeliberationOutcome
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.memory_habits
+import com.hereliesaz.geministrator.resources.memory_habits_find
+import com.hereliesaz.geministrator.resources.memory_habits_log_copied
+import com.hereliesaz.geministrator.resources.memory_habits_log_copy
+import com.hereliesaz.geministrator.resources.memory_habits_log_copy_failed
+import com.hereliesaz.geministrator.resources.memory_habits_log_empty
+import com.hereliesaz.geministrator.resources.memory_habits_log_hide
+import com.hereliesaz.geministrator.resources.memory_habits_log_recent
+import com.hereliesaz.geministrator.resources.memory_habits_log_show
+import com.hereliesaz.geministrator.resources.memory_habits_no_match
 import com.hereliesaz.geministrator.resources.memory_habits_add_failed
 import com.hereliesaz.geministrator.resources.memory_habits_add_to
 import com.hereliesaz.geministrator.resources.memory_habits_added
@@ -95,6 +108,21 @@ internal fun MemoryHabitsSection(controller: MemoryLayerController, settings: Me
     val now = Clock.System.now().toEpochMilliseconds()
     var open by remember { mutableStateOf<String?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
+    // Finding a habit, and the receipts behind one (or behind all of them).
+    var query by remember { mutableStateOf("") }
+    var logFor by remember { mutableStateOf<String?>(null) }
+    var showRecent by remember { mutableStateOf(false) }
+    var logEntries by remember { mutableStateOf<List<HabitLogEntry>>(emptyList()) }
+    LaunchedEffect(bank, snapshot, refresh, logFor, showRecent) {
+        logEntries = if (logFor == null && !showRecent) {
+            emptyList()
+        } else {
+            runCatching { controller.habitLog(bank, logFor, if (logFor == null) RECENT_LOG else HabitLog.DEFAULT_LIMIT) }
+                .getOrDefault(emptyList())
+        }
+    }
+    @Suppress("DEPRECATION")
+    val clipboard = LocalClipboardManager.current
     // A proposal the keeper is looking at, and the workflows of their own it could be added to.
     var proposal by remember { mutableStateOf<List<TaskDefinition>?>(null) }
     val host = LocalWorkflowLibraryHost.current
@@ -123,11 +151,43 @@ internal fun MemoryHabitsSection(controller: MemoryLayerController, settings: Me
             color = azphaltOnSurface(),
         )
     }
-    habits.forEach { habit ->
+    if (habits.isNotEmpty()) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            label = { Text(stringResource(Res.string.memory_habits_find)) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        AzphaltPill(
+            stringResource(if (showRecent) Res.string.memory_habits_log_hide else Res.string.memory_habits_log_show) +
+                " · " + stringResource(Res.string.memory_habits_log_recent),
+            "memory-habits-log-recent",
+            selected = showRecent,
+            onClick = { showRecent = !showRecent; if (showRecent) logFor = null },
+        )
+        if (showRecent) HabitLogView(logEntries, clipboard, scope) { message = it }
+    }
+    val shownHabits = habits.filter { habit ->
+        val needle = query.trim().lowercase()
+        needle.isEmpty() || habit.operation.lowercase().contains(needle) ||
+            habit.flags.newest.any { it.text.lowercase().contains(needle) } ||
+            (habit.lastDeliberation?.text?.lowercase()?.contains(needle) == true)
+    }
+    if (habits.isNotEmpty() && shownHabits.isEmpty()) {
+        Text(stringResource(Res.string.memory_habits_no_match), style = AzphaltType.body, color = azphaltOnSurface())
+    }
+    shownHabits.forEach { habit ->
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SelectionContainer {
                 Text(HabitOffers.describe(habit, now), style = AzphaltType.body, color = azphaltOnSurface())
             }
+            AzphaltPill(
+                stringResource(if (logFor == habit.operation) Res.string.memory_habits_log_hide else Res.string.memory_habits_log_show),
+                "memory-habit-log-${habit.operation}",
+                selected = logFor == habit.operation,
+                onClick = { logFor = if (logFor == habit.operation) null else habit.operation; showRecent = false },
+            )
+            if (logFor == habit.operation) HabitLogView(logEntries, clipboard, scope) { message = it }
             if (open != habit.operation) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AzphaltPill(
@@ -292,3 +352,38 @@ private fun HabitWordsEditor(
         AzphaltPill(stringResource(Res.string.memory_habits_close), "memory-habit-close", onClick = onClose)
     }
 }
+
+private const val RECENT_LOG = 30
+
+/** The receipts behind a habit as plain lines the keeper can select or copy. */
+@Suppress("DEPRECATION")
+@Composable
+private fun HabitLogView(
+    entries: List<HabitLogEntry>,
+    clipboard: androidx.compose.ui.platform.ClipboardManager,
+    scope: kotlinx.coroutines.CoroutineScope,
+    report: (String) -> Unit,
+) {
+    if (entries.isEmpty()) {
+        Text(stringResource(Res.string.memory_habits_log_empty), style = AzphaltType.body, color = azphaltOnSurface())
+        return
+    }
+    SelectionContainer {
+        Text(HabitLog.render(entries), style = AzphaltType.body, color = azphaltOnSurface())
+    }
+    AzphaltPill(
+        stringResource(Res.string.memory_habits_log_copy),
+        "memory-habits-log-copy",
+        onClick = {
+            scope.launch {
+                report(
+                    runCatching { clipboard.setText(AnnotatedString(HabitLog.render(entries))) }.fold(
+                        onSuccess = { getString(Res.string.memory_habits_log_copied) },
+                        onFailure = { getString(Res.string.memory_habits_log_copy_failed) },
+                    ),
+                )
+            }
+        },
+    )
+}
+

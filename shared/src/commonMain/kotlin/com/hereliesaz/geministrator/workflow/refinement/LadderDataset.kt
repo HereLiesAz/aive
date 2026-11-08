@@ -218,6 +218,52 @@ class SettingsLadderDatasetStore(
     }
 }
 
+/**
+ * What a capture holds, as counts, so the keeper can see how close it is to being enough to train on.
+ * A level row is [usable] when it is structured, sound against the level above, and its gate approved
+ * it: the same test the corpus builder applies, so the number shown is the number it would keep.
+ */
+data class LadderDatasetSummary(
+    val records: Int,
+    val ladders: Int,
+    val usablePerLevel: Map<Int, Int>,
+    val structured: Int,
+    val turnedBack: Int,
+    val outcomes: Int,
+) {
+    companion object {
+        /** Rows per level the corpus builder wants before it calls a level ready. */
+        const val ROWS_NEEDED: Int = 200
+
+        fun of(records: List<LadderDatasetRecord>): LadderDatasetSummary {
+            val levels = records.filter { it.kind == LadderDatasetRecord.KIND_LEVEL }
+            return LadderDatasetSummary(
+                records = records.size,
+                ladders = records.map { it.ladder }.distinct().size,
+                usablePerLevel = levels
+                    .filter { it.level != null && it.structured && it.valid && it.gateVerdict == "approve" }
+                    .groupingBy { it.level!! }.eachCount().toSortedMap(),
+                structured = levels.count { it.structured },
+                turnedBack = levels.count { it.gateVerdict == "reject" || it.gateVerdict == "revise" },
+                outcomes = records.count { it.kind == LadderDatasetRecord.KIND_OUTCOME },
+            )
+        }
+    }
+}
+
+/** One record as a line for a screen: when, which level of which ladder, and what the gate said. */
+fun LadderDatasetRecord.line(): String {
+    val what = if (kind == LadderDatasetRecord.KIND_LEVEL) {
+        "level ${level ?: "?"}/${total ?: "?"} of $ladder: " +
+            (if (structured) "structured" else "not structured") +
+            (if (valid) ", sound" else ", not sound") +
+            ", gate ${gateVerdict ?: "not stated"}"
+    } else {
+        "ladder $ladder ended ${finalStatus ?: "unknown"}" + (verifierVerdict?.let { ", verifier $it" } ?: "")
+    }
+    return "$capturedAtEpochMillis  $what"
+}
+
 object LadderDatasetExporter {
     private val json = Json { encodeDefaults = true }
 
@@ -251,6 +297,12 @@ class LadderDatasetCapture(
     }
 
     suspend fun exportJsonl(): String = LadderDatasetExporter.toJsonl(store.all())
+
+    suspend fun summary(): LadderDatasetSummary = LadderDatasetSummary.of(store.all())
+
+    /** The newest [limit] records, newest first. */
+    suspend fun recent(limit: Int = 30): List<LadderDatasetRecord> =
+        store.all().sortedByDescending { it.capturedAtEpochMillis }.take(limit)
 
     suspend fun clear() = store.clear()
 
