@@ -182,6 +182,26 @@ class ProcedureBankCatalog(
         return ownCandidates + inherited
     }
 
+    /**
+     * The receipts a habit can form from for [workflowId]: its own, its ancestors', and, read-only,
+     * those of the other workflows of its project. This is the reach of memory recall, so a habit
+     * forms from the runs memory already lets this workflow remember, and nothing outside them. A
+     * bank that cannot be read adds nothing.
+     */
+    suspend fun habitTraces(workflowId: String): List<ProcedureTrace> {
+        val key = requireNotNull(memoryBankKey(workflowId))
+        val banks = listOf(key) + lineage.ancestorsOf(key) + lineage.readOnlyNeighboursOf(key)
+        return banks.distinct().flatMap { bank ->
+            try {
+                own(bank).read().traces
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
+    }
+
     suspend fun lookup(workflowId: String, ref: ProcedureReference): ProcedureCandidate? =
         visible(workflowId).firstOrNull { it.definition.ref == ref }
 }

@@ -728,6 +728,26 @@ class MemoryLayerController(
         }
     }
 
+    /**
+     * The habits [workflowId] has formed: repeated runs of one named operation, from this workflow's
+     * lineage and the other runs of its project, read-only. Empty while memory or procedural capture
+     * is off. A habit is information for a model to weigh; this does not run anything.
+     */
+    suspend fun formedHabits(
+        workflowId: String,
+        habitSettings: com.hereliesaz.geministrator.memory.procedural.HabitSettings =
+            com.hereliesaz.geministrator.memory.procedural.HabitSettings(),
+    ): List<com.hereliesaz.geministrator.memory.procedural.FormedHabit> {
+        if (!active || !settings.value.proceduralTraceCaptureEnabled || memoryBankKey(workflowId) == null) {
+            return emptyList()
+        }
+        val catalog = procedureCatalog ?: return emptyList()
+        return com.hereliesaz.geministrator.memory.procedural.HabitFormation.form(
+            catalog.habitTraces(workflowId),
+            habitSettings,
+        )
+    }
+
     val promptContextProvider: MemoryPromptContextProvider = object : MemoryPromptContextProvider {
         override suspend fun recallFor(request: AgentTaskRequest, queryPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan): MemoryPromptRecall =
             recallForPrompt(request, queryPlan)

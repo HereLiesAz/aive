@@ -2,8 +2,12 @@ package com.hereliesaz.geministrator.memory.procedural
 
 import kotlinx.serialization.Serializable
 
+/**
+ * [Verification] receipts are written after the fact, one per verified or rejected execution, as
+ * new records beside the original receipt. A receipt is never rewritten.
+ */
 @Serializable
-enum class ProcedureTracePhase { Dispatch, Reconcile }
+enum class ProcedureTracePhase { Dispatch, Reconcile, Verification }
 
 @Serializable
 enum class ProcedureTraceOutcome { Running, Verifying, Completed, Failed, Threw }
@@ -82,7 +86,9 @@ data class ProcedureTrace(
         }
     }
 
-    val receiptKey: String get() = "$workflowId:$taskRunId:$attempt:${phase.name}:${outcome.name}"
+    val receiptKey: String
+        get() = "$workflowId:$taskRunId:$attempt:${phase.name}:${outcome.name}" +
+            if (phase == ProcedureTracePhase.Verification) ":${verification.name}" else ""
 
     /**
      * The text banked as the receipt's episode. Memory condenses episodes whose frame matches and
