@@ -1115,6 +1115,7 @@ private fun MainDestination(
                     roleSurfaceFilePicker = roleSurfaceFilePicker,
                     modifier = Modifier.fillMaxSize(),
                     onLoadWorkflowDefinitions = onLoadWorkflowDefinitions,
+                    onLoadRunHistory = onLoadRunHistory,
                 )
                 ControlRoomDestination.Inbox -> LiveInboxScreen(runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize(), onLiftSpendStop)
                 ControlRoomDestination.Stable -> Column(

@@ -179,4 +179,30 @@ class PanelScreenshotTest {
             LadderDatasetBridge.reset()
         }
     }
+
+    @Test
+    fun shootsTheRoleActivity() {
+        val later = run.copy(
+            id = WorkflowRunId("run-2"), updatedAtEpochMillis = 1_794_056_000_000L,
+            taskRuns = run.taskRuns.mapValues { (_, taskRun) ->
+                taskRun.copy(id = TaskRunId("b-${taskRun.id.value}"), status = TaskRunStatus.Completed,
+                    usage = com.hereliesaz.geministrator.domain.TaskUsage(12_400, 3_100, 0.18))
+            },
+        )
+        val earlier = run.copy(
+            id = WorkflowRunId("run-1"), updatedAtEpochMillis = 1_794_055_000_000L,
+            taskRuns = run.taskRuns.mapValues { (_, taskRun) ->
+                taskRun.copy(status = if (taskRun.taskDefinitionId.value == "build") TaskRunStatus.Failed else taskRun.status, attempt = 2)
+            },
+        )
+        val activity = com.hereliesaz.geministrator.workflow.RoleActivities.of(
+            BuiltInRoles.ImplementationEngineer.id, listOf(definition), listOf(later, earlier),
+        )
+        shoot("53-role-activity", 780, 700) {
+            androidx.compose.foundation.layout.Column(
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+            ) { RoleActivityView(activity) }
+        }
+    }
 }
+
