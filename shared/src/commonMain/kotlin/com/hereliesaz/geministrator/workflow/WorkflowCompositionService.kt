@@ -105,7 +105,8 @@ class WorkflowCompositionService(
      * Adds tasks a habit proposed (see HabitInvocation) to [definition]: the first of them may wait on
      * [connectFrom], the rest keep the dependencies they came with. Task ids must be new. The result is
      * validated and returned, not saved, like every other method here; the proposal's own approval
-     * policy is untouched, so each added task still asks a person before it runs.
+     * policy is untouched, so each added task still asks a person before it runs. A step that changes
+     * the repository also gets its own human-approval task right before it, which the graph requires.
      */
     fun addProposedTasks(
         definition: WorkflowDefinition,
@@ -119,8 +120,29 @@ class WorkflowCompositionService(
         require(tasks.map { it.id }.distinct().size == tasks.size) { "Proposed task ids repeat." }
         val missing = connectFrom.filter { it !in taken }
         require(missing.isEmpty()) { "Cannot follow undefined tasks: ${missing.joinToString { it.value }}" }
-        val added = tasks.mapIndexed { index, task ->
-            if (index == 0) task.copy(dependsOn = task.dependsOn + connectFrom) else task
+        val added = mutableListOf<TaskDefinition>()
+        tasks.forEachIndexed { index, proposed ->
+            val task = if (index == 0) proposed.copy(dependsOn = proposed.dependsOn + connectFrom) else proposed
+            val mutation = (task.executor.withoutPlacement() as? TaskExecutor.RepositoryOperation)?.isMutation() == true
+            if (!mutation) {
+                added += task
+                return@forEachIndexed
+            }
+            // A repository mutation needs a human-approval task ahead of it (the graph validator's rule),
+            // so the gate is added beside it, in the open, rather than assumed from the task's own policy.
+            val gateId = TaskDefinitionId("${task.id.value}-approval")
+            require(gateId !in taken && added.none { it.id == gateId } && tasks.none { it.id == gateId }) {
+                "Task id already in use: ${gateId.value}"
+            }
+            added += TaskDefinition(
+                id = gateId,
+                name = "Approve: ${task.name}",
+                objective = "A person approves before ${task.name} changes the repository.",
+                roleId = null,
+                executor = TaskExecutor.HumanApproval(),
+                dependsOn = task.dependsOn,
+            )
+            added += task.copy(dependsOn = setOf(gateId))
         }
         return validated(definition.copy(tasks = definition.tasks + added))
     }

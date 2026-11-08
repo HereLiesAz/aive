@@ -19,8 +19,15 @@ I fixed review findings, pushed, and resolved the threads without writing on the
 
 When a piece of work is done, start the next one without asking. A decision I would have asked about gets a sensible default, written into the design note as an open decision, and is fixed later if the keeper disagrees. Stopping to ask whether to continue costs more than a default that turns out wrong.
 
+- Waiting on CI or a reviewer is not the end of a turn. Set the check-in, then start the next item while it runs. I ended turns to wait and was told to keep going; do not end a turn while an unbuilt item remains.
+
 ## A test that ends in `runBlocking` returns Unit
 
 A JUnit 4 test method must return void. `fun test() = runBlocking { ... }` takes the type of its last expression, so a test ending in `assertIs`, `assertNotNull` or any other value-returning call fails with `InvalidTestClassError` and runs nothing. I made this mistake twice.
 
 - Write `fun test(): Unit = runBlocking { ... }` for every test that uses `runBlocking`, as the existing tests do.
+
+## A test base can satisfy the rule it is meant to test
+
+My test for a proposed repository step passed on the first run because its base workflow already held a human-approval task, which counts as an approval ancestor. The test showed nothing. Before trusting a test of a guard, make the base fail the guard first: change the base until the unguarded case is refused, then add the fix.
+
