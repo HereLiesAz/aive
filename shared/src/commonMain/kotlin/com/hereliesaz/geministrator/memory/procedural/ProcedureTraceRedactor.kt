@@ -43,8 +43,13 @@ object ProcedureTraceRedactor {
             recordedAtEpochMillis = context.nowEpochMillis,
             operation = operationOf(context.executor),
             slots = slotsOf(context.executor),
+            environment = environmentOf(context.project.repository),
         )
     }
+
+    /** The repository as `owner/name`, or null when there is none or it is not a plain name. */
+    fun environmentOf(repository: com.hereliesaz.geministrator.domain.RepositoryRef?): String? =
+        repository?.let { "${it.owner}/${it.name}" }?.takeIf { it.matches(ProcedureTrace.ENVIRONMENT) }
 
     /** The executor's kind as a receipt names it. */
     fun kindOf(executor: TaskExecutor): String = when (executor) {

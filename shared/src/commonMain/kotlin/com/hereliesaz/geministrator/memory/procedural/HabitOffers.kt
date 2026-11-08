@@ -107,6 +107,9 @@ object HabitOffers {
         }
         append("Last used ").append(ago(habit.lastUsedAtEpochMillis, nowEpochMillis)).append(". Strength: ")
             .append(habit.strength.name.lowercase()).append(".")
+        if (habit.environments.isNotEmpty()) {
+            append("\n  Done in ").append(habit.environments.joinToString(", ") { "${it.name} (${it.uses})" }).append(".")
+        }
         for (slot in habit.slots) {
             append("\n  ").append(slot.name).append(" has been ")
                 .append(slot.values.joinToString(", ") { "${it.value} (${it.count})" }).append(".")

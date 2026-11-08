@@ -146,4 +146,65 @@ class HabitFlagObserverTest {
         assertEquals(0, habit.flags.used + habit.flags.keeper)
         assertEquals("The build failed in step two.", habit.flags.newest.single().text)
     }
+
+    @Test
+    fun anAgentThatPreparedAFinishedRunHasItsCautionsRecordedAsAUsersFlag() {
+        val plan = TaskDefinitionId("plan")
+        val def = WorkflowDefinition(
+            id = WorkflowDefinitionId("w"),
+            name = "w",
+            tasks = listOf(
+                TaskDefinition(
+                    id = plan, name = "Plan", objective = "Choose the CI run", roleId = BuiltInRoles.QaEngineer.id,
+                    executor = TaskExecutor.RoleAgent(BuiltInRoles.QaEngineer.id),
+                ),
+                TaskDefinition(
+                    id = build, name = "Build", objective = "Run CI", roleId = null,
+                    executor = TaskExecutor.GitHubAction("ci.yml"), dependsOn = setOf(plan),
+                ),
+            ),
+        )
+        val finished = WorkflowRun(
+            id = WorkflowRunId("run"),
+            projectId = project.id,
+            workflowDefinitionId = def.id,
+            objective = "o",
+            status = WorkflowRunStatus.Running,
+            taskRuns = mapOf(
+                plan to TaskRun(
+                    TaskRunId("rp"), plan, TaskRunStatus.Completed, assignedRoleId = BuiltInRoles.QaEngineer.id,
+                    executor = def.tasks[0].executor,
+                    artifacts = listOf(art("I chose the CI run, but it assumes a clean tree.", trusted = true)),
+                ),
+                build to TaskRun(
+                    TaskRunId("rb"), build, TaskRunStatus.Completed, assignedRoleId = null,
+                    executor = def.tasks[1].executor, artifacts = listOf(art("CI output", trusted = true)),
+                ),
+            ),
+            createdAtEpochMillis = 1L,
+            updatedAtEpochMillis = 77L,
+        )
+        val flags = observe(def, finished, finished)
+        val flag = flags.single()
+        assertEquals(ProcedureFlagSource.Used, flag.flag?.source)
+        assertEquals("github-action:ci.yml", flag.operation)
+        assertEquals("rp", flag.taskRunId)
+        // The run has not finished, so the window has not opened.
+        val running = finished.copy(taskRuns = finished.taskRuns + (build to finished.taskRuns.getValue(build).copy(status = TaskRunStatus.Running)))
+        assertTrue(observe(def, running).isEmpty())
+        // The two windows are counted apart on the habit.
+        val habit = HabitFormation.form(
+            (1..3).map { n ->
+                ProcedureTrace(
+                    workflowId = "x$n", projectId = "p", taskRunId = "t$n", taskDefinitionId = "build", attempt = 1,
+                    phase = ProcedureTracePhase.Reconcile, executorKind = "GitHubAction",
+                    outcome = com.hereliesaz.geministrator.memory.procedural.ProcedureTraceOutcome.Completed,
+                    recordedAtEpochMillis = n.toLong(), operation = "github-action:ci.yml",
+                )
+            } + flag,
+        ).single()
+        assertEquals(1, habit.flags.used)
+        assertEquals(0, habit.flags.handled)
+    }
 }
+

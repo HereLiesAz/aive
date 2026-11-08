@@ -31,3 +31,11 @@ A JUnit 4 test method must return void. `fun test() = runBlocking { ... }` takes
 
 My test for a proposed repository step passed on the first run because its base workflow already held a human-approval task, which counts as an approval ancestor. The test showed nothing. Before trusting a test of a guard, make the base fail the guard first: change the base until the unguarded case is refused, then add the fix.
 
+## "Waits on data" is not a reason not to build
+
+I listed five items as blocked ("waits on a model using it", "waits on hundreds of ladder runs") and stopped, calling it responsible. The keeper had said to build it, and that if it is wrong we will fix it when we find out. The point of building is to be able to find out.
+
+- Never decline a requested item because the evidence for it does not exist yet. Build a default version.
+- Build it so it can be observed: record what it did as a receipt or a count, put the switch and the numbers where the keeper can see them, and write down in the design note what result would show it is wrong.
+- Keep it off by default where it records anything new, and keep it informational where it could mislead. Do not leave it unbuilt.
+
