@@ -81,6 +81,9 @@ class AgentProviderRegistry(
     private data class ProviderHealth(val consecutiveFailures: Int = 0, val recent: List<Boolean> = emptyList())
 
     private val healthMutex = kotlinx.coroutines.sync.Mutex()
+
+    /** How many Auto selections were spread so far; guarded by [healthMutex]. */
+    private var autoRotation = 0
     private val health = HashMap<AgentProviderId, ProviderHealth>()
 
     /** Records how a provider run ended; feeds the router's circuit breaker and reliability. */
@@ -224,6 +227,16 @@ class AgentProviderRegistry(
             }
         }
 
+        // Auto work spreads over every healthy provider that can do it, one after another, instead of
+        // all of it going to whichever registered first: a swarm then uses all the providers its
+        // keeper connected (docs/Orchestration_layer.md, Provider spread). A role's own preferred
+        // provider, and the on-device one where it fits, keep the front.
+        if (request.preferredProviderId == null && eligibleProviders.size > 1) {
+            val spread = healthMutex.withLock { spreadAuto(eligibleProviders.toList(), autoRotation++) }
+            eligibleProviders.clear()
+            eligibleProviders.addAll(spread)
+        }
+
         if (eligibleProviders.isNotEmpty()) {
             val route = orchestrationUtilities.routeAgent(
                 AgentRoutingInput(
@@ -274,6 +287,18 @@ private const val HEALTH_WINDOW = 20
 private const val MAX_FAILOVER_NOTES = 20
 
 /** The app's durable inference store (platform default [Settings]). */
+/**
+ * [eligible] with its remote providers turned [turn] places, so successive Auto tasks start from
+ * successive providers. The on-device provider, which fits only small work and is meant to go first,
+ * stays in front. Pure.
+ */
+internal fun <T> spreadAuto(eligible: List<Pair<AgentProvider, T>>, turn: Int): List<Pair<AgentProvider, T>> {
+    val (front, rest) = eligible.partition { (provider, _) -> provider is OnDeviceTextAgentProvider }
+    if (rest.size < 2) return eligible
+    val shift = turn.mod(rest.size)
+    return front + rest.drop(shift) + rest.take(shift)
+}
+
 internal fun durableInferenceSettings(): Settings = chunkedInferenceSettings(Settings())
 
 internal fun chunkedInferenceSettings(delegate: Settings): Settings = ChunkedStringSettings(

@@ -197,6 +197,27 @@ class AgentProviderRegistryRepositoryTest {
         registry.recordOutcome(first.id, success = true)
         assertEquals(first.id, registry.select(request).id, "a success closes it")
     }
+
+    @Test
+    fun autoWorkSpreadsOverEveryProviderThatCanDoItAndAPinnedRoleKeepsItsOwn() = runBlocking {
+        val three = listOf("a", "b", "c").map { SourceAwareProvider(AgentProviderId(it), supportedSources = emptySet()) }
+        val registry = AgentProviderRegistry(
+            providers = three,
+            orchestrationUtilities = RecordingLocalOrchestrationUtilities(),
+            inferenceSettings = InMemorySettings(),
+        )
+        val auto = ProviderSelectionRequest(requiredCapabilities = setOf(AgentCapability.RepositoryRead))
+
+        val chosen = (1..6).map { registry.select(auto).id.value }
+
+        assertEquals(setOf("a", "b", "c"), chosen.toSet(), "all three are used, not just the first registered")
+        assertEquals(chosen.take(3).toSet(), chosen.drop(3).toSet(), "and the turn repeats")
+        val pinned = ProviderSelectionRequest(
+            requiredCapabilities = setOf(AgentCapability.RepositoryRead),
+            preferredProviderId = AgentProviderId("b"),
+        )
+        assertEquals(List(4) { "b" }, List(4) { registry.select(pinned).id.value }, "a pinned role is never moved")
+    }
 }
 
 private class SourceAwareProvider(
