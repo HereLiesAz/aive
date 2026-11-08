@@ -154,6 +154,73 @@ class HabitProposalRuntimeTest {
         assertEquals(listOf("ci.yml", "production"), integration.dispatched)
     }
 
+    @Test
+    fun aHalfFinishedSequenceResumesAfterARestartWithoutRepeatingAStep(): Unit = runBlocking {
+        val receipts = listOf("r1", "r2", "r3").flatMap { listOf(step(it, 10, ci), step(it, 11, deploy)) }
+        val proposed = assertIs<HabitInvocation.SequenceResult.Proposed>(
+            HabitInvocation.proposeSequence(HabitSequences.form(receipts).single(), HabitFormation.form(receipts), "habit"),
+        ).tasks
+        val lint = TaskDefinitionId("lint")
+        val base = WorkflowDefinition(
+            id = WorkflowDefinitionId("base"),
+            name = "Base",
+            tasks = listOf(
+                TaskDefinition(id = lint, name = "Lint", objective = "Lint", roleId = null, executor = TaskExecutor.GitHubAction("lint.yml")),
+            ),
+        )
+        val definition = WorkflowCompositionService(InMemoryWorkflowPersistence())
+            .addProposedTasks(base, proposed, connectFrom = setOf(lint))
+        val project = Project(ProjectId("project"), "Project", createdAtEpochMillis = 1L, updatedAtEpochMillis = 1L)
+        val persistence = InMemoryWorkflowPersistence()
+        persistence.projects.put(project)
+        persistence.definitions.put(definition)
+        val gateway = IdleGateway()
+        val engine = WorkflowEngine(gateway, BuiltInRoles.all)
+        fun coordinator(integration: RecordingIntegration) = WorkflowRuntimeCoordinator(
+            persistence = persistence,
+            engine = engine,
+            sessionGateway = gateway,
+            executorIntegrations = TaskExecutorIntegrationRegistry(listOf(integration)),
+        )
+        val artifactIds = { taskRun: TaskRun, _: ProviderArtifact, index: Int -> ArtifactId("${taskRun.id.value}-$index") }
+
+        val before = RecordingIntegration()
+        var state = WorkflowRuntimeState(
+            WorkflowRunFactory.create(
+                definition = definition,
+                workflowRunId = WorkflowRunId("restart"),
+                projectId = project.id,
+                objective = "Ship",
+                nowEpochMillis = 1L,
+                taskRunIdFactory = { TaskRunId("restart-${it.value}") },
+            ),
+        )
+        var clock = 10L
+        repeat(4) {
+            clock += 10
+            state = coordinator(before).cycle(project, definition, state, clock, artifactIds)
+        }
+        assertEquals(TaskRunStatus.AwaitingApproval, state.run.taskRuns.getValue(TaskDefinitionId("habit-1-approval")).status)
+        assertEquals(listOf("lint.yml"), before.dispatched)
+
+        // The app restarts here: a new coordinator, a new integration, and only what was stored.
+        val approved = engine.completeHumanApprovalTask(definition, state.run, TaskDefinitionId("habit-1-approval"), clock + 5)
+        persistence.runs.put(approved)
+        val after = RecordingIntegration()
+        val resumed = coordinator(after)
+        state = resumed.resume(approved.id)
+        repeat(4) {
+            clock += 10
+            state = resumed.cycle(project, definition, state, clock, artifactIds)
+        }
+
+        assertEquals(listOf("ci.yml"), after.dispatched, "the finished lint step is not dispatched again")
+        assertEquals(
+            TaskRunStatus.AwaitingApproval,
+            state.run.taskRuns.getValue(TaskDefinitionId("habit-2-approval")).status,
+        )
+    }
+
     private class IdleGateway : ManagedSessionGateway {
         override suspend fun resolveProvider(selection: ProviderSelectionRequest) = AgentProviderId("provider")
 
