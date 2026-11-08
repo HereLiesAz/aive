@@ -82,6 +82,7 @@ The swarm gets a leg up by tagging the habit where it is offered, programmatical
 - **Set by the engine from memory state**, as `Diverges` is, not written by a clerk. Setting a flag is noticing, not ruling.
 - **Wording is factual.** A flag the engine writes uses no judging word (correct, wrong, better, outdated), the rule already applied to divergence pair summaries. A flag that carries a judgment quotes a deliberation and names who made it; the judgment is theirs, not the memory layer's.
 - **Offer, not block.** The habit stays in the offer with its flags. Several flags can stack. A flag never removes the habit, lowers its authority, or changes what policy requires to run it.
+- **The habit can always be chosen.** As with a bad habit, nothing in memory takes the choice away. Choosing a flagged habit knowingly is allowed and is recorded as a decision, with the flags that were shown. If it goes well, that is evidence against the flag or the override that warned: it pairs with the deliberation as a contrast and can be deliberated in turn, so flags are corrected the way habits are. If it goes badly, the next offer carries a stronger `RecentFailure`. The only thing that can stop a step is the task layer's own approval policy, which exists without memory and is not changed by it.
 - **It teaches by repetition.** The agent that keeps meeting `RecentFailure` and `Overridden` on a habit starts deciding on purpose, which is the controlled occurrence of §5. A flag the agent reads and sets aside is still a decision made knowingly, and is recorded as one.
 
 ## 6. Boundaries
@@ -117,11 +118,14 @@ The swarm gets a leg up by tagging the habit where it is offered, programmatical
 
 Each step is testable without the next. Acceptance for the whole: a habit forms from repeated runs without any promotion step; a differing execution surfaces beside it; a deliberation produces a new version and keeps the old as history; after an override, the cue yields the habit's offer tagged `Overridden` (not hidden, not blocked), and enough knowing passes consolidate the alternative; no step ever runs without the task layer's own approval.
 
-## 9. Open decisions for the keeper
+## 9. Decided
+
+- Flags are informational. None ever becomes a required acknowledgement or a block; the habit can always be chosen (§5.1). Approval gates on mutating and privileged steps are the task layer's and are unchanged.
+
+## 10. Open decisions for the keeper
 
 - The recurrence and strength levels at which a habit is offered, and the number of controlled passes that consolidates an alternative.
 - Whether read-only reflexes may ever be offered by strength alone, without a person choosing.
 - Where anticipation runs first: the planner, the Context Packer, or both.
 - Whether a keeper's override carries more weight than an agent's, and how long an override lives with no cue match.
 - How fast an unused habit fades, and whether fading differs for mutating habits.
-- Whether any flag ever becomes a required acknowledgement before a step runs (for example `Overridden` on a mutating habit), or flags stay purely informational.
