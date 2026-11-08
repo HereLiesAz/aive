@@ -88,12 +88,33 @@ The swarm gets a leg up from what memory already holds about a habit, stated whe
 
 A flag is written by a model, and only by a model. The engine states facts (§5.1). A keeper's decision is a deliberation or an override and is shown as one. Neither is a flag. A model that uses a habit either adds its own flag or does not. Nothing makes it. What the next model sees is the record of both.
 
-- **The flag.** A short, bounded note on a habit version and cue, saying what the model hit (for example "step 3 assumes a clean tree"). It is a warning, never a prohibition. It is written through a typed action offered with the habit, not as a free edge in the memory graph, so `MODEL_WRITABLE_RELATIONS` does not widen. It is stored as a memory linked to the habit, attributed to its author (role, provider, task run), and scrubbed and bounded like any memory text.
+- **The flag.** The model's own words about what it just did, when they warn (for example "step 3 assumes a clean tree"). The model does not call anything to flag a habit: it reacts as it normally would, and a clerk recognizes whether the reaction is a flag (§5.3). A flag is a warning, never a prohibition. It is stored as a memory linked to the habit, attributed to its author (role, provider, task run), and scrubbed and bounded like any memory text. The engine writes the link on the clerk's recognition, so `MODEL_WRITABLE_RELATIONS` does not widen.
 - **The counts.** Every offer shows two raw numbers beside the habit and its flags: **how many times it has been used** (the habit memory's occurrence count, with how many of those were independently verified) and **how many flags it carries** (by kind, with the newest few quoted). There is no score. The memory layer does not divide one by the other or rank by the result, and the facts of §5.1 sit beside them unscored; the model reading the offer starts forming its own judgment from the numbers, which is the point.
 - **Silence is not approval.** A use with no flag counts as a use. It does not count as an endorsement, and it weighs less than a verified outcome.
 - **Flags are memories.** Identical flags from different runs condense into one with an occurrence count. A flag that conflicts with another flag, or with a later deliberation, is a contrast and is handled by §4. A flag is never deleted by the habit's later success: success is counted as a verified use beside it (§5.1).
 - **Data, not instruction.** A flag's text is recalled and shown as quoted, attributed data. It is never an instruction the memory layer or the offer gives the reader. A flag from a remote peer is marked untrusted until locally accepted. Authors are deduplicated per run so one run cannot stack flags.
 - **No special path to authority.** A flag, however many a habit has, cannot hide the habit, block it, or change what policy requires to run it.
+
+### 5.3 Recognizing a flag
+
+A clerk, not the model and not the engine, recognizes whether a model's reaction to what it just did is a flag. The model only talks.
+
+~~~text
+offer H ─▶ model uses H (receipt matched to H, same session)
+                         │
+         engine opens a window: the model's next message(s) in that session
+                         │
+         clerk reads the window ── caution about what was just done? ──▶ yes: keep the model's own words as a flag on H
+                                                                        no: nothing is recorded
+~~~
+
+- **Which clerk.** The `CategoryClassifier`, with one more filing label, `caution`, beside the labels it already assigns for what a segment is (`requirement`, `preference`, `implementation state`, and so on). The label says what the speaker expressed, as `preference` does. It is not a verdict on the habit and never says the habit is wrong. A new clerk role is not needed.
+- **What the engine decides, mechanically.** Whether a window exists and which habit it is about: the model used H (a receipt matched to H's skeleton) and is the same session, and the window is the messages after the use up to a bound (a few messages, the next tool use, or the end of the task). No window, no flag. A reaction from a model that did not use H, or from a different session, is never a flag on H.
+- **What the clerk decides.** One question: in these messages, does the model express a caution, difficulty or warning about the thing it just did, as opposed to routine narration? It answers flag or not. It keeps the model's own sentences, verbatim, and bounded. It writes nothing of its own and gives no reason.
+- **What the clerk does not decide.** Whether the caution is true, whether the habit is bad, which habit version it concerns beyond the engine's binding, or what should be done. A flag from a mistaken model is still a flag; the counts and the other flags let the next model weigh it. The clerk never infers a flag from silence or from outcome alone.
+- **Programmatic first.** As with every clerk, a programmatic recognizer ships first: negation and hedge structure, the model's reference back to a step or an outcome ("failed", "had to", "assumes", "unexpected"), and a window tied to a use. A local model is added only if it beats that baseline on held-out sessions by more than noise, with the shortcut checks the retired orchestration specialists lacked: predict "not a flag" always, and predict "flag" whenever the outcome was a failure.
+- **Training data.** Labels come from sessions where a later deliberation or a keeper confirmed or rejected a flag. Until there are enough, only the programmatic recognizer runs.
+- **The model is told.** The offer says that a reaction after use may be kept as a flag on the habit, so the behavior is not hidden from the model whose words are kept. Capture follows the existing opt-in for procedural memory.
 
 ## 6. Boundaries
 
@@ -116,14 +137,14 @@ A flag is written by a model, and only by a model. The engine states facts (§5.
 | Import | Digest and source checks only. | Check the definition against its artifact; validate operation ids and bindings; scan free text. |
 | Recall | None. | A procedural lane offering a few habits by strength, and anticipation checking overrides before dispatch. |
 | Offer | None. | Each offered habit shows uses, verified uses and flag counts, the engine's facts (§5.1), and the newest quoted model flags. |
-| Flag action | None. | A typed action for a model to add a flag to a habit version and cue, attributed and bounded, stored by the engine on the model's behalf. No other writer. |
+| Flag recognition | None. | The engine opens a window after a model's use of a habit; the `CategoryClassifier` (new label `caution`, programmatic first) says whether the model's reaction is a flag; the engine stores the model's own words, attributed and bounded. No typed action for the model to call. |
 | Duplex | None. | Unchanged in this note. |
 
 ## 8. Order of work
 
 1. This note, and the trace additions (operation identity, slots, outcome). Nothing forms without them.
 2. Lineage-scoped formation: condense receipts into habit memories; per-step slots. Fix the parameter-merge and version-identity bugs here.
-3. Recall of habits by strength, offer only, with the counts (uses, verified uses, flags) and the facts that need only the divergence marker and the receipts (open contrast, recent outcomes, verification, environment, last used). Uses are the habit's occurrences from formation, so they need no invocation. The typed action for a model to add its own flag ships here too. No execution.
+3. Recall of habits by strength, offer only, with the counts (uses, verified uses, flags) and the facts that need only the divergence marker and the receipts (open contrast, recent outcomes, verification, environment, last used). Uses are the habit's occurrences from formation, so they need no invocation. The use window and the programmatic `caution` recognizer ship here too. No execution.
 4. Correction: `Diverges` pairing of habits with differing executions, deliberation records scoped to a habit, absorption into a new version.
 5. Overcoming: overrides and their place among the facts, anticipation at planning and recall time, controlled-pass counting, consolidation of the alternative.
 6. Governed reflex invocation, then the habit runner, behind the existing gates.
@@ -132,7 +153,7 @@ Each step is testable without the next. Acceptance for the whole: a habit forms 
 
 ## 9. Decided
 
-- Only models write flags. The engine states facts; a keeper's decision is a deliberation. Flags and facts are informational: none becomes a required acknowledgement or a block, and the habit can always be chosen (§5.1). Approval gates on mutating and privileged steps are the task layer's and are unchanged.
+- Only models write flags, in their own words; a clerk recognizes that a reaction is one. The engine states facts; a keeper's decision is a deliberation. Flags and facts are informational: none becomes a required acknowledgement or a block, and the habit can always be chosen (§5.1). Approval gates on mutating and privileged steps are the task layer's and are unchanged.
 
 ## 10. Open decisions for the keeper
 
@@ -141,6 +162,7 @@ Each step is testable without the next. Acceptance for the whole: a habit forms 
 - Where anticipation runs first: the planner, the Context Packer, or both.
 - Whether a keeper's override carries more weight than an agent's, and how long an override lives with no cue match.
 - How fast an unused habit fades, and whether fading differs for mutating habits.
+- Whether `caution` extends the `CategoryClassifier` (suggested) or becomes its own clerk, and how wide the window after a use is.
 - Whether a keeper may also add a flag directly, or only write a deliberation that models see as an override.
 - How many model flags an offer quotes, the length limit of a flag, and whether flags from peers show at all before they are accepted.
 - Whether the offer shows flag counts only for the current cue or also across all cues.
