@@ -155,7 +155,7 @@ The keeper can go back at any time, find a habit, and flag it themselves, in the
 
 ## 8. Order of work
 
-1. This note, and the trace additions (operation identity, slots, outcome). Nothing forms without them.
+1. This note, and the trace additions (operation identity, slots, outcome). Nothing forms without them. **Built:** the receipt carries `operation`, typed `slots` and a `verification` field, and `ProcedureVerifications.of` derives verified or rejected from a reviewing task's verdict. **Next within this step:** record the derived verification into the bank (a receipt is written once, so this is an update the store does not yet have), and give scripts and test commands a name through a host-supplied descriptor.
 2. Lineage-scoped formation: condense receipts into habit memories; per-step slots. Fix the parameter-merge and version-identity bugs here.
 3. Recall of habits by strength, offer only, with the counts (uses, verified uses, flags) and the facts that need only the divergence marker and the receipts (open contrast, recent outcomes, verification, environment, last used). Uses are the habit's occurrences from formation, so they need no invocation. The use window, the results window (direct consumers) and the programmatic `caution` recognizer ship here too. No execution.
 4. Correction: `Diverges` pairing of habits with differing executions, deliberation records scoped to a habit, absorption into a new version.
