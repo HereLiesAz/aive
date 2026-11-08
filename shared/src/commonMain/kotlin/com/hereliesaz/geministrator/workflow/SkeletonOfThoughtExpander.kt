@@ -130,7 +130,7 @@ object SkeletonOfThoughtExpander {
                     TaskDefinition(
                         id = independenceId,
                         name = "Independence review: ${task.name}",
-                        objective = "Review the skeleton for branch overlap, hidden ordering, shared conclusions, and dependencies that would make parallel expansion unsound. Preserve the numbered branch identities. Approve only a decomposition whose branches can be expanded independently; do not solve the branches or mutate the repository.",
+                        objective = "Review the skeleton for branch overlap, hidden ordering, shared conclusions, and dependencies that would make parallel expansion unsound. Preserve the numbered branch identities. Approve only a decomposition whose branches can be expanded independently; do not solve the branches or mutate the repository. ${ArtifactVerdicts.INSTRUCTION}",
                         roleId = independenceReviewer.id,
                         dependsOn = task.dependsOn + skeletonId,
                         condition = task.condition,

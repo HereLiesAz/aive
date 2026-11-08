@@ -5,6 +5,7 @@ import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ApprovalPolicy
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactRef
+import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.BlockingReason
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProviderConstraints
@@ -596,13 +597,28 @@ class WorkflowEngine(
                     artifacts = receivedArtifacts,
                 )
             }
-            val mappedStatus = when (status) {
-                ManagedSessionStatus.Planning -> TaskRunStatus.Planning
-                ManagedSessionStatus.AwaitingApproval -> TaskRunStatus.AwaitingApproval
-                ManagedSessionStatus.Running -> TaskRunStatus.Running
-                ManagedSessionStatus.Completed -> TaskRunStatus.Completed
-                ManagedSessionStatus.Failed -> TaskRunStatus.Failed
-                ManagedSessionStatus.Unknown -> taskRun.status
+            // A gate (a task that requires a Verification artifact) whose artifact turns the work back
+            // fails, so what depends on it stays blocked (ArtifactVerdict.kt). No stated verdict, no change.
+            val gateVerdict = if (
+                status == ManagedSessionStatus.Completed &&
+                producingTask != null &&
+                ArtifactKind.Verification in producingTask.requiredArtifacts
+            ) {
+                ArtifactVerdicts.blocking(durableArtifacts)
+            } else {
+                null
+            }
+            val mappedStatus = if (gateVerdict != null) {
+                TaskRunStatus.Failed
+            } else {
+                when (status) {
+                    ManagedSessionStatus.Planning -> TaskRunStatus.Planning
+                    ManagedSessionStatus.AwaitingApproval -> TaskRunStatus.AwaitingApproval
+                    ManagedSessionStatus.Running -> TaskRunStatus.Running
+                    ManagedSessionStatus.Completed -> TaskRunStatus.Completed
+                    ManagedSessionStatus.Failed -> TaskRunStatus.Failed
+                    ManagedSessionStatus.Unknown -> taskRun.status
+                }
             }
             val safeStatus = if (
                 mappedStatus == taskRun.status || TaskRunTransitions.canTransition(taskRun.status, mappedStatus)
@@ -643,6 +659,14 @@ class WorkflowEngine(
                             providerProgress?.fraction ?: taskRun.progress
                         },
                         progressMessage = providerProgress?.message ?: taskRun.progressMessage,
+                        blockingReason = if (gateVerdict != null) {
+                            BlockingReason(
+                                code = GATE_VERDICT_BLOCKED,
+                                message = "The gate turned this work back (${gateVerdict.name.lowercase()}).",
+                            )
+                        } else {
+                            taskRun.blockingReason
+                        },
                         usage = usageTotal,
                         keeperQuestion = keeperQuestion,
                         answeredKeeperQuestion = answeredQuestion,
