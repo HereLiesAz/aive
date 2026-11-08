@@ -16,6 +16,7 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
+import com.hereliesaz.geministrator.domain.TaskRunId
 import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.events.ApprovalDecisionReceived
 import com.hereliesaz.geministrator.events.ExternalRunCancelFailed
@@ -429,6 +430,64 @@ class WorkflowRuntimeCoordinator(
      * The local cancellation is persisted first. Remote cancels follow, best effort, outside the
      * cycle lock; one that fails is recorded as [ExternalRunCancelFailed] and the rest still run.
      */
+    /**
+     * Rewinds a live run to [taskId] in place (docs/Keepers-Room.md, Pause, change, resume): the
+     * creature and everything downstream of it (and the approvals a repository change needs) start
+     * again as a new attempt, while the rest of the swarm keeps running. Only what is in that set has
+     * its sessions cancelled; what it spent stays on its record; its old approval gates are closed,
+     * its old artifacts stay as history, and the work upstream of it is untouched.
+     */
+    suspend fun rewind(
+        project: Project,
+        definition: WorkflowDefinition,
+        state: WorkflowRuntimeState,
+        taskId: TaskDefinitionId,
+        nowEpochMillis: Long,
+    ): WorkflowRuntimeState = cycleMutex.withLock {
+        val run = persistence.runs.get(state.run.id)
+            ?.takeIf { it.updatedAtEpochMillis > state.run.updatedAtEpochMillis }
+            ?: state.run
+        require(!run.status.isTerminal()) { "A finished run is run again from a task; it cannot be rewound" }
+        require(definition.tasks.any { it.id == taskId }) { "Task ${taskId.value} is not part of this workflow" }
+        val rewound = TaskRerunPlanner.rerunSet(definition, setOf(taskId))
+            .filter { run.taskRuns[it]?.status != TaskRunStatus.Created }
+            .toSet()
+        // Stop what runs inside the set; the rest of the swarm is left as it is.
+        val stopped = state.handles.filterKeys { it in rewound }
+        cancelSessions(run, stopped)
+        persistence.approvalGates.unresolved(run.id)
+            .filter { it.taskDefinitionId in rewound }
+            .forEach { gate ->
+                persistence.approvalGates.put(
+                    gate.copy(status = ApprovalGateStatus.Rejected, decisionNote = "Rewound", decidedAtEpochMillis = nowEpochMillis),
+                )
+            }
+        val fresh = WorkflowRunFactory.create(
+            definition = definition,
+            workflowRunId = run.id,
+            projectId = run.projectId,
+            objective = run.objective,
+            nowEpochMillis = nowEpochMillis,
+            taskRunIdFactory = { id -> TaskRunId("${run.id.value}-${id.value}-r${(run.taskRuns[id]?.attempt ?: 0) + 1}") },
+            repository = run.repositorySnapshot,
+            roles = run.roleSnapshot,
+        )
+        val reset = rewound.mapNotNull { id ->
+            val prior = run.taskRuns[id] ?: return@mapNotNull null
+            fresh.taskRuns[id]?.let { f -> id to f.copy(attempt = prior.attempt + 1, usage = prior.usage) }
+        }.toMap()
+        var next = run.copy(
+            taskRuns = run.taskRuns + reset,
+            status = WorkflowRunStatus.Running,
+            updatedAtEpochMillis = maxOf(nowEpochMillis, run.updatedAtEpochMillis + 1),
+        )
+        next = WorkflowRunFactory.refreshReadiness(definition, next, nowEpochMillis)
+        val handles = state.handles - rewound
+        val result = WorkflowRuntimeState(next, handles)
+        persist(project, definition, result)
+        result
+    }
+
     suspend fun cancel(
         project: Project,
         definition: WorkflowDefinition,

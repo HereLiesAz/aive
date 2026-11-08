@@ -74,6 +74,7 @@ import com.hereliesaz.geministrator.resources.hive_feed_queue
 import com.hereliesaz.geministrator.resources.hive_feed_queued
 import com.hereliesaz.geministrator.resources.hive_feed_title
 import com.hereliesaz.geministrator.resources.hive_feed_unqueue
+import com.hereliesaz.geministrator.resources.launch_error_check_connections
 import com.hereliesaz.geministrator.resources.hive_legend_complete
 import com.hereliesaz.geministrator.resources.hive_legend_note
 import com.hereliesaz.geministrator.resources.hive_legend_waiting
@@ -442,6 +443,8 @@ internal fun HiveFeedBar(
     onLaunch: (String) -> Unit,
     modifier: Modifier = Modifier,
     message: String? = null,
+    /** Opens the Keeper's room's Connections: a launch that failed is usually about what is connected. */
+    onOpenConnections: (() -> Unit)? = null,
 ) {
     var objective by remember(run.id) { mutableStateOf("") }
     val fieldName = stringResource(Res.string.hive_feed_title)
@@ -504,6 +507,9 @@ internal fun HiveFeedBar(
             }
             message?.let {
                 Text(it, style = AzphaltType.body.copy(fontSize = 13.sp), color = azphaltOnSurface(), modifier = Modifier.azphaltLiveRegion())
+                onOpenConnections?.let { open ->
+                    AzphaltPill(label = stringResource(Res.string.launch_error_check_connections), seed = "feed-error-connections", onClick = open)
+                }
             }
         }
     }
@@ -549,13 +555,16 @@ internal fun DockedCreatureCard(
     status: TaskRunStatus,
     provider: String?,
     rigOverride: String?,
+    /** Set, the card is a link to the creature's job and provider (its Work tab). */
+    onClick: (() -> Unit)? = null,
 ) {
     Row(
         Modifier
             .fillMaxWidth()
             .height(138.dp)
             .clip(RoundedCornerShape(14.dp))
-            .background(AzphaltLiftedInk),
+            .background(AzphaltLiftedInk)
+            .then(if (onClick != null) Modifier.clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick) else Modifier),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // The creature is decoration here: its role and state are read from the text beside it.

@@ -92,6 +92,7 @@ import com.hereliesaz.geministrator.resources.overview_search_gitlab_repositorie
 import com.hereliesaz.geministrator.resources.overview_start_run
 import com.hereliesaz.geministrator.resources.overview_start_typing_to_search_your_own
 import com.hereliesaz.geministrator.resources.overview_swarm_activity
+import com.hereliesaz.geministrator.resources.launch_error_check_connections
 import com.hereliesaz.geministrator.resources.hive_pause_run
 import com.hereliesaz.geministrator.resources.hive_paused_note
 import com.hereliesaz.geministrator.resources.overview_swarm_execution
@@ -716,6 +717,14 @@ internal fun MindMapRunScreen(
                         color = azphaltOnSurface(),
                         modifier = Modifier.azphaltLiveRegion(),
                     )
+                    // A launch that failed is usually about what is connected: take the keeper there.
+                    if (launchError != null) {
+                        AzphaltPill(
+                            label = stringResource(Res.string.launch_error_check_connections),
+                            seed = "launch-error-connections",
+                            onClick = onOpenSettings,
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(24.dp))
@@ -767,6 +776,7 @@ internal fun MindMapRunScreen(
                                 onLaunchWorkflow(liveWorkflow.project.name, objective, liveWorkflow.project.repository, listOf(run.id))
                             },
                             message = launchError,
+                            onOpenConnections = onOpenSettings,
                         )
                     },
                 ),

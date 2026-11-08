@@ -19,7 +19,10 @@ class ScheduleClockTest {
         enabled: Boolean = true,
         created: Long = sunday,
         last: Long? = null,
-    ) = WorkflowSchedule(id, "hive", id, "Do it", cadence, enabled, created, last)
+    ) = WorkflowSchedule(
+        id = id, workflowId = "hive", name = id, objective = "Do it", cadence = cadence, enabled = enabled,
+        createdAtEpochMillis = created, lastStartedAtEpochMillis = last,
+    )
 
     @Test
     fun daysOfTheWeekCountFromMondayAndEpochDayZeroWasAThursday() {
@@ -87,5 +90,20 @@ class ScheduleClockTest {
         assertFailsWith<IllegalArgumentException> { ScheduleCadence.daily(24) }
         assertFailsWith<IllegalArgumentException> { ScheduleCadence.weekly(0, 1) }
         assertFailsWith<IllegalArgumentException> { ScheduleCadence.everyHours(0) }
+    }
+
+    @Test
+    fun anOffsetMovesTheHourAndTheDayOfWeekWithIt() {
+        // Daily 07:00 at UTC-6 is 13:00 UTC.
+        val daily = ScheduleCadence.daily(7)
+        assertEquals(sunday + 13 * hour, ScheduleClock.nextSlot(daily, sunday + 2 * hour, utcOffsetMinutes = -360))
+        // Monday 01:00 at UTC-6 is Monday 07:00 UTC; Sunday 22:00 UTC is already Sunday 16:00 there.
+        val monday1 = ScheduleCadence.weekly(dayOfWeek = 1, hourUtc = 1)
+        assertEquals(sunday + day + 7 * hour, ScheduleClock.nextSlot(monday1, sunday + 22 * hour, utcOffsetMinutes = -360))
+        // At UTC+5:30 it is already Monday 03:30 when UTC says Sunday 22:00: that Monday's 01:00 has passed, so next week's.
+        assertEquals(sunday + 8 * day + 1 * hour - 330 * 60_000L, ScheduleClock.nextSlot(monday1, sunday + 22 * hour, utcOffsetMinutes = 330))
+        assertFailsWith<IllegalArgumentException> {
+            WorkflowSchedule(id = "s", workflowId = "h", name = "n", objective = "o", cadence = daily, utcOffsetMinutes = 15 * 60, createdAtEpochMillis = 0)
+        }
     }
 }

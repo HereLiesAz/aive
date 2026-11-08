@@ -115,6 +115,8 @@ import com.hereliesaz.geministrator.resources.inspector_message_agent
 import com.hereliesaz.geministrator.resources.inspector_no_run_is_loaded
 import com.hereliesaz.geministrator.resources.inspector_now
 import com.hereliesaz.geministrator.resources.inspector_payload_context
+import com.hereliesaz.geministrator.resources.inspector_rewind
+import com.hereliesaz.geministrator.resources.inspector_rewind_note
 import com.hereliesaz.geministrator.resources.inspector_plan
 import com.hereliesaz.geministrator.resources.inspector_plan_place
 import com.hereliesaz.geministrator.resources.inspector_open_trace
@@ -183,6 +185,7 @@ internal fun TechnicalInspector(
     activity: SessionActivityFeeds = SessionActivityFeeds.Shared,
     /** Runs a finished run again from this creature; returns why it could not, or null. */
     onRerunFromTask: suspend (WorkflowRunId, TaskRerunRequest) -> String? = { _, _ -> "Running again is unavailable" },
+    onRewindTask: suspend (String) -> String? = { "Rewinding is unavailable" },
     /** Closes the panel onto the hive's Timeline with this creature selected; null where there is none. */
     onOpenTrace: (() -> Unit)? = null,
     /** Docked beside the hive on wide screens (HiveWorkspace.kt): its own head, card and close. Null in a sheet. */
@@ -268,6 +271,7 @@ internal fun TechnicalInspector(
                 status = taskRun.status,
                 provider = providerName,
                 rigOverride = if (executor.isAgentWork()) null else CreatureRigMapping.PROGRAMMATIC_RIG,
+                onClick = if (tab != CreatureTab.Work) ({ onTabChange(CreatureTab.Work) }) else null,
             )
         } else {
         // The creature large at the top, its name and the three tabs beside it (mockup H4).
@@ -575,6 +579,18 @@ internal fun TechnicalInspector(
                         .takeIf { it.isNotEmpty() && hasDependents && taskRun.status == TaskRunStatus.Completed }
                         ?.takeIf { task.executor !is TaskExecutor.HumanApproval }
                         ?.joinToString("\n\n")
+                    // Rewind in place: only this creature and what follows restart; the rest keeps running.
+                    if (!liveWorkflow.run.status.isFinished()) {
+                        var rewindMessage by remember(taskId) { mutableStateOf<String?>(null) }
+                        val rewindScope = rememberCoroutineScope()
+                        AzphaltPill(
+                            label = stringResource(Res.string.inspector_rewind),
+                            seed = "inspector-rewind",
+                            onClick = { rewindScope.launch { rewindMessage = onRewindTask(taskId.value) } },
+                        )
+                        Text(stringResource(Res.string.inspector_rewind_note), style = AzphaltType.body, color = azphaltOnSurface())
+                        rewindMessage?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface()) }
+                    }
                     RerunFromTaskPanel(
                         runId = runId,
                         taskId = taskId,

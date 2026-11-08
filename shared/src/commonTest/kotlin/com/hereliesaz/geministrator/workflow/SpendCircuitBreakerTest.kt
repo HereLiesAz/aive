@@ -149,6 +149,38 @@ class SpendCircuitBreakerTest {
         assertTrue(resumed.run.taskRuns.getValue(waiting).status != TaskRunStatus.Ready, "it is no longer waiting to start")
     }
 
+    @Test
+    fun rewindingACreatureRestartsItAndWhatFollowsWhileAnUnrelatedOneKeepsRunning() = runTest {
+        val gateway = UsageGateway()
+        val other = TaskDefinitionId("other")
+        val definition = definition(task(working), task(waiting, dependsOn = working), task(other))
+        val spent = TaskUsage(inputTokens = 5, outputTokens = 5)
+        val run = run(
+            definition,
+            taskRun(working, TaskRunStatus.Running, providerRunId = "run-working", usage = spent),
+            taskRun(waiting, TaskRunStatus.Blocked),
+            taskRun(other, TaskRunStatus.Running, providerRunId = "run-other"),
+        )
+        val state = WorkflowRuntimeState(
+            run,
+            mapOf(working to handle(working, "run-working"), other to handle(other, "run-other")),
+        )
+
+        val result = coordinator(InMemoryWorkflowPersistence(), gateway, roles(budget = null))
+            .rewind(project(), definition, state, working, 20L)
+
+        val again = result.run.taskRuns.getValue(working)
+        assertEquals(2, again.attempt, "a new attempt")
+        assertEquals(TaskRunStatus.Ready, again.status)
+        assertNull(again.providerRunId)
+        assertEquals(spent, again.usage, "what it spent stays on the record")
+        assertTrue(again.id != run.taskRuns.getValue(working).id, "its old attempt stays as history")
+        assertEquals(2, result.run.taskRuns.getValue(waiting).attempt, "what follows it starts again too")
+        assertEquals(TaskRunStatus.Running, result.run.taskRuns.getValue(other).status, "the unrelated creature keeps running")
+        assertEquals(listOf(ProviderRunId("run-working")), gateway.cancelled.map { it.providerRunId }, "only the rewound session is stopped")
+        assertEquals(setOf(other), result.handles.keys)
+    }
+
     // ---- Spend caps ----
 
     @Test

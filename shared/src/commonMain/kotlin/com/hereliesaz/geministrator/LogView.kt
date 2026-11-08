@@ -67,6 +67,8 @@ internal class RunLogSources(
     val roleOfTask: (TaskDefinitionId) -> String? = { null },
     /** The role whose session a feed is; null when none is. */
     val roleOfSession: (SessionActivityKey) -> String? = { null },
+    /** The creature a feed belongs to, so its lines open it. */
+    val taskOfSession: (SessionActivityKey) -> String? = { null },
 )
 
 private const val LOG_SOURCE_KEY = "overview.timeline.log.source"
@@ -95,8 +97,8 @@ internal fun RunLogView(
     val app by sources.app.collectAsState()
     val memory = sources.memory?.collectAsState()?.value.orEmpty()
     val runLines = remember(events, sources.roleOfTask) { runEventLines(events, taskName, roleOf = sources.roleOfTask) }
-    val agentLines = remember(agents, sources.agentScope, sources.roleOfSession) {
-        agentActivityLines(agents, sources.agentScope, sources.roleOfSession)
+    val agentLines = remember(agents, sources.agentScope, sources.roleOfSession, sources.taskOfSession) {
+        agentActivityLines(agents, sources.agentScope, sources.roleOfSession, sources.taskOfSession)
     }
     val sourceLines = when (source) {
         LogSource.Activity -> remember(runLines, agentLines) { allActivityLines(runLines, agentLines) }

@@ -110,6 +110,7 @@ internal fun LiveInboxScreen(
     onResolveEscalation: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier,
     onLiftSpendStop: () -> Unit = {},
+    onOpenLimits: (() -> Unit)? = null,
 ) {
     if (runtimeState is ApplicationRuntimeState.Live) {
         val presentation = runtimeState.presentation
@@ -118,6 +119,7 @@ internal fun LiveInboxScreen(
                 presentation = presentation,
                 onLiftSpendStop = onLiftSpendStop,
                 modifier = modifier,
+                onOpenLimits = onOpenLimits,
             )
 
             presentation.run.globalPause != null -> HallMonitorPauseInboxScreen(

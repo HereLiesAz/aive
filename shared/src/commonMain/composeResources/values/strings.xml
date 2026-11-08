@@ -510,8 +510,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="schedule_kind_daily">Daily</string>
     <string name="schedule_kind_weekly">Weekly</string>
     <string name="schedule_cadence_hours">Every %1$d hours</string>
-    <string name="schedule_cadence_daily">Daily at %1$s UTC</string>
-    <string name="schedule_cadence_weekly">%1$s at %2$s UTC</string>
+    <string name="schedule_cadence_daily">Daily at %1$s</string>
+    <string name="schedule_cadence_weekly">%1$s at %2$s</string>
     <string name="schedule_next">Next: %1$s</string>
     <string name="schedule_next_off">Off: it does not start</string>
     <string name="schedule_last_never">Has not started yet.</string>
@@ -522,7 +522,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="schedule_hour_later">Later</string>
     <string name="schedule_day_earlier">Day before</string>
     <string name="schedule_day_later">Day after</string>
-    <string name="schedule_note">Times are UTC. A schedule runs only while the app is open; one that came due while it was closed starts once when it opens. It never approves anything, so a hive with an approval waits for you.</string>
+    <string name="schedule_note">Each schedule's hours are in its own offset from UTC (set it with Zone west and east; UTC until you do). A schedule runs only while the app is open; one that came due while it was closed starts once when it opens. It never approves anything, so a hive with an approval waits for you.</string>
+    <string name="schedule_zone_west">Zone west</string>
+    <string name="schedule_zone_east">Zone east</string>
     <string name="schedule_day_1">Monday</string>
     <string name="schedule_day_2">Tuesday</string>
     <string name="schedule_day_3">Wednesday</string>
@@ -576,6 +578,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="creature_egg_withered">Withered egg</string>
     <string name="hive_stop_run">Stop</string>
     <string name="hive_pause_run">Pause</string>
+    <string name="launch_error_check_connections">Check connections</string>
+    <string name="inspector_rewind">Rewind to here</string>
+    <string name="inspector_rewind_note">This creature and what follows it start again as a new attempt. Everything else keeps running, and what this one already spent stays on the record.</string>
     <string name="hive_resume_run">Paused · Resume</string>
     <string name="app_pause_run_failed">Pausing or resuming the run failed</string>
     <string name="hive_paused_note">Paused: nothing new starts. What is running finishes. Change anything, then Resume.</string>
@@ -1305,6 +1310,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="spend_stop_spent">%1$s of %2$s in known cost. Every creature is parked and no session is running.</string>
     <string name="spend_stop_how_to_lift">Raise or clear the cap in the Keeper's room, under This device, then lift the stop. If the cap is still reached, the hive stops again.</string>
     <string name="spend_stop_stopped">STOPPED</string>
+    <string name="spend_stop_change_caps">Change the spend caps</string>
     <string name="spend_stop_lift">Lift the stop</string>
     <string name="settings_local_planner_2">Local planner</string>
     <string name="settings_local_planner_installed_remove">Local planner installed: remove</string>

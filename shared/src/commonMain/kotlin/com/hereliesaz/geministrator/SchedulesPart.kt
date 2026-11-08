@@ -48,6 +48,8 @@ import com.hereliesaz.geministrator.resources.schedule_note
 import com.hereliesaz.geministrator.resources.schedule_off
 import com.hereliesaz.geministrator.resources.schedule_on
 import com.hereliesaz.geministrator.resources.schedule_remove
+import com.hereliesaz.geministrator.resources.schedule_zone_east
+import com.hereliesaz.geministrator.resources.schedule_zone_west
 import com.hereliesaz.geministrator.resources.schedule_run_now
 import com.hereliesaz.geministrator.resources.schedule_run_now_note
 import com.hereliesaz.geministrator.resources.schedule_suite_added
@@ -84,12 +86,20 @@ private fun dayLabel(day: Int): String = stringResource(
 
 private fun hourLabel(hour: Int) = hour.toString().padStart(2, '0') + ":00"
 
-/** "Daily at 07:00 UTC", "Tuesday at 08:00 UTC", "Every 6 hours". */
+/** "UTC", "UTC-6", "UTC+5:30". */
+internal fun offsetLabel(minutes: Int): String {
+    if (minutes == 0) return "UTC"
+    val sign = if (minutes < 0) "-" else "+"
+    val abs = kotlin.math.abs(minutes)
+    return "UTC$sign${abs / 60}" + if (abs % 60 != 0) ":" + (abs % 60).toString().padStart(2, '0') else ""
+}
+
+/** "Daily at 07:00 UTC-6", "Tuesday at 08:00 UTC", "Every 6 hours". */
 @Composable
-internal fun cadenceText(cadence: ScheduleCadence): String = when (cadence.kind) {
+internal fun cadenceText(cadence: ScheduleCadence, utcOffsetMinutes: Int = 0): String = when (cadence.kind) {
     ScheduleCadence.Kind.EveryHours -> stringResource(Res.string.schedule_cadence_hours, cadence.everyHours)
-    ScheduleCadence.Kind.Daily -> stringResource(Res.string.schedule_cadence_daily, hourLabel(cadence.hourUtc))
-    ScheduleCadence.Kind.Weekly -> stringResource(Res.string.schedule_cadence_weekly, dayLabel(cadence.dayOfWeek), hourLabel(cadence.hourUtc))
+    ScheduleCadence.Kind.Daily -> stringResource(Res.string.schedule_cadence_daily, hourLabel(cadence.hourUtc) + " " + offsetLabel(utcOffsetMinutes).let { it })
+    ScheduleCadence.Kind.Weekly -> stringResource(Res.string.schedule_cadence_weekly, dayLabel(cadence.dayOfWeek), hourLabel(cadence.hourUtc) + " " + offsetLabel(utcOffsetMinutes))
 }
 
 /**
@@ -156,7 +166,7 @@ private fun ScheduleCard(schedule: WorkflowSchedule, onChange: (WorkflowSchedule
     val runNow = stringResource(Res.string.schedule_run_now_note)
     AzphaltRecord(
         seed = "schedule-${schedule.id}",
-        eyebrow = cadenceText(schedule.cadence),
+        eyebrow = cadenceText(schedule.cadence, schedule.utcOffsetMinutes),
         title = schedule.name,
         body = listOf(next, last).joinToString("\n"),
         endCap = stringResource(if (schedule.enabled) Res.string.schedule_on else Res.string.schedule_off),
@@ -184,6 +194,20 @@ private fun ScheduleCard(schedule: WorkflowSchedule, onChange: (WorkflowSchedule
                         tone = PillTone.Danger,
                         onClick = onRemove,
                     )
+                }
+                if (schedule.cadence.kind != ScheduleCadence.Kind.EveryHours) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AzphaltPill(
+                            label = stringResource(Res.string.schedule_zone_west) + " (" + offsetLabel(schedule.utcOffsetMinutes) + ")",
+                            seed = "schedule-zone-west-${schedule.id}",
+                            onClick = { onChange(schedule.copy(utcOffsetMinutes = (schedule.utcOffsetMinutes - 30).coerceAtLeast(-14 * 60), lastStartedAtEpochMillis = null, createdAtEpochMillis = currentEpochMillis())) },
+                        )
+                        AzphaltPill(
+                            label = stringResource(Res.string.schedule_zone_east),
+                            seed = "schedule-zone-east-${schedule.id}",
+                            onClick = { onChange(schedule.copy(utcOffsetMinutes = (schedule.utcOffsetMinutes + 30).coerceAtMost(14 * 60), lastStartedAtEpochMillis = null, createdAtEpochMillis = currentEpochMillis())) },
+                        )
+                    }
                 }
                 CadenceEditor(schedule.cadence) { onChange(schedule.copy(cadence = it, createdAtEpochMillis = currentEpochMillis(), lastStartedAtEpochMillis = null)) }
             }

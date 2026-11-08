@@ -11,7 +11,10 @@ class ScheduleTickerTest {
     private val base = 20_765L * 24 * hour
 
     private fun due(id: String = "s") =
-        WorkflowSchedule(id, "hive-$id", "Nightly $id", "Report", ScheduleCadence.everyHours(1), enabled = true, createdAtEpochMillis = base)
+        WorkflowSchedule(
+            id = id, workflowId = "hive-$id", name = "Nightly $id", objective = "Report",
+            cadence = ScheduleCadence.everyHours(1), enabled = true, createdAtEpochMillis = base,
+        )
 
     private class Fixture(var now: Long, var active: Boolean = false, var failWith: String? = null) {
         val store = InMemoryWorkflowScheduleStore()

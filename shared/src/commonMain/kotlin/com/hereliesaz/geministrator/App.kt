@@ -820,6 +820,16 @@ fun App(
                                 failure.message?.takeIf(String::isNotBlank) ?: getString(Res.string.app_provider_message_failed)
                             }
                         },
+                        onRewindTask = { taskId ->
+                            try {
+                                runtime?.rewindToTask(TaskDefinitionId(taskId))
+                                null
+                            } catch (failure: CancellationException) {
+                                throw failure
+                            } catch (failure: Exception) {
+                                failure.message?.takeIf(String::isNotBlank) ?: getString(Res.string.app_rerun_failed)
+                            }
+                        },
                         onRerunFromTask = { runId, request ->
                             try {
                                 val activeRuntime = runtime

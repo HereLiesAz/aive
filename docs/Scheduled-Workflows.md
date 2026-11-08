@@ -4,7 +4,7 @@ A hive can start by itself, on a schedule (`workflow/schedule/`). **Keeper's roo
 
 ## What a schedule is
 
-`WorkflowSchedule`: a hive (by id), an objective, a cadence, on or off (**off by default**), and what it last did (`lastStartedAtEpochMillis`, `lastNote`). Cadences (`ScheduleCadence`): every N hours (1 to 744), daily at an hour, weekly on a day at an hour. **Times are UTC**, written as such everywhere: the app keeps no time zone yet. Schedules are kept on this device (`SettingsWorkflowScheduleStore`, one JSON list; an unreadable list reads as empty rather than breaking the app).
+`WorkflowSchedule`: a hive (by id), an objective, a cadence, on or off (**off by default**), and what it last did (`lastStartedAtEpochMillis`, `lastNote`). Cadences (`ScheduleCadence`): every N hours (1 to 744), daily at an hour, weekly on a day at an hour. The hour of a daily or weekly schedule is in the schedule's own **offset from UTC** (`utcOffsetMinutes`, in half-hour steps with **Zone west / Zone east**, UTC until set): the app reads no time zone from the device. The offset is fixed, so it does not follow daylight saving; move it when the clocks change. Schedules are kept on this device (`SettingsWorkflowScheduleStore`, one JSON list; an unreadable list reads as empty rather than breaking the app).
 
 ## When one starts
 
@@ -29,7 +29,7 @@ It starts the hive **as drawn**: no planner, no plan to confirm, the project tha
 ## Open decisions (what to check against real use)
 
 - **Only while the app is open.** There is no background service: Android has none for this, and the desktop app has no tray. A schedule is wrong for "every night at 02:00" if the app is closed at 02:00; it starts when the app next opens. A real background runner is a platform piece (WorkManager on Android, the control API on desktop) and is not built.
-- **UTC.** Wrong for "7am my time". A UTC offset, kept with each schedule, is the smallest fix.
+- **A fixed offset.** It does not follow daylight saving or a trip. Wrong twice a year; reading the device's zone is the fix and needs a platform call on each target.
 - **One active run.** A scheduled run waiting on a person blocks every other schedule and every run you start. It is wrong if you want parallel runs; the runtime keeps one active run.
 - **The project that is open.** A schedule does not name its project or repository; it uses the open one. Wrong for a keeper with several repositories: a schedule would need to keep a project.
 - **No history beyond the last note.** The log has the decisions; runs are in the hive's history. A per-schedule list of past runs is not built.

@@ -715,6 +715,26 @@ class ApplicationRuntime private constructor(
         taken
     }
 
+    /**
+     * Rewinds the active run to [taskDefinitionId] in place: that creature and what follows it start
+     * again while the rest of the swarm keeps running ([WorkflowRuntimeCoordinator.rewind]).
+     */
+    suspend fun rewindToTask(taskDefinitionId: TaskDefinitionId) {
+        runtimeMutex.withLock {
+            val snapshot = requireNotNull(current) { "No active workflow is loaded" }
+            val next = coordinator.rewind(
+                project = snapshot.project,
+                definition = snapshot.definition,
+                state = snapshot.state,
+                taskId = taskDefinitionId,
+                nowEpochMillis = nowEpochMillis(),
+            )
+            replaceCurrent(snapshot.copy(state = next))
+            publishCurrent()
+            appLog("Rewind", "Rewound ${taskDefinitionId.value} and what follows it; the rest keeps running.")
+        }
+    }
+
     fun close() {
         cycleJob?.cancel()
         cycleJob = null

@@ -7,7 +7,10 @@ import kotlin.test.assertEquals
 
 class WorkflowScheduleStoreTest {
     private fun schedule(id: String, name: String = id) =
-        WorkflowSchedule(id, "hive", name, "Do it", ScheduleCadence.weekly(2, 9), enabled = true, createdAtEpochMillis = 5L, lastNote = "kept")
+        WorkflowSchedule(
+            id = id, workflowId = "hive", name = name, objective = "Do it", cadence = ScheduleCadence.weekly(2, 9),
+            enabled = true, createdAtEpochMillis = 5L, lastNote = "kept",
+        )
 
     @Test
     fun aScheduleSurvivesAWriteAndRead() = runTest {
