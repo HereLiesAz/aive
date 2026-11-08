@@ -24,6 +24,8 @@ internal fun GeministratorWorkflowMindMap(
     modifier: Modifier = Modifier,
     onSurface: (() -> Unit)? = null,
     frame: HiveFrame? = null,
+    /** What a long press on the swarm can delete; null where that is not offered. */
+    hiveDeletion: HiveDeletionActions? = null,
 ) {
     GeministratorWorkflowTerrarium(
         definition = definition,
@@ -35,5 +37,6 @@ internal fun GeministratorWorkflowMindMap(
         compact = branchIsolation,
         onSurface = onSurface,
         frame = frame,
+        hiveDeletion = hiveDeletion,
     )
 }

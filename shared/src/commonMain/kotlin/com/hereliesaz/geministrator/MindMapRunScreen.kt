@@ -160,6 +160,17 @@ internal fun MindMapRunScreen(
     onLoadRuns: suspend () -> List<WorkflowRun> = { emptyList() },
 ) {
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
+    // A long press on the swarm offers Delete hive for the hive on screen; a running one is refused
+    // there, in a plain line, and nothing is deleted (HiveDeletion.kt).
+    val libraryHost = LocalWorkflowLibraryHost.current
+    val liveHiveDeletion = libraryHost?.let { h ->
+        liveWorkflow?.let { live ->
+            HiveDeletionActions(
+                check = { h.hiveDeleteVerdict(live.definition.id) },
+                delete = { h.deleteHive(live.definition.id).also { if (it is HiveDeleteVerdict.Allowed) onSurface?.invoke() } },
+            )
+        }
+    }
     val scope = rememberCoroutineScope()
     val activityEntrance = remember { AzphaltEntrance.childBand() }
     var projectLoadError by remember(runtimeState) { mutableStateOf<String?>(null) }
@@ -741,6 +752,7 @@ internal fun MindMapRunScreen(
                 onTaskSelected = onTaskSelected,
                 modifier = Modifier.fillMaxWidth(),
                 onSurface = onSurface,
+                hiveDeletion = liveHiveDeletion,
                 frame = HiveFrame(
                     // Title, controls bar, feed bar and the page's own padding take the rest.
                     tissueHeight = (viewportHeight - WIDE_HIVE_CHROME).coerceAtLeast(WIDE_TISSUE_MIN),
@@ -866,6 +878,7 @@ internal fun MindMapRunScreen(
             onTaskSelected = onTaskSelected,
             modifier = Modifier.fillMaxWidth(),
             onSurface = onSurface,
+            hiveDeletion = liveHiveDeletion,
         )
 
         Text(stringResource(Res.string.overview_swarm_activity), style = AzphaltType.eyebrow, color = azphaltOnSurface())

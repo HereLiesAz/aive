@@ -25,7 +25,8 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 internal fun HiveActionsMenu(
     name: String,
-    onOpen: () -> Unit,
+    /** Null on a hive that is already open: there is nothing to open. */
+    onOpen: (() -> Unit)?,
     onDelete: (() -> Unit)?,
     onDismiss: () -> Unit,
 ) {
@@ -37,13 +38,15 @@ internal fun HiveActionsMenu(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Text(name, style = AzphaltType.section, color = azphaltOnSurface(), maxLines = 3)
-                    AzphaltPill(
-                        label = stringResource(Res.string.hive_menu_open),
-                        seed = "hive-menu-open",
-                        tone = PillTone.Primary,
-                        onClick = { onDismiss(); onOpen() },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    if (onOpen != null) {
+                        AzphaltPill(
+                            label = stringResource(Res.string.hive_menu_open),
+                            seed = "hive-menu-open",
+                            tone = PillTone.Primary,
+                            onClick = { onDismiss(); onOpen() },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                     if (onDelete != null) {
                         AzphaltPill(
                             label = stringResource(Res.string.hive_delete),

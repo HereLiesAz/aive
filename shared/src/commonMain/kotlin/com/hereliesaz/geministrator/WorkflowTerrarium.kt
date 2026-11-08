@@ -33,6 +33,10 @@ import com.hereliesaz.geministrator.resources.hive_view_creatures
 import com.hereliesaz.geministrator.resources.hive_view_flowchart
 import com.hereliesaz.geministrator.resources.flowchart_empty
 import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlinx.coroutines.withTimeoutOrNull
 import com.hereliesaz.geministrator.resources.hive_new_empty
 import com.hereliesaz.geministrator.resources.terrarium_could_not_stage_workflow_edit
 import androidx.compose.foundation.background
@@ -145,6 +149,8 @@ internal fun GeministratorWorkflowTerrarium(
     val roaming = remember(stagedDefinition, run) { projectRoaming(stagedDefinition, run) }
     val swarmView = rememberDurableBooleanState("hive.view.swarm")
     val flowView = rememberDurableBooleanState("hive.view.flow")
+    var hiveMenu by remember { mutableStateOf(false) }
+    var hiveDeleting by remember { mutableStateOf(false) }
     val animatedRelationships = remember(projection.relationships, run) {
         projection.relationships.map { relationship ->
             if (relationship.kind != H2g2TerrariumRelationshipKind.Dependency) {
@@ -437,7 +443,52 @@ internal fun GeministratorWorkflowTerrarium(
             }
         }
 
-        val shownField: @Composable () -> Unit = if (flowView.value && !readOnly) flowField else field
+        val baseField: @Composable () -> Unit = if (flowView.value && !readOnly) flowField else field
+        // A long press anywhere on the swarm opens its menu (Delete hive, which asks first). It only
+        // watches: a drag, a pinch or a creature's own gesture cancels it, so none of them is disturbed.
+        val shownField: @Composable () -> Unit = if (hiveDeletion == null || readOnly) {
+            baseField
+        } else {
+            {
+                Box(
+                    Modifier.fillMaxSize().pointerInput(Unit) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            val ended = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val change = event.changes.firstOrNull { it.id == down.id }
+                                    if (event.changes.size > 1 || change == null || !change.pressed || change.isConsumed ||
+                                        (change.position - down.position).getDistance() > viewConfiguration.touchSlop
+                                    ) {
+                                        return@withTimeoutOrNull true
+                                    }
+                                }
+                                @Suppress("UNREACHABLE_CODE")
+                                false
+                            }
+                            if (ended == null) hiveMenu = true
+                        }
+                    },
+                ) { baseField() }
+            }
+        }
+        if (hiveMenu && hiveDeletion != null) {
+            HiveActionsMenu(
+                name = definition.name,
+                onOpen = null,
+                onDelete = { hiveDeleting = true },
+                onDismiss = { hiveMenu = false },
+            )
+        }
+        if (hiveDeleting && hiveDeletion != null) {
+            HiveDeleteRequest(
+                name = definition.name,
+                creatures = stagedDefinition.tasks.size,
+                actions = hiveDeletion,
+                onFinished = { hiveDeleting = false },
+            )
+        }
         if (frame == null) {
             Box(Modifier.fillMaxWidth().height(if (compact) 470.dp else 620.dp)) { shownField() }
         } else {
