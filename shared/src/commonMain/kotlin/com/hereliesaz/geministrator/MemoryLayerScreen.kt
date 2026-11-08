@@ -342,6 +342,7 @@ private fun MemoryLayerControls(controller: MemoryLayerController, connectedProv
 
     QueueSection(controller, settings)
     SummariesSection(controller)
+    MemoryHabitsSection(controller, settings)
     ProjectsSection(controller, settings)
     TuningSection(settings, onApply = { policy -> update { it.copy(policy = policy) } })
     ModelsSection(controller)

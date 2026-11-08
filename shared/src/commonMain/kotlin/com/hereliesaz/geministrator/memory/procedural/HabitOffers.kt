@@ -91,6 +91,9 @@ object HabitOffers {
             ).joinToString("\n").take(MAX_CHARS)
     }
 
+    /** One habit as the facts the offer states, for a screen that lists habits. */
+    fun describe(habit: FormedHabit, nowEpochMillis: Long): String = entry(habit, nowEpochMillis)
+
     private fun entry(habit: FormedHabit, nowEpochMillis: Long): String = buildString {
         append("- ").append(habit.operation).append(": used ").append(habit.uses)
             .append(if (habit.uses == 1) " time" else " times")
