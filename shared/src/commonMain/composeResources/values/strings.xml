@@ -544,6 +544,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="timeline_view_memory">Memory</string>
     <string name="timeline_view_log">Log</string>
     <string name="timeline_view_flowchart">Flowchart</string>
+    <string name="hive_view_creatures">Creatures</string>
+    <string name="hive_view_flowchart">Flowchart</string>
     <string name="swarm_activity_show">Show activity</string>
     <string name="swarm_activity_hide">Hide activity</string>
     <string name="swarm_activity_none">This role has not done anything in any run yet.</string>

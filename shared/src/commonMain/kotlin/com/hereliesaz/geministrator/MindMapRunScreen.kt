@@ -853,7 +853,9 @@ internal fun MindMapRunScreen(
                 val waitingOnIt = remember(liveWorkflow.definition, run, liveWorkflow.roles) {
                     creaturesWaitingOn(activeRun.taskDefinitionId, liveWorkflow.definition, run, liveWorkflow.roles)
                 }
-                CreatureDoingNow(activeRun, name, waitingOnIt, activity)
+                CreatureDoingNow(activeRun, name, waitingOnIt, activity) {
+                    if (selectedTaskId != activeTaskId) onTaskSelected(activeTaskId)
+                }
             }
         }
         if (compact) GeministratorWorkflowMindMap(
@@ -887,6 +889,8 @@ internal fun MindMapRunScreen(
                 seed = "task-activity-${task.id.value}",
                 label = task.name,
                 value = detail,
+                // A link: what it says is acted on in the creature's panel (its provider, its job).
+                onClick = { if (selectedTaskId != task.id.value) onTaskSelected(task.id.value) },
                 modifier = Modifier
                     .azphaltLiveRegion()
                     .azphaltEntrance(activityEntrance, index, recentTasks.size.coerceAtLeast(1)),
@@ -932,7 +936,13 @@ private fun hiveStatusLine(live: LiveWorkflowPresentation, activeTaskId: String?
  * creatures waiting on its output ("· feeds Engineer").
  */
 @Composable
-private fun CreatureDoingNow(taskRun: TaskRun, name: String, waitingOnIt: List<String>, activity: SessionActivityFeeds) {
+private fun CreatureDoingNow(
+    taskRun: TaskRun,
+    name: String,
+    waitingOnIt: List<String>,
+    activity: SessionActivityFeeds,
+    onOpen: () -> Unit,
+) {
     val providerRunId = taskRun.providerRunId ?: return
     val feeds by activity.feeds.collectAsState()
     val latest = feeds[SessionActivityKey(taskRun.id, providerRunId)]?.lastOrNull() ?: return
@@ -945,6 +955,7 @@ private fun CreatureDoingNow(taskRun: TaskRun, name: String, waitingOnIt: List<S
         } else {
             stringResource(Res.string.overview_doing_now_feeds, doing, waitingOnIt.joinToString(", "))
         },
+        onClick = onOpen,
     )
 }
 

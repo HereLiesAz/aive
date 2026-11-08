@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -28,6 +29,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.hive_view_label
+import com.hereliesaz.geministrator.resources.hive_view_creatures
+import com.hereliesaz.geministrator.resources.hive_view_flowchart
+import com.hereliesaz.geministrator.resources.flowchart_empty
+import androidx.compose.ui.semantics.Role
 import com.hereliesaz.geministrator.resources.hive_new_empty
 import com.hereliesaz.geministrator.resources.terrarium_could_not_stage_workflow_edit
 import androidx.compose.foundation.background
@@ -38,6 +43,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
+
+/**
+ * How the shell lets a selected creature go when bare ground is tapped. It differs from
+ * `onTaskSelected`, which treats a tap on the creature whose panel was closed as "open it again".
+ */
+internal val LocalReleaseCreature = staticCompositionLocalOf<((String) -> Unit)?> { null }
 
 /**
  * Production workflow view: the DAG is a living node-creature map rather than a diagram.
@@ -78,6 +89,8 @@ internal fun GeministratorWorkflowTerrarium(
      */
     readOnly: Boolean = false,
 ) {
+    // Bare ground lets the selection go; where the shell offers a plain release, use it, else a re-tap.
+    val releaseCreature = LocalReleaseCreature.current ?: onTaskSelected
     val scope = rememberCoroutineScope()
     val layoutStore = remember { SettingsTerrariumLayoutStore.createDefault() }
     val fallbackDraftPersistence = remember { com.hereliesaz.geministrator.persistence.WorkflowPersistenceFactory.durable }
@@ -131,6 +144,7 @@ internal fun GeministratorWorkflowTerrarium(
     // Who shares a creature: ordered tasks of one role. Build and the Swarm view keep one creature per task.
     val roaming = remember(stagedDefinition, run) { projectRoaming(stagedDefinition, run) }
     val swarmView = rememberDurableBooleanState("hive.view.swarm")
+    val flowView = rememberDurableBooleanState("hive.view.flow")
     val animatedRelationships = remember(projection.relationships, run) {
         projection.relationships.map { relationship ->
             if (relationship.kind != H2g2TerrariumRelationshipKind.Dependency) {
@@ -313,6 +327,44 @@ internal fun GeministratorWorkflowTerrarium(
                 }
             }
         }
+        // Any hive, resting or live, can be read as a flowchart instead of creatures: a workflow's
+        // steps and what each waits on. It shows the staged hive and the run's states, and edits nothing.
+        if (!readOnly) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                AzphaltPill(
+                    label = stringResource(Res.string.hive_view_creatures),
+                    seed = "view-creatures",
+                    selected = !flowView.value,
+                    role = Role.RadioButton,
+                    onClick = { flowView.value = false },
+                )
+                AzphaltPill(
+                    label = stringResource(Res.string.hive_view_flowchart),
+                    seed = "view-flowchart",
+                    selected = flowView.value,
+                    role = Role.RadioButton,
+                    onClick = { flowView.value = true },
+                )
+            }
+        }
+        val flowField: @Composable () -> Unit = {
+            WorkflowFlowchartView(
+                flow = remember(stagedDefinition, run, roles) {
+                    com.hereliesaz.geministrator.workflow.WorkflowFlowchart.of(
+                        stagedDefinition,
+                        run,
+                        roleName = { id -> roles.firstOrNull { it.id == id }?.name ?: id.value },
+                    )
+                },
+                selectedTaskId = selectedTaskId,
+                onTaskSelected = onTaskSelected,
+                emptyText = stringResource(Res.string.flowchart_empty),
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
         val field: @Composable () -> Unit = {
           // Programmatic steps, local or remote, wear the neuron: the swarm reads as a flowchart.
           androidx.compose.runtime.CompositionLocalProvider(
@@ -365,7 +417,7 @@ internal fun GeministratorWorkflowTerrarium(
                 },
                 // Tapping the bare ground lets go of the selection, which returns the view to the whole hive.
                 onGroundTapped = {
-                    if (grouping == null) selectedTaskId?.let(onTaskSelected)
+                    if (grouping == null) selectedTaskId?.let(releaseCreature)
                 },
                 modifier = Modifier.fillMaxSize(),
                 camera = camera,
@@ -385,10 +437,11 @@ internal fun GeministratorWorkflowTerrarium(
             }
         }
 
+        val shownField: @Composable () -> Unit = if (flowView.value && !readOnly) flowField else field
         if (frame == null) {
-            Box(Modifier.fillMaxWidth().height(if (compact) 470.dp else 620.dp)) { field() }
+            Box(Modifier.fillMaxWidth().height(if (compact) 470.dp else 620.dp)) { shownField() }
         } else {
-            HiveTissueFrame(height = frame.tissueHeight, building = building) { field() }
+            HiveTissueFrame(height = frame.tissueHeight, building = building) { shownField() }
             frame.feedBar()
         }
         if (building) beneathField?.let { bench ->

@@ -36,6 +36,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.produceState
@@ -395,6 +396,14 @@ fun ControlRoom(
         if (destination.navigationItem != ControlRoomDestination.Settings) keeperOpen.value = false
         onDestinationSelected(ControlRoomDestination.Settings)
     }
+    // Tapping bare ground lets the selected creature go. It must not go through selectCreature, which
+    // reads a tap on the creature whose panel was set aside as "open it again": that made the sheet
+    // return on any tap after it was closed.
+    val releaseCreature: (String) -> Unit = { id ->
+        panelSetAside = null
+        onTaskSelected(id)
+    }
+    CompositionLocalProvider(LocalReleaseCreature provides releaseCreature) {
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
@@ -554,6 +563,7 @@ fun ControlRoom(
                 }
             }
         }
+    }
     }
 }
 
