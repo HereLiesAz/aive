@@ -34,6 +34,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.hive_draft_adopted
+import com.hereliesaz.geministrator.resources.hive_draft_closest
+import com.hereliesaz.geministrator.resources.hive_draft_closest_line
+import com.hereliesaz.geministrator.resources.hive_draft_closest_use
+import com.hereliesaz.geministrator.resources.hive_draft_planner
 import com.hereliesaz.geministrator.resources.hive_draft_done
 import com.hereliesaz.geministrator.resources.hive_draft_go
 import com.hereliesaz.geministrator.resources.hive_draft_hint
@@ -67,6 +72,11 @@ private sealed interface DraftPhase {
     data class Review(val ready: SwarmDraftResult.Ready) : DraftPhase
     data class Failed(val message: String, val raw: String?) : DraftPhase
     data object Kept : DraftPhase
+
+    /** Saved hives that resemble the description, offered before the planner is asked. */
+    data class Closest(val asked: String, val matches: List<ClosestHive>) : DraftPhase
+
+    data class Adopted(val name: String, val creatures: Int) : DraftPhase
 }
 
 /**
@@ -94,6 +104,7 @@ internal fun SwarmDraftBox(
     var prompt by remember(key) { mutableStateOf("") }
     var phase by remember(key) { mutableStateOf<DraftPhase>(DraftPhase.Idle) }
     val defaultName = stringResource(Res.string.hive_new_name)
+    val host = LocalWorkflowLibraryHost.current
 
     fun apply(ready: SwarmDraftResult.Ready) {
         scope.launch {
@@ -105,13 +116,8 @@ internal fun SwarmDraftBox(
         }
     }
 
-    fun draft() {
-        if (phase == DraftPhase.Working) return
-        if (prompt.isBlank()) {
-            scope.launch { phase = DraftPhase.Failed(problemMessage(SwarmDraftProblem.NoPrompt), null) }
-            return
-        }
-        val asked = prompt
+    /** The planner's draft of [asked]; what the Draft button did before saved hives were offered first. */
+    fun plan(asked: String) {
         phase = DraftPhase.Working
         scope.launch {
             val result = try {
@@ -130,6 +136,40 @@ internal fun SwarmDraftBox(
                     phase = DraftPhase.Failed(result.summary ?: friendlyErrorMessageOutsideComposition(result.raw), result.raw)
                 SwarmDraftResult.Unavailable -> phase = DraftPhase.Failed(getString(Res.string.hive_draft_unavailable), null)
             }
+        }
+    }
+
+    fun draft() {
+        if (phase == DraftPhase.Working) return
+        if (prompt.isBlank()) {
+            scope.launch { phase = DraftPhase.Failed(problemMessage(SwarmDraftProblem.NoPrompt), null) }
+            return
+        }
+        val asked = prompt
+        // A new hive first shows the closest hives already saved, the literal option, beside the
+        // planner's own; with none close, it goes straight to the planner.
+        if (!redraft && host != null) {
+            phase = DraftPhase.Working
+            scope.launch {
+                val found = try {
+                    ClosestHives.of(asked, host.entries().map { it.definition }.filter { it.id != definition.id })
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Throwable) {
+                    emptyList()
+                }
+                if (found.isEmpty()) plan(asked) else phase = DraftPhase.Closest(asked, found)
+            }
+            return
+        }
+        plan(asked)
+    }
+
+    /** The saved hive's creatures become this hive's, as one edit on the tide: one Undo takes them out again. */
+    fun adopt(match: ClosestHive) {
+        scope.launch {
+            onEdit(TerrariumDependencyEditResult.Applied(definition.copy(tasks = match.definition.tasks)))
+            phase = DraftPhase.Adopted(match.definition.name, match.definition.tasks.size)
         }
     }
 
@@ -156,6 +196,27 @@ internal fun SwarmDraftBox(
                 now.notes.forEach { Status(it) }
             }
             DraftPhase.Kept -> Status(stringResource(Res.string.hive_draft_kept))
+            is DraftPhase.Adopted -> Status(stringResource(Res.string.hive_draft_adopted, now.name, now.creatures))
+            is DraftPhase.Closest -> {
+                Status(stringResource(Res.string.hive_draft_closest))
+                now.matches.forEach { match ->
+                    val line = stringResource(
+                        Res.string.hive_draft_closest_line,
+                        match.definition.name,
+                        match.definition.tasks.size,
+                        match.matched.joinToString(", "),
+                    )
+                    val use = stringResource(Res.string.hive_draft_closest_use)
+                    Status(line)
+                    AzphaltThemedSurface(Azphalt.Ink) {
+                        DraftCapsuleButton(use, "$use: ${match.definition.name}", Azphalt.Ink, onClick = { adopt(match) })
+                    }
+                }
+                AzphaltThemedSurface(Azphalt.Ink) {
+                    val planner = stringResource(Res.string.hive_draft_planner)
+                    DraftCapsuleButton(planner, planner, AzphaltLiftedInk, onClick = { plan(now.asked) })
+                }
+            }
             is DraftPhase.Review -> {
                 Status(stringResource(Res.string.hive_draft_review, now.ready.tasks.size, redraftReplaces(definition)))
                 now.ready.notes.forEach { Status(it) }

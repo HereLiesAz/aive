@@ -495,6 +495,11 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_draft_replace">Replace</string>
     <string name="hive_draft_keep">Keep mine</string>
     <string name="hive_draft_kept">Kept your hive as it is.</string>
+    <string name="hive_draft_closest">Closest to what you described, from your hives:</string>
+    <string name="hive_draft_closest_line">%1$s · %2$d creatures · matched: %3$s</string>
+    <string name="hive_draft_closest_use">Use this hive</string>
+    <string name="hive_draft_planner">See how the planner would do it</string>
+    <string name="hive_draft_adopted">Using %1$s: %2$d creatures. Undo takes them out again.</string>
     <string name="hive_draft_retry">Try again</string>
     <string name="hive_draft_problem_no_prompt">Say what the swarm is for first.</string>
     <string name="hive_draft_problem_no_roles">No creatures are switched on to draft with. Switch some on in the Roster.</string>
