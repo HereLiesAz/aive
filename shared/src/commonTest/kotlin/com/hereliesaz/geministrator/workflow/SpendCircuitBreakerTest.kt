@@ -111,6 +111,76 @@ class SpendCircuitBreakerTest {
         assertTrue(gateway.cancelled.isEmpty())
     }
 
+    // ---- The keeper's pause ----
+
+    @Test
+    fun aKeeperPauseStartsNothingNewAndCancelsNothingUntilItIsCleared() = runTest {
+        val gateway = UsageGateway()
+        val definition = definition(task(working), task(waiting))
+        val run = run(
+            definition,
+            taskRun(working, TaskRunStatus.Running, providerRunId = "run-working"),
+            taskRun(waiting, TaskRunStatus.Ready),
+        ).copy(keeperPause = com.hereliesaz.geministrator.domain.WorkflowKeeperPause(pausedAtEpochMillis = 10L))
+        val coordinator = coordinator(InMemoryWorkflowPersistence(), gateway, roles(budget = null))
+
+        // The control: the same hive without the pause starts the waiting creature, so the pause is what held it.
+        val controlGateway = UsageGateway()
+        coordinator(InMemoryWorkflowPersistence(), controlGateway, roles(budget = null)).cycle(
+            project(), definition,
+            WorkflowRuntimeState(run.copy(keeperPause = null), mapOf(working to handle(working, "run-working"))), 20L, ::artifactId,
+        )
+        assertEquals(1, controlGateway.created, "without a pause the Ready creature starts")
+
+        val paused = coordinator.cycle(project(), definition, WorkflowRuntimeState(run, mapOf(working to handle(working, "run-working"))), 20L, ::artifactId)
+
+        assertEquals(TaskRunStatus.Running, paused.run.taskRuns.getValue(working).status, "what runs keeps running")
+        assertEquals(TaskRunStatus.Ready, paused.run.taskRuns.getValue(waiting).status, "nothing new starts")
+        assertEquals(0, gateway.created)
+        assertTrue(gateway.cancelled.isEmpty(), "nothing is cancelled")
+        assertNotNull(paused.run.keeperPause)
+
+        val resumed = coordinator.cycle(
+            project(), definition,
+            // As the runtime does it: the cleared pause is a newer run, so it wins over the persisted one.
+            WorkflowRuntimeState(paused.run.copy(keeperPause = null, updatedAtEpochMillis = 25L), paused.handles), 30L, ::artifactId,
+        )
+        assertEquals(1, gateway.created, "resuming starts what waited")
+        assertTrue(resumed.run.taskRuns.getValue(waiting).status != TaskRunStatus.Ready, "it is no longer waiting to start")
+    }
+
+    @Test
+    fun rewindingACreatureRestartsItAndWhatFollowsWhileAnUnrelatedOneKeepsRunning() = runTest {
+        val gateway = UsageGateway()
+        val other = TaskDefinitionId("other")
+        val definition = definition(task(working), task(waiting, dependsOn = working), task(other))
+        val spent = TaskUsage(inputTokens = 5, outputTokens = 5)
+        val run = run(
+            definition,
+            taskRun(working, TaskRunStatus.Running, providerRunId = "run-working", usage = spent),
+            taskRun(waiting, TaskRunStatus.Blocked),
+            taskRun(other, TaskRunStatus.Running, providerRunId = "run-other"),
+        )
+        val state = WorkflowRuntimeState(
+            run,
+            mapOf(working to handle(working, "run-working"), other to handle(other, "run-other")),
+        )
+
+        val result = coordinator(InMemoryWorkflowPersistence(), gateway, roles(budget = null))
+            .rewind(project(), definition, state, working, 20L)
+
+        val again = result.run.taskRuns.getValue(working)
+        assertEquals(2, again.attempt, "a new attempt")
+        assertEquals(TaskRunStatus.Ready, again.status)
+        assertNull(again.providerRunId)
+        assertEquals(spent, again.usage, "what it spent stays on the record")
+        assertTrue(again.id != run.taskRuns.getValue(working).id, "its old attempt stays as history")
+        assertEquals(2, result.run.taskRuns.getValue(waiting).attempt, "what follows it starts again too")
+        assertEquals(TaskRunStatus.Running, result.run.taskRuns.getValue(other).status, "the unrelated creature keeps running")
+        assertEquals(listOf(ProviderRunId("run-working")), gateway.cancelled.map { it.providerRunId }, "only the rewound session is stopped")
+        assertEquals(setOf(other), result.handles.keys)
+    }
+
     // ---- Spend caps ----
 
     @Test

@@ -17,6 +17,7 @@ import com.hereliesaz.geministrator.resources.common_inbox
 import com.hereliesaz.geministrator.resources.spend_stop_eyebrow
 import com.hereliesaz.geministrator.resources.spend_stop_how_to_lift
 import com.hereliesaz.geministrator.resources.spend_stop_lift
+import com.hereliesaz.geministrator.resources.spend_stop_change_caps
 import com.hereliesaz.geministrator.resources.spend_stop_spent
 import com.hereliesaz.geministrator.resources.spend_stop_stopped
 import com.hereliesaz.geministrator.resources.spend_stop_title_hourly
@@ -34,6 +35,8 @@ internal fun SpendStopInboxScreen(
     presentation: LiveWorkflowPresentation,
     onLiftSpendStop: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Opens the spend caps in the Keeper's room, so the cap that stopped the run can be raised. */
+    onOpenLimits: (() -> Unit)? = null,
 ) {
     val pause = presentation.run.spendPause ?: return
     Column(
@@ -65,6 +68,14 @@ internal fun SpendStopInboxScreen(
                         tone = PillTone.Primary,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    onOpenLimits?.let { open ->
+                        AzphaltPill(
+                            label = stringResource(Res.string.spend_stop_change_caps),
+                            seed = "spend-stop-caps",
+                            onClick = open,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                 }
             },
         )

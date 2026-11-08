@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -66,6 +67,8 @@ internal class RunLogSources(
     val roleOfTask: (TaskDefinitionId) -> String? = { null },
     /** The role whose session a feed is; null when none is. */
     val roleOfSession: (SessionActivityKey) -> String? = { null },
+    /** The creature a feed belongs to, so its lines open it. */
+    val taskOfSession: (SessionActivityKey) -> String? = { null },
 )
 
 private const val LOG_SOURCE_KEY = "overview.timeline.log.source"
@@ -82,6 +85,8 @@ internal fun RunLogView(
     taskName: (TaskDefinitionId) -> String,
     sources: RunLogSources,
     modifier: Modifier = Modifier,
+    /** Opens the creature a run-event row is about; rows with a creature are links when set. */
+    onTaskSelected: ((String) -> Unit)? = null,
 ) {
     var picked by rememberDurableStringState(LOG_SOURCE_KEY, LogSource.Run.name)
     val available = remember(sources.memory) {
@@ -92,8 +97,8 @@ internal fun RunLogView(
     val app by sources.app.collectAsState()
     val memory = sources.memory?.collectAsState()?.value.orEmpty()
     val runLines = remember(events, sources.roleOfTask) { runEventLines(events, taskName, roleOf = sources.roleOfTask) }
-    val agentLines = remember(agents, sources.agentScope, sources.roleOfSession) {
-        agentActivityLines(agents, sources.agentScope, sources.roleOfSession)
+    val agentLines = remember(agents, sources.agentScope, sources.roleOfSession, sources.taskOfSession) {
+        agentActivityLines(agents, sources.agentScope, sources.roleOfSession, sources.taskOfSession)
     }
     val sourceLines = when (source) {
         LogSource.Activity -> remember(runLines, agentLines) { allActivityLines(runLines, agentLines) }
@@ -114,6 +119,7 @@ internal fun RunLogView(
             onSelected = { picked = it },
             seedPrefix = "log-source",
             keepSelectedInView = true,
+            wrap = true,
         )
         Text(logSourceNote(source), style = AzphaltType.endCap, color = azphaltOnSurface())
         if (roles.isNotEmpty()) {
@@ -148,7 +154,7 @@ internal fun RunLogView(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                items(count = lines.size, key = { keys[it] }) { index -> LogRow(lines[index]) }
+                items(count = lines.size, key = { keys[it] }) { index -> LogRow(lines[index], onTaskSelected) }
             }
         }
     }
@@ -166,8 +172,17 @@ internal fun stableLogKeys(lines: List<LogLine>): List<String> {
 }
 
 @Composable
-private fun LogRow(line: LogLine) {
-    Column(Modifier.fillMaxWidth()) {
+private fun LogRow(line: LogLine, onTaskSelected: ((String) -> Unit)?) {
+    val taskId = line.taskId
+    Column(
+        Modifier.fillMaxWidth().then(
+            if (taskId != null && onTaskSelected != null) {
+                Modifier.clickable(role = androidx.compose.ui.semantics.Role.Button) { onTaskSelected(taskId) }
+            } else {
+                Modifier
+            },
+        ),
+    ) {
         Text(
             text = formatLogTime(line.atEpochMillis) + if (line.scope.isEmpty()) "" else "  ·  ${line.scope}" +
                 (line.role?.let { "  ·  $it" } ?: ""),

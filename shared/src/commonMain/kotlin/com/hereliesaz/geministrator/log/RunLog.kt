@@ -50,6 +50,7 @@ fun runEventLines(
         scope = task?.let(taskName) ?: "workflow",
         text = scrub(event.logText()),
         role = task?.let(roleOf),
+        taskId = task?.value,
     )
 }
 
@@ -121,12 +122,15 @@ fun agentActivityLines(
     feeds: Map<SessionActivityKey, List<SessionActivityLine>>,
     scopeOf: (SessionActivityKey) -> String?,
     roleOf: (SessionActivityKey) -> String? = { null },
+    /** The creature (task id) a session belongs to, so its lines can link to it. */
+    taskOf: (SessionActivityKey) -> String? = { null },
 ): List<LogLine> = feeds.flatMap { (key, lines) ->
     val scope = scopeOf(key) ?: return@flatMap emptyList()
     val role = roleOf(key)
+    val task = taskOf(key)
     lines.map { line ->
         val mark = if (line.kind == SessionActivityKind.Thinking) "thinking" else "step"
-        Triple(line, key, LogLine(line.atEpochMillis, scope, "[$mark] ${line.text}", role))
+        Triple(line, key, LogLine(line.atEpochMillis, scope, "[$mark] ${line.text}", role, task))
     }
 }.sortedWith(compareBy({ it.first.atEpochMillis }, { it.second.providerRunId.value }, { it.first.id }))
     .map { it.third }
@@ -153,6 +157,11 @@ fun rolesIn(lines: List<LogLine>): List<String> = lines.mapNotNull { it.role }.d
 /** The lines about [role]; all of them when it is null. */
 fun linesForRole(lines: List<LogLine>, role: String?): List<LogLine> =
     if (role == null) lines else lines.filter { it.role == role }
+
+/** The task (creature) of each task run of a run, by session, for [agentActivityLines]. */
+fun sessionTask(
+    taskRunToTask: Map<TaskRunId, String>,
+): (SessionActivityKey) -> String? = { key -> taskRunToTask[key.taskRunId] }
 
 /** The role of each task run of a run, by session, for [agentActivityLines]. */
 fun sessionRole(

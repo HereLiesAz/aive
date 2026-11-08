@@ -11,7 +11,7 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 /** The logs the Log tab can show (docs/Keepers-Room.md). [Activity] is the run's events and its agents' own steps, together. */
-enum class LogSource { Activity, Run, Agents, App, Memory }
+enum class LogSource { Activity, Agents, Run, Memory, App }
 
 /** One dated line. [scope] says whose it is: a task, a tag, a workflow. */
 data class LogLine(
@@ -20,6 +20,8 @@ data class LogLine(
     val text: String,
     /** The role whose work this line is about, when it is a step of the run; null for the rest. */
     val role: String? = null,
+    /** The creature (task id) this line is about, when it is a run event: a link to it. */
+    val taskId: String? = null,
 )
 
 /**

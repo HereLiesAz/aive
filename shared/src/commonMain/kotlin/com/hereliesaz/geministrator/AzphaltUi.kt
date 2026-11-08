@@ -356,6 +356,8 @@ internal fun AzphaltTabs(
     leading: (@Composable () -> Unit)? = null,
     /** Scrolls the selected tab into view when it changes, so a row that overflows never hides where you are. */
     keepSelectedInView: Boolean = false,
+    /** Wraps onto more lines instead of scrolling sideways, so no tab is ever off the edge. */
+    wrap: Boolean = false,
 ) {
     val scroll = rememberScrollState()
     var viewport by remember { mutableStateOf(0) }
@@ -372,14 +374,7 @@ internal fun AzphaltTabs(
             }
         }
     }
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .onSizeChanged { viewport = it.width }
-            .horizontalScroll(scroll)
-            .selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(AzphaltSpacing.s),
-    ) {
+    val tabContent: @Composable () -> Unit = {
         leading?.invoke()
         tabs.forEachIndexed { index, tab ->
             AzphaltPill(
@@ -388,7 +383,7 @@ internal fun AzphaltTabs(
                 selected = tab.key == selectedKey,
                 endCap = tab.endCap,
                 onClick = { onSelected(tab.key) },
-                modifier = if (keepSelectedInView) {
+                modifier = if (keepSelectedInView && !wrap) {
                     Modifier.onPlaced { spans[tab.key] = it.positionInParent().x.toInt().let { x -> x..(x + it.size.width) } }
                 } else {
                     Modifier
@@ -397,6 +392,23 @@ internal fun AzphaltTabs(
                 stateDescription = stringResource(Res.string.tab_position, index + 1, tabs.size),
             )
         }
+    }
+    if (wrap) {
+        @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+        androidx.compose.foundation.layout.FlowRow(
+            modifier = modifier.fillMaxWidth().selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(AzphaltSpacing.s),
+            verticalArrangement = Arrangement.spacedBy(AzphaltSpacing.s),
+        ) { tabContent() }
+    } else {
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .onSizeChanged { viewport = it.width }
+                .horizontalScroll(scroll)
+                .selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(AzphaltSpacing.s),
+        ) { tabContent() }
     }
 }
 

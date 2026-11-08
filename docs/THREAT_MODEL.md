@@ -628,3 +628,7 @@ Invariant 4, together with the gate-decider, approval-policy and add-on permissi
 
 - `.github/workflows/multiplatform.yml` consumes the shared `HereLiesAz/workflows` actions at `@main`. The owner made this deliberate decision because both repositories share one owner. It is recorded here as accepted, not as an item to fix.
 - The crash relay key ships in the APK. It is a spam filter, not an authentication secret.
+
+## Scheduled launches
+
+A schedule (`workflow/schedule/`) starts a saved hive by itself while the app is open. It adds no authority: it goes through the same `launchSavedWorkflow` as a keeper's launch, as drawn, with no planner and no plan to confirm, and it never approves, so invariant 4 holds (a repository change still waits behind a person's approval step, which stops the run and holds every later schedule behind it). A schedule is off until the keeper turns it on; only a keeper edits one (the Keeper's room); it names a hive and an objective, not a command; and each decision is written in the app log. The coding suite's scheduled hives contain no approval, implementation or test-authoring step, a property `CodingWorkflowSuiteTest` enforces. Residual risk: an edited copy of a suite hive, put on a schedule, runs whatever the keeper put in it, unattended, with the open project's repository and the connected agents' reach.

@@ -14,6 +14,7 @@ import com.hereliesaz.geministrator.domain.TaskRun
 import com.hereliesaz.geministrator.domain.TaskRunId
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
+import com.hereliesaz.geministrator.domain.WorkflowKeeperPause
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
@@ -348,6 +349,13 @@ class ApplicationRuntime private constructor(
      */
     suspend fun rerunFromTask(sourceRunId: WorkflowRunId, request: TaskRerunRequest) {
         runtimeMutex.withLock {
+            // Rewinding a run that is still live: it is cancelled first (what had finished keeps its
+            // result and carries over; what was running starts again in the new run), then forked.
+            var cancelledLive = false
+            current?.takeIf { it.state.run.id == sourceRunId && !it.state.run.status.isTerminal() }?.let { live ->
+                coordinator.cancel(live.project, live.definition, live.state, nowEpochMillis())
+                cancelledLive = true
+            }
             val source = persistence.runs.get(sourceRunId)
                 ?: error("Run ${sourceRunId.value} was not found")
             val storedProject = persistence.projects.get(source.projectId)
@@ -383,7 +391,7 @@ class ApplicationRuntime private constructor(
 
             // As with a launch, one run is active at a time: a live one being replaced is cancelled,
             // best effort, rather than left Running with its sessions still open.
-            current?.takeUnless { it.state.run.status.isTerminal() }?.let { previous ->
+            current?.takeUnless { cancelledLive || it.state.run.status.isTerminal() }?.let { previous ->
                 try {
                     coordinator.cancel(previous.project, previous.definition, previous.state, now)
                 } catch (cancellation: CancellationException) {
@@ -650,6 +658,80 @@ class ApplicationRuntime private constructor(
             persistence.runs.put(lifted)
             replaceCurrent(snapshot.copy(state = WorkflowRuntimeState(lifted, emptyMap())))
             publishCurrent()
+        }
+    }
+
+    /**
+     * The keeper's pause of the active run, or its resume (docs/Keepers-Room.md, Pause, change, resume).
+     * Paused, nothing new starts; what is running finishes, and nothing is cancelled or parked, so
+     * resuming starts nothing over. A run that has finished is left alone.
+     */
+    suspend fun setKeeperPause(paused: Boolean) {
+        runtimeMutex.withLock {
+            val snapshot = requireNotNull(current) { "No active workflow is loaded" }
+            val live = snapshot.state.run
+            val run = persistence.runs.get(live.id)
+                ?.takeIf { it.updatedAtEpochMillis > live.updatedAtEpochMillis }
+                ?: live
+            if (run.status.isTerminal() || (run.keeperPause != null) == paused) return@withLock
+            val now = maxOf(nowEpochMillis(), run.updatedAtEpochMillis + 1)
+            val updated = run.copy(
+                keeperPause = if (paused) WorkflowKeeperPause(pausedAtEpochMillis = now) else null,
+                updatedAtEpochMillis = now,
+            )
+            persistence.runs.put(updated)
+            replaceCurrent(snapshot.copy(state = WorkflowRuntimeState(updated, snapshot.state.handles)))
+            publishCurrent()
+        }
+    }
+
+    /**
+     * An edit saved to the hive on screen reaches its live run (docs/Keepers-Room.md, Pause, change,
+     * resume). Only a creature the run has not started (waiting, ready or about to retry) takes the
+     * edit, its job and criteria, now, because the engine reads a task's definition when it starts it;
+     * a creature that is running or done, a creature's role, executor and strands, and the hive's shape
+     * stay as the run has them and change from the next run. Nothing is cancelled and nothing restarts.
+     * Returns how many creatures took an edit.
+     */
+    suspend fun applyLiveDefinitionEdit(edited: WorkflowDefinition): Int = runtimeMutex.withLock {
+        val snapshot = current ?: return@withLock 0
+        val run = snapshot.state.run
+        if (snapshot.definition.id != edited.id || run.status.isTerminal()) return@withLock 0
+        val open = setOf(TaskRunStatus.Created, TaskRunStatus.Blocked, TaskRunStatus.Ready, TaskRunStatus.Retrying)
+        var taken = 0
+        val tasks = snapshot.definition.tasks.map { old ->
+            val new = edited.tasks.firstOrNull { it.id == old.id }
+            if (new != null && run.taskRuns[old.id]?.status in open) {
+                val merged = new.copy(dependsOn = old.dependsOn, roleId = old.roleId, executor = old.executor)
+                if (merged != old) taken += 1
+                merged
+            } else {
+                old
+            }
+        }
+        if (taken == 0) return@withLock 0
+        replaceCurrent(snapshot.copy(definition = snapshot.definition.copy(tasks = tasks)))
+        publishCurrent()
+        taken
+    }
+
+    /**
+     * Rewinds the active run to [taskDefinitionId] in place: that creature and what follows it start
+     * again while the rest of the swarm keeps running ([WorkflowRuntimeCoordinator.rewind]).
+     */
+    suspend fun rewindToTask(taskDefinitionId: TaskDefinitionId) {
+        runtimeMutex.withLock {
+            val snapshot = requireNotNull(current) { "No active workflow is loaded" }
+            val next = coordinator.rewind(
+                project = snapshot.project,
+                definition = snapshot.definition,
+                state = snapshot.state,
+                taskId = taskDefinitionId,
+                nowEpochMillis = nowEpochMillis(),
+            )
+            replaceCurrent(snapshot.copy(state = next))
+            publishCurrent()
+            appLog("Rewind", "Rewound ${taskDefinitionId.value} and what follows it; the rest keeps running.")
         }
     }
 

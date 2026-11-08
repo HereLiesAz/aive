@@ -1579,3 +1579,9 @@ Deterministic baselines (shipped)
 Every value a specialist would otherwise compute (rarity order, the second-pass text, synonyms, repeats, the knapsack selection and prompt order, circuit state, the fitted handoff, the critical path, failure groups, test targets) is precomputed in its model input, and the guard copies the lookups (synonyms, cuts, sources, circuit state, critical path, failure groups) from the baseline.
 
 Changing a baseline changes the training labels: rebuild the corpus (`tools/orchestration_training/build_kaggle_dataset.sh`) and retrain the affected adapters.
+
+## Provider spread
+
+An Auto task (its role pins no provider) goes to the next healthy provider that can do it, turn by turn, so a swarm uses every provider its keeper connected instead of all of it going to the first one registered (`spreadAuto`, `AgentProviderRegistry.select`). The on-device provider, where it fits, and a role's own preferred provider keep the front; a task that requires a provider by id goes to it; a benched or circuit-open provider is left out as before. The turn is a counter of this launch, not stored, so it starts over at a restart.
+
+Open decision: round-robin ignores cost and quality. It is wrong if a keeper wants the cheapest or best provider used first; pin the role to that provider (Work, Provider) and the spread leaves it alone. A weighted choice by cost, health or load can replace the counter later without changing anything else.

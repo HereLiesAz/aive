@@ -170,6 +170,7 @@ internal fun RunTimeline(
             seedPrefix = "timeline-view",
             leading = overview,
             keepSelectedInView = true,
+            wrap = true,
         )
         // Memory scrolls itself; the timeline's own views share one scrolling body under the fixed row.
         if (shown == TIMELINE_MEMORY) {
@@ -188,6 +189,7 @@ internal fun RunTimeline(
                 taskName = taskName,
                 sources = logSources,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
+                onTaskSelected = onTaskSelected,
             )
             return@Column
         }

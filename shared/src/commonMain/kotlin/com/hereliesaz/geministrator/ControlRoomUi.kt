@@ -6,6 +6,8 @@ import com.hereliesaz.geministrator.resources.hive_show_hive
 import com.hereliesaz.geministrator.resources.hive_stop_cancel
 import com.hereliesaz.geministrator.resources.hive_stop_confirm
 import com.hereliesaz.geministrator.resources.hive_stop_run
+import com.hereliesaz.geministrator.resources.hive_pause_run
+import com.hereliesaz.geministrator.resources.hive_resume_run
 import com.hereliesaz.geministrator.resources.hive_stop_text
 import com.hereliesaz.geministrator.resources.hive_stop_title
 import kotlinx.coroutines.launch
@@ -162,9 +164,12 @@ fun ControlRoom(
     onLiftSpendStop: () -> Unit = {},
     /** Stops the active run: every unfinished creature and provider session. */
     onStopRun: (WorkflowRunId) -> Unit = {},
+    onPauseRun: (Boolean) -> Unit = {},
     onMessageAgent: suspend (String, String) -> String? = { _, _ -> "Messaging is unavailable" },
     /** Runs a finished run again from one of its creatures; returns why it could not, or null. */
     onRerunFromTask: suspend (WorkflowRunId, TaskRerunRequest) -> String? = { _, _ -> "Running again is unavailable" },
+    /** Rewinds the live run to a creature in place; null on success, else why not. */
+    onRewindTask: suspend (String) -> String? = { "Rewinding is unavailable" },
     /** Answers a creature's question to the keeper: task id, question key, answer; null on success. */
     onAnswerKeeperQuestion: suspend (String, String, String) -> String? = { _, _, _ -> "Messaging is unavailable" },
     onRecoverFromCorruption: () -> Unit,
@@ -367,6 +372,7 @@ fun ControlRoom(
                 onResolveEscalation = onResolveEscalation,
                 onMessageAgent = onMessageAgent,
                 onRerunFromTask = onRerunFromTask,
+                onRewindTask = onRewindTask,
                 onAnswerKeeperQuestion = onAnswerKeeperQuestion,
                 tab = creatureTab,
                 onTabChange = { creatureTabName = it.name },
@@ -468,6 +474,7 @@ fun ControlRoom(
                 onResolveEscalation = onResolveEscalation,
                 onLiftSpendStop = onLiftSpendStop,
                 onStopRun = onStopRun,
+                onPauseRun = onPauseRun,
                 onMessageAgent = onMessageAgent,
                 onRecoverFromCorruption = onRecoverFromCorruption,
                 onRetryRuntime = onRetryRuntime,
@@ -742,6 +749,8 @@ private fun MainDestination(
     onResolveEscalation: (String, Boolean) -> Unit,
     onLiftSpendStop: () -> Unit,
     onStopRun: (WorkflowRunId) -> Unit,
+    /** Pause (true) or resume (false) the live hive; see [ApplicationRuntime.setKeeperPause]. */
+    onPauseRun: (Boolean) -> Unit,
     onMessageAgent: suspend (String, String) -> String?,
     onRecoverFromCorruption: () -> Unit,
     onRetryRuntime: () -> Unit,
@@ -829,6 +838,15 @@ private fun MainDestination(
             // where the hive's own pills scroll off the end, and heads them on a wide window.
             val stopPill: @Composable () -> Unit = {
                 liveHive?.takeUnless { it.run.status.isFinished() }?.let {
+                    // Pause lets what runs finish and starts nothing new, with no creature stopped; the
+                    // pill then reads Resume. Everything stays open to change while it is paused.
+                    val paused = it.run.keeperPause != null
+                    AzphaltPill(
+                        label = stringResource(if (paused) Res.string.hive_resume_run else Res.string.hive_pause_run),
+                        seed = "hive-pause-run",
+                        selected = paused,
+                        onClick = { onPauseRun(!paused) },
+                    )
                     AzphaltPill(
                         label = stringResource(Res.string.hive_stop_run),
                         seed = "hive-stop-run",
@@ -1055,6 +1073,9 @@ private fun MainDestination(
                                             memory = memoryLayer?.journal?.lines,
                                             roleOfTask = { roleOfTask[it] },
                                             roleOfSession = com.hereliesaz.geministrator.log.sessionRole(roleOfTaskRun),
+                                            taskOfSession = com.hereliesaz.geministrator.log.sessionTask(
+                                                live.run.taskRuns.values.associate { it.id to it.taskDefinitionId.value },
+                                            ),
                                         )
                                     },
                                     flowchartContent = {
@@ -1127,7 +1148,14 @@ private fun MainDestination(
                     onLoadWorkflowDefinitions = onLoadWorkflowDefinitions,
                     onLoadRunHistory = onLoadRunHistory,
                 )
-                ControlRoomDestination.Inbox -> LiveInboxScreen(runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize(), onLiftSpendStop)
+                ControlRoomDestination.Inbox -> LiveInboxScreen(
+                    runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize(), onLiftSpendStop,
+                    onOpenLimits = {
+                        keeperSectionName.value = (if (compact) KeeperSection.Device else KeeperSection.Limits).name
+                        keeperOpen.value = true
+                        onDestinationSelected(ControlRoomDestination.Settings)
+                    },
+                )
                 ControlRoomDestination.Stable -> Column(
                     Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                         .padding(horizontal = hiveGutter(compact), vertical = 12.dp),
@@ -1215,6 +1243,7 @@ private fun MainDestination(
                                             embedded = true,
                                         )
                                         KeeperSection.Delegations -> delegations?.let { DelegationsPart(it, compact) }
+                                        KeeperSection.Schedules -> SchedulesPart(compact)
                                         else -> Unit
                                     }
                                 },

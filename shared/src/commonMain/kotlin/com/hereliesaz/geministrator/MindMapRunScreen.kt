@@ -92,6 +92,9 @@ import com.hereliesaz.geministrator.resources.overview_search_gitlab_repositorie
 import com.hereliesaz.geministrator.resources.overview_start_run
 import com.hereliesaz.geministrator.resources.overview_start_typing_to_search_your_own
 import com.hereliesaz.geministrator.resources.overview_swarm_activity
+import com.hereliesaz.geministrator.resources.launch_error_check_connections
+import com.hereliesaz.geministrator.resources.hive_pause_run
+import com.hereliesaz.geministrator.resources.hive_paused_note
 import com.hereliesaz.geministrator.resources.overview_swarm_execution
 import com.hereliesaz.geministrator.resources.overview_this_runtime_can_link_the_selected
 import com.hereliesaz.geministrator.resources.overview_workflow_definition_error
@@ -714,6 +717,14 @@ internal fun MindMapRunScreen(
                         color = azphaltOnSurface(),
                         modifier = Modifier.azphaltLiveRegion(),
                     )
+                    // A launch that failed is usually about what is connected: take the keeper there.
+                    if (launchError != null) {
+                        AzphaltPill(
+                            label = stringResource(Res.string.launch_error_check_connections),
+                            seed = "launch-error-connections",
+                            onClick = onOpenSettings,
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(24.dp))
@@ -765,6 +776,7 @@ internal fun MindMapRunScreen(
                                 onLaunchWorkflow(liveWorkflow.project.name, objective, liveWorkflow.project.repository, listOf(run.id))
                             },
                             message = launchError,
+                            onOpenConnections = onOpenSettings,
                         )
                     },
                 ),
@@ -834,6 +846,16 @@ internal fun MindMapRunScreen(
                 body = stringResource(Res.string.overview_a_workflow_gate_is_waiting_for),
                 endCap = stringResource(Res.string.overview_required),
                 onClick = { if (selectedTaskId != waiting) onTaskSelected(waiting) },
+            )
+        }
+
+        // A paused hive says so, and that everything can still be changed before Resume.
+        if (run.keeperPause != null) {
+            AzphaltNote(
+                seed = "hive-paused",
+                label = stringResource(Res.string.hive_pause_run),
+                value = stringResource(Res.string.hive_paused_note),
+                modifier = Modifier.azphaltLiveRegion(),
             )
         }
 
