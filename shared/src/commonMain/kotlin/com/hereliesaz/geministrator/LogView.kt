@@ -117,6 +117,7 @@ internal fun RunLogView(
             onSelected = { picked = it },
             seedPrefix = "log-source",
             keepSelectedInView = true,
+            wrap = true,
         )
         Text(logSourceNote(source), style = AzphaltType.endCap, color = azphaltOnSurface())
         if (roles.isNotEmpty()) {

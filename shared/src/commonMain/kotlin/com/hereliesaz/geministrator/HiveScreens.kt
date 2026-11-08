@@ -170,6 +170,7 @@ internal fun RunTimeline(
             seedPrefix = "timeline-view",
             leading = overview,
             keepSelectedInView = true,
+            wrap = true,
         )
         // Memory scrolls itself; the timeline's own views share one scrolling body under the fixed row.
         if (shown == TIMELINE_MEMORY) {

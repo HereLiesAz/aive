@@ -565,10 +565,10 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="log_note_activity">Everything in this swarm in one list: its events and what its agents thought and did, by time. Pick a role to see only its steps. Agent lines are kept in memory, this launch only. Times are UTC.</string>
     <string name="log_empty_activity">Nothing has happened in this swarm yet.</string>
     <string name="log_roles_all">All roles</string>
-    <string name="log_source_run">Run events</string>
-    <string name="log_source_agents">Agents</string>
-    <string name="log_source_app">App</string>
-    <string name="log_source_memory">Memory layer</string>
+    <string name="log_source_run">Workflow log</string>
+    <string name="log_source_agents">Agent actions</string>
+    <string name="log_source_app">App log</string>
+    <string name="log_source_memory">Memory log</string>
     <string name="log_note_run">Every event of this swarm, in order, with the whole reason. Times are UTC.</string>
     <string name="log_note_agents">What the agents thought and did, this launch only: kept in memory, never saved or sent anywhere.</string>
     <string name="log_note_app">Diagnostic lines from the app itself: the newest 500, kept on this device. Keys are scrubbed before they are kept.</string>

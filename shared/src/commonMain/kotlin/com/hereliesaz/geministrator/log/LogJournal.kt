@@ -11,7 +11,7 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 /** The logs the Log tab can show (docs/Keepers-Room.md). [Activity] is the run's events and its agents' own steps, together. */
-enum class LogSource { Activity, Run, Agents, App, Memory }
+enum class LogSource { Activity, Agents, Run, Memory, App }
 
 /** One dated line. [scope] says whose it is: a task, a tag, a workflow. */
 data class LogLine(
