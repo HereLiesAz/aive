@@ -33,6 +33,8 @@ class WorkflowLibraryHost(
     private val launchWorkflow: suspend (WorkflowDefinition, List<RoleDefinition>, String?, com.hereliesaz.geministrator.domain.RepositoryRef?) -> Unit,
     private val onPackagesChanged: () -> Unit,
     private val onWorkflowCreated: suspend (WorkflowDefinition) -> Unit = {},
+    /** Told of every authored save, so a hive that is running can take edits to creatures it has not started. */
+    private val onDefinitionSaved: suspend (WorkflowDefinition) -> Unit = {},
 ) {
     private val composition = WorkflowCompositionService(persistence)
 
@@ -104,6 +106,7 @@ class WorkflowLibraryHost(
         val saved = composition.save(definition)
         authoredStore.add(saved.id)
         if (!wasAuthored) onWorkflowCreated(saved)
+        onDefinitionSaved(saved)
         return saved
     }
 

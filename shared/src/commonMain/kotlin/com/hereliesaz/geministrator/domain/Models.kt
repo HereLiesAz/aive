@@ -260,6 +260,8 @@ data class WorkflowRun(
     val parentWorkflowRunIds: List<WorkflowRunId> = emptyList(),
     /** Set while a keeper's spend cap has stopped this run; the keeper lifts it. */
     val spendPause: WorkflowSpendPause? = null,
+    /** Set while the keeper has paused the hive: nothing new starts, what runs finishes. */
+    val keeperPause: WorkflowKeeperPause? = null,
 ) {
     init {
         require(id !in parentWorkflowRunIds) { "A workflow run cannot continue itself" }

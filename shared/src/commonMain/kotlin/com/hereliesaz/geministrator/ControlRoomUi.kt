@@ -6,6 +6,8 @@ import com.hereliesaz.geministrator.resources.hive_show_hive
 import com.hereliesaz.geministrator.resources.hive_stop_cancel
 import com.hereliesaz.geministrator.resources.hive_stop_confirm
 import com.hereliesaz.geministrator.resources.hive_stop_run
+import com.hereliesaz.geministrator.resources.hive_pause_run
+import com.hereliesaz.geministrator.resources.hive_resume_run
 import com.hereliesaz.geministrator.resources.hive_stop_text
 import com.hereliesaz.geministrator.resources.hive_stop_title
 import kotlinx.coroutines.launch
@@ -162,6 +164,7 @@ fun ControlRoom(
     onLiftSpendStop: () -> Unit = {},
     /** Stops the active run: every unfinished creature and provider session. */
     onStopRun: (WorkflowRunId) -> Unit = {},
+    onPauseRun: (Boolean) -> Unit = {},
     onMessageAgent: suspend (String, String) -> String? = { _, _ -> "Messaging is unavailable" },
     /** Runs a finished run again from one of its creatures; returns why it could not, or null. */
     onRerunFromTask: suspend (WorkflowRunId, TaskRerunRequest) -> String? = { _, _ -> "Running again is unavailable" },
@@ -468,6 +471,7 @@ fun ControlRoom(
                 onResolveEscalation = onResolveEscalation,
                 onLiftSpendStop = onLiftSpendStop,
                 onStopRun = onStopRun,
+                onPauseRun = onPauseRun,
                 onMessageAgent = onMessageAgent,
                 onRecoverFromCorruption = onRecoverFromCorruption,
                 onRetryRuntime = onRetryRuntime,
@@ -742,6 +746,8 @@ private fun MainDestination(
     onResolveEscalation: (String, Boolean) -> Unit,
     onLiftSpendStop: () -> Unit,
     onStopRun: (WorkflowRunId) -> Unit,
+    /** Pause (true) or resume (false) the live hive; see [ApplicationRuntime.setKeeperPause]. */
+    onPauseRun: (Boolean) -> Unit,
     onMessageAgent: suspend (String, String) -> String?,
     onRecoverFromCorruption: () -> Unit,
     onRetryRuntime: () -> Unit,
@@ -829,6 +835,15 @@ private fun MainDestination(
             // where the hive's own pills scroll off the end, and heads them on a wide window.
             val stopPill: @Composable () -> Unit = {
                 liveHive?.takeUnless { it.run.status.isFinished() }?.let {
+                    // Pause lets what runs finish and starts nothing new, with no creature stopped; the
+                    // pill then reads Resume. Everything stays open to change while it is paused.
+                    val paused = it.run.keeperPause != null
+                    AzphaltPill(
+                        label = stringResource(if (paused) Res.string.hive_resume_run else Res.string.hive_pause_run),
+                        seed = "hive-pause-run",
+                        selected = paused,
+                        onClick = { onPauseRun(!paused) },
+                    )
                     AzphaltPill(
                         label = stringResource(Res.string.hive_stop_run),
                         seed = "hive-stop-run",

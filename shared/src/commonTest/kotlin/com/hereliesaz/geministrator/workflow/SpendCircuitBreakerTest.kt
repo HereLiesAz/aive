@@ -111,6 +111,44 @@ class SpendCircuitBreakerTest {
         assertTrue(gateway.cancelled.isEmpty())
     }
 
+    // ---- The keeper's pause ----
+
+    @Test
+    fun aKeeperPauseStartsNothingNewAndCancelsNothingUntilItIsCleared() = runTest {
+        val gateway = UsageGateway()
+        val definition = definition(task(working), task(waiting))
+        val run = run(
+            definition,
+            taskRun(working, TaskRunStatus.Running, providerRunId = "run-working"),
+            taskRun(waiting, TaskRunStatus.Ready),
+        ).copy(keeperPause = com.hereliesaz.geministrator.domain.WorkflowKeeperPause(pausedAtEpochMillis = 10L))
+        val coordinator = coordinator(InMemoryWorkflowPersistence(), gateway, roles(budget = null))
+
+        // The control: the same hive without the pause starts the waiting creature, so the pause is what held it.
+        val controlGateway = UsageGateway()
+        coordinator(InMemoryWorkflowPersistence(), controlGateway, roles(budget = null)).cycle(
+            project(), definition,
+            WorkflowRuntimeState(run.copy(keeperPause = null), mapOf(working to handle(working, "run-working"))), 20L, ::artifactId,
+        )
+        assertEquals(1, controlGateway.created, "without a pause the Ready creature starts")
+
+        val paused = coordinator.cycle(project(), definition, WorkflowRuntimeState(run, mapOf(working to handle(working, "run-working"))), 20L, ::artifactId)
+
+        assertEquals(TaskRunStatus.Running, paused.run.taskRuns.getValue(working).status, "what runs keeps running")
+        assertEquals(TaskRunStatus.Ready, paused.run.taskRuns.getValue(waiting).status, "nothing new starts")
+        assertEquals(0, gateway.created)
+        assertTrue(gateway.cancelled.isEmpty(), "nothing is cancelled")
+        assertNotNull(paused.run.keeperPause)
+
+        val resumed = coordinator.cycle(
+            project(), definition,
+            // As the runtime does it: the cleared pause is a newer run, so it wins over the persisted one.
+            WorkflowRuntimeState(paused.run.copy(keeperPause = null, updatedAtEpochMillis = 25L), paused.handles), 30L, ::artifactId,
+        )
+        assertEquals(1, gateway.created, "resuming starts what waited")
+        assertTrue(resumed.run.taskRuns.getValue(waiting).status != TaskRunStatus.Ready, "it is no longer waiting to start")
+    }
+
     // ---- Spend caps ----
 
     @Test

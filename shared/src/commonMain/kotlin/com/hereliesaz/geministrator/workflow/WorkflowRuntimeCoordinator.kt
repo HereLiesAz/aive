@@ -344,7 +344,9 @@ class WorkflowRuntimeCoordinator(
             return stopForSpendCap(project, definition, nextRun, nextHandles, trip, nowEpochMillis)
         }
 
-        nextRun = dispatchRemoteCompute(project, definition, nextRun, nowEpochMillis)
+        // The keeper's pause: what already runs is reconciled above and finishes; nothing new starts.
+        val keeperPaused = nextRun.keeperPause != null
+        if (!keeperPaused) nextRun = dispatchRemoteCompute(project, definition, nextRun, nowEpochMillis)
         nextRun = blockUnavailableSystemExecutors(project, definition, nextRun, nowEpochMillis)
         ensurePlanApprovalGates(definition, nextRun, nowEpochMillis)
 
@@ -352,7 +354,7 @@ class WorkflowRuntimeCoordinator(
         persist(project, definition, nextState)
 
         val beforeSystemDispatch = nextRun
-        nextRun = dispatchSystemExecutors(project, definition, nextRun, nowEpochMillis)
+        if (!keeperPaused) nextRun = dispatchSystemExecutors(project, definition, nextRun, nowEpochMillis)
         nextRun = refreshAfterSystemExecution(definition, nextRun, nowEpochMillis)
 
         val dispatchFailedTaskIds = nextRun.taskRuns
@@ -397,19 +399,21 @@ class WorkflowRuntimeCoordinator(
         // Tasks that system executors made ready in this cycle pass the same gate before agents start.
         nextRun = holdTaintedPrivilegedTasks(definition, nextRun, nowEpochMillis)
 
-        val dispatched = engine.dispatchReadyTasks(
-            project = project,
-            definition = definition,
-            run = nextRun,
-            existingHandles = nextHandles,
-            nowEpochMillis = nowEpochMillis,
-        )
-        nextRun = dispatched.run
-        if (nextRun.status.isTerminal()) {
-            return terminate(project, definition, nextRun, dispatched.handles, nowEpochMillis)
-        }
-        nextHandles = dispatched.handles.filterKeys { taskId ->
-            nextRun.taskRuns[taskId]?.status?.isActiveProviderStatus() == true
+        if (!keeperPaused) {
+            val dispatched = engine.dispatchReadyTasks(
+                project = project,
+                definition = definition,
+                run = nextRun,
+                existingHandles = nextHandles,
+                nowEpochMillis = nowEpochMillis,
+            )
+            nextRun = dispatched.run
+            if (nextRun.status.isTerminal()) {
+                return terminate(project, definition, nextRun, dispatched.handles, nowEpochMillis)
+            }
+            nextHandles = dispatched.handles.filterKeys { taskId ->
+                nextRun.taskRuns[taskId]?.status?.isActiveProviderStatus() == true
+            }
         }
         nextState = WorkflowRuntimeState(nextRun, nextHandles)
         persist(project, definition, nextState)

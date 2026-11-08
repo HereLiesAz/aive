@@ -64,6 +64,7 @@ import com.hereliesaz.geministrator.resources.app_import_failed
 import com.hereliesaz.geministrator.resources.app_plan_rejection_failed
 import com.hereliesaz.geministrator.resources.app_lift_spend_stop_failed
 import com.hereliesaz.geministrator.resources.app_stop_run_failed
+import com.hereliesaz.geministrator.resources.app_pause_run_failed
 import com.hereliesaz.geministrator.resources.app_provider_message_failed
 import com.hereliesaz.geministrator.resources.app_reachable_capabilities
 import com.hereliesaz.geministrator.resources.app_recovery_failed
@@ -564,6 +565,7 @@ fun App(
                 if (!started) error(getString(Res.string.app_launch_already_in_progress))
             },
             onPackagesChanged = { runtimeGeneration += 1 },
+            onDefinitionSaved = { edited -> runtime?.applyLiveDefinitionEdit(edited) },
             onWorkflowCreated = { authored ->
                 if (!authored.id.value.startsWith("node-characters-for-")) {
                     val catalog = resolveRoleCollection(
@@ -700,6 +702,17 @@ fun App(
                                     throw failure
                                 } catch (failure: Exception) {
                                     runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_lift_spend_stop_failed))
+                                }
+                            }
+                        },
+                        onPauseRun = { paused ->
+                            scope.launch {
+                                try {
+                                    runtime?.setKeeperPause(paused)
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_pause_run_failed))
                                 }
                             }
                         },

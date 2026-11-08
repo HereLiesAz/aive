@@ -535,6 +535,10 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="creature_egg_action">Egg, %1$d of %2$d feeders done</string>
     <string name="creature_egg_withered">Withered egg</string>
     <string name="hive_stop_run">Stop</string>
+    <string name="hive_pause_run">Pause</string>
+    <string name="hive_resume_run">Paused · Resume</string>
+    <string name="app_pause_run_failed">Pausing or resuming the run failed</string>
+    <string name="hive_paused_note">Paused: nothing new starts. What is running finishes. Change anything, then Resume.</string>
     <string name="hive_stop_title">Stop this run?</string>
     <string name="hive_stop_text">Every creature still working stops and its provider sessions close. What has finished is kept.</string>
     <string name="hive_stop_confirm">Stop run</string>
@@ -638,7 +642,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="job_runs_any">Any paired device</string>
     <string name="job_runs_chosen">A chosen device</string>
     <string name="job_add">Add</string>
-    <string name="job_saved">Saved. It takes effect from its next run.</string>
+    <string name="job_saved">Saved. A creature that has not started takes it now; one that is running or done, from its next run.</string>
     <string name="job_not_saved">Its job could not be saved</string>
     <string name="build_redo">Redo</string>
     <string name="build_cut">Cut</string>
