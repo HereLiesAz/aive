@@ -24,6 +24,14 @@ enum class ProcedureDeliberationOutcome {
 
     /** The habit is replaced. What was done before is history; a new version begins. */
     Superseded,
+
+    /**
+     * The habit stays, and wherever its cue appears the offer shows this decision and its
+     * alternative first. It only informs and redirects; it never hides or blocks the habit
+     * (docs/architecture/HABITS_AS_MEMORY.md, section 5). When the alternative names an operation,
+     * three uses of that operation make it a habit of its own and retire the override.
+     */
+    Overrides,
 }
 
 /**
@@ -37,11 +45,25 @@ data class ProcedureTraceDeliberation(
     /** The author's role id, or `keeper`. */
     val author: String,
     val text: String,
+    /** What to do instead, in the author's words. Required for [ProcedureDeliberationOutcome.Overrides]. */
+    val alternative: String? = null,
+    /** The alternative as a named operation, when it is one (for example `github-action:ci-v2.yml`). */
+    val alternativeOperation: String? = null,
 ) {
     init {
         require(author.isNotBlank() && author.length <= 128) { "Invalid deliberation author" }
         require(text.isNotBlank() && text.length <= ProcedureTraceFlag.MAX_TEXT) {
             "A deliberation is 1..${ProcedureTraceFlag.MAX_TEXT} characters"
+        }
+        if (outcome == ProcedureDeliberationOutcome.Overrides) {
+            require(!alternative.isNullOrBlank() && alternative.length <= ProcedureTraceFlag.MAX_TEXT) {
+                "An override names its alternative in 1..${ProcedureTraceFlag.MAX_TEXT} characters"
+            }
+            require(alternativeOperation == null || alternativeOperation.matches(ProcedureTrace.OPERATION)) {
+                "Invalid alternative operation"
+            }
+        } else {
+            require(alternative == null && alternativeOperation == null) { "Only an override has an alternative" }
         }
     }
 }
@@ -176,7 +198,8 @@ data class ProcedureTrace(
             "Flag on ${operation ?: executorKind} (${flag.source.name.lowercase()}) by ${flag.author}: \"${flag.text}\""
         } else if (deliberation != null) {
             "Deliberation on ${operation ?: executorKind} (${deliberation.outcome.name.lowercase()}) by " +
-                "${deliberation.author}: \"${deliberation.text}\""
+                "${deliberation.author}: \"${deliberation.text}\"" +
+                (deliberation.alternative?.let { " Instead: \"$it\"" } ?: "")
         } else "System executor $executorKind ${phase.name.lowercase()} reported ${outcome.name.lowercase()}. " +
             (operation?.let { "Operation: $it. " } ?: "") +
             (slots.takeIf { it.isNotEmpty() }

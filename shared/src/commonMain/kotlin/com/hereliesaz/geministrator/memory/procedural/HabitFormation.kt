@@ -70,6 +70,24 @@ data class HabitContrast(
 )
 
 /**
+ * An override on a habit: a written decision that its offer shows first, with what to do instead.
+ * It informs and redirects; it never hides or blocks the habit, and the habit can still be chosen.
+ */
+data class HabitOverride(
+    val author: String,
+    val text: String,
+    val alternative: String,
+    val alternativeOperation: String?,
+    val atEpochMillis: Long,
+    /** Uses of the habit since the override: it was chosen anyway, or came up again. */
+    val usesSince: Int,
+    /** Uses of the alternative operation since the override, when it names one. */
+    val alternativeUses: Int?,
+    /** The alternative has become a habit of its own, so this override is history. */
+    val retired: Boolean,
+)
+
+/**
  * What repeated runs of one named operation add up to. The frame is the named operation; the slots
  * are the fillers that varied. Nothing here judges: the counts are facts, and strength says only how
  * often the habit has been used. Every count is of the current version; what was done before a
@@ -100,8 +118,13 @@ data class FormedHabit(
     val openContrasts: List<HabitContrast> = emptyList(),
     /** The newest deliberation about this habit, of either outcome. */
     val lastDeliberation: ProcedureTraceDeliberation? = null,
+    /** The newest override of the current version, if any, active or retired. */
+    val habitOverride: HabitOverride? = null,
 ) {
     val offered: Boolean get() = strength != HabitStrength.Forming
+
+    /** An override that still stands and should be shown first. */
+    val activeOverride: HabitOverride? get() = habitOverride?.takeUnless { it.retired }
 
     /** Uses no reviewing task has approved or turned back. */
     val unreviewedUses: Int get() = uses - verifiedUses - rejectedUses
@@ -159,7 +182,8 @@ object HabitFormation {
 
         // The frame is the named operation: a placement choice (a Distributed executor) is not a
         // different thing being done.
-        return uses.groupBy { it.operation }
+        val usesByOperation = uses.groupBy { it.operation }
+        return usesByOperation
             .map { (operation, group) ->
                 habitOf(
                     executorKind = group.minBy { it.atEpochMillis }.executorKind,
@@ -168,6 +192,7 @@ object HabitFormation {
                     settings = settings,
                     flags = flagsOf(flagsByOperation[operation].orEmpty()),
                     deliberations = deliberationsByOperation[operation].orEmpty(),
+                    usesOf = { usesByOperation[it].orEmpty() },
                 )
             }
             .sortedWith(compareByDescending<FormedHabit> { it.uses }.thenBy { it.operation })
@@ -217,6 +242,7 @@ object HabitFormation {
         settings: HabitSettings,
         flags: HabitFlags,
         deliberations: List<ProcedureTrace>,
+        usesOf: (String) -> List<Use>,
     ): FormedHabit {
         val decided = deliberations.mapNotNull { trace -> trace.deliberation?.let { trace.recordedAtEpochMillis to it } }
             .sortedBy { it.first }
@@ -250,6 +276,35 @@ object HabitFormation {
             earlierUses = allUses.size - uses.size,
             openContrasts = contrastsOf(uses, lastStands),
             lastDeliberation = decided.lastOrNull()?.second,
+            habitOverride = overrideOf(decided, boundary, allUses, usesOf, settings),
+        )
+    }
+
+    /**
+     * The newest override of the current version. Its alternative's uses since it was written are the
+     * controlled passes: the alternative is just a new habit, so the same number of uses that offers any
+     * habit retires the override.
+     */
+    private fun overrideOf(
+        decided: List<Pair<Long, ProcedureTraceDeliberation>>,
+        boundary: Long?,
+        habitUses: List<Use>,
+        usesOf: (String) -> List<Use>,
+        settings: HabitSettings,
+    ): HabitOverride? {
+        val (at, decision) = decided
+            .filter { it.second.outcome == ProcedureDeliberationOutcome.Overrides && (boundary == null || it.first > boundary) }
+            .maxByOrNull { it.first } ?: return null
+        val alternativeUses = decision.alternativeOperation?.let { op -> usesOf(op).count { it.atEpochMillis > at } }
+        return HabitOverride(
+            author = decision.author,
+            text = decision.text,
+            alternative = checkNotNull(decision.alternative),
+            alternativeOperation = decision.alternativeOperation,
+            atEpochMillis = at,
+            usesSince = habitUses.count { it.atEpochMillis > at },
+            alternativeUses = alternativeUses,
+            retired = alternativeUses != null && alternativeUses >= settings.controlledPassesToConsolidate,
         )
     }
 

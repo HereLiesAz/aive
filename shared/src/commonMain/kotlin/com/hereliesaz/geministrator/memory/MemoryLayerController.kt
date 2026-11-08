@@ -796,12 +796,23 @@ class MemoryLayerController(
         outcome: com.hereliesaz.geministrator.memory.procedural.ProcedureDeliberationOutcome,
         author: String,
         text: String,
+        alternative: String? = null,
+        alternativeOperation: String? = null,
     ): Boolean {
         if (!active || !settings.value.proceduralTraceCaptureEnabled) return false
         if (!operation.matches(com.hereliesaz.geministrator.memory.procedural.ProcedureTrace.OPERATION)) return false
         val quote = com.hereliesaz.geministrator.control.ControlRedaction.scrub(text.trim())
             .take(com.hereliesaz.geministrator.memory.procedural.ProcedureTraceFlag.MAX_TEXT)
         if (quote.isBlank() || author.isBlank() || author.length > 128) return false
+        val isOverride = outcome == com.hereliesaz.geministrator.memory.procedural.ProcedureDeliberationOutcome.Overrides
+        val instead = alternative?.let {
+            com.hereliesaz.geministrator.control.ControlRedaction.scrub(it.trim())
+                .take(com.hereliesaz.geministrator.memory.procedural.ProcedureTraceFlag.MAX_TEXT)
+        }?.takeIf { it.isNotBlank() }
+        if (isOverride != (instead != null)) return false
+        if (alternativeOperation != null &&
+            (!isOverride || !alternativeOperation.matches(com.hereliesaz.geministrator.memory.procedural.ProcedureTrace.OPERATION))
+        ) return false
         val project = lineage.projectOf(workflowId) ?: return false
         procedureTraceSink.record(
             com.hereliesaz.geministrator.memory.procedural.ProcedureTrace(
@@ -819,6 +830,8 @@ class MemoryLayerController(
                     outcome = outcome,
                     author = author.trim(),
                     text = quote,
+                    alternative = instead,
+                    alternativeOperation = alternativeOperation,
                 ),
             ),
         )

@@ -41,7 +41,8 @@ object HabitOffers {
      */
     fun select(habits: List<FormedHabit>, objective: String): List<HabitOffer> {
         val taskWords = words(objective).toSet()
-        return habits.filter { it.offered }
+        // An active override is shown wherever its cue appears, even before the habit is offered.
+        return habits.filter { it.offered || it.activeOverride != null }
             .mapNotNull { habit ->
                 val matched = cuesOf(habit).filter { it in taskWords }
                 if (matched.isEmpty()) null else HabitOffer(habit, matched)
@@ -99,7 +100,26 @@ object HabitOffers {
                 .append(" and been failed or turned back ").append(contrast.turnedBack)
                 .append(if (contrast.turnedBack == 1) " time." else " times.")
         }
-        habit.lastDeliberation?.let { decision ->
+        habit.habitOverride?.let { o ->
+            if (o.retired) {
+                append("\n  Earlier override by ").append(o.author).append(" (retired: its alternative ")
+                    .append(o.alternativeOperation).append(" has been used ").append(o.alternativeUses)
+                    .append(" times and is a habit of its own): \"").append(quoted(o.text)).append("\"")
+            } else {
+                append("\n  Override by ").append(o.author).append(": \"").append(quoted(o.text))
+                    .append("\" Instead: \"").append(quoted(o.alternative)).append("\".")
+                append(" Since it was written this habit has been used ").append(o.usesSince)
+                    .append(if (o.usesSince == 1) " time" else " times")
+                o.alternativeUses?.let { passes ->
+                    append(" and ").append(o.alternativeOperation).append(" ")
+                        .append(passes).append(if (passes == 1) " time" else " times")
+                        .append(" (it becomes a habit of its own at ")
+                        .append(HabitSettings().controlledPassesToConsolidate).append(" uses)")
+                }
+                append(".")
+            }
+        }
+        habit.lastDeliberation?.takeIf { it.outcome != ProcedureDeliberationOutcome.Overrides }?.let { decision ->
             append("\n  Latest decision (").append(decision.outcome.name.lowercase()).append(", ")
                 .append(decision.author).append("): \"").append(quoted(decision.text)).append("\"")
         }
