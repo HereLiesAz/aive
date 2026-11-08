@@ -204,5 +204,27 @@ class PanelScreenshotTest {
             ) { RoleActivityView(activity) }
         }
     }
+
+    @Test
+    fun schedulesPanel() {
+        val now = 20_765L * 86_400_000L + 9 * 3_600_000L
+        val store = com.hereliesaz.geministrator.workflow.schedule.InMemoryWorkflowScheduleStore()
+        runBlocking {
+            com.hereliesaz.geministrator.workflow.CodingWorkflowSuite.all().filter { it.schedule != null }.take(3).forEachIndexed { i, entry ->
+                store.put(
+                    com.hereliesaz.geministrator.workflow.schedule.WorkflowSchedule(
+                        id = "schedule-${entry.definition.id.value}", workflowId = entry.definition.id.value,
+                        name = entry.definition.name, objective = entry.schedule!!.objective, cadence = entry.schedule!!.cadence,
+                        enabled = i == 0, createdAtEpochMillis = now,
+                        lastStartedAtEpochMillis = if (i == 0) now - 86_400_000L else null,
+                        lastNote = if (i == 0) "Started." else null,
+                    ),
+                )
+            }
+        }
+        shoot("54-schedules", 780, 1500) {
+            androidx.compose.runtime.CompositionLocalProvider(LocalWorkflowScheduleStore provides store) { SchedulesPart(compact = true) }
+        }
+    }
 }
 

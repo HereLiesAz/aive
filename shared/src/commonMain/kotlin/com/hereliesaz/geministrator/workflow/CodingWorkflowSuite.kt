@@ -308,7 +308,7 @@ object CodingWorkflowSuite {
             "Judge whether the tests cover the change and would catch a regression. Say what is missing.",
         ),
         step(
-            "summary", "Summarize", BuiltInRoles.Orchestrator, RoleAuthority.ProposePlan,
+            "summary", "Summarize", BuiltInRoles.ProductManager, RoleAuthority.ProposePlan,
             "Merge the three reviews into one: blockers first, then suggestions, then what is good. Remove duplicates.",
             after = listOf("correctness", "risk", "tests"),
         ),
@@ -332,7 +332,7 @@ object CodingWorkflowSuite {
             after = listOf("hunt"),
         ),
         step(
-            "report", "Write the report", BuiltInRoles.Orchestrator, RoleAuthority.ProposePlan,
+            "report", "Write the report", BuiltInRoles.ProductManager, RoleAuthority.ProposePlan,
             "Write the report: findings by severity, each with where, why and the smallest fix. End with what to fix first.",
             after = listOf("triage"),
         ),
@@ -369,7 +369,7 @@ object CodingWorkflowSuite {
             "List every dependency that is outdated or has a known vulnerability, with the version to move to and the risk. Say if nothing changed.",
         ),
         step(
-            "report", "Write the report", BuiltInRoles.Orchestrator, RoleAuthority.ProposePlan,
+            "report", "Write the report", BuiltInRoles.ProductManager, RoleAuthority.ProposePlan,
             "Summarize the audit: security issues first, then major updates, then the rest. If nothing needs action, say so in one line.",
             after = listOf("audit"),
         ),
@@ -390,7 +390,7 @@ object CodingWorkflowSuite {
             after = listOf("collect"),
         ),
         step(
-            "report", "Write the triage", BuiltInRoles.Orchestrator, RoleAuthority.ProposePlan,
+            "report", "Write the triage", BuiltInRoles.ProductManager, RoleAuthority.ProposePlan,
             "Write a short triage: what to fix first and why. If CI is healthy, say so in one line.",
             after = listOf("diagnose"),
         ),
@@ -406,7 +406,7 @@ object CodingWorkflowSuite {
             "Assess the test suite: the slowest tests, the flaky ones, the areas changed this week with no tests, and anything skipped.",
         ),
         step(
-            "report", "Write the report", BuiltInRoles.Orchestrator, RoleAuthority.ProposePlan,
+            "report", "Write the report", BuiltInRoles.ProductManager, RoleAuthority.ProposePlan,
             "Write the report with the three things most worth doing next and why.",
             after = listOf("assess"),
         ),
@@ -422,7 +422,7 @@ object CodingWorkflowSuite {
             "Read the changes of the last seven days for secrets, injection, weakened access checks and unsafe defaults. Cite file and line.",
         ),
         step(
-            "report", "Write the report", BuiltInRoles.Orchestrator, RoleAuthority.ProposePlan,
+            "report", "Write the report", BuiltInRoles.ProductManager, RoleAuthority.ProposePlan,
             "Report findings by severity, or say that none were found.",
             after = listOf("scan"),
         ),
@@ -438,7 +438,7 @@ object CodingWorkflowSuite {
             "From the last seven days of changes, list each place the documentation now disagrees with the code, with both locations.",
         ),
         step(
-            "report", "Write the report", BuiltInRoles.Orchestrator, RoleAuthority.ProposePlan,
+            "report", "Write the report", BuiltInRoles.ProductManager, RoleAuthority.ProposePlan,
             "Report the stale docs in order of how misleading they are, or say that none are.",
             after = listOf("compare"),
         ),
@@ -454,7 +454,7 @@ object CodingWorkflowSuite {
             "Find the files and modules that changed most this month, grew most, or collect TODOs, duplication and workarounds. Rank them.",
         ),
         step(
-            "report", "Write the report", BuiltInRoles.Orchestrator, RoleAuthority.ProposePlan,
+            "report", "Write the report", BuiltInRoles.ProductManager, RoleAuthority.ProposePlan,
             "Recommend the one or two debts worth paying down first, each with the smallest first step.",
             after = listOf("survey"),
         ),

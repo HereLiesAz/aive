@@ -27,6 +27,8 @@ import com.hereliesaz.geministrator.workflow.SettingsNodeCharacterAssetStore
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
+import com.hereliesaz.geministrator.workflow.schedule.ScheduleTicker
+import com.hereliesaz.geministrator.workflow.schedule.SettingsWorkflowScheduleStore
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RepositoryRef
@@ -616,6 +618,33 @@ fun App(
             }
         }
 
+        // Scheduled hives (docs/Scheduled-Workflows.md): while the app is open, a due schedule starts its
+        // hive as drawn, with no planner to ask and nothing approved for anyone. It waits for the active
+        // run to finish, says what it decided in the app log, and a hive with an approval waits for the keeper.
+        val scheduleStore = remember { SettingsWorkflowScheduleStore() }
+        LaunchedEffect(runtime, workflowPersistence) {
+            val active = runtime ?: return@LaunchedEffect
+            ScheduleTicker(
+                store = scheduleStore,
+                now = { currentEpochMillis() },
+                runActive = { active.hasUnfinishedActiveRun() },
+                start = { schedule ->
+                    val definition = workflowPersistence.definitions.get(WorkflowDefinitionId(schedule.workflowId))
+                        ?: error("the hive is no longer on this device")
+                    val started = guardedSavedWorkflowLaunch { activeRuntime, existingProject ->
+                        activeRuntime.launchSavedWorkflow(
+                            definition = definition,
+                            existingProject = existingProject,
+                            objective = schedule.objective,
+                            repository = existingProject?.repository,
+                        )
+                    }
+                    if (!started) error(getString(Res.string.app_launch_already_in_progress))
+                },
+                log = { line -> appLog("Schedule", line) },
+            ).run()
+        }
+
         val rolesByName = (liveRun?.roles.orEmpty() + BuiltInRoles.all).associate { it.name to it.id }
         // A role that runs a script or an action rather than an agent is programmatic work: it wears the neuron, never a kept creature.
         val programmaticRoles = (liveRun?.roles.orEmpty() + BuiltInRoles.all)
@@ -623,6 +652,7 @@ fun App(
             .mapTo(hashSetOf()) { it.name }
         CompositionLocalProvider(
             LocalWorkflowLibraryHost provides workflowLibraryHost,
+            LocalWorkflowScheduleStore provides scheduleStore,
             LocalStableHost provides stableHost,
             LocalBreedPurchases provides breedPurchases,
             LocalEntire provides entire,

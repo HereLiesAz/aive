@@ -1230,6 +1230,7 @@ private fun MainDestination(
                                             embedded = true,
                                         )
                                         KeeperSection.Delegations -> delegations?.let { DelegationsPart(it, compact) }
+                                        KeeperSection.Schedules -> SchedulesPart(compact)
                                         else -> Unit
                                     }
                                 },
