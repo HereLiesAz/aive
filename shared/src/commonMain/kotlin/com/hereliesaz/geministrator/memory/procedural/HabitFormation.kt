@@ -58,6 +58,9 @@ data class HabitFlags(
     }
 }
 
+/** A repository a habit has been used in, with how many uses were there. */
+data class HabitEnvironment(val name: String, val uses: Int)
+
 /**
  * A contrast within one habit: the same operation with the same configured values has both
  * completed and been failed or turned back. It is a fact, not a ruling; only a deliberation answers it.
@@ -120,6 +123,8 @@ data class FormedHabit(
     val lastDeliberation: ProcedureTraceDeliberation? = null,
     /** The newest override of the current version, if any, active or retired. */
     val habitOverride: HabitOverride? = null,
+    /** Where the current version's uses were done, most used first. Empty if no receipt named one. */
+    val environments: List<HabitEnvironment> = emptyList(),
 ) {
     val offered: Boolean get() = strength != HabitStrength.Forming
 
@@ -134,6 +139,7 @@ object HabitFormation {
     const val MAX_HABITS = 64
     const val MAX_VALUES_PER_SLOT = 8
     const val MAX_CONTRASTS = 4
+    const val MAX_ENVIRONMENTS = 8
 
     /** How many of the newest uses make up a habit's recent outcomes. */
     const val RECENT = 3
@@ -148,6 +154,7 @@ object HabitFormation {
         val verification: ProcedureTraceVerification,
         val slots: List<ProcedureTraceSlot>,
         val atEpochMillis: Long,
+        val environment: String? = null,
     ) {
         /** Failed, or completed but turned back by a reviewer. */
         val turnedBack: Boolean get() = failed || verification == ProcedureTraceVerification.Rejected
@@ -239,6 +246,7 @@ object HabitFormation {
             verification = verification,
             slots = receipts.firstOrNull { it.slots.isNotEmpty() }?.slots.orEmpty(),
             atEpochMillis = receipts.maxOf { it.recordedAtEpochMillis },
+            environment = receipts.firstNotNullOfOrNull { it.environment },
         )
     }
 
@@ -294,6 +302,10 @@ object HabitFormation {
             openContrasts = contrastsOf(uses, lastStands),
             lastDeliberation = decided.lastOrNull()?.second,
             habitOverride = overrideOf(decided, boundary, allUses, usesOf, settings),
+            environments = uses.mapNotNull { it.environment }.groupingBy { it }.eachCount()
+                .map { (name, count) -> HabitEnvironment(name, count) }
+                .sortedWith(compareByDescending<HabitEnvironment> { it.uses }.thenBy { it.name })
+                .take(MAX_ENVIRONMENTS),
         )
     }
 

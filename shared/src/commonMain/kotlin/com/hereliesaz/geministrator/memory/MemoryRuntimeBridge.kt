@@ -60,11 +60,14 @@ object MemoryRuntimeBridge {
     var procedureTraceSink: ProcedureTraceSink = NoOpProcedureTraceSink
     /** Read-only receipts for role-instruction proposals; never an execution path. */
     var procedureTraceReader: ProcedureTraceReader = NoOpProcedureTraceReader
+    /** Optional clerk that adds recall to the caution recognizer; null leaves the recognizer alone. */
+    var cautionClerk: com.hereliesaz.geministrator.memory.procedural.CautionClerk? = null
 
     fun reset() {
         observer = NoOpMemorySessionObserver
         promptContextProvider = NoOpMemoryPromptContextProvider
         procedureTraceSink = NoOpProcedureTraceSink
         procedureTraceReader = NoOpProcedureTraceReader
+        cautionClerk = null
     }
 }

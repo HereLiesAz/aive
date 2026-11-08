@@ -141,6 +141,28 @@ class WorkflowCompositionService(
         return validated(definition.copy(tasks = definition.tasks + added))
     }
 
+    /**
+     * [tasks] with their ids made new for [definition]: the same ids when none is in use, else every id
+     * given the smallest numeric suffix that clears them all, and the dependencies among them renamed to
+     * match. A proposal can be added to a workflow more than once this way.
+     */
+    fun withFreshIds(definition: WorkflowDefinition, tasks: List<TaskDefinition>): List<TaskDefinition> {
+        val taken = definition.tasks.map { it.id.value }.toSet()
+        fun clashes(suffix: String) = tasks.any { task ->
+            task.id.value + suffix in taken || task.id.value + suffix + "-approval" in taken
+        }
+        if (!clashes("")) return tasks
+        var n = 2
+        while (clashes("-$n")) n++
+        val rename = tasks.associate { it.id to TaskDefinitionId("${it.id.value}-$n") }
+        return tasks.map { task ->
+            task.copy(
+                id = rename.getValue(task.id),
+                dependsOn = task.dependsOn.map { rename[it] ?: it }.toSet(),
+            )
+        }
+    }
+
     suspend fun saveAs(
         definition: WorkflowDefinition,
         id: WorkflowDefinitionId,

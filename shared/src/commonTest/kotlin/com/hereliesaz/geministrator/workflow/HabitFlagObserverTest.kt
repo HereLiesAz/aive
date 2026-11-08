@@ -18,6 +18,8 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
+import com.hereliesaz.geministrator.memory.procedural.CautionClerk
+import com.hereliesaz.geministrator.memory.procedural.CautionRecognizer
 import com.hereliesaz.geministrator.memory.procedural.HabitFormation
 import com.hereliesaz.geministrator.memory.procedural.ProcedureFlagSource
 import com.hereliesaz.geministrator.memory.procedural.ProcedureTrace
@@ -146,4 +148,93 @@ class HabitFlagObserverTest {
         assertEquals(0, habit.flags.used + habit.flags.keeper)
         assertEquals("The build failed in step two.", habit.flags.newest.single().text)
     }
+
+    @Test
+    fun anAgentThatPreparedAFinishedRunHasItsCautionsRecordedAsAUsersFlag() {
+        val plan = TaskDefinitionId("plan")
+        val def = WorkflowDefinition(
+            id = WorkflowDefinitionId("w"),
+            name = "w",
+            tasks = listOf(
+                TaskDefinition(
+                    id = plan, name = "Plan", objective = "Choose the CI run", roleId = BuiltInRoles.QaEngineer.id,
+                    executor = TaskExecutor.RoleAgent(BuiltInRoles.QaEngineer.id),
+                ),
+                TaskDefinition(
+                    id = build, name = "Build", objective = "Run CI", roleId = null,
+                    executor = TaskExecutor.GitHubAction("ci.yml"), dependsOn = setOf(plan),
+                ),
+            ),
+        )
+        val finished = WorkflowRun(
+            id = WorkflowRunId("run"),
+            projectId = project.id,
+            workflowDefinitionId = def.id,
+            objective = "o",
+            status = WorkflowRunStatus.Running,
+            taskRuns = mapOf(
+                plan to TaskRun(
+                    TaskRunId("rp"), plan, TaskRunStatus.Completed, assignedRoleId = BuiltInRoles.QaEngineer.id,
+                    executor = def.tasks[0].executor,
+                    artifacts = listOf(art("I chose the CI run, but it assumes a clean tree.", trusted = true)),
+                ),
+                build to TaskRun(
+                    TaskRunId("rb"), build, TaskRunStatus.Completed, assignedRoleId = null,
+                    executor = def.tasks[1].executor, artifacts = listOf(art("CI output", trusted = true)),
+                ),
+            ),
+            createdAtEpochMillis = 1L,
+            updatedAtEpochMillis = 77L,
+        )
+        val flags = observe(def, finished, finished)
+        val flag = flags.single()
+        assertEquals(ProcedureFlagSource.Used, flag.flag?.source)
+        assertEquals("github-action:ci.yml", flag.operation)
+        assertEquals("rp", flag.taskRunId)
+        // The run has not finished, so the window has not opened.
+        val running = finished.copy(taskRuns = finished.taskRuns + (build to finished.taskRuns.getValue(build).copy(status = TaskRunStatus.Running)))
+        assertTrue(observe(def, running).isEmpty())
+        // The two windows are counted apart on the habit.
+        val habit = HabitFormation.form(
+            (1..3).map { n ->
+                ProcedureTrace(
+                    workflowId = "x$n", projectId = "p", taskRunId = "t$n", taskDefinitionId = "build", attempt = 1,
+                    phase = ProcedureTracePhase.Reconcile, executorKind = "GitHubAction",
+                    outcome = com.hereliesaz.geministrator.memory.procedural.ProcedureTraceOutcome.Completed,
+                    recordedAtEpochMillis = n.toLong(), operation = "github-action:ci.yml",
+                )
+            } + flag,
+        ).single()
+        assertEquals(1, habit.flags.used)
+        assertEquals(0, habit.flags.handled)
+    }
+
+    @Test
+    fun aClerkAddsRecallForASentenceTheRecognizerSetAsideAndNeverRewritesIt() {
+        val def = definition(TaskExecutor.GitHubAction("ci.yml"))
+        // No warning cue the recognizer keeps: it is a plain remark about the run.
+        val report = run(def, "The build ran against the old fixtures. Everything else went as planned.")
+        assertTrue(observe(def, report).isEmpty())
+
+        val asked = mutableListOf<String>()
+        val seen = mutableListOf<ProcedureTrace>()
+        runBlocking {
+            HabitFlagObserver(
+                sink = { ProcedureTraceSink { seen += it } },
+                clerk = { CautionClerk { sentence, _ -> asked += sentence; "old fixtures" in sentence } },
+            ).observe(project, def, report)
+        }
+        assertEquals("The build ran against the old fixtures.", seen.single().flag?.text)
+        assertTrue(asked.isNotEmpty())
+
+        // A clerk that fails is as good as none, and a calm outcome is never put to it.
+        val failing = mutableListOf<ProcedureTrace>()
+        runBlocking {
+            HabitFlagObserver(clerk = { CautionClerk { _, _ -> error("down") } }, sink = { ProcedureTraceSink { failing += it } })
+                .observe(project, def, report)
+        }
+        assertTrue(failing.isEmpty())
+        assertTrue(CautionRecognizer.candidates("The build passed with no errors.", listOf("ci")).isEmpty())
+    }
 }
+

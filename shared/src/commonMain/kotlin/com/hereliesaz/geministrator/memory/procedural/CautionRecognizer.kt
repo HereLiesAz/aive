@@ -62,5 +62,38 @@ object CautionRecognizer {
             .take(MAX_SENTENCES)
     }
 
+    /**
+     * Sentences that are about the work but that [recognize] did not keep, verbatim and scrubbed, at
+     * most [MAX_CANDIDATES]: what a clerk could be asked about. A sentence with only a calm outcome
+     * ("the build passed") is not a candidate. Nothing here is a caution until a clerk says so.
+     */
+    fun candidates(text: String, cues: List<String>): List<String> {
+        val cueWords = cues.map { it.lowercase() }.toSet()
+        val kept = recognize(text, cues).toSet()
+        return text.split(sentenceBreak)
+            .map { it.trim() }
+            .filter { it.length in MIN_SENTENCE_CHARS..MAX_SENTENCE_CHARS }
+            .filter { sentence ->
+                val about = referent.containsMatchIn(sentence) ||
+                    sentence.lowercase().split(words).any { it in cueWords }
+                about && calm.replace(sentence, " ").isNotBlank() && !calm.containsMatchIn(sentence)
+            }
+            .map { ControlRedaction.scrub(it) }
+            .filter { it !in kept }
+            .distinct()
+            .take(MAX_CANDIDATES)
+    }
+
+    const val MAX_CANDIDATES = 6
     private const val MIN_SENTENCE_CHARS = 12
+}
+
+/**
+ * A clerk that says whether one sentence, written about the work a habit names, is a caution about it.
+ * It is a filing step like the other memory clerks: it labels a sentence and never rewrites it, so what
+ * is recorded is still the model's own words. It can only add to what the programmatic recognizer
+ * keeps. The app supplies one when a model for the job is available; with none, nothing changes.
+ */
+fun interface CautionClerk {
+    suspend fun isCaution(sentence: String, operation: String): Boolean
 }

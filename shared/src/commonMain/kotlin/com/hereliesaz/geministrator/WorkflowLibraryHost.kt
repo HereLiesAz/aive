@@ -107,6 +107,20 @@ class WorkflowLibraryHost(
         return saved
     }
 
+    /**
+     * Adds a habit's proposed tasks to a workflow the keeper authored, after the tasks nothing else
+     * waits on, each behind its own approval task (see [WorkflowCompositionService.addProposedTasks]).
+     * An installed workflow is not changed. Saved only if the result is a valid graph; throws otherwise.
+     */
+    suspend fun addProposedTasks(id: WorkflowDefinitionId, tasks: List<com.hereliesaz.geministrator.domain.TaskDefinition>): WorkflowDefinition {
+        require(id in authoredStore.all()) { "Only a workflow you authored can take added tasks" }
+        val definition = requireNotNull(persistence.definitions.get(id)) { "Workflow ${id.value} was not found" }
+        val waitedOn = definition.tasks.flatMap { it.dependsOn }.toSet()
+        val tails = definition.tasks.map { it.id }.filter { it !in waitedOn }.toSet()
+        val fresh = composition.withFreshIds(definition, tasks)
+        return saveAuthored(composition.addProposedTasks(definition, fresh, connectFrom = tails))
+    }
+
     suspend fun saveAuthoredAs(
         definition: WorkflowDefinition,
         id: WorkflowDefinitionId,

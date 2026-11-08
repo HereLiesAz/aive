@@ -161,6 +161,12 @@ data class ProcedureTrace(
     val flag: ProcedureTraceFlag? = null,
     /** Present exactly on a [ProcedureTracePhase.Deliberation] receipt. */
     val deliberation: ProcedureTraceDeliberation? = null,
+    /**
+     * Where the work was done, as the repository's `owner/name`, or null when the project has none
+     * or it is not a plain name. A fact for the offer ("done in these repositories"); nothing
+     * decides on it.
+     */
+    val environment: String? = null,
 ) {
     init {
         require((phase == ProcedureTracePhase.Flag) == (flag != null)) {
@@ -173,6 +179,7 @@ data class ProcedureTrace(
         require(taskRunId.isNotBlank() && taskDefinitionId.isNotBlank())
         require(attempt >= 0 && artifactCount >= 0 && artifactKinds.size <= 32)
         require(operation == null || operation.matches(OPERATION)) { "Invalid operation name" }
+        require(environment == null || environment.matches(ENVIRONMENT)) { "Invalid environment name" }
         require(slots.size <= ProcedureTraceSlot.MAX_SLOTS && slots.map { it.name }.distinct().size == slots.size) {
             "Slots must be unique and bounded"
         }
@@ -202,6 +209,7 @@ data class ProcedureTrace(
                 (deliberation.alternative?.let { " Instead: \"$it\"" } ?: "")
         } else "System executor $executorKind ${phase.name.lowercase()} reported ${outcome.name.lowercase()}. " +
             (operation?.let { "Operation: $it. " } ?: "") +
+            (environment?.let { "Environment: $it. " } ?: "") +
             (slots.takeIf { it.isNotEmpty() }
                 ?.let { "Slots: ${it.joinToString("; ") { slot -> "${slot.name}=${slot.value}" }}. " } ?: "") +
             "Verification: ${verification.name.lowercase()}. " +
@@ -209,6 +217,7 @@ data class ProcedureTrace(
 
     companion object {
         val OPERATION = Regex("[a-z][a-z-]*:[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}")
+        val ENVIRONMENT = Regex("[A-Za-z0-9][A-Za-z0-9._-]{0,99}/[A-Za-z0-9][A-Za-z0-9._-]{0,99}")
     }
 }
 
