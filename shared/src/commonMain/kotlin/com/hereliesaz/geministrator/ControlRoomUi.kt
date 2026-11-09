@@ -244,6 +244,13 @@ fun ControlRoom(
     // The Keeper's room's open part, held here so the breadcrumb can name it.
     val keeperSectionName = rememberDurableStringState("keeper.section", KeeperSection.Connections.name)
     val keeperOpen = rememberDurableBooleanState("keeper.open")
+    // The creature's panel links a provider or integration to Connections itself, not to whichever
+    // Keeper's room section was left open last.
+    val openConnectionsFromPanel: () -> Unit = {
+        keeperSectionName.value = KeeperSection.Connections.name
+        keeperOpen.value = true
+        onDestinationSelected(ControlRoomDestination.Settings)
+    }
     // The hive on screen: a resting hive when one is open (it shows even while another run is live),
     // else the live run's. The breadcrumb and the panel follow what is shown.
     val restingShown = restingHive.value.isNotBlank()
@@ -381,6 +388,12 @@ fun ControlRoom(
                 roleSurfaceFilePicker = roleSurfaceFilePicker,
                 computeAvailable = ControlRoomDestination.Compute in destinations,
                 onSelectTask = onTaskSelected,
+                onOpenConnections = openConnectionsFromPanel,
+                onOpenCompute = if (ControlRoomDestination.Compute in destinations) {
+                    { onDestinationSelected(ControlRoomDestination.Compute) }
+                } else {
+                    null
+                },
                 // Closes the panel onto the hive's Timeline, this creature still selected there.
                 onOpenTrace = {
                     showTimeline.value = true
