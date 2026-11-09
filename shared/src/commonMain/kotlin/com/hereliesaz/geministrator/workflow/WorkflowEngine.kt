@@ -128,9 +128,15 @@ class WorkflowEngine(
         definition: WorkflowDefinition,
         run: WorkflowRun,
         nowEpochMillis: Long,
+        undecidedFailures: Set<TaskDefinitionId> = emptySet(),
     ): WorkflowRun {
         val decisions = mutableListOf<Pair<PolicyRequest, PolicyDecision>>()
-        val refreshed = WorkflowRunFactory.refreshReadiness(definition, run, nowEpochMillis) { request, decision ->
+        val refreshed = WorkflowRunFactory.refreshReadiness(
+            definition,
+            run,
+            nowEpochMillis,
+            undecidedFailures,
+        ) { request, decision ->
             decisions += request to decision
         }
         decisions.forEach { (request, decision) -> eventSink.recordPolicyDecision(request, decision, nowEpochMillis) }
@@ -785,7 +791,12 @@ class WorkflowEngine(
         }
 
         nextRun = stopRolesOverBudget(nextRun, handles, nowEpochMillis)
-        nextRun = refreshReadiness(definition, nextRun, nowEpochMillis)
+        // A task that failed in this pass has not met its failure policy yet (the caller applies it
+        // next): what is conditioned on its failure waits for that decision.
+        val failedThisPass = nextRun.taskRuns
+            .filter { (id, taskRun) -> taskRun.status == TaskRunStatus.Failed && run.taskRuns[id]?.status != TaskRunStatus.Failed }
+            .keys
+        nextRun = refreshReadiness(definition, nextRun, nowEpochMillis, failedThisPass)
         val workflowStatus = deriveWorkflowStatus(nextRun)
         if (workflowStatus == WorkflowRunStatus.Completed && run.status != WorkflowRunStatus.Completed) {
             eventSink.append(WorkflowCompleted(nextRun.id, nowEpochMillis))

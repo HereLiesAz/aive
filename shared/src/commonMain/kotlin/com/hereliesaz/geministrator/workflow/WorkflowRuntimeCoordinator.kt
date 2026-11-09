@@ -252,7 +252,6 @@ class WorkflowRuntimeCoordinator(
         nextRun = preserveArtifactTimestamps(state.run, nextRun)
         nextRun = reconcileSystemExecutors(project, definition, nextRun, nowEpochMillis)
         persistArtifacts(nextRun)
-        nextRun = refreshAfterSystemExecution(definition, nextRun, nowEpochMillis)
 
         val newlyFailedTaskIds = nextRun.taskRuns
             .filter { (taskId, taskRun) ->
@@ -260,6 +259,9 @@ class WorkflowRuntimeCoordinator(
                     state.run.taskRuns[taskId]?.status != TaskRunStatus.Failed
             }
             .keys
+        // What waits on a failure (an on-failure handler, an any-outcome task) is released only after
+        // the failure policy below has decided: a task about to be retried has not failed for good.
+        nextRun = refreshAfterSystemExecution(definition, nextRun, nowEpochMillis, newlyFailedTaskIds)
 
         if (newlyFailedTaskIds.isNotEmpty() && nextRun.status == WorkflowRunStatus.Failed) {
             nextRun = nextRun.copy(status = WorkflowRunStatus.Running)
@@ -356,7 +358,6 @@ class WorkflowRuntimeCoordinator(
 
         val beforeSystemDispatch = nextRun
         if (!keeperPaused) nextRun = dispatchSystemExecutors(project, definition, nextRun, nowEpochMillis)
-        nextRun = refreshAfterSystemExecution(definition, nextRun, nowEpochMillis)
 
         val dispatchFailedTaskIds = nextRun.taskRuns
             .filter { (taskId, taskRun) ->
@@ -364,6 +365,7 @@ class WorkflowRuntimeCoordinator(
                     beforeSystemDispatch.taskRuns[taskId]?.status != TaskRunStatus.Failed
             }
             .keys
+        nextRun = refreshAfterSystemExecution(definition, nextRun, nowEpochMillis, dispatchFailedTaskIds)
         if (dispatchFailedTaskIds.isNotEmpty() && nextRun.status == WorkflowRunStatus.Failed) {
             nextRun = nextRun.copy(status = WorkflowRunStatus.Running)
         }
@@ -1111,8 +1113,9 @@ class WorkflowRuntimeCoordinator(
         definition: WorkflowDefinition,
         run: WorkflowRun,
         now: Long,
+        undecidedFailures: Set<TaskDefinitionId> = emptySet(),
     ): WorkflowRun {
-        val refreshed = engine.refreshReadiness(definition, run, now)
+        val refreshed = engine.refreshReadiness(definition, run, now, undecidedFailures)
         return if (
             refreshed.taskRuns.isNotEmpty() &&
             refreshed.taskRuns.values.all { it.status == TaskRunStatus.Cancelled }

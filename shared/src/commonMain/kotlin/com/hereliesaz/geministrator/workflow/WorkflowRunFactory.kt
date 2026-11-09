@@ -98,14 +98,31 @@ object WorkflowRunFactory {
      * Releases blocked tasks whose dependencies settled. [onPolicyDecision] hears each non-allow
      * policy decision made here (a repository mutation cancelled for want of a granted approval),
      * so a caller with an event sink can record it on the run timeline.
+     *
+     * A task in [undecidedFailures] has just been marked Failed and its failure policy has not run
+     * yet (it may be retried, restarted on another provider or reassigned), so for what waits on it
+     * it is still working: a failure handler or an any-outcome task is released only once the
+     * failure is settled, not while the failed task is about to run again.
      */
     fun refreshReadiness(
         definition: WorkflowDefinition,
         run: WorkflowRun,
         nowEpochMillis: Long,
+        undecidedFailures: Set<TaskDefinitionId> = emptySet(),
         onPolicyDecision: ((PolicyRequest, PolicyDecision) -> Unit)? = null,
     ): WorkflowRun {
         val definitionsById = definition.tasks.associateBy { it.id }
+        val outcomes = if (undecidedFailures.isEmpty()) {
+            run.taskRuns
+        } else {
+            run.taskRuns.mapValues { (id, taskRun) ->
+                if (id in undecidedFailures && taskRun.status == TaskRunStatus.Failed) {
+                    taskRun.copy(status = TaskRunStatus.Running)
+                } else {
+                    taskRun
+                }
+            }
+        }
         val refreshed = run.taskRuns.mapValues { (taskId, taskRun) ->
             if (taskRun.status != TaskRunStatus.Blocked) return@mapValues taskRun
             if (taskRun.blockingReason?.code == EXECUTOR_INTEGRATION_UNAVAILABLE) return@mapValues taskRun
@@ -114,7 +131,7 @@ object WorkflowRunFactory {
             if (taskRun.blockingReason?.code == SPEND_CAP_STOP) return@mapValues taskRun
 
             val task = definitionsById[taskId] ?: return@mapValues taskRun
-            val dependencyRuns = task.dependsOn.mapNotNull(run.taskRuns::get)
+            val dependencyRuns = task.dependsOn.mapNotNull(outcomes::get)
             val allTerminal = dependencyRuns.size == task.dependsOn.size &&
                 dependencyRuns.all { it.status.isTerminal() }
 
@@ -127,8 +144,8 @@ object WorkflowRunFactory {
 
             val conditionTargetRun = when (val c = task.condition) {
                 is TaskCondition.Always -> null
-                is TaskCondition.OnAnyOutcome -> run.taskRuns[c.ofTask]
-                is TaskCondition.OnFailure -> run.taskRuns[c.ofTask]
+                is TaskCondition.OnAnyOutcome -> outcomes[c.ofTask]
+                is TaskCondition.OnFailure -> outcomes[c.ofTask]
             }
             // A condition reference is a real scheduling edge even when it is not duplicated in
             // dependsOn. Do not decide the branch until both explicit dependencies and the
@@ -139,9 +156,7 @@ object WorkflowRunFactory {
                 is TaskCondition.Always -> allCompletedOrSkipped && anyCompleted
                 is TaskCondition.OnAnyOutcome -> conditionSettled && conditionTargetRun != null
                 is TaskCondition.OnFailure -> conditionSettled && conditionTargetRun != null &&
-                    (conditionTargetRun.status == TaskRunStatus.Failed ||
-                        conditionTargetRun.status == TaskRunStatus.Escalated ||
-                        conditionTargetRun.status == TaskRunStatus.Cancelled)
+                    conditionTargetRun.isFailureOutcome()
             }
 
             // Always-conditioned tasks stay Blocked when a dep fails rather than being cancelled:
@@ -230,6 +245,17 @@ object WorkflowRunFactory {
             }
         }
         return visit(taskId)
+    }
+
+    /**
+     * Whether a settled task is one an on-failure handler is for: it failed, was escalated, or was
+     * cancelled. A branch that was not taken ([CONDITION_NOT_MET]) and a change nobody approved
+     * ([APPROVAL_NOT_GRANTED]) are cancelled too, but nothing failed there, so there is nothing to handle.
+     */
+    private fun TaskRun.isFailureOutcome() = when (status) {
+        TaskRunStatus.Failed, TaskRunStatus.Escalated -> true
+        TaskRunStatus.Cancelled -> blockingReason?.code.let { it != CONDITION_NOT_MET && it != APPROVAL_NOT_GRANTED }
+        else -> false
     }
 
     private fun TaskRun.isSkippedBranch() =

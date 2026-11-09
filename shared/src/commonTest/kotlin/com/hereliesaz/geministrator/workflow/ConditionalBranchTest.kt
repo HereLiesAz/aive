@@ -115,6 +115,36 @@ class ConditionalBranchTest {
     }
 
     @Test
+    fun failureHandlerDoesNotRunForATargetThatWasSkippedOrDeniedNotFailed() {
+        val run = WorkflowRunFactory.create(
+            definition = definition,
+            workflowRunId = WorkflowRunId("run"),
+            projectId = ProjectId("proj"),
+            objective = "test",
+            nowEpochMillis = 1L,
+            taskRunIdFactory = { TaskRunId(it.value) },
+        )
+        fun handlerAfter(target: TaskRun): TaskRun {
+            val withTarget = run.copy(taskRuns = run.taskRuns + (mainTaskId to target))
+            return WorkflowRunFactory.refreshReadiness(definition, withTarget, 2L).taskRuns.getValue(failureHandlerId)
+        }
+        val base = run.taskRuns.getValue(mainTaskId)
+
+        // A branch that was not taken, and a change nobody approved, did not fail: nothing to handle.
+        listOf(WorkflowRunFactory.CONDITION_NOT_MET, WorkflowRunFactory.APPROVAL_NOT_GRANTED).forEach { code ->
+            val handler = handlerAfter(
+                base.copy(status = TaskRunStatus.Cancelled, blockingReason = BlockingReason(code, "not a failure")),
+            )
+            assertEquals(TaskRunStatus.Cancelled, handler.status, code)
+            assertEquals(WorkflowRunFactory.CONDITION_NOT_MET, handler.blockingReason?.code, code)
+        }
+
+        // A task cancelled for any other reason still counts as one the handler is for.
+        assertEquals(TaskRunStatus.Ready, handlerAfter(base.copy(status = TaskRunStatus.Cancelled)).status)
+        assertEquals(TaskRunStatus.Ready, handlerAfter(base.copy(status = TaskRunStatus.Escalated)).status)
+    }
+
+    @Test
     fun alwaysJoinAfterASkippedBranchDoesNotBlockForever() {
         val joinId = TaskDefinitionId("join")
         val afterHandlerId = TaskDefinitionId("after-handler")
