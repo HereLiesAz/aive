@@ -515,6 +515,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="schedule_add_suite">Add the coding suite</string>
     <string name="schedule_suite_added">Added %1$d hives to your hives. Your scheduled ones are listed here, off.</string>
     <string name="schedule_suite_present">The coding suite is already on this device.</string>
+    <string name="schedule_add_film">Add the short-film hive (desktop)</string>
+    <string name="schedule_film_added">Added the short-film hive to your hives. It needs the desktop app, an OpenAI connection and ffmpeg, and it is never scheduled.</string>
+    <string name="schedule_film_present">The short-film hive is already on this device.</string>
     <string name="schedule_none">No schedules yet. Add the coding suite for six that report on their own, or set one up from any hive.</string>
     <string name="schedule_on">On</string>
     <string name="schedule_off">Off</string>

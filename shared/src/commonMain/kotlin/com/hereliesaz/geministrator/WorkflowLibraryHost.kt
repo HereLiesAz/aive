@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.workflow.CodingWorkflowSuite
+import com.hereliesaz.geministrator.workflow.CreativeWorkflowSuite
 import com.hereliesaz.geministrator.workflow.schedule.WorkflowSchedule
 import com.hereliesaz.geministrator.workflow.schedule.WorkflowScheduleStore
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -156,6 +157,23 @@ class WorkflowLibraryHost(
                         createdAtEpochMillis = nowEpochMillis,
                     ),
                 )
+            }
+        }
+        return added
+    }
+
+    /**
+     * Adds the creative hives ([CreativeWorkflowSuite]: the short film) the same way [installCodingSuite]
+     * adds the coding ones: each as a hive you authored and can edit, one already on the device left as it
+     * is. None is scheduled, because they spend money. Returns how many hives were added.
+     */
+    suspend fun installCreativeSuite(): Int {
+        val present = persistence.definitions.all().map { it.id }.toSet()
+        var added = 0
+        for (entry in CreativeWorkflowSuite.all()) {
+            if (entry.definition.id !in present) {
+                saveAuthored(entry.definition)
+                added += 1
             }
         }
         return added

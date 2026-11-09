@@ -495,10 +495,16 @@ class OpenAiNodeCharacterImageApi(
 ) {
     private val client = client.config { followRedirects = false }
 
+    /**
+     * One image from the `image_generation` tool. The defaults are the node-character sheet's (portrait,
+     * transparent); the short-film frames ask for a landscape picture on a background.
+     */
     suspend fun generate(
         prompt: String,
         inputImages: List<String>,
         action: String,
+        size: String = "1024x1536",
+        background: String = "transparent",
     ): GeneratedNodeImage {
         val request = ResponsesRequest(
             model = responseModel,
@@ -522,9 +528,9 @@ class OpenAiNodeCharacterImageApi(
             tools = listOf(
                 ImageGenerationTool(
                     model = imageModel,
-                    size = "1024x1536",
+                    size = size,
                     quality = "high",
-                    background = "transparent",
+                    background = background,
                     outputFormat = "png",
                     action = action,
                 ),

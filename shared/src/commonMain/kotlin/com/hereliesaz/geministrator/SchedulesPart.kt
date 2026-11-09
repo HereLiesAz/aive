@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.log.formatLogTime
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.schedule_add_film
 import com.hereliesaz.geministrator.resources.schedule_add_suite
 import com.hereliesaz.geministrator.resources.schedule_cadence_daily
 import com.hereliesaz.geministrator.resources.schedule_cadence_hours
@@ -52,6 +53,8 @@ import com.hereliesaz.geministrator.resources.schedule_zone_east
 import com.hereliesaz.geministrator.resources.schedule_zone_west
 import com.hereliesaz.geministrator.resources.schedule_run_now
 import com.hereliesaz.geministrator.resources.schedule_run_now_note
+import com.hereliesaz.geministrator.resources.schedule_film_added
+import com.hereliesaz.geministrator.resources.schedule_film_present
 import com.hereliesaz.geministrator.resources.schedule_suite_added
 import com.hereliesaz.geministrator.resources.schedule_suite_present
 import com.hereliesaz.geministrator.workflow.schedule.ScheduleCadence
@@ -141,6 +144,22 @@ internal fun SchedulesPart(compact: Boolean) {
                             getString(Res.string.schedule_suite_added, added)
                         }
                         reload += 1
+                    }
+                },
+            )
+            // The creative hives spend money, so they are never scheduled: this only puts them on the device.
+            AzphaltPill(
+                label = stringResource(Res.string.schedule_add_film),
+                seed = "schedule-add-film",
+                tone = PillTone.Primary,
+                onClick = {
+                    scope.launch {
+                        val added = runCatching { host.installCreativeSuite() }.getOrNull()
+                        message = if (added == null || added == 0) {
+                            getString(Res.string.schedule_film_present)
+                        } else {
+                            getString(Res.string.schedule_film_added)
+                        }
                     }
                 },
             )

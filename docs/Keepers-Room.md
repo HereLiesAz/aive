@@ -151,7 +151,7 @@ The Keeper's room has a **Local agents** part on the desktop (`LocalAgentsPart`)
 
 ## Schedules
 
-The Keeper's room has a **Schedules** part (`SchedulesPart`). **Add the coding suite** puts seventeen coding hives on the device and, for the six that only read and report, a schedule each, off ([Coding workflows](Coding-Workflows.md)). A schedule shows when it runs (in its own offset from UTC), when it runs next, what it last did, and **On/Off**, **Run now** (due within a minute, once no other run is active) and **Remove**, with kind, hour and day steppers and a **Zone west / east** stepper for its UTC offset. A running app starts what is due, as drawn, with nothing approved on anyone's behalf ([Scheduled workflows](Scheduled-Workflows.md)).
+The Keeper's room has a **Schedules** part (`SchedulesPart`). **Add the coding suite** puts seventeen coding hives on the device and, for the six that only read and report, a schedule each, off ([Coding workflows](Coding-Workflows.md)). A schedule shows when it runs (in its own offset from UTC), when it runs next, what it last did, and **On/Off**, **Run now** (due within a minute, once no other run is active) and **Remove**, with kind, hour and day steppers and a **Zone west / east** stepper for its UTC offset. A running app starts what is due, as drawn, with nothing approved on anyone's behalf ([Scheduled workflows](Scheduled-Workflows.md)). **Add the short-film hive (desktop)** puts one more hive on the device, with no schedule because it spends an image per shot; it needs the desktop app, an OpenAI connection and ffmpeg ([Short film](Short-Film.md)).
 
 ## Improvement
 

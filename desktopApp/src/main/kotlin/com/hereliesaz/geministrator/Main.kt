@@ -21,6 +21,8 @@ import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.onDeviceTextProviderOrNull
 import com.hereliesaz.geministrator.providers.llm.AnthropicMessagesApi
 import com.hereliesaz.geministrator.providers.llm.AnthropicProvider
+import com.hereliesaz.geministrator.providers.llm.FilmFramesExecutorIntegration
+import com.hereliesaz.geministrator.providers.llm.OpenAiFilmImageApi
 import com.hereliesaz.geministrator.providers.llm.GeminiGenerateContentApi
 import com.hereliesaz.geministrator.providers.llm.GeminiProvider
 import com.hereliesaz.geministrator.providers.llm.GitLabWorkspaceAgentProvider
@@ -183,6 +185,17 @@ fun main() {
         ),
     )
     controlApi.startIfEnabled()
+    // The short-film hive (docs/Short-Film.md). Built once: the frames step counts its image budget per run
+    // and tracks the drawings it has started, which a rebuild when a connection changes would lose.
+    // The image model's connection is read at each call, so a newly connected OpenAI account is used at once.
+    val filmOpenAiConnection = java.util.concurrent.atomic.AtomicReference(initialProviderCredentials.cleanKey(ProviderCatalog.OPENAI_ID).orEmpty())
+    val filmFrameStore = FileFilmFrameStore()
+    val filmFrames = FilmFramesExecutorIntegration(
+        api = OpenAiFilmImageApi(LlmApiKeyProvider { filmOpenAiConnection.get() }),
+        store = filmFrameStore,
+        imageBudget = filmImageBudget(),
+    )
+    val filmAssemble = FilmAssembleExecutorIntegration(filmFrameStore)
 
     try {
         application {
@@ -279,10 +292,13 @@ fun main() {
                     }
                 }
                 // The test runner runs repository code on this computer, so it is added only here,
-                // never to the base set that pool leases from other devices run on.
+                // never to the base set that pool leases from other devices run on. The film steps read and
+                // write files on this computer and run ffmpeg here, so they are local-only for the same reason.
                 val executorIntegrations = remember(computeSession, baseExecutorIntegrations) {
                     (computeSession?.executorIntegrations ?: baseExecutorIntegrations)
                         .withIntegration(TestRunnerExecutorIntegration(testRunner))
+                        .withIntegration(filmFrames)
+                        .withIntegration(filmAssemble)
                 }
                 val uiScope = rememberCoroutineScope()
                 var localPlannerStatus by remember {
@@ -306,6 +322,7 @@ fun main() {
                 // The plan is read by a reviewer before a run exists; the keeper then has the final say.
                 val planReviewer = remember(credentials) { configuredPlanReviewer(credentials) }
                 LaunchedEffect(credentials) {
+                    filmOpenAiConnection.set(credentials.cleanKey(ProviderCatalog.OPENAI_ID).orEmpty())
                     memoryEngines.hostedTextGenerator = { providerId, model, prompt ->
                         val api = memoryTextApi(credentials, providerId, model)
                             ?: error("Memory provider ${providerId ?: "(default)"} is not configured")

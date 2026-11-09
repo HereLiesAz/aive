@@ -9,9 +9,13 @@ import java.io.File
  * program that runs.
  */
 internal object CliLocator {
-    fun locate(spec: CliAgentSpec, environment: Map<String, String> = System.getenv(), home: String = System.getProperty("user.home").orEmpty()): File? {
+    fun locate(spec: CliAgentSpec, environment: Map<String, String> = System.getenv(), home: String = System.getProperty("user.home").orEmpty()): File? =
+        locateBinary(spec.binaries, environment, home)
+
+    /** The first of [binaries] that is installed, by the same rules as [locate]; for a tool that is not a CLI agent (ffmpeg). */
+    fun locateBinary(binaries: List<String>, environment: Map<String, String> = System.getenv(), home: String = System.getProperty("user.home").orEmpty()): File? {
         val windows = System.getProperty("os.name").orEmpty().lowercase().contains("win")
-        val names = spec.binaries.flatMap { if (windows) listOf("$it.exe", "$it.cmd", "$it.bat", it) else listOf(it) }
+        val names = binaries.flatMap { if (windows) listOf("$it.exe", "$it.cmd", "$it.bat", it) else listOf(it) }
         val path = environment["PATH"].orEmpty().split(File.pathSeparatorChar).filter { it.isNotBlank() && File(it).isAbsolute }
         val wellKnown = listOfNotNull(
             "/opt/homebrew/bin", "/usr/local/bin", "/home/linuxbrew/.linuxbrew/bin",
