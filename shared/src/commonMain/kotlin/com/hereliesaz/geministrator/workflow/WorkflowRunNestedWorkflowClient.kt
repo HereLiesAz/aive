@@ -115,7 +115,7 @@ class WorkflowRunNestedWorkflowClient(
             val childProject = checkNotNull(persistence.projects.get(stored.projectId)) {
                 "Project ${stored.projectId.value} was not found"
             }
-            val definition = checkNotNull(persistence.definitions.get(stored.workflowDefinitionId)) {
+            val definition = checkNotNull(persistence.definitionFor(stored)) {
                 "Workflow definition ${stored.workflowDefinitionId.value} was not found"
             }
             val next = child.coordinator.cycle(childProject, definition, child.state, nowEpochMillis(), ::artifactId)
@@ -152,7 +152,7 @@ class WorkflowRunNestedWorkflowClient(
         val childProject = checkNotNull(persistence.projects.get(stored.projectId)) {
             "Project ${stored.projectId.value} was not found"
         }
-        val definition = checkNotNull(persistence.definitions.get(stored.workflowDefinitionId)) {
+        val definition = checkNotNull(persistence.definitionFor(stored)) {
             "Workflow definition ${stored.workflowDefinitionId.value} was not found"
         }
         val cached = childrenMutex.withLock { children.remove(id) }
@@ -177,7 +177,7 @@ class WorkflowRunNestedWorkflowClient(
         val id = WorkflowRunId(childRunId)
         val run = persistence.runs.get(id) ?: return false
         if (run.status.isTerminal()) return false
-        val definition = persistence.definitions.get(run.workflowDefinitionId) ?: return false
+        val definition = persistence.definitionFor(run) ?: return false
         val tasks = definition.tasks.associateBy { it.id }
         fun TaskRun.resolvedExecutor(): TaskExecutor? = executor ?: tasks[taskDefinitionId]?.effectiveExecutor()
 

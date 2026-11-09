@@ -87,6 +87,7 @@ object WorkflowRunFactory {
             createdAtEpochMillis = nowEpochMillis,
             updatedAtEpochMillis = nowEpochMillis,
             repositorySnapshot = repository,
+            definitionSnapshot = definition,
             roleSnapshot = roles
                 .filterNot { it.id.value == ROLE_COLLECTION_MARKER_ID }
                 .distinctBy(RoleDefinition::id),

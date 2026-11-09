@@ -40,6 +40,14 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
+/**
+ * The hive [run] follows: the definition it recorded when it started (with the job and criteria edits
+ * it took), else the saved hive under its id for a run saved before runs recorded one. The saved hive
+ * can be changed while the run is live, so a run is never resumed against it when it has its own copy.
+ */
+internal suspend fun WorkflowPersistence.definitionFor(run: WorkflowRun): WorkflowDefinition? =
+    run.definitionSnapshot ?: definitions.get(run.workflowDefinitionId)
+
 data class WorkflowRuntimeState(
     val run: WorkflowRun,
     val handles: Map<TaskDefinitionId, ManagedSessionHandle> = emptyMap(),
@@ -125,7 +133,7 @@ class WorkflowRuntimeCoordinator(
         val project = storedProject.copy(
             repository = run.repositorySnapshot ?: storedProject.repository,
         )
-        val definition = requireNotNull(persistence.definitions.get(run.workflowDefinitionId)) {
+        val definition = requireNotNull(persistence.definitionFor(run)) {
             "Workflow definition ${run.workflowDefinitionId.value} was not found"
         }
         val tasksById = definition.tasks.associateBy { it.id }

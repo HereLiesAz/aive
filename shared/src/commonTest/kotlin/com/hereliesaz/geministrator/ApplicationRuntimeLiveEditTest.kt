@@ -90,6 +90,7 @@ class ApplicationRuntimeLiveEditTest {
         },
         createdAtEpochMillis = 1L,
         updatedAtEpochMillis = 1L,
+        definitionSnapshot = definition,
     )
 
     private inner class Fixture {
@@ -179,6 +180,57 @@ class ApplicationRuntimeLiveEditTest {
             assertEquals("Approve the start", running.tasks.single { it.id == gate }.objective, "a started creature keeps its job in this run")
             assertEquals("Build it twice", running.tasks.single { it.id == build }.objective, "an unstarted creature takes the job now")
             assertTrue(running.tasks.none { it.id == extra.id }, "the hive's shape changes from the next run")
+        } finally {
+            fixture.scope.cancel()
+        }
+    }
+
+    @Test
+    fun aStructuralEditSavedWhileTheRunIsLiveDoesNotChangeWhatARestartResumes() = runBlocking<Unit> {
+        val fixture = Fixture().start()
+        try {
+            // The keeper removes Build and saves: the library copy no longer has a creature the run holds.
+            val saved = fixture.definition.copy(
+                tasks = fixture.definition.tasks.filter { it.id != build }.map {
+                    if (it.id == ship) it.copy(dependsOn = setOf(gate)) else it
+                },
+            )
+            fixture.persistence.definitions.put(saved)
+            assertEquals(0, fixture.runtime.applyLiveDefinitionEdit(saved))
+            fixture.runtime.close()
+
+            val restarted = ApplicationRuntime.create(providers = emptyList(), scope = fixture.scope, persistence = fixture.persistence)
+            try {
+                val live = assertIs<ApplicationRuntimeState.Live>(restarted.state.value).presentation
+                assertEquals(fixture.definition, live.definition, "the run resumes with the hive it started with")
+                assertEquals(setOf(gate, build, ship), live.run.taskRuns.keys)
+                assertEquals(saved, fixture.persistence.definitions.get(saved.id), "the saved copy stays the keeper's")
+            } finally {
+                restarted.close()
+            }
+        } finally {
+            fixture.scope.cancel()
+        }
+    }
+
+    @Test
+    fun aLiveEditTheRunTookSurvivesARestart() = runBlocking<Unit> {
+        val fixture = Fixture().start()
+        try {
+            val saved = fixture.definition.copy(
+                tasks = fixture.definition.tasks.map { if (it.id == build) it.copy(objective = "Build it twice") else it },
+            )
+            fixture.persistence.definitions.put(saved)
+            assertEquals(1, fixture.runtime.applyLiveDefinitionEdit(saved))
+            fixture.runtime.close()
+
+            val restarted = ApplicationRuntime.create(providers = emptyList(), scope = fixture.scope, persistence = fixture.persistence)
+            try {
+                val live = assertIs<ApplicationRuntimeState.Live>(restarted.state.value).presentation
+                assertEquals("Build it twice", live.definition.tasks.single { it.id == build }.objective)
+            } finally {
+                restarted.close()
+            }
         } finally {
             fixture.scope.cancel()
         }

@@ -76,6 +76,7 @@ import com.hereliesaz.geministrator.workflow.WorkflowGraphValidator
 import com.hereliesaz.geministrator.workflow.WorkflowLaunchService
 import com.hereliesaz.geministrator.workflow.WorkflowRuntimeCoordinator
 import com.hereliesaz.geministrator.workflow.cancelledRunView
+import com.hereliesaz.geministrator.workflow.definitionFor
 import com.hereliesaz.geministrator.workflow.WorkflowRunNestedWorkflowClient
 import com.hereliesaz.geministrator.workflow.WorkflowRuntimeState
 import com.hereliesaz.geministrator.workflow.awaitsNestedHumanApproval
@@ -191,10 +192,12 @@ class ApplicationRuntime private constructor(
                 val (project, run) = latestProjectRun
                 val storedDefinition = persistence.definitions.get(run.workflowDefinitionId)
                     ?: error("Workflow definition ${run.workflowDefinitionId.value} was not found")
-                val definition = repairKnownNodeCreatureRigCycle(storedDefinition)
-                if (definition !== storedDefinition) {
-                    persistence.definitions.put(definition)
+                val repairedDefinition = repairKnownNodeCreatureRigCycle(storedDefinition)
+                if (repairedDefinition !== storedDefinition) {
+                    persistence.definitions.put(repairedDefinition)
                 }
+                // The run follows the hive it started with, not a later save under the same id.
+                val definition = run.definitionSnapshot?.let(::repairKnownNodeCreatureRigCycle) ?: repairedDefinition
                 val runtimeState = try {
                     coordinator.resume(run.id)
                 } catch (failure: Throwable) {
@@ -726,7 +729,11 @@ class ApplicationRuntime private constructor(
                 return@withLock 0
             }
             is LiveEditMerge.Merged -> {
-                replaceCurrent(snapshot.copy(definition = merge.definition))
+                // The run records the hive it follows, so an edit it took survives a restart and a later
+                // save of the library copy never changes what this run resumes against.
+                val followed = run.copy(definitionSnapshot = merge.definition)
+                persistence.runs.put(followed)
+                replaceCurrent(snapshot.copy(definition = merge.definition, state = snapshot.state.copy(run = followed)))
                 publishCurrent()
                 merge.taken
             }
@@ -911,7 +918,7 @@ class ApplicationRuntime private constructor(
                     return@withLock
                 }
 
-                val definition = persistence.definitions.get(run.workflowDefinitionId)
+                val definition = persistence.definitionFor(run)
                     ?: error("Workflow definition ${run.workflowDefinitionId.value} was not found")
                 val runtimeState = try {
                     coordinator.resume(run.id)
