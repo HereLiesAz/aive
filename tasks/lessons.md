@@ -59,3 +59,11 @@ The creature sheet came back on any tap after it was closed. The field's "tap ba
 ## A saved edit is not a live edit
 
 A creature's job saved from its panel was written to the library and then written over about once a second by the runtime's own copy of the definition, while the panel said it "takes effect from its next run". Where state is held twice (a library, a running copy), say which one a save changes, and route it through the owner.
+
+## One task's fault is that task's failure, not the batch's
+
+`dispatchReadyTasks` created sessions for every ready task in one batch, and a provider's refusal to start one (HTTP 402) was thrown out of the whole batch and out of `cycle()`, which the runtime retried every few seconds without end; a role missing from the collection did the same through `requireNotNull`. A fault that belongs to one task must fail that task through its own failure policy and leave the others running.
+
+- Catch the expected failure type (`ManagedSessionFailure`) per task and route it through `failTaskBeforeStart`; keep rethrowing programming errors and cancellation so the rollback still cancels the sessions that did start.
+- A status that is only a stop on the way to a decision (Failed, before the failure policy runs) must not be read as settled by readiness: failure handlers waited for nothing, then ran while the task was being retried. Pass such tasks as `undecidedFailures`.
+- Count retries by cause, not by `attempt`: a hold that restarts work (`heldAttempts`, `failedProviders`) bumps `attempt` but is not a retry of failed work.

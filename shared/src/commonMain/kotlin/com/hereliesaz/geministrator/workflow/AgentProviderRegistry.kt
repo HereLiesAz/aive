@@ -20,6 +20,7 @@ import com.hereliesaz.geministrator.orchestration.AgentRoutingInput
 import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities
 import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamily
 import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
+import com.hereliesaz.geministrator.providers.AgentCapabilities
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.OnDeviceTextAgentProvider
 import com.russhwolf.settings.Settings
@@ -149,7 +150,22 @@ class AgentProviderRegistry(
     suspend fun canStaff(required: Set<AgentCapability>, repository: RepositoryRef? = null): Boolean =
         providersById.values
             .filterNot { it.explicitOnly || it is OnDeviceTextAgentProvider }
-            .any { it.capabilities().supported.containsAll(required) && it.supportsRepository(repository) }
+            .any { provider ->
+                readableCapabilities(provider)?.supported?.containsAll(required) == true &&
+                    provider.supportsRepository(repository)
+            }
+
+    /**
+     * What [provider] says it can do, or null when it cannot say (it threw): one provider's fault
+     * must not fail the choice among the others. Cancellation still propagates.
+     */
+    private suspend fun readableCapabilities(provider: AgentProvider): AgentCapabilities? = try {
+        provider.capabilities()
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        null
+    }
 
     suspend fun select(request: ProviderSelectionRequest): AgentProvider {
         val required = buildSet {
@@ -205,9 +221,14 @@ class AgentProviderRegistry(
         }
 
         val eligibleProviders = mutableListOf<Pair<AgentProvider, Set<AgentCapability>>>()
+        val unreadable = mutableListOf<AgentProvider>()
         for (provider in ordered) {
             if (provider.id in request.excludedProviderIds) continue
-            val capabilities = provider.capabilities().supported
+            val capabilities = readableCapabilities(provider)?.supported
+            if (capabilities == null) {
+                unreadable += provider
+                continue
+            }
             // Asked even without a repository: an agent that only works inside one (OpenCode on
             // GitHub, a local or GitLab workspace) says no to repository-less work.
             if (capabilities.containsAll(required) && provider.supportsRepository(request.repository)) {
@@ -279,7 +300,11 @@ class AgentProviderRegistry(
             .takeIf { it.isNotEmpty() }
             ?.joinToString(prefix = ". Not chosen automatically: ", postfix = " (assign to a role to use)") { it.id.value }
             .orEmpty()
-        error("No agent provider satisfies required capabilities $required$repositorySuffix$explicitOnlyHint")
+        val unreadableHint = unreadable
+            .takeIf { it.isNotEmpty() }
+            ?.joinToString(prefix = ". Could not read the capabilities of: ") { it.id.value }
+            .orEmpty()
+        error("No agent provider satisfies required capabilities $required$repositorySuffix$explicitOnlyHint$unreadableHint")
     }
 }
 

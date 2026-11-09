@@ -218,6 +218,32 @@ class AgentProviderRegistryRepositoryTest {
         )
         assertEquals(List(4) { "b" }, List(4) { registry.select(pinned).id.value }, "a pinned role is never moved")
     }
+
+    @Test
+    fun aProviderThatCannotReportItsCapabilitiesDoesNotStopTheOthersBeingChosen() = runBlocking {
+        val broken = BrokenCapabilitiesProvider(AgentProviderId("broken"))
+        val healthy = SourceAwareProvider(AgentProviderId("healthy"), supportedSources = emptySet())
+        val registry = AgentProviderRegistry(listOf(broken, healthy), inferenceSettings = InMemorySettings())
+        val request = ProviderSelectionRequest(requiredCapabilities = setOf(AgentCapability.RepositoryRead))
+
+        assertEquals(healthy.id, registry.select(request).id)
+        assertEquals(healthy.id, registry.select(request.copy(preferredProviderId = broken.id)).id)
+        assertTrue(registry.canStaff(setOf(AgentCapability.RepositoryRead)))
+
+        // With nothing else to turn to, the refusal says which provider could not be read.
+        val alone = AgentProviderRegistry(listOf(broken), inferenceSettings = InMemorySettings())
+        val failure = assertFailsWith<IllegalStateException> { alone.select(request) }
+        assertTrue("broken" in failure.message.orEmpty(), failure.message)
+    }
+}
+
+private class BrokenCapabilitiesProvider(override val id: AgentProviderId) : AgentProvider {
+    override suspend fun capabilities(): AgentCapabilities = throw IllegalStateException("capability probe failed")
+    override suspend fun start(request: AgentTaskRequest): AgentRunHandle = error("not started")
+    override fun observe(runId: ProviderRunId): Flow<AgentEvent> = emptyFlow()
+    override suspend fun sendMessage(runId: ProviderRunId, message: String) = ProviderActionResult.Accepted
+    override suspend fun approvePlan(runId: ProviderRunId) = ProviderActionResult.Accepted
+    override suspend fun cancel(runId: ProviderRunId) = ProviderActionResult.Accepted
 }
 
 private class SourceAwareProvider(
