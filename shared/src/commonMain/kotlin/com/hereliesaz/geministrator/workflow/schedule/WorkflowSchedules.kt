@@ -54,6 +54,11 @@ data class WorkflowSchedule(
     val lastStartedAtEpochMillis: Long? = null,
     /** What the last decision was, in plain words, for the keeper to read. */
     val lastNote: String? = null,
+    /**
+     * The keeper asked for one start now ("Run now"). It is due at the next look whether the schedule is on or not, and
+     * the start clears it; it never turns the schedule on.
+     */
+    val runNowRequested: Boolean = false,
 ) {
     init {
         require(id.isNotBlank() && workflowId.isNotBlank()) { "A schedule needs an id and a hive" }
@@ -100,7 +105,8 @@ object ScheduleClock {
     fun nextDue(schedule: WorkflowSchedule): Long =
         nextSlot(schedule.cadence, schedule.lastStartedAtEpochMillis ?: schedule.createdAtEpochMillis, schedule.utcOffsetMinutes)
 
-    fun isDue(schedule: WorkflowSchedule, now: Long): Boolean = schedule.enabled && now >= nextDue(schedule)
+    fun isDue(schedule: WorkflowSchedule, now: Long): Boolean =
+        schedule.runNowRequested || (schedule.enabled && now >= nextDue(schedule))
 }
 
 /** What one look at the schedules decides. */
@@ -126,7 +132,7 @@ enum class HoldReason {
  */
 fun decideSchedules(schedules: List<WorkflowSchedule>, now: Long, runActive: Boolean): ScheduleDecision {
     val due = schedules.filter { ScheduleClock.isDue(it, now) }
-        .sortedWith(compareBy({ ScheduleClock.nextDue(it) }, { it.id }))
+        .sortedWith(compareBy({ if (it.runNowRequested) Long.MIN_VALUE else ScheduleClock.nextDue(it) }, { it.id }))
     val first = due.firstOrNull() ?: return ScheduleDecision.Idle
     return if (runActive) ScheduleDecision.Hold(first, HoldReason.RunActive) else ScheduleDecision.Start(first)
 }

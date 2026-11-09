@@ -81,4 +81,32 @@ class ScheduleTickerTest {
         assertEquals(ScheduleDecision.Idle, f.ticker.tick())
         assertEquals(emptyList(), f.started)
     }
+
+    @Test
+    fun aRunNowRequestStartsAScheduleThatIsOffOnceAndNeverTurnsItOn() = runTest {
+        val f = Fixture(base + 2 * hour)
+        f.store.put(due().copy(enabled = false, runNowRequested = true))
+
+        assertIs<ScheduleDecision.Start>(f.ticker.tick())
+        assertEquals(listOf("hive-s"), f.started)
+        val saved = f.store.all().single()
+        assertEquals(false, saved.enabled, "asking for one run does not turn the schedule on")
+        assertEquals(false, saved.runNowRequested, "and the request is spent")
+        assertEquals(ScheduleDecision.Idle, f.ticker.tick())
+        f.now += 100 * hour
+        assertEquals(ScheduleDecision.Idle, f.ticker.tick(), "it never comes round again on its own")
+        assertEquals(1, f.started.size)
+    }
+
+    @Test
+    fun aRunNowRequestWaitsForTheActiveRunAndKeepsItsPlaceUntilItStarts() = runTest {
+        val f = Fixture(base + 2 * hour, active = true)
+        f.store.put(due().copy(enabled = false, runNowRequested = true))
+
+        assertIs<ScheduleDecision.Hold>(f.ticker.tick())
+        assertEquals(true, f.store.all().single().runNowRequested)
+        f.active = false
+        assertIs<ScheduleDecision.Start>(f.ticker.tick())
+        assertEquals(1, f.started.size)
+    }
 }
