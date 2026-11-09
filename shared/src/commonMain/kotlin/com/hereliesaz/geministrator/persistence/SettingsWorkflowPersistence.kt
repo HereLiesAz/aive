@@ -22,8 +22,25 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 class PersistenceCorruptionException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
+
+/**
+ * The stored data says a newer build saved it ([foundVersion] is above what this build reads). It is not
+ * damaged, so it is not corruption: nothing here reads it as such, offers to clear it, or writes over it.
+ */
+class UnsupportedPersistenceSchemaException(
+    val foundVersion: Int,
+    val supportedVersion: Int,
+    cause: Throwable? = null,
+) : IllegalArgumentException(
+    "Unsupported workflow persistence schema $foundVersion: this data was saved by a newer version of the app, " +
+        "and this version reads up to $supportedVersion. Update the app to open it. Nothing has been changed or deleted.",
+    cause,
+)
 
 private val settingsWorkflowPersistenceMutex = Mutex()
 
@@ -346,6 +363,10 @@ class SettingsWorkflowPersistence(
             val decoded = try {
                 json.decodeFromString(WorkflowEvent.serializer(), encoded)
             } catch (failure: Exception) {
+                // An event kind a newer build added is not damage: the snapshot it was saved beside says which build saved it.
+                storedVersionUnlocked()?.takeIf { it > CURRENT_SCHEMA_VERSION }?.let { newer ->
+                    throw UnsupportedPersistenceSchemaException(newer, CURRENT_SCHEMA_VERSION, failure)
+                }
                 throw corruption("Workflow event journal entry $index for ${workflowRunId.value} is unreadable.", failure)
             }
             decoded.also {
@@ -407,6 +428,10 @@ class SettingsWorkflowPersistence(
 
     override suspend fun recoverFromCorruption(): Boolean {
         val hadData = settingsWorkflowPersistenceMutex.withLock {
+            // Clearing is for damaged data. What a newer build saved is not damaged, and is kept.
+            storedVersionUnlocked()?.takeIf { it > CURRENT_SCHEMA_VERSION }?.let { newer ->
+                throw UnsupportedPersistenceSchemaException(newer, CURRENT_SCHEMA_VERSION)
+            }
             val had = snapshotSettings.hasKey(storageKey) ||
                 settings.hasKey(LEGACY_STORAGE_KEY_V1)
             snapshotSettings.remove(storageKey)
@@ -427,6 +452,22 @@ class SettingsWorkflowPersistence(
     private var decodedText: String? = null
     private var decodedSnapshot: PersistenceSnapshot? = null
 
+    /** The format version the stored text says it has, read without decoding the rest; null when it cannot be read. */
+    private fun declaredVersion(encoded: String): Int? = try {
+        (json.parseToJsonElement(encoded) as? JsonObject)?.get("version")?.jsonPrimitive?.intOrNull
+    } catch (_: Exception) {
+        null
+    }
+
+    private fun storedVersionUnlocked(): Int? {
+        val text = try {
+            snapshotSettings.getStringOrNull(storageKey)
+        } catch (_: Exception) {
+            null
+        } ?: if (storageKey == DEFAULT_STORAGE_KEY) settings.getStringOrNull(LEGACY_STORAGE_KEY_V1) else null
+        return text?.let(::declaredVersion)
+    }
+
     private fun readUnlocked(): PersistenceSnapshot {
         // A chunked snapshot with missing chunks reports itself as corrupt while being read.
         val currentEncoded = trackingCorruption { snapshotSettings.getStringOrNull(storageKey) }
@@ -441,6 +482,10 @@ class SettingsWorkflowPersistence(
         val snapshot = try {
             json.decodeFromString(PersistenceSnapshot.serializer(), encoded)
         } catch (failure: Exception) {
+            // Data a newer build saved can hold values this build does not know: that is a version to report, not damage.
+            declaredVersion(encoded)?.takeIf { it > CURRENT_SCHEMA_VERSION }?.let { newer ->
+                throw UnsupportedPersistenceSchemaException(newer, CURRENT_SCHEMA_VERSION, failure)
+            }
             lastCorruptionError = failure
             throw PersistenceCorruptionException(
                 "Workflow persistence data is unreadable and must be recovered. " +
@@ -449,8 +494,8 @@ class SettingsWorkflowPersistence(
             )
         }
 
-        require(snapshot.version <= CURRENT_SCHEMA_VERSION) {
-            "Unsupported workflow persistence schema ${snapshot.version}; maximum supported is $CURRENT_SCHEMA_VERSION"
+        if (snapshot.version > CURRENT_SCHEMA_VERSION) {
+            throw UnsupportedPersistenceSchemaException(snapshot.version, CURRENT_SCHEMA_VERSION)
         }
 
         val migrated = migrate(snapshot)
