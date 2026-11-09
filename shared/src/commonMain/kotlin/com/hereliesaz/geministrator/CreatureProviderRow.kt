@@ -14,6 +14,8 @@ import com.hereliesaz.geministrator.resources.creature_provider_badge_auto
 import com.hereliesaz.geministrator.resources.creature_provider_badge_pinned
 import com.hereliesaz.geministrator.resources.creature_provider_label
 import com.hereliesaz.geministrator.resources.creature_provider_pinned_note
+import com.hereliesaz.geministrator.resources.creature_provider_pinned_unconnected
+import com.hereliesaz.geministrator.resources.launch_error_check_connections
 import com.hereliesaz.geministrator.resources.creature_provider_role_scope
 import org.jetbrains.compose.resources.stringResource
 
@@ -31,6 +33,8 @@ internal fun CreatureProviderRow(
     connectedProviderIds: Set<String>,
     onSaveRoleCollection: ((List<RoleDefinition>) -> Unit)?,
     modifier: Modifier = Modifier,
+    /** Opens Connections: a pinned provider that is not connected links there. Null leaves the warning without it. */
+    onOpenConnections: (() -> Unit)? = null,
 ) {
     val routing = creatureProviderRouting(role, task) ?: return
     val pinnedId = (routing as? CreatureProviderRouting.Pinned)?.providerId
@@ -56,6 +60,21 @@ internal fun CreatureProviderRow(
             style = AzphaltType.body,
             color = azphaltOnSurface(),
         )
+        // A pin to a provider that is not linked fails at once; say so where it can be fixed.
+        if (pinnedId != null && pinnedId !in connectedProviderIds) {
+            Text(
+                stringResource(Res.string.creature_provider_pinned_unconnected, pinnedProviderName(pinnedId, role)),
+                style = AzphaltType.body,
+                color = azphaltOnSurface(),
+            )
+            onOpenConnections?.let { open ->
+                AzphaltPill(
+                    label = stringResource(Res.string.launch_error_check_connections),
+                    seed = "creature-provider-connect-${task.id.value}",
+                    onClick = open,
+                )
+            }
+        }
         Text(stringResource(Res.string.creature_provider_role_scope, role.name), style = AzphaltType.body, color = azphaltMutedOnSurface())
     }
 }

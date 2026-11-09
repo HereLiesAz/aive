@@ -1431,7 +1431,7 @@ class WorkflowRuntimeCoordinator(
     }
 
     private companion object {
-        const val REMOTE_COMPUTE_UNAVAILABLE: String = "remote_compute_unavailable"
+        const val REMOTE_COMPUTE_UNAVAILABLE: String = REMOTE_COMPUTE_UNAVAILABLE_CODE
         val TERMINAL_TASK_STATUSES: Set<TaskRunStatus> = setOf(
             TaskRunStatus.Completed,
             TaskRunStatus.Failed,

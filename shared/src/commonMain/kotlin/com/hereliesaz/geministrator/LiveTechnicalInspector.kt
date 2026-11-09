@@ -32,6 +32,9 @@ import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.workflow.awaitsNestedHumanApproval
 import com.hereliesaz.geministrator.workflow.CONTEXT_TAINT_BLOCKING_CODE
+import com.hereliesaz.geministrator.workflow.REMOTE_COMPUTE_UNAVAILABLE_CODE
+import com.hereliesaz.geministrator.workflow.ROLE_BUDGET_SPENT
+import com.hereliesaz.geministrator.workflow.WorkflowRunFactory
 import com.hereliesaz.geministrator.workflow.contextInputs
 import com.hereliesaz.geministrator.workflow.isHeldAtContextTaintGate
 import com.hereliesaz.geministrator.domain.ContextProvenance
@@ -194,6 +197,10 @@ internal fun TechnicalInspector(
     computeAvailable: Boolean = false,
     /** Opens another task's creature from this one's panel: a shared creature does several tasks (CreatureRoam.kt). */
     onSelectTask: (String) -> Unit = {},
+    /** Opens Connections, where a provider or an integration is linked or swapped. Null leaves those lines plain. */
+    onOpenConnections: (() -> Unit)? = null,
+    /** Opens the Compute place, where paired devices are managed. Null leaves those lines plain. */
+    onOpenCompute: (() -> Unit)? = null,
 ) {
     if (liveWorkflow == null) {
         EmptyTechnicalInspector(stringResource(Res.string.inspector_no_run_is_loaded), modifier)
@@ -325,7 +332,7 @@ internal fun TechnicalInspector(
         when (tab) {
             CreatureTab.Needs -> {
                 creatureNeeds(taskId, liveWorkflow.definition, liveWorkflow.run, liveWorkflow.roles)
-                    ?.let { CreatureNeedsPanel(it, titled = false) }
+                    ?.let { CreatureNeedsPanel(it, titled = false, onOpenMind = { onTabChange(CreatureTab.Mind) }) }
                 // A question its agent asked you (docs/Agent-UI.md): a wait like any other.
                 taskRun.keeperQuestion?.takeIf { taskRun.awaitsKeeperAnswer() }?.let { question ->
                     AgentQuestionPanel(
@@ -430,6 +437,7 @@ internal fun TechnicalInspector(
                         roles = liveWorkflow.roles.filter { it.enabled && it.id.value != ROLE_COLLECTION_MARKER_ID },
                         connectedProviderIds = connectedProviderIds,
                         onSaveRoleCollection = onSaveRoleCollection,
+                        onOpenConnections = onOpenConnections,
                     )
                 }
                 jobStatus?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface(), modifier = Modifier.azphaltLiveRegion()) }
@@ -483,12 +491,22 @@ internal fun TechnicalInspector(
                     messageStatus?.let { LiveInspectorLine(stringResource(Res.string.inspector_message), it, live = true) }
                 }
                 LiveInspectorLine(stringResource(Res.string.inspector_state), taskRun.status.label())
-                LiveInspectorLine(stringResource(Res.string.inspector_executor), executor.displayName())
-                LiveInspectorLine(stringResource(Res.string.inspector_executor_ref), executor.reference())
+                // An executor that lives off this device or behind an integration links to where that is set up.
+                val executorLink = when (executor) {
+                    is TaskExecutor.Distributed -> onOpenCompute
+                    is TaskExecutor.GitHubAction, is TaskExecutor.ExternalService -> onOpenConnections
+                    else -> null
+                }
+                LiveInspectorLine(stringResource(Res.string.inspector_executor), executor.displayName(), onClick = executorLink)
+                LiveInspectorLine(stringResource(Res.string.inspector_executor_ref), executor.reference(), onClick = executorLink)
                 (taskRun.assignedRoleId?.value ?: task.roleId?.value)
                     ?.takeIf { it != executor.reference() }
                     ?.let { LiveInspectorLine(stringResource(Res.string.inspector_responsible_role), it) }
-                LiveInspectorLine(stringResource(Res.string.inspector_provider), taskRun.assignedProviderId?.value ?: "—")
+                LiveInspectorLine(
+                    stringResource(Res.string.inspector_provider),
+                    taskRun.assignedProviderId?.value ?: "—",
+                    onClick = onOpenConnections,
+                )
                 LiveInspectorLine(stringResource(Res.string.inspector_attempt), taskRun.attempt.toString())
                 LiveInspectorLine(stringResource(Res.string.inspector_provider_run), taskRun.providerRunId?.value ?: "—")
                 LiveInspectorLine(stringResource(Res.string.inspector_external_run), taskRun.externalRunId ?: "—")
@@ -508,7 +526,14 @@ internal fun TechnicalInspector(
                 }
                 taskRun.blockingReason?.let {
                     val text = if (it.code == CONTEXT_TAINT_BLOCKING_CODE) it.message else "${it.code} · ${it.message}"
-                    LiveInspectorLine(stringResource(Res.string.inspector_blocked), text, live = true)
+                    // Each block that has a place to be cleared links to it.
+                    val blockedLink: (() -> Unit)? = when {
+                        it.code == REMOTE_COMPUTE_UNAVAILABLE_CODE -> onOpenCompute
+                        it.code == WorkflowRunFactory.EXECUTOR_INTEGRATION_UNAVAILABLE -> onOpenConnections
+                        it.code == ROLE_BUDGET_SPENT -> ({ onTabChange(CreatureTab.Mind) })
+                        else -> null
+                    }
+                    LiveInspectorLine(stringResource(Res.string.inspector_blocked), text, live = true, onClick = blockedLink)
                 }
                 // Its Git checkpoint: the commit its own changes became (Local Git, Desktop).
                 checkpointSummary(taskRun.artifacts)?.let {
@@ -527,19 +552,24 @@ internal fun TechnicalInspector(
                 })
                 // Its Connections (docs/Swarm-OS.md): who feeds it, and whom it feeds and whether they took it.
                 val connections = creatureConnections(taskId, liveWorkflow.definition, liveWorkflow.run, liveWorkflow.roles)
+                // Each neighbour is a link: one tap opens that creature.
                 if (connections.fedBy.isNotEmpty()) {
-                    LiveInspectorLine(
-                        stringResource(Res.string.inspector_fed_by),
-                        connections.fedBy.joinToString("\n") { it.name },
-                    )
+                    Text(stringResource(Res.string.inspector_fed_by), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+                    connections.fedBy.forEach { link ->
+                        AzphaltPill(label = link.name, seed = "fed-by-${link.taskId.value}", onClick = { onSelectTask(link.taskId.value) })
+                    }
                 }
                 if (connections.feeds.isNotEmpty()) {
                     val took = stringResource(Res.string.inspector_took_its_output)
                     val notYet = stringResource(Res.string.inspector_not_taken_yet)
-                    LiveInspectorLine(
-                        stringResource(Res.string.inspector_feeds),
-                        connections.feeds.joinToString("\n") { "${it.name} · ${if (it.tookOutput) took else notYet}" },
-                    )
+                    Text(stringResource(Res.string.inspector_feeds), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+                    connections.feeds.forEach { link ->
+                        AzphaltPill(
+                            label = "${link.name} · ${if (link.tookOutput) took else notYet}",
+                            seed = "feeds-${link.taskId.value}",
+                            onClick = { onSelectTask(link.taskId.value) },
+                        )
+                    }
                 }
                 // Its artifacts: what it made, each opening on its contents (once the Artifacts place).
                 LiveInspectorLine(stringResource(Res.string.inspector_artifacts), taskRun.artifacts.size.toString())
@@ -772,10 +802,11 @@ private fun ArtifactRef.provenanceLabel(): String {
 }
 
 @Composable
-private fun LiveInspectorLine(label: String, value: String, live: Boolean = false) {
+private fun LiveInspectorLine(label: String, value: String, live: Boolean = false, onClick: (() -> Unit)? = null) {
     Column(
         verticalArrangement = Arrangement.spacedBy(3.dp),
-        modifier = if (live) Modifier.semantics { liveRegion = LiveRegionMode.Polite } else Modifier,
+        modifier = (if (live) Modifier.semantics { liveRegion = LiveRegionMode.Polite } else Modifier)
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier),
     ) {
         Text(label, style = AzphaltType.eyebrow, color = azphaltOnSurface())
         Text(value, style = AzphaltType.body, color = azphaltOnSurface())

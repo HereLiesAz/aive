@@ -18,6 +18,9 @@ import com.hereliesaz.geministrator.persistence.WorkflowPersistence
 /** A task parked because its role spent its token budget in this run. Raising the budget releases it. */
 const val ROLE_BUDGET_SPENT: String = "ROLE_BUDGET_SPENT"
 
+/** A task parked because its job must run on a paired device and none is reachable; the Compute place resolves it. */
+const val REMOTE_COMPUTE_UNAVAILABLE_CODE: String = "remote_compute_unavailable"
+
 /** A task parked because a keeper's spend cap stopped the whole run. Lifting the stop releases it. */
 const val SPEND_CAP_STOP: String = "SPEND_CAP_STOP"
 

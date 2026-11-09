@@ -32,6 +32,7 @@ import com.hereliesaz.geministrator.resources.hive_repository
 import com.hereliesaz.geministrator.resources.hive_show_hive
 import com.hereliesaz.geministrator.resources.hive_timeline
 import com.hereliesaz.geministrator.resources.hive_timeline_empty
+import com.hereliesaz.geministrator.resources.launch_error_check_connections
 import com.hereliesaz.geministrator.resources.timeline_view_events
 import com.hereliesaz.geministrator.resources.timeline_view_flowchart
 import com.hereliesaz.geministrator.resources.timeline_view_log
@@ -49,9 +50,19 @@ import org.jetbrains.compose.resources.stringResource
  * the hive's own workflow is what runs.
  */
 @Composable
-internal fun HiveLaunchBar(definition: WorkflowDefinition, modifier: Modifier = Modifier) {
+internal fun HiveLaunchBar(
+    definition: WorkflowDefinition,
+    modifier: Modifier = Modifier,
+    /** A launch that fails usually fails on a connection: set, the failure carries a link to Connections. */
+    onOpenConnections: (() -> Unit)? = null,
+) {
     val host = LocalWorkflowLibraryHost.current ?: return
-    HiveLaunchBar(definition.id.value, onLaunch = { objective, repository -> host.run(definition, objective, repository) }, modifier)
+    HiveLaunchBar(
+        definition.id.value,
+        onLaunch = { objective, repository -> host.run(definition, objective, repository) },
+        modifier = modifier,
+        onOpenConnections = onOpenConnections,
+    )
 }
 
 /** The launch bar's body: [onLaunch] gets the objective and repository, each null when blank. */
@@ -60,6 +71,7 @@ internal fun HiveLaunchBar(
     key: String,
     onLaunch: suspend (String?, com.hereliesaz.geministrator.domain.RepositoryRef?) -> Unit,
     modifier: Modifier = Modifier,
+    onOpenConnections: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     var objective by remember(key) { mutableStateOf("") }
@@ -97,7 +109,12 @@ internal fun HiveLaunchBar(
                 }
             },
         )
-        message?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface()) }
+        message?.let {
+            Text(it, style = AzphaltType.body, color = azphaltOnSurface())
+            onOpenConnections?.let { open ->
+                AzphaltPill(label = stringResource(Res.string.launch_error_check_connections), seed = "hive-launch-error-connections", onClick = open)
+            }
+        }
     }
 }
 
@@ -216,12 +233,15 @@ internal fun RunTimeline(
                 return@Column
             }
             list.sortedBy { it.occurredAtEpochMillis }.forEach { event ->
+                // An event about a creature is a link to that creature, named, not its id.
+                val eventTask = workflowEventTaskId(event)
                 AzphaltRecord(
                     seed = "event-${event.occurredAtEpochMillis}-${event::class.simpleName}",
-                    eyebrow = workflowEventTaskId(event)?.value?.takeLast(12) ?: "workflow",
+                    eyebrow = eventTask?.let(taskName) ?: "workflow",
                     title = workflowEventLabel(event),
                     body = workflowEventDetail(event),
                     endCap = null,
+                    onClick = eventTask?.let { id -> { onTaskSelected(id.value) } },
                 )
             }
         }
@@ -248,6 +268,7 @@ internal fun RestingHive(
     modifier: Modifier = Modifier,
     /** The hive was deleted from its page: leave it for the hives list. */
     onDeleted: () -> Unit = onSurface,
+    onOpenConnections: (() -> Unit)? = null,
 ) {
     val host = LocalWorkflowLibraryHost.current
     // The hive as opened: the field's tide starts from it, so saving an edit never resets undo.
@@ -314,7 +335,7 @@ internal fun RestingHive(
             },
         )
         // An empty hive has nothing to launch yet; the launch bar comes with its first creature.
-        if (!fresh || current.tasks.isNotEmpty()) HiveLaunchBar(current)
+        if (!fresh || current.tasks.isNotEmpty()) HiveLaunchBar(current, onOpenConnections = onOpenConnections)
         // A hive with creatures can be written down as a hive card (HiveCardPanels.kt).
         if (current.tasks.isNotEmpty()) {
             var sharing by remember(current.id) { mutableStateOf(false) }

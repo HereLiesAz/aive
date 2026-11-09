@@ -161,7 +161,17 @@ internal fun MindMapRunScreen(
     activity: SessionActivityFeeds = SessionActivityFeeds.Shared,
     /** Every run, for the wide page's "RUN n" (which run of its hive this is); empty hides it. */
     onLoadRuns: suspend () -> List<WorkflowRun> = { emptyList() },
+    /** Lifts the keeper's pause: the paused note is a link to it. Null leaves the note plain. */
+    onResumeRun: (() -> Unit)? = null,
+    /** Opens the hive's workflow for editing: a definition error is a link to where it is fixed. */
+    onEditWorkflow: (() -> Unit)? = null,
+    /**
+     * Opens a creature from a link: a set-aside panel comes back, an open one stays open. Without it a
+     * link opens the creature only when it is not already the selected one.
+     */
+    onOpenCreature: ((String) -> Unit)? = null,
 ) {
+    val openCreature: (String) -> Unit = onOpenCreature ?: { id -> if (selectedTaskId != id) onTaskSelected(id) }
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
     // A long press on the swarm offers Delete hive for the hive on screen; a running one is refused
     // there, in a plain line, and nothing is deleted (HiveDeletion.kt).
@@ -768,7 +778,7 @@ internal fun MindMapRunScreen(
                     // Title, controls bar, feed bar and the page's own padding take the rest.
                     tissueHeight = (viewportHeight - WIDE_HIVE_CHROME).coerceAtLeast(WIDE_TISSUE_MIN),
                     status = status,
-                    onStatusClick = activeTaskId?.let { id -> { if (selectedTaskId != id) onTaskSelected(id) } },
+                    onStatusClick = activeTaskId?.let { id -> { openCreature(id) } },
                     feedBar = {
                         HiveFeedBar(
                             run = run,
@@ -833,6 +843,7 @@ internal fun MindMapRunScreen(
             RepositoryProgressRecord(
                 repository = repository,
                 run = run,
+                onOpenTask = openCreature,
             )
         }
 
@@ -845,7 +856,7 @@ internal fun MindMapRunScreen(
                 title = stringResource(Res.string.overview_decision_required),
                 body = stringResource(Res.string.overview_a_workflow_gate_is_waiting_for),
                 endCap = stringResource(Res.string.overview_required),
-                onClick = { if (selectedTaskId != waiting) onTaskSelected(waiting) },
+                onClick = { openCreature(waiting) },
             )
         }
 
@@ -856,6 +867,7 @@ internal fun MindMapRunScreen(
                 label = stringResource(Res.string.hive_pause_run),
                 value = stringResource(Res.string.hive_paused_note),
                 modifier = Modifier.azphaltLiveRegion(),
+                onClick = onResumeRun,
             )
         }
 
@@ -869,6 +881,7 @@ internal fun MindMapRunScreen(
                     title = stringResource(Res.string.overview_workflow_definition_error),
                     body = error,
                     endCap = stringResource(Res.string.overview_blocked),
+                    onClick = onEditWorkflow,
                 )
             }
         }
@@ -877,7 +890,7 @@ internal fun MindMapRunScreen(
                 label = stringResource(Res.string.overview_jump_to_active),
                 seed = "jump-active",
                 // Opens the working creature; never closes it if it is already open.
-                onClick = { if (selectedTaskId != activeTaskId) onTaskSelected(activeTaskId) },
+                onClick = { openCreature(activeTaskId) },
             )
             run.taskRuns.values.firstOrNull { it.taskDefinitionId.value == activeTaskId }?.let { activeRun ->
                 val name = activeRun.assignedRoleId
@@ -888,7 +901,7 @@ internal fun MindMapRunScreen(
                     creaturesWaitingOn(activeRun.taskDefinitionId, liveWorkflow.definition, run, liveWorkflow.roles)
                 }
                 CreatureDoingNow(activeRun, name, waitingOnIt, activity) {
-                    if (selectedTaskId != activeTaskId) onTaskSelected(activeTaskId)
+                    openCreature(activeTaskId)
                 }
             }
         }
@@ -925,7 +938,7 @@ internal fun MindMapRunScreen(
                 label = task.name,
                 value = detail,
                 // A link: what it says is acted on in the creature's panel (its provider, its job).
-                onClick = { if (selectedTaskId != task.id.value) onTaskSelected(task.id.value) },
+                onClick = { openCreature(task.id.value) },
                 modifier = Modifier
                     .azphaltLiveRegion()
                     .azphaltEntrance(activityEntrance, index, recentTasks.size.coerceAtLeast(1)),
