@@ -24,6 +24,7 @@ import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.events.AgentAssigned
 import com.hereliesaz.geministrator.events.ArtifactCreated
 import com.hereliesaz.geministrator.events.ExecutorAssigned
+import com.hereliesaz.geministrator.events.ExternalRunCancelFailed
 import com.hereliesaz.geministrator.events.HumanDecisionRequired
 import com.hereliesaz.geministrator.events.NoOpWorkflowEventSink
 import com.hereliesaz.geministrator.events.ProviderUsageRecorded
@@ -1069,8 +1070,23 @@ class WorkflowEngine(
             if (taskRun.status !in BUDGET_STOPPABLE) continue
             val roleId = taskRun.assignedRoleId ?: continue
             if (!roleBudgetSpent(nextRun, roleId)) continue
-            // Best effort, like any cancel: the task is parked either way so nothing more is sent.
-            withContext(NonCancellable) { runCatching { sessionGateway.cancel(handle) } }
+            // The task is parked either way so nothing more is sent, but a session the provider would not
+            // stop keeps billing: that is recorded, not lost.
+            withContext(NonCancellable) {
+                sessionGateway.cancelFailure(handle)?.let { reason ->
+                    runCatching {
+                        eventSink.append(
+                            ExternalRunCancelFailed(
+                                workflowRunId = run.id,
+                                taskDefinitionId = taskId,
+                                externalRunId = handle.providerRunId.value,
+                                reason = reason,
+                                occurredAtEpochMillis = nowEpochMillis,
+                            ),
+                        )
+                    }
+                }
+            }
             TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Blocked)
             nextRun = nextRun.copy(
                 taskRuns = nextRun.taskRuns + (

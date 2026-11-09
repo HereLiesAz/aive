@@ -70,3 +70,11 @@ A creature's job saved from its panel was written to the library and then writte
 - Catch the expected failure type (`ManagedSessionFailure`) per task and route it through `failTaskBeforeStart`; keep rethrowing programming errors and cancellation so the rollback still cancels the sessions that did start.
 - A status that is only a stop on the way to a decision (Failed, before the failure policy runs) must not be read as settled by readiness: failure handlers waited for nothing, then ran while the task was being retried. Pass such tasks as `undecidedFailures`.
 - Count retries by cause, not by `attempt`: a hold that restarts work (`heldAttempts`, `failedProviders`) bumps `attempt` but is not a retry of failed work.
+
+## "Asked to stop" is not "stopped", and one compare is written once
+
+Cancels were `runCatching` and the handle dropped, so a provider that rejected one kept billing with nothing to say so; and the same "is the stored run newer than mine" test was written four ways (`>=` in the cycle, `>` in rewind, cancel, lift and pause), so a decision in the same millisecond, or after the clock stepped back, was overwritten.
+
+- Whatever stops something outside the process returns whether it stopped: record a refusal as an event and keep the handle to ask again (bounded), instead of discarding it with the result.
+- A rule that two places must agree on (which copy of a run is newest) is one function (`newestOf`, `decisionTime`), and every caller uses it; a new write path is checked against it, not given its own comparison.
+- A decision that settles a thing with a second record (a person's approval step has a plan gate) settles both in the same act, or the second waits for an approval with nothing left to resume.
