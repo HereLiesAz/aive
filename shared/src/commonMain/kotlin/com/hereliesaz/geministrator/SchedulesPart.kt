@@ -49,6 +49,12 @@ import com.hereliesaz.geministrator.resources.schedule_note
 import com.hereliesaz.geministrator.resources.schedule_off
 import com.hereliesaz.geministrator.resources.schedule_on
 import com.hereliesaz.geministrator.resources.schedule_remove
+import com.hereliesaz.geministrator.resources.schedule_dst_eu
+import com.hereliesaz.geministrator.resources.schedule_dst_none
+import com.hereliesaz.geministrator.resources.schedule_dst_us
+import com.hereliesaz.geministrator.resources.schedule_pill_named
+import com.hereliesaz.geministrator.resources.schedule_unreadable
+import com.hereliesaz.geministrator.resources.schedule_unreadable_discard
 import com.hereliesaz.geministrator.resources.schedule_zone_east
 import com.hereliesaz.geministrator.resources.schedule_zone_west
 import com.hereliesaz.geministrator.resources.schedule_run_now
@@ -57,6 +63,7 @@ import com.hereliesaz.geministrator.resources.schedule_film_added
 import com.hereliesaz.geministrator.resources.schedule_film_present
 import com.hereliesaz.geministrator.resources.schedule_suite_added
 import com.hereliesaz.geministrator.resources.schedule_suite_present
+import com.hereliesaz.geministrator.workflow.schedule.DaylightSaving
 import com.hereliesaz.geministrator.workflow.schedule.ScheduleCadence
 import com.hereliesaz.geministrator.workflow.schedule.ScheduleClock
 import com.hereliesaz.geministrator.workflow.schedule.WorkflowSchedule
@@ -118,19 +125,54 @@ internal fun SchedulesPart(compact: Boolean) {
     var items by remember { mutableStateOf<List<WorkflowSchedule>>(emptyList()) }
     var reload by remember { mutableStateOf(0) }
     var message by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(reload) { items = store.all() }
+    var unreadable by remember { mutableStateOf(false) }
+    suspend fun refresh() {
+        items = store.all()
+        unreadable = store.unreadable()
+    }
+    LaunchedEffect(reload) { refresh() }
     // The ticker writes what it decided on the schedule; read it while this is open.
     LaunchedEffect(Unit) {
         while (true) {
             delay(5_000)
-            items = store.all()
+            refresh()
         }
     }
-    fun change(schedule: WorkflowSchedule) = scope.launch { store.put(schedule); reload += 1 }
+    // Every change is made to the schedule as it is stored now, never to the copy this screen last read (up to 5 s old), so it
+    // cannot roll back what the ticker just wrote. A write the store refuses (an unreadable list) is said, not lost.
+    fun edit(id: String, change: (WorkflowSchedule) -> WorkflowSchedule?) = scope.launch {
+        runCatching { store.update(id, change) }.onFailure { message = it.message }
+        reload += 1
+    }
+    fun toggle(schedule: WorkflowSchedule) = scope.launch {
+        if (schedule.enabled) {
+            runCatching { store.update(schedule.id) { it.copy(enabled = false) } }.onFailure { message = it.message }
+        } else {
+            // Turning it on is the keeper's review: it takes the hive as it is now, unless the hive may never be scheduled.
+            val vetting = host?.scheduleVetting(schedule.workflowId)
+            if (vetting?.refusal != null) {
+                message = vetting.refusal
+            } else {
+                runCatching {
+                    store.update(schedule.id) { it.copy(enabled = true, definitionFingerprint = vetting?.fingerprint ?: it.definitionFingerprint) }
+                }.onFailure { message = it.message }
+            }
+        }
+        reload += 1
+    }
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(stringResource(Res.string.schedule_note), style = AzphaltType.body, color = azphaltOnSurface())
-        if (host != null) {
+        if (unreadable) {
+            Text(stringResource(Res.string.schedule_unreadable), style = AzphaltType.body, color = azphaltOnSurface(), modifier = Modifier.azphaltLiveRegion())
+            AzphaltPill(
+                label = stringResource(Res.string.schedule_unreadable_discard),
+                seed = "schedule-discard-unreadable",
+                tone = PillTone.Danger,
+                onClick = { scope.launch { store.discardUnreadable(); reload += 1 } },
+            )
+        }
+        if (host != null && !unreadable) {
             AzphaltPill(
                 label = stringResource(Res.string.schedule_add_suite),
                 seed = "schedule-add-suite",
@@ -168,12 +210,24 @@ internal fun SchedulesPart(compact: Boolean) {
         if (items.isEmpty()) {
             Text(stringResource(Res.string.schedule_none), style = AzphaltType.body, color = azphaltOnSurface())
         }
-        items.forEach { schedule -> ScheduleCard(schedule, onChange = ::change, onRemove = { scope.launch { store.remove(schedule.id); reload += 1 } }) }
+        items.forEach { schedule ->
+            ScheduleCard(
+                schedule,
+                onEdit = { change -> edit(schedule.id, change) },
+                onToggle = { toggle(schedule) },
+                onRemove = { scope.launch { runCatching { store.remove(schedule.id) }.onFailure { message = it.message }; reload += 1 } },
+            )
+        }
     }
 }
 
 @Composable
-private fun ScheduleCard(schedule: WorkflowSchedule, onChange: (WorkflowSchedule) -> Unit, onRemove: () -> Unit) {
+private fun ScheduleCard(
+    schedule: WorkflowSchedule,
+    onEdit: ((WorkflowSchedule) -> WorkflowSchedule?) -> Unit,
+    onToggle: () -> Unit,
+    onRemove: () -> Unit,
+) {
     val next = if (schedule.enabled) {
         stringResource(Res.string.schedule_next, formatLogTime(ScheduleClock.nextDue(schedule)))
     } else {
@@ -183,6 +237,13 @@ private fun ScheduleCard(schedule: WorkflowSchedule, onChange: (WorkflowSchedule
         stringResource(Res.string.schedule_last, formatLogTime(at) + (schedule.lastNote?.let { " · $it" } ?: ""))
     } ?: (schedule.lastNote ?: stringResource(Res.string.schedule_last_never))
     val runNow = stringResource(Res.string.schedule_run_now_note)
+    // A pill says what it acts on: "Run now, Nightly dependency audit", not an unnamed "Run now" among several.
+    val onLabel = stringResource(if (schedule.enabled) Res.string.schedule_on else Res.string.schedule_off)
+    val runNowLabel = stringResource(Res.string.schedule_run_now)
+    val removeLabel = stringResource(Res.string.schedule_remove)
+    val onNamed = stringResource(Res.string.schedule_pill_named, onLabel, schedule.name)
+    val runNowNamed = stringResource(Res.string.schedule_pill_named, runNowLabel, schedule.name)
+    val removeNamed = stringResource(Res.string.schedule_pill_named, removeLabel, schedule.name)
     AzphaltRecord(
         seed = "schedule-${schedule.id}",
         eyebrow = cadenceText(schedule.cadence, schedule.utcOffsetMinutes),
@@ -194,21 +255,22 @@ private fun ScheduleCard(schedule: WorkflowSchedule, onChange: (WorkflowSchedule
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     AzphaltPill(
                         // The state it is in, filled while on; tapping flips it.
-                        label = stringResource(if (schedule.enabled) Res.string.schedule_on else Res.string.schedule_off),
+                        label = onLabel,
+                        description = onNamed,
                         seed = "schedule-toggle-${schedule.id}",
                         selected = schedule.enabled,
-                        onClick = { onChange(schedule.copy(enabled = !schedule.enabled)) },
+                        onClick = onToggle,
                     )
                     AzphaltPill(
-                        label = stringResource(Res.string.schedule_run_now),
+                        label = runNowLabel,
+                        description = runNowNamed,
                         seed = "schedule-run-${schedule.id}",
-                        // Due at the next look: an earlier clock for its slot, and on.
-                        onClick = {
-                            onChange(schedule.copy(enabled = true, createdAtEpochMillis = 0L, lastStartedAtEpochMillis = null, lastNote = runNow))
-                        },
+                        // One start at the next look; the schedule is not turned on and keeps its own cadence.
+                        onClick = { onEdit { it.copy(runNowRequested = true, lastNote = runNow) } },
                     )
                     AzphaltPill(
-                        label = stringResource(Res.string.schedule_remove),
+                        label = removeLabel,
+                        description = removeNamed,
                         seed = "schedule-remove-${schedule.id}",
                         tone = PillTone.Danger,
                         onClick = onRemove,
@@ -219,16 +281,36 @@ private fun ScheduleCard(schedule: WorkflowSchedule, onChange: (WorkflowSchedule
                         AzphaltPill(
                             label = stringResource(Res.string.schedule_zone_west) + " (" + offsetLabel(schedule.utcOffsetMinutes) + ")",
                             seed = "schedule-zone-west-${schedule.id}",
-                            onClick = { onChange(schedule.copy(utcOffsetMinutes = (schedule.utcOffsetMinutes - 30).coerceAtLeast(-14 * 60), lastStartedAtEpochMillis = null, createdAtEpochMillis = currentEpochMillis())) },
+                            onClick = { onEdit { it.copy(utcOffsetMinutes = (it.utcOffsetMinutes - 30).coerceAtLeast(-14 * 60), lastStartedAtEpochMillis = null, createdAtEpochMillis = currentEpochMillis()) } },
                         )
                         AzphaltPill(
                             label = stringResource(Res.string.schedule_zone_east),
                             seed = "schedule-zone-east-${schedule.id}",
-                            onClick = { onChange(schedule.copy(utcOffsetMinutes = (schedule.utcOffsetMinutes + 30).coerceAtMost(14 * 60), lastStartedAtEpochMillis = null, createdAtEpochMillis = currentEpochMillis())) },
+                            onClick = { onEdit { it.copy(utcOffsetMinutes = (it.utcOffsetMinutes + 30).coerceAtMost(14 * 60), lastStartedAtEpochMillis = null, createdAtEpochMillis = currentEpochMillis()) } },
+                        )
+                        // None, then the US rule, then the EU rule: the offset above is the winter one.
+                        AzphaltPill(
+                            label = stringResource(
+                                when (schedule.daylightSaving) {
+                                    DaylightSaving.None -> Res.string.schedule_dst_none
+                                    DaylightSaving.UnitedStates -> Res.string.schedule_dst_us
+                                    DaylightSaving.Europe -> Res.string.schedule_dst_eu
+                                },
+                            ),
+                            seed = "schedule-dst-${schedule.id}",
+                            onClick = {
+                                onEdit {
+                                    it.copy(
+                                        daylightSaving = DaylightSaving.entries[(it.daylightSaving.ordinal + 1) % DaylightSaving.entries.size],
+                                        lastStartedAtEpochMillis = null,
+                                        createdAtEpochMillis = currentEpochMillis(),
+                                    )
+                                }
+                            },
                         )
                     }
                 }
-                CadenceEditor(schedule.cadence) { onChange(schedule.copy(cadence = it, createdAtEpochMillis = currentEpochMillis(), lastStartedAtEpochMillis = null)) }
+                CadenceEditor(schedule.cadence) { cadence -> onEdit { it.copy(cadence = cadence, createdAtEpochMillis = currentEpochMillis(), lastStartedAtEpochMillis = null) } }
             }
         },
     )

@@ -106,4 +106,42 @@ class ScheduleClockTest {
             WorkflowSchedule(id = "s", workflowId = "h", name = "n", objective = "o", cadence = daily, utcOffsetMinutes = 15 * 60, createdAtEpochMillis = 0)
         }
     }
+
+    // Epoch days of 2026: Mar 8 (second Sunday of March), Mar 29 (last Sunday), Nov 1 (first Sunday of November).
+    private val mar8 = 20_520L
+    private val mar29 = 20_541L
+    private val nov1 = 20_758L
+
+    private fun at(epochDay: Long, hourUtc: Int) = epochDay * day + hourUtc * hour
+
+    private fun next(cadence: ScheduleCadence, after: Long, offsetHours: Int, rule: DaylightSaving) =
+        ScheduleClock.nextSlot(cadence, after, offsetHours * 60, rule)
+
+    @Test
+    fun aUnitedStatesScheduleKeepsItsLocalHourAcrossBothClockChanges() {
+        val daily = ScheduleCadence.daily(7)
+        val us = DaylightSaving.UnitedStates
+        // New Orleans (UTC-6 in winter): 07:00 is 13:00 UTC in winter and 12:00 UTC in summer.
+        assertEquals(at(mar8 - 1, 13), next(daily, at(mar8 - 2, 14), -6, us))
+        assertEquals(at(mar8, 12), next(daily, at(mar8 - 1, 14), -6, us), "the clocks went forward in the small hours")
+        assertEquals(at(nov1, 13), next(daily, at(nov1 - 1, 14), -6, us), "and back")
+        assertEquals(at(nov1 + 1, 13), next(daily, at(nov1, 14), -6, us))
+        // Without a rule the hour is the same UTC hour all year, as before.
+        assertEquals(at(mar8, 13), next(daily, at(mar8 - 1, 14), -6, DaylightSaving.None))
+    }
+
+    @Test
+    fun aEuropeanScheduleFollowsTheLastSundaysAndAWallTimeTheClocksSkipRunsAfterTheGap() {
+        val daily = ScheduleCadence.daily(7)
+        assertEquals(at(mar29 - 1, 6), next(daily, at(mar29 - 2, 12), 1, DaylightSaving.Europe))
+        assertEquals(at(mar29, 5), next(daily, at(mar29 - 1, 12), 1, DaylightSaving.Europe))
+        // 02:00 on the day the US clocks go forward does not exist: it runs at 03:00 (08:00 UTC), once.
+        assertEquals(at(mar8, 8), next(ScheduleCadence.daily(2), at(mar8 - 1, 12), -6, DaylightSaving.UnitedStates))
+        assertEquals(at(mar8 + 1, 7), next(ScheduleCadence.daily(2), at(mar8, 8), -6, DaylightSaving.UnitedStates))
+    }
+
+    @Test
+    fun everyNHoursIgnoresDaylightSaving() {
+        assertEquals(at(mar8, 10), next(ScheduleCadence.everyHours(6), at(mar8, 4), -6, DaylightSaving.UnitedStates))
+    }
 }

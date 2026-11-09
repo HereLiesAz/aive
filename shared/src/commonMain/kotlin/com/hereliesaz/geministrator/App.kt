@@ -694,6 +694,7 @@ fun App(
                     if (!started) error(getString(Res.string.app_launch_already_in_progress))
                 },
                 log = { line -> appLog("Schedule", line) },
+                vet = { schedule -> workflowLibraryHost.scheduleVetting(schedule.workflowId) },
             ).run()
         }
 

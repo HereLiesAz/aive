@@ -12,6 +12,8 @@ import java.nio.file.LinkOption
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /** A frame path that is not inside the film's folder in the store. */
@@ -54,6 +56,46 @@ internal class FileFilmFrameStore(private val root: File = defaultRoot()) : Film
             emptySet()
         } else {
             Files.readAllLines(file).map(String::trim).filter(::isValidShotId).toSet()
+        }
+    }
+
+    private val counters = Mutex()
+
+    override suspend fun reserveImage(workflowRunId: String, budget: Int): Boolean = counters.withLock {
+        val used = readCount(workflowRunId)
+        if (used >= budget) {
+            false
+        } else {
+            writeSmall(BUDGET_DIR, workflowRunId, (used + 1).toString())
+            true
+        }
+    }
+
+    override suspend fun spentImages(workflowRunId: String): Int = counters.withLock { readCount(workflowRunId) }
+
+    override suspend fun consumeOnce(key: String): Boolean = counters.withLock {
+        val seen = withContext(Dispatchers.IO) { Files.isRegularFile(smallFile(ONCE_DIR, key), LinkOption.NOFOLLOW_LINKS) }
+        if (!seen) writeSmall(ONCE_DIR, key, "1")
+        !seen
+    }
+
+    private suspend fun readCount(workflowRunId: String): Int = withContext(Dispatchers.IO) {
+        val file = smallFile(BUDGET_DIR, workflowRunId)
+        if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) 0 else Files.readString(file).trim().toIntOrNull()?.coerceAtLeast(0) ?: Int.MAX_VALUE
+    }
+
+    /** `<root>/<dir>/<hash of key>`: a key (a run id, a request) is text from elsewhere, so it names a file only through its hash. */
+    private fun smallFile(dir: String, key: String): Path = rootPath.resolve(dir).resolve(fnv1a64Hex(key))
+
+    private suspend fun writeSmall(dir: String, key: String, text: String) = withContext(Dispatchers.IO) {
+        val folder = rootPath.resolve(dir)
+        Files.createDirectories(folder)
+        val temp = Files.createTempFile(folder, ".small-", ".tmp")
+        try {
+            Files.writeString(temp, text)
+            Files.move(temp, smallFile(dir, key), StandardCopyOption.REPLACE_EXISTING)
+        } finally {
+            Files.deleteIfExists(temp)
         }
     }
 
@@ -147,6 +189,16 @@ internal class FileFilmFrameStore(private val root: File = defaultRoot()) : Film
 
     companion object {
         private const val PENDING_FILE = "regenerate.txt"
+        private const val BUDGET_DIR = ".budget"
+        private const val ONCE_DIR = ".once"
+
+        private fun fnv1a64Hex(text: String): String {
+            var hash = -3750763034362895579L
+            for (byte in text.encodeToByteArray()) {
+                hash = (hash xor (byte.toLong() and 0xff)) * 1099511628211L
+            }
+            return hash.toULong().toString(16).padStart(16, '0')
+        }
         private val FILM_ID = Regex("^film-[0-9a-f]{16}$")
 
         fun defaultRoot(): File = File(System.getProperty("user.home").orEmpty(), ".aive/film/frames")

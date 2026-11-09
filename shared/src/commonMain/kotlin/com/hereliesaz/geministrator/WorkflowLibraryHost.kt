@@ -3,6 +3,8 @@ package com.hereliesaz.geministrator
 import com.hereliesaz.geministrator.workflow.CodingWorkflowSuite
 import com.hereliesaz.geministrator.workflow.CreativeWorkflowSuite
 import com.hereliesaz.geministrator.workflow.schedule.WorkflowSchedule
+import com.hereliesaz.geministrator.workflow.schedule.HiveVetting
+import com.hereliesaz.geministrator.workflow.schedule.ScheduleVetting
 import com.hereliesaz.geministrator.workflow.schedule.WorkflowScheduleStore
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.hereliesaz.geministrator.azphalt.AuthoredWorkflowStore
@@ -129,6 +131,16 @@ class WorkflowLibraryHost(
     }
 
     /**
+     * What a schedule needs to know about the hive it names as it is now: its fingerprint, and why it may never be scheduled (it
+     * spends money), or null when the hive is not on this device. One answer for the ticker and for the Schedules screen.
+     */
+    suspend fun scheduleVetting(workflowId: String): HiveVetting? {
+        val definitions = persistence.definitions
+        val definition = definitions.get(WorkflowDefinitionId(workflowId)) ?: return null
+        return ScheduleVetting.vet(definition, definitions.all().associateBy { it.id })
+    }
+
+    /**
      * Adds the coding suite ([CodingWorkflowSuite]) to this device's hives, each as one you authored and
      * can edit. A hive already on the device is left as it is, so your edits survive; each of the
      * suite's scheduled hives also gets a schedule, off until you turn it on. Returns how many hives
@@ -144,7 +156,9 @@ class WorkflowLibraryHost(
             }
             val suggestion = entry.schedule ?: continue
             val id = "schedule-${entry.definition.id.value}"
-            if (schedules.all().none { it.id == id }) {
+            val vetting = scheduleVetting(entry.definition.id.value)
+            // A hive that spends money is never scheduled, whatever suggested it.
+            if (vetting?.refusal == null && schedules.all().none { it.id == id }) {
                 schedules.put(
                     WorkflowSchedule(
                         id = id,
@@ -155,6 +169,7 @@ class WorkflowLibraryHost(
                         enabled = false,
                         withEvidence = suggestion.withEvidence,
                         createdAtEpochMillis = nowEpochMillis,
+                        definitionFingerprint = vetting?.fingerprint,
                     ),
                 )
             }

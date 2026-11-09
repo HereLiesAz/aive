@@ -288,6 +288,8 @@ internal fun AzphaltPill(
     tone: PillTone = PillTone.Quiet,
     /** False while the action cannot be taken (a decision is already running): the pill is dimmed, announced as disabled and does nothing. */
     enabled: Boolean = true,
+    /** What a screen reader says in place of the label (and end cap), when the label alone does not say what it acts on. */
+    description: String? = null,
 ) {
     // Every pill wears its own colour: a hue from its seed, with an end cap in the same family.
     // Selected sits on Ink (Yellow when its surface is Ink, so it never vanishes); the one main
@@ -311,7 +313,7 @@ internal fun AzphaltPill(
             .semantics {
                 this.role = pillRole
                 this.selected = selected
-                contentDescription = if (endCap != null) "$label: $endCap" else label
+                contentDescription = description ?: if (endCap != null) "$label: $endCap" else label
                 if (stateDescription != null) this.stateDescription = stateDescription
                 if (!enabled) disabled()
             }

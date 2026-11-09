@@ -127,4 +127,20 @@ class FileFilmFrameStoreTest {
         assertEquals(1, filmImageBudget(mapOf("AIVE_FILM_IMAGE_BUDGET" to "-3")))
         assertEquals(40, filmImageBudget(mapOf("AIVE_FILM_IMAGE_BUDGET" to "lots")))
     }
+
+    @Test
+    fun theImageBudgetAndAHandledRequestSurviveANewStoreOverTheSameFolder(): Unit = withStore { root, store ->
+        assertTrue(store.reserveImage("run/with odd:chars", 2))
+        assertTrue(store.reserveImage("run/with odd:chars", 2))
+        assertEquals(false, store.reserveImage("run/with odd:chars", 2), "the budget is spent")
+        assertEquals(true, store.consumeOnce("run|regenerate|film|s2"))
+
+        val restarted = FileFilmFrameStore(root)
+
+        assertEquals(2, restarted.spentImages("run/with odd:chars"))
+        assertEquals(false, restarted.reserveImage("run/with odd:chars", 2), "a restart does not hand it back")
+        assertEquals(true, restarted.reserveImage("another-run", 2))
+        assertEquals(false, restarted.consumeOnce("run|regenerate|film|s2"), "and the request is not acted on twice")
+        assertEquals(true, restarted.consumeOnce("run|regenerate|film|s3"))
+    }
 }

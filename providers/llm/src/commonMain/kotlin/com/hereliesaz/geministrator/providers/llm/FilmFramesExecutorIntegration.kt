@@ -85,12 +85,13 @@ class OpenAiFilmImageApi(
  * The short-film hive's frames step (docs/Short-Film.md): reads the storyboard and style sheet from its
  * dependencies and draws one picture per shot.
  *
- * - **Bounded spend.** At most [imageBudget] images per workflow run, every attempt counted. A storyboard that
- *   needs more than is left fails before anything is drawn, saying how to raise the budget.
+ * - **Bounded spend.** At most [imageBudget] images per workflow run, every attempt counted, and the count is kept in the
+ *   [FilmFrameStore] before each picture is asked for, so a restart does not give it back. A storyboard that needs more than
+ *   is left fails before anything is drawn, saying how to raise the budget.
  * - **Bounded work.** [parallelism] shots at a time; a shot is tried at most `1 + maxRetries` times.
  * - **Kept frames.** Frames are filed by [FilmKey] in the [FilmFrameStore]. A run again finds what was drawn and draws
  *   only the missing shots and the shots the frame review, or a `regenerate-shots` line in this step's
- *   objective, sent back; the rest are kept and cost nothing.
+ *   objective, sent back (a `regenerate-shots` line is acted on once per run); the rest are kept and cost nothing.
  * - **Progress.** The step starts the drawing and reports Running, with a count of frames drawn, until it finishes.
  *   If the app restarts meanwhile, the step is started again and finds the frames already kept.
  *
@@ -122,7 +123,6 @@ class FilmFramesExecutorIntegration(
 
     private val lock = Mutex()
     private val runs = mutableMapOf<String, FrameRun>()
-    private val spent = mutableMapOf<String, Int>()
 
     override suspend fun dispatch(context: TaskExecutorContext): TaskExecutorExecution = try {
         start(context)
@@ -156,7 +156,7 @@ class FilmFramesExecutorIntegration(
         val run = FrameRun(externalId, plan)
         val needed = plan.toDraw.size
         if (needed > 0) {
-            val remaining = lock.withLock { imageBudget - (spent[workflowRunId] ?: 0) }
+            val remaining = imageBudget - store.spentImages(workflowRunId)
             if (needed > remaining) {
                 throw FilmStepFailure(
                     "The storyboard needs $needed new images, but this run's image budget is $imageBudget and " +
@@ -208,8 +208,14 @@ class FilmFramesExecutorIntegration(
 
         val filmId = FilmKey.of(storyboard, style)
         val ids = storyboard.shots.map { it.id }.toSet()
-        val sentBack = (store.pendingRegeneration(filmId) + FilmFrameReview.parse(context.task.objective).regenerate)
-            .filterTo(linkedSetOf()) { it in ids }
+        // A `regenerate-shots` line stays in the hive's text, so it is acted on once per run (it is moved into the store's
+        // waiting list, which survives a restart and is emptied as the shots are drawn): reading it again after a restart or a
+        // second reconcile must not redraw, and pay for, the same shots.
+        val asked = FilmFrameReview.parse(context.task.objective).regenerate.filterTo(linkedSetOf()) { it in ids }
+        if (asked.isNotEmpty() && store.consumeOnce("${context.run.id.value}|regenerate|$filmId|${asked.sorted().joinToString(",")}")) {
+            store.markForRegeneration(filmId, asked)
+        }
+        val sentBack = store.pendingRegeneration(filmId).filterTo(linkedSetOf()) { it in ids }
         val existing = mutableMapOf<String, String>()
         val toDraw = mutableListOf<FilmShot>()
         for (shot in storyboard.shots) {
@@ -243,10 +249,8 @@ class FilmFramesExecutorIntegration(
         for (attempt in 1..attempts) {
             // A cancelled run neither spends budget nor asks the image model again.
             currentCoroutineContext().ensureActive()
-            val allowed = lock.withLock {
-                val used = spent[workflowRunId] ?: 0
-                (used < imageBudget).also { if (it) spent[workflowRunId] = used + 1 }
-            }
+            // Kept before the picture is asked for, in the store, so a restart does not hand the budget back.
+            val allowed = lock.withLock { store.reserveImage(workflowRunId, imageBudget) }
             if (!allowed) {
                 lock.withLock { run.failures[shot.id] = "the image budget ($imageBudget) was used up. ${budgetHint()}" }
                 return
@@ -274,8 +278,8 @@ class FilmFramesExecutorIntegration(
     /** What the task shows now: Running with a count, or its final result once the drawing has finished. */
     private suspend fun snapshot(run: FrameRun, context: TaskExecutorContext): TaskExecutorExecution {
         val state = lock.withLock {
+            // A finished run is kept, so a second reconcile before the engine has saved its result answers the same and draws nothing.
             val finished = run.finished
-            if (finished) runs.remove(run.externalId)
             State(finished, run.drawn.size, run.failures.size, run.failures.toMap(), run.drawn.toMap(), run.fatal)
         }
         if (!state.finished) {

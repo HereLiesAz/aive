@@ -33,6 +33,23 @@ data class ScheduleCadence(
 }
 
 /**
+ * Which daylight-saving rule moves a schedule's hour (docs/Scheduled-Workflows.md). The app reads no time zone from the
+ * device, so a schedule's [WorkflowSchedule.utcOffsetMinutes] is its standard (winter) offset and this adds an hour in
+ * summer by a fixed rule. Other regions keep [None] and move the offset by hand when their clocks change.
+ */
+@Serializable
+enum class DaylightSaving {
+    /** The offset never changes. */
+    None,
+
+    /** The United States and Canada: second Sunday of March 02:00 to first Sunday of November 02:00, local time. */
+    UnitedStates,
+
+    /** The European Union: last Sunday of March 01:00 UTC to last Sunday of October 01:00 UTC. */
+    Europe,
+}
+
+/**
  * A hive set to run by itself. It is off until the keeper turns it on, and only ever starts the hive
  * as drawn, with [objective] as its run's objective, in the project that is open; it cannot approve
  * anything, so a hive with an approval waits for the keeper like any other.
@@ -47,8 +64,10 @@ data class WorkflowSchedule(
     val enabled: Boolean = false,
     /** Whether the run's objective is followed by the swarm's evidence, computed when it starts (SELF_IMPROVEMENT.md). */
     val withEvidence: Boolean = false,
-    /** The keeper's offset from UTC in minutes (New Orleans is -360 in winter), for daily and weekly hours. */
+    /** The keeper's standard (winter) offset from UTC in minutes (New Orleans is -360), for daily and weekly hours. */
     val utcOffsetMinutes: Int = 0,
+    /** The rule that adds an hour in summer to [utcOffsetMinutes]; none until the keeper picks one. */
+    val daylightSaving: DaylightSaving = DaylightSaving.None,
     /** When it was made: the first start is the first slot after this, never one already past. */
     val createdAtEpochMillis: Long,
     val lastStartedAtEpochMillis: Long? = null,
@@ -59,6 +78,12 @@ data class WorkflowSchedule(
      * the start clears it; it never turns the schedule on.
      */
     val runNowRequested: Boolean = false,
+    /**
+     * A fingerprint of the hive's definition ([ScheduleVetting.fingerprint]) as it was when the keeper made or turned on the
+     * schedule. A schedule is bound to a hive's id, not its content: when the hive differs from this at a start, the run is
+     * held and the schedule turned off. Null on a schedule saved before this existed: it is taken from the hive on first sight.
+     */
+    val definitionFingerprint: String? = null,
 ) {
     init {
         require(id.isNotBlank() && workflowId.isNotBlank()) { "A schedule needs an id and a hive" }
@@ -73,12 +98,78 @@ object ScheduleClock {
     private const val DAY = 24 * HOUR
 
     /**
-     * The first slot strictly after [after] for [cadence], in epoch milliseconds, with the day and hour
-     * read at [utcOffsetMinutes] from UTC.
+     * The first slot strictly after [after] for [cadence], in epoch milliseconds, with the day and hour read at
+     * [utcOffsetMinutes] from UTC, plus an hour in summer under [daylightSaving]. A wall time the clocks skip runs at the
+     * first instant after the gap; one they repeat runs at its first occurrence.
      */
-    fun nextSlot(cadence: ScheduleCadence, after: Long, utcOffsetMinutes: Int = 0): Long {
-        val offset = utcOffsetMinutes * 60_000L
-        return nextLocalSlot(cadence, after + offset) - offset
+    fun nextSlot(
+        cadence: ScheduleCadence,
+        after: Long,
+        utcOffsetMinutes: Int = 0,
+        daylightSaving: DaylightSaving = DaylightSaving.None,
+    ): Long {
+        if (cadence.kind == ScheduleCadence.Kind.EveryHours) return after + cadence.everyHours * HOUR
+        val standard = utcOffsetMinutes * 60_000L
+        val before = offsetAt(after, standard, daylightSaving)
+        val local = nextLocalSlot(cadence, after + before)
+        val inForce = offsetAt(local - before, standard, daylightSaving)
+        var slot = local - inForce
+        if (offsetAt(slot, standard, daylightSaving) != inForce || slot <= after) slot = local - before
+        return slot
+    }
+
+    /** The offset from UTC in force at [instant], in milliseconds. */
+    fun offsetAt(instant: Long, standardMillis: Long, rule: DaylightSaving): Long =
+        if (rule != DaylightSaving.None && inSummerTime(instant, standardMillis, rule)) standardMillis + HOUR else standardMillis
+
+    private fun inSummerTime(instant: Long, standard: Long, rule: DaylightSaving): Boolean {
+        val year = civilYear((instant + standard).floorDiv(DAY))
+        return when (rule) {
+            DaylightSaving.None -> false
+            DaylightSaving.UnitedStates -> {
+                val start = (nthSunday(year, 3, 2)) * DAY + 2 * HOUR - standard
+                val end = (nthSunday(year, 11, 1)) * DAY + 2 * HOUR - (standard + HOUR)
+                instant in start until end
+            }
+            DaylightSaving.Europe -> {
+                val start = lastSunday(year, 3) * DAY + HOUR
+                val end = lastSunday(year, 10) * DAY + HOUR
+                instant in start until end
+            }
+        }
+    }
+
+    /** The epoch day of the [n]th Sunday of [month] (1 to 4). */
+    private fun nthSunday(year: Long, month: Int, n: Int): Long {
+        val first = daysFromCivil(year, month, 1)
+        return first + (7 - dayOfWeek(first)) % 7 + 7L * (n - 1)
+    }
+
+    /** The epoch day of the last Sunday of a 31-day [month]. */
+    private fun lastSunday(year: Long, month: Int): Long {
+        val last = daysFromCivil(year, month, 31)
+        return last - dayOfWeek(last) % 7
+    }
+
+    // Civil calendar arithmetic (Howard Hinnant), proleptic Gregorian.
+    private fun daysFromCivil(year: Long, month: Int, day: Int): Long {
+        val y = if (month <= 2) year - 1 else year
+        val era = y.floorDiv(400L)
+        val yoe = y - era * 400
+        val doy = (153 * (if (month > 2) month - 3 else month + 9) + 2) / 5 + day - 1
+        val doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
+        return era * 146_097 + doe - 719_468
+    }
+
+    private fun civilYear(epochDay: Long): Long {
+        val z = epochDay + 719_468
+        val era = z.floorDiv(146_097L)
+        val doe = z - era * 146_097
+        val yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365
+        val doy = doe - (365 * yoe + yoe / 4 - yoe / 100)
+        val mp = (5 * doy + 2) / 153
+        val month = if (mp < 10) mp + 3 else mp - 9
+        return yoe + era * 400 + if (month <= 2) 1 else 0
     }
 
     private fun nextLocalSlot(cadence: ScheduleCadence, after: Long): Long = when (cadence.kind) {
@@ -103,7 +194,12 @@ object ScheduleClock {
 
     /** When [schedule] is next due: the slot after its last start, or after it was made. */
     fun nextDue(schedule: WorkflowSchedule): Long =
-        nextSlot(schedule.cadence, schedule.lastStartedAtEpochMillis ?: schedule.createdAtEpochMillis, schedule.utcOffsetMinutes)
+        nextSlot(
+            schedule.cadence,
+            schedule.lastStartedAtEpochMillis ?: schedule.createdAtEpochMillis,
+            schedule.utcOffsetMinutes,
+            schedule.daylightSaving,
+        )
 
     fun isDue(schedule: WorkflowSchedule, now: Long): Boolean =
         schedule.runNowRequested || (schedule.enabled && now >= nextDue(schedule))
@@ -119,6 +215,9 @@ sealed interface ScheduleDecision {
 
     /** [schedule] is due but [reason] holds it; it is looked at again next time. */
     data class Hold(val schedule: WorkflowSchedule, val reason: HoldReason) : ScheduleDecision
+
+    /** [schedule] was due and its hive may not be started on a schedule as it is now: it was turned off with [note] on it. */
+    data class Refused(val schedule: WorkflowSchedule, val note: String) : ScheduleDecision
 }
 
 enum class HoldReason {

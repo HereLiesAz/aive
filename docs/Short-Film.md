@@ -4,6 +4,8 @@ An objective becomes a short film made of **still frames**: a concept, a storybo
 
 **This hive needs the desktop app.** The frames step needs an OpenAI connection and the assemble step runs ffmpeg on your computer. On Android and the web the two steps have no executor, and the engine blocks them as "not available in this runtime" instead of waiting for them. It also **spends money** (one image per shot), so it runs only when you start it: it has no suggested schedule and is not part of the coding suite.
 
+It is never run on a schedule: it spends money, so a schedule refuses a hive with the frames or assemble step (the schedule is turned off with a note saying so), and **Add the coding suite** never gives it one.
+
 Put it on the device with **Keeper's room › Schedules › Add the short-film hive (desktop)**. It arrives as a hive you authored and can edit (`ShortFilmHive`, `workflow/ShortFilmWorkflow.kt`); one already on the device is left alone, so your edits survive. Then launch it like any hive and type the objective: *a film about a lighthouse keeper who finds a letter*.
 
 ## The steps
@@ -58,7 +60,7 @@ To raise the budget set the environment variable AIVE_FILM_IMAGE_BUDGET (now 40,
 restart the app and run this step again, or cut shots from the storyboard. Frames already drawn are kept.
 ~~~
 
-Set `AIVE_FILM_IMAGE_BUDGET` before starting The Aive (a whole number, kept between 1 and `FILM_IMAGE_BUDGET_CEILING`, 500). The count lives in memory: restarting the app, or a run that is run again from a task (a new workflow run), starts a new count. Reusing frames that were already drawn costs nothing and is not counted.
+Set `AIVE_FILM_IMAGE_BUDGET` before starting The Aive (a whole number, kept between 1 and `FILM_IMAGE_BUDGET_CEILING`, 500). The count is kept on this computer (in the frame store, taken before each picture is asked for), so restarting the app does not give it back; a run that is started again from a task is a new workflow run and starts a new count. Reusing frames that were already drawn costs nothing and is not counted.
 
 ## Frames are kept, and shots can be sent back
 
@@ -66,7 +68,7 @@ Frames are filed by the **film**, not by the run: `~/.aive/film/frames/film-<16 
 
 1. shots with no picture (a failed shot, a deleted file),
 2. shots the **frame review** sent back, and
-3. shots named in the frames step's own objective, if you edited it: a line `regenerate-shots: s03, s07` and **Run again from here** on the frames step.
+3. shots named in the frames step's own objective, if you edited it: a line `regenerate-shots: s03, s07` and **Run again from here** on the frames step. The line stays in the hive's text, so it is acted on **once per workflow run** (the same set of shots is not drawn again after a restart or a repeated check by the engine); name a different set, or send the shots back from the frame review, to draw them again.
 
 The reviewer states its result as a JSON object (or a line `regenerate-shots: s03, s07`); `FilmFrameReview.parse` reads it and keeps only valid ids:
 
