@@ -232,6 +232,12 @@ data class TaskRun(
      * restart does not use up the task's retry budget.
      */
     val failedProviders: List<AgentProviderId> = emptyList(),
+    /**
+     * Attempts that only restarted work a spend limit had stopped (a role's token budget, a spend
+     * cap): [attempt] still moves on for them, but they are not retries of failed work, so they do
+     * not count against the task's retry budget ([com.hereliesaz.geministrator.workflow.FailurePolicyEvaluator]).
+     */
+    val heldAttempts: Int = 0,
 ) {
     init {
         require(progress == null || progress in 0f..1f) { "Task progress must be normalized 0f..1f" }
@@ -252,6 +258,13 @@ data class WorkflowRun(
     val repositorySnapshot: RepositoryRef? = null,
     /** Exact role definitions used by this run, including package-local roles. */
     val roleSnapshot: List<RoleDefinition> = emptyList(),
+    /**
+     * The hive this run follows: the library copy under the same id can be saved over while the run is
+     * live, and a run resumes against what it started with (plus the job and criteria edits it took),
+     * never against a later structural edit. Null on a run saved before this existed, which falls back
+     * to the saved hive.
+     */
+    val definitionSnapshot: WorkflowDefinition? = null,
     val globalPause: WorkflowGlobalPause? = null,
     /**
      * Workflow runs this run continues: one parent for a continuation, several for a merge that

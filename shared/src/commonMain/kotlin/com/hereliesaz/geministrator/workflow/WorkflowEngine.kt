@@ -24,6 +24,7 @@ import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.events.AgentAssigned
 import com.hereliesaz.geministrator.events.ArtifactCreated
 import com.hereliesaz.geministrator.events.ExecutorAssigned
+import com.hereliesaz.geministrator.events.ExternalRunCancelFailed
 import com.hereliesaz.geministrator.events.HumanDecisionRequired
 import com.hereliesaz.geministrator.events.NoOpWorkflowEventSink
 import com.hereliesaz.geministrator.events.ProviderUsageRecorded
@@ -128,9 +129,15 @@ class WorkflowEngine(
         definition: WorkflowDefinition,
         run: WorkflowRun,
         nowEpochMillis: Long,
+        undecidedFailures: Set<TaskDefinitionId> = emptySet(),
     ): WorkflowRun {
         val decisions = mutableListOf<Pair<PolicyRequest, PolicyDecision>>()
-        val refreshed = WorkflowRunFactory.refreshReadiness(definition, run, nowEpochMillis) { request, decision ->
+        val refreshed = WorkflowRunFactory.refreshReadiness(
+            definition,
+            run,
+            nowEpochMillis,
+            undecidedFailures,
+        ) { request, decision ->
             decisions += request to decision
         }
         decisions.forEach { (request, decision) -> eventSink.recordPolicyDecision(request, decision, nowEpochMillis) }
@@ -178,21 +185,46 @@ class WorkflowEngine(
             val request: AgentTaskRequest,
             val sessionRequest: ManagedSessionRequest,
             val providerId: AgentProviderId,
+            val selection: ProviderSelectionRequest,
         )
 
         val pendingAgentDispatches = mutableListOf<PendingAgentDispatch>()
 
         for (taskRun in dispatchable) {
             if (remainingSlots == 0) break
-            val task = requireNotNull(definitionsById[taskRun.taskDefinitionId])
+            val task = definitionsById[taskRun.taskDefinitionId]
+            if (task == null) {
+                // A run saved before its hive was edited can hold a task run the hive no longer has.
+                // Nothing can say what it should do or what waits on it, so the run fails with that
+                // reason; throwing here would stop every other ready task from starting, every cycle.
+                nextRun = failRunForMissingTask(nextRun, taskRun, nowEpochMillis)
+                return DispatchResult(nextRun, handles)
+            }
             val executor = taskRun.executor ?: task.effectiveExecutor()
 
             when (executor) {
                 is TaskExecutor.RoleAgent -> {
-                    val role = requireNotNull(roleDefinition(nextRun, executor.roleId)) {
-                        "Role ${executor.roleId.value} is not registered for this run"
+                    val role = roleDefinition(nextRun, executor.roleId)
+                    if (role == null || !role.enabled) {
+                        // A missing or disabled role (a creature reassigned to one, a role switched off
+                        // mid-run) fails this task through its escalation policy, without a retry that
+                        // would find the same thing, and leaves the other ready tasks to start.
+                        nextRun = failTaskBeforeStart(
+                            definition = definition,
+                            run = nextRun,
+                            taskRun = taskRun,
+                            task = task,
+                            reason = if (role == null) {
+                                "Role ${executor.roleId.value} is not registered for this run"
+                            } else {
+                                "Role ${role.name} is disabled"
+                            },
+                            nowEpochMillis = nowEpochMillis,
+                            allowRetry = false,
+                        )
+                        if (nextRun.status.isTerminal()) return DispatchResult(nextRun, handles)
+                        continue
                     }
-                    require(role.enabled) { "Role ${role.name} is disabled" }
 
                     // Token budget circuit breaker: a role that has spent its budget in this run
                     // starts no more work until the keeper raises the budget.
@@ -256,28 +288,15 @@ class WorkflowEngine(
                         } catch (failure: ManagedSessionFailure) {
                             // A provider refusal while drafting (HTTP 429, bad key) fails the task with
                             // the provider's reason and goes through the task's retry policy.
-                            var reason = failure.message?.takeIf(String::isNotBlank) ?: "Unable to draft a plan"
-                            TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Failed)
-                            eventSink.append(TaskFailed(nextRun.id, task.id, reason, nowEpochMillis))
-                            val failedRun = nextRun.copy(
-                                taskRuns = nextRun.taskRuns + (
-                                    task.id to taskRun.copy(status = TaskRunStatus.Failed, progressMessage = reason)
-                                ),
-                            )
-                            // The provider's own failure moves the draft to another provider (next cycle).
-                            val failover = failOver(failedRun, task.id, providerId, reason, selection, nowEpochMillis)
-                            if (failover.restarted != null) {
-                                nextRun = failover.restarted
-                                continue
-                            }
-                            failover.stopMessage?.let { reason = it }
-                            nextRun = handleFailure(
+                            nextRun = failTaskBeforeStart(
                                 definition = definition,
-                                run = failedRun,
-                                taskDefinitionId = task.id,
-                                retryReason = RetryReason.ProviderFailure,
-                                reason = "Executor failed. Last status: $reason",
+                                run = nextRun,
+                                taskRun = taskRun,
+                                task = task,
+                                reason = failure.message?.takeIf(String::isNotBlank) ?: "Unable to draft a plan",
                                 nowEpochMillis = nowEpochMillis,
+                                providerId = providerId,
+                                selection = selection,
                             )
                             if (nextRun.status.isTerminal()) {
                                 // The task's policy failed the workflow: start nothing else, and keep
@@ -325,6 +344,7 @@ class WorkflowEngine(
                             taskRequest = request,
                         ),
                         providerId = providerId,
+                        selection = selection,
                     )
                     activeByProvider[providerId] = providerActive + 1
                     remainingSlots -= 1
@@ -365,21 +385,31 @@ class WorkflowEngine(
         // Phase 2: create sessions concurrently. This batch is transactional with respect to
         // provider lifetime: Phase 3 is the only place handles become workflow state, so any
         // session created before a sibling fails must be cancelled before the failure escapes.
+        // A provider's refusal to start one task (ManagedSessionFailure: credit, key, rate limit, an
+        // unavailable provider) is that task's failure, not the batch's: it is kept aside and the task
+        // goes through its failure policy in Phase 3, while the sessions that did start stay.
         val createdHandles = mutableListOf<Pair<PendingAgentDispatch, ManagedSessionHandle>>()
+        val refusedStarts = mutableListOf<Pair<PendingAgentDispatch, ManagedSessionFailure>>()
         val createdHandlesMutex = Mutex()
         try {
             coroutineScope {
                 pendingAgentDispatches.map { pending ->
                     async {
-                        val handle = sessionGateway.createSession(pending.sessionRequest)
+                        val handle = try {
+                            sessionGateway.createSession(pending.sessionRequest)
+                        } catch (refusal: ManagedSessionFailure) {
+                            withContext(NonCancellable) {
+                                createdHandlesMutex.withLock { refusedStarts += pending to refusal }
+                            }
+                            return@async
+                        }
                         withContext(NonCancellable) {
                             createdHandlesMutex.withLock {
                                 createdHandles += pending to handle
                             }
                         }
-                        pending to handle
                     }
-                }.map { it.await() }
+                }.forEach { it.await() }
             }
         } catch (failure: Throwable) {
             val rollbackHandles = withContext(NonCancellable) {
@@ -430,6 +460,22 @@ class WorkflowEngine(
                 eventSink.append(ExecutorAssigned(nextRun.id, pending.task.id, pending.executor, pending.task.roleId, nowEpochMillis))
                 eventSink.append(TaskStarted(nextRun.id, pending.task.id, pending.taskRun.attempt, nowEpochMillis))
             }
+            // A refused start fails its own task now that the started ones are committed.
+            for ((pending, refusal) in refusedStarts) {
+                nextRun = failTaskBeforeStart(
+                    definition = definition,
+                    run = nextRun,
+                    taskRun = pending.taskRun,
+                    task = pending.task,
+                    reason = refusal.message?.takeIf(String::isNotBlank) ?: "Unable to start provider session",
+                    nowEpochMillis = nowEpochMillis,
+                    providerId = pending.providerId,
+                    selection = pending.selection,
+                )
+                // The task's policy failed the workflow: keep the terminal status, and the sessions
+                // that did start are handed back for the caller to cancel with the run.
+                if (nextRun.status.isTerminal()) return DispatchResult(nextRun, handles)
+            }
         } catch (failure: Throwable) {
             cancelSessions(createdHandles.map { it.second }, failure)
             throw failure
@@ -444,6 +490,67 @@ class WorkflowEngine(
             else -> refreshed.status
         }
         return DispatchResult(nextRun.copy(status = finalStatus), handles)
+    }
+
+    /**
+     * Fails [task] before any session exists for it (a provider refused to draft its plan or to
+     * start it, its role is missing or disabled) and applies its failure policy. A refusal that is the
+     * provider's own may move the task to another provider first ([failOver], when [providerId] and
+     * [selection] are given); [allowRetry] is false for a cause a retry would find again.
+     */
+    private suspend fun failTaskBeforeStart(
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        taskRun: TaskRun,
+        task: TaskDefinition,
+        reason: String,
+        nowEpochMillis: Long,
+        providerId: AgentProviderId? = null,
+        selection: ProviderSelectionRequest? = null,
+        allowRetry: Boolean = true,
+    ): WorkflowRun {
+        TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Failed)
+        eventSink.append(TaskFailed(run.id, task.id, reason, nowEpochMillis))
+        val failedRun = run.copy(
+            taskRuns = run.taskRuns + (
+                task.id to taskRun.copy(status = TaskRunStatus.Failed, progressMessage = reason)
+            ),
+        )
+        var stopReason = reason
+        if (providerId != null && selection != null) {
+            // The provider's own failure moves the work to another provider (next cycle).
+            val failover = failOver(failedRun, task.id, providerId, reason, selection, nowEpochMillis)
+            failover.restarted?.let { return it }
+            failover.stopMessage?.let { stopReason = it }
+        }
+        return handleFailure(
+            definition = definition,
+            run = failedRun,
+            taskDefinitionId = task.id,
+            retryReason = RetryReason.ProviderFailure,
+            reason = "Executor failed. Last status: $stopReason",
+            nowEpochMillis = nowEpochMillis,
+            allowRetry = allowRetry,
+        )
+    }
+
+    /** Fails [run] because [taskRun] belongs to a task the workflow definition no longer has. */
+    private suspend fun failRunForMissingTask(
+        run: WorkflowRun,
+        taskRun: TaskRun,
+        nowEpochMillis: Long,
+    ): WorkflowRun {
+        val reason = "Task ${taskRun.taskDefinitionId.value} is no longer part of this workflow"
+        TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Failed)
+        eventSink.append(TaskFailed(run.id, taskRun.taskDefinitionId, reason, nowEpochMillis))
+        eventSink.append(WorkflowFailed(run.id, reason, nowEpochMillis))
+        return run.copy(
+            status = WorkflowRunStatus.Failed,
+            taskRuns = run.taskRuns + (
+                taskRun.taskDefinitionId to taskRun.copy(status = TaskRunStatus.Failed, progressMessage = reason)
+            ),
+            updatedAtEpochMillis = nowEpochMillis,
+        )
     }
 
     suspend fun completeTask(
@@ -685,7 +792,12 @@ class WorkflowEngine(
         }
 
         nextRun = stopRolesOverBudget(nextRun, handles, nowEpochMillis)
-        nextRun = refreshReadiness(definition, nextRun, nowEpochMillis)
+        // A task that failed in this pass has not met its failure policy yet (the caller applies it
+        // next): what is conditioned on its failure waits for that decision.
+        val failedThisPass = nextRun.taskRuns
+            .filter { (id, taskRun) -> taskRun.status == TaskRunStatus.Failed && run.taskRuns[id]?.status != TaskRunStatus.Failed }
+            .keys
+        nextRun = refreshReadiness(definition, nextRun, nowEpochMillis, failedThisPass)
         val workflowStatus = deriveWorkflowStatus(nextRun)
         if (workflowStatus == WorkflowRunStatus.Completed && run.status != WorkflowRunStatus.Completed) {
             eventSink.append(WorkflowCompleted(nextRun.id, nowEpochMillis))
@@ -934,20 +1046,12 @@ class WorkflowEngine(
 
     suspend fun cancelWorkflow(run: WorkflowRun, nowEpochMillis: Long): WorkflowRun {
         if (run.status.isTerminal()) return run
-        val cancelledTaskRuns = run.taskRuns.mapValues { (taskId, taskRun) ->
-            if (taskRun.status == TaskRunStatus.Completed || taskRun.status == TaskRunStatus.Failed) {
-                taskRun
-            } else {
-                eventSink.append(TaskCancelled(run.id, taskId, nowEpochMillis))
-                taskRun.copy(status = TaskRunStatus.Cancelled)
-            }
+        val cancelled = cancelledRunView(run, nowEpochMillis)
+        run.taskRuns.forEach { (taskId, taskRun) ->
+            if (cancelled.taskRuns.getValue(taskId) !== taskRun) eventSink.append(TaskCancelled(run.id, taskId, nowEpochMillis))
         }
         eventSink.append(WorkflowCancelled(run.id, nowEpochMillis))
-        return run.copy(
-            status = WorkflowRunStatus.Cancelled,
-            taskRuns = cancelledTaskRuns,
-            updatedAtEpochMillis = nowEpochMillis,
-        )
+        return cancelled
     }
 
     /**
@@ -966,14 +1070,30 @@ class WorkflowEngine(
             if (taskRun.status !in BUDGET_STOPPABLE) continue
             val roleId = taskRun.assignedRoleId ?: continue
             if (!roleBudgetSpent(nextRun, roleId)) continue
-            // Best effort, like any cancel: the task is parked either way so nothing more is sent.
-            withContext(NonCancellable) { runCatching { sessionGateway.cancel(handle) } }
+            // The task is parked either way so nothing more is sent, but a session the provider would not
+            // stop keeps billing: that is recorded, not lost.
+            withContext(NonCancellable) {
+                sessionGateway.cancelFailure(handle)?.let { reason ->
+                    runCatching {
+                        eventSink.append(
+                            ExternalRunCancelFailed(
+                                workflowRunId = run.id,
+                                taskDefinitionId = taskId,
+                                externalRunId = handle.providerRunId.value,
+                                reason = reason,
+                                occurredAtEpochMillis = nowEpochMillis,
+                            ),
+                        )
+                    }
+                }
+            }
             TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Blocked)
             nextRun = nextRun.copy(
                 taskRuns = nextRun.taskRuns + (
                     taskId to taskRun.copy(
                         status = TaskRunStatus.Blocked,
                         attempt = taskRun.attempt + 1,
+                        heldAttempts = taskRun.heldAttempts + 1,
                         assignedProviderId = null,
                         providerRunId = null,
                         externalRunId = null,
@@ -1057,4 +1177,24 @@ class WorkflowEngine(
             }
         }
     }
+}
+
+/**
+ * What [run] is once cancelled: every task that has not completed or failed is Cancelled. Pure;
+ * [WorkflowEngine.cancelWorkflow] adds the journal entries. A caller that must know whether a
+ * cancelled run could still be used (a rerun from it) asks this before it stops anything.
+ */
+internal fun cancelledRunView(run: WorkflowRun, nowEpochMillis: Long): WorkflowRun {
+    if (run.status.isTerminal()) return run
+    return run.copy(
+        status = WorkflowRunStatus.Cancelled,
+        taskRuns = run.taskRuns.mapValues { (_, taskRun) ->
+            if (taskRun.status == TaskRunStatus.Completed || taskRun.status == TaskRunStatus.Failed) {
+                taskRun
+            } else {
+                taskRun.copy(status = TaskRunStatus.Cancelled)
+            }
+        },
+        updatedAtEpochMillis = nowEpochMillis,
+    )
 }

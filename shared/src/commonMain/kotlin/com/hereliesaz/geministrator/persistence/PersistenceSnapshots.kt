@@ -141,7 +141,9 @@ internal fun PersistenceSnapshot.asUntrustedImport(importedAtEpochMillis: Long):
     )
     return copy(
         definitions = validDefinitions,
-        runs = runs.map { run ->
+        runs = runs.map { imported ->
+            // The definitions above are the ones that were validated; a copy carried inside a run was not.
+            val run = imported.copy(definitionSnapshot = null)
             if (run.status == WorkflowRunStatus.Completed ||
                 run.status == WorkflowRunStatus.Failed ||
                 run.status == WorkflowRunStatus.Cancelled

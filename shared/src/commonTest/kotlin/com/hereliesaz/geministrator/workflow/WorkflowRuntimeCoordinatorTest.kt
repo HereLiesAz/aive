@@ -8,6 +8,7 @@ import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.ProviderRunId
+import com.hereliesaz.geministrator.domain.TaskCondition
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
@@ -115,6 +116,94 @@ class WorkflowRuntimeCoordinatorTest {
         assertEquals(2, retried.attempt)
         assertEquals(AgentProviderId("provider"), retried.assignedProviderId)
         assertEquals(ProviderRunId("provider-run-new"), retried.providerRunId)
+    }
+
+    @Test
+    fun aFailureHandlerWaitsWhileTheTaskItHandlesIsStillBeingRetried() = runBlocking {
+        val mainId = TaskDefinitionId("main")
+        val handlerId = TaskDefinitionId("handler")
+        val roleId = BuiltInRoles.ImplementationEngineer.id
+        val mainExecutor = TaskExecutor.RoleAgent(roleId)
+        val definition = WorkflowDefinition(
+            id = WorkflowDefinitionId("definition-handler"),
+            name = "Workflow",
+            tasks = listOf(
+                TaskDefinition(
+                    id = mainId,
+                    name = "Main",
+                    objective = "Do work",
+                    roleId = roleId,
+                    executor = mainExecutor,
+                ),
+                TaskDefinition(
+                    id = handlerId,
+                    name = "Handler",
+                    objective = "Recover",
+                    roleId = roleId,
+                    executor = mainExecutor,
+                    dependsOn = setOf(mainId),
+                    condition = TaskCondition.OnFailure(mainId),
+                ),
+            ),
+            testDesignPolicy = TestDesignPolicy.None,
+        )
+        val run = run(
+            definition = definition,
+            status = WorkflowRunStatus.Running,
+            taskRuns = mapOf(
+                mainId to taskRun(mainId, TaskRunStatus.Running, mainExecutor, provider = true),
+                handlerId to taskRun(handlerId, TaskRunStatus.Blocked, mainExecutor),
+            ),
+        )
+        val fixture = fixture(FakeManagedSessionGateway(status = ManagedSessionStatus.Failed))
+
+        // The first failure is retried (default policy), so nothing has gone wrong for good yet.
+        val result = fixture.coordinator.cycle(
+            project = project(),
+            definition = definition,
+            state = WorkflowRuntimeState(run, mapOf(mainId to handle(mainId))),
+            nowEpochMillis = 20L,
+            artifactIdFactory = ::artifactId,
+        )
+
+        assertEquals(2, result.run.taskRuns.getValue(mainId).attempt)
+        assertEquals(TaskRunStatus.Running, result.run.taskRuns.getValue(mainId).status)
+        assertEquals(TaskRunStatus.Blocked, result.run.taskRuns.getValue(handlerId).status)
+        assertEquals(setOf(mainId), result.handles.keys)
+    }
+
+    @Test
+    fun aProviderRefusingToStartASessionFailsTheTaskInsteadOfBreakingTheCycle() = runBlocking {
+        val taskId = TaskDefinitionId("agent")
+        val executor = TaskExecutor.RoleAgent(BuiltInRoles.ImplementationEngineer.id)
+        val definition = definition(
+            TaskDefinition(
+                id = taskId,
+                name = "Agent",
+                objective = "Do work",
+                roleId = BuiltInRoles.ImplementationEngineer.id,
+                executor = executor,
+            ),
+        )
+        val run = run(
+            definition = definition,
+            status = WorkflowRunStatus.Running,
+            taskRuns = mapOf(taskId to taskRun(taskId, TaskRunStatus.Ready, executor)),
+        )
+        val fixture = fixture(FakeManagedSessionGateway(startFailure = ManagedSessionFailure.ProviderOperationFailed("HTTP 402")))
+
+        // Before: the refusal escaped cycle(), which the runtime retried every few seconds without end.
+        val result = fixture.coordinator.cycle(
+            project = project(),
+            definition = definition,
+            state = WorkflowRuntimeState(run),
+            nowEpochMillis = 20L,
+            artifactIdFactory = ::artifactId,
+        )
+
+        assertEquals(TaskRunStatus.Retrying, result.run.taskRuns.getValue(taskId).status)
+        assertEquals(2, result.run.taskRuns.getValue(taskId).attempt)
+        assertEquals(emptyMap(), result.handles)
     }
 
     @Test
@@ -500,15 +589,19 @@ class WorkflowRuntimeCoordinatorTest {
 private class FakeManagedSessionGateway(
     private val status: ManagedSessionStatus = ManagedSessionStatus.Unknown,
     private val artifacts: List<ProviderArtifact> = emptyList(),
+    private val startFailure: Throwable? = null,
 ) : ManagedSessionGateway {
     override suspend fun resolveProvider(selection: ProviderSelectionRequest) =
         AgentProviderId("provider")
 
-    override suspend fun createSession(request: ManagedSessionRequest) = ManagedSessionHandle(
-        taskRunId = request.taskRequest.taskRunId,
-        providerId = AgentProviderId("provider"),
-        providerRunId = ProviderRunId("provider-run-new"),
-    )
+    override suspend fun createSession(request: ManagedSessionRequest): ManagedSessionHandle {
+        startFailure?.let { throw it }
+        return ManagedSessionHandle(
+            taskRunId = request.taskRequest.taskRunId,
+            providerId = AgentProviderId("provider"),
+            providerRunId = ProviderRunId("provider-run-new"),
+        )
+    }
 
     override suspend fun status(handle: ManagedSessionHandle) = status
 

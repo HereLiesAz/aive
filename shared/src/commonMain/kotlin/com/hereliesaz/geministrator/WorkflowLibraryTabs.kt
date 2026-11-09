@@ -1,5 +1,8 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.domain.WorkflowDefinition
+import kotlinx.serialization.builtins.nullable
+
 /**
  * Tabs of the Workflows destination. [Library] and [Store] are always available; the rest work on
  * the pinned selected workflow, so they only exist while one is selected.
@@ -69,5 +72,38 @@ internal data class WorkflowLibraryTabState(
             tabName = if (fallBack) WorkflowLibraryTab.Library.name else tabName,
             selectedKey = "",
         )
+    }
+}
+
+/** The durable keys the Workflows destination keeps its selection and working draft under. */
+internal object WorkflowLibraryKeys {
+    const val TAB = "workflows.tab"
+    const val SELECTED_KEY = "workflows.selected-key"
+    const val DRAFT = "workflows.draft"
+    const val DRAFT_ORIGIN = "workflows.draft-origin"
+    const val SELECTED_TASK_ID = "workflows.selected-task-id"
+}
+
+/**
+ * Opens the Workflows destination on [entry] from somewhere else (a hive's "More editing", a
+ * definition error): pins it and shows its overview. The screen works on its draft, not on the pinned
+ * key, and Save writes the draft; so a draft left from another hive is dropped here, and the screen
+ * loads [entry] into a fresh draft the way selecting its card does. A draft of this same hive stays,
+ * because that is the keeper's own unsaved work on it.
+ */
+internal fun DurableUiStateStore.openWorkflowsOn(entry: WorkflowLibraryEntry) {
+    putString(WorkflowLibraryKeys.SELECTED_KEY, entry.key)
+    putString(WorkflowLibraryKeys.TAB, WorkflowLibraryTab.Overview.name)
+    val draftId = getString(WorkflowLibraryKeys.DRAFT)
+        ?.let { stored ->
+            runCatching {
+                DurableUiState.json.decodeFromString(WorkflowDefinition.serializer().nullable, stored)
+            }.getOrNull()
+        }
+        ?.id
+    if (draftId != entry.definition.id) {
+        remove(WorkflowLibraryKeys.DRAFT)
+        remove(WorkflowLibraryKeys.DRAFT_ORIGIN)
+        remove(WorkflowLibraryKeys.SELECTED_TASK_ID)
     }
 }

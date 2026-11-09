@@ -8,6 +8,7 @@ import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RetryReason
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.SpendCapKind
+import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRun
@@ -40,6 +41,31 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
+/**
+ * The hive [run] follows: the definition it recorded when it started (with the job and criteria edits
+ * it took), else the saved hive under its id for a run saved before runs recorded one. The saved hive
+ * can be changed while the run is live, so a run is never resumed against it when it has its own copy.
+ */
+internal suspend fun WorkflowPersistence.definitionFor(run: WorkflowRun): WorkflowDefinition? =
+    run.definitionSnapshot ?: definitions.get(run.workflowDefinitionId)
+
+/**
+ * The one freshness rule between the copy of a run a runtime holds ([live]) and the copy in the store
+ * ([stored]), used by every reader (the cycle, a rewind, a cancel, the runtime's own decisions).
+ * Whatever this runtime produces is stored as it is produced, so a stored copy that differs from the live
+ * one was written by someone else (a decision on a gate) and is the newer, unless the live one is
+ * strictly newer (a change not stored yet). Never a strict comparison in one place and a loose one in another.
+ */
+internal fun newestOf(live: WorkflowRun, stored: WorkflowRun?): WorkflowRun =
+    if (stored != null && stored != live && stored.updatedAtEpochMillis >= live.updatedAtEpochMillis) stored else live
+
+/**
+ * The time to stamp a decision made on [run]: never before what it decides, so a clock that stepped
+ * back cannot make the decision look older than the copy it replaces and be discarded by [newestOf].
+ */
+internal fun decisionTime(nowEpochMillis: Long, run: WorkflowRun): Long =
+    maxOf(nowEpochMillis, run.updatedAtEpochMillis + 1)
+
 data class WorkflowRuntimeState(
     val run: WorkflowRun,
     val handles: Map<TaskDefinitionId, ManagedSessionHandle> = emptyMap(),
@@ -62,6 +88,8 @@ class WorkflowRuntimeCoordinator(
         RepositoryWorkflowEventSink(persistence.events),
     )
     private val cycleMutex = Mutex()
+    /** How many times each provider session has refused to stop (under [cycleMutex], like every cancel). */
+    private val sessionCancelFailures = mutableMapOf<ProviderRunId, Int>()
     /** When the hourly spend was last summed; it is summed again when this run's cost rises. */
     private var lastHourlySpendCheckAtMillis: Long? = null
 
@@ -71,7 +99,10 @@ class WorkflowRuntimeCoordinator(
         state: WorkflowRuntimeState,
     ) {
         persistence.projects.put(project)
-        persistence.definitions.put(definition)
+        // The saved hive under this id is the keeper's, and a save made while the run lives is newer than
+        // the copy this run holds: it is not written over (docs/Keepers-Room.md, Pause, change, resume).
+        // Launching and forking store the definition a run follows; this stores it only if there is none.
+        if (persistence.definitions.get(definition.id) == null) persistence.definitions.put(definition)
         persistence.runs.put(state.run)
         persistArtifacts(state.run)
         // Refinement-ladder training data, only while the keeper has switched capture on; it never
@@ -122,7 +153,7 @@ class WorkflowRuntimeCoordinator(
         val project = storedProject.copy(
             repository = run.repositorySnapshot ?: storedProject.repository,
         )
-        val definition = requireNotNull(persistence.definitions.get(run.workflowDefinitionId)) {
+        val definition = requireNotNull(persistence.definitionFor(run)) {
             "Workflow definition ${run.workflowDefinitionId.value} was not found"
         }
         val tasksById = definition.tasks.associateBy { it.id }
@@ -169,17 +200,11 @@ class WorkflowRuntimeCoordinator(
         nowEpochMillis: Long,
         artifactIdFactory: (TaskRun, ProviderArtifact, Int) -> ArtifactId,
     ): WorkflowRuntimeState = cycleMutex.withLock {
-        val persistedRun = persistence.runs.get(state.run.id)
-        val authoritativeState = if (
-            persistedRun != null &&
-            persistedRun != state.run &&
-            // Every state this coordinator produces is persisted, so a different persisted run with
-            // the same timestamp was written by someone else (a decision in the same millisecond).
-            persistedRun.updatedAtEpochMillis >= state.run.updatedAtEpochMillis
-        ) {
+        val newest = newestOf(state.run, persistence.runs.get(state.run.id))
+        val authoritativeState = if (newest !== state.run) {
             WorkflowRuntimeState(
-                run = persistedRun,
-                handles = mergeHandles(state.handles, persistedRun),
+                run = newest,
+                handles = mergeHandles(state.handles, newest),
             )
         } else {
             state
@@ -204,14 +229,13 @@ class WorkflowRuntimeCoordinator(
             // A run made terminal outside the cycle (an escalation decision) must not leave its
             // provider sessions running and billing.
             if (state.handles.isEmpty()) return state
-            cancelSessions(state.run, state.handles)
-            return state.copy(handles = emptyMap())
+            // A session that would not stop stays on the state, and is asked again next cycle.
+            return state.copy(handles = cancelSessions(state.run, state.handles, nowEpochMillis))
         }
         if (state.run.spendPause != null) {
             // Stopped by a spend cap: nothing runs or starts until the keeper lifts the stop.
             if (state.handles.isEmpty()) return state
-            cancelSessions(state.run, state.handles)
-            return state.copy(handles = emptyMap())
+            return state.copy(handles = cancelSessions(state.run, state.handles, nowEpochMillis))
         }
 
         var nextRun = reconcileResolvedApprovalGates(definition, state.run, nowEpochMillis)
@@ -252,7 +276,6 @@ class WorkflowRuntimeCoordinator(
         nextRun = preserveArtifactTimestamps(state.run, nextRun)
         nextRun = reconcileSystemExecutors(project, definition, nextRun, nowEpochMillis)
         persistArtifacts(nextRun)
-        nextRun = refreshAfterSystemExecution(definition, nextRun, nowEpochMillis)
 
         val newlyFailedTaskIds = nextRun.taskRuns
             .filter { (taskId, taskRun) ->
@@ -260,6 +283,9 @@ class WorkflowRuntimeCoordinator(
                     state.run.taskRuns[taskId]?.status != TaskRunStatus.Failed
             }
             .keys
+        // What waits on a failure (an on-failure handler, an any-outcome task) is released only after
+        // the failure policy below has decided: a task about to be retried has not failed for good.
+        nextRun = refreshAfterSystemExecution(definition, nextRun, nowEpochMillis, newlyFailedTaskIds)
 
         if (newlyFailedTaskIds.isNotEmpty() && nextRun.status == WorkflowRunStatus.Failed) {
             nextRun = nextRun.copy(status = WorkflowRunStatus.Running)
@@ -337,6 +363,9 @@ class WorkflowRuntimeCoordinator(
                 TaskRunStatus.Cancelled,
                 TaskRunStatus.Retrying,
                 TaskRunStatus.Escalated,
+                // Parked (a role over its budget): its session was cancelled, and a handle kept on a parked
+                // task would read that session as Failed and fail the task it only paused.
+                TaskRunStatus.Blocked,
             )
         }
 
@@ -356,7 +385,6 @@ class WorkflowRuntimeCoordinator(
 
         val beforeSystemDispatch = nextRun
         if (!keeperPaused) nextRun = dispatchSystemExecutors(project, definition, nextRun, nowEpochMillis)
-        nextRun = refreshAfterSystemExecution(definition, nextRun, nowEpochMillis)
 
         val dispatchFailedTaskIds = nextRun.taskRuns
             .filter { (taskId, taskRun) ->
@@ -364,6 +392,7 @@ class WorkflowRuntimeCoordinator(
                     beforeSystemDispatch.taskRuns[taskId]?.status != TaskRunStatus.Failed
             }
             .keys
+        nextRun = refreshAfterSystemExecution(definition, nextRun, nowEpochMillis, dispatchFailedTaskIds)
         if (dispatchFailedTaskIds.isNotEmpty() && nextRun.status == WorkflowRunStatus.Failed) {
             nextRun = nextRun.copy(status = WorkflowRunStatus.Running)
         }
@@ -398,6 +427,10 @@ class WorkflowRuntimeCoordinator(
             return terminate(project, definition, nextRun, nextHandles, nowEpochMillis)
         }
         // Tasks that system executors made ready in this cycle pass the same gate before agents start.
+        // A failure handled above can have settled what a task waits on (an any-outcome or on-failure
+        // task behind a creature that just escalated): that task is released now, so the gate sees it,
+        // instead of by the dispatch below, which would start it with nothing between.
+        nextRun = engine.refreshReadiness(definition, nextRun, nowEpochMillis)
         nextRun = holdTaintedPrivilegedTasks(definition, nextRun, nowEpochMillis)
 
         if (!keeperPaused) {
@@ -417,8 +450,33 @@ class WorkflowRuntimeCoordinator(
             }
         }
         nextState = WorkflowRuntimeState(nextRun, nextHandles)
-        persist(project, definition, nextState)
+        persistWhatStarted(project, definition, nextState, started = nextHandles.filterKeys { it !in state.handles }, nowEpochMillis)
         return nextState
+    }
+
+    /**
+     * Saves the run that now holds sessions this cycle started. A cancellation that arrives while it is
+     * being saved must not lose them: the sessions exist, and a reopened runtime that never learnt of
+     * them would start the same tasks again. So it is saved to the end, and if it cannot be saved the
+     * new sessions are stopped before the failure goes on.
+     */
+    private suspend fun persistWhatStarted(
+        project: Project,
+        definition: WorkflowDefinition,
+        state: WorkflowRuntimeState,
+        started: Map<TaskDefinitionId, ManagedSessionHandle>,
+        nowEpochMillis: Long,
+    ) {
+        if (started.isEmpty()) {
+            persist(project, definition, state)
+            return
+        }
+        try {
+            withContext(NonCancellable) { persist(project, definition, state) }
+        } catch (failure: Throwable) {
+            cancelSessions(state.run, started, nowEpochMillis)
+            throw failure
+        }
     }
 
     /**
@@ -443,49 +501,57 @@ class WorkflowRuntimeCoordinator(
         state: WorkflowRuntimeState,
         taskId: TaskDefinitionId,
         nowEpochMillis: Long,
-    ): WorkflowRuntimeState = cycleMutex.withLock {
-        val run = persistence.runs.get(state.run.id)
-            ?.takeIf { it.updatedAtEpochMillis > state.run.updatedAtEpochMillis }
-            ?: state.run
-        require(!run.status.isTerminal()) { "A finished run is run again from a task; it cannot be rewound" }
-        require(definition.tasks.any { it.id == taskId }) { "Task ${taskId.value} is not part of this workflow" }
-        val rewound = TaskRerunPlanner.rerunSet(definition, setOf(taskId))
-            .filter { run.taskRuns[it]?.status != TaskRunStatus.Created }
-            .toSet()
-        // Stop what runs inside the set; the rest of the swarm is left as it is.
-        val stopped = state.handles.filterKeys { it in rewound }
-        cancelSessions(run, stopped)
-        persistence.approvalGates.unresolved(run.id)
-            .filter { it.taskDefinitionId in rewound }
-            .forEach { gate ->
-                persistence.approvalGates.put(
-                    gate.copy(status = ApprovalGateStatus.Rejected, decisionNote = "Rewound", decidedAtEpochMillis = nowEpochMillis),
-                )
-            }
-        val fresh = WorkflowRunFactory.create(
-            definition = definition,
-            workflowRunId = run.id,
-            projectId = run.projectId,
-            objective = run.objective,
-            nowEpochMillis = nowEpochMillis,
-            taskRunIdFactory = { id -> TaskRunId("${run.id.value}-${id.value}-r${(run.taskRuns[id]?.attempt ?: 0) + 1}") },
-            repository = run.repositorySnapshot,
-            roles = run.roleSnapshot,
-        )
-        val reset = rewound.mapNotNull { id ->
-            val prior = run.taskRuns[id] ?: return@mapNotNull null
-            fresh.taskRuns[id]?.let { f -> id to f.copy(attempt = prior.attempt + 1, usage = prior.usage) }
-        }.toMap()
-        var next = run.copy(
-            taskRuns = run.taskRuns + reset,
-            status = WorkflowRunStatus.Running,
-            updatedAtEpochMillis = maxOf(nowEpochMillis, run.updatedAtEpochMillis + 1),
-        )
-        next = WorkflowRunFactory.refreshReadiness(definition, next, nowEpochMillis)
-        val handles = state.handles - rewound
-        val result = WorkflowRuntimeState(next, handles)
-        persist(project, definition, result)
-        result
+    ): WorkflowRuntimeState {
+        val (rewoundState, remote) = cycleMutex.withLock {
+            val run = newestOf(state.run, persistence.runs.get(state.run.id))
+            require(!run.status.isTerminal()) { "A finished run is run again from a task; it cannot be rewound" }
+            require(definition.tasks.any { it.id == taskId }) { "Task ${taskId.value} is not part of this workflow" }
+            val rewound = TaskRerunPlanner.rerunSet(definition, setOf(taskId))
+                .filter { run.taskRuns[it]?.status != TaskRunStatus.Created }
+                .toSet()
+            // Stop what runs inside the set; the rest of the swarm is left as it is. A system step's remote
+            // run (a workflow run, a deployment, a service call) is stopped as well: the new attempt starts
+            // its own, and the old one must not carry on unowned.
+            val stopped = state.handles.filterKeys { it in rewound }
+            // A session that will not stop is recorded; it cannot be kept on the state, because the creature
+            // starts over under the same id and would read the old session as its own.
+            cancelSessions(run, stopped, nowEpochMillis)
+            val remote = unfinishedExternalRuns(definition, run).filter { it.task.id in rewound }
+            persistence.approvalGates.unresolved(run.id)
+                .filter { it.taskDefinitionId in rewound }
+                .forEach { gate ->
+                    persistence.approvalGates.put(
+                        gate.copy(status = ApprovalGateStatus.Rejected, decisionNote = "Rewound", decidedAtEpochMillis = nowEpochMillis),
+                    )
+                }
+            val fresh = WorkflowRunFactory.create(
+                definition = definition,
+                workflowRunId = run.id,
+                projectId = run.projectId,
+                objective = run.objective,
+                nowEpochMillis = nowEpochMillis,
+                taskRunIdFactory = { id -> TaskRunId("${run.id.value}-${id.value}-r${(run.taskRuns[id]?.attempt ?: 0) + 1}") },
+                repository = run.repositorySnapshot,
+                roles = run.roleSnapshot,
+            )
+            val reset = rewound.mapNotNull { id ->
+                val prior = run.taskRuns[id] ?: return@mapNotNull null
+                fresh.taskRuns[id]?.let { f -> id to f.copy(attempt = prior.attempt + 1, usage = prior.usage) }
+            }.toMap()
+            var next = run.copy(
+                taskRuns = run.taskRuns + reset,
+                status = WorkflowRunStatus.Running,
+                updatedAtEpochMillis = maxOf(nowEpochMillis, run.updatedAtEpochMillis + 1),
+            )
+            next = WorkflowRunFactory.refreshReadiness(definition, next, nowEpochMillis)
+            val handles = state.handles - rewound
+            val result = WorkflowRuntimeState(next, handles)
+            persist(project, definition, result)
+            result to remote
+        }
+        // Outside the cycle lock, as cancel() does: a slow remote must not hold the swarm's cycle.
+        cancelExternalRuns(project, definition, rewoundState.run, remote, nowEpochMillis)
+        return rewoundState
     }
 
     suspend fun cancel(
@@ -495,18 +561,16 @@ class WorkflowRuntimeCoordinator(
         nowEpochMillis: Long,
     ): WorkflowRuntimeState {
         val (cancelled, remote) = cycleMutex.withLock {
-            val persistedRun = persistence.runs.get(state.run.id)
-                ?.takeIf { it.updatedAtEpochMillis > state.run.updatedAtEpochMillis }
-                ?: state.run
+            val persistedRun = newestOf(state.run, persistence.runs.get(state.run.id))
             if (persistedRun.status.isTerminal()) {
-                cancelSessions(persistedRun, state.handles)
-                return@withLock WorkflowRuntimeState(persistedRun, emptyMap()) to emptyList<ExternalRunToCancel>()
+                val leftover = cancelSessions(persistedRun, state.handles, nowEpochMillis)
+                return@withLock WorkflowRuntimeState(persistedRun, leftover) to emptyList<ExternalRunToCancel>()
             }
             val pending = unfinishedExternalRuns(definition, persistedRun)
             terminate(
                 project,
                 definition,
-                engine.cancelWorkflow(persistedRun, nowEpochMillis),
+                engine.cancelWorkflow(persistedRun, decisionTime(nowEpochMillis, persistedRun)),
                 state.handles,
                 nowEpochMillis,
             ) to pending
@@ -598,8 +662,7 @@ class WorkflowRuntimeCoordinator(
         nowEpochMillis: Long,
     ): WorkflowRuntimeState {
         val closed = closeFailureEscalationsForTerminalRun(run, nowEpochMillis)
-        cancelSessions(closed, handles)
-        val terminalState = WorkflowRuntimeState(closed, emptyMap())
+        val terminalState = WorkflowRuntimeState(closed, cancelSessions(closed, handles, nowEpochMillis))
         persist(project, definition, terminalState)
         return terminalState
     }
@@ -632,20 +695,53 @@ class WorkflowRuntimeCoordinator(
         nowEpochMillis: Long,
     ): WorkflowRuntimeState {
         val live = handles.filterKeys { taskId -> run.taskRuns[taskId]?.status?.isActiveProviderStatus() == true }
-        cancelSessions(run, live)
+        val leftover = cancelSessions(run, live, nowEpochMillis)
         val stopped = pauseRunForSpendCap(run, trip, cancelledTaskIds = live.keys, nowEpochMillis = nowEpochMillis)
-        val stoppedState = WorkflowRuntimeState(stopped, emptyMap())
+        val stoppedState = WorkflowRuntimeState(stopped, leftover)
         persist(project, definition, stoppedState)
         return stoppedState
     }
 
-    /** Best effort: a session that already finished, or a provider that is unreachable, is not an error here. */
-    private suspend fun cancelSessions(run: WorkflowRun, handles: Map<TaskDefinitionId, ManagedSessionHandle>) {
+    /**
+     * Stops [handles]' sessions, best effort: a session that already finished is not an error. One the
+     * provider rejects, or that throws, keeps billing, so it is recorded as an [ExternalRunCancelFailed]
+     * and handed back to be asked again on a later cycle, up to [MAX_SESSION_CANCEL_ATTEMPTS] times, so
+     * a provider that can never cancel does not keep a run cycling for ever.
+     */
+    private suspend fun cancelSessions(
+        run: WorkflowRun,
+        handles: Map<TaskDefinitionId, ManagedSessionHandle>,
+        nowEpochMillis: Long,
+    ): Map<TaskDefinitionId, ManagedSessionHandle> {
         val live = handles.filterKeys { taskId -> run.taskRuns[taskId]?.status != TaskRunStatus.Completed }
-        if (live.isEmpty()) return
+        if (live.isEmpty()) return emptyMap()
+        val askAgain = mutableMapOf<TaskDefinitionId, ManagedSessionHandle>()
         withContext(NonCancellable) {
-            live.values.forEach { handle -> runCatching { sessionGateway.cancel(handle) } }
+            for ((taskId, handle) in live) {
+                val reason = sessionGateway.cancelFailure(handle)
+                if (reason == null) {
+                    sessionCancelFailures.remove(handle.providerRunId)
+                    continue
+                }
+                val failures = (sessionCancelFailures[handle.providerRunId] ?: 0) + 1
+                sessionCancelFailures[handle.providerRunId] = failures
+                try {
+                    persistence.events.append(
+                        ExternalRunCancelFailed(
+                            workflowRunId = run.id,
+                            taskDefinitionId = taskId,
+                            externalRunId = handle.providerRunId.value,
+                            reason = reason,
+                            occurredAtEpochMillis = nowEpochMillis,
+                        ),
+                    )
+                } catch (_: Throwable) {
+                    // Recording the failure is itself best effort.
+                }
+                if (failures < MAX_SESSION_CANCEL_ATTEMPTS) askAgain[taskId] = handle else sessionCancelFailures.remove(handle.providerRunId)
+            }
         }
+        return askAgain
     }
 
     private suspend fun persistArtifacts(run: WorkflowRun) {
@@ -889,7 +985,15 @@ class WorkflowRuntimeCoordinator(
                         continue
                     }
                     nextRun = if (gate.status == ApprovalGateStatus.Approved) {
-                        engine.approvePlanGate(nextRun, taskId, now)
+                        val sessionless = !taskRun.isHeldAtEnginePlanGate() && taskRun.providerRunId == null
+                        when {
+                            !sessionless -> engine.approvePlanGate(nextRun, taskId, now)
+                            // A person's own approval step has no session: approving its gate is approving it.
+                            (taskRun.executor ?: tasks.getValue(taskId).effectiveExecutor()) is TaskExecutor.HumanApproval ->
+                                engine.completeHumanApprovalTask(definition, nextRun, taskId, now)
+                            // Nothing is running behind this gate for an approval to resume.
+                            else -> nextRun
+                        }
                     } else {
                         engine.handleFailure(
                             definition = definition,
@@ -1111,8 +1215,9 @@ class WorkflowRuntimeCoordinator(
         definition: WorkflowDefinition,
         run: WorkflowRun,
         now: Long,
+        undecidedFailures: Set<TaskDefinitionId> = emptySet(),
     ): WorkflowRun {
-        val refreshed = engine.refreshReadiness(definition, run, now)
+        val refreshed = engine.refreshReadiness(definition, run, now, undecidedFailures)
         return if (
             refreshed.taskRuns.isNotEmpty() &&
             refreshed.taskRuns.values.all { it.status == TaskRunStatus.Cancelled }
@@ -1438,6 +1543,7 @@ class WorkflowRuntimeCoordinator(
             TaskRunStatus.Cancelled,
         )
         const val HOURLY_SPEND_RECHECK_MILLIS: Long = 60_000L
+        const val MAX_SESSION_CANCEL_ATTEMPTS: Int = 5
     }
 
     private fun TaskRunStatus.isActiveProviderStatus(): Boolean = this in setOf(

@@ -231,6 +231,55 @@ class NestedWorkflowRuntimeTest {
     }
 
     @Test
+    fun rewindingACreatureCancelsItsRemoteRunSoItIsNotDispatchedTwice() = runBlocking {
+        val fixture = Fixture()
+        fixture.persistence.definitions.put(childDefinition())
+        val release = TaskDefinitionId("release")
+        val parent = WorkflowDefinition(
+            id = WorkflowDefinitionId("parent"),
+            name = "Parent",
+            tasks = listOf(
+                TaskDefinition(
+                    id = release,
+                    name = "Release",
+                    objective = "Release",
+                    roleId = null,
+                    executor = TaskExecutor.Deployment("production"),
+                    retryPolicy = RetryPolicy(maxAttempts = 1),
+                ),
+                TaskDefinition(
+                    id = parentTask,
+                    name = "Nest",
+                    objective = "Run the child workflow",
+                    roleId = null,
+                    executor = TaskExecutor.NestedWorkflow(WorkflowDefinitionId("child")),
+                    retryPolicy = RetryPolicy(maxAttempts = 1),
+                ),
+            ),
+            testDesignPolicy = TestDesignPolicy.None,
+        )
+        var state = fixture.launch(parent)
+        repeat(2) { state = fixture.cycle(parent, state) }
+        assertEquals("deploy-1", state.run.taskRuns.getValue(release).externalRunId)
+        val childRunId = WorkflowRunId(assertNotNull(state.run.taskRuns.getValue(parentTask).externalRunId))
+
+        // A rewound deployment: the old remote run is cancelled, and the new attempt starts clean.
+        val afterRelease = fixture.coordinator.rewind(project, parent, state, release, 500L)
+        assertEquals(listOf("deploy-1"), fixture.deployments.cancelled, "the rewound creature's remote run is cancelled")
+        assertEquals(null, afterRelease.run.taskRuns.getValue(release).externalRunId)
+        assertEquals(
+            WorkflowRunStatus.Running,
+            fixture.persistence.runs.get(childRunId)?.status,
+            "a creature outside the rewound set keeps its remote run",
+        )
+
+        // A rewound nested workflow: its child run is cancelled, and through it the child's own deployment.
+        fixture.coordinator.rewind(project, parent, afterRelease, parentTask, 600L)
+        assertEquals(WorkflowRunStatus.Cancelled, fixture.persistence.runs.get(childRunId)?.status)
+        assertEquals(listOf("deploy-1", "deploy-2"), fixture.deployments.cancelled.sorted())
+    }
+
+    @Test
     fun depthLimitRefusesDeeperChild() = runBlocking {
         val fixture = Fixture(maxDepth = 1)
         fixture.persistence.definitions.put(childDefinition())

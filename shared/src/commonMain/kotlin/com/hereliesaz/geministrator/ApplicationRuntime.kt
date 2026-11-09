@@ -52,6 +52,8 @@ import com.hereliesaz.geministrator.workflow.DelegationEligibility
 import com.hereliesaz.geministrator.workflow.DelegationKey
 import com.hereliesaz.geministrator.workflow.DelegationPolicy
 import com.hereliesaz.geministrator.workflow.GateDelegationContext
+import com.hereliesaz.geministrator.workflow.LiveDefinitionEdit
+import com.hereliesaz.geministrator.workflow.LiveEditMerge
 import com.hereliesaz.geministrator.workflow.ProgressiveDelegationStore
 import com.hereliesaz.geministrator.workflow.ManagedSessionFailure
 import com.hereliesaz.geministrator.workflow.ManagedSessionGateway
@@ -73,6 +75,10 @@ import com.hereliesaz.geministrator.workflow.WorkflowEngine
 import com.hereliesaz.geministrator.workflow.WorkflowGraphValidator
 import com.hereliesaz.geministrator.workflow.WorkflowLaunchService
 import com.hereliesaz.geministrator.workflow.WorkflowRuntimeCoordinator
+import com.hereliesaz.geministrator.workflow.cancelledRunView
+import com.hereliesaz.geministrator.workflow.decisionTime
+import com.hereliesaz.geministrator.workflow.definitionFor
+import com.hereliesaz.geministrator.workflow.newestOf
 import com.hereliesaz.geministrator.workflow.WorkflowRunNestedWorkflowClient
 import com.hereliesaz.geministrator.workflow.WorkflowRuntimeState
 import com.hereliesaz.geministrator.workflow.awaitsNestedHumanApproval
@@ -159,6 +165,7 @@ class ApplicationRuntime private constructor(
             try {
                 val projects = persistence.projects.all()
                 if (projects.isEmpty()) {
+                    retireOutgoing(continuing = null)
                     replaceCurrent(null)
                     publisher.publish(ApplicationRuntimeState.NoProject(roles))
                     return@withLock
@@ -175,6 +182,7 @@ class ApplicationRuntime private constructor(
                     .maxByOrNull { (_, run) -> run.updatedAtEpochMillis }
 
                 if (latestProjectRun == null) {
+                    retireOutgoing(continuing = null)
                     replaceCurrent(null)
                     publisher.publish(
                         ApplicationRuntimeState.NoRun(
@@ -188,20 +196,30 @@ class ApplicationRuntime private constructor(
                 val (project, run) = latestProjectRun
                 val storedDefinition = persistence.definitions.get(run.workflowDefinitionId)
                     ?: error("Workflow definition ${run.workflowDefinitionId.value} was not found")
-                val definition = repairKnownNodeCreatureRigCycle(storedDefinition)
-                if (definition !== storedDefinition) {
-                    persistence.definitions.put(definition)
+                val repairedDefinition = repairKnownNodeCreatureRigCycle(storedDefinition)
+                if (repairedDefinition !== storedDefinition) {
+                    persistence.definitions.put(repairedDefinition)
                 }
+                // The run follows the hive it started with, not a later save under the same id.
+                val definition = run.definitionSnapshot?.let(::repairKnownNodeCreatureRigCycle) ?: repairedDefinition
                 val runtimeState = try {
                     coordinator.resume(run.id)
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
                 } catch (failure: Throwable) {
                     throw classifyResumeFailure(failure)
                 }
 
+                retireOutgoing(continuing = run.id)
                 replaceCurrent(Current(project, definition, runtimeState))
                 publishCurrent()
                 startCycling()
+            } catch (cancellation: CancellationException) {
+                // A cancelled caller is not a failed load: what was showing keeps showing.
+                restorePublishedState()
+                throw cancellation
             } catch (failure: Throwable) {
+                retireOutgoing(continuing = null)
                 replaceCurrent(null)
                 publishFailure(failure)
             }
@@ -217,9 +235,7 @@ class ApplicationRuntime private constructor(
     internal suspend fun <T> withActiveRun(block: suspend (WorkflowRun) -> T): T =
         runtimeMutex.withLock {
             val snapshot = requireNotNull(current) { "No active workflow is loaded" }
-            val live = snapshot.state.run
-            val persisted = persistence.runs.get(live.id)
-            block(persisted?.takeIf { it.updatedAtEpochMillis > live.updatedAtEpochMillis } ?: live)
+            block(newestRun(snapshot.state.run))
         }
 
     suspend fun loadRunHistory(): List<Pair<Project, List<WorkflowRun>>> {
@@ -242,6 +258,8 @@ class ApplicationRuntime private constructor(
                 val stored = persistence.definitions.get(run.workflowDefinitionId)
                 viewingRun = ViewingRun(project, stored ?: deletedHiveStandIn(run), run, deleted = stored == null)
                 publishCurrent()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
             } catch (failure: Throwable) {
                 publishFailure(failure)
             }
@@ -349,19 +367,37 @@ class ApplicationRuntime private constructor(
      */
     suspend fun rerunFromTask(sourceRunId: WorkflowRunId, request: TaskRerunRequest) {
         runtimeMutex.withLock {
-            // Rewinding a run that is still live: it is cancelled first (what had finished keeps its
-            // result and carries over; what was running starts again in the new run), then forked.
+            // Rewinding a run that is still live: it is cancelled (what had finished keeps its result and
+            // carries over; what was running starts again in the new run), then forked. The request is
+            // checked against what the run will be once cancelled first, so a refused request leaves the
+            // live run running.
             var cancelledLive = false
-            current?.takeIf { it.state.run.id == sourceRunId && !it.state.run.status.isTerminal() }?.let { live ->
+            val live = current?.takeIf { it.state.run.id == sourceRunId && !it.state.run.status.isTerminal() }
+            val stored = persistence.runs.get(sourceRunId)
+                ?: error("Run ${sourceRunId.value} was not found")
+            val storedProject = persistence.projects.get(stored.projectId)
+                ?: error("Project ${stored.projectId.value} was not found")
+            // A live run is followed by the definition it runs with, not by the saved copy, which a save may have changed.
+            val definition = live?.definition
+                ?: persistence.definitions.get(stored.workflowDefinitionId)
+                ?: error("Workflow definition ${stored.workflowDefinitionId.value} was not found")
+            if (live != null) {
+                val newest = newestOf(live.state.run, stored)
+                val previewAt = nowEpochMillis()
+                TaskRerunPlanner.fork(
+                    definition = definition,
+                    source = cancelledRunView(newest, previewAt),
+                    request = request,
+                    workflowRunId = WorkflowRunId("run-$previewAt"),
+                    nowEpochMillis = previewAt,
+                    taskRunIdFactory = { id -> TaskRunId("run-$previewAt-${id.value}") },
+                    editedDefinitionId = WorkflowDefinitionId("workflow-$previewAt"),
+                )
                 coordinator.cancel(live.project, live.definition, live.state, nowEpochMillis())
                 cancelledLive = true
             }
             val source = persistence.runs.get(sourceRunId)
                 ?: error("Run ${sourceRunId.value} was not found")
-            val storedProject = persistence.projects.get(source.projectId)
-                ?: error("Project ${source.projectId.value} was not found")
-            val definition = persistence.definitions.get(source.workflowDefinitionId)
-                ?: error("Workflow definition ${source.workflowDefinitionId.value} was not found")
             val now = nowEpochMillis()
             val fork = TaskRerunPlanner.fork(
                 definition = definition,
@@ -436,7 +472,8 @@ class ApplicationRuntime private constructor(
             "Task ${taskDefinitionId.value} is not awaiting approval"
         }
 
-        val now = nowEpochMillis()
+        // A decision never sorts before the run it decides, even if the clock stepped back (newestOf).
+        val now = decisionTime(nowEpochMillis(), snapshot.state.run)
         val nextState = if (taskRun.isHeldAtContextTaintGate()) {
             // External-input gates are the keeper's own decision; never delegated.
             require(!byDelegation) { "External-input gates are never delegated" }
@@ -546,10 +583,34 @@ class ApplicationRuntime private constructor(
             require(task.effectiveExecutor() is TaskExecutor.HumanApproval) {
                 "Task ${taskDefinitionId.value} is not a human approval gate"
             }
+            // Built on the newest copy of the run, as every other decision is: a change someone else saved
+            // since the last cycle is not written over.
+            val run = newestRun(snapshot.state.run)
+            val waiting = requireNotNull(run.taskRuns[taskDefinitionId]) { "Task ${taskDefinitionId.value} has no runtime state" }
+            require(waiting.status == TaskRunStatus.AwaitingApproval) {
+                "Task ${taskDefinitionId.value} is not awaiting approval"
+            }
+            // The plan gate opened for it when it began to wait is the same decision: it is decided here,
+            // so it is not left Pending for a second approval that would have nothing to resume.
+            val gateId = ApprovalGateId("plan:${run.id.value}:${taskDefinitionId.value}:${waiting.attempt}")
+            persistence.approvalGates.get(gateId)
+                ?.takeIf { it.status == ApprovalGateStatus.Pending || it.status == ApprovalGateStatus.Applying }
+                ?.let {
+                    ApprovalGateCoordinator(
+                        repository = persistence.approvalGates,
+                        eventSink = RepositoryWorkflowEventSink(persistence.events),
+                    ).decide(
+                        id = gateId,
+                        approved = true,
+                        decidedByRoleId = null,
+                        note = "Approved in application",
+                        nowEpochMillis = now,
+                    )
+                }
             WorkflowRuntimeState(
                 run = engine.completeHumanApprovalTask(
                     definition = snapshot.definition,
-                    run = snapshot.state.run,
+                    run = run,
                     taskDefinitionId = taskDefinitionId,
                     nowEpochMillis = now,
                 ),
@@ -649,12 +710,9 @@ class ApplicationRuntime private constructor(
     suspend fun liftSpendStop() {
         runtimeMutex.withLock {
             val snapshot = requireNotNull(current) { "No active workflow is loaded" }
-            val live = snapshot.state.run
-            val run = persistence.runs.get(live.id)
-                ?.takeIf { it.updatedAtEpochMillis > live.updatedAtEpochMillis }
-                ?: live
+            val run = newestRun(snapshot.state.run)
             if (run.spendPause == null || run.status.isTerminal()) return@withLock
-            val lifted = liftSpendPause(run, maxOf(nowEpochMillis(), run.updatedAtEpochMillis + 1))
+            val lifted = liftSpendPause(run, decisionTime(nowEpochMillis(), run))
             persistence.runs.put(lifted)
             replaceCurrent(snapshot.copy(state = WorkflowRuntimeState(lifted, emptyMap())))
             publishCurrent()
@@ -669,12 +727,9 @@ class ApplicationRuntime private constructor(
     suspend fun setKeeperPause(paused: Boolean) {
         runtimeMutex.withLock {
             val snapshot = requireNotNull(current) { "No active workflow is loaded" }
-            val live = snapshot.state.run
-            val run = persistence.runs.get(live.id)
-                ?.takeIf { it.updatedAtEpochMillis > live.updatedAtEpochMillis }
-                ?: live
+            val run = newestRun(snapshot.state.run)
             if (run.status.isTerminal() || (run.keeperPause != null) == paused) return@withLock
-            val now = maxOf(nowEpochMillis(), run.updatedAtEpochMillis + 1)
+            val now = decisionTime(nowEpochMillis(), run)
             val updated = run.copy(
                 keeperPause = if (paused) WorkflowKeeperPause(pausedAtEpochMillis = now) else null,
                 updatedAtEpochMillis = now,
@@ -689,30 +744,31 @@ class ApplicationRuntime private constructor(
      * An edit saved to the hive on screen reaches its live run (docs/Keepers-Room.md, Pause, change,
      * resume). Only a creature the run has not started (waiting, ready or about to retry) takes the
      * edit, its job and criteria, now, because the engine reads a task's definition when it starts it;
-     * a creature that is running or done, a creature's role, executor and strands, and the hive's shape
-     * stay as the run has them and change from the next run. Nothing is cancelled and nothing restarts.
-     * Returns how many creatures took an edit.
+     * a creature that is running or done, a creature's role, executor, condition and policies, and the
+     * hive's shape stay as the run has them and change from the next run, as the saved copy in the
+     * library: the runtime never writes its own copy over a saved one ([WorkflowRuntimeCoordinator.persist]).
+     * Nothing is cancelled and nothing restarts. Returns how many creatures took an edit.
      */
     suspend fun applyLiveDefinitionEdit(edited: WorkflowDefinition): Int = runtimeMutex.withLock {
         val snapshot = current ?: return@withLock 0
-        val run = snapshot.state.run
+        val run = newestRun(snapshot.state.run)
         if (snapshot.definition.id != edited.id || run.status.isTerminal()) return@withLock 0
-        val open = setOf(TaskRunStatus.Created, TaskRunStatus.Blocked, TaskRunStatus.Ready, TaskRunStatus.Retrying)
-        var taken = 0
-        val tasks = snapshot.definition.tasks.map { old ->
-            val new = edited.tasks.firstOrNull { it.id == old.id }
-            if (new != null && run.taskRuns[old.id]?.status in open) {
-                val merged = new.copy(dependsOn = old.dependsOn, roleId = old.roleId, executor = old.executor)
-                if (merged != old) taken += 1
-                merged
-            } else {
-                old
+        when (val merge = LiveDefinitionEdit.merge(snapshot.definition, edited, run)) {
+            LiveEditMerge.Nothing -> return@withLock 0
+            is LiveEditMerge.Rejected -> {
+                appLog("Live edit", merge.reason)
+                return@withLock 0
+            }
+            is LiveEditMerge.Merged -> {
+                // The run records the hive it follows, so an edit it took survives a restart and a later
+                // save of the library copy never changes what this run resumes against.
+                val followed = run.copy(definitionSnapshot = merge.definition)
+                persistence.runs.put(followed)
+                replaceCurrent(snapshot.copy(definition = merge.definition, state = snapshot.state.copy(run = followed)))
+                publishCurrent()
+                merge.taken
             }
         }
-        if (taken == 0) return@withLock 0
-        replaceCurrent(snapshot.copy(definition = snapshot.definition.copy(tasks = tasks)))
-        publishCurrent()
-        taken
     }
 
     /**
@@ -748,6 +804,45 @@ class ApplicationRuntime private constructor(
         viewingRun = null
     }
 
+    /** What the screen showed before a load that was cancelled half way published Loading. */
+    private fun restorePublishedState() {
+        if (current != null) publishCurrent()
+    }
+
+    /** [live], or the saved copy when someone else wrote it since ([newestOf]). */
+    private suspend fun newestRun(live: WorkflowRun): WorkflowRun = newestOf(live, persistence.runs.get(live.id))
+
+    /**
+     * The run being left by a switch must not keep spending where nothing watches it: only [current]
+     * is cycled and held to the keeper's spend caps, so a live run that the next one does not continue
+     * is cancelled (every unfinished task, its provider sessions and the remote work behind its system
+     * steps), as a new launch cancels the run it replaces. Best effort: the switch still happens.
+     */
+    private suspend fun retireOutgoing(continuing: WorkflowRunId?) {
+        val outgoing = current ?: return
+        if (outgoing.state.run.id == continuing) return
+        if (outgoing.state.run.status.isTerminal() && outgoing.state.handles.isEmpty()) return
+        try {
+            if (persistence.runs.get(outgoing.state.run.id) != null) {
+                coordinator.cancel(outgoing.project, outgoing.definition, outgoing.state, nowEpochMillis())
+            } else {
+                // The stored runs were replaced (an import, a recovery): nothing to write back, but its sessions still bill.
+                outgoing.state.handles.values.forEach { handle ->
+                    try {
+                        sessionGateway.cancel(handle)
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            // The run being left stays as persisted; the switch goes on.
+        }
+    }
+
     private fun startCycling() {
         if (cycleJob?.isActive == true) return
         cycleJob = runtimeScope.launch {
@@ -758,7 +853,8 @@ class ApplicationRuntime private constructor(
                 runtimeMutex.withLock {
                     val snapshot = current ?: return@withLock
                     val snapshotGeneration = currentGeneration
-                    if (snapshot.state.run.status.isTerminal()) return@withLock
+                    // A finished run is cycled only while a session of it could not be stopped yet.
+                    if (snapshot.state.run.status.isTerminal() && snapshot.state.handles.isEmpty()) return@withLock
 
                     try {
                         val nextState = coordinator.cycle(
@@ -888,22 +984,30 @@ class ApplicationRuntime private constructor(
                     .filter { it.workflowDefinitionId in knownHives }
                     .maxByOrNull(WorkflowRun::updatedAtEpochMillis)
                 if (run == null) {
+                    retireOutgoing(continuing = null)
                     replaceCurrent(null)
                     publisher.publish(ApplicationRuntimeState.NoRun(project = project, roles = roles))
                     return@withLock
                 }
 
-                val definition = persistence.definitions.get(run.workflowDefinitionId)
+                val definition = persistence.definitionFor(run)
                     ?: error("Workflow definition ${run.workflowDefinitionId.value} was not found")
                 val runtimeState = try {
                     coordinator.resume(run.id)
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
                 } catch (failure: Throwable) {
                     throw classifyResumeFailure(failure)
                 }
+                retireOutgoing(continuing = run.id)
                 replaceCurrent(Current(project, definition, runtimeState))
                 publishCurrent()
                 startCycling()
+            } catch (cancellation: CancellationException) {
+                restorePublishedState()
+                throw cancellation
             } catch (failure: Throwable) {
+                retireOutgoing(continuing = null)
                 replaceCurrent(null)
                 publishFailure(failure)
             }

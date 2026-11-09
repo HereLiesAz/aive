@@ -177,3 +177,19 @@ internal fun com.hereliesaz.geministrator.domain.TaskUsage?.plus(
         },
     )
 }
+
+/**
+ * Asks the provider to stop [handle]'s session. Null when it did; otherwise why it did not (the provider
+ * rejected the request, or the call threw): a session that is not stopped keeps billing, so a caller
+ * records that rather than treating "asked" as "stopped".
+ */
+internal suspend fun ManagedSessionGateway.cancelFailure(handle: ManagedSessionHandle): String? =
+    try {
+        when (val result = cancel(handle)) {
+            ProviderActionResult.Accepted -> null
+            is ProviderActionResult.Rejected -> result.reason.ifBlank { "The provider rejected the cancellation" }
+        }
+    } catch (failure: Exception) {
+        // Including a CancellationException the provider itself threw: callers run this NonCancellable.
+        failure.message?.takeIf(String::isNotBlank) ?: "The cancellation failed"
+    }

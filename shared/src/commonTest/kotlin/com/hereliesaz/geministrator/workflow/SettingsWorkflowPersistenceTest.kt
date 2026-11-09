@@ -457,7 +457,12 @@ class SettingsWorkflowPersistenceTest {
         // An unfinished run arrives as history: cancelled, so nothing from the file resumes on its own.
         val importedRun = assertNotNull(destination.runs.get(run.id))
         assertEquals(WorkflowRunStatus.Cancelled, importedRun.status)
-        assertEquals(run.copy(status = importedRun.status, taskRuns = importedRun.taskRuns), importedRun)
+        // The hive a run carries is not trusted as it arrives; the validated, imported definitions are.
+        assertNull(importedRun.definitionSnapshot)
+        assertEquals(
+            run.copy(status = importedRun.status, taskRuns = importedRun.taskRuns, definitionSnapshot = null),
+            importedRun,
+        )
         assertEquals(1, destination.events.forRun(run.id).size)
         assertEquals(
             BuiltInRoles.ImplementationEngineer,

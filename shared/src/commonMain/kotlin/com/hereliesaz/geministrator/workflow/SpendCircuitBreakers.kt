@@ -153,6 +153,7 @@ fun liftSpendPause(run: WorkflowRun, nowEpochMillis: Long): WorkflowRun {
             taskRun.copy(
                 status = TaskRunStatus.Retrying,
                 attempt = taskRun.attempt + 1,
+                heldAttempts = taskRun.heldAttempts + 1,
                 assignedProviderId = null,
                 providerRunId = null,
                 externalRunId = null,

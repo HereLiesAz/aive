@@ -59,3 +59,22 @@ The creature sheet came back on any tap after it was closed. The field's "tap ba
 ## A saved edit is not a live edit
 
 A creature's job saved from its panel was written to the library and then written over about once a second by the runtime's own copy of the definition, while the panel said it "takes effect from its next run". Where state is held twice (a library, a running copy), say which one a save changes, and route it through the owner.
+
+- The first fix routed only the unstarted creatures' edit to the running copy; the runtime still wrote that whole copy back over the library every cycle, and the live merge took whole tasks (conditions, policies) the doc did not list. When a copy is held twice, the copy that is not the owner's must stop writing, not only start receiving; and a merge takes a named list of fields, then is checked as a whole.
+- A link that opens a screen on one record must set what the screen actually works on (here the draft Save writes), not only what it highlights; and a request must be refused before it stops anything, not after (rerun cancelled the live run, then found the request invalid).
+
+## One task's fault is that task's failure, not the batch's
+
+`dispatchReadyTasks` created sessions for every ready task in one batch, and a provider's refusal to start one (HTTP 402) was thrown out of the whole batch and out of `cycle()`, which the runtime retried every few seconds without end; a role missing from the collection did the same through `requireNotNull`. A fault that belongs to one task must fail that task through its own failure policy and leave the others running.
+
+- Catch the expected failure type (`ManagedSessionFailure`) per task and route it through `failTaskBeforeStart`; keep rethrowing programming errors and cancellation so the rollback still cancels the sessions that did start.
+- A status that is only a stop on the way to a decision (Failed, before the failure policy runs) must not be read as settled by readiness: failure handlers waited for nothing, then ran while the task was being retried. Pass such tasks as `undecidedFailures`.
+- Count retries by cause, not by `attempt`: a hold that restarts work (`heldAttempts`, `failedProviders`) bumps `attempt` but is not a retry of failed work.
+
+## "Asked to stop" is not "stopped", and one compare is written once
+
+Cancels were `runCatching` and the handle dropped, so a provider that rejected one kept billing with nothing to say so; and the same "is the stored run newer than mine" test was written four ways (`>=` in the cycle, `>` in rewind, cancel, lift and pause), so a decision in the same millisecond, or after the clock stepped back, was overwritten.
+
+- Whatever stops something outside the process returns whether it stopped: record a refusal as an event and keep the handle to ask again (bounded), instead of discarding it with the result.
+- A rule that two places must agree on (which copy of a run is newest) is one function (`newestOf`, `decisionTime`), and every caller uses it; a new write path is checked against it, not given its own comparison.
+- A decision that settles a thing with a second record (a person's approval step has a plan gate) settles both in the same act, or the second waits for an approval with nothing left to resume.
