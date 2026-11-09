@@ -269,5 +269,28 @@ class PanelScreenshotTest {
             }
         }
     }
+
+    @Test
+    fun localAgentsPanel() {
+        val host = object : com.hereliesaz.geministrator.providers.cli.CliAgentHost {
+            override suspend fun statuses() = com.hereliesaz.geministrator.providers.cli.CliAgentSpecs.all.mapIndexed { i, spec ->
+                com.hereliesaz.geministrator.providers.cli.CliAgentStatus(
+                    spec = spec, path = if (i < 3) "/usr/local/bin/" + spec.binaries.first() else null, version = if (i < 3) "1.${i}.0" else null,
+                    enabled = i == 0, passKeys = false,
+                    lastTest = when (i) {
+                        0 -> com.hereliesaz.geministrator.providers.cli.CliTestResult(true, "Answered in 3.2 s: OK", 1L, 3200)
+                        1 -> com.hereliesaz.geministrator.providers.cli.CliTestResult(false, "Exit 1: unknown option --approval-mode", 1L, 800)
+                        else -> null
+                    },
+                )
+            }
+            override fun setEnabled(id: String, enabled: Boolean) = Unit
+            override fun setPassKeys(id: String, passKeys: Boolean) = Unit
+            override suspend fun test(id: String) = com.hereliesaz.geministrator.providers.cli.CliTestResult(true, "OK", 1L, 1)
+        }
+        shoot("56-local-agents", 780, 2400) {
+            androidx.compose.runtime.CompositionLocalProvider(com.hereliesaz.geministrator.providers.cli.LocalCliAgentHost provides host) { LocalAgentsPart() }
+        }
+    }
 }
 

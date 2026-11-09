@@ -39,7 +39,17 @@ internal fun ProviderChoiceRow(
                 onClick = { onSelected(entry.id) },
             )
         }
-        if (selectedProviderId != null && listed.none { it.id == selectedProviderId }) {
+        // A vendor CLI that is turned on (Keeper's room › Local agents) is a provider a role can prefer.
+        val cli = connectedProviderIds.filter(ProviderCatalog::isCliAgent).sorted()
+        cli.forEach { id ->
+            AzphaltPill(
+                label = providerDisplayName(id),
+                seed = "$seedPrefix-$id-${selectedProviderId.orEmpty()}",
+                selected = selectedProviderId == id,
+                onClick = { onSelected(id) },
+            )
+        }
+        if (selectedProviderId != null && listed.none { it.id == selectedProviderId } && selectedProviderId !in cli) {
             AzphaltPill(
                 label = pinnedLabel ?: providerDisplayName(selectedProviderId),
                 seed = "$seedPrefix-$selectedProviderId-$selectedProviderId",

@@ -199,9 +199,13 @@ fun main() {
                 var computeConfiguration by remember { mutableStateOf(initialComputeConfiguration) }
                 var computeToken by remember { mutableStateOf(initialComputeToken) }
                 var onDeviceSmallTasksEnabled by remember { mutableStateOf(onDeviceSmallTaskPreference.enabled) }
-                val providers = remember(credentials, repositoryCredentials, onDeviceSmallTasksEnabled) {
+                // The vendor CLIs the keeper turned on (Keeper's room › Local agents); a switch rebuilds the list.
+                var cliAgentsGeneration by remember { mutableStateOf(0) }
+                val cliAgents = remember { DesktopCliAgents(onChanged = { cliAgentsGeneration += 1 }) }
+                val providers = remember(credentials, repositoryCredentials, onDeviceSmallTasksEnabled, cliAgentsGeneration) {
                     configuredDesktopProviders(credentials, repositoryCredentials, httpClient, entireRecorder, codeExecution) +
-                        listOfNotNull(onDeviceTextProviderOrNull(onDeviceSmallTasksEnabled, onDeviceTextGenerator))
+                        listOfNotNull(onDeviceTextProviderOrNull(onDeviceSmallTasksEnabled, onDeviceTextGenerator)) +
+                        configuredCliProviders()
                 }
                 val baseExecutorIntegrations = remember(repositoryCredentials, credentials) {
                     val configured = configuredDesktopExecutorIntegrations(repositoryCredentials, httpClient)
@@ -497,7 +501,10 @@ fun main() {
                         },
                         onCancel = { configuringProviderId = null },
                     )
-                    else -> App(
+                    else -> androidx.compose.runtime.CompositionLocalProvider(
+                        com.hereliesaz.geministrator.providers.cli.LocalCliAgentHost provides cliAgents,
+                    ) {
+                    App(
                         entire = desktopEntire,
                         mcpHost = mcpHost,
                         mcpConsent = mcpConsent,
@@ -614,6 +621,7 @@ fun main() {
                             }
                         },
                     )
+                    }
                 }
             }
         }

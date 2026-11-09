@@ -234,15 +234,7 @@ internal class CliAgentProvider(
     }
 
     /** The environment a CLI gets: the basics, how it finds its own login, a proxy and certificates if set; no API key unless the keeper chose. */
-    internal fun cliEnvironment(): Map<String, String> {
-        val inherited = environment()
-        val allowed = BASE_ENVIRONMENT + spec.authEnvironment + if (settings.passKeys(spec.id)) spec.optionalKeyEnvironment else emptyList()
-        val kept = inherited.filterKeys { key -> allowed.any { it.equals(key, ignoreCase = true) } }.toMutableMap()
-        sanitizeGitEnvironment(kept)
-        kept["NO_COLOR"] = "1"
-        kept["TERM"] = "dumb"
-        return kept
-    }
+    internal fun cliEnvironment(): Map<String, String> = cliEnvironmentFor(spec, settings, environment())
 
     private suspend fun changedPaths(worktree: File): List<String> {
         val status = git(worktree, "status", "--porcelain=v1", "-z", "--untracked-files=all")
@@ -275,6 +267,16 @@ internal class CliAgentProvider(
             "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "ALL_PROXY", "SSL_CERT_FILE", "SSL_CERT_DIR", "NODE_EXTRA_CA_CERTS", "REQUESTS_CA_BUNDLE",
         )
     }
+}
+
+/** The environment a CLI gets: the basics, how it finds its own login, a proxy and certificates if set; no vendor key unless the keeper chose. */
+internal fun cliEnvironmentFor(spec: CliAgentSpec, settings: CliAgentSettings, inherited: Map<String, String>): Map<String, String> {
+    val allowed = CliAgentProvider.BASE_ENVIRONMENT + spec.authEnvironment + if (settings.passKeys(spec.id)) spec.optionalKeyEnvironment else emptyList()
+    val kept = inherited.filterKeys { key -> allowed.any { it.equals(key, ignoreCase = true) } }.toMutableMap()
+    sanitizeGitEnvironment(kept)
+    kept["NO_COLOR"] = "1"
+    kept["TERM"] = "dumb"
+    return kept
 }
 
 /**

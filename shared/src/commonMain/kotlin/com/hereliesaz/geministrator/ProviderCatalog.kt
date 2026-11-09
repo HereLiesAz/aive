@@ -4,6 +4,8 @@ import com.hereliesaz.geministrator.a2a.A2aAgentConnection
 import com.hereliesaz.geministrator.a2a.A2aAgentConnections
 import com.hereliesaz.geministrator.azphalt.InstalledStoreLlm
 import com.hereliesaz.geministrator.azphalt.StoreLlmProviders
+import com.hereliesaz.geministrator.providers.cli.CliAgentSpec
+import com.hereliesaz.geministrator.providers.cli.CliAgentSpecs
 
 data class ProviderCatalogEntry(
     val id: String,
@@ -222,7 +224,20 @@ object ProviderCatalog {
     /** True for a remote A2A agent's id ([A2aAgentConnection.providerId]). */
     fun isA2aAgent(id: String): Boolean = id.startsWith(A2aAgentConnection.PROVIDER_ID_PREFIX)
 
-    fun entry(id: String): ProviderCatalogEntry? = entries.firstOrNull { it.id == id }
+    fun entry(id: String): ProviderCatalogEntry? =
+        entries.firstOrNull { it.id == id } ?: CliAgentSpecs.byId(id)?.let(::cliEntry)
+
+    /** True for a vendor CLI the app drives on this computer ([CliAgentSpecs]). */
+    fun isCliAgent(id: String): Boolean = CliAgentSpecs.byId(id) != null
+
+    private fun cliEntry(spec: CliAgentSpec) = ProviderCatalogEntry(
+        id = spec.id,
+        displayName = spec.displayName + " (CLI)",
+        apiKeyUrl = "",
+        credentialLabel = "",
+        description = "The ${spec.displayName} command-line tool, run headless on this computer under your own login. Used only by roles that prefer it.",
+        keyOptional = true,
+    )
 
     private fun a2aEntry(agent: A2aAgentConnection) = ProviderCatalogEntry(
         id = agent.providerId,

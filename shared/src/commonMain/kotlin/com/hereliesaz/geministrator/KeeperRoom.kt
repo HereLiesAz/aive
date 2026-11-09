@@ -51,6 +51,8 @@ import com.hereliesaz.geministrator.resources.keeper_delegations
 import com.hereliesaz.geministrator.resources.keeper_delegations_lead
 import com.hereliesaz.geministrator.resources.keeper_improvement
 import com.hereliesaz.geministrator.resources.keeper_improvement_lead
+import com.hereliesaz.geministrator.resources.keeper_local_agents
+import com.hereliesaz.geministrator.resources.keeper_local_agents_lead
 import com.hereliesaz.geministrator.resources.keeper_schedules
 import com.hereliesaz.geministrator.resources.keeper_schedules_lead
 import com.hereliesaz.geministrator.resources.keeper_device
@@ -84,6 +86,7 @@ internal enum class KeeperSection(
     Projects(Res.string.keeper_projects, Res.string.keeper_projects_lead, false),
     Delegations(Res.string.keeper_delegations, Res.string.keeper_delegations_lead, false),
     Schedules(Res.string.keeper_schedules, Res.string.keeper_schedules_lead, false),
+    LocalAgents(Res.string.keeper_local_agents, Res.string.keeper_local_agents_lead, false),
     Improvement(Res.string.keeper_improvement, Res.string.keeper_improvement_lead, false),
     /** Wide only: the spend caps, which a phone keeps in [Device]. */
     Limits(Res.string.keeper_limits, Res.string.keeper_limits_lead, false),
