@@ -39,6 +39,7 @@ import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
 import com.hereliesaz.geministrator.workflow.OrchestratedWorkflowFactory
 import com.hereliesaz.geministrator.workflow.WorkflowDefinitionPreparer
 import com.hereliesaz.geministrator.workflow.WorkflowLaunchService
+import com.hereliesaz.geministrator.workflow.uniqueLaunchStamp
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -139,12 +140,13 @@ private suspend fun ApplicationRuntime.planInputs(
 @OptIn(ExperimentalTime::class)
 private suspend fun ApplicationRuntime.startPlannedWorkflow(inputs: PlanInputs, plan: OrchestrationPlan) {
     val now = Clock.System.now().toEpochMilliseconds()
+    val stamp = persistence.uniqueLaunchStamp(now, newProject = inputs.existingProject == null)
     val project = inputs.existingProject?.copy(
         name = inputs.projectName,
         repository = inputs.repository ?: inputs.existingProject.repository,
         updatedAtEpochMillis = now,
     ) ?: Project(
-        id = ProjectId("project-$now"),
+        id = ProjectId("project-$stamp"),
         name = inputs.projectName,
         repository = inputs.repository,
         createdAtEpochMillis = now,
@@ -159,11 +161,11 @@ private suspend fun ApplicationRuntime.startPlannedWorkflow(inputs: PlanInputs, 
             plan = plan,
             packet = inputs.packet,
             roles = inputs.launchRoles,
-            id = WorkflowDefinitionId("${inputs.design.id.value}--planned-$now"),
+            id = WorkflowDefinitionId("${inputs.design.id.value}--planned-$stamp"),
         )
     } else {
         OrchestratedWorkflowFactory.create(
-            id = WorkflowDefinitionId("workflow-$now"),
+            id = WorkflowDefinitionId("workflow-$stamp"),
             objective = inputs.objective,
             plan = plan,
             packet = inputs.packet,
@@ -181,10 +183,10 @@ private suspend fun ApplicationRuntime.startPlannedWorkflow(inputs: PlanInputs, 
     launchService.launch(
         project = project,
         definition = definition,
-        workflowRunId = WorkflowRunId("run-$now"),
+        workflowRunId = WorkflowRunId("run-$stamp"),
         objective = inputs.objective,
         nowEpochMillis = now,
-        taskRunIdFactory = { id -> TaskRunId("run-$now-${id.value}") },
+        taskRunIdFactory = { id -> TaskRunId("run-$stamp-${id.value}") },
         parentWorkflowRunIds = inputs.parentRunIds,
     )
     reportLaunchProgress("Loading the new run…")

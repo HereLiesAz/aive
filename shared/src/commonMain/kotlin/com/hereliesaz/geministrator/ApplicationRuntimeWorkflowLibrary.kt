@@ -16,6 +16,7 @@ import com.hereliesaz.geministrator.orchestration.ReviewedPlanStore
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
 import com.hereliesaz.geministrator.workflow.WorkflowDefinitionPreparer
 import com.hereliesaz.geministrator.workflow.WorkflowLaunchService
+import com.hereliesaz.geministrator.workflow.uniqueLaunchStamp
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -62,12 +63,13 @@ suspend fun ApplicationRuntime.launchSavedWorkflow(
     require(cleanObjective.isNotEmpty()) { "Objective is required" }
 
     val now = Clock.System.now().toEpochMilliseconds()
+    val stamp = persistence.uniqueLaunchStamp(now, newProject = existingProject == null)
     val project = existingProject?.copy(
         name = cleanProjectName,
         repository = repository?.normalized() ?: existingProject.repository,
         updatedAtEpochMillis = now,
     ) ?: Project(
-        id = ProjectId("project-$now"),
+        id = ProjectId("project-$stamp"),
         name = cleanProjectName,
         repository = repository?.normalized(),
         createdAtEpochMillis = now,
@@ -88,10 +90,10 @@ suspend fun ApplicationRuntime.launchSavedWorkflow(
     launchService.launch(
         project = project,
         definition = definition,
-        workflowRunId = WorkflowRunId("run-$now"),
+        workflowRunId = WorkflowRunId("run-$stamp"),
         objective = cleanObjective,
         nowEpochMillis = now,
-        taskRunIdFactory = { id -> TaskRunId("run-$now-${id.value}") },
+        taskRunIdFactory = { id -> TaskRunId("run-$stamp-${id.value}") },
         parentWorkflowRunIds = parents,
     )
     loadLatest()
