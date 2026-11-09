@@ -65,7 +65,12 @@ class FailureEscalationAtomicityTest {
 
         assertEquals(ApprovalGateStatus.Rejected, fixture.persistence.approvalGates.get(fixture.gate.id)?.status)
         assertEquals(WorkflowRunStatus.Failed, nextRun.status)
-        assertEquals(TaskRunStatus.Cancelled, nextRun.taskRuns.getValue(fixture.taskId).status)
+        // The task failed and the keeper declined to retry it: Failed, as when the same decision is read back by the
+        // engine (WorkflowEngine.resolveEscalation), so a failure handler and the run's log see the same thing.
+        assertEquals(TaskRunStatus.Failed, nextRun.taskRuns.getValue(fixture.taskId).status)
+        val events = fixture.persistence.events.forRun(fixture.run.id)
+        assertEquals(1, events.filterIsInstance<com.hereliesaz.geministrator.events.TaskFailed>().size)
+        assertEquals(1, events.filterIsInstance<com.hereliesaz.geministrator.events.WorkflowFailed>().size)
         assertEquals(nextRun, fixture.persistence.runs.get(fixture.run.id))
         val decisions = fixture.persistence.events.forRun(fixture.run.id)
             .filterIsInstance<ApprovalDecisionReceived>()
@@ -110,7 +115,7 @@ class FailureEscalationAtomicityTest {
             assertEquals(TaskRunStatus.Retrying, persistedRun?.taskRuns?.get(fixture.taskId)?.status)
         } else {
             assertEquals(WorkflowRunStatus.Failed, persistedRun?.status)
-            assertEquals(TaskRunStatus.Cancelled, persistedRun?.taskRuns?.get(fixture.taskId)?.status)
+            assertEquals(TaskRunStatus.Failed, persistedRun?.taskRuns?.get(fixture.taskId)?.status)
         }
     }
 
@@ -184,6 +189,7 @@ class FailureEscalationAtomicityTest {
             ),
             sessionGateway = NoopEscalationGateway,
             failureEscalationDecisionStore = persistence,
+            eventSink = RepositoryWorkflowEventSink(persistence.events),
         )
         return Fixture(taskId, run, gate, persistence, service)
     }
