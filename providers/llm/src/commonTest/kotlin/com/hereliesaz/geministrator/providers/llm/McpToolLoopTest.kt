@@ -1,7 +1,15 @@
 package com.hereliesaz.geministrator.providers.llm
 
 import com.hereliesaz.geministrator.domain.AgentProviderId
+import com.hereliesaz.geministrator.domain.CONTEXT_PROVENANCE_METADATA_KEY
+import com.hereliesaz.geministrator.domain.ArtifactId
+import com.hereliesaz.geministrator.domain.ArtifactKind
+import com.hereliesaz.geministrator.domain.ArtifactRef
+import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.TaskRunId
+import com.hereliesaz.geministrator.domain.isUntrustedContext
+import com.hereliesaz.geministrator.domain.labelledAtIntake
+import com.hereliesaz.geministrator.domain.provenance
 import com.hereliesaz.geministrator.mcp.McpToolOffer
 import com.hereliesaz.geministrator.mcp.McpToolOutcome
 import com.hereliesaz.geministrator.mcp.McpToolSource
@@ -100,6 +108,19 @@ class McpToolLoopTest {
         val artifact = events.filterIsInstance<AgentEvent.ArtifactProduced>().single().artifact
         assertEquals("Answer: ⟦external⟧ Sunny in Lyon", artifact.textContent)
         assertEquals("external-tool-results", artifact.metadata[MCP_PROVENANCE_METADATA])
+        // The label the runtime's taint rule reads (domain/ContextProvenance.kt), not only the descriptive one.
+        assertEquals(ContextProvenance.ExternalContent.name, artifact.metadata[CONTEXT_PROVENANCE_METADATA_KEY])
+        val takenIn = ArtifactRef(
+            id = ArtifactId("answer"),
+            kind = ArtifactKind.Research,
+            taskRunId = TaskRunId("task-weather"),
+            label = artifact.label,
+            textContent = artifact.textContent,
+            metadata = artifact.metadata,
+            createdAtEpochMillis = 1L,
+        ).labelledAtIntake(ContextProvenance.AgentArtifact, madeFromUntrustedInput = false)
+        assertEquals(ContextProvenance.ExternalContent, takenIn.provenance)
+        assertTrue(takenIn.isUntrustedContext(), "a writer step downstream of a tool-assisted answer is held at a gate")
         assertEquals("Weather/get_weather", artifact.metadata[MCP_TOOL_CALLS_METADATA])
         val usage = events.filterIsInstance<AgentEvent.UsageReported>().single()
         assertEquals(30L, usage.inputTokens)
@@ -126,6 +147,7 @@ class McpToolLoopTest {
         assertTrue(streamed)
         assertEquals("plain answer", events.filterIsInstance<AgentEvent.ArtifactProduced>().single().artifact.textContent)
         assertTrue(events.filterIsInstance<AgentEvent.ArtifactProduced>().single().artifact.metadata[MCP_PROVENANCE_METADATA] == null)
+        assertTrue(events.filterIsInstance<AgentEvent.ArtifactProduced>().single().artifact.metadata[CONTEXT_PROVENANCE_METADATA_KEY] == null)
     }
 
     @Test

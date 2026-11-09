@@ -68,7 +68,7 @@ Keeper's room › Connections › **MCP servers** (`McpServerConnections`). A se
 - `McpToolLoop` runs at most 8 rounds of calls, and at most 8 calls per round; extra calls are answered with an error and not run. After the last round, one more turn is requested with tools refused. Malformed arguments are answered with an error and not run.
 - If the first request, the one that offers the tools, fails, the run is retried once without tools. This covers models and services that do not take tools.
 - Each call is reported as a `Progress` event ("Calling get_weather on Weather").
-- The answer artifact of a run that called tools carries `contentProvenance=external-tool-results` and `mcpToolCalls` (`server/tool, …`).
+- The answer artifact of a run that called tools is labelled `ExternalContent` (`aive.provenance`, which the context-taint rule reads: a later step that can change something is held at a gate) and carries `contentProvenance=external-tool-results` and `mcpToolCalls` (`server/tool, …`).
 
 ## Authority
 
