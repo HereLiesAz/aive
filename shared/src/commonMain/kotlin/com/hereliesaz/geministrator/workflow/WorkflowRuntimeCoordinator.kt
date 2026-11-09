@@ -1581,6 +1581,8 @@ class WorkflowRuntimeCoordinator(
                     progress = execution.progress
                         ?: if (execution.status == TaskRunStatus.Completed) 1f else previous.progress,
                     progressMessage = execution.progressMessage ?: previous.progressMessage,
+                    // A nested workflow reports its child run's total: the parent's caps and budgets count it.
+                    usage = execution.usage ?: previous.usage,
                 )
             ),
             updatedAtEpochMillis = now,

@@ -11,6 +11,11 @@ data class ExternalExecutionRun(
     val artifacts: List<ArtifactRef> = emptyList(),
     val progress: Float? = null,
     val message: String? = null,
+    /**
+     * What the remote work has spent so far, in total, when the executor can say (a nested workflow's whole child
+     * run): the task's own usage becomes this, so the parent run's caps count it.
+     */
+    val usage: com.hereliesaz.geministrator.domain.TaskUsage? = null,
 ) {
     init {
         require(progress == null || progress in 0f..1f) { "Execution progress must be normalized 0f..1f" }
@@ -98,4 +103,5 @@ internal fun ExternalExecutionRun.toTaskExecution(): TaskExecutorExecution = Tas
     artifacts = artifacts,
     progress = progress ?: if (status == ExternalExecutionStatus.Completed) 1f else null,
     progressMessage = message,
+    usage = usage,
 )

@@ -206,23 +206,22 @@ class WorkflowRunNestedWorkflowClient(
     private suspend fun nestingCycle(
         parentId: WorkflowDefinitionId,
         child: WorkflowDefinition,
-    ): List<WorkflowDefinitionId>? {
-        val explored = mutableSetOf<WorkflowDefinitionId>()
-        suspend fun visit(definition: WorkflowDefinition, path: List<WorkflowDefinitionId>): List<WorkflowDefinitionId>? {
-            val nextPath = path + definition.id
-            if (definition.id in path) return nextPath
-            if (!explored.add(definition.id)) return null
-            for (nestedId in definition.nestedDefinitionIds()) {
-                if (nestedId in nextPath) return nextPath + nestedId
-                val nested = persistence.definitions.get(nestedId) ?: continue
-                visit(nested, nextPath)?.let { return it }
-            }
-            return null
-        }
-        return visit(child, listOf(parentId))
+    ): List<WorkflowDefinitionId>? = persistence.nestingCycle(listOf(parentId), child)
+
+    private fun WorkflowRun.totalUsage(): com.hereliesaz.geministrator.domain.TaskUsage? {
+        val spent = taskRuns.values.mapNotNull { it.usage }
+        if (spent.isEmpty()) return null
+        return com.hereliesaz.geministrator.domain.TaskUsage(
+            inputTokens = spent.sumOf { it.inputTokens },
+            outputTokens = spent.sumOf { it.outputTokens },
+            costUsd = spent.mapNotNull { it.costUsd }.takeIf { it.isNotEmpty() }?.sum(),
+            costUnknown = spent.any { it.costUnknown },
+        )
     }
 
-    private fun WorkflowRun.toExternalRun(): ExternalExecutionRun {
+    private fun WorkflowRun.toExternalRun(): ExternalExecutionRun = toExternalRunWithoutUsage().copy(usage = totalUsage())
+
+    private fun WorkflowRun.toExternalRunWithoutUsage(): ExternalExecutionRun {
         val total = taskRuns.size
         val done = taskRuns.values.count { it.status == TaskRunStatus.Completed || it.status == TaskRunStatus.Cancelled }
         val progress = if (total == 0) null else done.toFloat() / total
@@ -290,4 +289,28 @@ private fun WorkflowDefinition.nestedDefinitionIds(): List<WorkflowDefinitionId>
         is TaskExecutor.Distributed -> (executor.delegate as? TaskExecutor.NestedWorkflow)?.workflowDefinitionId
         else -> null
     }
+}
+
+/**
+ * The definition path that closes a nesting cycle when [definition] runs below [ancestors], or null: every nested
+ * workflow reachable from it is looked up in the store, and one that leads back to a definition already on the
+ * path is a cycle. A definition the store does not have ends that branch (it fails when it is started).
+ */
+internal suspend fun WorkflowPersistence.nestingCycle(
+    ancestors: List<WorkflowDefinitionId>,
+    definition: WorkflowDefinition,
+): List<WorkflowDefinitionId>? {
+    val explored = mutableSetOf<WorkflowDefinitionId>()
+    suspend fun visit(current: WorkflowDefinition, path: List<WorkflowDefinitionId>): List<WorkflowDefinitionId>? {
+        val nextPath = path + current.id
+        if (current.id in path) return nextPath
+        if (!explored.add(current.id)) return null
+        for (nestedId in current.nestedDefinitionIds()) {
+            if (nestedId in nextPath) return nextPath + nestedId
+            val nested = definitions.get(nestedId) ?: continue
+            visit(nested, nextPath)?.let { return it }
+        }
+        return null
+    }
+    return visit(definition, ancestors)
 }

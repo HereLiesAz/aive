@@ -28,6 +28,11 @@ class WorkflowLaunchService(
         parentWorkflowRunIds: List<WorkflowRunId> = emptyList(),
     ): Pair<WorkflowDefinition, WorkflowRuntimeState> {
         val prepared = preparer.prepare(definition, project.repository)
+        // A hive that nests itself, directly or through the hives it nests, is refused now, not when the nesting
+        // task starts after everything upstream of it has already run and spent.
+        persistence.nestingCycle(emptyList(), prepared)?.let { cycle ->
+            throw IllegalArgumentException("Nested workflow cycle refused: ${cycle.joinToString(" -> ") { it.value }}")
+        }
         val run = WorkflowRunFactory.create(
             definition = prepared,
             workflowRunId = workflowRunId,
