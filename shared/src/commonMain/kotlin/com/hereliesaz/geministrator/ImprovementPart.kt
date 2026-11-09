@@ -13,6 +13,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -21,6 +22,12 @@ import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.log.formatLogTime
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.improvement_adopt
+import com.hereliesaz.geministrator.resources.improvement_already_decided
+import com.hereliesaz.geministrator.resources.improvement_breaks_loop
+import com.hereliesaz.geministrator.resources.improvement_not_recorded
+import com.hereliesaz.geministrator.resources.improvement_replaces
+import com.hereliesaz.geministrator.resources.improvement_save_failed
+import com.hereliesaz.geministrator.resources.improvement_would_break_loop
 import com.hereliesaz.geministrator.resources.improvement_add_to_hive
 import com.hereliesaz.geministrator.resources.improvement_source_habit
 import com.hereliesaz.geministrator.resources.improvement_source_loop
@@ -52,7 +59,6 @@ import com.hereliesaz.geministrator.resources.improvement_status_reverted
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.memory.MemoryLayerController
-import com.hereliesaz.geministrator.memory.procedural.RoleInstructionApproval
 import com.hereliesaz.geministrator.workflow.improvement.ImprovementApplier
 import com.hereliesaz.geministrator.workflow.improvement.ImprovementKind
 import com.hereliesaz.geministrator.workflow.improvement.ImprovementSource
@@ -63,7 +69,7 @@ import com.hereliesaz.geministrator.workflow.improvement.ImprovementStore
 import com.hereliesaz.geministrator.workflow.improvement.LoopObligation
 import com.hereliesaz.geministrator.workflow.improvement.ProposalStatus
 import com.hereliesaz.geministrator.workflow.improvement.SelfImprovementLoop
-import com.hereliesaz.geministrator.workflow.schedule.WorkflowScheduleStore
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
@@ -76,13 +82,14 @@ internal val LocalImprovementStore = compositionLocalOf<ImprovementStore?> { nul
  * Improvement (docs/architecture/SELF_IMPROVEMENT.md): what the loop proposes, and nothing else. A proposal
  * changes a role, a hive or a schedule only when it is adopted here, by the keeper, with the exact
  * text shown; adoption records the text before and after, and **Revert** puts it back (unless something
- * edited it since). A proposal about the loop itself is marked, and is adopted exactly like any other.
+ * edited it since). A proposal about the loop itself is marked, and is adopted like any other, except that a change
+ * that would leave the loop breaking its own rules is refused ([ImprovementAdoption]).
  */
 @Composable
 internal fun ImprovementPart(
     /** The habits layer, whose formed habits are offered here as steps for a hive; null where there is none. */
     memoryLayer: MemoryLayerController? = null,
-    /** Replaces the instructions of one installed role (the Mind's save path); true when it was saved. */
+    /** Replaces the instructions of one installed role (the Mind's save path); returns once it is saved and throws if it could not be. */
     onSaveRoleInstructions: suspend (roleId: String, instructions: String) -> Unit,
 ) {
     val store = LocalImprovementStore.current ?: return
@@ -92,6 +99,10 @@ internal fun ImprovementPart(
     var state by remember { mutableStateOf(ImprovementState()) }
     var roles by remember { mutableStateOf<List<RoleDefinition>>(emptyList()) }
     var authored by remember { mutableStateOf<List<WorkflowDefinition>>(emptyList()) }
+    // A decision is running: its buttons are off until it ends, so a second tap cannot start a second one.
+    var deciding by remember { mutableStateOf(false) }
+    val saveRole by rememberUpdatedState(onSaveRoleInstructions)
+    val adoption = remember(store, host) { ImprovementAdoption(store, host, { roleId, instructions -> saveRole(roleId, instructions) }) }
     var hasLoop by remember { mutableStateOf(true) }
     var message by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableStateOf(0) }
@@ -131,7 +142,13 @@ internal fun ImprovementPart(
                 label = stringResource(Res.string.improvement_run_cycle),
                 seed = "improvement-run-cycle",
                 tone = PillTone.Primary,
-                onClick = { scope.launch { runCycleNow(schedules); message = getString(Res.string.improvement_run_cycle_note) } },
+                onClick = {
+                    scope.launch {
+                        message = getString(
+                            if (ImprovementAdoption.runCycleNow(schedules)) Res.string.improvement_run_cycle_note else Res.string.improvement_no_loop,
+                        )
+                    }
+                },
             )
         }
         message?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface(), modifier = Modifier.azphaltLiveRegion()) }
@@ -140,29 +157,29 @@ internal fun ImprovementPart(
             ProposalCard(
                 proposal = proposal,
                 hives = authored,
+                roles = roles,
+                busy = deciding,
                 onAdopt = {
-                    scope.launch {
-                        message = adopt(proposal, store, host, roles, onSaveRoleInstructions)
+                    decide(scope, { deciding }, { deciding = it }) {
+                        message = describe(adoption.adopt(proposal.id))
                         reload += 1
                     }
                 },
                 onAddToHive = { hive ->
-                    scope.launch {
+                    decide(scope, { deciding }, { deciding = it }) {
                         message = adoptHabit(proposal, hive, store, host, memoryLayer)
                         reload += 1
                     }
                 },
                 onDismiss = {
-                    scope.launch {
-                        // A proposal from run history is dismissed there too, so its lines are never offered again.
-                        if (proposal.source == ImprovementSource.RoleHistory) proposal.sourceRef?.let { RoleInstructionProposalsHost.ledger.dismiss(it) }
-                        store.decide(proposal.id) { it.copy(status = ProposalStatus.Dismissed, decidedAtEpochMillis = currentEpochMillis()) }
+                    decide(scope, { deciding }, { deciding = it }) {
+                        message = describe(adoption.dismiss(proposal.id))
                         reload += 1
                     }
                 },
                 onRevert = {
-                    scope.launch {
-                        message = revert(proposal, store, host, roles, onSaveRoleInstructions)
+                    decide(scope, { deciding }, { deciding = it }) {
+                        message = describe(adoption.revert(proposal.id))
                         reload += 1
                     }
                 },
@@ -171,95 +188,30 @@ internal fun ImprovementPart(
     }
 }
 
-/** Makes the loop's schedule due at the next look: on, and counted from long ago. */
-private suspend fun runCycleNow(schedules: WorkflowScheduleStore) {
-    val schedule = schedules.all().firstOrNull { it.id == SelfImprovementLoop.SCHEDULE_ID } ?: return
-    schedules.put(schedule.copy(enabled = true, createdAtEpochMillis = 0L, lastStartedAtEpochMillis = null))
-}
-
-private suspend fun adopt(
-    proposal: ImprovementProposal,
-    store: ImprovementStore,
-    host: WorkflowLibraryHost?,
-    roles: List<RoleDefinition>,
-    saveRole: suspend (String, String) -> Unit,
-): String {
-    val hives = host?.entries()?.filter { it.origin == WorkflowLibraryOrigin.Authored }?.map { it.definition }.orEmpty()
-    val now = currentEpochMillis()
-    if (proposal.source == ImprovementSource.RoleHistory && proposal.sourceRef != null) {
-        // Decided by the mechanism that made it: its own check that the role is still as it was drafted against.
-        val before = roles.firstOrNull { it.id.value == proposal.target }?.instructions
-        return when (val result = RoleInstructionProposalsHost.ledger.approve(proposal.sourceRef!!, roles)) {
-            is RoleInstructionApproval.Applied -> {
-                saveRole(proposal.target, result.role.instructions)
-                store.decide(proposal.id) {
-                    it.copy(status = ProposalStatus.Adopted, decidedAtEpochMillis = now, appliedBefore = before, appliedAfter = result.role.instructions)
-                }
-                appLog("Improvement", "Adopted: ${proposal.summary}")
-                ""
-            }
-            RoleInstructionApproval.Stale -> {
-                store.decide(proposal.id) { it.copy(status = ProposalStatus.Superseded, decidedAtEpochMillis = now, note = "The role changed since it was drafted.") }
-                getString(Res.string.improvement_stale)
-            }
-            RoleInstructionApproval.NotFound -> getString(Res.string.improvement_stale)
+/** Runs one decision, unless another is already running; the screen's buttons are off meanwhile. */
+private fun decide(scope: CoroutineScope, running: () -> Boolean, setRunning: (Boolean) -> Unit, block: suspend () -> Unit) {
+    if (running()) return
+    setRunning(true)
+    scope.launch {
+        try {
+            block()
+        } finally {
+            setRunning(false)
         }
-    }
-    return when (val plan = ImprovementApplier.plan(proposal, roles, hives)) {
-        is ImprovementApplier.Plan.RoleInstructions -> {
-            saveRole(plan.roleId, plan.after)
-            store.decide(proposal.id) { it.copy(status = ProposalStatus.Adopted, decidedAtEpochMillis = now, appliedBefore = plan.before, appliedAfter = plan.after) }
-            appLog("Improvement", "Adopted: ${proposal.summary} (role ${plan.roleId})")
-            ""
-        }
-        is ImprovementApplier.Plan.HiveStepObjective -> {
-            val hive = hives.first { it.id.value == plan.hiveId }
-            host!!.saveAuthored(ImprovementApplier.applyTo(hive, plan))
-            store.decide(proposal.id) { it.copy(status = ProposalStatus.Adopted, decidedAtEpochMillis = now, appliedBefore = plan.before, appliedAfter = plan.after) }
-            appLog("Improvement", "Adopted: ${proposal.summary} (${plan.hiveId}/${plan.taskId})")
-            ""
-        }
-        is ImprovementApplier.Plan.Manual -> {
-            store.decide(proposal.id) { it.copy(status = ProposalStatus.Adopted, decidedAtEpochMillis = now, note = plan.why) }
-            appLog("Improvement", "Noted: ${proposal.summary}")
-            getString(Res.string.improvement_manual_noted)
-        }
-        is ImprovementApplier.Plan.Cannot -> getString(Res.string.improvement_cannot, plan.why)
     }
 }
 
-private suspend fun revert(
-    proposal: ImprovementProposal,
-    store: ImprovementStore,
-    host: WorkflowLibraryHost?,
-    roles: List<RoleDefinition>,
-    saveRole: suspend (String, String) -> Unit,
-): String {
-    val before = proposal.appliedBefore
-    if (before == null) {
-        store.decide(proposal.id) { it.copy(status = ProposalStatus.Reverted, decidedAtEpochMillis = currentEpochMillis()) }
-        return ""
-    }
-    val now = currentEpochMillis()
-    when (proposal.kind) {
-        com.hereliesaz.geministrator.workflow.improvement.ImprovementKind.RoleInstruction -> {
-            val current = roles.firstOrNull { it.id.value == proposal.target }?.instructions
-            if (!ImprovementApplier.canRevert(proposal, current)) return getString(Res.string.improvement_revert_conflict)
-            saveRole(proposal.target, before)
-        }
-        else -> {
-            val hiveId = proposal.target.substringBefore('/')
-            val taskId = proposal.target.substringAfter('/', "")
-            val hive = host?.entries()?.firstOrNull { it.definition.id.value == hiveId && it.origin == WorkflowLibraryOrigin.Authored }?.definition
-                ?: return getString(Res.string.improvement_revert_conflict)
-            val current = hive.tasks.firstOrNull { it.id.value == taskId }?.objective
-            if (!ImprovementApplier.canRevert(proposal, current)) return getString(Res.string.improvement_revert_conflict)
-            host.saveAuthored(hive.copy(tasks = hive.tasks.map { if (it.id.value == taskId) it.copy(objective = before) else it }))
-        }
-    }
-    store.decide(proposal.id) { it.copy(status = ProposalStatus.Reverted, decidedAtEpochMillis = now) }
-    appLog("Improvement", "Reverted: ${proposal.summary}")
-    return ""
+/** The words for what a decision came to; nothing to say when it simply worked. */
+private suspend fun describe(result: AdoptionResult): String = when (result) {
+    AdoptionResult.Done -> ""
+    AdoptionResult.Noted -> getString(Res.string.improvement_manual_noted)
+    AdoptionResult.Stale -> getString(Res.string.improvement_stale)
+    AdoptionResult.AlreadyDecided -> getString(Res.string.improvement_already_decided)
+    is AdoptionResult.Cannot -> getString(Res.string.improvement_cannot, result.why)
+    is AdoptionResult.BreaksLoop -> getString(Res.string.improvement_breaks_loop, result.violations.joinToString(" "))
+    AdoptionResult.RevertConflict -> getString(Res.string.improvement_revert_conflict)
+    is AdoptionResult.SaveFailed -> getString(Res.string.improvement_save_failed, result.reason)
+    AdoptionResult.NotRecorded -> getString(Res.string.improvement_not_recorded)
 }
 
 /** Mirrors the role-instruction proposals and the formed habits into the one ledger. Reading only: nothing is decided. */
@@ -282,16 +234,17 @@ private suspend fun adoptHabit(
     memoryLayer: MemoryLayerController?,
 ): String {
     if (host == null || memoryLayer == null || proposal.sourceRef == null) return getString(Res.string.improvement_habit_no_memory)
+    if (store.state().proposals.none { it.id == proposal.id && it.status == ProposalStatus.Proposed }) return getString(Res.string.improvement_already_decided)
     val taskId = "habit-" + proposal.target.filter { it.isLetterOrDigit() }.take(24).ifEmpty { "step" }
     return when (val result = memoryLayer.proposeHabitTask(proposal.sourceRef!!, proposal.target, taskId)) {
         is com.hereliesaz.geministrator.memory.procedural.HabitInvocation.Result.Proposed -> {
             val saved = runCatching { host.addProposedTasks(hive.id, listOf(result.task)) }
             saved.exceptionOrNull()?.let { return it.message ?: getString(Res.string.improvement_habit_no_memory) }
-            store.decide(proposal.id) {
+            val decided = store.decide(proposal.id) {
                 it.copy(status = ProposalStatus.Adopted, decidedAtEpochMillis = currentEpochMillis(), note = "Added to ${hive.name}, behind its own approval step.")
             }
             appLog("Improvement", "Adopted: ${proposal.summary} (into ${hive.id.value})")
-            getString(Res.string.improvement_habit_added, hive.name)
+            if (decided) getString(Res.string.improvement_habit_added, hive.name) else getString(Res.string.improvement_not_recorded)
         }
         is com.hereliesaz.geministrator.memory.procedural.HabitInvocation.Result.Refused -> result.reason
     }
@@ -301,6 +254,8 @@ private suspend fun adoptHabit(
 private fun ProposalCard(
     proposal: ImprovementProposal,
     hives: List<WorkflowDefinition>,
+    roles: List<RoleDefinition>,
+    busy: Boolean,
     onAdopt: () -> Unit,
     onAddToHive: (WorkflowDefinition) -> Unit,
     onDismiss: () -> Unit,
@@ -322,6 +277,8 @@ private fun ProposalCard(
             ImprovementSource.Habit -> Res.string.improvement_source_habit
         },
     )
+    // A hive-step proposal replaces a step's whole objective: show what it replaces, and what it would break in the loop.
+    val preview = if (proposal.status == ProposalStatus.Proposed) ImprovementApplier.preview(proposal, roles, hives) else null
     val eyebrow = status + " · " + source + " · " + proposal.kind.label + " · " + proposal.target + if (proposal.meta) " · " + stringResource(Res.string.improvement_meta) else ""
     AzphaltRecord(
         seed = "improvement-${proposal.id}",
@@ -330,7 +287,9 @@ private fun ProposalCard(
         body = stringResource(
             Res.string.improvement_body,
             proposal.expectedEffect, proposal.undo, proposal.newText.ifBlank { "-" }, formatLogTime(proposal.createdAtEpochMillis),
-        ) + (proposal.evidence.takeIf { it.isNotBlank() }?.let { "\nEvidence: $it" } ?: "") + (proposal.note?.let { "\n$it" } ?: ""),
+        ) + (preview?.let { "\n" + stringResource(Res.string.improvement_replaces, it.before) } ?: "") +
+            (preview?.loopViolations?.takeIf { it.isNotEmpty() }?.let { "\n" + stringResource(Res.string.improvement_would_break_loop, it.joinToString(" ")) } ?: "") +
+            (proposal.evidence.takeIf { it.isNotBlank() }?.let { "\nEvidence: $it" } ?: "") + (proposal.note?.let { "\n$it" } ?: ""),
         well = if (proposal.status != ProposalStatus.Proposed && !(proposal.status == ProposalStatus.Adopted && proposal.appliedBefore != null)) null else {
             {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -340,16 +299,16 @@ private fun ProposalCard(
                             hives.forEach { hive ->
                                 AzphaltPill(
                                     stringResource(Res.string.improvement_add_to_hive, hive.name), "improvement-habit-${proposal.id}-${hive.id.value}",
-                                    tone = PillTone.Primary, onClick = { onAddToHive(hive) },
+                                    tone = PillTone.Primary, enabled = !busy, onClick = { onAddToHive(hive) },
                                 )
                             }
                         } else {
-                            AzphaltPill(stringResource(Res.string.improvement_adopt), "improvement-adopt-${proposal.id}", tone = PillTone.Primary, onClick = onAdopt)
+                            AzphaltPill(stringResource(Res.string.improvement_adopt), "improvement-adopt-${proposal.id}", tone = PillTone.Primary, enabled = !busy, onClick = onAdopt)
                         }
-                        AzphaltPill(stringResource(Res.string.improvement_dismiss), "improvement-dismiss-${proposal.id}", onClick = onDismiss)
+                        AzphaltPill(stringResource(Res.string.improvement_dismiss), "improvement-dismiss-${proposal.id}", enabled = !busy, onClick = onDismiss)
                     }
                     ProposalStatus.Adopted -> if (proposal.appliedBefore != null) {
-                        AzphaltPill(stringResource(Res.string.improvement_revert), "improvement-revert-${proposal.id}", onClick = onRevert)
+                        AzphaltPill(stringResource(Res.string.improvement_revert), "improvement-revert-${proposal.id}", enabled = !busy, onClick = onRevert)
                     }
                     else -> Unit
                 }

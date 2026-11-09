@@ -18,6 +18,7 @@ object SwarmEvidence {
     private const val MAX_ROWS = 12
     private const val MAX_CHARS = 9_000
     private const val MAX_LOOP_CHARS = 3_000
+    private const val MAX_META_CHARS = 500
 
     private data class Tally(
         var steps: Int = 0,
@@ -44,7 +45,8 @@ object SwarmEvidence {
             }
         }
 
-        val failRate: Double get() = if (steps == 0) 0.0 else (failed + escalated).toDouble() / steps
+        /** Failed and escalated over steps; null with no steps, which is "nothing to compare", not a rate of zero. */
+        val failRate: Double? get() = if (steps == 0) null else (failed + escalated).toDouble() / steps
     }
 
     /** Runs whose last change fell in `[from, to)`. */
@@ -90,13 +92,28 @@ object SwarmEvidence {
         return "⟦agent-written: $clean⟧"
     }
 
-    private fun pct(x: Double) = "${kotlin.math.round(x * 100).toInt()}%"
+    private fun pct(x: Double?) = if (x == null) "no steps" else "${kotlin.math.round(x * 100).toInt()}%"
+
+    private fun roleSteps(runs: List<WorkflowRun>, roleId: String, from: Long, to: Long): Tally =
+        Tally().also { t -> inWindow(runs, from, to).forEach { r -> r.taskRuns.values.filter { it.assignedRoleId?.value == roleId }.forEach(t::add) } }
 
     private fun row(name: String, now: Tally, before: Tally?, label: (String) -> String): String =
         "- ${label(name)}: ${now.steps} steps, ${now.completed} completed, ${now.failed} failed, ${now.escalated} escalated, ${now.retried} retried, " +
             "${now.tokens} tokens, ${usd(now)}" + (before?.takeIf { it.steps > 0 }?.let {
                 "; before: ${it.steps} steps, fail rate ${pct(it.failRate)} (now ${pct(now.failRate)})"
             } ?: "")
+
+    /**
+     * What the last cycle said about the loop when it proposed no change to it: a finding for this cycle to test
+     * against the numbers above, not a conclusion to repeat (SELF_IMPROVEMENT.md §4, point 2). Quoted as data.
+     */
+    private fun metaFinding(state: ImprovementState): String {
+        val last = state.cycles.maxByOrNull { it.atEpochMillis } ?: return ""
+        val reason = last.metaNoChange?.takeIf { it.isNotBlank() } ?: return ""
+        val counted = if (MetaNoChange.isExamination(reason)) "" else " It was too short, or cited no figure, to count as an examination of the loop."
+        return "\nTHE LAST CYCLE SAID THE LOOP NEEDED NO CHANGE (a finding to re-examine against the evidence above, not a conclusion to repeat): " +
+            agentText(reason, MAX_META_CHARS) + counted + "\n"
+    }
 
     fun of(
         runs: List<WorkflowRun>,
@@ -132,16 +149,19 @@ object SwarmEvidence {
             val providerBefore = byProvider(before)
             byProvider(now).entries.sortedByDescending { it.value.steps }.take(MAX_ROWS).forEach { (p, t) -> appendLine(row(p, t, providerBefore[p]) { it }) }
             appendLine()
-            appendLine("Adopted since the last cycle, and what happened after (a role's fail rate before and after the adoption):")
+            appendLine("Adopted since the last cycle, and what happened after (a role's fail rate over the window before the adoption and over the time since):")
             val lastCycle = state.cycles.maxOfOrNull { it.atEpochMillis } ?: 0L
-            val adopted = state.proposals.filter { it.status == ProposalStatus.Adopted && (it.decidedAtEpochMillis ?: 0L) > lastCycle - windowMillis }
-            if (adopted.isEmpty()) appendLine("- Nothing adopted yet.")
+            // Adopted since the last cycle, so a cycle does not report again what an earlier one already saw.
+            val adopted = state.proposals.filter { it.status == ProposalStatus.Adopted && (it.decidedAtEpochMillis ?: 0L) > lastCycle }
+            if (adopted.isEmpty()) appendLine("- Nothing adopted since the last cycle.")
             adopted.take(MAX_ROWS).forEach { p ->
                 val at = p.decidedAtEpochMillis ?: 0L
                 val effect = if (p.kind == ImprovementKind.RoleInstruction) {
-                    val pre = Tally().also { t -> runs.filter { it.updatedAtEpochMillis < at }.forEach { r -> r.taskRuns.values.filter { it.assignedRoleId?.value == p.target }.forEach(t::add) } }
-                    val post = Tally().also { t -> runs.filter { it.updatedAtEpochMillis >= at }.forEach { r -> r.taskRuns.values.filter { it.assignedRoleId?.value == p.target }.forEach(t::add) } }
-                    "; ${agentText(p.target, 60)} fail rate ${pct(pre.failRate)} over ${pre.steps} steps before, ${pct(post.failRate)} over ${post.steps} steps after"
+                    // One window of the role's steps before the adoption against what has run since it (at most one window).
+                    val pre = roleSteps(runs, p.target, at - windowMillis, at)
+                    val post = roleSteps(runs, p.target, at, minOf(at + windowMillis, nowEpochMillis + 1))
+                    val verdict = if (pre.steps == 0 || post.steps == 0) " (too few steps on one side to compare)" else ""
+                    "; ${agentText(p.target, 60)} fail rate ${pct(pre.failRate)} over ${pre.steps} steps before, ${pct(post.failRate)} over ${post.steps} steps after$verdict"
                 } else {
                     ""
                 }
@@ -168,8 +188,8 @@ object SwarmEvidence {
             appendLine("Proposals still waiting on the keeper: $pending. Recently dismissed (the keeper judged these not worth it): " +
                 if (dismissed.isEmpty()) "none." else dismissed.joinToString("; ") { agentText(it.summary, 80) })
         }
-        // The loop's own section is never the part that is cut: the loop must always see itself.
-        val own = "\nTHE LOOP, AS IT IS NOW (examine this too; nothing in it is off limits):\n" + loopDescription.take(MAX_LOOP_CHARS)
+        // The loop's own section is never the part that is cut: the loop must always see itself, and what it last concluded about itself.
+        val own = metaFinding(state) + "\nTHE LOOP, AS IT IS NOW (examine this too; nothing in it is off limits):\n" + loopDescription.take(MAX_LOOP_CHARS)
         return body.take((MAX_CHARS - own.length).coerceAtLeast(0)) + own
     }
 }

@@ -31,11 +31,13 @@ import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
@@ -284,6 +286,8 @@ internal fun AzphaltPill(
     role: Role = Role.Button,
     stateDescription: String? = null,
     tone: PillTone = PillTone.Quiet,
+    /** False while the action cannot be taken (a decision is already running): the pill is dimmed, announced as disabled and does nothing. */
+    enabled: Boolean = true,
 ) {
     // Every pill wears its own colour: a hue from its seed, with an end cap in the same family.
     // Selected sits on Ink (Yellow when its surface is Ink, so it never vanishes); the one main
@@ -309,12 +313,14 @@ internal fun AzphaltPill(
                 this.selected = selected
                 contentDescription = if (endCap != null) "$label: $endCap" else label
                 if (stateDescription != null) this.stateDescription = stateDescription
+                if (!enabled) disabled()
             }
+            .alpha(if (enabled) 1f else 0.5f)
             .azphaltSelectedTransform(selected)
             .defaultMinSize(minHeight = AzphaltMinTouchTarget)
             .clip(RoundedCornerShape(999.dp))
             .background(fill)
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(start = 16.dp, top = 9.dp, bottom = 9.dp, end = if (endCap == null) 16.dp else 7.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),

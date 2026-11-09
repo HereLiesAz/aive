@@ -2,7 +2,14 @@ package com.hereliesaz.geministrator.workflow.improvement
 
 import com.hereliesaz.geministrator.WorkflowLibraryHost
 import com.hereliesaz.geministrator.azphalt.SettingsAuthoredWorkflowStore
+import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.ApprovalPolicy
+import com.hereliesaz.geministrator.domain.BuiltInRoles
+import com.hereliesaz.geministrator.domain.EscalationPolicy
+import com.hereliesaz.geministrator.domain.ProviderConstraints
+import com.hereliesaz.geministrator.domain.RoleAuthority
+import com.hereliesaz.geministrator.domain.TaskCondition
+import com.hereliesaz.geministrator.domain.TestDesignPolicy
 import com.hereliesaz.geministrator.domain.HallMonitorRole
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
@@ -111,5 +118,86 @@ class SelfImprovementClauseTest {
         host.saveAuthored(stripped)
         assertEquals(stripped, persistence.definitions.get(id))
         assertTrue(LoopIntegrity.violations(stripped).isNotEmpty(), "and the checker says what they gave up")
+    }
+
+    private fun withTask(id: String, change: (TaskDefinition) -> TaskDefinition) = loop.copy(tasks = loop.tasks.map { if (it.id.value == id) change(it) else it })
+
+    @Test
+    fun m6_everyStepOfTheShippedLoopFailsTheRunRatherThanAskingAPersonAndALoopThatAsksOneIsNamedAsViolating() {
+        assertTrue(loop.tasks.all { it.escalationPolicy == EscalationPolicy.FailWorkflow }, "no step can leave the run waiting on a person")
+        for (id in listOf("examine-loop", "challenge-loop", "propose", "refine", "observe")) {
+            val asking = withTask(id) { it.copy(escalationPolicy = EscalationPolicy.RequireHumanDecision) }
+            assertTrue(LoopIntegrity.violations(asking).any { "wait on a person" in it && "'$id'" in it }, id)
+        }
+        val reassigning = withTask("propose") { it.copy(escalationPolicy = EscalationPolicy.Reassign(BuiltInRoles.ImplementationEngineer.id)) }
+        assertTrue(LoopIntegrity.violations(reassigning).any { "'propose'" in it })
+    }
+
+    @Test
+    fun s4_theLoopsIntegrityCoversEveryKindOfStepThatCouldChangeOrHoldSomethingUp() {
+        fun extra(executor: TaskExecutor) = loop.copy(tasks = loop.tasks + TaskDefinition(
+            id = TaskDefinitionId("extra"), name = "Extra", objective = "x", roleId = null, dependsOn = setOf(TaskDefinitionId("refine")), executor = executor,
+        ))
+        for (executor in listOf(
+            TaskExecutor.TestRunner("echo"), TaskExecutor.ExternalService("svc"), TaskExecutor.Deployment("prod"),
+            TaskExecutor.NestedWorkflow(WorkflowDefinitionId("other")), TaskExecutor.Script(com.hereliesaz.geministrator.domain.ScriptLanguage.Python, "print(1)", com.hereliesaz.geministrator.domain.ScriptRunner.LocalSandbox),
+            TaskExecutor.Distributed(TaskExecutor.RoleAgent(BuiltInRoles.Architect.id)),
+        )) {
+            assertTrue(LoopIntegrity.violations(extra(executor)).any { "only reads" in it }, executor.toString())
+        }
+        assertTrue(LoopIntegrity.violations(withTask("propose") { it.copy(requiredRoleAuthority = RoleAuthority.ApproveRelease) }).any { "changes nothing" in it })
+        assertTrue(LoopIntegrity.violations(withTask("propose") { it.copy(providerConstraints = ProviderConstraints.RequireCapabilities(setOf(AgentCapability.ShellExecution))) }).any { "'propose'" in it })
+        assertTrue(LoopIntegrity.violations(loop.copy(testDesignPolicy = TestDesignPolicy.BeforeAndAfterImplementation)).any { "test-design" in it })
+    }
+
+    @Test
+    fun s4_aStepRunByARoleThatCanWriteOrRunCommandsIsNamedEvenAtProposePlanAuthority() {
+        val roles = haiveBuiltInRoles
+        assertEquals(emptyList(), LoopIntegrity.violations(loop, roles), "the shipped loop uses roles that only read")
+
+        val shellRole = BuiltInRoles.ProductManager.copy(capabilitiesRequired = setOf(AgentCapability.ShellExecution))
+        val writer = BuiltInRoles.ProductManager.copy(authorities = setOf(RoleAuthority.ProposePlan, RoleAuthority.Implement))
+        for (role in listOf(shellRole, writer)) {
+            val installed = roles.map { if (it.id == role.id) role else it }
+            assertTrue(LoopIntegrity.violations(loop, installed).any { "'propose'" in it && "can write" in it }, role.toString())
+        }
+        assertEquals(emptyList(), LoopIntegrity.violations(loop), "without the roles to look at, only the hive is judged")
+    }
+
+    @Test
+    fun s4_theStructureIsCheckedNotTheWords_aStepCannotBeSkippedWithheldOrSelfGradedAndTheLoopHasOneEnd() {
+        assertTrue(LoopIntegrity.violations(withTask("examine-loop") { it.copy(condition = TaskCondition.OnFailure(TaskDefinitionId("observe"))) }).any { "skipped" in it })
+        assertTrue(LoopIntegrity.violations(withTask("challenge-loop") { it.copy(holdOutput = true) }).any { "withhold" in it })
+        // The Hall Monitor grading its own overlay, or the examination waiting on its report.
+        assertTrue(LoopIntegrity.violations(withTask("examine-loop") { it.copy(roleId = HallMonitorRole.id) }).any { "independently" in it })
+        assertTrue(LoopIntegrity.violations(withTask("examine-loop") { it.copy(dependsOn = setOf(TaskDefinitionId("observe"))) }).any { "independently" in it })
+        // The challenge by the same role that made the examination.
+        assertTrue(LoopIntegrity.violations(withTask("challenge-loop") { it.copy(roleId = BuiltInRoles.Architect.id) }).any { "different role" in it })
+        // Proposals that do not follow from the challenge, a last step that is not last, an objective that is only whitespace.
+        assertTrue(LoopIntegrity.violations(withTask("propose") { it.copy(dependsOn = setOf(TaskDefinitionId("challenge-report"))) }).any { "challenge of the examination" in it })
+        assertTrue(LoopIntegrity.violations(withTask("refine") { it.copy(dependsOn = emptySet()) }).any { "every other step" in it })
+        assertTrue(LoopIntegrity.violations(withTask("examine-loop") { it.copy(objective = "   ") }).any { "examine itself" in it })
+        // The word "loop" in a step that does nothing of the kind no longer passes: what counts is the step, not its text.
+        assertTrue(LoopIntegrity.violations(withTask("examine-loop") { it.copy(objective = "loop loop loop", roleId = HallMonitorRole.id) }).isNotEmpty())
+    }
+
+    @Test
+    fun s4_theProposeStepMustTellTheWriterTheLineFormsTheParserReadsAndTheLastStepMustToo() {
+        val noGrammar = withTask("propose") { it.copy(objective = "Say something about the loop itself, or META-NO-CHANGE, with itself in it.") }
+        assertTrue(LoopIntegrity.violations(noGrammar).any { "about the loop" in it })
+        val noMetaKind = withTask("propose") { it.copy(objective = it.objective.replace("loop-definition", "x").replace("evidence-rule", "y")) }
+        assertTrue(LoopIntegrity.violations(noMetaKind).any { "about the loop" in it })
+        val finalWithoutForm = withTask("refine") { it.copy(objective = "Output a summary.") }
+        assertTrue(LoopIntegrity.violations(finalWithoutForm).any { "proposal lines" in it })
+        assertTrue(loop.tasks.single { it.id.value == "propose" }.objective.contains(SelfImprovementLoop.ESCAPING), "the writer is told how to write a pipe")
+    }
+
+    @Test
+    fun s4_aScheduleDoesNotStartALoopThatNoLongerKeepsItsRulesAndSaysWhyButTheKeeperMayStillEditItFreely() {
+        assertEquals(null, LoopIntegrity.startRefusal(loop, haiveBuiltInRoles))
+        val broken = withTask("propose") { it.copy(escalationPolicy = EscalationPolicy.RequireHumanDecision) }
+        val why = LoopIntegrity.startRefusal(broken, haiveBuiltInRoles)
+        assertNotNull(why)
+        assertTrue("was not started" in why && "'propose'" in why, why)
     }
 }

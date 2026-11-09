@@ -190,6 +190,8 @@ fun ControlRoom(
     onExportDiagnosticBundle: suspend () -> String? = { null },
     onValidateWorkflow: () -> List<String> = { emptyList() },
     onSaveRoleCollection: (List<RoleDefinition>) -> Unit = {},
+    /** The same save, awaited: returns once the roles are saved and throws if they could not be. The Improvement screen records an adoption only after it. */
+    onSaveRoleCollectionNow: (suspend (List<RoleDefinition>) -> Unit)? = null,
     onResetRoleCollection: () -> Unit = {},
     onAssignWorkflowCompute: (WorkflowDefinitionId, ComputeDelegationTarget) -> Unit = { _, _ -> },
     onAssignRoleCompute: (WorkflowDefinitionId, RoleDefinitionId, ComputeDelegationTarget) -> Unit = { _, _, _ -> },
@@ -517,6 +519,7 @@ fun ControlRoom(
                 onExportDiagnosticBundle = onExportDiagnosticBundle,
                 onValidateWorkflow = onValidateWorkflow,
                 onSaveRoleCollection = onSaveRoleCollection,
+                onSaveRoleCollectionNow = onSaveRoleCollectionNow,
                 onResetRoleCollection = onResetRoleCollection,
                 onAssignWorkflowCompute = onAssignWorkflowCompute,
                 onAssignRoleCompute = onAssignRoleCompute,
@@ -795,6 +798,7 @@ private fun MainDestination(
     onExportDiagnosticBundle: suspend () -> String?,
     onValidateWorkflow: () -> List<String>,
     onSaveRoleCollection: (List<RoleDefinition>) -> Unit,
+    onSaveRoleCollectionNow: (suspend (List<RoleDefinition>) -> Unit)?,
     onResetRoleCollection: () -> Unit,
     onAssignWorkflowCompute: (WorkflowDefinitionId, ComputeDelegationTarget) -> Unit,
     onAssignRoleCompute: (WorkflowDefinitionId, RoleDefinitionId, ComputeDelegationTarget) -> Unit,
@@ -1292,7 +1296,8 @@ private fun MainDestination(
                                                 memoryLayer = memoryLayer,
                                                 onSaveRoleInstructions = { roleId, instructions ->
                                                     val all = roleHost?.installedRoles().orEmpty()
-                                                    onSaveRoleCollection(all.map { if (it.id.value == roleId) it.copy(instructions = instructions) else it })
+                                                    val changed = all.map { if (it.id.value == roleId) it.copy(instructions = instructions) else it }
+                                                    onSaveRoleCollectionNow?.invoke(changed) ?: onSaveRoleCollection(changed)
                                                 },
                                             )
                                         }

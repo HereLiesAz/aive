@@ -18,7 +18,15 @@ object ProposalMirrors {
 
     fun roleHistoryId(proposalId: String) = "role-history:$proposalId"
 
-    fun habitId(bank: String, operation: String) = "habit:$bank:$operation"
+    /**
+     * One habit is one proposal, however many banks (workflows) can see it: a bank also reads its neighbours' runs,
+     * so keying by bank offered the same operation once per bank. Ledgers written before that keep their
+     * `habit:<bank>:<operation>` ids; [habits] finds those by their target, not their id.
+     */
+    fun habitId(operation: String) = "habit:$operation"
+
+    /** A habit offered while this share of its uses failed is mostly a habit of failing, and is not offered as a step. */
+    const val MAX_HABIT_FAILURE_SHARE = 1.0 / 3.0
 
     /** [current] with the role-instruction proposals of [roles] mirrored in, and every mirrored one's status brought up to date. */
     fun roleHistory(current: ImprovementState, roles: RoleInstructionProposalState, nowEpochMillis: Long): ImprovementState {
@@ -49,13 +57,13 @@ object ProposalMirrors {
                 val next = when (p.status) {
                     RoleInstructionProposalStatus.Pending -> existing
                     RoleInstructionProposalStatus.Approved -> existing.copy(
-                        status = ProposalStatus.Adopted, decidedAtEpochMillis = nowEpochMillis,
+                        status = ProposalStatus.Adopted, decidedAtEpochMillis = p.decidedAtEpochMillis ?: nowEpochMillis,
                         appliedBefore = p.baseInstructions, appliedAfter = p.proposedInstructions,
                         note = "Approved on the creature's Mind tab.",
                     )
-                    RoleInstructionProposalStatus.Dismissed -> existing.copy(status = ProposalStatus.Dismissed, decidedAtEpochMillis = nowEpochMillis, note = "Dismissed on the creature's Mind tab.")
+                    RoleInstructionProposalStatus.Dismissed -> existing.copy(status = ProposalStatus.Dismissed, decidedAtEpochMillis = p.decidedAtEpochMillis ?: nowEpochMillis, note = "Dismissed on the creature's Mind tab.")
                     RoleInstructionProposalStatus.Superseded -> existing.copy(
-                        status = ProposalStatus.Superseded, decidedAtEpochMillis = nowEpochMillis,
+                        status = ProposalStatus.Superseded, decidedAtEpochMillis = p.decidedAtEpochMillis ?: nowEpochMillis,
                         note = "The role changed, or new evidence replaced it.",
                     )
                 }
@@ -65,15 +73,19 @@ object ProposalMirrors {
         return current.copy(proposals = order.mapNotNull { byId[it] })
     }
 
-    /** [current] with each formed habit offered once as a step to add to a hive; one already offered is never offered again. */
+    /**
+     * [current] with each formed habit offered once as a step to add to a hive; one already offered (by any bank, under
+     * any id the ledger has used) is never offered again, and one that mostly failed is not offered at all.
+     */
     fun habits(current: ImprovementState, habits: List<Pair<String, FormedHabit>>, nowEpochMillis: Long): ImprovementState {
-        val have = current.proposals.mapTo(hashSetOf()) { it.id }
+        val have = current.proposals.filter { it.source == ImprovementSource.Habit }.mapTo(hashSetOf()) { it.target }
         val added = habits.mapNotNull { (bank, habit) ->
             // Only a habit used often enough to be offered; one still forming is not a proposal.
             if (habit.strength == HabitStrength.Forming) return@mapNotNull null
-            val id = habitId(bank, habit.operation)
-            if (id in have) return@mapNotNull null
-            have += id
+            // "Done N times" must not describe an operation that mostly failed.
+            if (habit.failedUses > habit.uses * MAX_HABIT_FAILURE_SHARE) return@mapNotNull null
+            if (!have.add(habit.operation)) return@mapNotNull null
+            val id = habitId(habit.operation)
             ImprovementProposal(
                 id = id, cycleRunId = "habits", kind = ImprovementKind.HabitTask, target = habit.operation,
                 summary = "Make ${habit.operation} a step in a hive: done ${habit.uses} times",

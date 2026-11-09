@@ -25,13 +25,32 @@ object ImprovementApplier {
 
     const val ADOPTED_MARK = "Adopted improvement:"
 
+    /**
+     * The most characters adopted improvements may add to one role's instructions in total (everything from the first
+     * [ADOPTED_MARK] on), so a role's prompt does not grow without limit as proposals are adopted over time.
+     */
+    const val MAX_ADOPTED_CHARS = 4_000
+
+    /** The characters adopted improvements have added to [instructions] so far. */
+    fun adoptedChars(instructions: String): Int {
+        val at = instructions.indexOf("\n\n$ADOPTED_MARK")
+        return if (at < 0) 0 else instructions.length - at
+    }
+
     fun plan(proposal: ImprovementProposal, roles: Collection<RoleDefinition>, hives: Collection<WorkflowDefinition>): Plan = when (proposal.kind) {
         ImprovementKind.RoleInstruction -> {
             val role = roles.firstOrNull { it.id.value == proposal.target }
             when {
                 proposal.newText.isBlank() -> Plan.Cannot("The proposal has no text to add.")
                 role == null -> Plan.Cannot("No role '${proposal.target}' is installed.")
-                else -> Plan.RoleInstructions(role.id.value, role.instructions, role.instructions.trimEnd() + "\n\n$ADOPTED_MARK ${proposal.newText}")
+                else -> {
+                    val after = role.instructions.trimEnd() + "\n\n$ADOPTED_MARK ${proposal.newText}"
+                    if (adoptedChars(after) > MAX_ADOPTED_CHARS) {
+                        Plan.Cannot("Adopted improvements already add ${adoptedChars(role.instructions)} characters to '${role.id.value}'; this would take it past $MAX_ADOPTED_CHARS. Remove some of what was added first.")
+                    } else {
+                        Plan.RoleInstructions(role.id.value, role.instructions, after)
+                    }
+                }
             }
         }
         ImprovementKind.HiveStep, ImprovementKind.LoopDefinition -> {
@@ -51,6 +70,21 @@ object ImprovementApplier {
         ImprovementKind.Schedule, ImprovementKind.EvidenceRule, ImprovementKind.Other ->
             Plan.Manual("The app does not apply this kind by itself; it is recorded as noted, and you change it by hand.")
     }
+
+    /**
+     * What the card shows beside the exact new text: the text it replaces and, for the loop's own hive, what the
+     * change would break. Null for a proposal that is not a replacement of one step's objective.
+     */
+    data class Preview(val before: String, val after: String, val loopViolations: List<String>)
+
+    fun preview(proposal: ImprovementProposal, roles: Collection<RoleDefinition>, hives: Collection<WorkflowDefinition>): Preview? {
+        val plan = plan(proposal, roles, hives) as? Plan.HiveStepObjective ?: return null
+        return Preview(plan.before, plan.after, loopViolations(hives.first { it.id.value == plan.hiveId }, plan, roles))
+    }
+
+    /** What the loop's integrity ([LoopIntegrity]) says of [hive] once [plan] is applied; empty for any hive that is not the loop. */
+    fun loopViolations(hive: WorkflowDefinition, plan: Plan.HiveStepObjective, roles: Collection<RoleDefinition>): List<String> =
+        if (hive.id.value == SelfImprovementLoop.HIVE_ID) LoopIntegrity.violations(applyTo(hive, plan), roles) else emptyList()
 
     /** The hive with [plan]'s step objective replaced. */
     fun applyTo(hive: WorkflowDefinition, plan: Plan.HiveStepObjective): WorkflowDefinition =
