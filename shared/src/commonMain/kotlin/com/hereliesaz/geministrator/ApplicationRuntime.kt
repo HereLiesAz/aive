@@ -3,6 +3,7 @@ package com.hereliesaz.geministrator
 import com.hereliesaz.geministrator.domain.ApprovalGateId
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.BuiltInRoles
+import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.RepositoryRef
@@ -300,6 +301,8 @@ class ApplicationRuntime private constructor(
         existingProject: Project? = null,
         /** Runs the new run continues (one) or merges (several); empty starts a new root lineage. */
         continuesWorkflowRunIds: List<WorkflowRunId> = emptyList(),
+        /** Where [objective] came from; a remote agent's request is not the keeper's own typing. */
+        objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
     ) {
         runtimeMutex.withLock {
             val parents = requireKnownParentRuns(continuesWorkflowRunIds)
@@ -342,6 +345,7 @@ class ApplicationRuntime private constructor(
                 nowEpochMillis = now,
                 taskRunIdFactory = { id -> TaskRunId("run-$stamp-${id.value}") },
                 parentWorkflowRunIds = parents,
+                objectiveProvenance = objectiveProvenance,
             )
 
             // The run being replaced would otherwise be orphaned Running with its provider

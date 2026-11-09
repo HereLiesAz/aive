@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.domain.ApprovalPolicy
+import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
@@ -39,6 +40,25 @@ class ApplicationRuntimeLaunchTest {
             val merge = launch("Merge A and B", listOf(b, a))
             assertEquals(listOf(b, a), persistence.runs.get(merge)!!.parentWorkflowRunIds)
             assertFailsWith<IllegalArgumentException> { runtime.launchStarterWorkflow("Lineage", "Ghost", continuesWorkflowRunIds = listOf(WorkflowRunId("missing"))) }
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun aLaunchRecordsWhereItsObjectiveCameFromAndStartsWithTheKeepersOwn() = runBlocking<Unit> {
+        val persistence = InMemoryWorkflowPersistence()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val runtime = ApplicationRuntime.create(providers = emptyList(), scope = scope, persistence = persistence)
+            runtime.launchStarterWorkflow("Typed", "Typed by the keeper")
+            val typed = assertIs<ApplicationRuntimeState.Live>(runtime.state.value).presentation.run
+            assertEquals(ContextProvenance.KeeperWritten, persistence.runs.get(typed.id)!!.objectiveProvenance)
+
+            delay(3) // run ids are millisecond-stamped
+            runtime.launchStarterWorkflow("Remote", "Sent by another agent", objectiveProvenance = ContextProvenance.ExternalContent)
+            val remote = assertIs<ApplicationRuntimeState.Live>(runtime.state.value).presentation.run
+            assertEquals(ContextProvenance.ExternalContent, persistence.runs.get(remote.id)!!.objectiveProvenance)
         } finally {
             scope.cancel()
         }

@@ -4,17 +4,22 @@ import com.hereliesaz.geministrator.a2a.A2aAgentConnection
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ApprovalGateId
+import com.hereliesaz.geministrator.domain.ArtifactId
+import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ArtifactRef
+import com.hereliesaz.geministrator.domain.CONTEXT_PROVENANCE_METADATA_KEY
 import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRun
+import com.hereliesaz.geministrator.domain.TaskRunId
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
+import com.hereliesaz.geministrator.domain.isUntrusted
 import com.hereliesaz.geministrator.domain.isUntrustedContext
 import com.hereliesaz.geministrator.domain.labelledAtIntake
 import com.hereliesaz.geministrator.domain.releasedDependencies
@@ -32,7 +37,7 @@ import com.hereliesaz.geministrator.domain.releasedDependencies
 const val CONTEXT_TAINT_BLOCKING_CODE: String = "context_taint"
 
 /** Role capabilities that let an agent change things outside its own output. */
-private val MUTATING_CAPABILITIES: Set<AgentCapability> = setOf(
+internal val MUTATING_CAPABILITIES: Set<AgentCapability> = setOf(
     AgentCapability.RepositoryWrite,
     AgentCapability.ShellExecution,
     AgentCapability.PullRequestCreation,
@@ -43,6 +48,29 @@ fun WorkflowDefinition.contextInputs(run: WorkflowRun, task: TaskDefinition): Li
     releasedDependencies(task)
         .mapNotNull(run.taskRuns::get)
         .flatMap(TaskRun::artifacts)
+
+/**
+ * Everything [task] reads that the taint rule weighs: its dependencies' artifacts and, when the run's
+ * objective did not come from the keeper's own typing (a remote agent's launch, a schedule fed
+ * model-written evidence), the objective itself, which every task receives, a task with no dependencies
+ * included.
+ */
+fun WorkflowDefinition.taintInputs(run: WorkflowRun, task: TaskDefinition): List<ArtifactRef> =
+    listOfNotNull(run.objectiveAsInput()) + contextInputs(run, task)
+
+/** The run's objective as an input, labelled with where it came from; null when the keeper wrote it. */
+fun WorkflowRun.objectiveAsInput(): ArtifactRef? {
+    if (!objectiveProvenance.isUntrusted()) return null
+    return ArtifactRef(
+        id = ArtifactId("objective:${id.value}"),
+        kind = ArtifactKind.Requirement,
+        taskRunId = TaskRunId(id.value),
+        label = "Run objective",
+        textContent = objective,
+        metadata = mapOf(CONTEXT_PROVENANCE_METADATA_KEY to objectiveProvenance.name),
+        createdAtEpochMillis = createdAtEpochMillis,
+    )
+}
 
 /**
  * Whether [this] executor can change something: a repository, a deployment, an external service, or
@@ -111,7 +139,7 @@ fun WorkflowDefinition.labelTaskOutputs(
     artifacts: List<ArtifactRef>,
 ): List<ArtifactRef> {
     if (artifacts.isEmpty()) return artifacts
-    val untrustedInput = contextInputs(run, task).any(ArtifactRef::isUntrustedContext)
+    val untrustedInput = taintInputs(run, task).any(ArtifactRef::isUntrustedContext)
     return artifacts.map { it.labelledAtIntake(assigned, untrustedInput) }
 }
 
@@ -126,7 +154,7 @@ fun WorkflowDefinition.untrustedInputsForPrivilegedTask(
     role: RoleDefinition?,
 ): List<ArtifactRef> {
     if (!executor.canMutate(role)) return emptyList()
-    return contextInputs(run, task).filter(ArtifactRef::isUntrustedContext)
+    return taintInputs(run, task).filter(ArtifactRef::isUntrustedContext)
 }
 
 /** The gate id for [taskId]'s context-taint approval on [attempt]. */

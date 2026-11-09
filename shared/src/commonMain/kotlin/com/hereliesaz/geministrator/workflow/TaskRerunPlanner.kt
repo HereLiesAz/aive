@@ -121,6 +121,8 @@ object TaskRerunPlanner {
             repository = source.repositorySnapshot,
             roles = source.roleSnapshot,
             parentWorkflowRunIds = listOf(source.id),
+            // The fork reads the same objective, so it keeps where that came from.
+            objectiveProvenance = source.objectiveProvenance,
         )
         val taskRuns = fresh.taskRuns.mapValues { (id, freshTaskRun) ->
             val prior = source.taskRuns[id]

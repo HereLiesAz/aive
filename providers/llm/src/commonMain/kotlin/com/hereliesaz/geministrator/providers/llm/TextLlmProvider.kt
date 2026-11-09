@@ -3,6 +3,8 @@ package com.hereliesaz.geministrator.providers.llm
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ArtifactKind
+import com.hereliesaz.geministrator.domain.CONTEXT_PROVENANCE_METADATA_KEY
+import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.domain.locationLabel
@@ -395,7 +397,10 @@ open class TextLlmProvider(
                 put("provider", id.value)
                 put("taskRunId", request.taskRunId.value)
                 if (toolOutcomes.isNotEmpty()) {
-                    // The answer was written with external content in view (docs/THREAT_MODEL.md).
+                    // The answer was written with external content in view (docs/THREAT_MODEL.md). The
+                    // runtime's taint rule reads the standard label, so a downstream task that can change
+                    // something is held at a gate; MCP_PROVENANCE_METADATA only says where it came from.
+                    put(CONTEXT_PROVENANCE_METADATA_KEY, ContextProvenance.ExternalContent.name)
                     put(MCP_PROVENANCE_METADATA, "external-tool-results")
                     put(
                         MCP_TOOL_CALLS_METADATA,

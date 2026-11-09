@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.a2a
 
+import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ArtifactRef
@@ -119,6 +120,7 @@ class A2aServerTest {
         val queued = server.pendingLaunches.value.single()
         assertEquals("Write a design note", queued.objective)
         assertEquals("A2A: Write a design note", queued.projectName)
+        assertEquals(ContextProvenance.ExternalContent, queued.objectiveProvenance, "another agent's objective is not the keeper's typing")
 
         server.launchHandled(queued.requestId, failure = null, runIdAfter = "run-1")
         assertTrue(server.pendingLaunches.value.isEmpty())

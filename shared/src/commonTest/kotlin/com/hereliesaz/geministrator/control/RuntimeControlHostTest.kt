@@ -2,7 +2,21 @@ package com.hereliesaz.geministrator.control
 
 import com.hereliesaz.geministrator.ApplicationRuntime
 import com.hereliesaz.geministrator.azphalt.AuthoredWorkflowStore
+import com.hereliesaz.geministrator.domain.AgentCapability
+import com.hereliesaz.geministrator.domain.AgentProviderId
+import com.hereliesaz.geministrator.domain.ProviderRunId
+import com.hereliesaz.geministrator.providers.AgentCapabilities
+import com.hereliesaz.geministrator.providers.AgentEvent
+import com.hereliesaz.geministrator.providers.AgentProvider
+import com.hereliesaz.geministrator.providers.AgentRunHandle
+import com.hereliesaz.geministrator.providers.AgentTaskRequest
+import com.hereliesaz.geministrator.providers.ProviderActionResult
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import com.hereliesaz.geministrator.domain.ApprovalGateId
+import com.hereliesaz.geministrator.domain.ContextProvenance
+import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.ApprovalPolicy
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
@@ -50,17 +64,29 @@ private class Authored(initial: Set<WorkflowDefinitionId> = emptySet()) : Author
     override suspend fun remove(id: WorkflowDefinitionId) { ids -= id }
 }
 
+/** A provider that can staff a plain agent task and does nothing else. */
+private class StaffingProvider : AgentProvider {
+    override val id = AgentProviderId("staffing")
+    override suspend fun capabilities() = AgentCapabilities(supported = setOf(AgentCapability.PlanGeneration, AgentCapability.PlanApproval))
+    override suspend fun start(request: AgentTaskRequest) = AgentRunHandle(ProviderRunId("staffing-${request.taskRunId.value}"))
+    override fun observe(runId: ProviderRunId): Flow<AgentEvent> = emptyFlow()
+    override suspend fun sendMessage(runId: ProviderRunId, message: String) = ProviderActionResult.Accepted
+    override suspend fun approvePlan(runId: ProviderRunId) = ProviderActionResult.Accepted
+    override suspend fun cancel(runId: ProviderRunId) = ProviderActionResult.Accepted
+}
+
 class RuntimeControlHostTest {
     private val project = Project(ProjectId("p"), "p", createdAtEpochMillis = 0, updatedAtEpochMillis = 0)
 
     private fun withHost(
         authored: Authored = Authored(),
+        providers: List<AgentProvider> = emptyList(),
         block: suspend (RuntimeControlHost, InMemoryWorkflowPersistence, Authored) -> Unit,
     ): Unit = runBlocking {
         val persistence = InMemoryWorkflowPersistence()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         try {
-            val runtime = ApplicationRuntime.create(providers = emptyList(), scope = scope, persistence = persistence)
+            val runtime = ApplicationRuntime.create(providers = providers, scope = scope, persistence = persistence)
             block(RuntimeControlHost({ runtime }, authored), persistence, authored)
         } finally {
             scope.cancel()
@@ -155,6 +181,60 @@ class RuntimeControlHostTest {
         val other = host.makeHive("Other", agent("b"))["id"]!!.jsonPrimitive.content
         host.updateCreature(other, "b", buildJsonObject { put("requiresHumanApproval", true) })
         assertEquals(ApprovalPolicy.HumanApproval, persistence.definitions.get(WorkflowDefinitionId(other))!!.tasks.single().approvalPolicy)
+    }
+
+    @Test
+    fun aHiveCannotBeAuthoredFromARoleThatCanChangeARepositoryOrRunCommands() = withHost { host, persistence, _ ->
+        // The built-in implementer holds RepositoryWrite; custom roles may hold the others.
+        val shell = RoleDefinition(RoleDefinitionId("shell-runner"), "Shell runner", "d", "i", capabilitiesRequired = setOf(AgentCapability.ShellExecution))
+        val pullRequests = RoleDefinition(RoleDefinitionId("pr-opener"), "PR opener", "d", "i", capabilitiesRequired = setOf(AgentCapability.PullRequestCreation))
+        persistence.roles.put(shell)
+        persistence.roles.put(pullRequests)
+        for (role in listOf("implementation-engineer", "crash-test-dummy", "shell-runner", "pr-opener")) {
+            denied(ControlErrorCode.PolicyDenied) {
+                host.makeHive("X", buildJsonObject { put("name", "c"); put("roleId", role) })
+            }
+        }
+        val id = host.makeHive("H", agent("a"))["id"]!!.jsonPrimitive.content
+        denied(ControlErrorCode.PolicyDenied) { host.addCreature(id, buildJsonObject { put("name", "w"); put("roleId", "implementation-engineer") }) }
+        denied(ControlErrorCode.PolicyDenied) { host.updateCreature(id, "a", buildJsonObject { put("roleId", "implementation-engineer") }) }
+        assertEquals(1, persistence.definitions.get(WorkflowDefinitionId(id))!!.tasks.size)
+        // A role that only reads and writes its own answer is still fine.
+        host.addCreature(id, buildJsonObject { put("name", "r"); put("roleId", "researcher") })
+    }
+
+    @Test
+    fun aCreatureCannotBeMovedOutFromBehindAnApprovalOverTheControlApi() = withHost { host, persistence, _ ->
+        val id = host.makeHive("H", agent("plan"), gate("ok", "plan"), agent("mid", "ok"), agent("work", "mid"), agent("other"))["id"]!!.jsonPrimitive.content
+        fun deps(vararg d: String) = buildJsonObject { put("dependsOn", buildJsonArray { d.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) } }) }
+        val before = persistence.definitions.get(WorkflowDefinitionId(id))!!
+
+        // Not from directly behind the gate, nor from behind it through another creature.
+        denied(ControlErrorCode.PolicyDenied) { host.updateCreature(id, "mid", deps()) }
+        denied(ControlErrorCode.PolicyDenied) { host.updateCreature(id, "mid", deps("other")) }
+        denied(ControlErrorCode.PolicyDenied) { host.updateCreature(id, "work", deps("plan")) }
+        // Not by removing the creature that links it to the gate.
+        denied(ControlErrorCode.PolicyDenied) { host.removeCreature(id, "mid") }
+        // The gate itself does not wait on less than it did.
+        denied(ControlErrorCode.PolicyDenied) { host.updateCreature(id, "ok", deps()) }
+        assertEquals(before, persistence.definitions.get(WorkflowDefinitionId(id)), "nothing was saved")
+
+        // Waiting on more, or rewiring what is not behind a gate, is allowed.
+        host.updateCreature(id, "work", deps("mid", "other"))
+        host.updateCreature(id, "ok", deps("plan", "other"))
+        host.updateCreature(id, "other", deps())
+        val after = persistence.definitions.get(WorkflowDefinitionId(id))!!
+        assertEquals(setOf("plan", "other"), after.tasks.first { it.id.value == "ok" }.dependsOn.map { it.value }.toSet())
+        assertEquals(setOf("mid", "other"), after.tasks.first { it.id.value == "work" }.dependsOn.map { it.value }.toSet())
+    }
+
+    @Test
+    fun aRunStartedOverTheControlApiTreatsItsObjectiveAsExternalContent() = withHost(providers = listOf(StaffingProvider())) { host, persistence, _ ->
+        val id = host.makeHive("Go", agent("a"))["id"]!!.jsonPrimitive.content
+        host.startRun(buildJsonObject { put("hiveId", id); put("objective", "Do the thing") })
+
+        val run = persistence.projects.all().flatMap { persistence.runs.byProject(it.id) }.single()
+        assertEquals(ContextProvenance.ExternalContent, run.objectiveProvenance)
     }
 
     @Test

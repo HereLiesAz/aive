@@ -21,6 +21,7 @@ import com.hereliesaz.geministrator.azphalt.AzphaltPackageImportRequest
 import com.hereliesaz.geministrator.azphalt.AzphaltStoreService
 import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.domain.BuiltInRoles
+import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.resolveRoleCollection
 import com.hereliesaz.geministrator.workflow.NodeCharacterGenerationWorkflowFactory
 import com.hereliesaz.geministrator.workflow.SettingsNodeCharacterAssetStore
@@ -32,6 +33,7 @@ import com.hereliesaz.geministrator.workflow.improvement.SettingsImprovementStor
 import com.hereliesaz.geministrator.workflow.improvement.SwarmEvidence
 import com.hereliesaz.geministrator.workflow.improvement.readCycle
 import com.hereliesaz.geministrator.workflow.schedule.ScheduleTicker
+import com.hereliesaz.geministrator.workflow.schedule.objectiveProvenance
 import com.hereliesaz.geministrator.workflow.schedule.SettingsWorkflowScheduleStore
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.Project
@@ -370,6 +372,7 @@ fun App(
         repository: RepositoryRef?,
         continuesWorkflowRunIds: List<WorkflowRunId>,
         existingProject: Project?,
+        objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
         onFinished: (Throwable?) -> Unit = {},
     ) = runLaunch(onFinished) { activeRuntime ->
         if (orchestrationRuntime != null) {
@@ -383,6 +386,7 @@ fun App(
                 planReviewer = planReviewer,
                 confirmPlan = askKeeper,
                 planStore = planStore,
+                objectiveProvenance = objectiveProvenance,
             )
         } else {
             launchSteps.push("Starting the starter workflow…")
@@ -392,6 +396,7 @@ fun App(
                 repository = repository,
                 existingProject = existingProject,
                 continuesWorkflowRunIds = continuesWorkflowRunIds,
+                objectiveProvenance = objectiveProvenance,
             )
         }
     }
@@ -481,7 +486,7 @@ fun App(
         val loaded = activeRuntime.state.first { it !is ApplicationRuntimeState.Loading }
         if (launching || runtime !== activeRuntime) return@LaunchedEffect
         val existingProject = (loaded as? ApplicationRuntimeState.NoRun)?.project
-        launchObjective(request.projectName, request.objective, request.repository, emptyList(), existingProject) { failure ->
+        launchObjective(request.projectName, request.objective, request.repository, emptyList(), existingProject, request.objectiveProvenance) { failure ->
             handledExternalRequestIds += request.requestId
             onExternalWorkflowLaunchHandled(
                 request.requestId,
@@ -671,6 +676,7 @@ fun App(
                             existingProject = existingProject,
                             objective = objective,
                             repository = existingProject?.repository,
+                            objectiveProvenance = schedule.objectiveProvenance(),
                         )
                     }
                     if (!started) error(getString(Res.string.app_launch_already_in_progress))

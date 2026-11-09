@@ -37,7 +37,7 @@ class HabitDecisionObserver(
             if (text.isBlank()) continue
             val decisions = HabitDecisions.parse(text)
             if (decisions.isEmpty()) continue
-            if (definition.contextInputs(run, task).any { it.isUntrustedContext() }) continue
+            if (definition.taintInputs(run, task).any { it.isUntrustedContext() }) continue
             val author = (taskRun.assignedRoleId ?: task.roleId)?.value ?: "agent"
             for (decision in decisions) {
                 val key = "${run.id.value}:${taskRun.id.value}:${taskRun.attempt}:${decision.operation}"

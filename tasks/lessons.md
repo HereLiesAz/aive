@@ -86,3 +86,11 @@ Hosted APIs report tokens, not dollars, and the spend caps summed `costUsd ?: 0.
 - Where a measurement can be absent, carry "unknown" beside it (`costUnknown`) and make the limit say so, instead of defaulting to zero. Never invent a value to fill it (the price list holds only prices read from a provider's page).
 - Whatever stops a session reads what it reported last before it forgets it, and a late report is added to the total, not dropped. A test of a stop checks the total afterwards, not only that the stop happened.
 - A cache that skips repeated work (unchanged writes, a decoded snapshot) is keyed by the thing it saves work on (the stored text, the last value written), so any change by anyone invalidates it.
+
+## A label nothing reads is not a defence, and an input nothing counts is not an input
+
+The MCP answer artifact carried `contentProvenance=external-tool-results`, which no code read; the taint rule reads `aive.provenance`. And the run objective, which every task receives, was never one of the taint inputs, so a launch by another agent was trusted by construction (a root step has no upstream artifact to check). Each looked covered by a doc sentence.
+
+- When a security property rests on a label, grep for the reader of that exact key before trusting the writer; test the pair end to end (producer output, intake, gate), not each half.
+- List every channel a privileged step reads (objective, task text, artifacts, recalled memory), and make each one either a taint input or a named gap in the threat model.
+- A control that restricts edits to a graph (here the control API) must check the property (nothing leaves the cover of an approval) after the edit, not only the individual fields it blocks.

@@ -21,7 +21,7 @@ None of it ran. Nothing started a Hall Monitor review, nothing gave it data (it 
 | `propose` | Product Manager | Turns what survived into proposals (§4). Must include at least one proposal about the loop, or `META-NO-CHANGE` with its evidence. |
 | `refine` | Adversarial Reviewer | Last attack on the proposals; only survivors are listed. |
 
-The evidence is put in the run's objective at start (`SwarmEvidence`, deterministic, computed from the run history on the device): per role, workflow and provider, the runs, steps, completions, failures, escalations, retries, tokens, cost, and the change since the last window, plus what was adopted since the last cycle and what it did to the numbers, plus a section **"The loop, as it is now"**: the loop's own steps and the Hall Monitor's instructions, so the loop always sees itself.
+The evidence is put in the run's objective at start (`SwarmEvidence`, deterministic, computed from the run history on the device; the objective of such a run is marked external content, and the earlier proposals it quotes are model text, each quoted as a one-line `⟦agent-written: …⟧` fence the loop reads as data): per role, workflow and provider, the runs, steps, completions, failures, escalations, retries, tokens, cost, and the change since the last window, plus what was adopted since the last cycle and what it did to the numbers, plus a section **"The loop, as it is now"**: the loop's own steps and the Hall Monitor's instructions, so the loop always sees itself.
 
 ## 3. One ledger for every mechanism that proposes
 
