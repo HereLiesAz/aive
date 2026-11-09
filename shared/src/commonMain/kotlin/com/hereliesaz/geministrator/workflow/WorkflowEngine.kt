@@ -899,7 +899,11 @@ class WorkflowEngine(
         if (workflowStatus == WorkflowRunStatus.Cancelled && run.status != WorkflowRunStatus.Cancelled) {
             eventSink.append(WorkflowCancelled(nextRun.id, nowEpochMillis))
         }
-        return nextRun.copy(status = workflowStatus, updatedAtEpochMillis = nowEpochMillis)
+        val result = nextRun.copy(status = workflowStatus)
+        // Nothing changed but the clock: the run is returned as it was, with its own time. Stamping every pass made
+        // an idle run look new to everything that compares or stores runs, so it was rewritten every second.
+        if (result.copy(updatedAtEpochMillis = run.updatedAtEpochMillis) == run) return run
+        return result.copy(updatedAtEpochMillis = nowEpochMillis)
     }
 
     /** True when the keeper left the provider to the app: no role preference and no provider required by id. */

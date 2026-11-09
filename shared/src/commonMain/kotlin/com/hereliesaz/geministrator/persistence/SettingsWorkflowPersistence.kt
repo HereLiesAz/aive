@@ -233,6 +233,8 @@ class SettingsWorkflowPersistence(
     override suspend fun clearWorkflowData() {
         settingsWorkflowPersistenceMutex.withLock {
             snapshotSettings.remove(storageKey)
+            decodedText = null
+            decodedSnapshot = null
             if (storageKey == DEFAULT_STORAGE_KEY) {
                 settings.remove(LEGACY_STORAGE_KEY_V1)
             }
@@ -409,11 +411,21 @@ class SettingsWorkflowPersistence(
                 settings.hasKey(LEGACY_STORAGE_KEY_V1)
             snapshotSettings.remove(storageKey)
             settings.remove(LEGACY_STORAGE_KEY_V1)
+            decodedText = null
+            decodedSnapshot = null
             had
         }
         lastCorruptionError = null
         return hadData
     }
+
+    /**
+     * The snapshot last read or written and the text it was read from or written as: the runtime reads the
+     * store several times a second, and a read of text that has not changed need not be decoded again.
+     * Guarded by [settingsWorkflowPersistenceMutex], like every read and write.
+     */
+    private var decodedText: String? = null
+    private var decodedSnapshot: PersistenceSnapshot? = null
 
     private fun readUnlocked(): PersistenceSnapshot {
         // A chunked snapshot with missing chunks reports itself as corrupt while being read.
@@ -424,6 +436,7 @@ class SettingsWorkflowPersistence(
             null
         }
         val encoded = currentEncoded ?: legacyEncoded ?: return PersistenceSnapshot()
+        if (currentEncoded != null && currentEncoded == decodedText) decodedSnapshot?.let { return it }
 
         val snapshot = try {
             json.decodeFromString(PersistenceSnapshot.serializer(), encoded)
@@ -446,15 +459,18 @@ class SettingsWorkflowPersistence(
             if (legacyEncoded != null) {
                 settings.remove(LEGACY_STORAGE_KEY_V1)
             }
+        } else {
+            decodedText = currentEncoded
+            decodedSnapshot = migrated
         }
         return migrated
     }
 
     private fun writeSnapshotUnlocked(snapshot: PersistenceSnapshot) {
-        snapshotSettings.putString(
-            storageKey,
-            json.encodeToString(PersistenceSnapshot.serializer(), snapshot),
-        )
+        val encoded = json.encodeToString(PersistenceSnapshot.serializer(), snapshot)
+        snapshotSettings.putString(storageKey, encoded)
+        decodedText = encoded
+        decodedSnapshot = snapshot
     }
 
     companion object {

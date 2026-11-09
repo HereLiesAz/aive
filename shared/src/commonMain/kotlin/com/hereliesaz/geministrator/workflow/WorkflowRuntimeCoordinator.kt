@@ -99,17 +99,34 @@ class WorkflowRuntimeCoordinator(
     /** When the hourly spend was last summed; it is summed again when this run's cost rises. */
     private var lastHourlySpendCheckAtMillis: Long? = null
 
+    /** What was last written to the store, so an unchanged run, project or artifact is not written again. */
+    private var lastPersistedProject: Project? = null
+    private var lastPersistedRun: WorkflowRun? = null
+    private var storedDefinitionId: com.hereliesaz.geministrator.domain.WorkflowDefinitionId? = null
+    private val persistedArtifacts = mutableMapOf<ArtifactId, com.hereliesaz.geministrator.domain.ArtifactRef>()
+
     suspend fun persist(
         project: Project,
         definition: WorkflowDefinition,
         state: WorkflowRuntimeState,
     ) {
-        persistence.projects.put(project)
+        // Each write is a whole-store rewrite on some backends (the web's settings), and a cycle persists
+        // several times: what has not changed since it was last written is not written again.
+        if (lastPersistedProject != project) {
+            persistence.projects.put(project)
+            lastPersistedProject = project
+        }
         // The saved hive under this id is the keeper's, and a save made while the run lives is newer than
         // the copy this run holds: it is not written over (docs/Keepers-Room.md, Pause, change, resume).
         // Launching and forking store the definition a run follows; this stores it only if there is none.
-        if (persistence.definitions.get(definition.id) == null) persistence.definitions.put(definition)
-        persistence.runs.put(state.run)
+        if (storedDefinitionId != definition.id) {
+            if (persistence.definitions.get(definition.id) == null) persistence.definitions.put(definition)
+            storedDefinitionId = definition.id
+        }
+        if (lastPersistedRun != state.run) {
+            persistence.runs.put(state.run)
+            lastPersistedRun = state.run
+        }
         persistArtifacts(state.run)
         // Refinement-ladder training data, only while the keeper has switched capture on; it never
         // affects the run (workflow/refinement/LadderDataset.kt).
@@ -880,10 +897,17 @@ class WorkflowRuntimeCoordinator(
         return run.withStoppedUsage(usage)
     }
 
+    /** Writes the artifacts the store does not have in this form yet; the rest of the run's are as they were. */
     private suspend fun persistArtifacts(run: WorkflowRun) {
-        run.taskRuns.values
-            .flatMap(TaskRun::artifacts)
-            .forEach { persistence.artifacts.put(it) }
+        val current = run.taskRuns.values.flatMap(TaskRun::artifacts)
+        for (artifact in current) {
+            if (persistedArtifacts[artifact.id] == artifact) continue
+            persistence.artifacts.put(artifact)
+            persistedArtifacts[artifact.id] = artifact
+        }
+        // Only the run being cycled is remembered: another run's artifacts are written again if it comes back.
+        val keep = current.mapTo(mutableSetOf()) { it.id }
+        persistedArtifacts.keys.retainAll(keep)
     }
 
     private suspend fun mergeHandles(
