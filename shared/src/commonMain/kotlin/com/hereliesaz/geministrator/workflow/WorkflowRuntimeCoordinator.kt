@@ -445,49 +445,57 @@ class WorkflowRuntimeCoordinator(
         state: WorkflowRuntimeState,
         taskId: TaskDefinitionId,
         nowEpochMillis: Long,
-    ): WorkflowRuntimeState = cycleMutex.withLock {
-        val run = persistence.runs.get(state.run.id)
-            ?.takeIf { it.updatedAtEpochMillis > state.run.updatedAtEpochMillis }
-            ?: state.run
-        require(!run.status.isTerminal()) { "A finished run is run again from a task; it cannot be rewound" }
-        require(definition.tasks.any { it.id == taskId }) { "Task ${taskId.value} is not part of this workflow" }
-        val rewound = TaskRerunPlanner.rerunSet(definition, setOf(taskId))
-            .filter { run.taskRuns[it]?.status != TaskRunStatus.Created }
-            .toSet()
-        // Stop what runs inside the set; the rest of the swarm is left as it is.
-        val stopped = state.handles.filterKeys { it in rewound }
-        cancelSessions(run, stopped)
-        persistence.approvalGates.unresolved(run.id)
-            .filter { it.taskDefinitionId in rewound }
-            .forEach { gate ->
-                persistence.approvalGates.put(
-                    gate.copy(status = ApprovalGateStatus.Rejected, decisionNote = "Rewound", decidedAtEpochMillis = nowEpochMillis),
-                )
-            }
-        val fresh = WorkflowRunFactory.create(
-            definition = definition,
-            workflowRunId = run.id,
-            projectId = run.projectId,
-            objective = run.objective,
-            nowEpochMillis = nowEpochMillis,
-            taskRunIdFactory = { id -> TaskRunId("${run.id.value}-${id.value}-r${(run.taskRuns[id]?.attempt ?: 0) + 1}") },
-            repository = run.repositorySnapshot,
-            roles = run.roleSnapshot,
-        )
-        val reset = rewound.mapNotNull { id ->
-            val prior = run.taskRuns[id] ?: return@mapNotNull null
-            fresh.taskRuns[id]?.let { f -> id to f.copy(attempt = prior.attempt + 1, usage = prior.usage) }
-        }.toMap()
-        var next = run.copy(
-            taskRuns = run.taskRuns + reset,
-            status = WorkflowRunStatus.Running,
-            updatedAtEpochMillis = maxOf(nowEpochMillis, run.updatedAtEpochMillis + 1),
-        )
-        next = WorkflowRunFactory.refreshReadiness(definition, next, nowEpochMillis)
-        val handles = state.handles - rewound
-        val result = WorkflowRuntimeState(next, handles)
-        persist(project, definition, result)
-        result
+    ): WorkflowRuntimeState {
+        val (rewoundState, remote) = cycleMutex.withLock {
+            val run = persistence.runs.get(state.run.id)
+                ?.takeIf { it.updatedAtEpochMillis > state.run.updatedAtEpochMillis }
+                ?: state.run
+            require(!run.status.isTerminal()) { "A finished run is run again from a task; it cannot be rewound" }
+            require(definition.tasks.any { it.id == taskId }) { "Task ${taskId.value} is not part of this workflow" }
+            val rewound = TaskRerunPlanner.rerunSet(definition, setOf(taskId))
+                .filter { run.taskRuns[it]?.status != TaskRunStatus.Created }
+                .toSet()
+            // Stop what runs inside the set; the rest of the swarm is left as it is. A system step's remote
+            // run (a workflow run, a deployment, a service call) is stopped as well: the new attempt starts
+            // its own, and the old one must not carry on unowned.
+            val stopped = state.handles.filterKeys { it in rewound }
+            cancelSessions(run, stopped)
+            val remote = unfinishedExternalRuns(definition, run).filter { it.task.id in rewound }
+            persistence.approvalGates.unresolved(run.id)
+                .filter { it.taskDefinitionId in rewound }
+                .forEach { gate ->
+                    persistence.approvalGates.put(
+                        gate.copy(status = ApprovalGateStatus.Rejected, decisionNote = "Rewound", decidedAtEpochMillis = nowEpochMillis),
+                    )
+                }
+            val fresh = WorkflowRunFactory.create(
+                definition = definition,
+                workflowRunId = run.id,
+                projectId = run.projectId,
+                objective = run.objective,
+                nowEpochMillis = nowEpochMillis,
+                taskRunIdFactory = { id -> TaskRunId("${run.id.value}-${id.value}-r${(run.taskRuns[id]?.attempt ?: 0) + 1}") },
+                repository = run.repositorySnapshot,
+                roles = run.roleSnapshot,
+            )
+            val reset = rewound.mapNotNull { id ->
+                val prior = run.taskRuns[id] ?: return@mapNotNull null
+                fresh.taskRuns[id]?.let { f -> id to f.copy(attempt = prior.attempt + 1, usage = prior.usage) }
+            }.toMap()
+            var next = run.copy(
+                taskRuns = run.taskRuns + reset,
+                status = WorkflowRunStatus.Running,
+                updatedAtEpochMillis = maxOf(nowEpochMillis, run.updatedAtEpochMillis + 1),
+            )
+            next = WorkflowRunFactory.refreshReadiness(definition, next, nowEpochMillis)
+            val handles = state.handles - rewound
+            val result = WorkflowRuntimeState(next, handles)
+            persist(project, definition, result)
+            result to remote
+        }
+        // Outside the cycle lock, as cancel() does: a slow remote must not hold the swarm's cycle.
+        cancelExternalRuns(project, definition, rewoundState.run, remote, nowEpochMillis)
+        return rewoundState
     }
 
     suspend fun cancel(
