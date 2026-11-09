@@ -304,6 +304,41 @@ class FilmFramesExecutorIntegrationTest {
     }
 
     @Test
+    fun aRestartDoesNotGiveTheRunItsImageBudgetBack() = runTest {
+        val images = Images()
+        val store = InMemoryFilmFrameStore()
+        assertEquals(TaskRunStatus.Completed, integration(images, store, budget = 4).dispatch(context()).status)
+        assertEquals(3, images.prompts.size)
+        // The frame review sends two back, and the app restarts: a new executor is asked about the frames step it no longer knows.
+        store.markForRegeneration(filmId(3), setOf("s1", "s2"))
+        val restarted = integration(images, store, budget = 4)
+
+        val result = restarted.reconcile(context(externalRunId = "film-frames:tr-frames"))
+
+        assertEquals(TaskRunStatus.Failed, result.status, "two more would be five of four")
+        assertTrue("budget" in assertNotNull(result.progressMessage))
+        assertEquals(3, images.prompts.size, "nothing more was drawn or paid for")
+    }
+
+    @Test
+    fun aRegenerateShotsLineIsActedOnOnceWhateverReconcilesTheStepAgainOrRestarts() = runTest {
+        val images = Images()
+        val store = InMemoryFilmFrameStore()
+        val objective = "Draw the frames.\nregenerate-shots: s2"
+        val film = integration(images, store)
+        assertEquals(TaskRunStatus.Completed, film.dispatch(context(objective = objective)).status)
+        assertEquals(1, images.callsFor("Shot prompt for s2"))
+
+        // The engine has not yet saved Completed and asks again, here and then after a restart.
+        val again = film.reconcile(context(objective = objective, externalRunId = "film-frames:tr-frames"))
+        val restarted = integration(images, store).reconcile(context(objective = objective, externalRunId = "film-frames:tr-frames"))
+
+        assertEquals(TaskRunStatus.Completed, again.status, again.progressMessage)
+        assertEquals(TaskRunStatus.Completed, restarted.status, restarted.progressMessage)
+        assertEquals(3, images.prompts.size, "s2 was not drawn, and paid for, again")
+    }
+
+    @Test
     fun aShotThatFailsWhenSentBackStaysSentBack() = runTest {
         val images = Images()
         val store = InMemoryFilmFrameStore()

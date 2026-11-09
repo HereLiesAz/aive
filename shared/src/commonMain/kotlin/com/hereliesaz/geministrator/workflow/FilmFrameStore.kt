@@ -23,12 +23,30 @@ interface FilmFrameStore {
 
     /** Forgets that [shotIds] were sent back, once they have been drawn again. */
     suspend fun clearRegeneration(filmId: String, shotIds: Set<String>)
+
+    /**
+     * Takes one image of [workflowRunId]'s budget, as one step that is kept before the picture is asked for: true and counted, or
+     * false when [budget] images were already taken. Every attempt is one, and the count survives a restart of the app, so a
+     * run that is picked up again cannot spend its budget twice.
+     */
+    suspend fun reserveImage(workflowRunId: String, budget: Int): Boolean
+
+    /** The images already taken from [workflowRunId]'s budget. */
+    suspend fun spentImages(workflowRunId: String): Int
+
+    /**
+     * True the first time it is called with [key], false ever after, including after a restart: a request acted on once (a
+     * `regenerate-shots` line in the frames step's objective stays in the hive's text, so it is remembered as handled).
+     */
+    suspend fun consumeOnce(key: String): Boolean
 }
 
 /** A store that keeps frames in memory: for tests, and for a runtime that has no place to put files. */
 class InMemoryFilmFrameStore : FilmFrameStore {
     private val frames = mutableMapOf<Pair<String, String>, ByteArray>()
     private val pending = mutableMapOf<String, Set<String>>()
+    private val spent = mutableMapOf<String, Int>()
+    private val consumed = mutableSetOf<String>()
 
     override suspend fun save(filmId: String, shotId: String, png: ByteArray): String {
         require(isValidShotId(shotId)) { "Not a shot id" }
@@ -48,6 +66,17 @@ class InMemoryFilmFrameStore : FilmFrameStore {
     override suspend fun clearRegeneration(filmId: String, shotIds: Set<String>) {
         pending[filmId] = pending[filmId].orEmpty() - shotIds
     }
+
+    override suspend fun reserveImage(workflowRunId: String, budget: Int): Boolean {
+        val used = spent[workflowRunId] ?: 0
+        if (used >= budget) return false
+        spent[workflowRunId] = used + 1
+        return true
+    }
+
+    override suspend fun spentImages(workflowRunId: String): Int = spent[workflowRunId] ?: 0
+
+    override suspend fun consumeOnce(key: String): Boolean = consumed.add(key)
 
     fun bytes(filmId: String, shotId: String): ByteArray? = frames[filmId to shotId]
 
