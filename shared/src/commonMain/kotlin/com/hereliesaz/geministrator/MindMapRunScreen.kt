@@ -161,6 +161,10 @@ internal fun MindMapRunScreen(
     activity: SessionActivityFeeds = SessionActivityFeeds.Shared,
     /** Every run, for the wide page's "RUN n" (which run of its hive this is); empty hides it. */
     onLoadRuns: suspend () -> List<WorkflowRun> = { emptyList() },
+    /** Lifts the keeper's pause: the paused note is a link to it. Null leaves the note plain. */
+    onResumeRun: (() -> Unit)? = null,
+    /** Opens the hive's workflow for editing: a definition error is a link to where it is fixed. */
+    onEditWorkflow: (() -> Unit)? = null,
 ) {
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
     // A long press on the swarm offers Delete hive for the hive on screen; a running one is refused
@@ -833,6 +837,7 @@ internal fun MindMapRunScreen(
             RepositoryProgressRecord(
                 repository = repository,
                 run = run,
+                onOpenTask = { id -> if (selectedTaskId != id) onTaskSelected(id) },
             )
         }
 
@@ -856,6 +861,7 @@ internal fun MindMapRunScreen(
                 label = stringResource(Res.string.hive_pause_run),
                 value = stringResource(Res.string.hive_paused_note),
                 modifier = Modifier.azphaltLiveRegion(),
+                onClick = onResumeRun,
             )
         }
 
@@ -869,6 +875,7 @@ internal fun MindMapRunScreen(
                     title = stringResource(Res.string.overview_workflow_definition_error),
                     body = error,
                     endCap = stringResource(Res.string.overview_blocked),
+                    onClick = onEditWorkflow,
                 )
             }
         }

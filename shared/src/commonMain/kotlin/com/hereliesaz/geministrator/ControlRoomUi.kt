@@ -825,6 +825,13 @@ private fun MainDestination(
     val hiveScope = rememberCoroutineScope()
     // Stop run's confirmation: stopping cancels every unfinished creature, so it asks first.
     var confirmingStopRun by remember { mutableStateOf(false) }
+    // Every "check your connections" link lands on the Connections section itself, not on whichever
+    // Keeper's room section was left open last.
+    val openConnections: () -> Unit = {
+        keeperSectionName.value = KeeperSection.Connections.name
+        keeperOpen.value = true
+        onOpenSettings()
+    }
     Column(modifier.fillMaxSize()) {
         // A first launch is one step: no places to wander off to until there is a hive. A stopped or
         // waking hive keeps the row, so every hive, the Stable and the Store stay reachable.
@@ -1025,6 +1032,7 @@ private fun MainDestination(
                                     restingHiveId = ""
                                     onZoomOut()
                                 },
+                                onOpenConnections = openConnections,
                             )
                             AzphaltPill(
                                 label = stringResource(Res.string.hive_more_editing),
@@ -1109,7 +1117,7 @@ private fun MainDestination(
                             onImportProjectFile = onImportProjectFile,
                             onRecoverFromCorruption = onRecoverFromCorruption,
                             onRetryRuntime = onRetryRuntime,
-                            onOpenSettings = onOpenSettings,
+                            onOpenSettings = openConnections,
                             onValidateWorkflow = onValidateWorkflow,
                             availableRepositorySources = availableRepositorySources,
                             onPickLocalRepository = onPickLocalRepository,
@@ -1123,6 +1131,8 @@ private fun MainDestination(
                             onConnectFreeProvider = onConnectFreeProvider,
                             launchError = launchError,
                             onDismissLaunchError = onDismissLaunchError,
+                            onResumeRun = { onPauseRun(false) },
+                            onEditWorkflow = { onDestinationSelected(ControlRoomDestination.Workflows) },
                         )
                             }
                             // No second launcher under a live hive: a finished one offers "Feed it more"

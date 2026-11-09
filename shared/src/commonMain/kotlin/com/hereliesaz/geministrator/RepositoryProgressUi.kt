@@ -52,6 +52,8 @@ internal fun RepositoryProgressRecord(
     repository: RepositoryRef,
     run: WorkflowRun,
     modifier: Modifier = Modifier,
+    /** Set, the record opens the creature that is working on the repository right now. */
+    onOpenTask: ((String) -> Unit)? = null,
 ) {
     val uriHandler = LocalUriHandler.current
     val artifacts = run.taskRuns.values
@@ -100,6 +102,7 @@ internal fun RepositoryProgressRecord(
         seed = "repository-progress-${repository.source}-${repository.displayName()}",
         eyebrow = stringResource(Res.string.repository_progress_repository, repository.source.displayName()),
         title = repository.displayName(),
+        onClick = active?.let { taskRun -> onOpenTask?.let { open -> { open(taskRun.taskDefinitionId.value) } } },
         body = buildString {
             append(repository.locationLabel())
             append(stringResource(Res.string.repository_progress_branch))
