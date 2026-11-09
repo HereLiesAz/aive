@@ -332,7 +332,7 @@ internal fun TechnicalInspector(
         when (tab) {
             CreatureTab.Needs -> {
                 creatureNeeds(taskId, liveWorkflow.definition, liveWorkflow.run, liveWorkflow.roles)
-                    ?.let { CreatureNeedsPanel(it, titled = false) }
+                    ?.let { CreatureNeedsPanel(it, titled = false, onOpenMind = { onTabChange(CreatureTab.Mind) }) }
                 // A question its agent asked you (docs/Agent-UI.md): a wait like any other.
                 taskRun.keeperQuestion?.takeIf { taskRun.awaitsKeeperAnswer() }?.let { question ->
                     AgentQuestionPanel(
@@ -437,6 +437,7 @@ internal fun TechnicalInspector(
                         roles = liveWorkflow.roles.filter { it.enabled && it.id.value != ROLE_COLLECTION_MARKER_ID },
                         connectedProviderIds = connectedProviderIds,
                         onSaveRoleCollection = onSaveRoleCollection,
+                        onOpenConnections = onOpenConnections,
                     )
                 }
                 jobStatus?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface(), modifier = Modifier.azphaltLiveRegion()) }

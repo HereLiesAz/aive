@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,7 +46,13 @@ private val OutputTeal = Azphalt.Yellow
 
 /** The four needs (docs/Swarm-OS.md), shown on the inspector's Ink surface. */
 @Composable
-internal fun CreatureNeedsPanel(needs: CreatureNeeds, modifier: Modifier = Modifier, titled: Boolean = true) {
+internal fun CreatureNeedsPanel(
+    needs: CreatureNeeds,
+    modifier: Modifier = Modifier,
+    titled: Boolean = true,
+    /** Opens the Mind tab, where the budget is raised: set, the Budget meter is a link to it. */
+    onOpenMind: (() -> Unit)? = null,
+) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         // In the creature panel the Needs tab already names it.
         if (titled) Text(stringResource(Res.string.needs_needs), style = AzphaltType.eyebrow, color = azphaltOnSurface())
@@ -69,6 +76,7 @@ internal fun CreatureNeedsPanel(needs: CreatureNeeds, modifier: Modifier = Modif
             color = Azphalt.Yellow,
             missing = needs.tokensSpent?.let { stringResource(Res.string.needs_tokens_spent, it.toString()) }
                 ?: stringResource(Res.string.needs_not_reported),
+            onClick = onOpenMind,
         )
         NeedMeter(stringResource(Res.string.needs_output_used), needs.outputUsed, OutputTeal, stringResource(Res.string.needs_nothing_downstream))
         needs.nearClone?.let { NeedLine(stringResource(Res.string.needs_near_clone), it) }
@@ -82,11 +90,13 @@ internal fun CreatureNeedsPanel(needs: CreatureNeeds, modifier: Modifier = Modif
 }
 
 @Composable
-private fun NeedMeter(label: String, value: Int?, color: Color, missing: String = "") {
+private fun NeedMeter(label: String, value: Int?, color: Color, missing: String = "", onClick: (() -> Unit)? = null) {
     val shown = value?.toString() ?: missing
     Column(
         verticalArrangement = Arrangement.spacedBy(5.dp),
-        modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "$label, $shown" },
+        modifier = Modifier
+            .semantics(mergeDescendants = true) { contentDescription = "$label, $shown" }
+            .then(if (onClick != null) Modifier.clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick) else Modifier),
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(label, style = AzphaltType.eyebrow, color = azphaltOnSurface())
