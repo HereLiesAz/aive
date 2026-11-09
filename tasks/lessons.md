@@ -94,3 +94,11 @@ The MCP answer artifact carried `contentProvenance=external-tool-results`, which
 - When a security property rests on a label, grep for the reader of that exact key before trusting the writer; test the pair end to end (producer output, intake, gate), not each half.
 - List every channel a privileged step reads (objective, task text, artifacts, recalled memory), and make each one either a taint input or a named gap in the threat model.
 - A control that restricts edits to a graph (here the control API) must check the property (nothing leaves the cover of an approval) after the edit, not only the individual fields it blocks.
+
+## A guard nothing calls is a sentence, and a cap that drops the oldest drops what must be kept
+
+`LoopIntegrity.violations` was documented as what fails a loop that stops examining itself, and only tests called it: adoption rewrote the loop's steps from model text and a schedule started whatever hive had the loop's id. Its checks were also substrings ("contains loop"). The improvement ledger kept its last 500 entries, so the oldest, which were the adopted ones holding the text a revert needs, went first; and a decision on a missing id wrote nothing and said nothing.
+
+- For every "refuses", "fails" or "checks" in a doc, grep for its production callers and put the test where the action happens (adopt, start), not on the checker alone. Check the structure the engine acts on (executor, escalation, condition, role), not a word in a step's text.
+- Bound a list by status, not by age: name what is never dropped (adopted, with its undo) and what goes first. A decision is a compare-and-set on the status it expects, returns whether it applied, and is recorded only after the change it describes was saved.
+- A one-press convenience ("run now") must not persist the state it needs to run (enabled): give it its own one-shot flag.

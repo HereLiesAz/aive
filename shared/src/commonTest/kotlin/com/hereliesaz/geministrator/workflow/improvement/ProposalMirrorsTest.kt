@@ -78,4 +78,45 @@ class ProposalMirrorsTest {
         val dismissed = offered.copy(proposals = offered.proposals.map { it.copy(status = ProposalStatus.Dismissed) })
         assertEquals(dismissed, ProposalMirrors.habits(dismissed, habits, 200L), "a dismissed habit is not offered again")
     }
+
+    @Test
+    fun oneHabitSeenByManyBanksIsOneProposalAndAnOldPerBankIdIsNotOfferedAgain() {
+        val habit = habit("ci.yml", HabitStrength.Low, uses = 6).copy(failedUses = 0, completedUses = 6)
+        val once = ProposalMirrors.habits(ImprovementState(), listOf("bank-a" to habit, "bank-b" to habit, "bank-c" to habit), 100L)
+
+        assertEquals(1, once.proposals.size, "banks read their neighbours' runs, so every bank forms the same habit")
+        assertEquals("bank-a", once.proposals.single().sourceRef)
+        assertEquals(once, ProposalMirrors.habits(once, listOf("bank-b" to habit), 200L), "and it is not offered again")
+
+        // A ledger written when the id carried the bank has the habit already, under the old id.
+        val legacy = once.copy(proposals = once.proposals.map { it.copy(id = "habit:bank-a:ci.yml") })
+        assertEquals(legacy, ProposalMirrors.habits(legacy, listOf("bank-b" to habit), 200L))
+        // A dismissed one stays dismissed, whichever bank sees it.
+        val dismissed = once.copy(proposals = once.proposals.map { it.copy(status = ProposalStatus.Dismissed) })
+        assertEquals(dismissed, ProposalMirrors.habits(dismissed, listOf("bank-z" to habit), 300L))
+    }
+
+    @Test
+    fun aHabitThatMostlyFailedIsNotOfferedAsSomethingDoneManyTimes() {
+        val failing = habit("flaky.yml", HabitStrength.Low, uses = 9).copy(failedUses = 8, completedUses = 1)
+        val steady = habit("ci.yml", HabitStrength.Low, uses = 9).copy(failedUses = 1, completedUses = 8)
+        val edge = habit("edge.yml", HabitStrength.Low, uses = 9).copy(failedUses = 3, completedUses = 6)
+
+        val offered = ProposalMirrors.habits(ImprovementState(), listOf("b" to failing, "b" to steady, "b" to edge), 100L).proposals.map { it.target }
+
+        assertEquals(listOf("ci.yml", "edge.yml"), offered, "a third failed is still offered; eight of nine is not")
+    }
+
+    @Test
+    fun aDecisionMadeOnTheMindTabIsRecordedAtTheTimeItWasMadeNotWhenTheScreenWasOpened() {
+        val mirrored = ProposalMirrors.roleHistory(ImprovementState(), RoleInstructionProposalState(proposals = listOf(roleProposal("rip-1", "qa-engineer"))), 100L)
+        val approvedAt250 = roleProposal("rip-1", "qa-engineer", RoleInstructionProposalStatus.Approved).copy(decidedAtEpochMillis = 250L)
+
+        val adopted = ProposalMirrors.roleHistory(mirrored, RoleInstructionProposalState(proposals = listOf(approvedAt250)), 9_000L).proposals.single()
+
+        assertEquals(250L, adopted.decidedAtEpochMillis)
+        // A proposal saved before the time was kept falls back to when it was noticed.
+        val old = ProposalMirrors.roleHistory(mirrored, RoleInstructionProposalState(proposals = listOf(roleProposal("rip-1", "qa-engineer", RoleInstructionProposalStatus.Approved))), 9_000L).proposals.single()
+        assertEquals(9_000L, old.decidedAtEpochMillis)
+    }
 }

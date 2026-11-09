@@ -50,7 +50,7 @@ class ScheduleTicker(
                     "Could not start: ${failure.message ?: failure::class.simpleName}"
                 }
                 // A failed start still counts as this slot's attempt, so it is not retried every look.
-                store.put(schedule.copy(lastStartedAtEpochMillis = at, lastNote = outcome))
+                store.put(schedule.copy(lastStartedAtEpochMillis = at, lastNote = outcome, runNowRequested = false))
                 log("Schedule '${schedule.name}': $outcome")
             }
         }

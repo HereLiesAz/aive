@@ -58,12 +58,38 @@ class ModelPriceTable(private val prices: Map<String, ModelPrice> = emptyMap()) 
         /**
          * Entries are `provider id/model id`, as the provider catalog and the model setting spell them.
          *
-         * None of the models the app offers today (the native OpenAI, Claude, Gemini and Grok defaults, and the
-         * hosted catalog's defaults) has a price that could be read back from a provider's price page when this
-         * list was made, so none is listed and every one of them fails closed under a dollar cap. A keyless,
+         * Every rate below was read from the provider's own price page on [CHECKED] and is the **highest**
+         * standard rate that page gives for the model (its long-context tier, its peak hours, its price after a
+         * dated change), so a dollar cap trips early and never late. They are upper bounds, and wrong if the
+         * provider changes a price. Sources, all fetched on [CHECKED]:
+         * - `anthropic`: https://platform.claude.com/docs/en/about-claude/pricing (Claude Sonnet 5 and 5.5: no
+         *   long-context tier; the page does not spell the API id of Sonnet 5, so the id the app already sends is used).
+         * - `openai`: https://developers.openai.com/api/docs/pricing (gpt-6-astra, the over-272K-input tier).
+         * - `gemini`: https://aistudio.google.com/docs/pricing (gemini-3.8-flash, the rate from 2027-01-01).
+         * - `xai`: https://docs.x.ai/docs/models (grok-4.6, the 200k-and-over prompt tier, applied to every token).
+         * - `deepseek`: https://api-docs.deepseek.com/quick_start/pricing (deepseek-flash, peak hours).
+         *
+         * The cached rate is the cache-hit price of that same top tier, and applies only to the part of the
+         * prompt the provider reports as served from its cache; everything else is billed at the full input rate.
+         * Anthropic's cache-write surcharge (1.25 times the input rate for 5-minute writes) is not modelled, so for
+         * a prompt that writes the cache the Claude figures are a little low, not an upper bound.
+         *
+         * A model that is not listed fails closed under a dollar cap (its usage is unpriced, never free). These
+         * stay unpriced because no vendor page gave a price for the id the app sends: `openai/gpt-5.6` (the page
+         * lists gpt-5.6-sol, -terra and -luna, which are not aliases of it), `gpt-oss-120b`, Cohere's
+         * `command-a-plus-05-2026` and Mistral's `mistral-small-latest`, and every other hosted default. A keyless,
          * anonymous endpoint is free and needs no entry ([com.hereliesaz.geministrator.providers.llm.TextGenerationApi.billsPerToken]).
          */
-        val Default: ModelPriceTable = ModelPriceTable(emptyMap())
+        val Default: ModelPriceTable = ModelPriceTable(
+            mapOf(
+                key("anthropic", "claude-sonnet-5") to ModelPrice(2.00, 10.00, cachedInputUsdPerMillion = 0.20),
+                key("anthropic", "claude-sonnet-5-5") to ModelPrice(2.00, 10.00, cachedInputUsdPerMillion = 0.10),
+                key("openai", "gpt-6-astra") to ModelPrice(20.00, 75.00, cachedInputUsdPerMillion = 2.00),
+                key("gemini", "gemini-3.8-flash") to ModelPrice(1.50, 7.50, cachedInputUsdPerMillion = 0.15),
+                key("xai", "grok-4.6") to ModelPrice(4.00, 12.00, cachedInputUsdPerMillion = 1.00),
+                key("deepseek", "deepseek-flash") to ModelPrice(0.30, 1.20, cachedInputUsdPerMillion = 0.006),
+            ),
+        )
 
         fun key(providerId: String, model: String): String = providerId.trim().lowercase() + "/" + model.trim().lowercase()
     }

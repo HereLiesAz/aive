@@ -71,7 +71,7 @@ class SwarmEvidenceTest {
         val text = SwarmEvidence.of(runs, listOf(qa), ImprovementState(proposals = listOf(adopted)), now, loopText)
 
         assertTrue("⟦agent-written: Quote the command⟧ (role-instruction, ⟦agent-written: qa-engineer⟧)" in text, text)
-        assertTrue("⟦agent-written: qa-engineer⟧ fail rate 0% over 3 steps before, 67% over 3 steps after" in text, text)
+        assertTrue("⟦agent-written: qa-engineer⟧ fail rate 0% over 2 steps before, 67% over 3 steps after" in text, "a window before against the time since, not all history: $text")
         assertTrue("It said: ⟦agent-written: fewer retries⟧" in text, "what it promised is next to what happened")
     }
 
@@ -116,5 +116,49 @@ class SwarmEvidenceTest {
             assertTrue(text.startsWith("⟦agent-written: ", m.range.first), "only agent-written fences open: ${text.drop(m.range.first).take(40)}")
         }
         assertTrue("Text inside ⟦agent-written: …⟧ was written by a model" in text, "the loop is told what the fence means")
+    }
+
+    private fun adoptedAt(at: Long) = ImprovementProposal(
+        id = "p1", cycleRunId = "c", kind = ImprovementKind.RoleInstruction, target = "qa-engineer", summary = "Quote the command",
+        newText = "t", expectedEffect = "fewer retries", undo = "u", meta = false, status = ProposalStatus.Adopted,
+        createdAtEpochMillis = at - day, decidedAtEpochMillis = at,
+    )
+
+    @Test
+    fun whatAnEarlierCycleAlreadySawIsNotReportedAgainAsAdoptedSinceTheLastCycle() {
+        // Adopted 12 days ago: after the window the last cycle looked back over, but before that cycle ran, so it has already seen it.
+        val adopted = adoptedAt(now - 12 * day)
+        val seenByLastCycle = ImprovementState(proposals = listOf(adopted), cycles = listOf(CycleRecord("c1", now - 10 * day, 1, 1)))
+        val before = SwarmEvidence.of(runs, listOf(qa), seenByLastCycle, now, loopText)
+        assertTrue("Nothing adopted since the last cycle." in before && "Quote the command" !in before, before)
+
+        val notYetSeen = ImprovementState(proposals = listOf(adopted), cycles = listOf(CycleRecord("c0", now - 30 * day, 1, 1)))
+        assertTrue("Quote the command" in SwarmEvidence.of(runs, listOf(qa), notYetSeen, now, loopText))
+    }
+
+    @Test
+    fun aSideWithNoStepsIsSaidToHaveNoStepsAndNeverReadAsAZeroPercentFailRate() {
+        // Adopted so long ago that no run falls in the window before it or in the one after.
+        val text = SwarmEvidence.of(runs, listOf(qa), ImprovementState(proposals = listOf(adoptedAt(now - 80 * day))), now, loopText)
+
+        assertTrue("0% over 0 steps" !in text, text)
+        assertTrue("fail rate no steps over 0 steps before, no steps over 0 steps after (too few steps on one side to compare)" in text, text)
+    }
+
+    @Test
+    fun theLastCyclesNoChangeVerdictIsHandedToTheNextCycleAsAFindingToReExamine() {
+        val reason = "The evidence shows 0 retried steps over 14 days, so no change to the loop is needed."
+        val state = ImprovementState(cycles = listOf(CycleRecord("c1", now - 7 * day, 0, 0, metaNoChange = reason)))
+
+        val text = SwarmEvidence.of(runs, listOf(qa), state, now, loopText)
+
+        assertTrue("THE LAST CYCLE SAID THE LOOP NEEDED NO CHANGE" in text && "a finding to re-examine" in text, text)
+        assertTrue("⟦agent-written: $reason⟧" in text, "quoted as data: $text")
+        assertTrue("too short" !in text, "a substantive reason is not called thin")
+        assertTrue(text.indexOf("THE LAST CYCLE SAID") < text.indexOf("THE LOOP, AS IT IS NOW"), "it sits with the loop's own section, which is never cut")
+
+        val thin = state.copy(cycles = listOf(CycleRecord("c1", now - 7 * day, 0, 0, metaNoChange = "fine")))
+        assertTrue("too short, or cited no figure" in SwarmEvidence.of(runs, listOf(qa), thin, now, loopText))
+        assertTrue("THE LAST CYCLE SAID" !in SwarmEvidence.of(runs, listOf(qa), ImprovementState(cycles = listOf(CycleRecord("c1", now, 1, 1))), now, loopText))
     }
 }

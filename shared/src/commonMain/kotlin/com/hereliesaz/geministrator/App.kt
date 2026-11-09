@@ -28,10 +28,11 @@ import com.hereliesaz.geministrator.workflow.SettingsNodeCharacterAssetStore
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
+import com.hereliesaz.geministrator.workflow.improvement.CycleIngest
+import com.hereliesaz.geministrator.workflow.improvement.LoopIntegrity
 import com.hereliesaz.geministrator.workflow.improvement.SelfImprovementLoop
 import com.hereliesaz.geministrator.workflow.improvement.SettingsImprovementStore
 import com.hereliesaz.geministrator.workflow.improvement.SwarmEvidence
-import com.hereliesaz.geministrator.workflow.improvement.readCycle
 import com.hereliesaz.geministrator.workflow.schedule.ScheduleTicker
 import com.hereliesaz.geministrator.workflow.schedule.objectiveProvenance
 import com.hereliesaz.geministrator.workflow.schedule.SettingsWorkflowScheduleStore
@@ -638,11 +639,17 @@ fun App(
             ?.takeIf { it.workflowDefinitionId.value == SelfImprovementLoop.HIVE_ID && it.status == com.hereliesaz.geministrator.domain.WorkflowRunStatus.Completed }
         LaunchedEffect(finishedCycle?.id) {
             val run = finishedCycle ?: return@LaunchedEffect
-            val text = run.taskRuns[com.hereliesaz.geministrator.domain.TaskDefinitionId(SelfImprovementLoop.FINAL_STEP)]
-                ?.artifacts?.mapNotNull { it.textContent }?.joinToString("\n").orEmpty()
-            val (cycle, proposals) = readCycle(run.id.value, text, currentEpochMillis())
-            if (improvementStore.ingest(cycle, proposals)) {
-                appLog("Improvement", "Cycle ${run.id.value}: ${proposals.size} proposals" + if (cycle.examinedLoop) ", the loop examined itself." else ", and the loop did NOT examine itself.")
+            if (CycleIngest.ingest(improvementStore, run)) {
+                val cycle = improvementStore.state().cycles.firstOrNull { it.runId == run.id.value }
+                appLog("Improvement", "Cycle ${run.id.value}: ${cycle?.proposals ?: 0} proposals" + if (cycle?.examinedLoop == true) ", the loop examined itself." else ", and the loop did NOT examine itself.")
+            }
+        }
+        // A cycle that finished while the app was closed, or while another run was on screen, is read from the run history.
+        LaunchedEffect(runtime) {
+            val active = runtime ?: return@LaunchedEffect
+            val history = runCatching { active.loadRunHistory().flatMap { it.second } }.getOrNull() ?: return@LaunchedEffect
+            CycleIngest.backfill(improvementStore, history).forEach { run ->
+                appLog("Improvement", "Cycle ${run.id.value} was read from the run history.")
             }
         }
         LaunchedEffect(runtime, workflowPersistence) {
@@ -654,6 +661,11 @@ fun App(
                 start = { schedule ->
                     val definition = workflowPersistence.definitions.get(WorkflowDefinitionId(schedule.workflowId))
                         ?: error("the hive is no longer on this device")
+                    // The loop runs unattended on the promise that it only reads and reports and never waits on anyone: a hive
+                    // that no longer keeps that is not started on a schedule (the keeper can still run it by hand).
+                    if (definition.id.value == SelfImprovementLoop.HIVE_ID) {
+                        LoopIntegrity.startRefusal(definition, resolveRoleCollection(workflowPersistence.roles.all()))?.let { error(it) }
+                    }
                     // An evidence-fed schedule (the self-improvement cycle) starts with the swarm's own numbers and the loop as it is now.
                     val objective = if (schedule.withEvidence) {
                         val roles = resolveRoleCollection(workflowPersistence.roles.all())
@@ -1007,6 +1019,17 @@ fun App(
                         onLoadWorkflowDefinitions = { runtime?.persistence?.definitions?.all() ?: emptyList() },
                         onExportDiagnosticBundle = { runtime?.exportDiagnosticBundle() },
                         onValidateWorkflow = { runtime?.validateCurrentWorkflow() ?: emptyList() },
+                        onSaveRoleCollectionNow = { roles ->
+                            try {
+                                runtime?.saveRoleCollection(roles)
+                                runtimeGeneration += 1
+                            } catch (failure: CancellationException) {
+                                throw failure
+                            } catch (failure: Exception) {
+                                runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_save_swarm_failed))
+                                throw failure
+                            }
+                        },
                         onSaveRoleCollection = { roles ->
                             scope.launch {
                                 try {

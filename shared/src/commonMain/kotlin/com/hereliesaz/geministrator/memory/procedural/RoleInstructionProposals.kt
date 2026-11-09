@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlin.time.Clock
 
 /*
  * Self-updating procedural memory as diff-gated edits (docs/architecture/PROCEDURAL_MEMORY.md §10).
@@ -83,6 +84,8 @@ data class RoleInstructionProposal(
     val changes: List<RoleInstructionChange>,
     val createdAtEpochMillis: Long,
     val status: RoleInstructionProposalStatus = RoleInstructionProposalStatus.Pending,
+    /** When it stopped being pending (approved, dismissed or superseded); null while pending and for proposals saved before it was kept. */
+    val decidedAtEpochMillis: Long? = null,
 ) {
     /** A unified-style diff of the instructions, for review and copying. */
     fun diff(): String = buildString {
@@ -244,6 +247,33 @@ object RoleInstructionProposer {
         return changes.distinctBy { it.line }
     }
 
+    /**
+     * The most characters the lessons section of one role's instructions may hold (its header and every line), so a
+     * role's prompt cannot grow without limit as proposals are adopted over time. A line that would take it past that
+     * is not proposed; the keeper can raise the room by editing the lessons out.
+     */
+    const val MAX_LESSONS_CHARS: Int = 2_000
+
+    /** The characters the lessons section of [base] holds now: from its header to the end, 0 when it has none. */
+    fun lessonsChars(base: String): Int {
+        val at = base.indexOf(LESSONS_HEADER)
+        return if (at < 0) 0 else base.length - at
+    }
+
+    /** The leading part of [lines], in order, that still fits in [MAX_LESSONS_CHARS] after what [base] already holds. */
+    fun fitting(base: String, lines: List<String>): List<String> {
+        var used = lessonsChars(base)
+        if (used == 0 && lines.isNotEmpty()) used = LESSONS_HEADER.length + 1
+        val kept = mutableListOf<String>()
+        for (line in lines) {
+            val cost = "\n- $line".length
+            if (used + cost > MAX_LESSONS_CHARS) break
+            used += cost
+            kept += line
+        }
+        return kept
+    }
+
     /** [base] with [lines] appended under the lessons header, which is added once. */
     fun applyLines(base: String, lines: List<String>): String {
         if (lines.isEmpty()) return base
@@ -295,6 +325,8 @@ class RoleInstructionProposalLedger(
     private val save: (String) -> Unit = {},
     private val maxObservations: Int = 500,
     private val maxHistory: Int = 200,
+    /** The time a decision is stamped with, in epoch milliseconds. */
+    private val clock: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) {
     private val mutableState = MutableStateFlow(decode(load()))
     val state: StateFlow<RoleInstructionProposalState> = mutableState.asStateFlow()
@@ -318,19 +350,34 @@ class RoleInstructionProposalLedger(
      * Applies a pending proposal to [roles] if its role's instructions are still the ones it was
      * drafted against. Marks it approved; the caller saves the returned collection.
      */
-    fun approve(proposalId: String, roles: List<RoleDefinition>): RoleInstructionApproval {
+    fun approve(proposalId: String, roles: List<RoleDefinition>): RoleInstructionApproval =
+        evaluate(proposalId, roles).also { if (it is RoleInstructionApproval.Applied) markApproved(proposalId) }
+
+    /**
+     * What [approve] would do, without marking the proposal approved: for a caller that saves the role itself and
+     * marks it with [markApproved] only once the save has succeeded, so a save that fails leaves the proposal
+     * pending instead of decided and its lines never proposed again. A role that has changed still supersedes it.
+     */
+    fun evaluate(proposalId: String, roles: List<RoleDefinition>): RoleInstructionApproval {
         val current = mutableState.value
         val proposal = current.proposals.firstOrNull {
             it.id == proposalId && it.status == RoleInstructionProposalStatus.Pending
         } ?: return RoleInstructionApproval.NotFound
         val role = roles.firstOrNull { it.id == proposal.roleId }
         if (role == null || role.instructions != proposal.baseInstructions) {
-            commit(current.withStatus(proposalId, RoleInstructionProposalStatus.Superseded))
+            commit(current.withStatus(proposalId, RoleInstructionProposalStatus.Superseded, clock()))
             return RoleInstructionApproval.Stale
         }
         val updated = role.copy(instructions = proposal.proposedInstructions)
-        commit(current.withStatus(proposalId, RoleInstructionProposalStatus.Approved))
         return RoleInstructionApproval.Applied(roles.map { if (it.id == role.id) updated else it }, updated)
+    }
+
+    /** Marks a pending proposal approved, after its role was saved. False when it is no longer pending. */
+    fun markApproved(proposalId: String): Boolean {
+        val current = mutableState.value
+        if (current.proposals.none { it.id == proposalId && it.status == RoleInstructionProposalStatus.Pending }) return false
+        commit(current.withStatus(proposalId, RoleInstructionProposalStatus.Approved, clock()))
+        return true
     }
 
     /** Dismisses a pending proposal; nothing is applied and its lines are never proposed for that role again. */
@@ -341,7 +388,7 @@ class RoleInstructionProposalLedger(
         } ?: return false
         val dismissed = (current.dismissed + proposal.changes.map { DismissedInstructionLine(proposal.roleId, it.line) })
             .distinct()
-        commit(current.withStatus(proposalId, RoleInstructionProposalStatus.Dismissed).copy(dismissed = dismissed))
+        commit(current.withStatus(proposalId, RoleInstructionProposalStatus.Dismissed, clock()).copy(dismissed = dismissed))
         return true
     }
 
@@ -359,8 +406,11 @@ class RoleInstructionProposalLedger(
             state.proposals
                 .filter { it.roleId == role.id && it.status == RoleInstructionProposalStatus.Approved }
                 .forEach { approved -> approved.changes.mapTo(decided) { it.line } }
-            val changes = RoleInstructionProposer.changesFor(role.id, state.observations)
+            val wanted = RoleInstructionProposer.changesFor(role.id, state.observations)
                 .filter { it.line !in decided && it.line !in role.instructions }
+            // Only what still fits in the role's lessons section: instructions do not grow without limit.
+            val room = RoleInstructionProposer.fitting(role.instructions, wanted.map { it.line }).size
+            val changes = wanted.take(room)
             val pending = proposals.firstOrNull { it.roleId == role.id && it.status == RoleInstructionProposalStatus.Pending }
             val unchanged = pending != null &&
                 pending.baseInstructions == role.instructions &&
@@ -368,7 +418,7 @@ class RoleInstructionProposalLedger(
             if (unchanged) return@forEach
             if (pending != null) {
                 proposals = proposals.map {
-                    if (it.id == pending.id) it.copy(status = RoleInstructionProposalStatus.Superseded) else it
+                    if (it.id == pending.id) it.copy(status = RoleInstructionProposalStatus.Superseded, decidedAtEpochMillis = now) else it
                 }
             }
             if (changes.isNotEmpty()) {
@@ -388,7 +438,9 @@ class RoleInstructionProposalLedger(
     private fun RoleInstructionProposalState.withStatus(
         id: String,
         status: RoleInstructionProposalStatus,
-    ): RoleInstructionProposalState = copy(proposals = proposals.map { if (it.id == id) it.copy(status = status) else it })
+        at: Long,
+    ): RoleInstructionProposalState =
+        copy(proposals = proposals.map { if (it.id == id) it.copy(status = status, decidedAtEpochMillis = at) else it })
 
     private fun commit(next: RoleInstructionProposalState) {
         val pending = next.proposals.filter { it.status == RoleInstructionProposalStatus.Pending }

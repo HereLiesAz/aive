@@ -13,6 +13,8 @@ A hive can start by itself, on a schedule (`workflow/schedule/`). **Keeper's roo
 - A schedule is due when it is on and its next slot has come. The next slot is the first one after its last start, or after it was made: **a new schedule never starts for a slot that already passed**.
 - A schedule whose slots passed while the app was closed starts **once**, at the next look, not once per missed slot.
 - At most one starts per look, the most overdue first.
+- A schedule carrying a **run-now request** (`runNowRequested`, set by the Improvement screen's **Run a cycle now**) is due at the next look whether it is on or not; starting it clears the request, and it never turns the schedule on. The request waits, and keeps its place, while another run is active.
+- The self-improvement cycle's schedule is not started when its hive no longer keeps the loop's own rules (`LoopIntegrity.startRefusal`: it reads and reports, never waits on a person, examines itself); the schedule's note says which rule. You can still run that hive by hand.
 - **One run is active at a time.** If a run has not finished (a run waiting on a person counts), the schedule is held, not skipped: it starts when that run does. The hold is said once in the log, and written on the schedule.
 - A start that fails (no connected agent, the hive was deleted) is written on the schedule with its reason, counts as that slot's attempt, and is not retried every minute.
 

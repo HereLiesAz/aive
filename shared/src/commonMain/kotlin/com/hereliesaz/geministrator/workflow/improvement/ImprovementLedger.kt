@@ -80,8 +80,28 @@ data class CycleRecord(
     val metaNoChange: String? = null,
     val malformedLines: Int = 0,
 ) {
-    /** A cycle examined the loop when it proposed a change to it or said, with evidence, that none was needed. */
-    val examinedLoop: Boolean get() = metaProposals > 0 || !metaNoChange.isNullOrBlank()
+    /**
+     * A cycle examined the loop when it proposed a change to it or said, with evidence, that none was needed.
+     * A reason that is only a few words, or cites no figure from the evidence, is not an examination
+     * ([MetaNoChange.isExamination]).
+     */
+    val examinedLoop: Boolean get() = metaProposals > 0 || MetaNoChange.isExamination(metaNoChange)
+}
+
+/**
+ * What a `META-NO-CHANGE` line has to carry to count as the loop having examined itself
+ * (SELF_IMPROVEMENT.md §4, point 2). The reason is a model's word, so the check is only that it is more than
+ * a gesture: a sentence's worth of text that cites at least one number from the evidence it was given (a
+ * count, a rate, a cost). It cannot tell a good reason from a plausible one; the next cycle is fed it as a
+ * finding to re-examine ([SwarmEvidence]) and the keeper reads it.
+ */
+object MetaNoChange {
+    const val MIN_CHARS = 60
+
+    fun isExamination(reason: String?): Boolean {
+        val text = reason?.trim().orEmpty()
+        return text.length >= MIN_CHARS && text.any { it.isDigit() }
+    }
 }
 
 @Serializable
@@ -105,13 +125,13 @@ object ImprovementParser {
         for (raw in text.lineSequence()) {
             val line = raw.trim()
             when {
-                line.startsWith("META-NO-CHANGE") -> {
+                line.startsWith(NO_CHANGE_PREFIX) -> {
                     val reason = line.substringAfter('|', "").trim()
                     if (reason.isNotEmpty()) noChange = clean(reason, TEXT) else malformed += 1
                 }
-                line.startsWith("IMPROVEMENT") -> {
-                    val parts = line.split(" | ").map(String::trim)
-                    if (parts.size < 7 || parts[3].isBlank() || parts[5].isBlank()) {
+                line.startsWith(LINE_PREFIX) -> {
+                    val parts = fields(line)
+                    if (parts.size != FIELDS || parts[3].isBlank() || parts[5].isBlank()) {
                         malformed += 1
                         continue
                     }
@@ -134,6 +154,40 @@ object ImprovementParser {
         }
         return Parsed(proposals, noChange, malformed)
     }
+
+    /** What a proposal line, and the line that says the loop needs no change, start with. */
+    const val LINE_PREFIX = "IMPROVEMENT"
+    const val NO_CHANGE_PREFIX = "META-NO-CHANGE"
+
+    /** A proposal line has exactly this many fields: the word IMPROVEMENT, then the six of [SelfImprovementLoop.GRAMMAR]. */
+    const val FIELDS = 7
+
+    /**
+     * The fields of a proposal line. They are separated by space, pipe, space; a pipe that belongs to a field's text
+     * is written `\|` (as [SelfImprovementLoop.GRAMMAR] tells the writer), so it cannot shift the fields after it.
+     * A line with more or fewer separators than the grammar has comes back with the wrong number of fields and is
+     * counted as malformed by the caller, never read with its fields moved. Lines written without any escape, as
+     * every line was before the escape existed, read exactly as they did.
+     */
+    internal fun fields(line: String): List<String> {
+        val out = mutableListOf<String>()
+        val current = StringBuilder()
+        var i = 0
+        while (i < line.length) {
+            if (line.startsWith(SEPARATOR, i)) {
+                out += current.toString()
+                current.clear()
+                i += SEPARATOR.length
+            } else {
+                current.append(line[i])
+                i += 1
+            }
+        }
+        out += current.toString()
+        return out.map { it.replace("\\|", "|").trim() }
+    }
+
+    private const val SEPARATOR = " | "
 
     /** About the loop: by kind or by target, and never by how the proposal is worded. */
     fun isMeta(kind: ImprovementKind, target: String): Boolean =
@@ -158,6 +212,33 @@ object LoopObligation {
     }
 }
 
+/**
+ * What the ledger forgets when it is full. An adopted proposal is never forgotten: it holds the text it replaced
+ * ([ImprovementProposal.appliedBefore]), which is all that lets the keeper revert it. Settled and dismissed ones go
+ * first, oldest first, then ones still waiting; so the cap may be exceeded by adopted ones, never by anything else.
+ */
+object ProposalRetention {
+    const val MAX = 500
+
+    private val dropOrder = listOf(ProposalStatus.Dismissed, ProposalStatus.Superseded, ProposalStatus.Reverted, ProposalStatus.Proposed)
+
+    fun bound(proposals: List<ImprovementProposal>, max: Int = MAX): List<ImprovementProposal> {
+        var excess = proposals.size - max
+        if (excess <= 0) return proposals
+        val drop = hashSetOf<Int>()
+        for (status in dropOrder) {
+            for ((index, proposal) in proposals.withIndex()) {
+                if (excess <= 0) break
+                if (proposal.status == status) {
+                    drop += index
+                    excess -= 1
+                }
+            }
+        }
+        return proposals.filterIndexed { index, _ -> index !in drop }
+    }
+}
+
 /** Where the keeper's proposals and cycle records are kept, on this device. */
 interface ImprovementStore {
     suspend fun state(): ImprovementState
@@ -165,7 +246,12 @@ interface ImprovementStore {
     /** Adds a finished cycle's proposals once; a cycle already recorded is left as it is. True when it was added. */
     suspend fun ingest(cycle: CycleRecord, proposals: List<ImprovementProposal>): Boolean
 
-    suspend fun decide(id: String, update: (ImprovementProposal) -> ImprovementProposal)
+    /**
+     * Applies [update] to proposal [id], but only while it is still [expected] (a compare-and-set, under the store's
+     * lock). True when it was updated; false when the proposal is not in the ledger or has already been decided,
+     * which the caller must not treat as done.
+     */
+    suspend fun decide(id: String, expected: ProposalStatus = ProposalStatus.Proposed, update: (ImprovementProposal) -> ImprovementProposal): Boolean
 
     /** Replaces the state with [update] of it, under the store's lock. For mirroring the other mechanisms. */
     suspend fun merge(update: (ImprovementState) -> ImprovementState)
@@ -183,19 +269,22 @@ class SettingsImprovementStore(
     override suspend fun ingest(cycle: CycleRecord, proposals: List<ImprovementProposal>): Boolean = mutex.withLock {
         val now = read()
         if (now.cycles.any { it.runId == cycle.runId }) return@withLock false
-        write(ImprovementState((now.proposals + proposals).takeLast(500), (now.cycles + cycle).takeLast(200)))
+        write(ImprovementState(ProposalRetention.bound(now.proposals + proposals), (now.cycles + cycle).takeLast(200)))
         true
     }
 
-    override suspend fun decide(id: String, update: (ImprovementProposal) -> ImprovementProposal) = mutex.withLock {
+    override suspend fun decide(id: String, expected: ProposalStatus, update: (ImprovementProposal) -> ImprovementProposal): Boolean = mutex.withLock {
         val now = read()
+        val target = now.proposals.firstOrNull { it.id == id }
+        if (target == null || target.status != expected) return@withLock false
         write(now.copy(proposals = now.proposals.map { if (it.id == id) update(it) else it }))
+        true
     }
 
     override suspend fun merge(update: (ImprovementState) -> ImprovementState) = mutex.withLock {
         val now = read()
         val next = update(now)
-        if (next != now) write(next.copy(proposals = next.proposals.takeLast(500)))
+        if (next != now) write(next.copy(proposals = ProposalRetention.bound(next.proposals)))
     }
 
     private fun read(): ImprovementState = settings.getStringOrNull(key)
@@ -216,13 +305,16 @@ class InMemoryImprovementStore : ImprovementStore {
     override suspend fun state() = state
     override suspend fun ingest(cycle: CycleRecord, proposals: List<ImprovementProposal>): Boolean {
         if (state.cycles.any { it.runId == cycle.runId }) return false
-        state = ImprovementState(state.proposals + proposals, state.cycles + cycle)
+        state = ImprovementState(ProposalRetention.bound(state.proposals + proposals), state.cycles + cycle)
         return true
     }
-    override suspend fun decide(id: String, update: (ImprovementProposal) -> ImprovementProposal) {
+    override suspend fun decide(id: String, expected: ProposalStatus, update: (ImprovementProposal) -> ImprovementProposal): Boolean {
+        val target = state.proposals.firstOrNull { it.id == id }
+        if (target == null || target.status != expected) return false
         state = state.copy(proposals = state.proposals.map { if (it.id == id) update(it) else it })
+        return true
     }
-    override suspend fun merge(update: (ImprovementState) -> ImprovementState) { state = update(state) }
+    override suspend fun merge(update: (ImprovementState) -> ImprovementState) { state = update(state).let { it.copy(proposals = ProposalRetention.bound(it.proposals)) } }
 }
 
 /** Reads a finished cycle into a record and proposals, ready for [ImprovementStore.ingest]. */

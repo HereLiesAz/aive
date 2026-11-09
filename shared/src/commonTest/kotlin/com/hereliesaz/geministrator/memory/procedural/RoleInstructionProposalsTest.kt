@@ -252,4 +252,43 @@ class RoleInstructionProposalsTest {
         assertEquals(2, state.pendingCount)
         assertEquals(1, state.pendingFor(qa.id).size)
     }
+
+    @Test
+    fun aDecisionIsStampedWithWhenItWasMadeAndAnApprovalMarkedAfterTheSaveLeavesAFailedSavePending() {
+        var clock = 500L
+        val ledger = RoleInstructionProposalLedger(clock = { clock })
+        ledger.observe(recurringFailure(), roles, nowEpochMillis = 100)
+        val proposal = ledger.pendingFor(engineer.id).single()
+
+        // Evaluating changes nothing: a save that then fails leaves the proposal pending, so it is proposed again later.
+        val applied = assertIs<RoleInstructionApproval.Applied>(ledger.evaluate(proposal.id, roles))
+        assertEquals(proposal.proposedInstructions, applied.role.instructions)
+        assertEquals(RoleInstructionProposalStatus.Pending, ledger.state.value.proposals.single().status)
+        assertEquals(null, ledger.state.value.proposals.single().decidedAtEpochMillis)
+
+        clock = 777L
+        assertTrue(ledger.markApproved(proposal.id))
+        val approved = ledger.state.value.proposals.single()
+        assertEquals(RoleInstructionProposalStatus.Approved, approved.status)
+        assertEquals(777L, approved.decidedAtEpochMillis)
+        assertFalse(ledger.markApproved(proposal.id), "once")
+    }
+
+    @Test
+    fun aRolesLessonsSectionDoesNotGrowPastItsCapAsProposalsAreAdopted() {
+        val ledger = RoleInstructionProposalLedger()
+        // Lessons adopted earlier have already filled the section to within a line of its cap.
+        val lessons = RoleInstructionProposer.LESSONS_HEADER + "\n" + "- an earlier lesson ".repeat(95).trim()
+        val full = engineer.copy(instructions = engineer.instructions + "\n\n" + lessons)
+        assertTrue(RoleInstructionProposer.lessonsChars(full.instructions) in 1_800..RoleInstructionProposer.MAX_LESSONS_CHARS)
+
+        ledger.observe(recurringFailure(), listOf(full, qa), nowEpochMillis = 100)
+
+        assertTrue(ledger.pendingFor(engineer.id).isEmpty(), "a new lesson that would take the section past its cap is not proposed")
+
+        // A role with room still gets it, and what is proposed never takes the section past the cap.
+        ledger.observe(recurringFailure(), roles, nowEpochMillis = 200)
+        val proposal = ledger.pendingFor(engineer.id).single()
+        assertTrue(RoleInstructionProposer.lessonsChars(proposal.proposedInstructions) <= RoleInstructionProposer.MAX_LESSONS_CHARS)
+    }
 }
