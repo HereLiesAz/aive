@@ -37,6 +37,8 @@ class OpenAiCompatibleChatApi(
     private val requireApiKey: Boolean = true,
     /** The most output tokens a plan may ask this service for (its model's documented cap); see [PlanOutputBudget]. */
     private val maxOutputTokenCap: Int = PlanOutputBudget.COMPATIBLE_CAP,
+    /** True for a keyless endpoint used anonymously: it cannot bill, so its usage costs nothing. */
+    private val freeOfCharge: Boolean = false,
     client: HttpClient = openAiCompatibleClient(),
 ) : ToolCallingTextGenerationApi {
     private val baseUrl = baseUrl.trimEnd('/')
@@ -50,6 +52,10 @@ class OpenAiCompatibleChatApi(
     override val promptCaching: PromptCacheCapabilities get() = IMPLICIT_PREFIX_CACHING
 
     override val outputTokenCap: Int get() = maxOutputTokenCap
+
+    override val modelId: String get() = model
+
+    override val billsPerToken: Boolean get() = !freeOfCharge
 
     init {
         require(model.isNotBlank()) { "model must not be blank" }
@@ -116,8 +122,11 @@ class OpenAiCompatibleChatApi(
         val payload = response.body<CompatibleChatResponse>()
         val choice = payload.choices
             .firstOrNull { !it.message?.content?.trim().isNullOrEmpty() }
-            ?: error("Compatible chat response did not contain assistant text")
-        requireCompleteFinishReason(choice.finishReason)
+            ?: throw SpentGenerationFailure(
+                "Compatible chat response did not contain assistant text", null,
+                payload.usage?.promptTokens, payload.usage?.completionTokens, payload.usage?.cachedTokens(),
+            )
+        requireCompleteFinishReason(choice.finishReason, payload.usage)
         val text = requireNotNull(choice.message).content!!.trim()
 
         return TextGenerationResult(
@@ -186,8 +195,13 @@ class OpenAiCompatibleChatApi(
             }
             deliver(splitter.finish())
             requireStreamTerminated(done || finishReason != null, "Compatible chat")
-            requireCompleteFinishReason(finishReason)
-            if (text.isBlank()) error("Compatible chat response did not contain assistant text")
+            requireCompleteFinishReason(finishReason, usage)
+            if (text.isBlank()) {
+                throw SpentGenerationFailure(
+                    "Compatible chat response did not contain assistant text", null,
+                    usage?.promptTokens, usage?.completionTokens, usage?.cachedTokens(),
+                )
+            }
             TextGenerationResult(
                 text = text.toString().trim(),
                 inputTokens = usage?.promptTokens,
@@ -200,9 +214,13 @@ class OpenAiCompatibleChatApi(
 }
 
 
-private fun requireCompleteFinishReason(finishReason: String?) {
+private fun requireCompleteFinishReason(finishReason: String?, usage: CompatibleChatUsage? = null) {
     if (finishReason.equals("length", ignoreCase = true)) {
-        error("Compatible chat response was truncated because the provider reached its output-token limit")
+        // Still the bare-error type in effect (it is an IllegalStateException): what the provider billed rides on it.
+        throw SpentGenerationFailure(
+            "Compatible chat response was truncated because the provider reached its output-token limit", null,
+            usage?.promptTokens, usage?.completionTokens, usage?.cachedTokens(),
+        )
     }
 }
 

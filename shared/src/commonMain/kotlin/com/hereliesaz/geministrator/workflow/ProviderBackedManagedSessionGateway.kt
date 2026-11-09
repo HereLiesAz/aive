@@ -23,12 +23,14 @@ import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.providers.ProviderArtifact
+import com.hereliesaz.geministrator.providers.ProviderPlanDraft
 import com.hereliesaz.geministrator.providers.PromptContextBlock
 import com.hereliesaz.geministrator.retrieval.ArtifactChunkSource
 import com.hereliesaz.geministrator.retrieval.ContextRetriever
 import com.hereliesaz.geministrator.retrieval.SimilarityContextRetriever
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
@@ -73,6 +75,7 @@ class ProviderBackedManagedSessionGateway(
         const val OBSERVER_RETRY_MILLIS = 1_000L
         const val MAX_OBSERVER_FAILURES = 10
         const val MAX_FAILURE_MESSAGE_CHARS = 500
+        const val MAX_RECORDED_FAILURES = 32
     }
 
     private data class SessionSnapshot(
@@ -90,6 +93,20 @@ class ProviderBackedManagedSessionGateway(
     private val mutex = Mutex()
     private val snapshots = mutableMapOf<ManagedSessionHandle, SessionSnapshot>()
     private val observedEventKeys = mutableMapOf<ManagedSessionHandle, MutableSet<String>>()
+
+    /** Each session's observer, kept so a cancel stops the generation it is watching ([cancel]) and a release frees it. */
+    private val observerJobs = mutableMapOf<ManagedSessionHandle, Job>()
+
+    /**
+     * Failures this gateway already recorded against a provider for a session, by provider and reason. The
+     * engine asks about failover for the same failure afterwards ([adviseFailover]); that ask is told, not
+     * recorded again, so one failed session counts once toward the provider's circuit breaker and bench.
+     * Bounded: a failure nobody asks about is dropped oldest first.
+     */
+    private val recordedFailures = LinkedHashMap<String, Int>()
+
+    /** How many sessions this gateway still holds state for. */
+    internal suspend fun trackedSessionCount(): Int = mutex.withLock { snapshots.size }
 
     override suspend fun resolveProvider(selection: ProviderSelectionRequest): AgentProviderId =
         selectProvider(selection, "No registered provider can satisfy this task").id
@@ -150,7 +167,11 @@ class ProviderBackedManagedSessionGateway(
         reason: String?,
         selection: ProviderSelectionRequest,
     ): FailoverAdvice {
-        val failure = providerRegistry.recordFailure(failedProviderId, reason) ?: return FailoverAdvice.NotApplicable
+        val failure = if (takeRecordedFailure(failedProviderId, reason)) {
+            providerRegistry.classifyFailure(failedProviderId, reason)
+        } else {
+            providerRegistry.recordFailure(failedProviderId, reason)
+        } ?: return FailoverAdvice.NotApplicable
         if (!providerRegistry.hasAlternatives()) return FailoverAdvice.NotApplicable
         if (!selection.failoverAllowed) return FailoverAdvice.Stop(ProviderFailover.pinnedMessage(failure))
         val tried = selection.excludedProviderIds + failedProviderId
@@ -248,7 +269,9 @@ class ProviderBackedManagedSessionGateway(
                 failure.providerFailureMessage("Unable to start provider session"),
             )
             // Failure bookkeeping (and the bench) is the caller's: createSession classifies it.
-            if (chosen == null) providerRegistry.recordFailure(provider.id, failure.providerFailureMessage("Unable to start provider session"))
+            if (chosen == null) {
+                recordSessionFailure(provider.id, failure.providerFailureMessage("Unable to start provider session"))
+            }
             throw failure
         }
     }
@@ -263,11 +286,16 @@ class ProviderBackedManagedSessionGateway(
         }
     }
 
-    override suspend fun draftPlan(providerId: AgentProviderId, request: AgentTaskRequest): String? {
+    override suspend fun draftPlan(providerId: AgentProviderId, request: AgentTaskRequest): String? =
+        draftPlanWithUsage(providerId, request)?.text
+
+    override suspend fun draftPlanWithUsage(providerId: AgentProviderId, request: AgentTaskRequest): ProviderPlanDraft? {
         val provider = providerRegistry.provider(providerId)
             ?: throw ManagedSessionFailure.ProviderUnavailable("Provider ${providerId.value} is not registered")
         return providerOperation("Unable to draft a plan with ${providerId.value}") {
-            provider.draftPlan(request.withRecalledMemory())?.trim()?.takeIf(String::isNotEmpty)
+            provider.draftPlanWithUsage(request.withRecalledMemory())
+                ?.let { draft -> draft.copy(text = draft.text.trim()) }
+                ?.takeIf { it.text.isNotEmpty() }
         }
     }
 
@@ -483,10 +511,14 @@ class ProviderBackedManagedSessionGateway(
         return providerOperation("Unable to cancel provider session ${handle.providerRunId.value}") {
             val result = providerFor(handle).cancel(handle.providerRunId)
             if (result is ProviderActionResult.Accepted) {
-                mutex.withLock {
+                val observer = mutex.withLock {
                     val current = snapshots[handle] ?: SessionSnapshot(ManagedSessionStatus.Unknown)
                     snapshots[handle] = current.copy(status = ManagedSessionStatus.Failed)
+                    observerJobs.remove(handle)
                 }
+                // The provider was told to stop; the observer is what keeps a generation streaming or a
+                // tool loop running inside this process, so it is stopped too.
+                observer?.cancel()
                 inferenceFabric.recordTerminal(
                     handle.providerId,
                     handle.providerRunId,
@@ -501,6 +533,15 @@ class ProviderBackedManagedSessionGateway(
 
     override suspend fun artifacts(handle: ManagedSessionHandle): List<ProviderArtifact> =
         mutex.withLock { snapshots[handle]?.artifacts.orEmpty() }
+
+    override suspend fun release(handle: ManagedSessionHandle) {
+        val observer = mutex.withLock {
+            snapshots.remove(handle)
+            observedEventKeys.remove(handle)
+            observerJobs.remove(handle)
+        }
+        observer?.cancel()
+    }
 
     override suspend fun usageReport(handle: ManagedSessionHandle): ManagedSessionUsage? =
         mutex.withLock {
@@ -526,7 +567,7 @@ class ProviderBackedManagedSessionGateway(
         recordMemory { duplexAttachment?.onSessionStarted(handle, this) }
 
         val provider = providerFor(handle)
-        scope.launch {
+        val observer = scope.launch {
             var consecutiveFailures = 0
             while (isActive && !handle.isTerminal()) {
                 try {
@@ -541,6 +582,8 @@ class ProviderBackedManagedSessionGateway(
                         val failed = mutex.withLock {
                             val current = snapshots[handle] ?: return@withLock false
                             if (current.status != ManagedSessionStatus.Completed && !current.status.isTerminal()) {
+                                // Recorded before the failure is visible, so the engine's failover question about it is told.
+                                recordSessionFailureLocked(handle.providerId, failure.message)
                                 snapshots[handle] = current.copy(
                                     status = ManagedSessionStatus.Failed,
                                     progress = ManagedSessionProgress(
@@ -560,9 +603,8 @@ class ProviderBackedManagedSessionGateway(
                                 InferenceTerminalStatus.Failed,
                                 "Provider observation failed repeatedly",
                             )
-                            providerRegistry.recordFailure(handle.providerId, failure.message)
                             recordMemory { memoryObserver.onSessionFinished(handle, ManagedSessionStatus.Failed) }
-                recordMemory { duplexAttachment?.onSessionFinished(handle, ManagedSessionStatus.Failed) }
+                            recordMemory { duplexAttachment?.onSessionFinished(handle, ManagedSessionStatus.Failed) }
                         }
                         return@launch
                     }
@@ -572,7 +614,34 @@ class ProviderBackedManagedSessionGateway(
                 }
             }
         }
+        mutex.withLock {
+            // A session released or cancelled while it was being registered has no snapshot to watch for.
+            if (snapshots.containsKey(handle)) observerJobs[handle] = observer else observer.cancel()
+        }
     }
+
+    /** Records a provider's failure for one session; [adviseFailover] is later told it was recorded. */
+    private suspend fun recordSessionFailure(providerId: AgentProviderId, reason: String?): ProviderFailure? =
+        mutex.withLock { recordSessionFailureLocked(providerId, reason) }
+
+    /** [recordSessionFailure] for a caller that already holds [mutex]. */
+    private suspend fun recordSessionFailureLocked(providerId: AgentProviderId, reason: String?): ProviderFailure? {
+        val failure = providerRegistry.recordFailure(providerId, reason)
+        val key = failureKey(providerId, reason)
+        recordedFailures[key] = (recordedFailures[key] ?: 0) + 1
+        while (recordedFailures.size > MAX_RECORDED_FAILURES) recordedFailures.remove(recordedFailures.keys.first())
+        return failure
+    }
+
+    private suspend fun takeRecordedFailure(providerId: AgentProviderId, reason: String?): Boolean = mutex.withLock {
+        val key = failureKey(providerId, reason)
+        val count = recordedFailures[key] ?: return@withLock false
+        if (count <= 1) recordedFailures.remove(key) else recordedFailures[key] = count - 1
+        true
+    }
+
+    private fun failureKey(providerId: AgentProviderId, reason: String?): String =
+        providerId.value + "\u0000" + reason?.trim().orEmpty()
 
     private suspend fun ManagedSessionHandle.isTerminal(): Boolean = mutex.withLock {
         snapshots[this]?.status?.isTerminal() == true
@@ -670,10 +739,20 @@ class ProviderBackedManagedSessionGateway(
         }
 
         var changed = false
+        var alreadyTerminal = false
         var terminalStatus: ManagedSessionStatus? = null
         mutex.withLock {
             val current = snapshots[handle] ?: SessionSnapshot(ManagedSessionStatus.Unknown)
-            if (current.status.isTerminal()) return@withLock
+            if (current.status.isTerminal()) {
+                alreadyTerminal = true
+                // What the session spent is spent whatever state it is in: a report that arrives once it
+                // ended is added, never dropped. Nothing else about an ended session changes.
+                if (effectiveEvent is AgentEvent.UsageReported) {
+                    snapshots[handle] = current.copy(pendingUsage = current.pendingUsage.plusReport(effectiveEvent.sanitizedUsage()))
+                    changed = true
+                }
+                return@withLock
+            }
             val next = when (effectiveEvent) {
                 is AgentEvent.PlanGenerated -> current.copy(
                     status = ManagedSessionStatus.AwaitingApproval,
@@ -719,19 +798,18 @@ class ProviderBackedManagedSessionGateway(
                     ),
                 )
                 // Keep the provider's reason; it becomes the task's last status and the failure reason.
-                is AgentEvent.Failed -> current.copy(
-                    keeperQuestion = null,
-                    status = ManagedSessionStatus.Failed,
-                    progress = ManagedSessionProgress(message = effectiveEvent.reason.takeIf { it.isNotBlank() }),
-                )
+                is AgentEvent.Failed -> {
+                    // Recorded before the failure is visible, so the engine's failover question about it is told.
+                    recordSessionFailureLocked(handle.providerId, effectiveEvent.reason)
+                    current.copy(
+                        keeperQuestion = null,
+                        status = ManagedSessionStatus.Failed,
+                        progress = ManagedSessionProgress(message = effectiveEvent.reason.takeIf { it.isNotBlank() }),
+                    )
+                }
+                // Summed with what the engine has not read yet: two reports between polls are both spend.
                 is AgentEvent.UsageReported -> current.copy(
-                    pendingUsage = ManagedSessionUsage(
-                        inputTokens = effectiveEvent.inputTokens,
-                        outputTokens = effectiveEvent.outputTokens,
-                        costUsd = effectiveEvent.costUsd,
-                        cacheHitFraction = effectiveEvent.cacheHitFraction,
-                        latencyMillis = effectiveEvent.latencyMillis,
-                    ),
+                    pendingUsage = current.pendingUsage.plusReport(effectiveEvent.sanitizedUsage()),
                 )
             }
             snapshots[handle] = next
@@ -747,17 +825,21 @@ class ProviderBackedManagedSessionGateway(
                 handle.providerRunId,
                 effectiveEvent.artifact,
             )
-            is AgentEvent.UsageReported -> inferenceFabric.recordUsage(
-                providerId = handle.providerId,
-                providerRunId = handle.providerRunId,
-                inputTokens = effectiveEvent.inputTokens,
-                outputTokens = effectiveEvent.outputTokens,
-                costUsd = effectiveEvent.costUsd,
-                cacheHitFraction = effectiveEvent.cacheHitFraction,
-                latencyMillis = effectiveEvent.latencyMillis,
-            )
+            is AgentEvent.UsageReported -> effectiveEvent.sanitizedUsage().let { usage ->
+                inferenceFabric.recordUsage(
+                    providerId = handle.providerId,
+                    providerRunId = handle.providerRunId,
+                    inputTokens = usage.inputTokens,
+                    outputTokens = usage.outputTokens,
+                    costUsd = usage.costUsd,
+                    cacheHitFraction = usage.cacheHitFraction,
+                    latencyMillis = usage.latencyMillis,
+                )
+            }
             else -> Unit
         }
+        // Nothing but usage is recorded about a session that had already ended.
+        if (alreadyTerminal) return
         activity.record(handle, effectiveEvent)
         recordMemory { memoryObserver.onSessionEvent(handle, effectiveEvent) { text -> message(handle, text) } }
         recordMemory { duplexAttachment?.onSessionEvent(handle, effectiveEvent) }
@@ -774,13 +856,20 @@ class ProviderBackedManagedSessionGateway(
             )
             if (status == ManagedSessionStatus.Completed) {
                 providerRegistry.recordOutcome(handle.providerId, success = true)
-            } else {
-                providerRegistry.recordFailure(handle.providerId, (effectiveEvent as? AgentEvent.Failed)?.reason)
             }
             recordMemory { memoryObserver.onSessionFinished(handle, status) }
             recordMemory { duplexAttachment?.onSessionFinished(handle, status) }
         }
     }
+
+    private fun AgentEvent.UsageReported.sanitizedUsage(): ManagedSessionUsage = ManagedSessionUsage(
+        inputTokens = inputTokens,
+        outputTokens = outputTokens,
+        costUsd = costUsd,
+        cacheHitFraction = cacheHitFraction,
+        latencyMillis = latencyMillis,
+        costUnknown = costUnknown,
+    ).sanitized()
 
     private fun AgentEvent.memoryReplayKey(): String = when (this) {
         is AgentEvent.PlanGenerated -> "plan:${runId.value}:${summary}"
@@ -792,7 +881,7 @@ class ProviderBackedManagedSessionGateway(
         is AgentEvent.Completed -> "completed:${runId.value}"
         is AgentEvent.Failed -> "failed:${runId.value}:${reason}"
         is AgentEvent.UsageReported ->
-            "usage:${runId.value}:${inputTokens}:${outputTokens}:${costUsd}:${cacheHitFraction}:${latencyMillis}"
+            "usage:${runId.value}:${inputTokens}:${outputTokens}:${costUsd}:${cacheHitFraction}:${latencyMillis}:${costUnknown}"
     }
 
     private fun List<ProviderArtifact>.upsertArtifact(artifact: ProviderArtifact): List<ProviderArtifact> {

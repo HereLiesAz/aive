@@ -192,6 +192,11 @@ sealed interface AgentEvent {
         val costUsd: Double? = null,
         val cacheHitFraction: Float? = null,
         val latencyMillis: Long? = null,
+        /**
+         * True when the provider billed tokens it cannot price: [costUsd] is then null because the cost is
+         * unknown, not because the run was free. A dollar cap does not treat such usage as zero.
+         */
+        val costUnknown: Boolean = false,
     ) : AgentEvent {
         init {
             require(cacheHitFraction == null || cacheHitFraction in 0f..1f) {
@@ -229,6 +234,13 @@ interface AgentProvider {
      * [approvePlan]), as Jules does.
      */
     suspend fun draftPlan(request: AgentTaskRequest): String? = null
+
+    /**
+     * [draftPlan] with what drafting it spent, for a provider that is billed per token: the engine counts it
+     * toward the task's role budget and the keeper's spend caps. The default has no usage to report.
+     */
+    suspend fun draftPlanWithUsage(request: AgentTaskRequest): ProviderPlanDraft? =
+        draftPlan(request)?.let { ProviderPlanDraft(it) }
 
     suspend fun start(request: AgentTaskRequest): AgentRunHandle
 

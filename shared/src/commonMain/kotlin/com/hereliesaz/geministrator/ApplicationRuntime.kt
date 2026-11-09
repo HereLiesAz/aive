@@ -81,6 +81,7 @@ import com.hereliesaz.geministrator.workflow.definitionFor
 import com.hereliesaz.geministrator.workflow.newestOf
 import com.hereliesaz.geministrator.workflow.WorkflowRunNestedWorkflowClient
 import com.hereliesaz.geministrator.workflow.WorkflowRuntimeState
+import com.hereliesaz.geministrator.workflow.uniqueLaunchStamp
 import com.hereliesaz.geministrator.workflow.awaitsNestedHumanApproval
 import com.hereliesaz.geministrator.workflow.humanReadable
 import kotlinx.coroutines.CancellationException
@@ -309,12 +310,13 @@ class ApplicationRuntime private constructor(
 
             val normalizedRepository = repository?.normalized()
             val now = nowEpochMillis()
+            val stamp = persistence.uniqueLaunchStamp(now, newProject = existingProject == null)
             val project = existingProject?.copy(
                 name = cleanProjectName,
                 repository = normalizedRepository ?: existingProject.repository,
                 updatedAtEpochMillis = now,
             ) ?: Project(
-                id = ProjectId("project-$now"),
+                id = ProjectId("project-$stamp"),
                 name = cleanProjectName,
                 repository = normalizedRepository,
                 createdAtEpochMillis = now,
@@ -322,7 +324,7 @@ class ApplicationRuntime private constructor(
             )
             val launchRoles = activeRoles(roles)
             val definition = StarterWorkflowFactory.create(
-                id = WorkflowDefinitionId("workflow-$now"),
+                id = WorkflowDefinitionId("workflow-$stamp"),
                 objective = cleanObjective,
                 roles = launchRoles,
             )
@@ -335,10 +337,10 @@ class ApplicationRuntime private constructor(
             val (prepared, runtimeState) = launchService.launch(
                 project = project,
                 definition = definition,
-                workflowRunId = WorkflowRunId("run-$now"),
+                workflowRunId = WorkflowRunId("run-$stamp"),
                 objective = cleanObjective,
                 nowEpochMillis = now,
-                taskRunIdFactory = { id -> TaskRunId("run-$now-${id.value}") },
+                taskRunIdFactory = { id -> TaskRunId("run-$stamp-${id.value}") },
                 parentWorkflowRunIds = parents,
             )
 
@@ -399,14 +401,15 @@ class ApplicationRuntime private constructor(
             val source = persistence.runs.get(sourceRunId)
                 ?: error("Run ${sourceRunId.value} was not found")
             val now = nowEpochMillis()
+            val stamp = persistence.uniqueLaunchStamp(now, newProject = false)
             val fork = TaskRerunPlanner.fork(
                 definition = definition,
                 source = source,
                 request = request,
-                workflowRunId = WorkflowRunId("run-$now"),
+                workflowRunId = WorkflowRunId("run-$stamp"),
                 nowEpochMillis = now,
-                taskRunIdFactory = { id -> TaskRunId("run-$now-${id.value}") },
-                editedDefinitionId = WorkflowDefinitionId("workflow-$now"),
+                taskRunIdFactory = { id -> TaskRunId("run-$stamp-${id.value}") },
+                editedDefinitionId = WorkflowDefinitionId("workflow-$stamp"),
             )
             val project = storedProject.copy(updatedAtEpochMillis = now)
             persistence.projects.put(project)
@@ -830,6 +833,7 @@ class ApplicationRuntime private constructor(
                 outgoing.state.handles.values.forEach { handle ->
                     try {
                         sessionGateway.cancel(handle)
+                        sessionGateway.release(handle)
                     } catch (cancellation: CancellationException) {
                         throw cancellation
                     } catch (_: Exception) {

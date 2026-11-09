@@ -97,6 +97,9 @@ class AgentProviderRegistry(
         )
     }
 
+    /** Failures in a row this process has recorded against [id]; what the router's circuit breaker reads. */
+    internal suspend fun consecutiveFailuresOf(id: AgentProviderId): Int = healthOf(id).consecutiveFailures
+
     private val _failoverNotes = kotlinx.coroutines.flow.MutableStateFlow<List<FailoverNote>>(emptyList())
 
     /** The most recent notes saying work moved to another provider, oldest first, bounded. */
@@ -124,6 +127,13 @@ class AgentProviderRegistry(
         healthMutex.withLock { bench.bench(failure) }
         return failure
     }
+
+    /**
+     * How [raw] would be classified for [id], without recording anything: the failure when it is the
+     * provider's own (a reason to fail over), null otherwise. For a failure already recorded.
+     */
+    fun classifyFailure(id: AgentProviderId, raw: String?): ProviderFailure? =
+        ProviderFailover.failureOf(id.value, displayName(id), raw).takeIf { ProviderFailover.shouldFailOver(it.kind) }
 
     /** The last failover-worthy failure of each of [ids] that has one, for an all-failed message. */
     suspend fun failuresOf(ids: Collection<AgentProviderId>): List<ProviderFailure> =
@@ -235,6 +245,14 @@ class AgentProviderRegistry(
                 eligibleProviders += provider to capabilities
             }
         }
+
+        // A creature pinned to a provider is never moved to another one: not while that provider is benched
+        // for a failure, and not by the router's circuit breaker. The task is started on it, and fails with
+        // its own reason and through the creature's own retry and escalation policy if it is still unwell
+        // (ProviderFailover: "a pinned creature reports the failure instead of switching silently").
+        request.preferredProviderId
+            ?.let { pin -> eligibleProviders.firstOrNull { (provider, _) -> provider.id == pin } }
+            ?.let { pinned -> return pinned.first }
 
         // Providers on the bench (failed lately for a reason that is theirs) go last: the router sees
         // only healthy ones while any exists, and the benched ones only when nothing else can do it.

@@ -52,6 +52,7 @@ private suspend fun ApplicationRuntime.decideFailureEscalationLocked(
         ),
         sessionGateway = sessionGateway,
         failureEscalationDecisionStore = persistence,
+        eventSink = RepositoryWorkflowEventSink(persistence.events),
     )
     service.decideFailureEscalation(
         run = run,

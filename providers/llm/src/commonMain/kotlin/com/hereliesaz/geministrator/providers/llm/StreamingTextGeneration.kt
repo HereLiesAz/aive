@@ -10,6 +10,7 @@ import io.ktor.client.request.preparePost
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.utils.io.readUTF8Line
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -161,6 +162,23 @@ class InterruptibleGeneration(
     private val pending = mutableListOf<String>()
     private var active = false
     private var interrupts = 0
+    private var cancelled = false
+
+    /** Thrown inside the stream callback when [cancel] was called: the stream is abandoned and the run ends. */
+    class GenerationCancelled : CancellationException("The generation was cancelled")
+
+    /**
+     * Stops the generation: the streaming attempt in progress is abandoned at its next piece (a provider keeps
+     * billing for a stream that is read to its end), and a run not yet started never makes its request.
+     */
+    suspend fun cancel() {
+        mutex.withLock {
+            cancelled = true
+            pending.clear()
+        }
+    }
+
+    private suspend fun isCancelled(): Boolean = mutex.withLock { cancelled }
 
     /** Queues a memory message while a generation is streaming; false when nothing can take it. */
     suspend fun offer(message: String): Boolean = mutex.withLock {
@@ -179,6 +197,7 @@ class InterruptibleGeneration(
     suspend fun run(prompt: CacheablePrompt, onThinking: suspend (String) -> Unit): TextGenerationResult {
         mutex.withLock { active = true }
         try {
+            if (isCancelled()) throw GenerationCancelled()
             var attemptPrompt = prompt
             while (true) {
                 val reasoning = StringBuilder()
@@ -202,6 +221,7 @@ class InterruptibleGeneration(
                                 answer.append(chunk.text)
                             }
                         }
+                        if (isCancelled()) throw GenerationCancelled()
                         takeRecalls()?.let { throw MemoryInterrupt(it) }
                     }
                     flush()

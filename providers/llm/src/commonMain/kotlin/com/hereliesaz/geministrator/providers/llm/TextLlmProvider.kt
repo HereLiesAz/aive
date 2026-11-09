@@ -15,7 +15,10 @@ import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.AgentRunHandle
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.ProviderActionResult
+import com.hereliesaz.geministrator.providers.ModelPriceTable
 import com.hereliesaz.geministrator.providers.ProviderArtifact
+import com.hereliesaz.geministrator.providers.ProviderPlanDraft
+import com.hereliesaz.geministrator.providers.spentTokens
 import com.hereliesaz.geministrator.workflow.HALL_MONITOR_REPORT_ID_METADATA
 import com.hereliesaz.geministrator.workflow.HALL_MONITOR_REVIEW_VERDICT_METADATA
 import kotlinx.coroutines.CancellationException
@@ -43,6 +46,8 @@ open class TextLlmProvider(
      * run has tools, the run goes through [McpToolLoop] instead of one streamed generation.
      */
     private val tools: McpToolSource? = null,
+    /** What this provider's models cost; the app's one price list unless a test gives its own. */
+    private val pricing: ModelPriceTable = ModelPriceTable.Default,
 ) : AgentProvider {
     private data class Session(
         val request: AgentTaskRequest,
@@ -77,7 +82,10 @@ open class TextLlmProvider(
      * provider-side gate. A refusal (HTTP 429, bad key) propagates, and the engine fails the task
      * with this provider's reason.
      */
-    override suspend fun draftPlan(request: AgentTaskRequest): String {
+    override suspend fun draftPlan(request: AgentTaskRequest): String = draftPlanWithUsage(request).text
+
+    /** The plan and what drafting it spent: a draft is a billed generation, counted like any other. */
+    override suspend fun draftPlanWithUsage(request: AgentTaskRequest): ProviderPlanDraft {
         val rendered = renderPrompt(request)
         // Appended to the dynamic part: the plan draft shares the stable prefix the run will reuse.
         val prompt = rendered.copy(
@@ -86,13 +94,30 @@ open class TextLlmProvider(
                 "produces. Do not perform the task yet; it starts once the plan is approved.\n",
         )
         val draft = try {
-            api.generate(prompt).text
+            api.generate(prompt)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Exception) {
-            throw IllegalStateException("$displayName: ${failure.message?.takeIf { it.isNotBlank() } ?: failure::class.simpleName}", failure)
+            // A draft cut off at the limit was still billed: the tokens ride on the failure the engine reads.
+            val spent = failure.spentTokens()
+            throw SpentGenerationFailure(
+                "$displayName: ${failure.message?.takeIf { it.isNotBlank() } ?: failure::class.simpleName}",
+                failure,
+                spent?.spentInputTokens,
+                spent?.spentOutputTokens,
+                spent?.spentCachedInputTokens,
+                spent?.let { priced(it.spentInputTokens, it.spentOutputTokens, it.spentCachedInputTokens)?.first },
+            )
         }
-        return draft.take(MAX_PLAN_PREVIEW_CHARS)
+        val usage = billedUsage(draft)
+        return ProviderPlanDraft(
+            text = draft.text.take(MAX_PLAN_PREVIEW_CHARS),
+            inputTokens = usage?.inputTokens,
+            outputTokens = usage?.outputTokens,
+            costUsd = usage?.costUsd,
+            cacheHitFraction = usage?.cacheHitFraction,
+            costUnknown = usage?.costUnknown == true,
+        )
     }
 
     override suspend fun start(request: AgentTaskRequest): AgentRunHandle {
@@ -154,6 +179,8 @@ open class TextLlmProvider(
             }
             val phase = session.phase.filter { it != TextLlmSessionPhase.AwaitingApproval }.first()
             if (phase == TextLlmSessionPhase.Cancelled) {
+                // The plan was generated, and billed, before it was cancelled.
+                session.planResult?.let { emitUsage(runId, it) }
                 emit(AgentEvent.Failed(runId, "$displayName session cancelled"))
                 mutex.withLock { sessions.remove(runId) }
                 return@flow
@@ -163,7 +190,7 @@ open class TextLlmProvider(
             // reconstructed by reconnect() after a restart only has the durable plan
             // flag, not the generation itself, so it executes exactly once here.
             val result = session.planResult ?: generateOrFail(runId, session) ?: return@flow
-            if (cancelledDuringGeneration(runId, session)) return@flow
+            if (cancelledDuringGeneration(runId, session, result)) return@flow
             emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text, session.toolOutcomes)))
             emitUsage(runId, result)
         } else {
@@ -173,7 +200,7 @@ open class TextLlmProvider(
                 return@flow
             }
             val result = generateOrFail(runId, session) ?: return@flow
-            if (cancelledDuringGeneration(runId, session)) return@flow
+            if (cancelledDuringGeneration(runId, session, result)) return@flow
             emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text, session.toolOutcomes)))
             emitUsage(runId, result)
         }
@@ -181,28 +208,57 @@ open class TextLlmProvider(
         mutex.withLock { sessions.remove(runId) }
     }
 
-    /** Token counts and, where the API reported cached input, the prompt-cache hit fraction. */
+    /** Token counts and, where the API reported cached input, the prompt-cache hit fraction; priced when the model has a price. */
     private suspend fun FlowCollector<AgentEvent>.emitUsage(runId: ProviderRunId, result: TextGenerationResult) {
-        if (result.inputTokens == null && result.outputTokens == null) return
-        emit(
-            AgentEvent.UsageReported(
-                runId = runId,
-                inputTokens = result.inputTokens,
-                outputTokens = result.outputTokens,
-                cacheHitFraction = result.cacheHitFraction,
-            ),
+        val usage = billedUsage(result) ?: return
+        emit(usage.toEvent(runId))
+    }
+
+    /** What [result] cost: its tokens, and a price (or "unknown", which a dollar cap does not treat as free). */
+    private fun billedUsage(result: TextGenerationResult): BilledUsage? {
+        if (result.inputTokens == null && result.outputTokens == null) return null
+        val (cost, unknown) = priced(result.inputTokens, result.outputTokens, result.cachedInputTokens) ?: (null to false)
+        return BilledUsage(result.inputTokens, result.outputTokens, cost, result.cacheHitFraction, unknown)
+    }
+
+    /**
+     * The cost of [inputTokens] and [outputTokens] (with its unknown flag): free for an anonymous keyless
+     * endpoint, the list price for a priced model, otherwise null cost with the unknown flag set. Null when
+     * there are no tokens to price.
+     */
+    private fun priced(inputTokens: Long?, outputTokens: Long?, cachedInputTokens: Long?): Pair<Double?, Boolean>? =
+        pricedUsage(api, id.value, pricing, inputTokens, outputTokens, cachedInputTokens)
+
+    private class BilledUsage(
+        val inputTokens: Long?,
+        val outputTokens: Long?,
+        val costUsd: Double?,
+        val cacheHitFraction: Float?,
+        val costUnknown: Boolean,
+    ) {
+        fun toEvent(runId: ProviderRunId) = AgentEvent.UsageReported(
+            runId = runId,
+            inputTokens = inputTokens,
+            outputTokens = outputTokens,
+            costUsd = costUsd,
+            cacheHitFraction = cacheHitFraction,
+            costUnknown = costUnknown,
         )
     }
 
     /**
-     * cancel() only flips the phase; a generation already streaming runs to its end. Its result must
-     * then be dropped, not delivered as the artifact of a run the engine believes cancelled.
+     * cancel() flips the phase and stops the streaming generation and the tool loop at their next step, but a
+     * request already in flight can still come back. Its result must then be dropped, not delivered as the
+     * artifact of a run the engine believes cancelled.
      */
     private suspend fun FlowCollector<AgentEvent>.cancelledDuringGeneration(
         runId: ProviderRunId,
         session: Session,
+        result: TextGenerationResult,
     ): Boolean {
         if (session.phase.value != TextLlmSessionPhase.Cancelled) return false
+        // Dropped, but not free: the provider billed it.
+        emitUsage(runId, result)
         emit(AgentEvent.Failed(runId, "$displayName session cancelled"))
         mutex.withLock { sessions.remove(runId) }
         return true
@@ -224,6 +280,8 @@ open class TextLlmProvider(
                     api = api,
                     prompt = renderPrompt(session.request).text + "\n\n" + McpToolLoop.TOOL_GUIDANCE,
                     toolbox = toolbox,
+                    // A cancelled run starts no further round and calls no further tool.
+                    isCancelled = { session.phase.value == TextLlmSessionPhase.Cancelled },
                 ) { call ->
                     val offer = toolbox.offers.firstOrNull { it.name == call.name }
                     emit(AgentEvent.Progress(runId, "Calling ${offer?.toolName ?: call.name} on ${offer?.serverName ?: "an MCP server"}"))
@@ -239,12 +297,37 @@ open class TextLlmProvider(
         }
         // Streamed: visible reasoning goes out as Thinking, where memory can answer it mid-thought.
         withTools ?: session.generation.run(renderPrompt(session.request)) { thought -> emit(AgentEvent.Thinking(runId, thought)) }
+    } catch (_: InterruptibleGeneration.GenerationCancelled) {
+        failCancelled(runId)
+    } catch (_: McpToolLoop.Cancelled) {
+        failCancelled(runId)
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (failure: Exception) {
+        // A reply that was cut off or unusable was still billed: its tokens are reported before the failure.
+        failure.spentTokens()?.let { spent ->
+            priced(spent.spentInputTokens, spent.spentOutputTokens, spent.spentCachedInputTokens)?.let { (cost, unknown) ->
+                emit(
+                    AgentEvent.UsageReported(
+                        runId = runId,
+                        inputTokens = spent.spentInputTokens,
+                        outputTokens = spent.spentOutputTokens,
+                        costUsd = cost,
+                        costUnknown = unknown,
+                    ),
+                )
+            }
+        }
         emit(AgentEvent.Failed(runId, "$displayName: ${failure.message?.takeIf { it.isNotBlank() } ?: failure::class.simpleName}"))
         mutex.withLock { sessions.remove(runId) }
         null
+    }
+
+    /** The run was cancelled while generating: it ends as cancelled, and nothing it made is delivered. */
+    private suspend fun FlowCollector<AgentEvent>.failCancelled(runId: ProviderRunId): TextGenerationResult? {
+        emit(AgentEvent.Failed(runId, "$displayName session cancelled"))
+        mutex.withLock { sessions.remove(runId) }
+        return null
     }
 
     /**
@@ -273,6 +356,8 @@ open class TextLlmProvider(
     override suspend fun cancel(runId: ProviderRunId): ProviderActionResult {
         val session = mutex.withLock { sessions[runId] } ?: return ProviderActionResult.Accepted
         session.phase.value = TextLlmSessionPhase.Cancelled
+        // A generation already streaming stops at its next piece instead of running to its end, billed.
+        session.generation.cancel()
         return ProviderActionResult.Accepted
     }
 

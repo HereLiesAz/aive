@@ -22,8 +22,25 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 class PersistenceCorruptionException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
+
+/**
+ * The stored data says a newer build saved it ([foundVersion] is above what this build reads). It is not
+ * damaged, so it is not corruption: nothing here reads it as such, offers to clear it, or writes over it.
+ */
+class UnsupportedPersistenceSchemaException(
+    val foundVersion: Int,
+    val supportedVersion: Int,
+    cause: Throwable? = null,
+) : IllegalArgumentException(
+    "Unsupported workflow persistence schema $foundVersion: this data was saved by a newer version of the app, " +
+        "and this version reads up to $supportedVersion. Update the app to open it. Nothing has been changed or deleted.",
+    cause,
+)
 
 private val settingsWorkflowPersistenceMutex = Mutex()
 
@@ -233,6 +250,8 @@ class SettingsWorkflowPersistence(
     override suspend fun clearWorkflowData() {
         settingsWorkflowPersistenceMutex.withLock {
             snapshotSettings.remove(storageKey)
+            decodedText = null
+            decodedSnapshot = null
             if (storageKey == DEFAULT_STORAGE_KEY) {
                 settings.remove(LEGACY_STORAGE_KEY_V1)
             }
@@ -344,6 +363,10 @@ class SettingsWorkflowPersistence(
             val decoded = try {
                 json.decodeFromString(WorkflowEvent.serializer(), encoded)
             } catch (failure: Exception) {
+                // An event kind a newer build added is not damage: the snapshot it was saved beside says which build saved it.
+                storedVersionUnlocked()?.takeIf { it > CURRENT_SCHEMA_VERSION }?.let { newer ->
+                    throw UnsupportedPersistenceSchemaException(newer, CURRENT_SCHEMA_VERSION, failure)
+                }
                 throw corruption("Workflow event journal entry $index for ${workflowRunId.value} is unreadable.", failure)
             }
             decoded.also {
@@ -405,14 +428,44 @@ class SettingsWorkflowPersistence(
 
     override suspend fun recoverFromCorruption(): Boolean {
         val hadData = settingsWorkflowPersistenceMutex.withLock {
+            // Clearing is for damaged data. What a newer build saved is not damaged, and is kept.
+            storedVersionUnlocked()?.takeIf { it > CURRENT_SCHEMA_VERSION }?.let { newer ->
+                throw UnsupportedPersistenceSchemaException(newer, CURRENT_SCHEMA_VERSION)
+            }
             val had = snapshotSettings.hasKey(storageKey) ||
                 settings.hasKey(LEGACY_STORAGE_KEY_V1)
             snapshotSettings.remove(storageKey)
             settings.remove(LEGACY_STORAGE_KEY_V1)
+            decodedText = null
+            decodedSnapshot = null
             had
         }
         lastCorruptionError = null
         return hadData
+    }
+
+    /**
+     * The snapshot last read or written and the text it was read from or written as: the runtime reads the
+     * store several times a second, and a read of text that has not changed need not be decoded again.
+     * Guarded by [settingsWorkflowPersistenceMutex], like every read and write.
+     */
+    private var decodedText: String? = null
+    private var decodedSnapshot: PersistenceSnapshot? = null
+
+    /** The format version the stored text says it has, read without decoding the rest; null when it cannot be read. */
+    private fun declaredVersion(encoded: String): Int? = try {
+        (json.parseToJsonElement(encoded) as? JsonObject)?.get("version")?.jsonPrimitive?.intOrNull
+    } catch (_: Exception) {
+        null
+    }
+
+    private fun storedVersionUnlocked(): Int? {
+        val text = try {
+            snapshotSettings.getStringOrNull(storageKey)
+        } catch (_: Exception) {
+            null
+        } ?: if (storageKey == DEFAULT_STORAGE_KEY) settings.getStringOrNull(LEGACY_STORAGE_KEY_V1) else null
+        return text?.let(::declaredVersion)
     }
 
     private fun readUnlocked(): PersistenceSnapshot {
@@ -424,10 +477,15 @@ class SettingsWorkflowPersistence(
             null
         }
         val encoded = currentEncoded ?: legacyEncoded ?: return PersistenceSnapshot()
+        if (currentEncoded != null && currentEncoded == decodedText) decodedSnapshot?.let { return it }
 
         val snapshot = try {
             json.decodeFromString(PersistenceSnapshot.serializer(), encoded)
         } catch (failure: Exception) {
+            // Data a newer build saved can hold values this build does not know: that is a version to report, not damage.
+            declaredVersion(encoded)?.takeIf { it > CURRENT_SCHEMA_VERSION }?.let { newer ->
+                throw UnsupportedPersistenceSchemaException(newer, CURRENT_SCHEMA_VERSION, failure)
+            }
             lastCorruptionError = failure
             throw PersistenceCorruptionException(
                 "Workflow persistence data is unreadable and must be recovered. " +
@@ -436,8 +494,8 @@ class SettingsWorkflowPersistence(
             )
         }
 
-        require(snapshot.version <= CURRENT_SCHEMA_VERSION) {
-            "Unsupported workflow persistence schema ${snapshot.version}; maximum supported is $CURRENT_SCHEMA_VERSION"
+        if (snapshot.version > CURRENT_SCHEMA_VERSION) {
+            throw UnsupportedPersistenceSchemaException(snapshot.version, CURRENT_SCHEMA_VERSION)
         }
 
         val migrated = migrate(snapshot)
@@ -446,15 +504,18 @@ class SettingsWorkflowPersistence(
             if (legacyEncoded != null) {
                 settings.remove(LEGACY_STORAGE_KEY_V1)
             }
+        } else {
+            decodedText = currentEncoded
+            decodedSnapshot = migrated
         }
         return migrated
     }
 
     private fun writeSnapshotUnlocked(snapshot: PersistenceSnapshot) {
-        snapshotSettings.putString(
-            storageKey,
-            json.encodeToString(PersistenceSnapshot.serializer(), snapshot),
-        )
+        val encoded = json.encodeToString(PersistenceSnapshot.serializer(), snapshot)
+        snapshotSettings.putString(storageKey, encoded)
+        decodedText = encoded
+        decodedSnapshot = snapshot
     }
 
     companion object {

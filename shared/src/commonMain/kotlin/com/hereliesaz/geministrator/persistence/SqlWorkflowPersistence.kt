@@ -123,6 +123,14 @@ class SqlWorkflowPersistence(
         }
     }
 
+    override suspend fun runsUpdatedSince(sinceEpochMillis: Long): List<WorkflowRun> = locked {
+        queries.runsUpdatedSince(sinceEpochMillis).awaitAsList().mapNotNull { it.decode(WorkflowRun.serializer()) }
+    }
+
+    override suspend fun eventsSince(runId: WorkflowRunId, sinceEpochMillis: Long): List<WorkflowEvent> = locked {
+        queries.eventsForRunSince(runId.value, sinceEpochMillis).awaitAsList().mapNotNull { it.decode(WorkflowEvent.serializer()) }
+    }
+
     override suspend fun replaceCatalog(definitions: List<WorkflowDefinition>, roles: List<RoleDefinition>) = locked {
         database.transaction {
             queries.deleteDefinitions()

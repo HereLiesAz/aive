@@ -64,6 +64,13 @@ interface RemoteComputeCoordinator {
     suspend fun dispatch(context: RemoteComputeContext): RemoteComputeDispatch
 
     suspend fun reconcile(context: RemoteComputeContext): RemoteComputeUpdate?
+
+    /**
+     * Stops the work leased for [taskRun] (one this coordinator [owns]); null when it stopped, otherwise why it
+     * did not. A cancelled or rewound run asks this for every unfinished task the mesh holds, like every other
+     * remote run. The default has nothing to stop.
+     */
+    suspend fun cancel(taskRun: TaskRun): String? = null
 }
 
 /**
@@ -124,6 +131,23 @@ class MeshRemoteComputeCoordinator(
                     localParticipant = placement.participants.any(ComputeParticipant::local),
                 )
             }
+        }
+    }
+
+    override suspend fun cancel(taskRun: TaskRun): String? {
+        val groupId = taskRun.externalRunId
+            ?.takeIf { it.startsWith(EXTERNAL_RUN_PREFIX) }
+            ?.removePrefix(EXTERNAL_RUN_PREFIX)
+            ?.takeIf(String::isNotBlank)
+            ?.let(::ComputeLeaseGroupId)
+            ?: return null
+        return try {
+            transport.cancel(groupId, "The workflow run was cancelled")
+            null
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            failure.message?.takeIf(String::isNotBlank) ?: "The compute mesh could not cancel its lease group"
         }
     }
 

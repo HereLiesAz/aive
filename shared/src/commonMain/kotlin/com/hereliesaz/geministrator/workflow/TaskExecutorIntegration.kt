@@ -201,6 +201,8 @@ data class TaskExecutorExecution(
     val artifacts: List<ArtifactRef> = emptyList(),
     val progress: Float? = null,
     val progressMessage: String? = null,
+    /** The task's total spend so far when the executor reports one (a nested workflow's child run); null keeps what the task has. */
+    val usage: com.hereliesaz.geministrator.domain.TaskUsage? = null,
 ) {
     init {
         require(status in supportedStatuses) {

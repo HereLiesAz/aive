@@ -6,6 +6,9 @@ import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.events.ApprovalDecisionReceived
+import com.hereliesaz.geministrator.events.TaskFailed
+import com.hereliesaz.geministrator.events.WorkflowEventSink
+import com.hereliesaz.geministrator.events.WorkflowFailed
 import com.hereliesaz.geministrator.providers.ProviderActionResult
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -17,6 +20,8 @@ class WorkflowApprovalService(
     private val gateCoordinator: ApprovalGateCoordinator,
     private val sessionGateway: ManagedSessionGateway,
     private val failureEscalationDecisionStore: FailureEscalationDecisionStore? = null,
+    /** Where the task's and the run's failure are written when a person rejects an escalation; none writes none. */
+    private val eventSink: WorkflowEventSink? = null,
 ) {
     /**
      * Approves a plan gate. [handle] is the provider session that drafted the plan, or null for an
@@ -206,12 +211,15 @@ class WorkflowApprovalService(
                 updatedAtEpochMillis = nowEpochMillis,
             )
         } else {
-            TaskRunTransitions.requireAllowed(TaskRunStatus.Escalated, TaskRunStatus.Cancelled)
+            // The task failed and the person declined to retry it: it ends Failed, as when the engine reads the same
+            // decision back (WorkflowEngine.resolveEscalation). Cancelled means "did not run", which a failure handler
+            // and the run's log must not mistake this for.
+            TaskRunTransitions.requireAllowed(TaskRunStatus.Escalated, TaskRunStatus.Failed)
             run.copy(
                 status = WorkflowRunStatus.Failed,
                 taskRuns = run.taskRuns + (
                     taskDefinitionId to taskRun.copy(
-                        status = TaskRunStatus.Cancelled,
+                        status = TaskRunStatus.Failed,
                         blockingReason = null,
                         progressMessage = note ?: "Failure escalation rejected",
                     )
@@ -255,6 +263,11 @@ class WorkflowApprovalService(
                 note = note,
                 nowEpochMillis = nowEpochMillis,
             )
+        }
+        if (!approved) {
+            val reason = note ?: "Failure escalation rejected"
+            eventSink?.append(TaskFailed(run.id, taskDefinitionId, reason, nowEpochMillis))
+            eventSink?.append(WorkflowFailed(run.id, reason, nowEpochMillis))
         }
 
         return nextRun

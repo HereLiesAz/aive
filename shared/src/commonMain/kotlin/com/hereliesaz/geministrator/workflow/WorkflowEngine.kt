@@ -9,6 +9,7 @@ import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.BlockingReason
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProviderConstraints
+import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.RetryReason
 import com.hereliesaz.geministrator.domain.RoleDefinition
@@ -49,9 +50,15 @@ import com.hereliesaz.geministrator.providers.PromptContext
 import com.hereliesaz.geministrator.providers.PromptContextBlock
 import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.providers.ProviderArtifact
+import com.hereliesaz.geministrator.providers.ProviderPlanDraft
+import com.hereliesaz.geministrator.providers.SpentTokens
+import com.hereliesaz.geministrator.providers.spentTokens
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -93,6 +100,22 @@ class WorkflowEngine(
         val id = roleId ?: return false
         val budget = roleTokenBudget(run, id) ?: return false
         return run.roleTokensSpent(id) >= budget
+    }
+
+    /**
+     * What [roleId]'s running tasks that have reported no usage yet are expected to spend: the estimate of
+     * their input. Their usage lands only when their session reports it, and until then the role's budget
+     * would not see them.
+     */
+    private fun roleTokensInFlight(definition: WorkflowDefinition, run: WorkflowRun, roleId: RoleDefinitionId): Long {
+        val role = roleDefinition(run, roleId) ?: return 0L
+        val tasks = definition.tasks.associateBy { it.id }
+        return run.taskRuns.values
+            .filter { it.status.isActive() && it.assignedRoleId == roleId && (it.usage?.totalTokens ?: 0L) == 0L }
+            .sumOf { taskRun ->
+                val task = tasks[taskRun.taskDefinitionId] ?: return@sumOf 0L
+                estimateTaskInputTokens(definition, run, task, role).toLong()
+            }
     }
 
     /**
@@ -189,6 +212,10 @@ class WorkflowEngine(
         )
 
         val pendingAgentDispatches = mutableListOf<PendingAgentDispatch>()
+        /** Tasks that hold at a plan gate and need their plan drafted before they start ([draftPlans]). */
+        val pendingDrafts = mutableListOf<PendingAgentDispatch>()
+        /** Tokens set aside for the budgeted roles' tasks chosen to start in this pass, by role ([roleTokensInFlight]). */
+        val reservedThisBatch = mutableMapOf<RoleDefinitionId, Long>()
 
         for (taskRun in dispatchable) {
             if (remainingSlots == 0) break
@@ -244,12 +271,26 @@ class WorkflowEngine(
                         continue
                     }
 
+                    // The budget is checked against usage that has landed, and tasks of this role that are
+                    // running have reported none yet: left to start together they would each be within the
+                    // budget and together over it. What the running ones are expected to spend (their input,
+                    // which is the least they will bill) is set aside, so a task that would take the role over
+                    // waits Ready until their usage lands. The first task of a role always starts.
+                    val ownEstimate = estimateTaskInputTokens(definition, nextRun, task, role)
+                    val roleBudget = roleTokenBudget(nextRun, budgetRoleId)
+                    if (roleBudget != null) {
+                        val reserved = roleTokensInFlight(definition, nextRun, budgetRoleId) +
+                            (reservedThisBatch[budgetRoleId] ?: 0L)
+                        if (reserved > 0L && nextRun.roleTokensSpent(budgetRoleId) + reserved + ownEstimate > roleBudget) continue
+                        reservedThisBatch[budgetRoleId] = (reservedThisBatch[budgetRoleId] ?: 0L) + ownEstimate
+                    }
+
                     val selection = ProviderSelectionRequest(
                         preferredProviderId = role.preferredProviderId,
                         requiredCapabilities = role.capabilitiesRequired,
                         constraints = task.providerConstraints,
                         repository = project.repository,
-                        estimatedInputTokens = estimateTaskInputTokens(definition, nextRun, task, role),
+                        estimatedInputTokens = ownEstimate,
                         excludedProviderIds = taskRun.failedProviders.toSet(),
                         failoverAllowed = isProviderAuto(role, task),
                     )
@@ -282,55 +323,7 @@ class WorkflowEngine(
                     } else {
                         builtRequest
                     }
-                    if (request.requirePlanApproval) {
-                        val drafted = try {
-                            sessionGateway.draftPlan(providerId, request)
-                        } catch (failure: ManagedSessionFailure) {
-                            // A provider refusal while drafting (HTTP 429, bad key) fails the task with
-                            // the provider's reason and goes through the task's retry policy.
-                            nextRun = failTaskBeforeStart(
-                                definition = definition,
-                                run = nextRun,
-                                taskRun = taskRun,
-                                task = task,
-                                reason = failure.message?.takeIf(String::isNotBlank) ?: "Unable to draft a plan",
-                                nowEpochMillis = nowEpochMillis,
-                                providerId = providerId,
-                                selection = selection,
-                            )
-                            if (nextRun.status.isTerminal()) {
-                                // The task's policy failed the workflow: start nothing else, and keep
-                                // the terminal status rather than overwriting it below.
-                                return DispatchResult(nextRun, handles)
-                            }
-                            continue
-                        }
-                        if (drafted != null) {
-                            // Engine-owned gate: hold the task with the drafted plan; no run exists yet.
-                            TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.AwaitingApproval)
-                            humanApprovalPending = true
-                            nextRun = nextRun.copy(
-                                taskRuns = nextRun.taskRuns + (
-                                    task.id to taskRun.copy(
-                                        status = TaskRunStatus.AwaitingApproval,
-                                        assignedRoleId = task.roleId ?: role.id,
-                                        executor = executor,
-                                        assignedProviderId = providerId,
-                                        providerRunId = null,
-                                        externalRunId = null,
-                                        blockingReason = null,
-                                        progress = null,
-                                        progressMessage = drafted,
-                                        providerPlan = drafted,
-                                    )
-                                ),
-                                updatedAtEpochMillis = nowEpochMillis,
-                            )
-                            eventSink.append(HumanDecisionRequired(nextRun.id, task.id, "Plan approval", nowEpochMillis))
-                            continue
-                        }
-                    }
-                    pendingAgentDispatches += PendingAgentDispatch(
+                    val dispatch = PendingAgentDispatch(
                         taskRun = taskRun,
                         task = task,
                         role = role,
@@ -346,6 +339,13 @@ class WorkflowEngine(
                         providerId = providerId,
                         selection = selection,
                     )
+                    if (request.requirePlanApproval) {
+                        // Its plan is drafted with the other tasks' after this pass has looked at every task
+                        // ([draftPlans]); a provider that plans inside its own run starts it then.
+                        pendingDrafts += dispatch
+                        continue
+                    }
+                    pendingAgentDispatches += dispatch
                     activeByProvider[providerId] = providerActive + 1
                     remainingSlots -= 1
                 }
@@ -379,6 +379,73 @@ class WorkflowEngine(
                 is TaskExecutor.NestedWorkflow,
                 is TaskExecutor.Distributed,
                 -> continue
+            }
+        }
+
+        // Plans are drafted together, a few at a time, not one after another: each is a model call that can take a
+        // minute and a half, and the cycle that waits on them holds the runtime's lock.
+        if (pendingDrafts.isNotEmpty()) {
+            val drafts = draftPlans(pendingDrafts.map { it.providerId to it.request })
+            for ((pending, outcome) in pendingDrafts.zip(drafts)) {
+                val failure = outcome.exceptionOrNull()
+                if (failure != null) {
+                    if (failure !is ManagedSessionFailure) throw failure
+                    // A provider refusal while drafting (HTTP 429, bad key) fails the task with the provider's
+                    // reason and goes through the task's retry policy. A draft that was cut off was still billed:
+                    // what it spent counts toward the task's budget.
+                    nextRun = failTaskBeforeStart(
+                        definition = definition,
+                        run = nextRun,
+                        taskRun = chargePlanDraft(nextRun, pending.taskRun, pending.task, pending.providerId, failure.spentTokens()?.toUsage(), nowEpochMillis),
+                        task = pending.task,
+                        reason = failure.message?.takeIf(String::isNotBlank) ?: "Unable to draft a plan",
+                        nowEpochMillis = nowEpochMillis,
+                        providerId = pending.providerId,
+                        selection = pending.selection,
+                    )
+                    if (nextRun.status.isTerminal()) {
+                        // The task's policy failed the workflow: start nothing else, and keep
+                        // the terminal status rather than overwriting it below.
+                        return DispatchResult(nextRun, handles)
+                    }
+                    continue
+                }
+                val draft = outcome.getOrNull()
+                val drafted = draft?.text
+                if (drafted != null) {
+                    // Engine-owned gate: hold the task with the drafted plan; no run exists yet.
+                    TaskRunTransitions.requireAllowed(pending.taskRun.status, TaskRunStatus.AwaitingApproval)
+                    humanApprovalPending = true
+                    val charged = chargePlanDraft(nextRun, pending.taskRun, pending.task, pending.providerId, draft.toUsage(), nowEpochMillis)
+                    nextRun = nextRun.copy(
+                        taskRuns = nextRun.taskRuns + (
+                            pending.task.id to charged.copy(
+                                status = TaskRunStatus.AwaitingApproval,
+                                assignedRoleId = pending.task.roleId ?: pending.role.id,
+                                executor = pending.executor,
+                                assignedProviderId = pending.providerId,
+                                providerRunId = null,
+                                externalRunId = null,
+                                blockingReason = null,
+                                progress = null,
+                                progressMessage = drafted,
+                                providerPlan = drafted,
+                            )
+                        ),
+                        updatedAtEpochMillis = nowEpochMillis,
+                    )
+                    eventSink.append(HumanDecisionRequired(nextRun.id, pending.task.id, "Plan approval", nowEpochMillis))
+                    continue
+                }
+                // The provider plans inside its own run: it starts now, if a slot and its provider's limit allow;
+                // otherwise the task stays Ready and starts on a later pass.
+                val providerLimit = definition.concurrencyPolicy.perProviderLimits[pending.providerId] ?: Int.MAX_VALUE
+                val providerActive = activeByProvider[pending.providerId] ?: 0
+                if (remainingSlots > 0 && providerActive < providerLimit) {
+                    pendingAgentDispatches += pending
+                    activeByProvider[pending.providerId] = providerActive + 1
+                    remainingSlots -= 1
+                }
             }
         }
 
@@ -491,6 +558,83 @@ class WorkflowEngine(
         }
         return DispatchResult(nextRun.copy(status = finalStatus), handles)
     }
+
+    /**
+     * Drafts the plans for [requests] (provider and request), at most [MAX_CONCURRENT_PLAN_DRAFTS] at a time, each
+     * outcome in the order of its request. A draft that fails is that task's outcome, not the batch's.
+     */
+    private suspend fun draftPlans(
+        requests: List<Pair<AgentProviderId, AgentTaskRequest>>,
+    ): List<Result<ProviderPlanDraft?>> {
+        val permits = Semaphore(MAX_CONCURRENT_PLAN_DRAFTS)
+        return coroutineScope {
+            requests.map { (providerId, request) ->
+                async {
+                    permits.withPermit {
+                        try {
+                            Result.success(sessionGateway.draftPlanWithUsage(providerId, request))
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (failure: Throwable) {
+                            Result.failure(failure)
+                        }
+                    }
+                }
+            }.awaitAll()
+        }
+    }
+
+    /**
+     * [taskRun] with what drafting its plan spent ([usage]) added, and that spend recorded as a usage event.
+     * Drafting a plan is a billed generation like any other: the task's role budget and the keeper's spend
+     * caps count it. Nothing changes when the draft reported no usage.
+     */
+    private suspend fun chargePlanDraft(
+        run: WorkflowRun,
+        taskRun: TaskRun,
+        task: TaskDefinition,
+        providerId: AgentProviderId,
+        usage: ManagedSessionUsage?,
+        nowEpochMillis: Long,
+    ): TaskRun {
+        val clean = usage?.sanitized() ?: return taskRun
+        val total = taskRun.usage.plus(clean) ?: return taskRun
+        runCatching {
+            eventSink.append(
+                ProviderUsageRecorded(
+                    workflowRunId = run.id,
+                    taskDefinitionId = task.id,
+                    providerId = providerId,
+                    providerRunId = ProviderRunId("${providerId.value}/plan-draft/${taskRun.id.value}"),
+                    inputTokens = clean.inputTokens,
+                    outputTokens = clean.outputTokens,
+                    costUsd = clean.costUsd,
+                    cacheHitFraction = clean.cacheHitFraction,
+                    costUnknown = clean.costUnknown,
+                    occurredAtEpochMillis = nowEpochMillis,
+                ),
+            )
+        }
+        return taskRun.copy(usage = total)
+    }
+
+    private fun ProviderPlanDraft?.toUsage(): ManagedSessionUsage? = this?.let {
+        if (it.inputTokens == null && it.outputTokens == null && it.costUsd == null && !it.costUnknown) null else ManagedSessionUsage(
+            inputTokens = it.inputTokens,
+            outputTokens = it.outputTokens,
+            costUsd = it.costUsd,
+            cacheHitFraction = it.cacheHitFraction,
+            costUnknown = it.costUnknown,
+        )
+    }
+
+    private fun SpentTokens.toUsage(): ManagedSessionUsage = ManagedSessionUsage(
+        inputTokens = spentInputTokens,
+        outputTokens = spentOutputTokens,
+        costUsd = spentCostUsd,
+        // A failed attempt was billed: unless the provider priced it, its cost is unknown, not free.
+        costUnknown = spentCostUsd == null,
+    )
 
     /**
      * Fails [task] before any session exists for it (a provider refused to draft its plan or to
@@ -654,7 +798,7 @@ class WorkflowEngine(
             // Usage is best effort, but cancellation of the cycle must still propagate.
             var usageTotal = taskRun.usage
             try {
-                sessionGateway.usageReport(handle)?.let { usage ->
+                sessionGateway.usageReport(handle)?.sanitized()?.let { usage ->
                     usageTotal = usageTotal.plus(usage)
                     eventSink.append(
                         ProviderUsageRecorded(
@@ -667,6 +811,7 @@ class WorkflowEngine(
                             costUsd = usage.costUsd,
                             cacheHitFraction = usage.cacheHitFraction,
                             latencyMillis = usage.latencyMillis,
+                            costUnknown = usage.costUnknown,
                             occurredAtEpochMillis = nowEpochMillis,
                         ),
                     )
@@ -802,7 +947,16 @@ class WorkflowEngine(
         if (workflowStatus == WorkflowRunStatus.Completed && run.status != WorkflowRunStatus.Completed) {
             eventSink.append(WorkflowCompleted(nextRun.id, nowEpochMillis))
         }
-        return nextRun.copy(status = workflowStatus, updatedAtEpochMillis = nowEpochMillis)
+        // A run whose every task ended Cancelled (a repository change that needed an approval nobody granted,
+        // branches whose condition was not met) is cancelled, and says so in its log like a stopped one.
+        if (workflowStatus == WorkflowRunStatus.Cancelled && run.status != WorkflowRunStatus.Cancelled) {
+            eventSink.append(WorkflowCancelled(nextRun.id, nowEpochMillis))
+        }
+        val result = nextRun.copy(status = workflowStatus)
+        // Nothing changed but the clock: the run is returned as it was, with its own time. Stamping every pass made
+        // an idle run look new to everything that compares or stores runs, so it was rewritten every second.
+        if (result.copy(updatedAtEpochMillis = run.updatedAtEpochMillis) == run) return run
+        return result.copy(updatedAtEpochMillis = nowEpochMillis)
     }
 
     /** True when the keeper left the provider to the app: no role preference and no provider required by id. */
@@ -1072,18 +1226,42 @@ class WorkflowEngine(
             if (!roleBudgetSpent(nextRun, roleId)) continue
             // The task is parked either way so nothing more is sent, but a session the provider would not
             // stop keeps billing: that is recorded, not lost.
+            var stoppedUsage: ManagedSessionUsage? = null
             withContext(NonCancellable) {
-                sessionGateway.cancelFailure(handle)?.let { reason ->
+                val refusal = sessionGateway.cancelFailure(handle)
+                if (refusal != null) {
                     runCatching {
                         eventSink.append(
                             ExternalRunCancelFailed(
                                 workflowRunId = run.id,
                                 taskDefinitionId = taskId,
                                 externalRunId = handle.providerRunId.value,
-                                reason = reason,
+                                reason = refusal,
                                 occurredAtEpochMillis = nowEpochMillis,
                             ),
                         )
+                    }
+                } else {
+                    // What it spent between the last poll and the stop is still spent: it counts toward the budget.
+                    stoppedUsage = runCatching { sessionGateway.usageReport(handle)?.sanitized() }.getOrNull()
+                    stoppedUsage?.let { usage ->
+                        runCatching {
+                            eventSink.append(
+                                ProviderUsageRecorded(
+                                    workflowRunId = run.id,
+                                    taskDefinitionId = taskId,
+                                    providerId = handle.providerId,
+                                    providerRunId = handle.providerRunId,
+                                    inputTokens = usage.inputTokens,
+                                    outputTokens = usage.outputTokens,
+                                    costUsd = usage.costUsd,
+                                    cacheHitFraction = usage.cacheHitFraction,
+                                    latencyMillis = usage.latencyMillis,
+                                    costUnknown = usage.costUnknown,
+                                    occurredAtEpochMillis = nowEpochMillis,
+                                ),
+                            )
+                        }
                     }
                 }
             }
@@ -1091,6 +1269,7 @@ class WorkflowEngine(
             nextRun = nextRun.copy(
                 taskRuns = nextRun.taskRuns + (
                     taskId to taskRun.copy(
+                        usage = stoppedUsage?.let { taskRun.usage.plus(it) } ?: taskRun.usage,
                         status = TaskRunStatus.Blocked,
                         attempt = taskRun.attempt + 1,
                         heldAttempts = taskRun.heldAttempts + 1,
@@ -1146,6 +1325,8 @@ class WorkflowEngine(
     )
 
     private companion object {
+        /** Plan drafts in flight at once in one pass: enough to overlap the waits, few enough not to flood a provider. */
+        const val MAX_CONCURRENT_PLAN_DRAFTS = 4
         val BUDGET_STOPPABLE = setOf(TaskRunStatus.Planning, TaskRunStatus.Running, TaskRunStatus.Verifying)
     }
     /** A task in one of these states has no agent left to answer: its question is dropped. */

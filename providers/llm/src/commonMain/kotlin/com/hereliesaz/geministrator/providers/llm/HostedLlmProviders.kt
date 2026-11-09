@@ -278,6 +278,8 @@ object HostedLlmProviders {
             extraHeaders = spec.extraHeaders,
             requireApiKey = !spec.keyOptional,
             maxOutputTokenCap = spec.maxOutputTokens,
+            // Used without a key, a free tier cannot bill.
+            freeOfCharge = anonymous && spec.keyOptional,
         )
     }
 
