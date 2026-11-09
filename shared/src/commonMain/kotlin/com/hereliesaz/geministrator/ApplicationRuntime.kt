@@ -833,6 +833,7 @@ class ApplicationRuntime private constructor(
                 outgoing.state.handles.values.forEach { handle ->
                     try {
                         sessionGateway.cancel(handle)
+                        sessionGateway.release(handle)
                     } catch (cancellation: CancellationException) {
                         throw cancellation
                     } catch (_: Exception) {

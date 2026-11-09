@@ -78,3 +78,11 @@ Cancels were `runCatching` and the handle dropped, so a provider that rejected o
 - Whatever stops something outside the process returns whether it stopped: record a refusal as an event and keep the handle to ask again (bounded), instead of discarding it with the result.
 - A rule that two places must agree on (which copy of a run is newest) is one function (`newestOf`, `decisionTime`), and every caller uses it; a new write path is checked against it, not given its own comparison.
 - A decision that settles a thing with a second record (a person's approval step has a plan gate) settles both in the same act, or the second waits for an approval with nothing left to resume.
+
+## A number that can be missing needs a word for "unknown", not a zero
+
+Hosted APIs report tokens, not dollars, and the spend caps summed `costUsd ?: 0.0`, so every hosted provider counted as free and the dollar caps never tripped. Usage was also overwritten instead of summed, dropped once a session ended, and lost with a handle the moment a run was cancelled, so what had already been billed went uncounted.
+
+- Where a measurement can be absent, carry "unknown" beside it (`costUnknown`) and make the limit say so, instead of defaulting to zero. Never invent a value to fill it (the price list holds only prices read from a provider's page).
+- Whatever stops a session reads what it reported last before it forgets it, and a late report is added to the total, not dropped. A test of a stop checks the total afterwards, not only that the stop happened.
+- A cache that skips repeated work (unchanged writes, a decoded snapshot) is keyed by the thing it saves work on (the stored text, the last value written), so any change by anyone invalidates it.
