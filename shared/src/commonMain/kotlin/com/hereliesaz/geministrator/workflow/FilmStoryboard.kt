@@ -108,7 +108,7 @@ internal fun safeEcho(text: String, max: Int = FILM_MAX_SHOT_ID_CHARS): String =
     text.take(max).map { if (it.isLetterOrDigit() || it in "-_ .,'") it else '?' }.joinToString("")
 
 /** Control characters other than newline and tab become spaces. */
-internal fun cleanFilmText(text: String): String =
+fun cleanFilmText(text: String): String =
     text.map { if (it.isISOControl() && it != '\n' && it != '\t') ' ' else it }.joinToString("")
 
 /**
