@@ -71,7 +71,10 @@ class WorkflowRuntimeCoordinator(
         state: WorkflowRuntimeState,
     ) {
         persistence.projects.put(project)
-        persistence.definitions.put(definition)
+        // The saved hive under this id is the keeper's, and a save made while the run lives is newer than
+        // the copy this run holds: it is not written over (docs/Keepers-Room.md, Pause, change, resume).
+        // Launching and forking store the definition a run follows; this stores it only if there is none.
+        if (persistence.definitions.get(definition.id) == null) persistence.definitions.put(definition)
         persistence.runs.put(state.run)
         persistArtifacts(state.run)
         // Refinement-ladder training data, only while the keeper has switched capture on; it never

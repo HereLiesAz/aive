@@ -52,6 +52,8 @@ import com.hereliesaz.geministrator.workflow.DelegationEligibility
 import com.hereliesaz.geministrator.workflow.DelegationKey
 import com.hereliesaz.geministrator.workflow.DelegationPolicy
 import com.hereliesaz.geministrator.workflow.GateDelegationContext
+import com.hereliesaz.geministrator.workflow.LiveDefinitionEdit
+import com.hereliesaz.geministrator.workflow.LiveEditMerge
 import com.hereliesaz.geministrator.workflow.ProgressiveDelegationStore
 import com.hereliesaz.geministrator.workflow.ManagedSessionFailure
 import com.hereliesaz.geministrator.workflow.ManagedSessionGateway
@@ -73,6 +75,7 @@ import com.hereliesaz.geministrator.workflow.WorkflowEngine
 import com.hereliesaz.geministrator.workflow.WorkflowGraphValidator
 import com.hereliesaz.geministrator.workflow.WorkflowLaunchService
 import com.hereliesaz.geministrator.workflow.WorkflowRuntimeCoordinator
+import com.hereliesaz.geministrator.workflow.cancelledRunView
 import com.hereliesaz.geministrator.workflow.WorkflowRunNestedWorkflowClient
 import com.hereliesaz.geministrator.workflow.WorkflowRuntimeState
 import com.hereliesaz.geministrator.workflow.awaitsNestedHumanApproval
@@ -349,19 +352,37 @@ class ApplicationRuntime private constructor(
      */
     suspend fun rerunFromTask(sourceRunId: WorkflowRunId, request: TaskRerunRequest) {
         runtimeMutex.withLock {
-            // Rewinding a run that is still live: it is cancelled first (what had finished keeps its
-            // result and carries over; what was running starts again in the new run), then forked.
+            // Rewinding a run that is still live: it is cancelled (what had finished keeps its result and
+            // carries over; what was running starts again in the new run), then forked. The request is
+            // checked against what the run will be once cancelled first, so a refused request leaves the
+            // live run running.
             var cancelledLive = false
-            current?.takeIf { it.state.run.id == sourceRunId && !it.state.run.status.isTerminal() }?.let { live ->
+            val live = current?.takeIf { it.state.run.id == sourceRunId && !it.state.run.status.isTerminal() }
+            val stored = persistence.runs.get(sourceRunId)
+                ?: error("Run ${sourceRunId.value} was not found")
+            val storedProject = persistence.projects.get(stored.projectId)
+                ?: error("Project ${stored.projectId.value} was not found")
+            // A live run is followed by the definition it runs with, not by the saved copy, which a save may have changed.
+            val definition = live?.definition
+                ?: persistence.definitions.get(stored.workflowDefinitionId)
+                ?: error("Workflow definition ${stored.workflowDefinitionId.value} was not found")
+            if (live != null) {
+                val newest = stored.takeIf { it.updatedAtEpochMillis > live.state.run.updatedAtEpochMillis } ?: live.state.run
+                val previewAt = nowEpochMillis()
+                TaskRerunPlanner.fork(
+                    definition = definition,
+                    source = cancelledRunView(newest, previewAt),
+                    request = request,
+                    workflowRunId = WorkflowRunId("run-$previewAt"),
+                    nowEpochMillis = previewAt,
+                    taskRunIdFactory = { id -> TaskRunId("run-$previewAt-${id.value}") },
+                    editedDefinitionId = WorkflowDefinitionId("workflow-$previewAt"),
+                )
                 coordinator.cancel(live.project, live.definition, live.state, nowEpochMillis())
                 cancelledLive = true
             }
             val source = persistence.runs.get(sourceRunId)
                 ?: error("Run ${sourceRunId.value} was not found")
-            val storedProject = persistence.projects.get(source.projectId)
-                ?: error("Project ${source.projectId.value} was not found")
-            val definition = persistence.definitions.get(source.workflowDefinitionId)
-                ?: error("Workflow definition ${source.workflowDefinitionId.value} was not found")
             val now = nowEpochMillis()
             val fork = TaskRerunPlanner.fork(
                 definition = definition,
@@ -689,30 +710,27 @@ class ApplicationRuntime private constructor(
      * An edit saved to the hive on screen reaches its live run (docs/Keepers-Room.md, Pause, change,
      * resume). Only a creature the run has not started (waiting, ready or about to retry) takes the
      * edit, its job and criteria, now, because the engine reads a task's definition when it starts it;
-     * a creature that is running or done, a creature's role, executor and strands, and the hive's shape
-     * stay as the run has them and change from the next run. Nothing is cancelled and nothing restarts.
-     * Returns how many creatures took an edit.
+     * a creature that is running or done, a creature's role, executor, condition and policies, and the
+     * hive's shape stay as the run has them and change from the next run, as the saved copy in the
+     * library: the runtime never writes its own copy over a saved one ([WorkflowRuntimeCoordinator.persist]).
+     * Nothing is cancelled and nothing restarts. Returns how many creatures took an edit.
      */
     suspend fun applyLiveDefinitionEdit(edited: WorkflowDefinition): Int = runtimeMutex.withLock {
         val snapshot = current ?: return@withLock 0
         val run = snapshot.state.run
         if (snapshot.definition.id != edited.id || run.status.isTerminal()) return@withLock 0
-        val open = setOf(TaskRunStatus.Created, TaskRunStatus.Blocked, TaskRunStatus.Ready, TaskRunStatus.Retrying)
-        var taken = 0
-        val tasks = snapshot.definition.tasks.map { old ->
-            val new = edited.tasks.firstOrNull { it.id == old.id }
-            if (new != null && run.taskRuns[old.id]?.status in open) {
-                val merged = new.copy(dependsOn = old.dependsOn, roleId = old.roleId, executor = old.executor)
-                if (merged != old) taken += 1
-                merged
-            } else {
-                old
+        when (val merge = LiveDefinitionEdit.merge(snapshot.definition, edited, run)) {
+            LiveEditMerge.Nothing -> return@withLock 0
+            is LiveEditMerge.Rejected -> {
+                appLog("Live edit", merge.reason)
+                return@withLock 0
+            }
+            is LiveEditMerge.Merged -> {
+                replaceCurrent(snapshot.copy(definition = merge.definition))
+                publishCurrent()
+                merge.taken
             }
         }
-        if (taken == 0) return@withLock 0
-        replaceCurrent(snapshot.copy(definition = snapshot.definition.copy(tasks = tasks)))
-        publishCurrent()
-        taken
     }
 
     /**

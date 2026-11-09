@@ -1045,20 +1045,12 @@ class WorkflowEngine(
 
     suspend fun cancelWorkflow(run: WorkflowRun, nowEpochMillis: Long): WorkflowRun {
         if (run.status.isTerminal()) return run
-        val cancelledTaskRuns = run.taskRuns.mapValues { (taskId, taskRun) ->
-            if (taskRun.status == TaskRunStatus.Completed || taskRun.status == TaskRunStatus.Failed) {
-                taskRun
-            } else {
-                eventSink.append(TaskCancelled(run.id, taskId, nowEpochMillis))
-                taskRun.copy(status = TaskRunStatus.Cancelled)
-            }
+        val cancelled = cancelledRunView(run, nowEpochMillis)
+        run.taskRuns.forEach { (taskId, taskRun) ->
+            if (cancelled.taskRuns.getValue(taskId) !== taskRun) eventSink.append(TaskCancelled(run.id, taskId, nowEpochMillis))
         }
         eventSink.append(WorkflowCancelled(run.id, nowEpochMillis))
-        return run.copy(
-            status = WorkflowRunStatus.Cancelled,
-            taskRuns = cancelledTaskRuns,
-            updatedAtEpochMillis = nowEpochMillis,
-        )
+        return cancelled
     }
 
     /**
@@ -1169,4 +1161,24 @@ class WorkflowEngine(
             }
         }
     }
+}
+
+/**
+ * What [run] is once cancelled: every task that has not completed or failed is Cancelled. Pure;
+ * [WorkflowEngine.cancelWorkflow] adds the journal entries. A caller that must know whether a
+ * cancelled run could still be used (a rerun from it) asks this before it stops anything.
+ */
+internal fun cancelledRunView(run: WorkflowRun, nowEpochMillis: Long): WorkflowRun {
+    if (run.status.isTerminal()) return run
+    return run.copy(
+        status = WorkflowRunStatus.Cancelled,
+        taskRuns = run.taskRuns.mapValues { (_, taskRun) ->
+            if (taskRun.status == TaskRunStatus.Completed || taskRun.status == TaskRunStatus.Failed) {
+                taskRun
+            } else {
+                taskRun.copy(status = TaskRunStatus.Cancelled)
+            }
+        },
+        updatedAtEpochMillis = nowEpochMillis,
+    )
 }
