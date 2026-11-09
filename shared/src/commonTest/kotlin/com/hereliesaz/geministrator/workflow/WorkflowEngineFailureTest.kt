@@ -11,6 +11,7 @@ import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.domain.RetryPolicy
 import com.hereliesaz.geministrator.domain.RetryReason
+import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskRunId
@@ -22,6 +23,8 @@ import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.events.InMemoryWorkflowEventSink
 import com.hereliesaz.geministrator.events.RetryScheduled
 import com.hereliesaz.geministrator.events.TaskEscalated
+import com.hereliesaz.geministrator.events.TaskFailed
+import com.hereliesaz.geministrator.events.WorkflowFailed
 import com.hereliesaz.geministrator.events.TaskStarted
 import com.hereliesaz.geministrator.providers.ProviderActionResult
 import kotlinx.coroutines.CompletableDeferred
@@ -87,6 +90,187 @@ class WorkflowEngineFailureTest {
         assertEquals(listOf(ProviderRunId("provider-run-first")), gateway.cancelled.map { it.providerRunId })
         assertTrue(events.snapshot().none { it is TaskStarted })
         assertTrue(run.taskRuns.values.all { it.status == TaskRunStatus.Ready })
+    }
+
+    @Test
+    fun aSessionThatCannotStartFailsOnlyItsTaskAndLeavesItsSiblingRunning() = runBlocking {
+        val goodId = TaskDefinitionId("good")
+        val badId = TaskDefinitionId("bad")
+        val definition = WorkflowDefinition(
+            id = WorkflowDefinitionId("start-failure"),
+            name = "Start failure",
+            tasks = listOf(
+                TaskDefinition(
+                    id = goodId,
+                    name = "Good",
+                    objective = "Start good",
+                    roleId = BuiltInRoles.ImplementationEngineer.id,
+                ),
+                TaskDefinition(
+                    id = badId,
+                    name = "Bad",
+                    objective = "Start bad",
+                    roleId = BuiltInRoles.ImplementationEngineer.id,
+                ),
+            ),
+        )
+        val run = WorkflowRunFactory.create(
+            definition = definition,
+            workflowRunId = WorkflowRunId("start-failure-run"),
+            projectId = ProjectId("project"),
+            objective = "Start both",
+            nowEpochMillis = 0L,
+            taskRunIdFactory = { id -> TaskRunId("run-${id.value}") },
+        )
+        val gateway = StartFailureGateway(failingObjective = "Start bad")
+        val events = InMemoryWorkflowEventSink()
+        val engine = WorkflowEngine(sessionGateway = gateway, roles = BuiltInRoles.all, eventSink = events)
+        val project = Project(
+            id = ProjectId("project"),
+            name = "Project",
+            createdAtEpochMillis = 0L,
+            updatedAtEpochMillis = 0L,
+        )
+
+        // The provider refuses the start (HTTP 402): this must not escape the dispatch.
+        val first = engine.dispatchReadyTasks(project = project, definition = definition, run = run, nowEpochMillis = 10L)
+
+        assertEquals(TaskRunStatus.Running, first.run.taskRuns.getValue(goodId).status)
+        assertEquals(setOf(goodId), first.handles.keys)
+        // The failed start goes through the task's retry policy like any other provider failure.
+        assertEquals(TaskRunStatus.Retrying, first.run.taskRuns.getValue(badId).status)
+        assertEquals(2, first.run.taskRuns.getValue(badId).attempt)
+        assertTrue(events.snapshot().any { it is TaskFailed && it.taskDefinitionId == badId })
+        assertTrue(events.snapshot().any { it is RetryScheduled && it.taskDefinitionId == badId })
+        assertTrue(gateway.cancelled.isEmpty(), "the sibling that started must keep running")
+
+        // Its retry budget is finite: the second refusal fails the workflow instead of looping.
+        val second = engine.dispatchReadyTasks(
+            project = project,
+            definition = definition,
+            run = first.run,
+            existingHandles = first.handles,
+            nowEpochMillis = 20L,
+        )
+        assertEquals(WorkflowRunStatus.Failed, second.run.status)
+        assertEquals(TaskRunStatus.Failed, second.run.taskRuns.getValue(badId).status)
+        assertTrue(events.snapshot().any { it is WorkflowFailed })
+    }
+
+    @Test
+    fun aTaskWhoseRoleIsMissingOrDisabledFailsAloneAndDoesNotStarveReadySiblings() = runBlocking {
+        val ghostId = TaskDefinitionId("ghost")
+        val disabledId = TaskDefinitionId("disabled")
+        val goodId = TaskDefinitionId("good")
+        val disabledRole = BuiltInRoles.RecoveryEngineer.copy(enabled = false)
+        fun agent(id: TaskDefinitionId, role: RoleDefinitionId) = TaskDefinition(
+            id = id,
+            name = id.value,
+            objective = "Start ${id.value}",
+            roleId = role,
+            escalationPolicy = EscalationPolicy.RequireHumanDecision,
+        )
+        val definition = WorkflowDefinition(
+            id = WorkflowDefinitionId("bad-roles"),
+            name = "Bad roles",
+            // The broken tasks come first, where the old dispatch threw before reaching the good one.
+            tasks = listOf(
+                agent(ghostId, RoleDefinitionId("no-such-role")),
+                agent(disabledId, disabledRole.id),
+                agent(goodId, BuiltInRoles.ImplementationEngineer.id),
+            ),
+        )
+        val run = WorkflowRunFactory.create(
+            definition = definition,
+            workflowRunId = WorkflowRunId("bad-roles-run"),
+            projectId = ProjectId("project"),
+            objective = "Start all",
+            nowEpochMillis = 0L,
+            taskRunIdFactory = { id -> TaskRunId("run-${id.value}") },
+        )
+        val gateway = StartFailureGateway(failingObjective = "never")
+        val events = InMemoryWorkflowEventSink()
+        val engine = WorkflowEngine(
+            sessionGateway = gateway,
+            roles = BuiltInRoles.all.filterNot { it.id == disabledRole.id } + disabledRole,
+            eventSink = events,
+        )
+
+        val result = engine.dispatchReadyTasks(
+            project = Project(
+                id = ProjectId("project"),
+                name = "Project",
+                createdAtEpochMillis = 0L,
+                updatedAtEpochMillis = 0L,
+            ),
+            definition = definition,
+            run = run,
+            nowEpochMillis = 10L,
+        )
+
+        assertEquals(TaskRunStatus.Running, result.run.taskRuns.getValue(goodId).status)
+        assertEquals(setOf(goodId), result.handles.keys)
+        assertEquals(TaskRunStatus.Escalated, result.run.taskRuns.getValue(ghostId).status)
+        assertEquals(TaskRunStatus.Escalated, result.run.taskRuns.getValue(disabledId).status)
+        val reasons = events.snapshot().filterIsInstance<TaskFailed>().associate { it.taskDefinitionId to it.reason }
+        assertTrue("no-such-role" in reasons.getValue(ghostId), reasons.toString())
+        assertTrue("disabled" in reasons.getValue(disabledId), reasons.toString())
+    }
+
+    @Test
+    fun aTaskRunWhoseTaskIsNoLongerInTheDefinitionFailsTheRunInsteadOfThrowing() = runBlocking {
+        val keptId = TaskDefinitionId("kept")
+        val definition = WorkflowDefinition(
+            id = WorkflowDefinitionId("orphan"),
+            name = "Orphan",
+            tasks = listOf(
+                TaskDefinition(
+                    id = keptId,
+                    name = "Kept",
+                    objective = "Start kept",
+                    roleId = BuiltInRoles.ImplementationEngineer.id,
+                ),
+            ),
+        )
+        val created = WorkflowRunFactory.create(
+            definition = definition,
+            workflowRunId = WorkflowRunId("orphan-run"),
+            projectId = ProjectId("project"),
+            objective = "Start",
+            nowEpochMillis = 0L,
+            taskRunIdFactory = { id -> TaskRunId("run-${id.value}") },
+        )
+        // A run saved before its hive was edited keeps a task run for a creature the hive no longer has.
+        val orphanId = TaskDefinitionId("removed")
+        val run = created.copy(
+            taskRuns = mapOf(orphanId to created.taskRuns.getValue(keptId).copy(
+                id = TaskRunId("run-removed"),
+                taskDefinitionId = orphanId,
+            )) + created.taskRuns,
+        )
+        val events = InMemoryWorkflowEventSink()
+        val engine = WorkflowEngine(
+            sessionGateway = StartFailureGateway(failingObjective = "never"),
+            roles = BuiltInRoles.all,
+            eventSink = events,
+        )
+
+        val result = engine.dispatchReadyTasks(
+            project = Project(
+                id = ProjectId("project"),
+                name = "Project",
+                createdAtEpochMillis = 0L,
+                updatedAtEpochMillis = 0L,
+            ),
+            definition = definition,
+            run = run,
+            nowEpochMillis = 10L,
+        )
+
+        assertEquals(WorkflowRunStatus.Failed, result.run.status)
+        assertEquals(TaskRunStatus.Failed, result.run.taskRuns.getValue(orphanId).status)
+        val reason = events.snapshot().filterIsInstance<TaskFailed>().single { it.taskDefinitionId == orphanId }.reason
+        assertTrue("removed" in reason, reason)
     }
 
     @Test
@@ -233,6 +417,36 @@ private class FailingParallelGateway : ManagedSessionGateway {
     }
 
     override suspend fun status(handle: ManagedSessionHandle): ManagedSessionStatus = ManagedSessionStatus.Unknown
+    override suspend fun message(handle: ManagedSessionHandle, message: String) = ProviderActionResult.Accepted
+    override suspend fun approvePlan(handle: ManagedSessionHandle) = ProviderActionResult.Accepted
+    override suspend fun artifacts(handle: ManagedSessionHandle) =
+        emptyList<com.hereliesaz.geministrator.providers.ProviderArtifact>()
+}
+
+/** Starts every session except the one whose objective is [failingObjective], which the provider refuses. */
+private class StartFailureGateway(private val failingObjective: String) : ManagedSessionGateway {
+    private val providerId = AgentProviderId("start-failure-provider")
+    val cancelled = mutableListOf<ManagedSessionHandle>()
+
+    override suspend fun resolveProvider(selection: ProviderSelectionRequest): AgentProviderId = providerId
+
+    override suspend fun createSession(request: ManagedSessionRequest): ManagedSessionHandle {
+        if (request.taskRequest.objective == failingObjective) {
+            throw ManagedSessionFailure.ProviderOperationFailed("HTTP 402 Payment Required")
+        }
+        return ManagedSessionHandle(
+            taskRunId = request.taskRequest.taskRunId,
+            providerId = providerId,
+            providerRunId = ProviderRunId("provider-run-${request.taskRequest.taskRunId.value}"),
+        )
+    }
+
+    override suspend fun cancel(handle: ManagedSessionHandle): ProviderActionResult {
+        cancelled += handle
+        return ProviderActionResult.Accepted
+    }
+
+    override suspend fun status(handle: ManagedSessionHandle): ManagedSessionStatus = ManagedSessionStatus.Running
     override suspend fun message(handle: ManagedSessionHandle, message: String) = ProviderActionResult.Accepted
     override suspend fun approvePlan(handle: ManagedSessionHandle) = ProviderActionResult.Accepted
     override suspend fun artifacts(handle: ManagedSessionHandle) =

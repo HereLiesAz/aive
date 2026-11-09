@@ -118,6 +118,40 @@ class WorkflowRuntimeCoordinatorTest {
     }
 
     @Test
+    fun aProviderRefusingToStartASessionFailsTheTaskInsteadOfBreakingTheCycle() = runBlocking {
+        val taskId = TaskDefinitionId("agent")
+        val executor = TaskExecutor.RoleAgent(BuiltInRoles.ImplementationEngineer.id)
+        val definition = definition(
+            TaskDefinition(
+                id = taskId,
+                name = "Agent",
+                objective = "Do work",
+                roleId = BuiltInRoles.ImplementationEngineer.id,
+                executor = executor,
+            ),
+        )
+        val run = run(
+            definition = definition,
+            status = WorkflowRunStatus.Running,
+            taskRuns = mapOf(taskId to taskRun(taskId, TaskRunStatus.Ready, executor)),
+        )
+        val fixture = fixture(FakeManagedSessionGateway(startFailure = ManagedSessionFailure.ProviderOperationFailed("HTTP 402")))
+
+        // Before: the refusal escaped cycle(), which the runtime retried every few seconds without end.
+        val result = fixture.coordinator.cycle(
+            project = project(),
+            definition = definition,
+            state = WorkflowRuntimeState(run),
+            nowEpochMillis = 20L,
+            artifactIdFactory = ::artifactId,
+        )
+
+        assertEquals(TaskRunStatus.Retrying, result.run.taskRuns.getValue(taskId).status)
+        assertEquals(2, result.run.taskRuns.getValue(taskId).attempt)
+        assertEquals(emptyMap(), result.handles)
+    }
+
+    @Test
     fun repeatedArtifactPollingPreservesOriginalCreationTimestamp() = runBlocking {
         val taskId = TaskDefinitionId("agent")
         val artifact = ArtifactRef(
@@ -500,15 +534,19 @@ class WorkflowRuntimeCoordinatorTest {
 private class FakeManagedSessionGateway(
     private val status: ManagedSessionStatus = ManagedSessionStatus.Unknown,
     private val artifacts: List<ProviderArtifact> = emptyList(),
+    private val startFailure: Throwable? = null,
 ) : ManagedSessionGateway {
     override suspend fun resolveProvider(selection: ProviderSelectionRequest) =
         AgentProviderId("provider")
 
-    override suspend fun createSession(request: ManagedSessionRequest) = ManagedSessionHandle(
-        taskRunId = request.taskRequest.taskRunId,
-        providerId = AgentProviderId("provider"),
-        providerRunId = ProviderRunId("provider-run-new"),
-    )
+    override suspend fun createSession(request: ManagedSessionRequest): ManagedSessionHandle {
+        startFailure?.let { throw it }
+        return ManagedSessionHandle(
+            taskRunId = request.taskRequest.taskRunId,
+            providerId = AgentProviderId("provider"),
+            providerRunId = ProviderRunId("provider-run-new"),
+        )
+    }
 
     override suspend fun status(handle: ManagedSessionHandle) = status
 
