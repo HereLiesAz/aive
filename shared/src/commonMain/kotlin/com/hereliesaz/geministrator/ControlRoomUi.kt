@@ -267,6 +267,15 @@ fun ControlRoom(
             onTaskSelected(id)
         }
     }
+    // A link to a creature opens it and never closes it: a tap on one that is already open does
+    // nothing, and a creature whose panel was set aside gets that panel back.
+    val openCreature: (String) -> Unit = { id ->
+        if (reopensSetAsidePanel(id, panelSetAside)) {
+            panelSetAside = null
+        } else if (id != selectedTaskId) {
+            onTaskSelected(id)
+        }
+    }
     // Closing the panel (sheet dismissed, dock's close, Back) only sets it aside: the creature stays
     // selected, so the field keeps the zoom level it showed and its other levels stay one step away.
     // Tapping the creature again reopens it; tapping bare ground or another creature lets it go.
@@ -480,6 +489,7 @@ fun ControlRoom(
                 onDestinationSelected = onDestinationSelected,
                 selectedTaskId = selectedTaskId,
                 onTaskSelected = selectCreature,
+                onOpenCreature = openCreature,
                 onLaunchWorkflow = onLaunchWorkflow,
                 onLoadLaunchableRuns = onLoadLaunchableRuns,
                 onApproveTask = onApproveTask,
@@ -755,6 +765,8 @@ private fun MainDestination(
     destination: ControlRoomDestination,
     selectedTaskId: String?,
     onTaskSelected: (String) -> Unit,
+    /** Opens a creature from a link: reopens a set-aside panel, never closes an open one. */
+    onOpenCreature: (String) -> Unit,
     onLaunchWorkflow: (String, String, RepositoryRef?, List<WorkflowRunId>) -> Unit,
     onLoadLaunchableRuns: suspend () -> List<LaunchableRun> = { emptyList() },
     onApproveTask: (String) -> Unit,
@@ -845,6 +857,18 @@ private fun MainDestination(
         keeperOpen.value = true
         onOpenSettings()
     }
+    // Workflows, opened on the hive on screen: its workflow is selected first, so the library shows
+    // the one the keeper came from and not whichever it showed last.
+    val openHiveInWorkflows: () -> Unit = {
+        hiveScope.launch {
+            val id = (runtimeState as? ApplicationRuntimeState.Live)?.presentation?.run?.workflowDefinitionId?.value
+            hiveHost?.entries()?.firstOrNull { it.definition.id.value == id }?.let { entry ->
+                DurableUiState.store.putString("workflows.selected-key", entry.key)
+                DurableUiState.store.putString("workflows.tab", WorkflowLibraryTab.Overview.name)
+            }
+            onDestinationSelected(ControlRoomDestination.Workflows)
+        }
+    }
     Column(modifier.fillMaxSize()) {
         // A first launch is one step: no places to wander off to until there is a hive. A stopped or
         // waking hive keeps the row, so every hive, the Stable and the Store stay reachable.
@@ -916,16 +940,7 @@ private fun MainDestination(
                     AzphaltPill(
                         label = stringResource(Res.string.hive_more_editing),
                         seed = "hive-more-editing",
-                        onClick = {
-                            hiveScope.launch {
-                                val id = live.run.workflowDefinitionId.value
-                                hiveHost?.entries()?.firstOrNull { it.definition.id.value == id }?.let { entry ->
-                                    DurableUiState.store.putString("workflows.selected-key", entry.key)
-                                    DurableUiState.store.putString("workflows.tab", WorkflowLibraryTab.Overview.name)
-                                }
-                                onDestinationSelected(ControlRoomDestination.Workflows)
-                            }
-                        },
+                        onClick = openHiveInWorkflows,
                     )
                 }
             }
@@ -1145,7 +1160,8 @@ private fun MainDestination(
                             launchError = launchError,
                             onDismissLaunchError = onDismissLaunchError,
                             onResumeRun = { onPauseRun(false) },
-                            onEditWorkflow = { onDestinationSelected(ControlRoomDestination.Workflows) },
+                            onEditWorkflow = openHiveInWorkflows,
+                            onOpenCreature = onOpenCreature,
                         )
                             }
                             // No second launcher under a live hive: a finished one offers "Feed it more"
