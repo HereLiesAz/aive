@@ -6,6 +6,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
@@ -70,6 +72,48 @@ class CliProcessTest {
             withTimeout(15_000) { job.cancelAndJoin() }
             assertTrue(System.currentTimeMillis() - started < 10_000)
         }
+    }
+
+    @Test
+    fun aConsumerThatFallsBehindHoldsTheCliInsteadOfTheOutputPilingUpInMemory() = withScript(
+        "i=0\nwhile [ \$i -lt 30000 ]; do echo 0123456789012345678901234567890123456789012345678901234567890123456789; i=\$((i+1)); done\ntouch finished",
+    ) { dir, script ->
+        val finished = File(dir, "finished")
+        var finishedWhileBlocked = false
+        runBlocking {
+            val result = async(Dispatchers.IO) {
+                var first = true
+                ProcessCliRunner.run(listOf(script.absolutePath), dir, mapOf("PATH" to "/usr/bin:/bin"), null, 60_000) {
+                    if (first) {
+                        first = false
+                        // The consumer stalls on the first line while the CLI writes 2 MB.
+                        delay(1_500)
+                        finishedWhileBlocked = finished.exists()
+                    }
+                }
+            }
+            result.await()
+        }
+        // Before: the reader drained the pipe into an unbounded queue, so the CLI finished while nobody had read a line.
+        assertEquals(false, finishedWhileBlocked)
+        assertTrue(finished.exists(), "and it does finish once the consumer catches up")
+    }
+
+    @Test
+    fun aSlowConsumerGetsEveryLineInOrderEvenWhenTheOutputIsLong() = withScript(
+        "i=0\nwhile [ \$i -lt 3000 ]; do echo line-\$i; i=\$((i+1)); done",
+    ) { dir, script ->
+        val lines = mutableListOf<String>()
+        val result = runBlocking {
+            ProcessCliRunner.run(listOf(script.absolutePath), dir, mapOf("PATH" to "/usr/bin:/bin"), null, 60_000) {
+                kotlinx.coroutines.yield()
+                lines += it
+            }
+        }
+        assertEquals(0, result.exitCode)
+        assertEquals(3000, lines.size)
+        assertEquals("line-0", lines.first())
+        assertEquals("line-2999", lines.last())
     }
 
     @Test

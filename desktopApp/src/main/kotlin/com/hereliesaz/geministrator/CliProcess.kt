@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
@@ -41,6 +42,11 @@ internal fun interface CliProcessRunner {
 internal object ProcessCliRunner : CliProcessRunner {
     const val MAX_LINE_CHARS = 64_000
     const val MAX_STDERR_CHARS = 8_000
+
+    /** Lines read from stdout and not yet handed on before the reader waits for the consumer. */
+    const val LINE_BACKLOG = 256
+
+    private class StopReading : RuntimeException("The output is no longer wanted")
 
     override suspend fun run(
         command: List<String>,
@@ -80,9 +86,16 @@ internal object ProcessCliRunner : CliProcessRunner {
                 }
             }
         }, "aive-cli-stderr").apply { isDaemon = true; start() }
-        val lines = Channel<String>(Channel.UNLIMITED)
+        // Bounded: a consumer slower than the CLI holds the reader, the pipe then fills and the CLI waits, instead of
+        // every line (up to MAX_LINE_CHARS each) piling up in memory without limit.
+        val lines = Channel<String>(LINE_BACKLOG)
         val outThread = Thread({
-            runCatching { readLines(process.inputStream) { lines.trySend(it) } }
+            runCatching {
+                readLines(process.inputStream) { line ->
+                    // A channel closed under the reader (the run ended) stops the reading.
+                    if (lines.trySendBlocking(line).isClosed) throw StopReading()
+                }
+            }
             lines.close()
         }, "aive-cli-stdout").apply { isDaemon = true; start() }
         val inThread = Thread({
