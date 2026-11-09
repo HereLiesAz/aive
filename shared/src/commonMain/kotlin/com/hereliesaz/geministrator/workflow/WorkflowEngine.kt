@@ -1085,6 +1085,7 @@ class WorkflowEngine(
                     taskId to taskRun.copy(
                         status = TaskRunStatus.Blocked,
                         attempt = taskRun.attempt + 1,
+                        heldAttempts = taskRun.heldAttempts + 1,
                         assignedProviderId = null,
                         providerRunId = null,
                         externalRunId = null,

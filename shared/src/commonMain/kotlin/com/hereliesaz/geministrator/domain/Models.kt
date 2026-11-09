@@ -232,6 +232,12 @@ data class TaskRun(
      * restart does not use up the task's retry budget.
      */
     val failedProviders: List<AgentProviderId> = emptyList(),
+    /**
+     * Attempts that only restarted work a spend limit had stopped (a role's token budget, a spend
+     * cap): [attempt] still moves on for them, but they are not retries of failed work, so they do
+     * not count against the task's retry budget ([com.hereliesaz.geministrator.workflow.FailurePolicyEvaluator]).
+     */
+    val heldAttempts: Int = 0,
 ) {
     init {
         require(progress == null || progress in 0f..1f) { "Task progress must be normalized 0f..1f" }

@@ -20,8 +20,9 @@ object FailurePolicyEvaluator {
         escalationPolicy: EscalationPolicy,
         reason: RetryReason,
     ): FailureDecision {
-        // A restart on another provider after that provider's own failure is not a retry of the work.
-        val used = (taskRun.attempt - taskRun.failedProviders.size).coerceAtLeast(1)
+        // A restart on another provider after that provider's own failure, and a restart after a
+        // spend limit stopped the task, are not retries of the work.
+        val used = (taskRun.attempt - taskRun.failedProviders.size - taskRun.heldAttempts).coerceAtLeast(1)
         val retryAllowed = reason in retryPolicy.retryOn && used < retryPolicy.maxAttempts
         if (retryAllowed) return FailureDecision.Retry(taskRun.attempt + 1)
 

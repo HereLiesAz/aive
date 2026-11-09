@@ -5,7 +5,10 @@ import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
+import com.hereliesaz.geministrator.domain.EscalationPolicy
 import com.hereliesaz.geministrator.domain.ProviderRunId
+import com.hereliesaz.geministrator.domain.RetryPolicy
+import com.hereliesaz.geministrator.domain.RetryReason
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.SpendCapKind
 import com.hereliesaz.geministrator.domain.TaskDefinition
@@ -68,6 +71,42 @@ class SpendCircuitBreakerTest {
         assertEquals(ROLE_BUDGET_SPENT, held.blockingReason?.code)
         assertEquals(0, gateway.created, "a role with no budget left starts nothing")
         assertTrue(result.handles.isEmpty())
+    }
+
+    @Test
+    fun beingParkedForASpendLimitDoesNotUseUpATasksRetryBudget() = runTest {
+        val retryPolicy = RetryPolicy(maxAttempts = 2)
+        fun decisionAfterAFailure(taskRun: TaskRun) = FailurePolicyEvaluator.decide(
+            taskRun = taskRun.copy(status = TaskRunStatus.Failed),
+            retryPolicy = retryPolicy,
+            escalationPolicy = EscalationPolicy.FailWorkflow,
+            reason = RetryReason.ProviderFailure,
+        )
+
+        // Stopped mid-run because its role spent its budget.
+        val gateway = UsageGateway()
+        gateway.pending[ProviderRunId("run-working")] = ManagedSessionUsage(inputTokens = 80, outputTokens = 40)
+        val definition = definition(task(working), task(waiting))
+        val run = run(
+            definition,
+            taskRun(working, TaskRunStatus.Running, providerRunId = "run-working"),
+            taskRun(waiting, TaskRunStatus.Ready),
+        )
+        val parkedForBudget = coordinator(InMemoryWorkflowPersistence(), gateway, roles(budget = 100))
+            .cycle(project(), definition, WorkflowRuntimeState(run, mapOf(working to handle(working, "run-working"))), 20L, ::artifactId)
+            .run.taskRuns.getValue(working)
+        assertEquals(2, parkedForBudget.attempt, "a parked task still starts a fresh attempt (its approval gates are keyed by it)")
+        // The first real failure after the hold is its first failure, so it is retried.
+        assertEquals(FailureDecision.Retry(3), decisionAfterAFailure(parkedForBudget))
+
+        // Stopped by a spend cap and lifted.
+        val paused = pauseRunForSpendCap(run, SpendCapTrip(SpendCapKind.RunCost, 1.0, 2.0), setOf(working), 15L)
+        val resumed = liftSpendPause(paused, 40L).taskRuns.getValue(working)
+        assertEquals(2, resumed.attempt)
+        assertEquals(FailureDecision.Retry(3), decisionAfterAFailure(resumed))
+
+        // A task that really failed once and is then retried has used that retry.
+        assertEquals(FailureDecision.FailWorkflow, decisionAfterAFailure(taskRun(working, TaskRunStatus.Running).copy(attempt = 2)))
     }
 
     @Test
