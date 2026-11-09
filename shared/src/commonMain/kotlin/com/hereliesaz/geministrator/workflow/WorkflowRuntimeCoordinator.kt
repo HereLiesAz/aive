@@ -491,15 +491,6 @@ class WorkflowRuntimeCoordinator(
     }
 
     /**
-     * Cancels [state]'s run: every unfinished task, every provider session it still holds, and the
-     * remote work behind every unfinished system-executor task (GitHub Actions runs, nested child
-     * runs, distributed leases, external service runs). Used when a run is abandoned, such as a
-     * new launch replacing it.
-     *
-     * The local cancellation is persisted first. Remote cancels follow, best effort, outside the
-     * cycle lock; one that fails is recorded as [ExternalRunCancelFailed] and the rest still run.
-     */
-    /**
      * Rewinds a live run to [taskId] in place (docs/Keepers-Room.md, Pause, change, resume): the
      * creature and everything downstream of it (and the approvals a repository change needs) start
      * again as a new attempt, while the rest of the swarm keeps running. Only what is in that set has
@@ -568,6 +559,15 @@ class WorkflowRuntimeCoordinator(
         return rewoundState
     }
 
+    /**
+     * Cancels [state]'s run: every unfinished task, every provider session it still holds, and the
+     * remote work behind every unfinished system-executor task (GitHub Actions runs, nested child
+     * runs, distributed leases, external service runs). Used when a run is abandoned, such as a
+     * new launch replacing it.
+     *
+     * The local cancellation is persisted first. Remote cancels follow, best effort, outside the
+     * cycle lock; one that fails is recorded as [ExternalRunCancelFailed] and the rest still run.
+     */
     suspend fun cancel(
         project: Project,
         definition: WorkflowDefinition,
@@ -597,6 +597,8 @@ class WorkflowRuntimeCoordinator(
         val task: TaskDefinition,
         val taskRun: TaskRun,
         val executor: TaskExecutor,
+        /** The work is leased on the compute mesh, which cancels it, not an executor integration. */
+        val onMesh: Boolean = false,
     )
 
     /** Unfinished system-executor tasks that hold a remote handle, read before the run is cancelled. */
@@ -608,10 +610,10 @@ class WorkflowRuntimeCoordinator(
         return run.taskRuns.mapNotNull { (id, taskRun) ->
             if (taskRun.externalRunId == null) return@mapNotNull null
             if (taskRun.status in TERMINAL_TASK_STATUSES) return@mapNotNull null
-            // The compute mesh owns these handles, not an executor integration.
-            if (remoteComputeCoordinator?.owns(taskRun) == true) return@mapNotNull null
             val task = tasks[id] ?: return@mapNotNull null
             val executor = taskRun.executor ?: task.effectiveExecutor()
+            // The compute mesh owns these handles, not an executor integration: it is asked to stop them.
+            if (remoteComputeCoordinator?.owns(taskRun) == true) return@mapNotNull ExternalRunToCancel(task, taskRun, executor, onMesh = true)
             if (!executor.isSystemExecutor()) return@mapNotNull null
             ExternalRunToCancel(task, taskRun, executor)
         }
@@ -627,10 +629,13 @@ class WorkflowRuntimeCoordinator(
     ) {
         if (remote.isEmpty()) return
         withContext(NonCancellable) {
-            for ((task, taskRun, executor) in remote) {
+            for ((task, taskRun, executor, onMesh) in remote) {
                 val externalRunId = taskRun.externalRunId ?: continue
                 val failure: Throwable? = try {
-                    executorIntegrations.integrationFor(executor, project)?.cancel(
+                    if (onMesh) {
+                        remoteComputeCoordinator?.cancel(taskRun)?.let { refusal -> throw IllegalStateException(refusal) }
+                        null
+                    } else executorIntegrations.integrationFor(executor, project)?.cancel(
                         TaskExecutorContext(
                             project = project,
                             definition = definition,
