@@ -22,6 +22,8 @@ import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.events.ApprovalDecisionReceived
 import com.hereliesaz.geministrator.events.ExternalRunCancelFailed
 import com.hereliesaz.geministrator.events.ProviderUsageRecorded
+import com.hereliesaz.geministrator.events.WorkflowCancelled
+import com.hereliesaz.geministrator.events.WorkflowCompleted
 import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities
 import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamily
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
@@ -90,6 +92,7 @@ class WorkflowRuntimeCoordinator(
         persistence.approvalGates,
         RepositoryWorkflowEventSink(persistence.events),
     )
+    private val eventSink = RepositoryWorkflowEventSink(persistence.events)
     private val cycleMutex = Mutex()
     /** How many times each provider session has refused to stop (under [cycleMutex], like every cancel). */
     private val sessionCancelFailures = mutableMapOf<ProviderRunId, Int>()
@@ -1346,10 +1349,13 @@ class WorkflowRuntimeCoordinator(
         undecidedFailures: Set<TaskDefinitionId> = emptySet(),
     ): WorkflowRun {
         val refreshed = engine.refreshReadiness(definition, run, now, undecidedFailures)
+        // The run ends here when its last step was a system executor, so the end event is written here too:
+        // the engine writes it only for a run it ends itself.
         return if (
             refreshed.taskRuns.isNotEmpty() &&
             refreshed.taskRuns.values.all { it.status == TaskRunStatus.Cancelled }
         ) {
+            if (run.status != WorkflowRunStatus.Cancelled) eventSink.append(WorkflowCancelled(refreshed.id, now))
             refreshed.copy(status = WorkflowRunStatus.Cancelled, updatedAtEpochMillis = now)
         } else if (
             refreshed.taskRuns.isNotEmpty() &&
@@ -1357,6 +1363,7 @@ class WorkflowRuntimeCoordinator(
                 it.status == TaskRunStatus.Completed || it.status == TaskRunStatus.Cancelled
             }
         ) {
+            if (run.status != WorkflowRunStatus.Completed) eventSink.append(WorkflowCompleted(refreshed.id, now))
             refreshed.copy(status = WorkflowRunStatus.Completed, updatedAtEpochMillis = now)
         } else {
             refreshed

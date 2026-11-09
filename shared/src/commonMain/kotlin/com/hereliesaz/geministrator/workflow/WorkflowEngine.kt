@@ -894,6 +894,11 @@ class WorkflowEngine(
         if (workflowStatus == WorkflowRunStatus.Completed && run.status != WorkflowRunStatus.Completed) {
             eventSink.append(WorkflowCompleted(nextRun.id, nowEpochMillis))
         }
+        // A run whose every task ended Cancelled (a repository change that needed an approval nobody granted,
+        // branches whose condition was not met) is cancelled, and says so in its log like a stopped one.
+        if (workflowStatus == WorkflowRunStatus.Cancelled && run.status != WorkflowRunStatus.Cancelled) {
+            eventSink.append(WorkflowCancelled(nextRun.id, nowEpochMillis))
+        }
         return nextRun.copy(status = workflowStatus, updatedAtEpochMillis = nowEpochMillis)
     }
 
