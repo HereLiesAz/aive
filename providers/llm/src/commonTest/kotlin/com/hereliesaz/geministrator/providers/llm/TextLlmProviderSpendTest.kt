@@ -66,6 +66,27 @@ class TextLlmProviderSpendTest {
     }
 
     @Test
+    fun theShippedPriceListPricesTheVerifiedDefaultsAndStillFailsClosedForTheOthers() = runTest {
+        // Claude's default is on the list: 1M in and 100k out at the listed $2 and $10 per million, 200k of the input cached at $0.20.
+        val claude = TextLlmProvider(
+            AgentProviderId("anthropic"), "Claude",
+            api("claude-sonnet-5") { TextGenerationResult("ok", inputTokens = 1_000_000, outputTokens = 100_000, cachedInputTokens = 200_000) },
+        )
+        val priced = usageOf(claude)
+        assertEquals(false, priced.costUnknown)
+        assertEquals(0.8 * 2.0 + 0.2 * 0.20 + 0.1 * 10.0, assertNotNull(priced.costUsd), 1e-9)
+
+        // The OpenAI default has no verified price: its usage is billed, uncounted, and a dollar cap is told so.
+        val openAi = TextLlmProvider(
+            AgentProviderId("openai"), "OpenAI",
+            api("gpt-5.6") { TextGenerationResult("ok", inputTokens = 1_000, outputTokens = 100) },
+        )
+        val unpriced = usageOf(openAi)
+        assertNull(unpriced.costUsd)
+        assertTrue(unpriced.costUnknown)
+    }
+
+    @Test
     fun aPricedModelReportsTheCostOfItsTokensWithCachedInputAtTheCachedPrice() = runTest {
         val prices = ModelPriceTable(mapOf(ModelPriceTable.key("hosted", "m1") to ModelPrice(3.0, 15.0, cachedInputUsdPerMillion = 0.30)))
         val provider = TextLlmProvider(
