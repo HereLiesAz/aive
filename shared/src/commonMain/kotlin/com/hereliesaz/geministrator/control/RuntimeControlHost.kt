@@ -7,7 +7,9 @@ import com.hereliesaz.geministrator.azphalt.AuthoredWorkflowStore
 import com.hereliesaz.geministrator.classifyError
 import com.hereliesaz.geministrator.domain.AcceptanceCriterion
 import com.hereliesaz.geministrator.domain.AgentProviderId
+import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.ApprovalPolicy
+import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.TaskDefinition
@@ -25,6 +27,7 @@ import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.launchSavedWorkflow
 import com.hereliesaz.geministrator.hiveDeleteVerdict
 import com.hereliesaz.geministrator.workflow.WorkflowCompositionService
+import com.hereliesaz.geministrator.workflow.MUTATING_CAPABILITIES
 import com.hereliesaz.geministrator.workflow.WorkflowGraphValidator
 import com.hereliesaz.geministrator.workflow.humanReadable
 import kotlinx.serialization.json.Json
@@ -395,6 +398,7 @@ class RuntimeControlHost(
             if (wanted) next = next.copy(approvalPolicy = ApprovalPolicy.HumanApproval)
         }
         val updated = definition.copy(tasks = definition.tasks.map { if (it.id == task.id) next else it })
+        refuseRelaxedApprovals(definition, updated)
         save(r, updated)
         return hiveDetail(updated, authored = true)
     }
@@ -412,6 +416,7 @@ class RuntimeControlHost(
         if (definition.tasks.size == 1) fail(ControlErrorCode.Conflict, "A hive keeps at least one creature; delete the hive instead")
         val remaining = definition.tasks.filterNot { it.id == task.id }.map { it.copy(dependsOn = it.dependsOn - task.id) }
         val updated = definition.copy(tasks = remaining)
+        refuseRelaxedApprovals(definition, updated)
         save(r, updated)
         return hiveDetail(updated, authored = true)
     }
@@ -474,6 +479,8 @@ class RuntimeControlHost(
                 definition = definition,
                 projectName = spec.str("projectName")?.trim()?.take(NAME_MAX)?.ifEmpty { null } ?: "MCP: ${definition.name}".take(NAME_MAX),
                 objective = objective,
+                // Another agent wrote it, not the keeper: every step that can change something waits at a context-taint gate.
+                objectiveProvenance = ContextProvenance.ExternalContent,
             )
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
@@ -527,7 +534,49 @@ class RuntimeControlHost(
         if (role.executionSource != com.hereliesaz.geministrator.domain.RoleExecutionSource.Agent) {
             fail(ControlErrorCode.PolicyDenied, "Role ${role.id.value} runs a script or an action, not an agent; bring it in with the app")
         }
+        if (role.capabilitiesRequired.any { it in MUTATING_CAPABILITIES }) {
+            fail(ControlErrorCode.PolicyDenied, "Role ${role.id.value} can change a repository or run commands; a hive that uses it is made in the app")
+        }
         return role
+    }
+
+    /** Creatures that wait for a person: a human-approval gate, or an agent whose own approval is human. */
+    private fun TaskDefinition.waitsForAPerson(): Boolean =
+        executor is TaskExecutor.HumanApproval || approvalPolicy is ApprovalPolicy.HumanApproval
+
+    /** For each creature, the creatures that wait for a person somewhere upstream of it (through any chain of dependencies). */
+    private fun approvalAncestors(definition: WorkflowDefinition): Map<TaskDefinitionId, Set<TaskDefinitionId>> {
+        val byId = definition.tasks.associateBy { it.id }
+        return definition.tasks.associate { task ->
+            val seen = mutableSetOf<TaskDefinitionId>()
+            val pending = ArrayDeque(task.dependsOn)
+            while (pending.isNotEmpty()) {
+                val id = pending.removeFirst()
+                if (seen.add(id)) byId[id]?.let { pending.addAll(it.dependsOn) }
+            }
+            task.id to seen.filterTo(mutableSetOf()) { byId[it]?.waitsForAPerson() == true }
+        }
+    }
+
+    /**
+     * An edit made here may not move a creature out from behind a person's approval (by changing its
+     * dependencies, or by removing a creature that links it to one), and a gate may not wait on less than
+     * it did. The validator only protects repository operations; this protects the order of the rest.
+     */
+    private fun refuseRelaxedApprovals(before: WorkflowDefinition, after: WorkflowDefinition) {
+        val upstreamBefore = approvalAncestors(before)
+        val upstreamAfter = approvalAncestors(after)
+        val priorById = before.tasks.associateBy { it.id }
+        after.tasks.forEach { task ->
+            val was = upstreamBefore[task.id].orEmpty()
+            if (!upstreamAfter[task.id].orEmpty().containsAll(was)) {
+                fail(ControlErrorCode.PolicyDenied, "'${task.name}' would no longer wait behind a creature that waits for a person; change that in the app")
+            }
+            val prior = priorById[task.id]
+            if (prior != null && prior.executor is TaskExecutor.HumanApproval && !task.dependsOn.containsAll(prior.dependsOn)) {
+                fail(ControlErrorCode.PolicyDenied, "An approval gate can be made to wait on more over this interface but not on less; change that in the app")
+            }
+        }
     }
 
     private fun buildTask(spec: JsonObject, available: List<RoleDefinition>, taken: MutableSet<String>, known: Set<String> = emptySet()): TaskDefinition {

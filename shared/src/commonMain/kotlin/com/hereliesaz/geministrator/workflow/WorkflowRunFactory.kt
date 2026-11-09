@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.BlockingReason
+import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.ROLE_COLLECTION_MARKER_ID
@@ -47,6 +48,8 @@ object WorkflowRunFactory {
         roles: Collection<RoleDefinition> = emptyList(),
         /** Runs this run continues (one) or merges (several); empty for a root run. */
         parentWorkflowRunIds: List<WorkflowRunId> = emptyList(),
+        /** Where [objective] came from; anything but the keeper's own typing counts as an input to every task. */
+        objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
     ): WorkflowRun {
         WorkflowGraphValidator.requireValid(definition)
         val rolesById = roles.associateBy(RoleDefinition::id)
@@ -92,6 +95,7 @@ object WorkflowRunFactory {
                 .filterNot { it.id.value == ROLE_COLLECTION_MARKER_ID }
                 .distinctBy(RoleDefinition::id),
             parentWorkflowRunIds = parentWorkflowRunIds.distinct(),
+            objectiveProvenance = objectiveProvenance,
         )
     }
 

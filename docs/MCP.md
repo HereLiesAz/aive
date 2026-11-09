@@ -89,7 +89,9 @@ The words are the app's: a **hive** is a workflow, a **creature** is one of its 
 Rules, each answered with a typed error:
 
 - A creature is an **agent** (a switched-on role that runs an agent) or an **approval** gate. Scripts, deployments, GitHub actions, nested workflows and repository operations cannot be made here, and a field that would carry an executor is refused.
+- A role whose capabilities include repository write, pull-request creation or shell execution cannot be used for a creature here (it is refused with a policy error); those hives are made in the app. Edits cannot move a creature out from behind a person's approval: changing the dependencies of a creature behind one, or removing a creature that links it to one, is refused, and an approval gate can be made to wait on more but not on less.
 - Every save is checked by the workflow validator. A repository change already in a hive keeps its human-approval ancestor (invariant 4).
+- A run started over this interface treats its objective as external content (context taint): a step that can change something waits at a gate for a person.
 - A human approval can be turned on, never off. A gate, or a creature that waits for a person, cannot be removed here.
 - Only hives made in the app (or here) can be changed or deleted. Not while a run of the hive is live; not one that came from a package or is used as a circuit by another hive.
 

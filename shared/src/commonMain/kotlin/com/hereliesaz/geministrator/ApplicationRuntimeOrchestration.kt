@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.RepositoryRef
@@ -59,6 +60,8 @@ private class PlanInputs(
     val supplementalRoles: List<RoleDefinition> = emptyList(),
     /** The global roles a saved-hive launch records with its run; null for an orchestrated launch. */
     val rolesToPersist: List<RoleDefinition>? = null,
+    /** Where [objective] came from; the run made from the plan keeps it. */
+    val objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
 ) {
     fun fingerprint(reviewer: RoleDefinition): String = planInputsFingerprint(
         objective = objective,
@@ -79,6 +82,7 @@ private suspend fun ApplicationRuntime.planInputs(
     /** A saved hive and its rough design, when the plan is made from one. */
     design: Pair<WorkflowDefinition, RoughDesign>? = null,
     supplementalRoles: List<RoleDefinition> = emptyList(),
+    objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
 ): PlanInputs {
     val parents = requireKnownParentRuns(continuesWorkflowRunIds)
     val cleanProjectName = projectName.trim()
@@ -133,6 +137,7 @@ private suspend fun ApplicationRuntime.planInputs(
         design = design?.first,
         supplementalRoles = supplementalRoles,
         rolesToPersist = globalRoles.takeIf { design != null },
+        objectiveProvenance = objectiveProvenance,
     )
 }
 
@@ -188,6 +193,7 @@ private suspend fun ApplicationRuntime.startPlannedWorkflow(inputs: PlanInputs, 
         nowEpochMillis = now,
         taskRunIdFactory = { id -> TaskRunId("run-$stamp-${id.value}") },
         parentWorkflowRunIds = inputs.parentRunIds,
+        objectiveProvenance = inputs.objectiveProvenance,
     )
     reportLaunchProgress("Loading the new run…")
     loadLatest()
@@ -272,6 +278,7 @@ private suspend fun ApplicationRuntime.planAndDecide(
             savedDefinitionId = inputs.design?.id?.value,
             supplementalRoles = inputs.supplementalRoles,
             design = inputs.design,
+            objectiveProvenance = inputs.objectiveProvenance,
         ),
     )
     val start = checkNotNull(confirmPlan)(PlanDecision(inputs.objective, role.name, outcome, inputs.packet.availableAgents.associate { it.id to it.name }))
@@ -302,6 +309,8 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
     confirmPlan: (suspend (PlanDecision) -> Boolean)? = null,
     /** Keeps a reviewed plan that waits for the keeper across a restart (see [resumePendingPlanLaunch]). */
     planStore: ReviewedPlanStore? = null,
+    /** Where [objective] came from; a remote agent's request is not the keeper's own typing. */
+    objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
 ) {
     reportLaunchProgress("Reading your objective…")
     val cleanObjective = objective.trim()
@@ -314,7 +323,7 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
         return
     }
 
-    val inputs = planInputs(projectName, objective, repository, existingProject, continuesWorkflowRunIds)
+    val inputs = planInputs(projectName, objective, repository, existingProject, continuesWorkflowRunIds, objectiveProvenance = objectiveProvenance)
     val review = reviewRole(planReviewer, confirmPlan, inputs.launchRoles)
     val plan = planAndDecide(inputs, orchestrationRuntime, review, confirmPlan, planStore) ?: return
     startPlannedWorkflow(inputs, plan)
@@ -339,12 +348,14 @@ internal suspend fun ApplicationRuntime.launchPlannedSavedWorkflow(
     planReviewer: PlanReviewer,
     confirmPlan: suspend (PlanDecision) -> Boolean,
     planStore: ReviewedPlanStore?,
+    objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
 ): Boolean {
     val rough = savedHiveRoughDesign(definition) ?: return false
     val inputs = planInputs(
         projectName, objective, repository, existingProject, continuesWorkflowRunIds,
         design = definition to rough,
         supplementalRoles = supplementalRoles,
+        objectiveProvenance = objectiveProvenance,
     )
     val review = reviewRole(planReviewer, confirmPlan, inputs.launchRoles) ?: return false
     val plan = planAndDecide(inputs, orchestrationRuntime, review, confirmPlan, planStore) ?: return true
@@ -379,6 +390,7 @@ suspend fun ApplicationRuntime.resumePendingPlanLaunch(
             continuesWorkflowRunIds = pending.parentRunIds.map(::WorkflowRunId),
             design = saved,
             supplementalRoles = pending.supplementalRoles,
+            objectiveProvenance = pending.objectiveProvenance,
         )
     } catch (cancelled: kotlinx.coroutines.CancellationException) {
         throw cancelled

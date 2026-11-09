@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.orchestration
 
 import com.hereliesaz.geministrator.Sha256
+import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
@@ -57,6 +58,8 @@ data class PendingPlanLaunch(
      * instead, so an edit to it is seen.
      */
     val design: WorkflowDefinition? = null,
+    /** Where [objective] came from; a plan made from a remote agent's objective stays marked after a restart. */
+    val objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
 )
 
 /** Settings-backed store for the one [PendingPlanLaunch]. Unreadable state is no state: the keeper is simply asked afresh. */

@@ -153,6 +153,7 @@ suspend fun ApplicationRuntime.repairFailureEscalation(
         },
         // A repair rebuilds the same run: it keeps the run's own lineage, it does not continue itself.
         parentWorkflowRunIds = approvedRun.parentWorkflowRunIds,
+        objectiveProvenance = approvedRun.objectiveProvenance,
     )
     val mergedTaskRuns = freshRun.taskRuns.mapValues { (taskId, freshTaskRun) ->
         val prior = approvedRun.taskRuns[taskId]

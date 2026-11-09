@@ -285,6 +285,12 @@ data class WorkflowRun(
     val unpricedCostAccepted: Boolean = false,
     /** Set while the keeper has paused the hive: nothing new starts, what runs finishes. */
     val keeperPause: WorkflowKeeperPause? = null,
+    /**
+     * Where the objective came from. Every task reads it, so an objective that did not come from the
+     * keeper's own typing (a remote agent's launch, a scheduled launch fed model-written evidence) counts as
+     * an input to every task for the context-taint rule. A run saved before this existed reads as keeper-written.
+     */
+    val objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
 ) {
     init {
         require(id !in parentWorkflowRunIds) { "A workflow run cannot continue itself" }

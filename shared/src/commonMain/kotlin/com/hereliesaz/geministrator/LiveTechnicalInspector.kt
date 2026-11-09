@@ -36,6 +36,8 @@ import com.hereliesaz.geministrator.workflow.REMOTE_COMPUTE_UNAVAILABLE_CODE
 import com.hereliesaz.geministrator.workflow.ROLE_BUDGET_SPENT
 import com.hereliesaz.geministrator.workflow.WorkflowRunFactory
 import com.hereliesaz.geministrator.workflow.contextInputs
+import com.hereliesaz.geministrator.workflow.objectiveAsInput
+import com.hereliesaz.geministrator.workflow.taintInputs
 import com.hereliesaz.geministrator.workflow.isHeldAtContextTaintGate
 import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.isUntrustedContext
@@ -345,7 +347,7 @@ internal fun TechnicalInspector(
                     val providerPlan = taskRun.assignedProviderId != null
                     if (taskRun.isHeldAtContextTaintGate()) {
                         // The gate's reason: which of its inputs came from outside the keeper's control.
-                        val external = liveWorkflow.definition.contextInputs(liveWorkflow.run, task)
+                        val external = liveWorkflow.definition.taintInputs(liveWorkflow.run, task)
                             .filter(ArtifactRef::isUntrustedContext)
                         LiveInspectorLine(
                             stringResource(Res.string.inspector_external_inputs),
@@ -544,7 +546,9 @@ internal fun TechnicalInspector(
                 LiveInspectorLine(stringResource(Res.string.inspector_inputs), buildString {
                     append(stringResource(Res.string.inspector_input_objective))
                     append(" · ")
-                    append(stringResource(Res.string.provenance_keeper_written))
+                    // A remote agent's or a model-fed schedule's objective is labelled as what it is.
+                    val objectiveInput = liveWorkflow.run.objectiveAsInput()
+                    append(objectiveInput?.provenanceLabel() ?: stringResource(Res.string.provenance_keeper_written))
                     inputs.forEach { input ->
                         append("\n${input.label} (${input.kind.name}) · ")
                         append(input.provenanceLabel())

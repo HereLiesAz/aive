@@ -5,6 +5,7 @@ import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.BuiltInRoles
+import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.ProviderRunId
@@ -106,6 +107,15 @@ class TaskRerunPlannerTest {
         taskRunIdFactory = { TaskRunId("rerun-${it.value}") },
         editedDefinitionId = WorkflowDefinitionId("wf-edited"),
     )
+
+    @Test
+    fun aRerunKeepsWhereTheObjectiveCameFrom() {
+        val source = finished(chain).copy(objectiveProvenance = ContextProvenance.ExternalContent)
+
+        val forked = fork(chain, source, TaskRerunRequest(b))
+
+        assertEquals(ContextProvenance.ExternalContent, forked.run.objectiveProvenance)
+    }
 
     @Test
     fun rerunningAMiddleTaskRestartsItAndItsDescendantsOnlyAndKeepsUpstreamResults() {

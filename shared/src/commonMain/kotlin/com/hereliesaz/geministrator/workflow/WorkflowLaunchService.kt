@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
@@ -26,6 +27,8 @@ class WorkflowLaunchService(
         taskRunIdFactory: (TaskDefinitionId) -> TaskRunId,
         /** Runs the new run continues (one) or merges (several); empty for a root run. */
         parentWorkflowRunIds: List<WorkflowRunId> = emptyList(),
+        /** Where [objective] came from (see [WorkflowRun.objectiveProvenance]). */
+        objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
     ): Pair<WorkflowDefinition, WorkflowRuntimeState> {
         val prepared = preparer.prepare(definition, project.repository)
         // A hive that nests itself, directly or through the hives it nests, is refused now, not when the nesting
@@ -43,6 +46,7 @@ class WorkflowLaunchService(
             repository = project.repository,
             roles = roles,
             parentWorkflowRunIds = parentWorkflowRunIds,
+            objectiveProvenance = objectiveProvenance,
         )
 
         persistence.projects.put(project)

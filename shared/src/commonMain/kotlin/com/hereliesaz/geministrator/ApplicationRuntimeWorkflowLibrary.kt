@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.RepositoryRef
@@ -39,6 +40,8 @@ suspend fun ApplicationRuntime.launchSavedWorkflow(
     planReviewer: PlanReviewer? = null,
     confirmPlan: (suspend (PlanDecision) -> Boolean)? = null,
     planStore: ReviewedPlanStore? = null,
+    /** Where [objective] came from; a remote agent's or a model-fed schedule's objective is not the keeper's own typing. */
+    objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
 ) {
     if (planner != null && planReviewer != null && confirmPlan != null) {
         val planned = launchPlannedSavedWorkflow(
@@ -53,6 +56,7 @@ suspend fun ApplicationRuntime.launchSavedWorkflow(
             planReviewer = planReviewer,
             confirmPlan = confirmPlan,
             planStore = planStore,
+            objectiveProvenance = objectiveProvenance,
         )
         if (planned) return
     }
@@ -95,6 +99,7 @@ suspend fun ApplicationRuntime.launchSavedWorkflow(
         nowEpochMillis = now,
         taskRunIdFactory = { id -> TaskRunId("run-$stamp-${id.value}") },
         parentWorkflowRunIds = parents,
+        objectiveProvenance = objectiveProvenance,
     )
     loadLatest()
 }

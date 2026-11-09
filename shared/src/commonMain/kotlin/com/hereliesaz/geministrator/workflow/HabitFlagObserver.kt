@@ -119,7 +119,7 @@ class HabitFlagObserver(
         val key = "${source.name}:${run.id.value}:${agentRun.id.value}:${agentRun.attempt}:$operation"
         if (!reported.add(key)) return
         if (reported.size > MAX_REMEMBERED) reported.clear()
-        val tainted = definition.contextInputs(run, agent).any { it.isUntrustedContext() }
+        val tainted = definition.taintInputs(run, agent).any { it.isUntrustedContext() }
         sink().record(
             ProcedureTrace(
                 workflowId = run.id.value,
