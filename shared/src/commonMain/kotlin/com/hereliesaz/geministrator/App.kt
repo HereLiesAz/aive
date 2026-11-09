@@ -27,6 +27,10 @@ import com.hereliesaz.geministrator.workflow.SettingsNodeCharacterAssetStore
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
+import com.hereliesaz.geministrator.workflow.improvement.SelfImprovementLoop
+import com.hereliesaz.geministrator.workflow.improvement.SettingsImprovementStore
+import com.hereliesaz.geministrator.workflow.improvement.SwarmEvidence
+import com.hereliesaz.geministrator.workflow.improvement.readCycle
 import com.hereliesaz.geministrator.workflow.schedule.ScheduleTicker
 import com.hereliesaz.geministrator.workflow.schedule.SettingsWorkflowScheduleStore
 import com.hereliesaz.geministrator.domain.WorkflowRunId
@@ -622,6 +626,20 @@ fun App(
         // hive as drawn, with no planner to ask and nothing approved for anyone. It waits for the active
         // run to finish, says what it decided in the app log, and a hive with an approval waits for the keeper.
         val scheduleStore = remember { SettingsWorkflowScheduleStore() }
+        val improvementStore = remember { SettingsImprovementStore() }
+        // A finished self-improvement cycle is read into the keeper's Improvement list, once
+        // (docs/architecture/SELF_IMPROVEMENT.md). Reading changes nothing: a proposal is adopted only by the keeper.
+        val finishedCycle = (runtimeState as? ApplicationRuntimeState.Live)?.presentation?.run
+            ?.takeIf { it.workflowDefinitionId.value == SelfImprovementLoop.HIVE_ID && it.status == com.hereliesaz.geministrator.domain.WorkflowRunStatus.Completed }
+        LaunchedEffect(finishedCycle?.id) {
+            val run = finishedCycle ?: return@LaunchedEffect
+            val text = run.taskRuns[com.hereliesaz.geministrator.domain.TaskDefinitionId(SelfImprovementLoop.FINAL_STEP)]
+                ?.artifacts?.mapNotNull { it.textContent }?.joinToString("\n").orEmpty()
+            val (cycle, proposals) = readCycle(run.id.value, text, currentEpochMillis())
+            if (improvementStore.ingest(cycle, proposals)) {
+                appLog("Improvement", "Cycle ${run.id.value}: ${proposals.size} proposals" + if (cycle.examinedLoop) ", the loop examined itself." else ", and the loop did NOT examine itself.")
+            }
+        }
         LaunchedEffect(runtime, workflowPersistence) {
             val active = runtime ?: return@LaunchedEffect
             ScheduleTicker(
@@ -631,11 +649,27 @@ fun App(
                 start = { schedule ->
                     val definition = workflowPersistence.definitions.get(WorkflowDefinitionId(schedule.workflowId))
                         ?: error("the hive is no longer on this device")
+                    // An evidence-fed schedule (the self-improvement cycle) starts with the swarm's own numbers and the loop as it is now.
+                    val objective = if (schedule.withEvidence) {
+                        val roles = resolveRoleCollection(workflowPersistence.roles.all())
+                        schedule.objective + "\n\n" + SwarmEvidence.of(
+                            runs = active.loadRunHistory().flatMap { it.second },
+                            roles = roles,
+                            state = improvementStore.state(),
+                            nowEpochMillis = currentEpochMillis(),
+                            loopDescription = SelfImprovementLoop.describe(
+                                definition = definition,
+                                hallMonitor = roles.firstOrNull { it.id == com.hereliesaz.geministrator.domain.HallMonitorRole.id } ?: com.hereliesaz.geministrator.domain.HallMonitorRole.definition,
+                            ),
+                        )
+                    } else {
+                        schedule.objective
+                    }
                     val started = guardedSavedWorkflowLaunch { activeRuntime, existingProject ->
                         activeRuntime.launchSavedWorkflow(
                             definition = definition,
                             existingProject = existingProject,
-                            objective = schedule.objective,
+                            objective = objective,
                             repository = existingProject?.repository,
                         )
                     }
@@ -653,6 +687,7 @@ fun App(
         CompositionLocalProvider(
             LocalWorkflowLibraryHost provides workflowLibraryHost,
             LocalWorkflowScheduleStore provides scheduleStore,
+            LocalImprovementStore provides improvementStore,
             LocalStableHost provides stableHost,
             LocalBreedPurchases provides breedPurchases,
             LocalEntire provides entire,

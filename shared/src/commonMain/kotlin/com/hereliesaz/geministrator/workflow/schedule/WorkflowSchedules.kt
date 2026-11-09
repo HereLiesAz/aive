@@ -45,6 +45,8 @@ data class WorkflowSchedule(
     val objective: String,
     val cadence: ScheduleCadence,
     val enabled: Boolean = false,
+    /** Whether the run's objective is followed by the swarm's evidence, computed when it starts (SELF_IMPROVEMENT.md). */
+    val withEvidence: Boolean = false,
     /** The keeper's offset from UTC in minutes (New Orleans is -360 in winter), for daily and weekly hours. */
     val utcOffsetMinutes: Int = 0,
     /** When it was made: the first start is the first slot after this, never one already past. */

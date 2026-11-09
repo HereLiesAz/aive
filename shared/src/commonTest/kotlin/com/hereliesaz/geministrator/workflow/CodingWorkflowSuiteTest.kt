@@ -30,7 +30,7 @@ class CodingWorkflowSuiteTest {
 
     @Test
     fun everyAgentStepIsGivenToARoleThatHoldsTheAuthorityItExercises() {
-        val roles = BuiltInRoles.all.associateBy { it.id }
+        val roles = com.hereliesaz.geministrator.domain.haiveBuiltInRoles.associateBy { it.id }
         entries.flatMap { e -> e.definition.tasks.map { e to it } }.forEach { (entry, task) ->
             val role = roles[task.roleId] ?: error("${entry.definition.id.value}/${task.id.value}: unknown role ${task.roleId}")
             task.requiredRoleAuthority?.let { authority ->

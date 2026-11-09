@@ -226,5 +226,71 @@ class PanelScreenshotTest {
             androidx.compose.runtime.CompositionLocalProvider(LocalWorkflowScheduleStore provides store) { SchedulesPart(compact = true) }
         }
     }
+
+    @Test
+    fun improvementPanel() {
+        val store = com.hereliesaz.geministrator.workflow.improvement.InMemoryImprovementStore()
+        val now = 20_765L * 86_400_000L
+        runBlocking {
+            val text = """
+                IMPROVEMENT | role-instruction | qa-engineer | Quote the failing command | Always quote the exact command that failed. | Fewer retries for qa-engineer; measure retried steps over the next seven days | Revert removes the added line
+                IMPROVEMENT | loop-definition | suite-self-improvement/examine-loop | Start the loop's self-examination from retried steps | Begin from the steps with attempt above one, then the rest. | The loop's findings cite retry counts; measure the share that do | Revert restores the old objective
+                IMPROVEMENT | schedule | schedule-suite-self-improvement | Run the cycle twice a week | - | More cycles inside the same weeks; measure cycles per month | Set it back to weekly
+            """.trimIndent()
+            val (cycle, proposals) = com.hereliesaz.geministrator.workflow.improvement.readCycle("run-cycle-1", text, now)
+            store.ingest(cycle, proposals)
+            store.merge { st ->
+                val role = com.hereliesaz.geministrator.memory.procedural.RoleInstructionProposal(
+                    id = "rip-1", roleId = BuiltInRoles.QaEngineer.id, baseInstructions = "Verify carefully.",
+                    proposedInstructions = "Verify carefully.\n\nLearned from past work:\n- When a check fails, quote the failing command.",
+                    changes = listOf(
+                        com.hereliesaz.geministrator.memory.procedural.RoleInstructionChange(
+                            "- When a check fails, quote the failing command.",
+                            com.hereliesaz.geministrator.memory.procedural.RoleInstructionEvidenceKind.RepeatedFailure, emptyList(),
+                        ),
+                    ),
+                    createdAtEpochMillis = now,
+                )
+                val withRole = com.hereliesaz.geministrator.workflow.improvement.ProposalMirrors.roleHistory(
+                    st, com.hereliesaz.geministrator.memory.procedural.RoleInstructionProposalState(proposals = listOf(role)), now,
+                )
+                val habit = com.hereliesaz.geministrator.memory.procedural.FormedHabit(
+                    executorKind = "GitHubAction", operation = "github-action:ci.yml", uses = 5, completedUses = 4, failedUses = 1,
+                    verifiedUses = 0, rejectedUses = 0, slots = emptyList(), firstUsedAtEpochMillis = 1L, lastUsedAtEpochMillis = 2L,
+                    strength = com.hereliesaz.geministrator.memory.procedural.HabitStrength.Low,
+                )
+                com.hereliesaz.geministrator.workflow.improvement.ProposalMirrors.habits(withRole, listOf("bank" to habit), now)
+            }
+            store.decide(proposals[2].id) { it.copy(status = com.hereliesaz.geministrator.workflow.improvement.ProposalStatus.Adopted, decidedAtEpochMillis = now, note = "by hand") }
+        }
+        shoot("55-improvement", 780, 2600) {
+            androidx.compose.runtime.CompositionLocalProvider(LocalImprovementStore provides store) {
+                ImprovementPart(onSaveRoleInstructions = { _, _ -> })
+            }
+        }
+    }
+
+    @Test
+    fun localAgentsPanel() {
+        val host = object : com.hereliesaz.geministrator.providers.cli.CliAgentHost {
+            override suspend fun statuses() = com.hereliesaz.geministrator.providers.cli.CliAgentSpecs.all.mapIndexed { i, spec ->
+                com.hereliesaz.geministrator.providers.cli.CliAgentStatus(
+                    spec = spec, path = if (i < 3) "/usr/local/bin/" + spec.binaries.first() else null, version = if (i < 3) "1.${i}.0" else null,
+                    enabled = i == 0, passKeys = false,
+                    lastTest = when (i) {
+                        0 -> com.hereliesaz.geministrator.providers.cli.CliTestResult(true, "Answered in 3.2 s: OK", 1L, 3200)
+                        1 -> com.hereliesaz.geministrator.providers.cli.CliTestResult(false, "Exit 1: unknown option --approval-mode", 1L, 800)
+                        else -> null
+                    },
+                )
+            }
+            override fun setEnabled(id: String, enabled: Boolean) = Unit
+            override fun setPassKeys(id: String, passKeys: Boolean) = Unit
+            override suspend fun test(id: String) = com.hereliesaz.geministrator.providers.cli.CliTestResult(true, "OK", 1L, 1)
+        }
+        shoot("56-local-agents", 780, 2400) {
+            androidx.compose.runtime.CompositionLocalProvider(com.hereliesaz.geministrator.providers.cli.LocalCliAgentHost provides host) { LocalAgentsPart() }
+        }
+    }
 }
 

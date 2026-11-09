@@ -1181,7 +1181,8 @@ private fun MainDestination(
                 ControlRoomDestination.Compute -> KeeperRoom(
                     sections = KeeperSection.entries.filter {
                         (it != KeeperSection.Compute || computeAvailable) &&
-                            (it != KeeperSection.Delegations || delegations != null)
+                            (it != KeeperSection.Delegations || delegations != null) &&
+                            (it != KeeperSection.LocalAgents || com.hereliesaz.geministrator.providers.cli.LocalCliAgentHost.current != null)
                     },
                     opening = KeeperSection.of(place),
                     selectedName = keeperSectionName,
@@ -1244,6 +1245,17 @@ private fun MainDestination(
                                         )
                                         KeeperSection.Delegations -> delegations?.let { DelegationsPart(it, compact) }
                                         KeeperSection.Schedules -> SchedulesPart(compact)
+                                        KeeperSection.LocalAgents -> LocalAgentsPart()
+                                        KeeperSection.Improvement -> {
+                                            val roleHost = LocalWorkflowLibraryHost.current
+                                            ImprovementPart(
+                                                memoryLayer = memoryLayer,
+                                                onSaveRoleInstructions = { roleId, instructions ->
+                                                    val all = roleHost?.installedRoles().orEmpty()
+                                                    onSaveRoleCollection(all.map { if (it.id.value == roleId) it.copy(instructions = instructions) else it })
+                                                },
+                                            )
+                                        }
                                         else -> Unit
                                     }
                                 },
