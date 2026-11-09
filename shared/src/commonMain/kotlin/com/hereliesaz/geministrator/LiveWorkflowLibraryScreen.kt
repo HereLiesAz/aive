@@ -110,8 +110,8 @@ internal fun LiveWorkflowLibraryScreen(
 
     // The selected tab and the pinned workflow live in durable UI state, so both survive leaving
     // this destination and coming back. Every change goes through WorkflowLibraryTabState.
-    var tabNameValue by rememberDurableStringState("workflows.tab", WorkflowLibraryTab.Library.name)
-    var selectedKeyValue by rememberDurableStringState("workflows.selected-key")
+    var tabNameValue by rememberDurableStringState(WorkflowLibraryKeys.TAB, WorkflowLibraryTab.Library.name)
+    var selectedKeyValue by rememberDurableStringState(WorkflowLibraryKeys.SELECTED_KEY)
     val tabState = WorkflowLibraryTabState(tabNameValue, selectedKeyValue)
     val tab = tabState.resolvedTab(canSave)
     val selectedKey = selectedKeyValue.takeIf(String::isNotBlank)
@@ -134,13 +134,13 @@ internal fun LiveWorkflowLibraryScreen(
     var filterName by rememberDurableStringState("workflows.filter", WorkflowLibraryFilter.All.name)
     val filter = WorkflowLibraryFilter.entries.firstOrNull { it.name == filterName } ?: WorkflowLibraryFilter.All
     var draft by rememberDurableJsonState(
-        key = "workflows.draft",
+        key = WorkflowLibraryKeys.DRAFT,
         serializer = WorkflowDefinition.serializer().nullable,
         initialValue = null,
     )
-    var draftOriginName by rememberDurableStringState("workflows.draft-origin")
+    var draftOriginName by rememberDurableStringState(WorkflowLibraryKeys.DRAFT_ORIGIN)
     val draftOrigin = WorkflowLibraryOrigin.entries.firstOrNull { it.name == draftOriginName }
-    var selectedTaskIdValue by rememberDurableStringState("workflows.selected-task-id")
+    var selectedTaskIdValue by rememberDurableStringState(WorkflowLibraryKeys.SELECTED_TASK_ID)
     val selectedTaskId = selectedTaskIdValue.takeIf(String::isNotBlank)
     var roleQuery by rememberDurableStringState("workflows.role-query")
     var composeQuery by rememberDurableStringState("workflows.compose-query")

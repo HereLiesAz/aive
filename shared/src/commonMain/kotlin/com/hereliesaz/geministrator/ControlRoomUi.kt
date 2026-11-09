@@ -857,14 +857,15 @@ private fun MainDestination(
         keeperOpen.value = true
         onOpenSettings()
     }
-    // Workflows, opened on the hive on screen: its workflow is selected first, so the library shows
-    // the one the keeper came from and not whichever it showed last.
-    val openHiveInWorkflows: () -> Unit = {
+    // Workflows, opened on a hive: its workflow is selected first (and a draft left from another hive is
+    // dropped, so Save cannot write to it), so the library shows the hive the keeper came from and not
+    // whichever it showed last. The hive on screen unless one is named: the resting hive names itself.
+    val openHiveInWorkflows: (String?) -> Unit = { definitionId ->
         hiveScope.launch {
-            val id = (runtimeState as? ApplicationRuntimeState.Live)?.presentation?.run?.workflowDefinitionId?.value
+            val id = definitionId
+                ?: (runtimeState as? ApplicationRuntimeState.Live)?.presentation?.run?.workflowDefinitionId?.value
             hiveHost?.entries()?.firstOrNull { it.definition.id.value == id }?.let { entry ->
-                DurableUiState.store.putString("workflows.selected-key", entry.key)
-                DurableUiState.store.putString("workflows.tab", WorkflowLibraryTab.Overview.name)
+                DurableUiState.store.openWorkflowsOn(entry)
             }
             onDestinationSelected(ControlRoomDestination.Workflows)
         }
@@ -940,7 +941,7 @@ private fun MainDestination(
                     AzphaltPill(
                         label = stringResource(Res.string.hive_more_editing),
                         seed = "hive-more-editing",
-                        onClick = openHiveInWorkflows,
+                        onClick = { openHiveInWorkflows(null) },
                     )
                 }
             }
@@ -1065,7 +1066,7 @@ private fun MainDestination(
                             AzphaltPill(
                                 label = stringResource(Res.string.hive_more_editing),
                                 seed = "hive-more-editing",
-                                onClick = { onDestinationSelected(ControlRoomDestination.Workflows) },
+                                onClick = { openHiveInWorkflows(restingHiveId) },
                             )
                         }
                     } else {
@@ -1160,7 +1161,7 @@ private fun MainDestination(
                             launchError = launchError,
                             onDismissLaunchError = onDismissLaunchError,
                             onResumeRun = { onPauseRun(false) },
-                            onEditWorkflow = openHiveInWorkflows,
+                            onEditWorkflow = { openHiveInWorkflows(null) },
                             onOpenCreature = onOpenCreature,
                         )
                             }
