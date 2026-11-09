@@ -102,3 +102,11 @@ The MCP answer artifact carried `contentProvenance=external-tool-results`, which
 - For every "refuses", "fails" or "checks" in a doc, grep for its production callers and put the test where the action happens (adopt, start), not on the checker alone. Check the structure the engine acts on (executor, escalation, condition, role), not a word in a step's text.
 - Bound a list by status, not by age: name what is never dropped (adopted, with its undo) and what goes first. A decision is a compare-and-set on the status it expects, returns whether it applied, and is recorded only after the change it describes was saved.
 - A one-press convenience ("run now") must not persist the state it needs to run (enabled): give it its own one-shot flag.
+
+## A copy read before a slow await is not what you write back after it
+
+The schedule ticker read the list, awaited a launch, then wrote its stale copy over the store, so a schedule turned off or removed in between came back, and two looks (or two windows) both started the same slot; the unreadable list read as empty and the next write erased it; a schedule named a hive's id, not its content; and the film budget lived in a map that a restart emptied.
+
+- After any await on something slow, change only your own fields on the stored copy in one read-modify-write (`update`), and claim an action (compare on the field that says it was done) before doing it, not after.
+- A parse failure is not "empty": keep the raw text, refuse writes, and make the keeper's choice visible. A limit or a "done once" flag that guards money lives where a restart cannot reset it, and is taken before the spend.
+- A binding by id needs the content it was made for beside it (a fingerprint), checked at the moment of use.
