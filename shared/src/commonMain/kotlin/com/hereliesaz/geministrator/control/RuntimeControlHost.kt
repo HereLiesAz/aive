@@ -50,10 +50,15 @@ import kotlinx.serialization.json.put
  *  - No approval gate is reachable: this class holds the runtime for reading, launching and
  *    stopping runs, and never calls anything that decides a gate, lifts a spend stop or reads a key.
  *  - Hives are authored from two kinds of creature only: an agent working as a switched-on role, and a
- *    human-approval gate. Scripts, deployments and repository operations cannot be authored here, so
- *    no hive made here can change a repository.
+ *    human-approval gate. Scripts, deployments and repository operations cannot be authored here, and a
+ *    role whose capabilities include repository write, pull-request creation or shell execution is refused
+ *    ([roleFor]), so no creature made here can change a repository or run a command. (A hive made in the
+ *    app can hold such a creature; the next rule keeps it behind its approval.)
  *  - An approval can be added but never lowered: a creature that waits for a person, or whose
- *    approval is "human", cannot be removed or relaxed over this interface.
+ *    approval is "human", cannot be removed or relaxed over this interface, and no edit may move a
+ *    creature out from behind one ([refuseRelaxedApprovals]).
+ *  - A run started here has an external objective for the context-taint rule: a step that can change
+ *    something waits at a gate for a person.
  *  - Only hives made in the app (the authored list) can be changed or deleted, and not while a run is live.
  */
 class RuntimeControlHost(
