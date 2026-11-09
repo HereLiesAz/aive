@@ -106,6 +106,31 @@ class SqlWorkflowPersistenceTest {
     }
 
     @Test
+    fun theHourlySpendReadsOnlyTheRunsAndEventsOfThatHour() = runBlocking<Unit> {
+        val persistence = desktopSqlWorkflowPersistence(tempDatabase())
+        val old = run("old", updatedAt = 1_000L)
+        val recent = run("recent", updatedAt = 9_000L)
+        persistence.projects.put(project)
+        persistence.runs.put(old)
+        persistence.runs.put(recent)
+        fun usage(run: WorkflowRun, at: Long) = com.hereliesaz.geministrator.events.ProviderUsageRecorded(
+            workflowRunId = run.id,
+            taskDefinitionId = TaskDefinitionId("task"),
+            providerId = com.hereliesaz.geministrator.domain.AgentProviderId("provider"),
+            providerRunId = com.hereliesaz.geministrator.domain.ProviderRunId("run"),
+            costUsd = 1.0,
+            occurredAtEpochMillis = at,
+        )
+        persistence.events.append(usage(recent, at = 2_000L))
+        persistence.events.append(usage(recent, at = 8_000L))
+        persistence.events.append(usage(old, at = 1_000L))
+
+        assertEquals(listOf(recent.id), persistence.runsUpdatedSince(5_000L).map { it.id })
+        assertEquals(listOf(8_000L), persistence.eventsSince(recent.id, 5_000L).map { it.occurredAtEpochMillis })
+        assertEquals(1.0, com.hereliesaz.geministrator.workflow.hourlySpendUsd(persistence, nowEpochMillis = 5_000L + 3_600_000L))
+    }
+
+    @Test
     fun anUnreadableRowIsQuarantinedInsteadOfCondemningTheStore() = runBlocking {
         val file = tempDatabase()
         val first = desktopSqlWorkflowPersistence(file)

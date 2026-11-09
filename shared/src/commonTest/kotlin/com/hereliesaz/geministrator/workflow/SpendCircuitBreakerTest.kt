@@ -314,6 +314,93 @@ class SpendCircuitBreakerTest {
         assertEquals(3.0, pause.spentUsd)
     }
 
+    // ---- Spend a dollar cap cannot count ----
+
+    @Test
+    fun unpricedUsageStopsARunUnderADollarCapInsteadOfCountingAsFree() = runTest {
+        val gateway = UsageGateway()
+        gateway.pending[ProviderRunId("run-working")] =
+            ManagedSessionUsage(inputTokens = 5_000, outputTokens = 900, costUnknown = true)
+        val definition = definition(task(working))
+        val run = run(definition, taskRun(working, TaskRunStatus.Running, providerRunId = "run-working"))
+
+        val result = coordinator(InMemoryWorkflowPersistence(), gateway, roles(budget = null), SpendCaps(runCostCapUsd = 5.0))
+            .cycle(project(), definition, WorkflowRuntimeState(run, mapOf(working to handle(working, "run-working"))), 20L, ::artifactId)
+
+        val pause = assertNotNull(result.run.spendPause, "tokens were billed and no price is known: the cap cannot say it is under")
+        assertTrue(pause.unknownCost)
+        assertEquals(SpendCapKind.RunCost, pause.kind)
+        assertEquals(1, gateway.cancelled.size)
+    }
+
+    @Test
+    fun unpricedUsageStopsNothingWhenNoDollarCapIsSet() = runTest {
+        val gateway = UsageGateway()
+        gateway.pending[ProviderRunId("run-working")] =
+            ManagedSessionUsage(inputTokens = 5_000, outputTokens = 900, costUnknown = true)
+        val definition = definition(task(working))
+        val run = run(definition, taskRun(working, TaskRunStatus.Running, providerRunId = "run-working"))
+
+        val result = coordinator(InMemoryWorkflowPersistence(), gateway, roles(budget = null))
+            .cycle(project(), definition, WorkflowRuntimeState(run, mapOf(working to handle(working, "run-working"))), 20L, ::artifactId)
+
+        assertNull(result.run.spendPause)
+        assertEquals(5_900L, result.run.taskRuns.getValue(working).usage?.totalTokens, "token counting is unaffected")
+        assertTrue(result.run.taskRuns.getValue(working).usage?.costUnknown == true)
+    }
+
+    @Test
+    fun liftingAStopForUnpricedUsageLetsThatRunGoOn() = runTest {
+        val gateway = UsageGateway()
+        gateway.pending[ProviderRunId("run-working")] =
+            ManagedSessionUsage(inputTokens = 100, outputTokens = 10, costUnknown = true)
+        val definition = definition(task(working))
+        val run = run(definition, taskRun(working, TaskRunStatus.Running, providerRunId = "run-working"))
+        val coordinator = coordinator(InMemoryWorkflowPersistence(), gateway, roles(budget = null), SpendCaps(runCostCapUsd = 5.0))
+        val stopped = coordinator.cycle(project(), definition, WorkflowRuntimeState(run, mapOf(working to handle(working, "run-working"))), 20L, ::artifactId)
+        assertNotNull(stopped.run.spendPause)
+
+        val lifted = liftSpendPause(stopped.run, 30L)
+
+        assertNull(runCostTrip(lifted, SpendCaps(runCostCapUsd = 5.0)), "the keeper accepted spend that cannot be priced")
+        assertTrue(lifted.unpricedCostAccepted)
+        // Known cost still counts after the lift.
+        val priced = lifted.copy(taskRuns = lifted.taskRuns.mapValues { (_, t) -> t.copy(usage = TaskUsage(10, 10, 6.0, costUnknown = true)) })
+        assertEquals(SpendCapKind.RunCost, runCostTrip(priced, SpendCaps(runCostCapUsd = 5.0))?.kind)
+    }
+
+    @Test
+    fun theHourSpendSaysWhenSomeOfItWasBilledButUnpricedAndCountsSpendOutsideRuns() = runTest {
+        val now = 10 * ONE_HOUR_MILLIS
+        val persistence = InMemoryWorkflowPersistence()
+        persistence.projects.put(project())
+        val other = WorkflowRun(
+            id = WorkflowRunId("other"),
+            projectId = ProjectId("project"),
+            workflowDefinitionId = WorkflowDefinitionId("other"),
+            objective = "Other",
+            status = WorkflowRunStatus.Completed,
+            taskRuns = emptyMap(),
+            createdAtEpochMillis = now - 600_000L,
+            updatedAtEpochMillis = now - 600_000L,
+        )
+        persistence.runs.put(other)
+        persistence.events.append(usageEvent(other.id, costUsd = 1.5, at = now - 600_000L))
+        val before = hourlySpend(persistence, now)
+        assertEquals(1.5, before.knownUsd)
+        assertEquals(false, before.unpricedUsage)
+
+        persistence.events.append(usageEvent(other.id, costUsd = null, at = now - 60_000L).copy(costUnknown = true))
+        assertTrue(hourlySpend(persistence, now).unpricedUsage)
+
+        val ledger = AmbientSpendLedger { now - 1_000L }
+        ledger.record(costUsd = 0.25)
+        ledger.record(costUsd = null, costUnknown = true)
+        val withAmbient = hourlySpend(persistence, now, ambient = ledger)
+        assertEquals(1.75, withAmbient.knownUsd)
+        assertTrue(withAmbient.unpricedUsage)
+    }
+
     @Test
     fun usdFormatsToTheCent() {
         assertEquals("\$2.50", formatUsd(2.5))

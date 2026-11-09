@@ -17,8 +17,9 @@ enum class SpendCapKind {
  *
  * While this is present, every non-terminal task is parked in Blocked and no provider session is
  * live: sessions were cancelled before the stop was committed and are re-dispatched as a retry when
- * the keeper lifts it. Only known cost counts toward a cap; a provider that reports no cost never
- * trips one.
+ * the keeper lifts it. Only known cost counts toward a cap, and usage that was billed but could not be
+ * priced ([unknownCost]: no cost reported, no price known for the model) stops the run too, since a cap
+ * cannot be trusted with spend it cannot count. A provider that reports no tokens and no cost never trips one.
  */
 @Serializable
 data class WorkflowSpendPause(
@@ -28,6 +29,8 @@ data class WorkflowSpendPause(
     val spentUsd: Double,
     val taskSnapshots: List<PausedTaskSnapshot>,
     val pausedAtEpochMillis: Long,
+    /** The stop is for spend that could not be priced, not for [spentUsd] reaching [capUsd]. */
+    val unknownCost: Boolean = false,
 ) {
     init {
         require(reason.isNotBlank()) { "Spend stop reason must not be blank" }

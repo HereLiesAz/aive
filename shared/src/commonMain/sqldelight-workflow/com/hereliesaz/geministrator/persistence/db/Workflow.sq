@@ -88,12 +88,16 @@ runsByProject:
 SELECT payload FROM run WHERE project_id = ? ORDER BY updated_at DESC;
 allRuns:
 SELECT payload FROM run ORDER BY rowid;
+runsUpdatedSince:
+SELECT payload FROM run WHERE updated_at >= ? ORDER BY updated_at DESC;
 
 -- Events
 appendEvent:
 INSERT INTO event(run_id, occurred_at, payload) VALUES (?, ?, ?);
 eventsForRun:
 SELECT payload FROM event WHERE run_id = ? ORDER BY occurred_at, seq;
+eventsForRunSince:
+SELECT payload FROM event WHERE run_id = ? AND occurred_at >= ? ORDER BY occurred_at, seq;
 allEvents:
 SELECT payload FROM event ORDER BY occurred_at, seq;
 deleteEventsForRun:

@@ -10,7 +10,10 @@ import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.content.TextContent
+import com.hereliesaz.geministrator.providers.spentTokens
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -88,49 +91,82 @@ class McpToolLoop(
         val calls: List<McpToolOutcome>,
     )
 
+    /** The run was cancelled between two steps: no further round or tool call is made. */
+    class Cancelled : CancellationException("The tool run was cancelled")
+
+    /**
+     * Runs the loop. [isCancelled] is asked before every round and before every tool call: a run the keeper
+     * (or a spend cap) stopped makes no further model request and calls no further tool, since each round
+     * is billed and a tool can change something. A round that fails after earlier ones were paid for throws a
+     * [SpentGenerationFailure] carrying everything spent so far, so the earlier rounds are still counted.
+     */
     suspend fun run(
         api: ToolCallingTextGenerationApi,
         prompt: String,
         toolbox: McpToolbox,
+        isCancelled: () -> Boolean = { false },
         onCall: suspend (ToolCall) -> Unit = {},
     ): Outcome {
         val rounds = mutableListOf<ToolRound>()
         val outcomes = mutableListOf<McpToolOutcome>()
         var inputTokens: Long? = null
         var outputTokens: Long? = null
-        while (true) {
-            val allowTools = rounds.size < maxRounds
-            val turn = if (rounds.isEmpty()) {
-                try {
+        fun spend(input: Long?, output: Long?) {
+            input?.let { inputTokens = (inputTokens ?: 0L) + it }
+            output?.let { outputTokens = (outputTokens ?: 0L) + it }
+        }
+        try {
+            while (true) {
+                currentCoroutineContext().ensureActive()
+                if (isCancelled()) throw Cancelled()
+                val allowTools = rounds.size < maxRounds
+                val turn = if (rounds.isEmpty()) {
+                    try {
+                        api.converse(prompt, toolbox.offers, rounds, allowTools)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        throw ToolOfferRefused(failure)
+                    }
+                } else {
                     api.converse(prompt, toolbox.offers, rounds, allowTools)
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (failure: Exception) {
-                    throw ToolOfferRefused(failure)
                 }
-            } else {
-                api.converse(prompt, toolbox.offers, rounds, allowTools)
-            }
-            turn.inputTokens?.let { inputTokens = (inputTokens ?: 0L) + it }
-            turn.outputTokens?.let { outputTokens = (outputTokens ?: 0L) + it }
-            if (turn.calls.isEmpty()) {
-                if (turn.text.isBlank()) error("The model ended its tool use without an answer")
-                return Outcome(TextGenerationResult(turn.text.trim(), inputTokens, outputTokens), outcomes)
-            }
-            if (!allowTools) error("The model kept calling tools after $maxRounds rounds")
-            val results = turn.calls.mapIndexed { index, call ->
-                when {
-                    index >= maxCallsPerRound -> ToolCallResult(call.id, call.name, "Not run: at most $maxCallsPerRound tool calls per turn.", isError = true)
-                    call.arguments == null -> ToolCallResult(call.id, call.name, "Not run: the arguments were not a JSON object.", isError = true)
-                    else -> {
-                        onCall(call)
-                        val outcome = toolbox.call(call.name, call.arguments)
-                        outcomes += outcome
-                        ToolCallResult(call.id, call.name, outcome.text, outcome.isError)
+                spend(turn.inputTokens, turn.outputTokens)
+                if (turn.calls.isEmpty()) {
+                    if (turn.text.isBlank()) error("The model ended its tool use without an answer")
+                    return Outcome(TextGenerationResult(turn.text.trim(), inputTokens, outputTokens), outcomes)
+                }
+                if (!allowTools) error("The model kept calling tools after $maxRounds rounds")
+                val results = turn.calls.mapIndexed { index, call ->
+                    when {
+                        index >= maxCallsPerRound -> ToolCallResult(call.id, call.name, "Not run: at most $maxCallsPerRound tool calls per turn.", isError = true)
+                        call.arguments == null -> ToolCallResult(call.id, call.name, "Not run: the arguments were not a JSON object.", isError = true)
+                        else -> {
+                            currentCoroutineContext().ensureActive()
+                            if (isCancelled()) throw Cancelled()
+                            onCall(call)
+                            val outcome = toolbox.call(call.name, call.arguments)
+                            outcomes += outcome
+                            ToolCallResult(call.id, call.name, outcome.text, outcome.isError)
+                        }
                     }
                 }
+                rounds += ToolRound(turn, results)
             }
-            rounds += ToolRound(turn, results)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (refused: ToolOfferRefused) {
+            // The first request failed before anything was paid for by this loop; the caller retries without tools.
+            throw refused
+        } catch (failure: Exception) {
+            // What this round's own failure carries (a truncated reply) joins what the earlier rounds spent.
+            val own = failure.spentTokens()
+            spend(own?.spentInputTokens, own?.spentOutputTokens)
+            if (inputTokens == null && outputTokens == null) throw failure
+            throw SpentGenerationFailure(
+                failure.message ?: failure::class.simpleName.orEmpty(), failure,
+                inputTokens, outputTokens,
+            )
         }
     }
 
@@ -227,13 +263,19 @@ internal object AnthropicToolWire {
         }
 
     fun turn(response: JsonObject): ToolTurn {
+        val usage = response["usage"] as? JsonObject
         when (response.str("stop_reason")) {
-            "max_tokens" -> throw OutputTruncatedException("Claude response was truncated at the token limit; output is incomplete")
-            "refusal" -> error("Claude declined this request")
+            "max_tokens" -> throw OutputTruncatedException(
+                "Claude response was truncated at the token limit; output is incomplete",
+                usage?.long("input_tokens"), usage?.long("output_tokens"),
+            )
+            "refusal" -> throw SpentGenerationFailure(
+                "Claude declined this request", null,
+                usage?.long("input_tokens"), usage?.long("output_tokens"),
+            )
         }
         val content = response["content"] as? JsonArray ?: JsonArray(emptyList())
         val blocks = content.mapNotNull { it as? JsonObject }
-        val usage = response["usage"] as? JsonObject
         return ToolTurn(
             text = blocks.filter { it.str("type") == "text" }.mapNotNull { it.str("text") }.joinToString(""),
             calls = blocks.filter { it.str("type") == "tool_use" }.map { block ->
@@ -287,7 +329,11 @@ internal object CompatibleToolWire {
         val choice = response["choices"].arrayOrEmpty().firstOrNull() as? JsonObject
             ?: error("Compatible chat response did not contain a choice")
         if (choice.str("finish_reason").equals("length", ignoreCase = true)) {
-            throw OutputTruncatedException("Compatible chat response was truncated because the provider reached its output-token limit")
+            val spent = response["usage"] as? JsonObject
+            throw OutputTruncatedException(
+                "Compatible chat response was truncated because the provider reached its output-token limit",
+                spent?.long("prompt_tokens"), spent?.long("completion_tokens"),
+            )
         }
         val message = choice["message"] as? JsonObject ?: JsonObject(emptyMap())
         val rawCalls = message["tool_calls"].arrayOrEmpty().mapNotNull { it as? JsonObject }
@@ -383,10 +429,17 @@ internal object GeminiToolWire {
         (response["error"] as? JsonObject)?.let { error("Gemini error: ${it.str("message") ?: it.toString().take(300)}") }
         val candidate = response["candidates"].arrayOrEmpty().firstOrNull() as? JsonObject
             ?: error("Gemini response did not contain a candidate")
+        val spent = response["usageMetadata"] as? JsonObject
         when (val finish = candidate.str("finishReason")) {
             null, "STOP", "FINISH_REASON_UNSPECIFIED" -> Unit
-            "MAX_TOKENS" -> throw OutputTruncatedException("Gemini response was truncated at the token limit; output is incomplete")
-            else -> error("Gemini response stopped early ($finish); output is incomplete")
+            "MAX_TOKENS" -> throw OutputTruncatedException(
+                "Gemini response was truncated at the token limit; output is incomplete",
+                spent?.long("promptTokenCount"), spent?.long("candidatesTokenCount"),
+            )
+            else -> throw SpentGenerationFailure(
+                "Gemini response stopped early ($finish); output is incomplete", null,
+                spent?.long("promptTokenCount"), spent?.long("candidatesTokenCount"),
+            )
         }
         val parts = ((candidate["content"] as? JsonObject)?.get("parts") as? JsonArray) ?: JsonArray(emptyList())
         val objects = parts.mapNotNull { it as? JsonObject }

@@ -21,6 +21,7 @@ import com.hereliesaz.geministrator.domain.TaskRunId
 import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.events.ApprovalDecisionReceived
 import com.hereliesaz.geministrator.events.ExternalRunCancelFailed
+import com.hereliesaz.geministrator.events.ProviderUsageRecorded
 import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities
 import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamily
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
@@ -82,6 +83,8 @@ class WorkflowRuntimeCoordinator(
     private val surfaceRuntime: RoleSurfaceRuntimeRegistry = RoleSurfaceRuntimeRegistry.Empty,
     /** The keeper's spend caps, read every cycle so a change in the Keeper's room applies at once. */
     private val spendCaps: () -> SpendCaps = { SpendCaps() },
+    /** What billed generations outside any run spent; the hourly cap counts it. */
+    private val ambientSpend: AmbientSpendLedger = AmbientSpendLedger.Shared,
 ) {
     private val gateCoordinator = ApprovalGateCoordinator(
         persistence.approvalGates,
@@ -230,12 +233,12 @@ class WorkflowRuntimeCoordinator(
             // provider sessions running and billing.
             if (state.handles.isEmpty()) return state
             // A session that would not stop stays on the state, and is asked again next cycle.
-            return state.copy(handles = cancelSessions(state.run, state.handles, nowEpochMillis))
+            return stopRemainingSessions(state, nowEpochMillis)
         }
         if (state.run.spendPause != null) {
             // Stopped by a spend cap: nothing runs or starts until the keeper lifts the stop.
             if (state.handles.isEmpty()) return state
-            return state.copy(handles = cancelSessions(state.run, state.handles, nowEpochMillis))
+            return stopRemainingSessions(state, nowEpochMillis)
         }
 
         var nextRun = reconcileResolvedApprovalGates(definition, state.run, nowEpochMillis)
@@ -369,6 +372,10 @@ class WorkflowRuntimeCoordinator(
             )
         }
 
+        // A handle the run no longer follows has read all it will: what it last reported is counted, and the
+        // gateway forgets the session.
+        nextRun = settleDroppedHandles(nextRun, state.handles.filterKeys { it !in nextHandles }, nowEpochMillis)
+
         // Spend circuit breakers: a reached cap stops the whole run before anything else starts.
         spendCapTrip(previous = state.run, run = nextRun, nowEpochMillis = nowEpochMillis)?.let { trip ->
             return stopForSpendCap(project, definition, nextRun, nextHandles, trip, nowEpochMillis)
@@ -448,6 +455,7 @@ class WorkflowRuntimeCoordinator(
             nextHandles = dispatched.handles.filterKeys { taskId ->
                 nextRun.taskRuns[taskId]?.status?.isActiveProviderStatus() == true
             }
+            nextRun = settleDroppedHandles(nextRun, dispatched.handles.filterKeys { it !in nextHandles }, nowEpochMillis)
         }
         nextState = WorkflowRuntimeState(nextRun, nextHandles)
         persistWhatStarted(project, definition, nextState, started = nextHandles.filterKeys { it !in state.handles }, nowEpochMillis)
@@ -514,8 +522,9 @@ class WorkflowRuntimeCoordinator(
             // its own, and the old one must not carry on unowned.
             val stopped = state.handles.filterKeys { it in rewound }
             // A session that will not stop is recorded; it cannot be kept on the state, because the creature
-            // starts over under the same id and would read the old session as its own.
-            cancelSessions(run, stopped, nowEpochMillis)
+            // starts over under the same id and would read the old session as its own. What it spent before
+            // it stopped stays on the creature's record.
+            val stoppedUsage = stopSessions(run, stopped, nowEpochMillis).usage
             val remote = unfinishedExternalRuns(definition, run).filter { it.task.id in rewound }
             persistence.approvalGates.unresolved(run.id)
                 .filter { it.taskDefinitionId in rewound }
@@ -536,7 +545,9 @@ class WorkflowRuntimeCoordinator(
             )
             val reset = rewound.mapNotNull { id ->
                 val prior = run.taskRuns[id] ?: return@mapNotNull null
-                fresh.taskRuns[id]?.let { f -> id to f.copy(attempt = prior.attempt + 1, usage = prior.usage) }
+                fresh.taskRuns[id]?.let { f ->
+                    id to f.copy(attempt = prior.attempt + 1, usage = stoppedUsage[id]?.let { prior.usage.plus(it) } ?: prior.usage)
+                }
             }.toMap()
             var next = run.copy(
                 taskRuns = run.taskRuns + reset,
@@ -563,8 +574,8 @@ class WorkflowRuntimeCoordinator(
         val (cancelled, remote) = cycleMutex.withLock {
             val persistedRun = newestOf(state.run, persistence.runs.get(state.run.id))
             if (persistedRun.status.isTerminal()) {
-                val leftover = cancelSessions(persistedRun, state.handles, nowEpochMillis)
-                return@withLock WorkflowRuntimeState(persistedRun, leftover) to emptyList<ExternalRunToCancel>()
+                return@withLock stopRemainingSessions(WorkflowRuntimeState(persistedRun, state.handles), nowEpochMillis) to
+                    emptyList<ExternalRunToCancel>()
             }
             val pending = unfinishedExternalRuns(definition, persistedRun)
             terminate(
@@ -661,8 +672,10 @@ class WorkflowRuntimeCoordinator(
         handles: Map<TaskDefinitionId, ManagedSessionHandle>,
         nowEpochMillis: Long,
     ): WorkflowRuntimeState {
-        val closed = closeFailureEscalationsForTerminalRun(run, nowEpochMillis)
-        val terminalState = WorkflowRuntimeState(closed, cancelSessions(closed, handles, nowEpochMillis))
+        val closedGates = closeFailureEscalationsForTerminalRun(run, nowEpochMillis)
+        val stop = stopSessions(closedGates, handles, nowEpochMillis)
+        val closed = closedGates.withStoppedUsage(stop.usage)
+        val terminalState = WorkflowRuntimeState(closed, stop.askAgain)
         persist(project, definition, terminalState)
         return terminalState
     }
@@ -678,11 +691,18 @@ class WorkflowRuntimeCoordinator(
         runCostTrip(run, caps)?.let { return it }
         val hourlyCap = caps.hourlySpendCapUsd ?: return null
         val lastCheck = lastHourlySpendCheckAtMillis
-        val costRose = run.knownCostUsd() > previous.knownCostUsd()
+        val costRose = run.knownCostUsd() > previous.knownCostUsd() ||
+            (run.hasUnpricedUsage() && !previous.hasUnpricedUsage())
         if (!costRose && lastCheck != null && nowEpochMillis - lastCheck < HOURLY_SPEND_RECHECK_MILLIS) return null
         lastHourlySpendCheckAtMillis = nowEpochMillis
-        val spent = hourlySpendUsd(persistence, nowEpochMillis, alsoRunId = run.id)
-        return if (spent >= hourlyCap) SpendCapTrip(SpendCapKind.HourlySpend, hourlyCap, spent) else null
+        val spent = hourlySpend(persistence, nowEpochMillis, alsoRunId = run.id, ambient = ambientSpend)
+        return when {
+            spent.knownUsd >= hourlyCap -> SpendCapTrip(SpendCapKind.HourlySpend, hourlyCap, spent.knownUsd)
+            // Spend that could not be priced is not free: the cap stops what it cannot count, unless the keeper lifted that.
+            spent.unpricedUsage && !run.unpricedCostAccepted ->
+                SpendCapTrip(SpendCapKind.HourlySpend, hourlyCap, spent.knownUsd, unknownCost = true)
+            else -> null
+        }
     }
 
     /** Cancels the run's live provider sessions and parks it under a spend stop the keeper lifts. */
@@ -695,8 +715,14 @@ class WorkflowRuntimeCoordinator(
         nowEpochMillis: Long,
     ): WorkflowRuntimeState {
         val live = handles.filterKeys { taskId -> run.taskRuns[taskId]?.status?.isActiveProviderStatus() == true }
-        val leftover = cancelSessions(run, live, nowEpochMillis)
-        val stopped = pauseRunForSpendCap(run, trip, cancelledTaskIds = live.keys, nowEpochMillis = nowEpochMillis)
+        val stop = stopSessions(run, live, nowEpochMillis)
+        val leftover = stop.askAgain
+        val stopped = pauseRunForSpendCap(
+            run.withStoppedUsage(stop.usage),
+            trip,
+            cancelledTaskIds = live.keys,
+            nowEpochMillis = nowEpochMillis,
+        )
         val stoppedState = WorkflowRuntimeState(stopped, leftover)
         persist(project, definition, stoppedState)
         return stoppedState
@@ -712,15 +738,40 @@ class WorkflowRuntimeCoordinator(
         run: WorkflowRun,
         handles: Map<TaskDefinitionId, ManagedSessionHandle>,
         nowEpochMillis: Long,
-    ): Map<TaskDefinitionId, ManagedSessionHandle> {
-        val live = handles.filterKeys { taskId -> run.taskRuns[taskId]?.status != TaskRunStatus.Completed }
-        if (live.isEmpty()) return emptyMap()
+    ): Map<TaskDefinitionId, ManagedSessionHandle> = stopSessions(run, handles, nowEpochMillis).askAgain
+
+    /** What [stopSessions] left: sessions to ask again, and what each stopped one reported since it was last read. */
+    private class StoppedSessions(
+        val askAgain: Map<TaskDefinitionId, ManagedSessionHandle>,
+        val usage: Map<TaskDefinitionId, ManagedSessionUsage>,
+    )
+
+    /**
+     * [cancelSessions] that also reads what each stopped session had reported but the cycle had not yet
+     * read (spend between the last poll and the stop is still spend), records it as usage events, and
+     * lets the gateway forget the session. The caller adds [StoppedSessions.usage] to the run it keeps.
+     */
+    private suspend fun stopSessions(
+        run: WorkflowRun,
+        handles: Map<TaskDefinitionId, ManagedSessionHandle>,
+        nowEpochMillis: Long,
+    ): StoppedSessions {
+        val (finished, live) = handles.entries.partition { (taskId, _) -> run.taskRuns[taskId]?.status == TaskRunStatus.Completed }
+        if (handles.isEmpty()) return StoppedSessions(emptyMap(), emptyMap())
         val askAgain = mutableMapOf<TaskDefinitionId, ManagedSessionHandle>()
+        val usage = mutableMapOf<TaskDefinitionId, ManagedSessionUsage>()
         withContext(NonCancellable) {
+            // A completed task's session has nothing to stop: what it last reported is counted and it is let go.
+            for ((taskId, handle) in finished) {
+                drainUsage(run, taskId, handle, nowEpochMillis)?.let { usage[taskId] = it }
+                runCatching { sessionGateway.release(handle) }
+            }
             for ((taskId, handle) in live) {
                 val reason = sessionGateway.cancelFailure(handle)
                 if (reason == null) {
                     sessionCancelFailures.remove(handle.providerRunId)
+                    drainUsage(run, taskId, handle, nowEpochMillis)?.let { usage[taskId] = it }
+                    runCatching { sessionGateway.release(handle) }
                     continue
                 }
                 val failures = (sessionCancelFailures[handle.providerRunId] ?: 0) + 1
@@ -741,7 +792,84 @@ class WorkflowRuntimeCoordinator(
                 if (failures < MAX_SESSION_CANCEL_ATTEMPTS) askAgain[taskId] = handle else sessionCancelFailures.remove(handle.providerRunId)
             }
         }
-        return askAgain
+        return StoppedSessions(askAgain, usage)
+    }
+
+    /** What [handle]'s session reported since the cycle last read it, as an event; null when it reported nothing. */
+    private suspend fun drainUsage(
+        run: WorkflowRun,
+        taskId: TaskDefinitionId,
+        handle: ManagedSessionHandle,
+        nowEpochMillis: Long,
+    ): ManagedSessionUsage? {
+        val usage = try {
+            sessionGateway.usageReport(handle)?.sanitized()
+        } catch (_: Exception) {
+            null
+        } ?: return null
+        try {
+            persistence.events.append(
+                ProviderUsageRecorded(
+                    workflowRunId = run.id,
+                    taskDefinitionId = taskId,
+                    providerId = handle.providerId,
+                    providerRunId = handle.providerRunId,
+                    inputTokens = usage.inputTokens,
+                    outputTokens = usage.outputTokens,
+                    costUsd = usage.costUsd,
+                    cacheHitFraction = usage.cacheHitFraction,
+                    latencyMillis = usage.latencyMillis,
+                    costUnknown = usage.costUnknown,
+                    occurredAtEpochMillis = nowEpochMillis,
+                ),
+            )
+        } catch (_: Throwable) {
+            // The event is telemetry for the hourly cap; the run's own total below still counts it.
+        }
+        return usage
+    }
+
+    /** [run] with each task's stopped-session [usage] added to what that task has spent. */
+    private fun WorkflowRun.withStoppedUsage(usage: Map<TaskDefinitionId, ManagedSessionUsage>): WorkflowRun {
+        if (usage.isEmpty()) return this
+        return copy(
+            taskRuns = taskRuns.mapValues { (id, taskRun) ->
+                val stopped = usage[id] ?: return@mapValues taskRun
+                taskRun.copy(usage = taskRun.usage.plus(stopped))
+            },
+        )
+    }
+
+    /**
+     * A run that is already finished or stopped but still holds sessions that would not stop: asks them to stop
+     * again, counts what the stopped ones reported, and keeps the rest.
+     */
+    private suspend fun stopRemainingSessions(state: WorkflowRuntimeState, nowEpochMillis: Long): WorkflowRuntimeState {
+        val stop = stopSessions(state.run, state.handles, nowEpochMillis)
+        if (stop.usage.isEmpty()) return state.copy(handles = stop.askAgain)
+        val counted = state.run.withStoppedUsage(stop.usage)
+        persistence.runs.put(counted)
+        return WorkflowRuntimeState(counted, stop.askAgain)
+    }
+
+    /**
+     * Handles the run no longer follows ([dropped]: their task finished, failed or is being retried): each one's
+     * last report is counted on the run and the gateway forgets the session. Nothing is stopped here.
+     */
+    private suspend fun settleDroppedHandles(
+        run: WorkflowRun,
+        dropped: Map<TaskDefinitionId, ManagedSessionHandle>,
+        nowEpochMillis: Long,
+    ): WorkflowRun {
+        if (dropped.isEmpty()) return run
+        val usage = mutableMapOf<TaskDefinitionId, ManagedSessionUsage>()
+        withContext(NonCancellable) {
+            for ((taskId, handle) in dropped) {
+                drainUsage(run, taskId, handle, nowEpochMillis)?.let { usage[taskId] = it }
+                runCatching { sessionGateway.release(handle) }
+            }
+        }
+        return run.withStoppedUsage(usage)
     }
 
     private suspend fun persistArtifacts(run: WorkflowRun) {

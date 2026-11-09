@@ -196,6 +196,11 @@ data class TaskUsage(
     val inputTokens: Long = 0,
     val outputTokens: Long = 0,
     val costUsd: Double? = null,
+    /**
+     * Some of this usage was billed but could not be priced (no cost reported, no price known for the
+     * model), so [costUsd] is a floor and a dollar cap cannot trust it.
+     */
+    val costUnknown: Boolean = false,
 ) {
     val totalTokens: Long get() = inputTokens + outputTokens
 }
@@ -273,6 +278,11 @@ data class WorkflowRun(
     val parentWorkflowRunIds: List<WorkflowRunId> = emptyList(),
     /** Set while a keeper's spend cap has stopped this run; the keeper lifts it. */
     val spendPause: WorkflowSpendPause? = null,
+    /**
+     * The keeper lifted a spend stop for usage that could not be priced: this run no longer stops for
+     * spend a dollar cap cannot count (known cost still counts toward the caps).
+     */
+    val unpricedCostAccepted: Boolean = false,
     /** Set while the keeper has paused the hive: nothing new starts, what runs finishes. */
     val keeperPause: WorkflowKeeperPause? = null,
 ) {

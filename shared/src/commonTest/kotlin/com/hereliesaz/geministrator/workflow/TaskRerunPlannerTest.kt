@@ -147,6 +147,23 @@ class TaskRerunPlannerTest {
     }
 
     @Test
+    fun aKeptResultDoesNotBringItsSpendIntoTheNewRunsCapsOrBudgets() {
+        val source = finished(chain)
+        val spent = source.copy(
+            taskRuns = source.taskRuns.mapValues { (_, taskRun) ->
+                taskRun.copy(usage = com.hereliesaz.geministrator.domain.TaskUsage(inputTokens = 900, outputTokens = 100, costUsd = 4.9))
+            },
+        )
+
+        val run = fork(chain, spent, TaskRerunRequest(b)).run
+
+        // a and d keep their results, but what they cost was spent in the source run and is still shown there.
+        listOf(a, d).forEach { id -> assertEquals(null, run.taskRuns.getValue(id).usage, "task ${id.value}") }
+        assertEquals(0.0, run.knownCostUsd(), "a run forked from one that spent \$4.90 starts its own count at zero")
+        assertEquals(4.9 * 4, spent.knownCostUsd(), 1e-9, "the source run is history and keeps its numbers")
+    }
+
+    @Test
     fun anEditedObjectiveIsWhatTheRerunTaskIsAskedAndUpstreamOutputReachesIt() = runBlocking {
         val source = finished(chain)
         val fork = fork(chain, source, TaskRerunRequest(b, editedObjective = "  Do b better  "))

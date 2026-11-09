@@ -6,6 +6,7 @@ import com.hereliesaz.geministrator.domain.TaskRunId
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.providers.ProviderArtifact
+import com.hereliesaz.geministrator.providers.ProviderPlanDraft
 
 data class ManagedSessionRequest(
     val providerSelection: ProviderSelectionRequest,
@@ -92,6 +93,10 @@ interface ManagedSessionGateway {
      */
     suspend fun draftPlan(providerId: AgentProviderId, request: AgentTaskRequest): String? = null
 
+    /** [draftPlan] with what drafting it spent; the default has none to report. */
+    suspend fun draftPlanWithUsage(providerId: AgentProviderId, request: AgentTaskRequest): ProviderPlanDraft? =
+        draftPlan(providerId, request)?.let { ProviderPlanDraft(it) }
+
     suspend fun reconnect(
         handle: ManagedSessionHandle,
         initialStatus: ManagedSessionStatus,
@@ -121,6 +126,13 @@ interface ManagedSessionGateway {
         ProviderActionResult.Rejected("Provider session cancellation is not supported")
 
     suspend fun artifacts(handle: ManagedSessionHandle): List<ProviderArtifact>
+
+    /**
+     * The runtime is done with [handle] (its task finished, failed, or was stopped, and what the
+     * session reported has been read): a gateway forgets everything it kept for the session, so a long
+     * process does not hold every finished session's text. The default keeps nothing, so forgets nothing.
+     */
+    suspend fun release(handle: ManagedSessionHandle) = Unit
 
     /**
      * Pending usage metrics from the last provider report, or null if not available. Reading drains
@@ -160,21 +172,60 @@ data class ManagedSessionUsage(
     val costUsd: Double? = null,
     val cacheHitFraction: Float? = null,
     val latencyMillis: Long? = null,
+    /**
+     * The provider spent tokens it did not price: no cost was reported and no price is known for the
+     * model (or the reported cost was not a usable number). A dollar cap cannot count this usage, so it
+     * says so instead of counting it as free ([SpendCaps]).
+     */
+    val costUnknown: Boolean = false,
 )
+
+/**
+ * [this] with every number that cannot be a measurement dropped: a negative or missing token count, a
+ * negative, NaN or infinite cost (which would poison every total it is added to), a latency below zero.
+ * A cost that was reported but cannot be used leaves the usage's cost unknown, not free.
+ */
+internal fun ManagedSessionUsage.sanitized(): ManagedSessionUsage {
+    val unusableCost = costUsd != null && (!costUsd.isFinite() || costUsd < 0.0)
+    return copy(
+        inputTokens = inputTokens?.takeIf { it >= 0L },
+        outputTokens = outputTokens?.takeIf { it >= 0L },
+        costUsd = if (unusableCost) null else costUsd,
+        costUnknown = costUnknown || unusableCost,
+        cacheHitFraction = cacheHitFraction?.takeIf { it in 0f..1f },
+        latencyMillis = latencyMillis?.takeIf { it >= 0L },
+    )
+}
+
+/** Two reports of the same session added: tokens and cost are summed; the later cache fraction and latency win. */
+internal fun ManagedSessionUsage?.plusReport(next: ManagedSessionUsage): ManagedSessionUsage {
+    val base = this ?: return next
+    fun sum(first: Long?, second: Long?): Long? = if (first == null && second == null) null else (first ?: 0L) + (second ?: 0L)
+    return ManagedSessionUsage(
+        inputTokens = sum(base.inputTokens, next.inputTokens),
+        outputTokens = sum(base.outputTokens, next.outputTokens),
+        costUsd = if (base.costUsd == null && next.costUsd == null) null else (base.costUsd ?: 0.0) + (next.costUsd ?: 0.0),
+        cacheHitFraction = next.cacheHitFraction ?: base.cacheHitFraction,
+        latencyMillis = next.latencyMillis ?: base.latencyMillis,
+        costUnknown = base.costUnknown || next.costUnknown,
+    )
+}
 
 /** Adds one drained report to a task's running total. A report with no token or cost data changes nothing. */
 internal fun com.hereliesaz.geministrator.domain.TaskUsage?.plus(
     report: ManagedSessionUsage,
 ): com.hereliesaz.geministrator.domain.TaskUsage? {
-    if (report.inputTokens == null && report.outputTokens == null && report.costUsd == null) return this
+    val clean = report.sanitized()
+    if (clean.inputTokens == null && clean.outputTokens == null && clean.costUsd == null && !clean.costUnknown) return this
     val base = this ?: com.hereliesaz.geministrator.domain.TaskUsage()
     return base.copy(
-        inputTokens = base.inputTokens + (report.inputTokens ?: 0),
-        outputTokens = base.outputTokens + (report.outputTokens ?: 0),
+        inputTokens = base.inputTokens + (clean.inputTokens ?: 0),
+        outputTokens = base.outputTokens + (clean.outputTokens ?: 0),
         costUsd = when {
-            report.costUsd == null -> base.costUsd
-            else -> (base.costUsd ?: 0.0) + report.costUsd
+            clean.costUsd == null -> base.costUsd
+            else -> (base.costUsd ?: 0.0) + clean.costUsd
         },
+        costUnknown = base.costUnknown || clean.costUnknown,
     )
 }
 

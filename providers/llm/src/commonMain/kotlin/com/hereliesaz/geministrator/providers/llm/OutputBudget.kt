@@ -1,5 +1,7 @@
 package com.hereliesaz.geministrator.providers.llm
 
+import com.hereliesaz.geministrator.providers.SpentTokens
+
 /**
  * A reply that stopped because the provider reached its output-token limit (`finish_reason: length`,
  * `stop_reason: max_tokens`, `MAX_TOKENS`, an `incomplete` response cut by `max_output_tokens`).
@@ -7,7 +9,27 @@ package com.hereliesaz.geministrator.providers.llm
  * [IllegalStateException] so callers that already catch the old bare `error(...)` still do; the
  * message keeps the word "truncated" so `classifyError` places it as `ErrorKind.OutputTooLong`.
  */
-class OutputTruncatedException(message: String) : IllegalStateException(message)
+class OutputTruncatedException(
+    message: String,
+    /** What the provider billed for the cut-off reply (it is billed in full): the caller counts it. */
+    override val spentInputTokens: Long? = null,
+    override val spentOutputTokens: Long? = null,
+    override val spentCachedInputTokens: Long? = null,
+) : IllegalStateException(message), SpentTokens
+
+/**
+ * A generation that failed after the provider had already billed it (no usable text in the reply, an
+ * incomplete or failed response, a later tool round that broke after earlier rounds were paid for): [cause]
+ * with the tokens that were spent, so they are counted instead of lost. [spentCostUsd] is the price when known.
+ */
+class SpentGenerationFailure(
+    message: String,
+    cause: Throwable? = null,
+    override val spentInputTokens: Long? = null,
+    override val spentOutputTokens: Long? = null,
+    override val spentCachedInputTokens: Long? = null,
+    override val spentCostUsd: Double? = null,
+) : IllegalStateException(message, cause), SpentTokens
 
 /**
  * How many output tokens a plan or swarm draft may ask for. This is the one place to tune it.

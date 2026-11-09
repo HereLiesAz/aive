@@ -217,7 +217,8 @@ object TaskRerunPlanner {
                 ),
             ) + prior.artifacts.filter { it.textContent == null }.map(::carried)
         }
-        return prior.copy(id = taskRunId, artifacts = artifacts)
+        // The result is kept; what it cost was spent in the source run, so this run's caps and budgets do not count it again.
+        return prior.copy(id = taskRunId, artifacts = artifacts, usage = null)
     }
 
     private fun TaskRun.hasSettledResult(): Boolean =

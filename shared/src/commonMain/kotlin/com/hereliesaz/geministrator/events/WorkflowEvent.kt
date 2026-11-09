@@ -231,6 +231,8 @@ data class ProviderUsageRecorded(
     val costUsd: Double? = null,
     val cacheHitFraction: Float? = null,
     val latencyMillis: Long? = null,
+    /** Billed but unpriced: [costUsd] does not cover this usage ([com.hereliesaz.geministrator.domain.TaskUsage.costUnknown]). */
+    val costUnknown: Boolean = false,
     override val occurredAtEpochMillis: Long,
 ) : WorkflowEvent
 

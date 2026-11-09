@@ -28,8 +28,10 @@ const val ONE_HOUR_MILLIS: Long = 60L * 60L * 1000L
 
 /**
  * The keeper's spend caps, in US dollars, set in the Keeper's room (This device). Null is no cap.
- * Only known cost counts: usage reported without a cost (keyless and free providers, or providers
- * that report tokens only) never trips a cap.
+ * Known cost counts. A hosted API reports tokens, not dollars, so the app prices them from its one price
+ * list ([com.hereliesaz.geministrator.providers.ModelPriceTable]); a model with no price there is billed
+ * but unpriced, and a cap stops the run that used it instead of counting it as free. Providers that are
+ * free (on-device, keyless) report no cost and never trip a cap.
  */
 data class SpendCaps(
     val runCostCapUsd: Double? = null,
@@ -41,15 +43,22 @@ data class SpendCaps(
     }
 }
 
-/** Which cap tripped, the cap, and the known spend that reached it. */
+/**
+ * Which cap tripped, the cap, and the known spend that reached it. [unknownCost] is a stop for usage that
+ * was billed but could not be priced, with [spentUsd] the known part.
+ */
 data class SpendCapTrip(
     val kind: SpendCapKind,
     val capUsd: Double,
     val spentUsd: Double,
+    val unknownCost: Boolean = false,
 )
 
-/** The cost providers have reported for this run. Usage without a cost adds nothing. */
+/** The cost providers have reported (or the app priced) for this run. Unpriced usage adds nothing here: see [hasUnpricedUsage]. */
 fun WorkflowRun.knownCostUsd(): Double = taskRuns.values.sumOf { it.usage?.costUsd ?: 0.0 }
+
+/** Whether some of this run's usage was billed but could not be priced, so [knownCostUsd] is only a floor. */
+fun WorkflowRun.hasUnpricedUsage(): Boolean = taskRuns.values.any { it.usage?.costUnknown == true }
 
 /** Tokens reported for every task [roleId] has worked in this run: the role's spend against its budget. */
 fun WorkflowRun.roleTokensSpent(roleId: RoleDefinitionId): Long =
@@ -63,34 +72,57 @@ fun TaskRun.isHeldForRoleBudget(): Boolean =
 fun runCostTrip(run: WorkflowRun, caps: SpendCaps): SpendCapTrip? {
     val cap = caps.runCostCapUsd ?: return null
     val spent = run.knownCostUsd()
-    return if (spent >= cap) SpendCapTrip(SpendCapKind.RunCost, cap, spent) else null
+    if (spent >= cap) return SpendCapTrip(SpendCapKind.RunCost, cap, spent)
+    // Spend that could not be priced is not free: a cap that cannot count it stops the run (the keeper can lift that).
+    if (run.hasUnpricedUsage() && !run.unpricedCostAccepted) return SpendCapTrip(SpendCapKind.RunCost, cap, spent, unknownCost = true)
+    return null
 }
 
 /**
  * Known cost reported in the hour before [nowEpochMillis] across every run in [persistence], plus
- * [alsoRunId] (the run being cycled, in case it is not stored yet). Usage without a cost adds nothing.
+ * [alsoRunId] (the run being cycled, in case it is not stored yet) and [ambient] (spend outside any run).
  */
 suspend fun hourlySpendUsd(
     persistence: WorkflowPersistence,
     nowEpochMillis: Long,
     alsoRunId: WorkflowRunId? = null,
-): Double {
+    ambient: AmbientSpendLedger? = null,
+): Double = hourlySpend(persistence, nowEpochMillis, alsoRunId, ambient).knownUsd
+
+/**
+ * [hourlySpendUsd] that also says whether any usage in that hour was billed but unpriced. Only the runs
+ * changed in the hour are read, and from each only the events of that hour (a range query on a SQL store).
+ * A run whose keeper accepted unpriced cost ([WorkflowRun.unpricedCostAccepted]) does not make the hour unpriced.
+ */
+suspend fun hourlySpend(
+    persistence: WorkflowPersistence,
+    nowEpochMillis: Long,
+    alsoRunId: WorkflowRunId? = null,
+    ambient: AmbientSpendLedger? = null,
+): HourlySpend {
     val since = nowEpochMillis - ONE_HOUR_MILLIS
     val runIds = linkedSetOf<WorkflowRunId>()
     alsoRunId?.let(runIds::add)
-    persistence.projects.all().forEach { project ->
-        persistence.runs.byProject(project.id)
-            // A run that recorded cost in the last hour was updated in the last hour.
-            .filter { it.updatedAtEpochMillis >= since }
-            .forEach { runIds += it.id }
+    // A run that recorded cost in the last hour was updated in the last hour.
+    val accepted = mutableSetOf<WorkflowRunId>()
+    persistence.runsUpdatedSince(since).forEach { run ->
+        runIds += run.id
+        if (run.unpricedCostAccepted) accepted += run.id
     }
-    return runIds.sumOf { runId ->
-        persistence.events.forRun(runId)
+    var known = 0.0
+    var unpriced = false
+    for (runId in runIds) {
+        persistence.eventsSince(runId, since)
             .asSequence()
             .filterIsInstance<ProviderUsageRecorded>()
             .filter { it.occurredAtEpochMillis in since..nowEpochMillis }
-            .sumOf { it.costUsd ?: 0.0 }
+            .forEach { event ->
+                known += event.costUsd ?: 0.0
+                if (event.costUnknown && runId !in accepted) unpriced = true
+            }
     }
+    val outside = ambient?.hourlySpend(nowEpochMillis) ?: HourlySpend(0.0, false)
+    return HourlySpend(known + outside.knownUsd, unpriced || outside.unpricedUsage)
 }
 
 /**
@@ -134,6 +166,7 @@ fun pauseRunForSpendCap(
             spentUsd = trip.spentUsd,
             taskSnapshots = snapshots,
             pausedAtEpochMillis = nowEpochMillis,
+            unknownCost = trip.unknownCost,
         ),
         updatedAtEpochMillis = nowEpochMillis,
     )
@@ -182,11 +215,18 @@ fun liftSpendPause(run: WorkflowRun, nowEpochMillis: Long): WorkflowRun {
         status = status,
         taskRuns = restored,
         spendPause = null,
+        // Lifting a stop for unpriced spend is the keeper's word that the run may go on without counting it.
+        unpricedCostAccepted = run.unpricedCostAccepted || pause.unknownCost,
         updatedAtEpochMillis = nowEpochMillis,
     )
 }
 
-private fun spendStopReason(trip: SpendCapTrip): String = when (trip.kind) {
+private fun spendStopReason(trip: SpendCapTrip): String = if (trip.unknownCost) {
+    val scope = if (trip.kind == SpendCapKind.RunCost) "this run" else "the last hour"
+    "A model used in $scope has no known price, so its cost cannot be counted against the cap " +
+        "(${formatUsd(trip.spentUsd)} counted so far of ${formatUsd(trip.capUsd)}). " +
+        "Lift the stop to go on without counting it, or use a creature's token budget instead."
+} else when (trip.kind) {
     SpendCapKind.RunCost ->
         "This run's known cost reached its cap: ${formatUsd(trip.spentUsd)} of ${formatUsd(trip.capUsd)}."
     SpendCapKind.HourlySpend ->

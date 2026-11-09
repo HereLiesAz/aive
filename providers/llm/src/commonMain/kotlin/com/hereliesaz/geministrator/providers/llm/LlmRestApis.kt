@@ -66,6 +66,18 @@ internal val IMPLICIT_PREFIX_CACHING = PromptCacheCapabilities(
 )
 
 interface TextGenerationApi {
+    /**
+     * The model this API sends requests to; null when it does not say (a test double). The price of its
+     * usage is looked up by it ([com.hereliesaz.geministrator.providers.ModelPriceTable]).
+     */
+    val modelId: String? get() = null
+
+    /**
+     * False for an endpoint used without a key (the free tiers): it cannot bill, so its usage costs nothing.
+     * True for every other API, whose usage is billed per token and must be priced to count against a dollar cap.
+     */
+    val billsPerToken: Boolean get() = true
+
     /** The prompt-cache mechanisms this API uses; none unless it says otherwise. */
     val promptCaching: PromptCacheCapabilities get() = PromptCacheCapabilities()
 
@@ -148,6 +160,8 @@ class OpenAiResponsesApi(
 ) : TextGenerationApi {
     private val client = client.config { followRedirects = false }
 
+    override val modelId: String get() = model
+
     /** OpenAI caches long prompt prefixes automatically and reports `input_tokens_details.cached_tokens`. */
     override val promptCaching: PromptCacheCapabilities get() = IMPLICIT_PREFIX_CACHING
 
@@ -168,14 +182,19 @@ class OpenAiResponsesApi(
         val payload = response.body<OpenAiResponse>()
         // A response cut off by max_output_tokens (or a content filter) is `incomplete`: partial
         // text must never be promoted to a completed result.
+        val spent = payload.usage
         if (payload.incompleteDetails?.reason == "max_output_tokens") {
-            throw OutputTruncatedException("OpenAI response was truncated at the output-token limit (max_output_tokens); output is incomplete")
+            throw OutputTruncatedException(
+                "OpenAI response was truncated at the output-token limit (max_output_tokens); output is incomplete",
+                spent?.inputTokens, spent?.outputTokens, spent?.inputTokensDetails?.cachedTokens,
+            )
         }
         if (payload.status == "incomplete" || payload.status == "failed") {
-            error(
+            throw SpentGenerationFailure(
                 "OpenAI response ${payload.status}: " +
                     (payload.error?.message ?: payload.incompleteDetails?.reason ?: "no detail") +
                     "; output is incomplete",
+                null, spent?.inputTokens, spent?.outputTokens, spent?.inputTokensDetails?.cachedTokens,
             )
         }
         val text = payload.output
@@ -183,7 +202,10 @@ class OpenAiResponsesApi(
             .flatMap { it.content.asSequence() }
             .firstOrNull { it.type == "output_text" && !it.text.isNullOrBlank() }
             ?.text
-            ?: error("OpenAI response did not contain output text")
+            ?: throw SpentGenerationFailure(
+                "OpenAI response did not contain output text", null,
+                spent?.inputTokens, spent?.outputTokens, spent?.inputTokensDetails?.cachedTokens,
+            )
         return TextGenerationResult(
             text = text,
             inputTokens = payload.usage?.inputTokens,
@@ -235,10 +257,19 @@ class OpenAiResponsesApi(
                         usage = event.response?.usage
                         completed = true
                     }
-                    "response.incomplete" -> if (event.response?.incompleteDetails?.reason == "max_output_tokens") {
-                        throw OutputTruncatedException("OpenAI response was truncated at the output-token limit (max_output_tokens); output is incomplete")
-                    } else {
-                        error("OpenAI response incomplete: " + (event.response?.error?.message ?: event.response?.incompleteDetails?.reason ?: "no detail"))
+                    "response.incomplete" -> {
+                        val spent = event.response?.usage
+                        if (event.response?.incompleteDetails?.reason == "max_output_tokens") {
+                            throw OutputTruncatedException(
+                                "OpenAI response was truncated at the output-token limit (max_output_tokens); output is incomplete",
+                                spent?.inputTokens, spent?.outputTokens, spent?.inputTokensDetails?.cachedTokens,
+                            )
+                        } else {
+                            throw SpentGenerationFailure(
+                                "OpenAI response incomplete: " + (event.response?.error?.message ?: event.response?.incompleteDetails?.reason ?: "no detail"),
+                                null, spent?.inputTokens, spent?.outputTokens, spent?.inputTokensDetails?.cachedTokens,
+                            )
+                        }
                     }
                     "response.failed" -> error(
                         "OpenAI response ${event.type.substringAfter('.')}: " +
@@ -248,7 +279,12 @@ class OpenAiResponsesApi(
                 }
             }
             requireStreamTerminated(completed, "OpenAI")
-            if (text.isBlank()) error("OpenAI response did not contain output text")
+            if (text.isBlank()) {
+                throw SpentGenerationFailure(
+                    "OpenAI response did not contain output text", null,
+                    usage?.inputTokens, usage?.outputTokens, usage?.inputTokensDetails?.cachedTokens,
+                )
+            }
             TextGenerationResult(
                 text = text.toString(),
                 inputTokens = usage?.inputTokens,
@@ -271,6 +307,8 @@ class XaiResponsesApi(
         baseUrl = baseUrl,
         client = client,
     )
+
+    override val modelId: String get() = model
 
     override val promptCaching: PromptCacheCapabilities get() = delegate.promptCaching
 
@@ -335,12 +373,18 @@ class AnthropicMessagesApi(
         response.requireSuccess("generate Claude response")
         val payload = response.body<AnthropicMessageResponse>()
         if (payload.stopReason == "max_tokens") {
-            throw OutputTruncatedException("Claude response was truncated at the token limit; output is incomplete")
+            throw OutputTruncatedException(
+                "Claude response was truncated at the token limit; output is incomplete",
+                payload.usage?.promptTokens(), payload.usage?.outputTokens, payload.usage?.cacheReadInputTokens,
+            )
         }
         val text = payload.content
             .firstOrNull { it.type == "text" && !it.text.isNullOrBlank() }
             ?.text
-            ?: error("Claude response did not contain text")
+            ?: throw SpentGenerationFailure(
+                "Claude response did not contain text", null,
+                payload.usage?.promptTokens(), payload.usage?.outputTokens, payload.usage?.cacheReadInputTokens,
+            )
         return TextGenerationResult(
             text = text,
             inputTokens = payload.usage?.promptTokens(),
@@ -455,10 +499,21 @@ class AnthropicMessagesApi(
         }
         requireStreamTerminated(stopped, "Claude")
         when (stopReason) {
-            "max_tokens" -> throw OutputTruncatedException("Claude response was truncated at the token limit; output is incomplete")
-            "refusal" -> error("Claude declined this request")
+            "max_tokens" -> throw OutputTruncatedException(
+                "Claude response was truncated at the token limit; output is incomplete",
+                inputUsage?.promptTokens(), outputTokens, inputUsage?.cacheReadInputTokens,
+            )
+            "refusal" -> throw SpentGenerationFailure(
+                "Claude declined this request", null,
+                inputUsage?.promptTokens(), outputTokens, inputUsage?.cacheReadInputTokens,
+            )
         }
-        if (text.isBlank()) error("Claude response did not contain text")
+        if (text.isBlank()) {
+            throw SpentGenerationFailure(
+                "Claude response did not contain text", null,
+                inputUsage?.promptTokens(), outputTokens, inputUsage?.cacheReadInputTokens,
+            )
+        }
         return TextGenerationResult(
             text = text.toString(),
             inputTokens = inputUsage?.promptTokens(),
@@ -485,6 +540,8 @@ class GeminiGenerateContentApi(
     client: HttpClient = defaultClient(),
 ) : ToolCallingTextGenerationApi {
     private val client = client.config { followRedirects = false }
+
+    override val modelId: String get() = model
 
     /** Gemini caches repeated prompt prefixes implicitly and reports `cachedContentTokenCount`. */
     override val promptCaching: PromptCacheCapabilities get() = IMPLICIT_PREFIX_CACHING
@@ -533,7 +590,7 @@ class GeminiGenerateContentApi(
         }
         response.requireSuccess("generate Gemini response")
         val payload = response.body<GeminiGenerateContentResponse>()
-        payload.candidates.firstOrNull()?.finishReason?.let(::requireCompleteGeminiFinish)
+        payload.candidates.firstOrNull()?.finishReason?.let { requireCompleteGeminiFinish(it, payload.usageMetadata) }
         val text = payload.candidates
             .asSequence()
             .flatMap { it.content?.parts.orEmpty().asSequence() }
@@ -588,8 +645,13 @@ class GeminiGenerateContentApi(
             }
             // The last chunk carries the finish reason; a stream without one was cut off.
             requireStreamTerminated(finishReason != null, "Gemini")
-            finishReason?.let(::requireCompleteGeminiFinish)
-            if (text.isBlank()) error("Gemini response did not contain text")
+            finishReason?.let { requireCompleteGeminiFinish(it, usage) }
+            if (text.isBlank()) {
+                throw SpentGenerationFailure(
+                    "Gemini response did not contain text", null,
+                    usage?.promptTokenCount, usage?.candidatesTokenCount, usage?.cachedContentTokenCount,
+                )
+            }
             TextGenerationResult(
                 text = text.toString(),
                 inputTokens = usage?.promptTokenCount,
@@ -815,11 +877,17 @@ private data class GeminiCandidate(
 )
 
 /** Only a natural stop is a complete answer; MAX_TOKENS, SAFETY, RECITATION and the like are not. */
-private fun requireCompleteGeminiFinish(finishReason: String) {
+private fun requireCompleteGeminiFinish(finishReason: String, usage: GeminiUsageMetadata? = null) {
     when (finishReason) {
         "STOP", "FINISH_REASON_UNSPECIFIED" -> Unit
-        "MAX_TOKENS" -> throw OutputTruncatedException("Gemini response was truncated at the token limit; output is incomplete")
-        else -> error("Gemini response stopped early ($finishReason); output is incomplete")
+        "MAX_TOKENS" -> throw OutputTruncatedException(
+            "Gemini response was truncated at the token limit; output is incomplete",
+            usage?.promptTokenCount, usage?.candidatesTokenCount, usage?.cachedContentTokenCount,
+        )
+        else -> throw SpentGenerationFailure(
+            "Gemini response stopped early ($finishReason); output is incomplete", null,
+            usage?.promptTokenCount, usage?.candidatesTokenCount, usage?.cachedContentTokenCount,
+        )
     }
 }
 

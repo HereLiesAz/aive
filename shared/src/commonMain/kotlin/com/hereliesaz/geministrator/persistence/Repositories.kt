@@ -65,6 +65,17 @@ interface WorkflowPersistence : FailureEscalationDecisionStore {
     val approvalGates: ApprovalGateRepository
 
     /**
+     * Every run changed at or after [sinceEpochMillis], across every project. A store that can ask for
+     * this without reading every run (SQL) overrides it; this reads them all.
+     */
+    suspend fun runsUpdatedSince(sinceEpochMillis: Long): List<WorkflowRun> =
+        projects.all().flatMap { project -> runs.byProject(project.id) }.filter { it.updatedAtEpochMillis >= sinceEpochMillis }
+
+    /** [runId]'s events that happened at or after [sinceEpochMillis], in order. */
+    suspend fun eventsSince(runId: WorkflowRunId, sinceEpochMillis: Long): List<WorkflowEvent> =
+        events.forRun(runId).filter { it.occurredAtEpochMillis >= sinceEpochMillis }
+
+    /**
      * Where the compound-inference state belonging to this workflow store lives. Defaults to the
      * platform's durable store; a store that is not the app's own (a test's, a scratch import)
      * overrides it so its inference bindings never leak into the app's.
