@@ -30,7 +30,7 @@ There are no tabs. How close you are decides what you see.
 
 | Distance | You see | Replaces |
 |---|---|---|
-| **The hive** (all the way out) | every workflow at once, live; drifters arriving; the Store at the edge | Overview, Workflows library, Store |
+| **The hive** (all the way out) | every workflow at once, live; the district of saved hives | Overview, Workflows library |
 | **A hive** | one workflow: its creatures, synapses, the eggs in flight | the mind map, the Bowl tab, Runs |
 | **A creature** | its needs panel slides over: job, species, kin, provider, what it's working on | task and role editing |
 | **Inside a creature** | its mind: instructions, tools, provider settings, what it's thinking now | Swarm role editor, technical inspector |
@@ -44,9 +44,7 @@ Pinch moves between distances; double-tap dives one level, two-finger tap surfac
 - **The inbox is a creature at the surface.** A creature that needs you (a gate, an approval, an escalation) rises toward the viewer and pulses. From any distance its hive shows the pulse. Tap to answer, in place. *(Replaces Inbox.)*
 - **Artifacts are what a creature leaves along its synapses**: tap a synapse to see what crossed it. Contaminated work shows as the stain it already is. *(Replaces Artifacts.)*
 - **The lineage is the family tree** of everyone who lived: kin, rarity, how hard each line is to breed. *(Replaces the Swarm roster.)*
-- **The Store is where drifters come from.** Workflows from the Store arrive as new hives; agents arrive as drifters at the hive's edge. **Import** is the cure for the clone trap, and the Store should say so. *(Replaces the Store tab.)*
-- **The hive's edge is a sheet.** **Bring in a drifter** on the district opens it from the bottom, over the hive dimmed behind; tapping the dim closes it. Titled "At the edge of the hive", it has two tabs: **Drifters** (A2A drifters waiting and already in, then the Store's agent packages) and **Swarms** (the Store's workflows). Each row is a creature, a name, a line under it saying what it does, and its action on the right: **Bring in** opens that package's install in the Store, where its permissions are approved; a drifter keeps **Let it in** and **Send it away**. The edge shows no similarity figure: nothing measures how alike an agent and a hive are, so the line is what the thing says it does. Breeds are sold in the Store (its **Breeds** tab), not at the edge.
-- **Remote agents are drifters too.** At the hive's edge, **Adoption** opens the A2A Agent Card address field; **Read its card** reads the agent before admission. The drifter waits at the edge as a creature (the same creature every time for the same card), with its name, what its card says and its skills. Whatever went wrong reading it (not an address, nothing answered, no card there, not a card, a binding The Aive does not speak) is written on the drifter itself. **Let it in** (the one Heroic act at the edge) makes it a role in the swarm that prefers its own `a2a:<host>` provider, so the planner can staff tasks with it; **Send it away** drops it. A drifter that asks for a token comes in waiting for it, with **Give it its token**. Drifters already in are listed under the waiting ones, the same list as Keeper's room › Connections. From the first launch a few public A2A agents (the seed list) wait at the edge too, unread until let in; sending one away dismisses it for good. See `A2A.md`.
+- **The Store installs packages; Connections links services.** Azphalt role, workflow and model packages are reviewed and installed in the Azphalt Store. Independent remote A2A agents are providers, connected in Keeper's room › Connections by Agent Card URL. Once connected, choose one as a role's provider in Swarm. These were originally combined at the hive's edge to show incoming drifters and Store offers together, but the second marketplace duplicated both the Store and Connections and obscured the distinction. The edge sheet was retired; it is not another route to install or recruit.
 - **Memory is the tissue's tone.** Its clarity is how much the swarm remembers; its tint is whose voice fills it. Consolidation is sleep. *(Replaces Memory.)*
 - **The machinery is the vasculature.** Providers are capillaries, budget is perfusion, compute is the heartbeat. Swipe up from a capillary to reach its settings. Each capillary carries its provider's name along its course, and a screen reader hears it with the creatures it feeds ("Claude, feeding Architect, Engineer"). *(Replaces Settings, Repositories, Compute.)*
 
@@ -57,7 +55,6 @@ Each tool is a real control (see the ledger). One sits in the creature's needs p
 | Tool | Does | Where |
 |---|---|---|
 | **Review** | you look at its work; Echo falls | needs panel, Heroic act when Echo is high |
-| **Adoption** | open the Agent Card address field to bring in a remote A2A agent | hive edge |
 | **Raise budget** | perfusion for a while | capillary |
 | **Consolidate** | memory consolidation now | the tissue, long-press |
 | **Move** | another provider | drag the body |

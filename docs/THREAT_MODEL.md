@@ -309,7 +309,7 @@ Every artifact a task receives is labelled with where it came from, in `Artifact
 - The creature's Work tab lists each input with its label. Its Needs tab shows the gate's reason.
 
 **Remaining gaps**
-- A drifter's role description quotes its Agent Card (description and skill names, bounded to one line each) and reaches the planner as role text. The keeper reads it at the hive's edge before **Let it in**, and the role can only research: it holds no authority and no mutating capability.
+- Remote A2A Agent Cards contain untrusted operator-written names and descriptions. Connections validates the JSON-RPC binding before adding a provider, without turning card text into role instructions. Roles authored through the retired hive-edge flow may still contain bounded quotes from cards; those remain untrusted, and A2A providers have no repository authority or power to approve a plan, gate or release.
 - Recalled memory, which can hold content from earlier runs, and role-surface data (including HTTPS spreadsheets) enter agent prompts after the check, so neither triggers the gate. Role-surface blocks are unlabelled.
 - A gate inside a nested child run is named on the parent node but, like plan approvals, cannot be decided from it.
 - Labels are not signed. A tampered store or imported bundle can relabel artifacts (see Persistence).

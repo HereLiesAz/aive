@@ -249,7 +249,6 @@ class HiveScreenshotTest {
                 onLoadDefinitions = { listOf(definition, definition.copy(id = WorkflowDefinitionId("research"), name = "Deep research")) },
                 onLoadRuns = { listOf("The Aive" to listOf(liveRun)) },
                 onEnterNeighbourhood = {},
-                onImportAgent = {},
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -263,42 +262,6 @@ class HiveScreenshotTest {
             com.hereliesaz.geministrator.azphalt.AzphaltPackageSummary(id = "w2", name = "Bug triage", description = "Sorts new issues and drafts a first fix", author = "azphalt", version = "2", kind = "workflow"),
             com.hereliesaz.geministrator.azphalt.AzphaltPackageSummary(id = "w3", name = "Deep research", description = "Evidence-first research with citations", author = "azphalt", version = "1", kind = "workflow", priceStatus = "paid"),
         )
-        // The hive's edge (mockup H5): a sheet from the bottom over the district, on a phone (390x844).
-        fun edgeShot(shelf: EdgeShelf) = @androidx.compose.runtime.Composable {
-            DistrictScreen(
-                onLoadDefinitions = { listOf(definition) },
-                onLoadRuns = { listOf("The Aive" to listOf(liveRun)) },
-                onEnterNeighbourhood = {},
-                onImportAgent = {},
-                edge = {
-                    HiveEdge(
-                        onLoadPackages = { storePackages },
-                        onBringIn = {},
-                        shelfAtStart = shelf,
-                        a2aDrifters = if (shelf == EdgeShelf.Drifters) {
-                            {
-                                A2aDrifterShelf(
-                                    open = false,
-                                    onOpenChange = {},
-                                    swarmRoles = roles,
-                                    connectedProviderIds = emptySet(),
-                                    onSaveRoles = {},
-                                    onConnectKeyless = {},
-                                    onGiveToken = {},
-                                    onDisconnect = {},
-                                )
-                            }
-                        } else {
-                            null
-                        },
-                    )
-                },
-                edgeOpenAtStart = true,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-        shoot("6-hive-edge", 780, 1688, edgeShot(EdgeShelf.Drifters))
-        shoot("6b-hive-edge-hives", 780, 1688, edgeShot(EdgeShelf.Hives))
         shoot("7-live-row", 780, 300) {
             @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
@@ -459,6 +422,13 @@ class HiveScreenshotTest {
         val two = setOf(ProviderCatalog.ANTHROPIC_ID, ProviderCatalog.OPENROUTER_ID)
         shoot("17-keeper-connections", 2400, 1500) { room(KeeperSection.Connections, false, signedIn, two)() }
         shoot("18-keeper-connections-first-run", 2400, 1500) { room(KeeperSection.Connections, false, EntireStatus(), emptySet())() }
+        // The former drifter discovery lives inside Connections, with no separate hive-edge sheet.
+        DurableUiState.store.putBoolean("keeper.connections.adding-a2a-agent", true)
+        try {
+            shoot("18b-keeper-remote-a2a", 2400, 2100) { room(KeeperSection.Connections, false, signedIn, two)() }
+        } finally {
+            DurableUiState.store.putBoolean("keeper.connections.adding-a2a-agent", false)
+        }
         shoot("19-keeper-phone-connections", 824, 1830) { room(KeeperSection.Connections, true, EntireStatus(version = "Entire CLI 0.9.2"), two)() }
         shoot("20-keeper-projects", 2400, 1500) { room(KeeperSection.Projects, false, signedIn, two)() }
         shoot("21-keeper-appearance", 2400, 1500) { room(KeeperSection.Appearance, false, signedIn, two)() }
