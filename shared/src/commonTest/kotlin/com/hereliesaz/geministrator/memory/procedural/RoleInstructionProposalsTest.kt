@@ -79,6 +79,27 @@ class RoleInstructionProposalsTest {
     }
 
     @Test
+    fun aKeyInAFailureReasonOrKeeperMessageNeverReachesAProposedInstructionLine() {
+        val key = "ghp_abcdefghijklmnopqrstuvwxyz0123456789"
+        val observations = RoleInstructionObservations.fromRun(
+            run("r1", "a", "b"),
+            listOf(
+                started("r1", "a", 1, 10),
+                failed("r1", "a", "Deploy failed: Authorization: Bearer $key", 11),
+                started("r1", "b", 1, 20),
+                failed("r1", "b", "Deploy failed: Authorization: Bearer $key", 21),
+            ),
+        ) + RoleInstructionObservations.keeperMessage(engineer.id, "r1", "a", "no, use token=$key instead", 30)
+        assertTrue(observations.none { key in it.detail }, observations.joinToString { it.detail })
+
+        val ledger = RoleInstructionProposalLedger()
+        ledger.observe(observations, roles, nowEpochMillis = 100)
+        val text = ledger.pendingFor(engineer.id).joinToString { it.proposedInstructions }
+        assertTrue(text.isNotEmpty())
+        assertFalse(key in text)
+    }
+
+    @Test
     fun aSingleFailureProposesNothing() {
         val ledger = RoleInstructionProposalLedger()
         ledger.observe(
