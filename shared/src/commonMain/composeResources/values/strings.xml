@@ -104,6 +104,13 @@
     <string name="keeper_a2a_agent_remove">Remove</string>
     <string name="keeper_a2a_agent_invalid_url">Use an https:// address (plain http:// only for this computer or the local network).</string>
     <string name="keeper_a2a_agent_suggestions">Examples of independent A2A services. Their cards are read only if you choose to connect.</string>
+    <string name="keeper_agent_directory_query">Find an agent by skill or purpose</string>
+    <string name="keeper_agent_directory_help">Searches public A2A Registry listings only when pressed. Your search terms leave this device. Listings are not verified identities; connecting requires an independent Agent Card check.</string>
+    <string name="keeper_agent_directory_search">Search directory</string>
+    <string name="keeper_agent_directory_searching">Searching directory…</string>
+    <string name="keeper_agent_directory_no_results">No matching agents were found.</string>
+    <string name="keeper_agent_directory_unavailable">Directory source unavailable: %1$s</string>
+    <string name="keeper_agent_directory_reported_tested">Registry reports a task test passed</string>
     <string name="keeper_a2a_agent_use_address">Use address</string>
     <string name="keeper_a2a_agent_unreachable">The Agent Card could not be reached. Check the address and try again.</string>
     <string name="keeper_a2a_agent_missing_card">There is no Agent Card at that address.</string>

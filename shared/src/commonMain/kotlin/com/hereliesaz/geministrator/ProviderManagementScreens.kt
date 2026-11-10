@@ -47,6 +47,13 @@ import com.hereliesaz.geministrator.resources.keeper_a2a_agent_card_url
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_explain
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_remove
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_suggestions
+import com.hereliesaz.geministrator.resources.keeper_agent_directory_query
+import com.hereliesaz.geministrator.resources.keeper_agent_directory_help
+import com.hereliesaz.geministrator.resources.keeper_agent_directory_search
+import com.hereliesaz.geministrator.resources.keeper_agent_directory_searching
+import com.hereliesaz.geministrator.resources.keeper_agent_directory_no_results
+import com.hereliesaz.geministrator.resources.keeper_agent_directory_unavailable
+import com.hereliesaz.geministrator.resources.keeper_agent_directory_reported_tested
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_unreachable
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_use_address
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_invalid_url
@@ -84,6 +91,8 @@ import com.hereliesaz.geministrator.resources.settings_a2a_server_temporary_toke
 import com.hereliesaz.geministrator.resources.settings_a2a_server_warning
 import com.hereliesaz.geministrator.a2a.A2aAgentConnections
 import com.hereliesaz.geministrator.a2a.A2aDrifterSeeds
+import com.hereliesaz.geministrator.a2a.AgentDirectory
+import com.hereliesaz.geministrator.a2a.AgentDirectoryResults
 import com.hereliesaz.geministrator.a2a.A2aDrifters
 import com.hereliesaz.geministrator.a2a.DrifterTrouble
 import com.hereliesaz.geministrator.resources.confirm_cancel
@@ -637,6 +646,11 @@ internal fun ProviderSettingsScreen(
         var a2aUrlDraft by remember { mutableStateOf("") }
         var a2aUrlError by remember { mutableStateOf<String?>(null) }
         var checkingA2aCard by remember { mutableStateOf(false) }
+        val directory = remember { AgentDirectory() }
+        var directoryQuery by remember { mutableStateOf("") }
+        var directorySearching by remember { mutableStateOf(false) }
+        var directoryRevision by remember { mutableStateOf(0) }
+        var directoryResults by remember { mutableStateOf<AgentDirectoryResults?>(null) }
         val dismissedSeeds by A2aDrifterSeeds.dismissed.collectAsState()
         val suggestions = remember(a2aAgents, dismissedSeeds) { A2aDrifterSeeds.pending(a2aAgents) }
         val invalidA2aUrl = stringResource(Res.string.keeper_a2a_agent_invalid_url)
@@ -645,6 +659,8 @@ internal fun ProviderSettingsScreen(
         val missingCard = stringResource(Res.string.keeper_a2a_agent_missing_card)
         val invalidCard = stringResource(Res.string.keeper_a2a_agent_invalid_card)
         val incompatibleCard = stringResource(Res.string.keeper_a2a_agent_unsupported_binding)
+        val connectedLabel = stringResource(Res.string.common_connected)
+        val directoryReportedTested = stringResource(Res.string.keeper_agent_directory_reported_tested)
         AddConnectionRow(
             label = stringResource(Res.string.keeper_add_a2a_agent),
             hint = stringResource(Res.string.keeper_add_a2a_agent_hint),
@@ -657,7 +673,99 @@ internal fun ProviderSettingsScreen(
                 style = AzphaltType.body,
                 color = azphaltOnSurface(),
             )
-            if (suggestions.isNotEmpty()) {
+            Text(
+                stringResource(Res.string.keeper_agent_directory_help),
+                style = AzphaltType.body,
+                color = azphaltOnSurface(),
+            )
+            AzphaltTextField(
+                value = directoryQuery,
+                onValueChange = {
+                    directoryQuery = it
+                    directoryRevision++
+                    directorySearching = false
+                    directoryResults = null
+                },
+                label = stringResource(Res.string.keeper_agent_directory_query),
+                placeholder = "research, translation, economic data",
+            )
+            AzphaltPill(
+                label = if (directorySearching) stringResource(Res.string.keeper_agent_directory_searching)
+                else stringResource(Res.string.keeper_agent_directory_search),
+                seed = "search-agent-directory",
+                onClick = {
+                    if (!directorySearching && directoryQuery.trim().length >= 2) {
+                        directorySearching = true
+                        val query = directoryQuery
+                        val revision = ++directoryRevision
+                        scope.launch {
+                            try {
+                                val results = directory.search(query)
+                                if (directoryRevision == revision && directoryQuery == query) {
+                                    directoryResults = results
+                                }
+                            } finally {
+                                if (directoryRevision == revision) directorySearching = false
+                            }
+                        }
+                    }
+                },
+                tone = PillTone.Primary,
+            )
+            directoryResults?.let { result ->
+                if (result.unavailableSources.isNotEmpty()) {
+                    Text(
+                        stringResource(
+                            Res.string.keeper_agent_directory_unavailable,
+                            result.unavailableSources.joinToString(", "),
+                        ),
+                        style = AzphaltType.body,
+                        color = azphaltOnSurface(),
+                    )
+                }
+                if (result.entries.isEmpty()) {
+                    Text(
+                        stringResource(Res.string.keeper_agent_directory_no_results),
+                        style = AzphaltType.body,
+                        color = azphaltOnSurface(),
+                    )
+                }
+                result.entries.forEach { entry ->
+                    ConnectionRow(
+                        name = entry.name,
+                        detail = buildString {
+                            append(entry.source)
+                            if (entry.registryReportsTaskTested) {
+                                append(" · ")
+                                append(directoryReportedTested)
+                            }
+                            if (entry.description.isNotBlank()) {
+                                append(" · ")
+                                append(entry.description)
+                            }
+                            if (entry.skills.isNotEmpty()) {
+                                append(" · ")
+                                append(entry.skills.joinToString(", "))
+                            }
+                        },
+                        status = if (entry.connectedProviderId != null) connectedLabel else null,
+                        connected = entry.connectedProviderId != null,
+                        compact = compact,
+                    ) {
+                        if (entry.connectedProviderId == null) {
+                            AzphaltPill(
+                                label = stringResource(Res.string.keeper_a2a_agent_use_address),
+                                seed = "directory-agent-${entry.cardUrl}",
+                                onClick = {
+                                    a2aUrlDraft = entry.cardUrl
+                                    a2aUrlError = null
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+            if (directoryResults == null && suggestions.isNotEmpty()) {
                 Text(stringResource(Res.string.keeper_a2a_agent_suggestions), style = AzphaltType.body, color = azphaltOnSurface())
                 suggestions.forEach { seed ->
                     ConnectionRow(
