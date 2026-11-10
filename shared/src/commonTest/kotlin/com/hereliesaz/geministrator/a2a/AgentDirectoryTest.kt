@@ -129,6 +129,32 @@ class AgentDirectoryTest {
     }
 
     @Test
+    fun registrySkillMatchStillShowsAlreadyConnectedWhenLocalNameDoesNotMatch() = runTest {
+        val url = "https://economic.example.org/.well-known/agent-card.json"
+        val connected = A2aAgentConnections.add(url)
+        val directory = AgentDirectory(
+            listOf(
+                LocalAgentDirectorySource,
+                object : AgentDirectorySource {
+                    override val name = "Registry"
+                    override suspend fun search(query: String) = listOf(
+                        AgentDirectoryEntry(
+                            url, "Economic Indicators", "Economic history",
+                            listOf("GDP forecasting"), name,
+                        ),
+                    )
+                },
+            ),
+        )
+
+        val results = directory.search("GDP")
+        assertEquals(1, results.entries.size)
+        assertEquals(connected.providerId, results.entries.single().connectedProviderId)
+        assertEquals("Registry", results.entries.single().source)
+        assertEquals(listOf("GDP forecasting"), results.entries.single().skills)
+    }
+
+    @Test
     fun failingRegistryDoesNotHideLocalMatchesOrLeakRemoteErrors() = runTest {
         val good = object : AgentDirectorySource {
             override val name = "Local"
