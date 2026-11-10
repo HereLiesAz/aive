@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,6 +51,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.domain.effectiveExecutor
@@ -62,6 +64,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import com.hereliesaz.geministrator.azphalt.AzphaltPackageImportRequest
 import com.hereliesaz.geministrator.azphalt.AzphaltStoreService
 import com.hereliesaz.geministrator.domain.Project
@@ -81,7 +85,6 @@ import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import com.hereliesaz.geministrator.domain.ROLE_COLLECTION_MARKER_ID
 import com.hereliesaz.geministrator.resources.Res
-import com.hereliesaz.geministrator.resources.flowchart_empty
 import com.hereliesaz.geministrator.resources.nav_runtime
 import com.hereliesaz.geministrator.resources.nav_runtime_disconnected
 import com.hereliesaz.geministrator.resources.nav_runtime_loading
@@ -346,10 +349,21 @@ fun ControlRoom(
     val crumbs = shellCrumbs(
         destination = destination,
         inDistrict = district.value,
-        // A hive with no run yet still has a name, so "Hive" above it stays a way out to the district.
+        // Only show a repository belonging to this hive. A resting hive need not belong
+        // to the project of the live run that may be open behind it.
+        repositoryName = when {
+            restingShown -> null
+            liveWorkflow != null -> liveWorkflow.run.repositorySnapshot ?: liveWorkflow.project.repository
+            runtimeState is ApplicationRuntimeState.NoRun -> runtimeState.project.repository
+            else -> null
+        }?.let(::shellRepositoryLabel),
         hiveName = when {
             restingShown -> restingDefinition?.name
-            liveWorkflow != null -> liveWorkflow.definition.name
+            // Objective-created workflows historically use the first 80 prompt characters as
+            // their name. That is not a hive name: prefer the named project in that case.
+            liveWorkflow != null -> shellHiveLabel(
+                liveWorkflow.definition, liveWorkflow.run, liveWorkflow.project,
+            )
             runtimeState is ApplicationRuntimeState.NoRun -> runtimeState.project.name
             runtimeState is ApplicationRuntimeState.NoProject -> stringResource(Res.string.first_hive)
             else -> null
@@ -600,17 +614,26 @@ fun ControlRoom(
     }
 }
 
+/** A repository's source and short, credential-free name; local Git uses its folder name. */
+internal fun shellRepositoryLabel(repository: RepositoryRef): String =
+    "${repository.source.displayName()}: ${repository.displayName()}"
+
+/** An explicitly named hive stays named. A legacy objective-named hive uses its project name instead. */
+internal fun shellHiveLabel(definition: WorkflowDefinition, run: WorkflowRun, project: Project): String =
+    definition.name.takeUnless { it.isBlank() || it == run.objective.take(80) } ?: project.name
+
 /** One step of the breadcrumb: where the keeper is, and the way back up. */
 internal data class ShellCrumb(val label: String, val seed: String, val onClick: (() -> Unit)?)
 
 /**
- * The breadcrumb (docs/Keepers-Room.md, stage 2): Hive › a hive › a creature, or Hive › a place
+ * The breadcrumb (docs/Keepers-Room.md, stage 2): Hive › repository › hive › creature, or Hive › a place
  * opened from it. It replaces the navigation and the page titles; the last step is where you are.
  */
 @Composable
 private fun shellCrumbs(
     destination: ControlRoomDestination,
     inDistrict: Boolean,
+    repositoryName: String?,
     hiveName: String?,
     creatureName: String?,
     creatureTab: String?,
@@ -625,6 +648,7 @@ private fun shellCrumbs(
     when {
         destination == ControlRoomDestination.Overview -> {
             if (inDistrict) return@buildList
+            repositoryName?.takeIf(String::isNotBlank)?.let { add(ShellCrumb(it, "crumb-repository", null)) }
             hiveName?.takeIf(String::isNotBlank)?.let { add(ShellCrumb(it, "crumb-a-hive", onOpenHive)) }
             if (creatureName == null) timelineName?.let { add(ShellCrumb(it, "crumb-timeline", null)) }
             creatureName?.let { add(ShellCrumb(it, "crumb-creature", onCloseCreature)) }
@@ -705,24 +729,26 @@ private fun Breadcrumb(crumbs: List<ShellCrumb>, modifier: Modifier = Modifier) 
     ) {
         crumbs.forEachIndexed { index, crumb ->
             if (index > 0) Text("›", style = AzphaltType.lead, color = azphaltOnSurface(), modifier = Modifier.clearAndSetSemantics {})
+            val last = index == crumbs.lastIndex
             val onClick = crumb.onClick
-            if (onClick != null) {
-                AzphaltPill(label = crumb.label, seed = crumb.seed, onClick = onClick)
-            } else {
-                // A step that goes nowhere is a place, not a button: the last is where you are.
-                AzphaltPill(
-                    label = crumb.label,
-                    seed = crumb.seed,
-                    selected = index == crumbs.lastIndex,
-                    stateDescription = if (index == crumbs.lastIndex) here else null,
-                    onClick = {},
-                    modifier = Modifier.clearAndSetSemantics {
+            Text(
+                text = crumb.label,
+                style = AzphaltType.body.copy(fontWeight = if (last) FontWeight.ExtraBold else FontWeight.Medium),
+                color = azphaltOnSurface(),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .defaultMinSize(minHeight = AzphaltMinTouchTarget)
+                    .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
+                    .semantics(mergeDescendants = true) {
                         contentDescription = crumb.label
-                        heading()
-                        if (index == crumbs.lastIndex) stateDescription = here
-                    },
-                )
-            }
+                        if (last) {
+                            heading()
+                            stateDescription = here
+                        }
+                    }
+                    .padding(horizontal = 4.dp),
+            )
         }
     }
 }
@@ -1117,17 +1143,6 @@ private fun MainDestination(
                                             taskOfSession = com.hereliesaz.geministrator.log.sessionTask(
                                                 live.run.taskRuns.values.associate { it.id to it.taskDefinitionId.value },
                                             ),
-                                        )
-                                    },
-                                    flowchartContent = {
-                                        WorkflowFlowchartView(
-                                            flow = remember(live.definition, live.run) {
-                                                com.hereliesaz.geministrator.workflow.WorkflowFlowchart.of(live.definition, live.run)
-                                            },
-                                            selectedTaskId = selectedTaskId,
-                                            onTaskSelected = onTaskSelected,
-                                            emptyText = stringResource(Res.string.flowchart_empty),
-                                            modifier = Modifier.fillMaxSize(),
                                         )
                                     },
                                     memoryContent = {

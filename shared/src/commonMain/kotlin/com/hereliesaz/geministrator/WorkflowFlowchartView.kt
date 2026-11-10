@@ -42,7 +42,7 @@ private val RowGap = 18.dp
 private val Pad = 16.dp
 
 /**
- * The workflow as boxes and arrows, left to right: a step sits to the right of everything it waits
+ * The workflow as boxes and arrows, top to bottom: a step sits below everything it waits
  * on. With a run, each box wears its step's state (the same colours as a creature's chip) and the
  * words for it; tapping a box selects that creature. It draws what [WorkflowFlowchart] says and
  * decides nothing: moving a box edits nothing.
@@ -62,8 +62,8 @@ internal fun WorkflowFlowchartView(
     val textMeasurer = rememberTextMeasurer()
     val line = azphaltOnSurface()
     val labelColor = azphaltMutedOnSurface()
-    val totalWidth = Pad * 2 + NodeWidth * flow.levels + ColumnGap * (flow.levels - 1).coerceAtLeast(0)
-    val totalHeight = Pad * 2 + NodeHeight * flow.rows + RowGap * (flow.rows - 1).coerceAtLeast(0)
+    val totalWidth = Pad * 2 + NodeWidth * flow.rows + RowGap * (flow.rows - 1).coerceAtLeast(0)
+    val totalHeight = Pad * 2 + NodeHeight * flow.levels + ColumnGap * (flow.levels - 1).coerceAtLeast(0)
     val positions = remember(flow) { flow.nodes.associate { it.id to (it.level to it.row) } }
 
     Box(modifier.horizontalScroll(rememberScrollState()).verticalScroll(rememberScrollState())) {
@@ -71,23 +71,23 @@ internal fun WorkflowFlowchartView(
             Canvas(Modifier.fillMaxSize()) {
                 val w = NodeWidth.toPx()
                 val h = NodeHeight.toPx()
-                val colStep = w + ColumnGap.toPx()
-                val rowStep = h + RowGap.toPx()
+                val acrossStep = w + RowGap.toPx()
+                val downStep = h + ColumnGap.toPx()
                 val pad = Pad.toPx()
-                fun left(level: Int) = pad + colStep * level
-                fun top(row: Int) = pad + rowStep * row
+                fun left(row: Int) = pad + acrossStep * row
+                fun top(level: Int) = pad + downStep * level
                 flow.edges.forEach { edge ->
                     val from = positions[edge.from] ?: return@forEach
                     val to = positions[edge.to] ?: return@forEach
-                    val x1 = left(from.first) + w
-                    val y1 = top(from.second) + h / 2
-                    val x2 = left(to.first)
-                    val y2 = top(to.second) + h / 2
-                    val mid = (x1 + x2) / 2
+                    val x1 = left(from.second) + w / 2
+                    val y1 = top(from.first) + h
+                    val x2 = left(to.second) + w / 2
+                    val y2 = top(to.first)
+                    val mid = (y1 + y2) / 2
                     drawPath(
                         Path().apply {
                             moveTo(x1, y1)
-                            cubicTo(mid, y1, mid, y2, x2, y2)
+                            cubicTo(x1, mid, x2, mid, x2, y2)
                         },
                         color = line.copy(alpha = 0.7f),
                         style = Stroke(width = 2.dp.toPx()),
@@ -96,15 +96,15 @@ internal fun WorkflowFlowchartView(
                     drawPath(
                         Path().apply {
                             moveTo(x2, y2)
-                            lineTo(x2 - head, y2 - head * 0.6f)
-                            lineTo(x2 - head, y2 + head * 0.6f)
+                            lineTo(x2 - head * 0.6f, y2 - head)
+                            lineTo(x2 + head * 0.6f, y2 - head)
                             close()
                         },
                         color = line.copy(alpha = 0.7f),
                     )
                     edge.label?.let { label ->
                         val measured = textMeasurer.measure(label, AzphaltType.endCap.copy(fontSize = 10.sp, color = labelColor))
-                        drawText(measured, topLeft = Offset(mid - measured.size.width / 2f, (y1 + y2) / 2 - measured.size.height - 2.dp.toPx()))
+                        drawText(measured, topLeft = Offset((x1 + x2) / 2f - measured.size.width / 2f, mid - measured.size.height - 2.dp.toPx()))
                     }
                 }
             }
@@ -114,7 +114,7 @@ internal fun WorkflowFlowchartView(
                     selected = node.id.value == selectedTaskId,
                     onClick = { onTaskSelected(node.id.value) },
                     modifier = Modifier
-                        .offset(Pad + (NodeWidth + ColumnGap) * node.level, Pad + (NodeHeight + RowGap) * node.row)
+                        .offset(Pad + (NodeWidth + RowGap) * node.row, Pad + (NodeHeight + ColumnGap) * node.level)
                         .size(NodeWidth, NodeHeight),
                 )
             }

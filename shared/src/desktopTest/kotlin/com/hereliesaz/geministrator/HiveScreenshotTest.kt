@@ -1030,8 +1030,13 @@ class HiveScreenshotTest {
                 task("review", "Review", qa, "notify"),
             ),
         )
-        shoot("24-flowchart", 900, 1400) {
-            GeministratorWorkflowTerrarium(flow, liveRun.copy(workflowDefinitionId = flow.id), roles, selectedTaskId = null, onTaskSelected = {}, onStageDefinition = { it })
+        DurableUiState.store.putBoolean("hive.view.flow", true)
+        try {
+            shoot("24-flowchart", 900, 1800) {
+                GeministratorWorkflowTerrarium(flow, liveRun.copy(workflowDefinitionId = flow.id), roles, selectedTaskId = null, onTaskSelected = {}, onStageDefinition = { it })
+            }
+        } finally {
+            DurableUiState.store.putBoolean("hive.view.flow", false)
         }
     }
 

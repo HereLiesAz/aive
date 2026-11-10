@@ -1,6 +1,5 @@
 package com.hereliesaz.geministrator
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -31,11 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -53,6 +47,7 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.build_build
 import com.hereliesaz.geministrator.resources.build_live
+import com.hereliesaz.geministrator.resources.hive_view_flowchart
 import com.hereliesaz.geministrator.resources.hive_new_build_help
 import com.hereliesaz.geministrator.resources.hive_new_build_title
 import com.hereliesaz.geministrator.resources.hive_new_build_title_only
@@ -69,58 +64,38 @@ import org.jetbrains.compose.resources.stringResource
 
 /*
  * A new hive (mockup H6): it opens empty in Build. Its head names it and leads back to the district,
- * beside Live and Build as one control; under the field it is named, and creatures come up from the
+ * beside Live, Build and Flowchart as one control; under the field it is named, and creatures come up from the
  * tray the way Build's Add creature brings them in.
  */
 
-/** The hive's name, and the way back up to the district: an Ink capsule led by a Yellow chevron. */
+/** Text-only hive name and a way back to the district. */
 @Composable
 internal fun NewHiveCrumb(name: String, onSurface: () -> Unit, modifier: Modifier = Modifier) {
     val description = stringResource(Res.string.hive_new_surface, name)
-    Row(
+    Text(
+        text = name.uppercase(),
+        style = AzphaltType.lead.copy(fontWeight = FontWeight.ExtraBold),
+        color = azphaltOnSurface(),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
         modifier = modifier
             .semantics(mergeDescendants = true) {
                 role = Role.Button
                 contentDescription = description
             }
             .defaultMinSize(minHeight = AzphaltMinTouchTarget)
-            .clip(RoundedCornerShape(999.dp))
-            .background(Azphalt.Ink)
             .clickable(onClick = onSurface)
-            .padding(start = 8.dp, end = 18.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        AzphaltThemedSurface(Azphalt.Ink) {
-            val strong = azphaltStrong()
-            Box(Modifier.size(32.dp).clip(CircleShape).background(strong), contentAlignment = Alignment.Center) {
-                val glyph = strong.onOpposite()
-                Canvas(Modifier.size(16.dp)) {
-                    val unit = size.width / 24f
-                    val chevron = Path().apply {
-                        moveTo(5f * unit, 14f * unit)
-                        lineTo(12f * unit, 7f * unit)
-                        lineTo(19f * unit, 14f * unit)
-                    }
-                    drawPath(chevron, glyph, style = Stroke(width = 2.6f * unit, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                }
-            }
-            Text(
-                text = name.uppercase(),
-                style = AzphaltType.lead.copy(fontWeight = FontWeight.ExtraBold),
-                color = azphaltOnSurface(),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
+            .padding(horizontal = 8.dp),
+    )
 }
 
-/** Live and Build as one Ink capsule, the open one filled; each is a radio button of the pair. */
+/** Live, Build and Flowchart share an Ink capsule; only one view is selected. */
 @Composable
 internal fun TerrariumModeSegments(
     building: Boolean,
     onBuildingChange: (Boolean) -> Unit,
+    flowchart: Boolean,
+    onFlowchartSelected: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     AzphaltThemedSurface(Azphalt.Ink) {
@@ -132,8 +107,11 @@ internal fun TerrariumModeSegments(
                 .padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            listOf(false to Res.string.build_live, true to Res.string.build_build).forEach { (forBuild, label) ->
-                val open = building == forBuild
+            listOf(
+                Triple("live", Res.string.build_live, !building && !flowchart),
+                Triple("build", Res.string.build_build, building && !flowchart),
+                Triple("flowchart", Res.string.hive_view_flowchart, flowchart),
+            ).forEach { (mode, label, open) ->
                 val fill = if (open) azphaltStrong() else Azphalt.Ink
                 val text = stringResource(label)
                 Box(
@@ -143,11 +121,14 @@ internal fun TerrariumModeSegments(
                             selected = open
                             contentDescription = text
                         }
-                        // With the capsule's own 4dp each side, the pair stands 48dp tall.
+                        // With the capsule's own 4dp each side, the control stands 48dp tall.
                         .height(AzphaltMinTouchTarget - 8.dp)
                         .clip(RoundedCornerShape(999.dp))
                         .background(fill)
-                        .clickable { onBuildingChange(forBuild) }
+                        .clickable {
+                            if (mode == "flowchart") onFlowchartSelected()
+                            else onBuildingChange(mode == "build")
+                        }
                         .padding(horizontal = 14.dp),
                     contentAlignment = Alignment.Center,
                 ) {
