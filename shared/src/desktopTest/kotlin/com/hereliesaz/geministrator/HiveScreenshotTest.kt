@@ -249,7 +249,6 @@ class HiveScreenshotTest {
                 onLoadDefinitions = { listOf(definition, definition.copy(id = WorkflowDefinitionId("research"), name = "Deep research")) },
                 onLoadRuns = { listOf("The Aive" to listOf(liveRun)) },
                 onEnterNeighbourhood = {},
-                onImportAgent = {},
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -263,42 +262,6 @@ class HiveScreenshotTest {
             com.hereliesaz.geministrator.azphalt.AzphaltPackageSummary(id = "w2", name = "Bug triage", description = "Sorts new issues and drafts a first fix", author = "azphalt", version = "2", kind = "workflow"),
             com.hereliesaz.geministrator.azphalt.AzphaltPackageSummary(id = "w3", name = "Deep research", description = "Evidence-first research with citations", author = "azphalt", version = "1", kind = "workflow", priceStatus = "paid"),
         )
-        // The hive's edge (mockup H5): a sheet from the bottom over the district, on a phone (390x844).
-        fun edgeShot(shelf: EdgeShelf) = @androidx.compose.runtime.Composable {
-            DistrictScreen(
-                onLoadDefinitions = { listOf(definition) },
-                onLoadRuns = { listOf("The Aive" to listOf(liveRun)) },
-                onEnterNeighbourhood = {},
-                onImportAgent = {},
-                edge = {
-                    HiveEdge(
-                        onLoadPackages = { storePackages },
-                        onBringIn = {},
-                        shelfAtStart = shelf,
-                        a2aDrifters = if (shelf == EdgeShelf.Drifters) {
-                            {
-                                A2aDrifterShelf(
-                                    open = false,
-                                    onOpenChange = {},
-                                    swarmRoles = roles,
-                                    connectedProviderIds = emptySet(),
-                                    onSaveRoles = {},
-                                    onConnectKeyless = {},
-                                    onGiveToken = {},
-                                    onDisconnect = {},
-                                )
-                            }
-                        } else {
-                            null
-                        },
-                    )
-                },
-                edgeOpenAtStart = true,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-        shoot("6-hive-edge", 780, 1688, edgeShot(EdgeShelf.Drifters))
-        shoot("6b-hive-edge-hives", 780, 1688, edgeShot(EdgeShelf.Hives))
         shoot("7-live-row", 780, 300) {
             @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
