@@ -356,14 +356,14 @@ fun ControlRoom(
             liveWorkflow != null -> liveWorkflow.project.repository
             runtimeState is ApplicationRuntimeState.NoRun -> runtimeState.project.repository
             else -> null
-        }?.let { "${it.source.displayName()}: ${it.displayName()}" },
+        }?.let(::shellRepositoryLabel),
         hiveName = when {
             restingShown -> restingDefinition?.name
             // Objective-created workflows historically use the first 80 prompt characters as
             // their name. That is not a hive name: prefer the named project in that case.
-            liveWorkflow != null -> liveWorkflow.definition.name
-                .takeUnless { it.isBlank() || it == liveWorkflow.run.objective.take(80) }
-                ?: liveWorkflow.project.name
+            liveWorkflow != null -> shellHiveLabel(
+                liveWorkflow.definition, liveWorkflow.run, liveWorkflow.project,
+            )
             runtimeState is ApplicationRuntimeState.NoRun -> runtimeState.project.name
             runtimeState is ApplicationRuntimeState.NoProject -> stringResource(Res.string.first_hive)
             else -> null
@@ -613,6 +613,14 @@ fun ControlRoom(
     }
     }
 }
+
+/** A repository's source and short, credential-free name; local Git uses its folder name. */
+internal fun shellRepositoryLabel(repository: RepositoryRef): String =
+    "${repository.source.displayName()}: ${repository.displayName()}"
+
+/** An explicitly named hive stays named. A legacy objective-named hive uses its project name instead. */
+internal fun shellHiveLabel(definition: WorkflowDefinition, run: WorkflowRun, project: Project): String =
+    definition.name.takeUnless { it.isBlank() || it == run.objective.take(80) } ?: project.name
 
 /** One step of the breadcrumb: where the keeper is, and the way back up. */
 internal data class ShellCrumb(val label: String, val seed: String, val onClick: (() -> Unit)?)
