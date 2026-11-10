@@ -148,7 +148,13 @@ internal class AgentDirectory(
                 continue
             }
             for (entry in entries.take(MAX_ENTRIES_PER_SOURCE)) {
-                val url = directoryPublicCardUrl(entry.cardUrl) ?: continue
+                // User-connected loopback agents are legitimate local entries; a public registry
+                // must never supply such an address for the user to fetch.
+                val url = if (source === LocalAgentDirectorySource) {
+                    runCatching { A2aAgentConnections.normalizeCardUrl(entry.cardUrl) }.getOrNull()
+                } else {
+                    directoryPublicCardUrl(entry.cardUrl)
+                } ?: continue
                 val existing = found[url]
                 found[url] = entry.copy(
                     cardUrl = url,
