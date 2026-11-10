@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.memory
 
+import com.hereliesaz.geministrator.control.ControlRedaction
 import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
@@ -31,6 +32,12 @@ interface MemorySessionObserver {
      * its cue cloud for the user's words; observers without one return it unchanged.
      */
     suspend fun annotateUserMessage(handle: ManagedSessionHandle, text: String): String = text
+
+    /**
+     * Memory is about to send [message] into a session. An echo of exactly that text is memory's own
+     * and is not banked again; any other message, whatever it starts with, is the agent's.
+     */
+    suspend fun noteIssued(message: String) = Unit
 }
 
 /** First line of every message memory sends into a session, so it is never banked or re-read as the agent's own. */
@@ -60,6 +67,14 @@ class QueuedMemorySessionObserver(
 
     private val mutex = Mutex()
     private val captures = mutableMapOf<ManagedSessionHandle, Capture>()
+    private val issued = ArrayDeque<String>()
+
+    override suspend fun noteIssued(message: String) {
+        mutex.withLock {
+            issued.addLast(message.trim())
+            while (issued.size > MAX_ISSUED_MESSAGES) issued.removeFirst()
+        }
+    }
 
     init {
         require(maxCapturedEventChars > 0)
@@ -118,8 +133,10 @@ class QueuedMemorySessionObserver(
                 "Agent plan",
                 event.summary.take(maxCapturedEventChars),
             )
-            // Memory's own injected cues and recalls are not experience to bank again.
-            is AgentEvent.Message -> if (event.content.startsWith(MEMORY_MESSAGE_MARKER)) null else MemorySessionPart(
+            // Memory's own injected cues and recalls (the exact text it sent, noted by noteIssued) are not
+            // experience to bank again. A marker at the start of an agent's own message proves nothing:
+            // the agent writes its text, so that cannot be a way to keep a message out of memory.
+            is AgentEvent.Message -> if (mutex.withLock { event.content.trim() in issued }) null else MemorySessionPart(
                 MemorySourceKind.Message,
                 "Agent message",
                 event.content.take(maxCapturedEventChars),
@@ -176,8 +193,10 @@ class QueuedMemorySessionObserver(
                 taskRunId = request.taskRunId.value,
                 taskDefinitionId = context.taskDefinitionId?.value,
                 roleId = context.roleId?.value ?: fallbackRoleId,
-                userPrompt = capture.userPrompt,
-                parts = capture.parts.toList() + MemorySessionPart(
+                // Nothing is banked unscrubbed: role instructions, prompt blocks, artifacts and messages
+                // can all carry a key a run saw, and a bank outlives the run (and is recalled into others).
+                userPrompt = ControlRedaction.scrub(capture.userPrompt),
+                parts = (capture.parts.toList() + MemorySessionPart(
                     kind = if (status == ManagedSessionStatus.Failed) {
                         MemorySourceKind.Failure
                     } else {
@@ -185,7 +204,7 @@ class QueuedMemorySessionObserver(
                     },
                     label = "Terminal status",
                     text = status.name,
-                ),
+                )).map { it.copy(text = ControlRedaction.scrub(it.text)) },
                 closedAtEpochMillis = nowEpochMillis(),
             ),
         )
@@ -205,6 +224,8 @@ fun memoryWorkflowOf(request: AgentTaskRequest, sessionId: String? = null): Stri
     request.taskRunId.value,
     sessionId,
 )
+
+private const val MAX_ISSUED_MESSAGES = 128
 
 internal const val MEMORY_RECALL_PROMPT_LABEL: String = "Relevant memory"
 
