@@ -14,18 +14,33 @@ internal class ChunkedStringSettings(
     private val delegate: Settings,
     private val chunkedKeys: Set<String>,
     private val chunkSize: Int = DEFAULT_CHUNK_SIZE,
+    /** Treat every key as chunkable (for stores with dynamic keys); see [onlyWhenLarge]. */
+    private val allKeys: Boolean = false,
+    /** Keep values that fit in one entry as plain values; only a value over [chunkSize] is chunked. */
+    private val onlyWhenLarge: Boolean = false,
 ) : Settings by delegate {
+    private fun chunks(key: String): Boolean = allKeys || key in chunkedKeys
+
     init {
         require(chunkSize > 0) { "chunkSize must be positive" }
     }
 
     override fun putString(key: String, value: String) {
-        if (key !in chunkedKeys) {
+        if (!chunks(key)) {
             delegate.putString(key, value)
             return
         }
 
         val previous = readManifest(key)
+        if (onlyWhenLarge && value.length <= chunkSize) {
+            // Write the plain value first, then retire any older chunked generation that would shadow it.
+            delegate.putString(key, value)
+            if (previous != null) {
+                delegate.remove(manifestKey(key))
+                repeat(previous.chunkCount) { index -> delegate.remove(chunkKey(key, previous.generation, index)) }
+            }
+            return
+        }
         val generation = (previous?.generation ?: 0L) + 1L
         val chunks = value.chunked(chunkSize).ifEmpty { listOf("") }
 
@@ -46,7 +61,7 @@ internal class ChunkedStringSettings(
         getStringOrNull(key) ?: defaultValue
 
     override fun getStringOrNull(key: String): String? {
-        if (key !in chunkedKeys) return delegate.getStringOrNull(key)
+        if (!chunks(key)) return delegate.getStringOrNull(key)
 
         val manifest = readManifest(key) ?: return delegate.getStringOrNull(key)
         return buildString {
@@ -61,7 +76,7 @@ internal class ChunkedStringSettings(
     }
 
     override fun remove(key: String) {
-        if (key !in chunkedKeys) {
+        if (!chunks(key)) {
             delegate.remove(key)
             return
         }
@@ -75,7 +90,7 @@ internal class ChunkedStringSettings(
     }
 
     override fun hasKey(key: String): Boolean =
-        if (key in chunkedKeys) {
+        if (chunks(key)) {
             delegate.hasKey(manifestKey(key)) || delegate.hasKey(key)
         } else {
             delegate.hasKey(key)
@@ -103,6 +118,14 @@ internal class ChunkedStringSettings(
     )
 
     companion object {
+        /** Wraps [settings] so any string value, under any key, may exceed the platform's per-entry limit. */
+        fun unbounded(settings: Settings): Settings =
+            if (settings is ChunkedStringSettings && settings.allKeys) {
+                settings
+            } else {
+                ChunkedStringSettings(settings, emptySet(), allKeys = true, onlyWhenLarge = true)
+            }
+
         // Safely below java.util.prefs.Preferences.MAX_VALUE_LENGTH (8192 chars) with room for
         // platform encoding/implementation differences.
         const val DEFAULT_CHUNK_SIZE: Int = 3_500

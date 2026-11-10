@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.memory
 
+import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -157,9 +158,10 @@ class InMemoryMemoryBankRegistry(initial: Set<String> = emptySet()) : MemoryBank
 }
 
 class SettingsMemoryBankRegistry(
-    private val settings: Settings,
+    settings: Settings,
     private val key: String = "${SettingsMemoryStore.DEFAULT_STORAGE_KEY}.banks",
 ) : MemoryBankRegistry {
+    private val settings: Settings = ChunkedStringSettings.unbounded(settings)
     private val mutex = Mutex()
     private val serializer = ListSerializer(String.serializer())
 

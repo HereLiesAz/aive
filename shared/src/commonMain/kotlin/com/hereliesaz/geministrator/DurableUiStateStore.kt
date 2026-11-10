@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
@@ -16,9 +17,10 @@ import kotlinx.serialization.json.Json
  * Do not rename the namespace as part of a product/branding rename.
  */
 internal class DurableUiStateStore(
-    private val settings: Settings = Settings(),
+    settings: Settings = Settings(),
     private val rootKey: String = ROOT_KEY,
 ) {
+    private val settings: Settings = ChunkedStringSettings.unbounded(settings)
     fun getString(key: String): String? = settings.getStringOrNull(scoped(key))
 
     fun putString(key: String, value: String) {

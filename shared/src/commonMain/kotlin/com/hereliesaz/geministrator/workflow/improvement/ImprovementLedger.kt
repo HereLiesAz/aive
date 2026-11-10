@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.workflow.improvement
 
+import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -258,9 +259,10 @@ interface ImprovementStore {
 }
 
 class SettingsImprovementStore(
-    private val settings: Settings = Settings(),
+    settings: Settings = Settings(),
     private val key: String = DEFAULT_KEY,
 ) : ImprovementStore {
+    private val settings: Settings = ChunkedStringSettings.unbounded(settings)
     private val mutex = Mutex()
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 

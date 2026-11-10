@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -132,9 +133,10 @@ internal fun inboxBadgeLabel(unread: Int): String? = when {
  * the Inbox page's MARK ALL READ clears the header's badge without the two sharing an instance.
  */
 internal class InboxReadLog(
-    private val settings: Settings,
+    settings: Settings,
     private val capacity: Int = INBOX_READ_CAPACITY,
 ) {
+    private val settings: Settings = ChunkedStringSettings.unbounded(settings)
     private var ordered: List<String> = load()
     private var cached: Set<String> = ordered.toSet()
     private var loadedAt: Int = inboxReadRevision.intValue
