@@ -21,6 +21,9 @@ import com.hereliesaz.geministrator.domain.CONTEXT_PROVENANCE_METADATA_KEY
 import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.net.CleartextPolicy
+import com.hereliesaz.geministrator.net.ResponseTooLargeException
+import com.hereliesaz.geministrator.net.boundedText
+import com.hereliesaz.geministrator.net.boundedTextOrTruncated
 import com.hereliesaz.geministrator.providers.AgentCapabilities
 import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.providers.AgentProvider
@@ -35,7 +38,6 @@ import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
@@ -435,9 +437,14 @@ internal class A2aClientApi(
 
     suspend fun card(): A2aAgentCard {
         val response = client.get(cardUrl) { header(HttpHeaders.Accept, "application/json") }
-        val body = response.bodyAsText()
         if (response.status.value !in 200..299) {
-            error("Unable to read the Agent Card: HTTP ${response.status.value}" + body.redactSecrets().take(300).let { if (it.isBlank()) "" else ": $it" })
+            val detail = response.boundedTextOrTruncated(ERROR_BODY_BYTES).redactSecrets().take(300)
+            error("Unable to read the Agent Card: HTTP ${response.status.value}" + if (detail.isBlank()) "" else ": $detail")
+        }
+        val body = try {
+            response.boundedText(MAX_CARD_BYTES)
+        } catch (_: ResponseTooLargeException) {
+            error("The Agent Card is larger than ${MAX_CARD_BYTES / 1024} KB; Aive does not read it")
         }
         return A2aCodec.decodeCard(Json.parseToJsonElement(body))
     }
@@ -451,12 +458,10 @@ internal class A2aClientApi(
         require(CleartextPolicy.allowsSecret(url)) {
             "The agent's endpoint must use https:// (plain http:// only for this computer or the local network)"
         }
-        // A card must not be able to send the token (or the prompts it guards) to another origin.
-        if (bearerToken != null) {
-            require(originOf(url) == originOf(cardUrl)) {
-                "The agent's endpoint (${originOf(url)}) is not on the Agent Card's origin (${originOf(cardUrl)}); " +
-                    "Aive sends the token only to the origin it was given for"
-            }
+        // A card must not be able to send the prompts it guards (or the token, when there is one) to another origin.
+        require(originOf(url) == originOf(cardUrl)) {
+            "The agent's endpoint (${originOf(url)}) is not on the Agent Card's origin (${originOf(cardUrl)}); " +
+                "Aive sends a task only to the origin it was given for"
         }
         resolved.also { resolvedEndpoint = it }
     }
@@ -502,9 +507,14 @@ internal class A2aClientApi(
     }
 
     private suspend fun HttpResponse.requireSuccess(): String {
-        val text = bodyAsText()
-        if (status.value in 200..299) return text
-        val detail = text.redactSecrets().take(300)
+        if (status.value in 200..299) {
+            return try {
+                boundedText(MAX_RESPONSE_BYTES)
+            } catch (_: ResponseTooLargeException) {
+                throw A2aRpcException(A2aErrorCodes.INVALID_AGENT_RESPONSE, "The agent's response is larger than ${MAX_RESPONSE_BYTES / 1_000_000} MB")
+            }
+        }
+        val detail = boundedTextOrTruncated(ERROR_BODY_BYTES).redactSecrets().take(300)
         val reason = when (status.value) {
             401, 403 -> "The A2A agent refused the request (HTTP ${status.value}); check its token in Connections"
             else -> "A2A request failed: HTTP ${status.value}"
@@ -526,6 +536,9 @@ internal class A2aClientApi(
 
     companion object {
         const val A2A_VERSION_HEADER = "A2A-Version"
+        const val MAX_CARD_BYTES = 256 * 1024
+        const val MAX_RESPONSE_BYTES = 4_000_000
+        const val ERROR_BODY_BYTES = 4096
         val ACCEPTED_OUTPUT_MODES = listOf("text/plain", "text/markdown", "application/json")
     }
 }

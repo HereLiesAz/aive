@@ -223,6 +223,53 @@ class A2aAgentProviderTest {
     }
 
     @Test
+    fun aTaskIsNeverSentToAnotherOriginEvenWhenThereIsNoToken() = runTest {
+        val calls = mutableListOf<Call>()
+        val (provider, client) = provider(calls, cardJson = card(url = "https://elsewhere.example/a2a"), token = null) { _, _ -> error("must not post") }
+        try {
+            assertFailsWith<IllegalArgumentException> { provider.start(request) }
+            assertTrue(calls.none { it.method == "POST" })
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun anOversizedAgentCardIsRefusedByBytesWhileItIsRead() = runTest {
+        // Multi-byte text: few characters, many bytes. The cap counts bytes.
+        val wide = """{"name":"${"€".repeat(A2aClientApi.MAX_CARD_BYTES / 2)}"}"""
+        val client = HttpClient(MockEngine { json(wide) }) { expectSuccess = false }
+        try {
+            val provider = A2aAgentProvider(
+                id = AgentProviderId("a2a:agent.example"), displayName = "Remote",
+                cardUrl = "https://agent.example/.well-known/agent-card.json", bearerToken = null, client = client, pollIntervalMillis = 250,
+            )
+            val failure = assertFailsWith<IllegalStateException> { provider.start(request) }
+            assertContains(failure.message.orEmpty(), "larger than")
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun anOversizedRpcResponseIsRefused() = runTest {
+        val big = "€".repeat(A2aClientApi.MAX_RESPONSE_BYTES / 2)
+        val client = HttpClient(MockEngine { call ->
+            if (call.method == HttpMethod.Get) json(card()) else json("""{"jsonrpc":"2.0","id":"x","result":{"pad":"$big"}}""")
+        }) { expectSuccess = false }
+        try {
+            val provider = A2aAgentProvider(
+                id = AgentProviderId("a2a:agent.example"), displayName = "Remote",
+                cardUrl = "https://agent.example/.well-known/agent-card.json", bearerToken = null, client = client, pollIntervalMillis = 250,
+            )
+            val failure = assertFailsWith<Exception> { provider.start(request) }
+            assertContains(failure.message.orEmpty(), "larger than")
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
     fun refusedTokenIsReportedAsAuthFailure() = runTest {
         val client = HttpClient(MockEngine { call ->
             if (call.method == HttpMethod.Get) json(card()) else respond("""{"error":"unauthorized"}""", HttpStatusCode.Unauthorized)

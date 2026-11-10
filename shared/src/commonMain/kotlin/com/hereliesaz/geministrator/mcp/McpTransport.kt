@@ -7,12 +7,14 @@ import io.ktor.client.request.preparePost
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsChannel
+import io.ktor.http.contentLength
+import com.hereliesaz.geministrator.net.BoundedLineReader
+import com.hereliesaz.geministrator.net.ResponseTooLargeException
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.URLProtocol
 import io.ktor.http.Url
 import io.ktor.http.content.TextContent
-import io.ktor.utils.io.readUTF8Line
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.longOrNull
 
@@ -61,7 +63,7 @@ class McpStreamableHttpTransport(
     client: HttpClient,
     val endpoint: String,
     private val bearerToken: String? = null,
-    private val maxResponseChars: Int = MAX_RESPONSE_CHARS,
+    private val maxResponseBytes: Int = MAX_RESPONSE_BYTES,
 ) : McpTransport {
     override val kind: McpTransportKind = McpTransportKind.StreamableHttp
     private val client: HttpClient
@@ -88,13 +90,18 @@ class McpStreamableHttpTransport(
         }
         if (id == null || status == 202) return McpIncoming(status, null, headers)
         val type = response.headers[HttpHeaders.ContentType].orEmpty().substringBefore(';').trim().lowercase()
-        val channel = response.bodyAsChannel()
+        response.contentLength()?.let { if (it > maxResponseBytes) throw McpProtocolException("The MCP server's response is too large") }
+        val lines = BoundedLineReader(response.bodyAsChannel(), maxResponseBytes.toLong())
+        suspend fun nextLine(): String? = try {
+            lines.readLine()
+        } catch (_: ResponseTooLargeException) {
+            throw McpProtocolException("The MCP server's response is too large")
+        }
         if (type == "text/event-stream" && status in 200..299) {
             // Notifications about the request may precede its response; take the response.
             val data = StringBuilder()
-            var read = 0
             while (true) {
-                val line = channel.readUTF8Line()
+                val line = nextLine()
                 if (line == null || line.isEmpty()) {
                     if (data.isNotEmpty()) {
                         val message = McpJsonRpc.parse(data.toString())
@@ -104,8 +111,6 @@ class McpStreamableHttpTransport(
                     if (line == null) break
                     continue
                 }
-                read += line.length
-                if (read > maxResponseChars) throw McpProtocolException("The MCP server's response is too large")
                 if (line.startsWith("data:")) {
                     if (data.isNotEmpty()) data.append('\n')
                     data.append(line.removePrefix("data:").removePrefix(" "))
@@ -116,8 +121,7 @@ class McpStreamableHttpTransport(
         // A JSON body; JSON never needs a raw newline inside a string, so lines rejoin losslessly.
         val body = StringBuilder()
         while (true) {
-            val line = channel.readUTF8Line() ?: break
-            if (body.length + line.length > maxResponseChars) throw McpProtocolException("The MCP server's response is too large")
+            val line = nextLine() ?: break
             if (body.isNotEmpty()) body.append('\n')
             body.append(line)
         }
@@ -128,7 +132,8 @@ class McpStreamableHttpTransport(
     override suspend fun close() = client.close()
 
     companion object {
-        const val MAX_RESPONSE_CHARS = 4_000_000
+        /** The most bytes of one response read, counted on the wire while reading (not characters after the fact). */
+        const val MAX_RESPONSE_BYTES = 4_000_000
 
         /** Throws [IllegalArgumentException] for an endpoint the host refuses to talk to. */
         fun requireUsableEndpoint(endpoint: String) {
