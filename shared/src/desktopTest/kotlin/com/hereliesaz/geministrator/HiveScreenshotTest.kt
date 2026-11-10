@@ -422,6 +422,13 @@ class HiveScreenshotTest {
         val two = setOf(ProviderCatalog.ANTHROPIC_ID, ProviderCatalog.OPENROUTER_ID)
         shoot("17-keeper-connections", 2400, 1500) { room(KeeperSection.Connections, false, signedIn, two)() }
         shoot("18-keeper-connections-first-run", 2400, 1500) { room(KeeperSection.Connections, false, EntireStatus(), emptySet())() }
+        // The former drifter discovery lives inside Connections, with no separate hive-edge sheet.
+        DurableUiState.store.putBoolean("keeper.connections.adding-a2a-agent", true)
+        try {
+            shoot("18b-keeper-remote-a2a", 2400, 2100) { room(KeeperSection.Connections, false, signedIn, two)() }
+        } finally {
+            DurableUiState.store.putBoolean("keeper.connections.adding-a2a-agent", false)
+        }
         shoot("19-keeper-phone-connections", 824, 1830) { room(KeeperSection.Connections, true, EntireStatus(version = "Entire CLI 0.9.2"), two)() }
         shoot("20-keeper-projects", 2400, 1500) { room(KeeperSection.Projects, false, signedIn, two)() }
         shoot("21-keeper-appearance", 2400, 1500) { room(KeeperSection.Appearance, false, signedIn, two)() }
