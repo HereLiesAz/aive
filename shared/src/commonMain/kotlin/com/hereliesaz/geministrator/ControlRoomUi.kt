@@ -874,8 +874,6 @@ private fun MainDestination(
     var showTimeline by showTimelineState
     // A live hive's Share hive card panel is open (HiveCardSharePanel).
     var sharingHiveCard by remember { mutableStateOf(false) }
-    // The hive edge's "Bring in a drifter" form is open (A2aDrifterShelf).
-    var bringingInDrifter by rememberDurableBooleanState("hive-edge.bringing-in")
     val hiveHost = LocalWorkflowLibraryHost.current
     val hiveScope = rememberCoroutineScope()
     // Stop run's confirmation: stopping cancels every unfinished creature, so it asks first.
@@ -1035,34 +1033,6 @@ private fun MainDestination(
                                     onCreated = { hive ->
                                         restingHiveId = hive.id.value
                                         inDistrict = false
-                                    },
-                                )
-                            },
-                            // Escorts to the hive's edge, where a drifter is brought in (docs/Swarm-OS.md).
-                            onImportAgent = { bringingInDrifter = true },
-                            edge = {
-                                val store = azphaltStoreService
-                                HiveEdge(
-                                    onLoadPackages = { store?.search()?.packages.orEmpty() },
-                                    onBringIn = { item ->
-                                        // Opens the Store on this package, where its install is approved.
-                                        DurableUiState.store.putString("azphalt-store.query", "")
-                                        DurableUiState.store.putString("azphalt-store.category", "All")
-                                        DurableUiState.store.putString("azphalt-store.selected-package", item.id)
-                                        onDestinationSelected(ControlRoomDestination.AddOns)
-                                    },
-                                    bringingIn = bringingInDrifter,
-                                    a2aDrifters = {
-                                        A2aDrifterShelf(
-                                            open = bringingInDrifter,
-                                            onOpenChange = { bringingInDrifter = it },
-                                            swarmRoles = swarmRoles(runtimeState),
-                                            connectedProviderIds = connectedProviderIds,
-                                            onSaveRoles = onSaveRoleCollection,
-                                            onConnectKeyless = onConnectFreeProvider,
-                                            onGiveToken = onReconfigureProvider,
-                                            onDisconnect = onDisconnectProvider,
-                                        )
                                     },
                                 )
                             },
