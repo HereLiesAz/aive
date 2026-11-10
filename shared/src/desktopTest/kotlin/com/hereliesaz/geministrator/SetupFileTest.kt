@@ -52,7 +52,7 @@ class SetupFileTest {
         }
         val targetStore = FakeSecretStore()
         val decoded = SetupFileCodec.decode(encoded, PASSPHRASE)
-        val summary = SetupFileTransfer(target, targetSettings).apply(decoded.contents)
+        val summary = SetupFileTransfer(target, targetSettings).apply(decoded.contents, decoded.secrets)
         targetStore.write(decoded.secrets)
 
         assertEquals(listOf(source.project), target.projects.all())
@@ -74,6 +74,59 @@ class SetupFileTest {
         assertEquals(secrets, targetStore.written)
         assertEquals(1, summary.projects)
         assertEquals(1, summary.definitions)
+    }
+
+    @Test
+    fun aFileCannotRedirectTheComputeRelayWhileKeepingTheExistingSecret() = runBlocking {
+        val target = InMemoryWorkflowPersistence()
+        val targetSettings = InMemorySettings()
+        val mine = """{"relayUrl":"https://mine.example.test","poolId":"p","nodeId":"n"}"""
+        targetSettings.putString(COMPUTE_KEY, mine)
+        val attacker = """{"relayUrl":"https://evil.example.test","poolId":"p","nodeId":"n"}"""
+
+        val summary = SetupFileTransfer(target, targetSettings)
+            .apply(SetupFileContents(settings = mapOf(COMPUTE_KEY to attacker)), SetupSecrets())
+
+        assertEquals(mine, targetSettings.getStringOrNull(COMPUTE_KEY))
+        assertTrue(summary.skipped.any { "evil.example.test" in it }, summary.skipped.toString())
+
+        val withOwn = SetupFileTransfer(target, targetSettings)
+            .apply(SetupFileContents(settings = mapOf(COMPUTE_KEY to attacker)), SetupSecrets(distributedComputeToken = "t"))
+        assertEquals(attacker, targetSettings.getStringOrNull(COMPUTE_KEY))
+        assertTrue(withOwn.destinationChanges.any { "mine.example.test -> https://evil.example.test" in it })
+    }
+
+    @Test
+    fun aFileCannotReplaceAPublisherPinOrMoveAnInstalledModelEndpoint() = runBlocking {
+        val targetSettings = InMemorySettings()
+        targetSettings.putString(PINS_KEY, """{"pkg.a":"mine"}""")
+        val llm = """[{"packageId":"m","version":"1","repositoryUrl":"https://r.test","name":"M","baseUrl":"https://mine.test/v1","defaultModel":"x","auth":"none"}]"""
+        targetSettings.putString(LLMS_KEY, llm)
+        val moved = llm.replace("https://mine.test/v1", "https://evil.test/v1")
+
+        val summary = SetupFileTransfer(InMemoryWorkflowPersistence(), targetSettings).apply(
+            SetupFileContents(settings = mapOf(PINS_KEY to """{"pkg.a":"evil","pkg.b":"new"}""", LLMS_KEY to moved)),
+            SetupSecrets(),
+        )
+
+        val pins = Json.parseToJsonElement(requireNotNull(targetSettings.getStringOrNull(PINS_KEY))).jsonObject
+        assertEquals("mine", (pins.getValue("pkg.a") as JsonPrimitive).content)
+        assertEquals("new", (pins.getValue("pkg.b") as JsonPrimitive).content)
+        assertTrue("https://mine.test/v1" in requireNotNull(targetSettings.getStringOrNull(LLMS_KEY)))
+        assertTrue(summary.skipped.any { "evil.test" in it })
+    }
+
+    @Test
+    fun modelsRegisteredWithAnotherDevicesFilePathAreNotImported() = runBlocking {
+        val target = InMemoryWorkflowPersistence()
+        SetupFileTransfer(target, InMemorySettings()).apply(
+            SetupFileContents(
+                inferenceRegistrations = """{"version":1,"models":[{"logicalModelId":"a","artifactPath":"/etc/passwd"},{"logicalModelId":"b"}]}""",
+            ),
+        )
+        val models = Json.parseToJsonElement(requireNotNull(target.inferenceSettings.getStringOrNull(INFERENCE_KEY)))
+            .jsonObject.getValue("models").jsonArray
+        assertEquals(1, models.size)
     }
 
     @Test
@@ -221,7 +274,10 @@ class SetupFileTest {
                         """"records":[{"note":"$INFERENCE_RECORD_MARKER"}],"providerRunBindings":[]}""",
                 )
                 val settings = InMemorySettings()
-                SETUP_SETTINGS_KEYS.forEach { key -> settings.putString(key, "value of $key") }
+                SETUP_SETTINGS_KEYS.forEach { key -> settings.putString(key, "\"value of $key\"") }
+                settings.putString(COMPUTE_KEY, COMPUTE_JSON)
+                settings.putString(PINS_KEY, """{"pkg.a":"key-a"}""")
+                settings.putString(LLMS_KEY, "[]")
                 settings.putString(MemoryLayerSettingsStore.DEFAULT_KEY, "{}")
                 settings.putString(TERRARIUM_KEY, "1.0,2.0")
                 settings.putString(UI_DRAFT_KEY, UI_DRAFT_VALUE)
@@ -231,6 +287,10 @@ class SetupFileTest {
     }
 
     private companion object {
+        const val COMPUTE_JSON = """{"relayUrl":"https://relay.example.test","poolId":"p","nodeId":"n"}"""
+        const val COMPUTE_KEY = "haive.distributed-compute.configuration.v1"
+        const val PINS_KEY = "haive.azphalt.publisher-pins.v1"
+        const val LLMS_KEY = "aive.azphalt.installed-llms.v1"
         const val PASSPHRASE = "correct horse battery staple"
         const val RUN_OBJECTIVE = "run objective that is history"
         const val INFERENCE_KEY = "haive.inference.fabric.v1"
