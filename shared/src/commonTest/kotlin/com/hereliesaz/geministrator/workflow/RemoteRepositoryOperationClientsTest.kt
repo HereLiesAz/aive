@@ -154,6 +154,40 @@ class RemoteRepositoryOperationClientsTest {
         assertTrue(routing.supports(gitLabProject()))
     }
 
+    private fun redirectingEngine(requests: MutableList<io.ktor.client.request.HttpRequestData>) = MockEngine { request ->
+        requests += request
+        respond(
+            content = "",
+            status = HttpStatusCode.Found,
+            headers = headersOf(HttpHeaders.Location, "https://evil.example/steal"),
+        )
+    }
+
+    @Test
+    fun repositoryClientsNeverFollowARedirectWithTheirToken() = runBlocking {
+        val requests = mutableListOf<io.ktor.client.request.HttpRequestData>()
+        // Whatever client is handed in, the redirect policy is the class's own.
+        val gitHub = GitHubRestRepositoryOperationClient(RepositoryServiceTokenProvider { "gh-token" }, HttpClient(redirectingEngine(requests)))
+        val gitLab = GitLabRestRepositoryOperationClient(RepositoryServiceTokenProvider { "gl-token" }, HttpClient(redirectingEngine(requests)))
+
+        runCatching { gitHub.start(githubProject(), "status") }
+        runCatching { gitLab.start(gitLabProject(), "status") }
+
+        assertTrue(requests.isNotEmpty())
+        assertTrue(requests.none { it.url.host == "evil.example" }, requests.map { it.url.toString() }.toString())
+    }
+
+    @Test
+    fun actionsClientNeverFollowsARedirectWithItsToken() = runBlocking {
+        val requests = mutableListOf<io.ktor.client.request.HttpRequestData>()
+        val client = GitHubRestActionsClient(GitHubTokenProvider { "gh-token" }, HttpClient(redirectingEngine(requests)))
+
+        runCatching { client.getRun(githubProject().repository!!, "42") }
+
+        assertTrue(requests.isNotEmpty())
+        assertTrue(requests.none { it.url.host == "evil.example" }, requests.map { it.url.toString() }.toString())
+    }
+
     private fun githubProject() = Project(
         id = ProjectId("github-project"),
         name = "GitHub",

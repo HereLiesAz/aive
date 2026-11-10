@@ -74,6 +74,7 @@ class WorkflowTraceExport(
         val durable: WorkflowTraceExport by lazy { WorkflowTraceExport(TraceExportSettingsStore()) }
 
         private fun defaultHttpClient(): HttpClient = HttpClient {
+            followRedirects = false
             install(HttpTimeout) {
                 requestTimeoutMillis = 30_000L
                 connectTimeoutMillis = 10_000L

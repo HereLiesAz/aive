@@ -62,10 +62,12 @@ class RoutingRepositoryOperationClient(
 
 class GitHubRestRepositoryOperationClient(
     private val tokenProvider: RepositoryServiceTokenProvider,
-    private val httpClient: HttpClient = defaultRepositoryHttpClient(),
+    httpClient: HttpClient = defaultRepositoryHttpClient(),
     private val baseUrl: String = "https://api.github.com",
     private val json: Json = repositoryJson,
 ) : RepositoryOperationClient {
+    // A redirect would carry the token to another host; none is followed, whatever client was given.
+    private val httpClient: HttpClient = httpClient.config { followRedirects = false }
     private val runs = RemoteRunStore()
 
     override fun supports(project: Project): Boolean =
@@ -200,9 +202,10 @@ class GitHubRestRepositoryOperationClient(
 
 class GitLabRestRepositoryOperationClient(
     private val tokenProvider: RepositoryServiceTokenProvider,
-    private val httpClient: HttpClient = defaultRepositoryHttpClient(),
+    httpClient: HttpClient = defaultRepositoryHttpClient(),
     private val json: Json = repositoryJson,
 ) : RepositoryOperationClient {
+    private val httpClient: HttpClient = httpClient.config { followRedirects = false }
     private val runs = RemoteRunStore()
 
     override fun supports(project: Project): Boolean =
@@ -456,6 +459,7 @@ private fun completedRun(
 }
 
 private fun defaultRepositoryHttpClient(): HttpClient = HttpClient {
+    followRedirects = false
     install(HttpTimeout) {
         requestTimeoutMillis = 30_000L
         connectTimeoutMillis = 10_000L

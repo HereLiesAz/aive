@@ -47,12 +47,14 @@ enum class OtlpExportOutcome {
  * retry and backoff; it is meant to run in its own coroutine, apart from the workflow engine.
  */
 class OtlpTraceExporter(
-    private val httpClient: HttpClient,
+    httpClient: HttpClient,
     private val settings: () -> TraceExportSettings,
     private val retryPolicy: OtlpRetryPolicy = OtlpRetryPolicy(),
     maxQueuedSpans: Int = DEFAULT_MAX_QUEUED_SPANS,
     private val maxBatchSpans: Int = DEFAULT_MAX_BATCH_SPANS,
 ) {
+    // The collector's headers (which may carry a key) go only where the keeper pointed them: no redirect is followed.
+    private val httpClient: HttpClient = httpClient.config { followRedirects = false }
     private val queue = Channel<OtelSpan>(maxQueuedSpans, BufferOverflow.DROP_OLDEST)
 
     fun enqueue(spans: List<OtelSpan>) {
