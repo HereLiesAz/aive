@@ -46,10 +46,10 @@ import com.hereliesaz.geministrator.resources.hive_edge_hives
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * The hive's edge (mockup H5): what the Store offers, without leaving the hive. Two tabs: drifters
- * are agents (remote A2A agents read from their Agent Card, [a2aDrifters], then the Store's "role"
- * packages); hives are the Store's workflows. Bring in opens that package's install, where its
- * permissions are approved. Breeds are sold in the Store itself (mockup B5).
+ * The hive's edge (mockup H5): two tabs, Drifters (remote A2A agents and Store roles) and
+ * Swarms (Store workflows). Adoption on the Drifters tab opens the A2A Agent Card entry;
+ * Bring in on a Store item opens that package's install for permission review.
+ * Breeds remain in the Store (mockup B5).
  */
 @Composable
 internal fun HiveEdge(
