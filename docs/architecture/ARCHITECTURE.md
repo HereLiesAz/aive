@@ -171,7 +171,7 @@ A provider may declare itself explicit-only (`AgentProvider.explicitOnly`): the 
 
 Jules was removed in 0.9.6. Credential stores delete any Jules key they still hold (`ProviderCatalog.RETIRED_PROVIDER_IDS`).
 
-New providers implement the same neutral contracts without changing workflow semantics. Provider selection is only relevant to role-agent executors; system executors do not pass through the agent-provider registry.
+Remote A2A providers are discoverable in the read-only [Agent Directory](AGENT_DIRECTORY.md) on explicit user search. The public registry supplies *leads*, not authenticated identities or auto-routable providers; the keeper must separately connect and assign one. Agent Cards are re-read at invocation with same-origin restrictions and explicit-only provider routing. New providers implement the same neutral contracts without changing workflow semantics. Provider selection is only relevant to role-agent executors; system executors do not pass through the agent-provider registry.
 
 ## Artifacts and evidence
 
