@@ -422,8 +422,11 @@ internal class AndroidAzphaltModelPackageInstaller(
             require(it.matches(Regex("[0-9a-f]{64}"))) { "Invalid model SHA-256 checksum" }
         }
 
-    private fun safeSegment(value: String): String =
-        value.replace(Regex("[^A-Za-z0-9._-]"), "_").take(180).ifBlank { "model" }
+    private fun safeSegment(value: String): String {
+        // Belt and braces behind the verifier: "." / ".." must never name a directory (remove() deletes recursively).
+        require(value.isNotBlank() && value.trim('.').isNotEmpty()) { "Unsafe model package segment" }
+        return value.replace(Regex("[^A-Za-z0-9._-]"), "_").take(180).trim('.').ifBlank { "model" }
+    }
 
     private fun safeRelativePath(value: String): String {
         val normalized = value.replace('\\', '/').trimStart('/')
