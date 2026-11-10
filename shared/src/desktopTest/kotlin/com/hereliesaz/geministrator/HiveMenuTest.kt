@@ -54,7 +54,6 @@ class HiveMenuTest {
                 onLoadDefinitions = { listOf(hive) },
                 onLoadRuns = { emptyList() },
                 onEnterNeighbourhood = { entered++ },
-                onImportAgent = {},
                 hiveDeletion = { HiveDeletionActions(check = { HiveDeleteVerdict.Allowed }, delete = { HiveDeleteVerdict.Allowed }) },
                 modifier = Modifier.fillMaxSize(),
             )
