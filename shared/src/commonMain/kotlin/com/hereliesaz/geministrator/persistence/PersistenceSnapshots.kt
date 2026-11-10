@@ -6,6 +6,7 @@ import com.hereliesaz.geministrator.domain.BlockingReason
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.haiveBuiltInRoles
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
@@ -174,6 +175,20 @@ internal fun PersistenceSnapshot.asUntrustedImport(importedAtEpochMillis: Long):
             }
         },
     )
+}
+
+/**
+ * Roles arriving in a .ive file never replace a role this device already has, and never replace a
+ * built-in id (an imported "adversarial-reviewer" would otherwise rewrite the reviewer's instructions
+ * and authorities, and the file is auto-imported on first launch). Colliding roles are quarantined
+ * (dropped, local wins); roles with fresh ids are kept but arrive disabled until a person enables them.
+ */
+internal fun quarantineImportedRoles(
+    localRoles: List<RoleDefinition>,
+    imported: List<RoleDefinition>,
+): List<RoleDefinition> {
+    val taken = localRoles.mapTo(hashSetOf()) { it.id } + haiveBuiltInRoles.map { it.id }
+    return imported.filter { it.id !in taken }.map { it.copy(enabled = false) }
 }
 
 internal const val IMPORTED_RUN_STOPPED_CODE = "imported-run-stopped"

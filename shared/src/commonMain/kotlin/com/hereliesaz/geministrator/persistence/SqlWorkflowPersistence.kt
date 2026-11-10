@@ -171,8 +171,9 @@ class SqlWorkflowPersistence(
     }
 
     override suspend fun importProjectFile(encoded: String): Project {
-        val imported = decodeProjectFile(encoded, json)
+        val decoded = decodeProjectFile(encoded, json)
         locked {
+            val imported = decoded.copy(roles = quarantineImportedRoles(snapshotUnlocked().roles, decoded.roles))
             database.transaction {
                 // Imported runs replace their own events, artifacts and gates so repeated loads are idempotent.
                 imported.runs.forEach { run ->
@@ -183,7 +184,7 @@ class SqlWorkflowPersistence(
                 writeSnapshot(imported)
             }
         }
-        return imported.projects.single()
+        return decoded.projects.single()
     }
 
     override suspend fun importJson(encoded: String) {

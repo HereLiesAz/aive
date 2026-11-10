@@ -224,7 +224,7 @@ class SettingsWorkflowPersistence(
                     values.upsert(value) { it.id == value.id }
                 },
                 events = current.events.filterNot { it.workflowRunId in importedRunIds } + imported.events,
-                roles = imported.roles.fold(current.roles) { values, value ->
+                roles = quarantineImportedRoles(current.roles, imported.roles).fold(current.roles) { values, value ->
                     values.upsert(value) { it.id == value.id }
                 },
                 artifacts = current.artifacts.filterNot { it.taskRunId in importedTaskRunIds } + imported.artifacts,
