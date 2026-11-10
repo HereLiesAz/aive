@@ -25,7 +25,7 @@ import com.hereliesaz.geministrator.a2a.DrifterTrouble
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.confirm_cancel
-import com.hereliesaz.geministrator.resources.district_import_agent
+import com.hereliesaz.geministrator.resources.hive_edge_adoption
 import com.hereliesaz.geministrator.resources.hive_edge_drifter_address
 import com.hereliesaz.geministrator.resources.hive_edge_drifter_bad_address
 import com.hereliesaz.geministrator.resources.hive_edge_drifter_explain
@@ -112,7 +112,7 @@ internal fun A2aDrifterShelf(
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         AzphaltPill(
-            label = stringResource(Res.string.district_import_agent),
+            label = stringResource(Res.string.hive_edge_adoption),
             seed = "edge-bring-in-drifter",
             selected = open,
             onClick = { onOpenChange(!open) },
