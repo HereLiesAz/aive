@@ -296,7 +296,7 @@ internal fun GeministratorWorkflowTerrarium(
                 TerrariumModeToggle(
                     building = building,
                     onBuildingChange = { building = it; flowView.value = false },
-                    flowchart = flowView.value,
+                    flowchart = flowView.value && !building,
                     onFlowchartSelected = { building = false; flowView.value = true },
                 )
             } else {
@@ -309,7 +309,7 @@ internal fun GeministratorWorkflowTerrarium(
                     TerrariumModeToggle(
                         building = building,
                         onBuildingChange = { building = it; flowView.value = false },
-                        flowchart = flowView.value,
+                        flowchart = flowView.value && !building,
                         onFlowchartSelected = { building = false; flowView.value = true },
                         segmented = true,
                     )
@@ -319,7 +319,7 @@ internal fun GeministratorWorkflowTerrarium(
             HiveControlsBar(
                 building = building,
                 onBuildingChange = { building = it; flowView.value = false },
-                flowchart = flowView.value,
+                flowchart = flowView.value && !building,
                 onFlowchartSelected = { building = false; flowView.value = true },
                 status = frame.status,
                 onStatusClick = frame.onStatusClick,
@@ -431,7 +431,7 @@ internal fun GeministratorWorkflowTerrarium(
             }
         }
 
-        val baseField: @Composable () -> Unit = if (flowView.value && !readOnly) flowField else field
+        val baseField: @Composable () -> Unit = if (flowView.value && !building && !readOnly) flowField else field
         // A long press anywhere on the swarm opens its menu (Delete hive, which asks first). It only
         // watches: a drag, a pinch or a creature's own gesture cancels it, so none of them is disturbed.
         val shownField: @Composable () -> Unit = if (hiveDeletion == null || readOnly) {
