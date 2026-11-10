@@ -29,10 +29,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.hive_view_label
-import com.hereliesaz.geministrator.resources.hive_view_creatures
-import com.hereliesaz.geministrator.resources.hive_view_flowchart
 import com.hereliesaz.geministrator.resources.flowchart_empty
-import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.pointerInput
@@ -296,7 +293,12 @@ internal fun GeministratorWorkflowTerrarium(
             // It only watches: no controls above the field.
         } else if (frame == null) {
             if (heading == null) {
-                TerrariumModeToggle(building = building, onBuildingChange = { building = it })
+                TerrariumModeToggle(
+                    building = building,
+                    onBuildingChange = { building = it; flowView.value = false },
+                    flowchart = flowView.value,
+                    onFlowchartSelected = { building = false; flowView.value = true },
+                )
             } else {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
@@ -304,13 +306,21 @@ internal fun GeministratorWorkflowTerrarium(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box(Modifier.weight(1f, fill = false).padding(end = 8.dp)) { heading() }
-                    TerrariumModeToggle(building = building, onBuildingChange = { building = it }, segmented = true)
+                    TerrariumModeToggle(
+                        building = building,
+                        onBuildingChange = { building = it; flowView.value = false },
+                        flowchart = flowView.value,
+                        onFlowchartSelected = { building = false; flowView.value = true },
+                        segmented = true,
+                    )
                 }
             }
         } else {
             HiveControlsBar(
                 building = building,
-                onBuildingChange = { building = it },
+                onBuildingChange = { building = it; flowView.value = false },
+                flowchart = flowView.value,
+                onFlowchartSelected = { building = false; flowView.value = true },
                 status = frame.status,
                 onStatusClick = frame.onStatusClick,
                 camera = camera,
@@ -321,7 +331,7 @@ internal fun GeministratorWorkflowTerrarium(
                 onRedo = redo,
             )
             // Setup, the flowchart kept simple, or Swarm, the whole swarm at once. Build always shows all of it.
-            if (!building) {
+            if (!building && !flowView.value) {
                 AzphaltThemedSurface(Azphalt.Ink) {
                     Row(Modifier.fillMaxWidth().background(Azphalt.Ink).padding(start = 8.dp, end = 8.dp, bottom = 10.dp)) {
                         SetupSwarmSwitch(
@@ -333,29 +343,7 @@ internal fun GeministratorWorkflowTerrarium(
                 }
             }
         }
-        // Any hive, resting or live, can be read as a flowchart instead of creatures: a workflow's
-        // steps and what each waits on. It shows the staged hive and the run's states, and edits nothing.
-        if (!readOnly) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                AzphaltPill(
-                    label = stringResource(Res.string.hive_view_creatures),
-                    seed = "view-creatures",
-                    selected = !flowView.value,
-                    role = Role.RadioButton,
-                    onClick = { flowView.value = false },
-                )
-                AzphaltPill(
-                    label = stringResource(Res.string.hive_view_flowchart),
-                    seed = "view-flowchart",
-                    selected = flowView.value,
-                    role = Role.RadioButton,
-                    onClick = { flowView.value = true },
-                )
-            }
-        }
+        // The single Flowchart mode shows the staged hive and run states without editing either.
         val flowField: @Composable () -> Unit = {
             WorkflowFlowchartView(
                 flow = remember(stagedDefinition, run, roles) {
