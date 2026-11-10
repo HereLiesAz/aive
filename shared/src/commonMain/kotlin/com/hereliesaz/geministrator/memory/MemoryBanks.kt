@@ -95,6 +95,11 @@ class WorkflowBankStore(
         delegate.replace(snapshot)
     }
 
+    override suspend fun replaceIfRevision(expectedRevision: Long, snapshot: MemorySnapshot): Boolean {
+        requireOwn(snapshot.episodes)
+        return delegate.replaceIfRevision(expectedRevision, snapshot)
+    }
+
     private fun requireOwn(episodes: List<MemoryEpisode>) {
         val foreign = episodes.filter { it.workflowRunId != workflowId }
         if (foreign.isNotEmpty()) {

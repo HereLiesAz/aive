@@ -428,14 +428,18 @@ class MemoryLayerController(
             val selected = rawPurgeSelection(episodes, retention, nowEpochMillis())
             if (selected.isEmpty()) return@forEach
             stores.forEach { (workflow, store) ->
-                val snapshot = store.read()
-                val mine = snapshot.episodes.map { it.id }.filter { it in selected }.toSet()
-                if (mine.isNotEmpty()) {
+                // Compare-and-set: a session banked between the read and the write forces a re-read.
+                while (true) {
+                    val snapshot = store.read()
+                    val mine = snapshot.episodes.map { it.id }.filter { it in selected }.toSet()
+                    if (mine.isEmpty()) break
                     snapshot.episodes.filter { it.id in mine }.forEach { source ->
                         eraseDerivedProcedures(workflow, source.id, source)
                     }
-                    store.replace(snapshot.purgeRaw(mine, retention, scope, nowEpochMillis()))
-                    purged += mine
+                    if (store.replaceIfRevision(snapshot.revision, snapshot.purgeRaw(mine, retention, scope, nowEpochMillis()))) {
+                        purged += mine
+                        break
+                    }
                 }
             }
         }
@@ -557,11 +561,15 @@ class MemoryLayerController(
         drainMutex.withLock {
             val store = selectedOwnStore() ?: return@withLock
             val workflow = selectedWorkflow() ?: return@withLock
-            val contextual = store.read()
-            val sourceEpisode = contextual.episodes.firstOrNull { it.id == episodeId }
-            // Remove procedure dependencies first; a crash cannot leave a runnable orphan.
-            eraseDerivedProcedures(workflow, episodeId, sourceEpisode)
-            store.replace(contextual.without(episodeId))
+            // Read, erase (suspending I/O), then commit only if nothing was deposited meanwhile; else
+            // re-read and redo, so a session banked in between is not overwritten with the stale graph.
+            while (true) {
+                val contextual = store.read()
+                val sourceEpisode = contextual.episodes.firstOrNull { it.id == episodeId }
+                // Remove procedure dependencies first; a crash cannot leave a runnable orphan.
+                eraseDerivedProcedures(workflow, episodeId, sourceEpisode)
+                if (store.replaceIfRevision(contextual.revision, contextual.without(episodeId))) break
+            }
             resetLayers()
         }
         publish()

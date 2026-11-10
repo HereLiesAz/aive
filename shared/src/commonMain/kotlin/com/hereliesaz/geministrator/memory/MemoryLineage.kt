@@ -279,6 +279,11 @@ class LineageMemoryStore(
         own.replace(snapshot)
     }
 
+    override suspend fun replaceIfRevision(expectedRevision: Long, snapshot: MemorySnapshot): Boolean {
+        requireOwnEpisodes(snapshot.episodes)
+        return own.replaceIfRevision(expectedRevision, snapshot)
+    }
+
     private fun stamp(mutation: MemoryStoreMutation, view: MemorySnapshot): MemoryStoreMutation {
         val episodes = mutation.episodesToAdd.map { if (it.workflowRunId == null) it.copy(workflowRunId = workflowId) else it }
         requireOwnEpisodes(episodes)

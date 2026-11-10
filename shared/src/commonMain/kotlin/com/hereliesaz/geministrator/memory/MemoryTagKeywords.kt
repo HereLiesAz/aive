@@ -300,4 +300,7 @@ internal class KeywordTriggeringStore(private val inner: MemoryStore, private va
         inner.replace(snapshot)
         triggers.invalidate()
     }
+
+    override suspend fun replaceIfRevision(expectedRevision: Long, snapshot: MemorySnapshot): Boolean =
+        inner.replaceIfRevision(expectedRevision, snapshot).also { ok -> if (ok) triggers.invalidate() }
 }

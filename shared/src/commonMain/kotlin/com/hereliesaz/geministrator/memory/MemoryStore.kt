@@ -22,6 +22,16 @@ interface MemoryStore {
      * remove records; ordinary consolidation is append-only.
      */
     suspend fun replace(snapshot: MemorySnapshot)
+
+    /**
+     * [replace] as a compare-and-set: installs [snapshot] only when the store is still at
+     * [expectedRevision], and stamps it with the next revision so a commit computed against the
+     * snapshot it was derived from fails instead of landing on the rewritten graph. Returns false
+     * (nothing written) when a deposit or another replace got there first; the caller re-reads and
+     * re-derives its snapshot. Forgetting and raw retention read, do suspend I/O, then write: a plain
+     * [replace] there silently dropped whatever was banked in between.
+     */
+    suspend fun replaceIfRevision(expectedRevision: Long, snapshot: MemorySnapshot): Boolean
 }
 
 class InMemoryMemoryStore(
@@ -48,6 +58,15 @@ class InMemoryMemoryStore(
             ids = MemoryIdIndex(snapshot, allowExternalReferences)
         }
     }
+
+    override suspend fun replaceIfRevision(expectedRevision: Long, snapshot: MemorySnapshot): Boolean =
+        mutex.withLock {
+            if (this.snapshot.revision != expectedRevision) return@withLock false
+            val next = snapshot.copy(revision = expectedRevision + 1)
+            this.snapshot = next
+            ids = MemoryIdIndex(next, allowExternalReferences)
+            true
+        }
 }
 
 class MemoryStoreCorruptionException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
@@ -121,6 +140,22 @@ class SettingsMemoryStore(
             ids = MemoryIdIndex(snapshot, allowExternalReferences)
         }
     }
+
+    override suspend fun replaceIfRevision(expectedRevision: Long, snapshot: MemorySnapshot): Boolean =
+        mutex.withLock {
+            if (loadUnlocked().revision != expectedRevision) return@withLock false
+            val next = snapshot.copy(revision = expectedRevision + 1)
+            try {
+                writeCompacted(next)
+            } catch (failure: Throwable) {
+                cached = null
+                ids = null
+                throw failure
+            }
+            cached = next
+            ids = MemoryIdIndex(next, allowExternalReferences)
+            true
+        }
 
     suspend fun clear() {
         mutex.withLock {

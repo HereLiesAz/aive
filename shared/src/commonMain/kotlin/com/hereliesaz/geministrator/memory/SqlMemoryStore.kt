@@ -75,6 +75,34 @@ class SqlMemoryStore(
         }
     }
 
+    override suspend fun replaceIfRevision(expectedRevision: Long, snapshot: MemorySnapshot): Boolean = mutex.withLock {
+        if (loadUnlocked().revision != expectedRevision) return@withLock false
+        val next = snapshot.copy(revision = expectedRevision + 1)
+        try {
+            database.transaction {
+                deleteAll()
+                writeMutation(
+                    MemoryStoreMutation(
+                        episodesToAdd = next.episodes,
+                        sectionsToAdd = next.sections,
+                        nodesToAdd = next.nodes,
+                        edgesToAdd = next.edges,
+                        queueUpserts = next.queue,
+                        condensationDeclinesToAdd = next.declinedCondensations,
+                    ),
+                )
+                queries.setRevision(next.revision.toString())
+            }
+        } catch (failure: Throwable) {
+            cached = null
+            ids = null
+            throw failure
+        }
+        cached = next
+        ids = MemoryIdIndex(next, allowExternalReferences)
+        true
+    }
+
     suspend fun clear() = replace(MemorySnapshot())
 
     /**

@@ -97,6 +97,33 @@ class MemoryLayerControllerTest {
         assertTrue(after.edges.all { it.from in nodeIds && it.to in nodeIds })
     }
 
+    /** A store that banks one more episode right after the first read, as a deposit landing mid-operation would. */
+    private class DepositingStore(val inner: InMemoryMemoryStore, val deposit: suspend () -> Unit) : MemoryStore {
+        var fired = true
+        override suspend fun read(): MemorySnapshot = inner.read().also {
+            if (!fired) { fired = true; deposit() }
+        }
+        override suspend fun commit(expectedRevision: Long, mutation: MemoryStoreMutation) = inner.commit(expectedRevision, mutation)
+        override suspend fun replace(snapshot: MemorySnapshot) = inner.replace(snapshot)
+        override suspend fun replaceIfRevision(expectedRevision: Long, snapshot: MemorySnapshot) =
+            inner.replaceIfRevision(expectedRevision, snapshot)
+    }
+
+    @Test
+    fun anEpisodeBankedWhileForgettingIsNotLost() = runBlocking {
+        val inner = InMemoryMemoryStore()
+        inner.bank("a", "The gradle build fails on Windows because of path length.")
+        inner.bank("b", "SettingsMemoryStore commits re-encode the whole snapshot.")
+        val depositing = DepositingStore(inner) { inner.bank("late", "A late deposit that must survive forgetting.") }
+        val controller = controller(depositing)
+        val forgotten = inner.read().episodes.first().id
+        depositing.fired = false
+        controller.forgetEpisode(forgotten)
+        val after = inner.read()
+        assertTrue(after.episodes.none { it.id == forgotten })
+        assertTrue(after.episodes.any { it.sourceSessionId == "late" }, "the deposit made during forgetting was lost")
+    }
+
     @Test
     fun exportImportRoundTripsAndClearEmpties() = runBlocking {
         val store = InMemoryMemoryStore()
