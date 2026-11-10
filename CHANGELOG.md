@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- **Hive edge labels.** The two shelves now read **Drifters** and **Swarms**; the Agent Card entry button is **Adoption**. Actions and admission checks are unchanged, and **Bring in a drifter** on the district still opens the edge.
 - **Store signature verification on Android.** Explicitly select bundled BouncyCastle to verify Ed25519-signed Azphalt packages instead of depending on Android's default JDK cryptography provider. A fixed signature vector from Azphalt guards against signing-format drift; manifest digests, signer identity and revocations are still enforced.
 - **Plain-text breadcrumbs.** A hive's breadcrumb shows its linked GitHub, GitLab or local Git repository/folder before its name. Objective-generated hives use the project's name instead of the full launch prompt. The new-hive breadcrumb is text-only too.
 - **One vertical Flowchart mode.** The workflow diagram now runs top to bottom, with arrows pointing downward. Live, Build and Flowchart sit together in the hive controls; the separate Creatures / Flowchart row and duplicate Timeline Flowchart tab are gone. Selecting Live or Build returns to the creature view.
