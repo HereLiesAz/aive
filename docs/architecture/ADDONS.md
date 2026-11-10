@@ -85,6 +85,8 @@ a failure with no message of its own is never shown as a bare generic. Cancellat
 failure. The repository publishes package size as `bytes`; `AzphaltPackageSummary.sizeInBytes` reads
 `bytes` or the older `byteSize`.
 
+Azphalt package verification checks the exact archived `manifest.json` bytes against the detached Ed25519 signature before considering publisher trust. On Android, the verifier explicitly selects the bundled BouncyCastle JDK provider (`AzphaltCryptographyProvider.android.kt`), as Android's default provider is not a portable Ed25519 implementation across the supported API levels. `AzphaltPackageRuntimeTest` checks the published independent Azphalt signature vector and rejects even a one-byte manifest change. Signature verification remains mandatory; publisher pinning and revocation checks are unchanged.
+
 On Android the Store and model downloads use Ktor's OkHttp engine (the platform TLS stack and system
 trust), not CIO's own TLS implementation, and `androidApp/proguard-rules.pro` keeps the
 kotlinx.serialization serializers, Ktor, and the `azphalt` models that release builds decode from JSON.
