@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.memory
 
+import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -62,9 +63,10 @@ data class MemoryLineageChange(val newWorkflow: Boolean, val newParents: List<St
  * in memory (tests, previews).
  */
 class MemoryLineage(
-    private val settings: Settings? = null,
+    settings: Settings? = null,
     private val key: String = "${SettingsMemoryStore.DEFAULT_STORAGE_KEY}.lineage",
 ) {
+    private val settings: Settings? = settings?.let { ChunkedStringSettings.unbounded(it) }
     private val mutex = Mutex()
     private var memoryOnly = MemoryLineageLog()
 

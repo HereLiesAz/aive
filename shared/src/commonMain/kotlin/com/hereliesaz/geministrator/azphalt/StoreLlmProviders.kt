@@ -1,5 +1,7 @@
 package com.hereliesaz.geministrator.azphalt
 
+import com.hereliesaz.geministrator.persistence.refuseIfUnreadable
+import com.hereliesaz.geministrator.persistence.readQuarantining
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -95,11 +97,12 @@ object StoreLlmProviders {
     }
 
     private fun read(): List<InstalledStoreLlm> {
-        val raw = runCatching { settings?.getStringOrNull(STORAGE_KEY) }.getOrNull() ?: return emptyList()
-        return runCatching { json.decodeFromString(serializer, raw) }.getOrDefault(emptyList())
+        val store = runCatching { settings }.getOrNull() ?: return emptyList()
+        return store.readQuarantining(STORAGE_KEY) { json.decodeFromString(serializer, it) } ?: emptyList()
     }
 
     private fun write(values: List<InstalledStoreLlm>) {
+        settings?.refuseIfUnreadable(STORAGE_KEY) { json.decodeFromString(serializer, it) }
         settings?.putString(STORAGE_KEY, json.encodeToString(serializer, values))
     }
 }

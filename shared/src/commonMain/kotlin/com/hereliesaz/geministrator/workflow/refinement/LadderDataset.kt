@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.workflow.refinement
 
+import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.hereliesaz.geministrator.control.ControlRedaction
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
@@ -178,10 +179,11 @@ class InMemoryLadderDatasetStore(
  * overwritten by the next append, so a corrupt value never blocks a run.
  */
 class SettingsLadderDatasetStore(
-    private val settings: Settings,
+    settings: Settings,
     private val key: String = KEY,
     private val capacity: Int = InMemoryLadderDatasetStore.DEFAULT_CAPACITY,
 ) : LadderDatasetStore {
+    private val settings: Settings = ChunkedStringSettings.unbounded(settings)
     private val mutex = Mutex()
 
     override suspend fun append(records: List<LadderDatasetRecord>): Int = mutex.withLock {

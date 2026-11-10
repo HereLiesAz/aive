@@ -1,5 +1,8 @@
 package com.hereliesaz.geministrator.workflow.improvement
 
+import com.hereliesaz.geministrator.persistence.refuseIfUnreadable
+import com.hereliesaz.geministrator.persistence.readQuarantining
+import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -258,9 +261,10 @@ interface ImprovementStore {
 }
 
 class SettingsImprovementStore(
-    private val settings: Settings = Settings(),
+    settings: Settings = Settings(),
     private val key: String = DEFAULT_KEY,
 ) : ImprovementStore {
+    private val settings: Settings = ChunkedStringSettings.unbounded(settings)
     private val mutex = Mutex()
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
@@ -287,11 +291,11 @@ class SettingsImprovementStore(
         if (next != now) write(next.copy(proposals = ProposalRetention.bound(next.proposals)))
     }
 
-    private fun read(): ImprovementState = settings.getStringOrNull(key)
-        ?.let { runCatching { json.decodeFromString(ImprovementState.serializer(), it) }.getOrNull() }
-        ?: ImprovementState()
+    private fun read(): ImprovementState =
+        settings.readQuarantining(key) { json.decodeFromString(ImprovementState.serializer(), it) } ?: ImprovementState()
 
     private fun write(state: ImprovementState) {
+        settings.refuseIfUnreadable(key) { json.decodeFromString(ImprovementState.serializer(), it) }
         settings.putString(key, json.encodeToString(ImprovementState.serializer(), state))
     }
 

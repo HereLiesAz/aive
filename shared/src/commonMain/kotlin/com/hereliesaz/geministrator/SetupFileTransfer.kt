@@ -7,6 +7,7 @@ import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
 import com.hereliesaz.geministrator.persistence.migrate
 import com.russhwolf.settings.Settings
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -39,6 +40,10 @@ data class SetupImportSummary(
     val repositories: Int,
     val computeToken: Boolean,
     val remoteRelay: Boolean,
+    /** Settings the file carried that were not imported, each with the reason. */
+    val skipped: List<String> = emptyList(),
+    /** Network destinations the import changed (old to new), shown so a changed relay or endpoint is seen. */
+    val destinationChanges: List<String> = emptyList(),
 )
 
 /**
@@ -71,7 +76,7 @@ class SetupFileTransfer(
      * Validates everything first (schema migration, inference JSON), then writes. A file that fails
      * validation writes nothing.
      */
-    suspend fun apply(contents: SetupFileContents): SetupImportSummary {
+    suspend fun apply(contents: SetupFileContents, secrets: SetupSecrets = SetupSecrets()): SetupImportSummary {
         if (contents.workflowSchemaVersion > SettingsWorkflowPersistence.CURRENT_SCHEMA_VERSION) {
             throw SetupFileException(
                 SetupFileFailure.UnsupportedVersion,
@@ -86,10 +91,31 @@ class SetupFileTransfer(
                 roles = contents.roles,
             ),
         )
-        val importedSettings = contents.settings.filterKeys(::isSetupSettingsKey)
+        // Every setting is checked against what its owning store accepts. A file is untrusted: it must not
+        // point a credentialed destination somewhere new, replace trust anchors, or install another
+        // device's absolute model paths.
+        val skipped = mutableListOf<String>()
+        val destinationChanges = mutableListOf<String>()
+        val importedSettings = linkedMapOf<String, String>()
+        contents.settings.filterKeys(::isSetupSettingsKey).forEach { (key, value) ->
+            val vetted = vetSetting(key, value, secrets, skipped, destinationChanges)
+            if (vetted != null) importedSettings[key] = vetted
+        }
         val importedInference = contents.inferenceRegistrations?.let { raw ->
             runCatching { inferenceRegistrationsOf(json.parseToJsonElement(raw).jsonObject) }.getOrElse { failure ->
                 throw SetupFileException(SetupFileFailure.NotASetupFile, "Setup file inference data is unreadable: ${failure.detail()}", failure)
+            }
+        }?.let { registrations ->
+            val models = (registrations["models"] as? JsonArray).orEmpty()
+            val local = models.filter { model ->
+                val path = (model as? JsonObject)?.get("artifactPath")
+                path != null && path !is kotlinx.serialization.json.JsonNull
+            }
+            if (local.isEmpty()) {
+                registrations
+            } else {
+                skipped += "${local.size} registered model(s) pointing at file paths on the other device were not imported."
+                JsonObject(registrations + ("models" to JsonArray(models.filterNot { it in local })))
             }
         }
 
@@ -110,7 +136,110 @@ class SetupFileTransfer(
             repositories = 0,
             computeToken = false,
             remoteRelay = false,
+            skipped = skipped,
+            destinationChanges = destinationChanges,
         )
+    }
+
+    /** The value to write for [key], or null (with a reason in [skipped]) when it must not be imported. */
+    private fun vetSetting(
+        key: String,
+        value: String,
+        secrets: SetupSecrets,
+        skipped: MutableList<String>,
+        destinationChanges: MutableList<String>,
+    ): String? {
+        fun skip(reason: String): String? {
+            skipped += "$key: $reason"
+            return null
+        }
+        return when {
+            key.startsWith(TERRARIUM_LAYOUT_PREFIX) ->
+                value.takeIf { v -> v.contains(',') && v.split(',', limit = 3).take(2).all { it.toFloatOrNull() != null } }
+                    ?: skip("not a layout position")
+            key == GROUND_KEY -> value.takeIf { it.length <= 64 && it.none(Char::isISOControl) } ?: skip("not a theme value")
+            key == MemoryLayerSettingsStore.DEFAULT_KEY ->
+                value.takeIf { runCatching { json.decodeFromString(MemoryLayerSettings.serializer(), it) }.isSuccess }
+                    ?: skip("unreadable memory settings")
+            key == COMPUTE_KEY -> vetComputeConfiguration(value, secrets, skipped, destinationChanges)
+            key == PINS_KEY -> mergePins(value) ?: skip("unreadable publisher pins")
+            key == com.hereliesaz.geministrator.azphalt.StoreLlmProviders.STORAGE_KEY ->
+                mergeInstalledLlms(value, skipped, destinationChanges) ?: skip("unreadable installed language models")
+            else -> value.takeIf { runCatching { json.parseToJsonElement(it) }.isSuccess } ?: skip("not valid JSON")
+        }
+    }
+
+    private fun vetComputeConfiguration(
+        value: String,
+        secrets: SetupSecrets,
+        skipped: MutableList<String>,
+        destinationChanges: MutableList<String>,
+    ): String? {
+        val serializer = com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration.serializer()
+        val incoming = runCatching { json.decodeFromString(serializer, value) }.getOrNull()
+        if (incoming == null) {
+            skipped += "$COMPUTE_KEY: unreadable compute settings"
+            return null
+        }
+        val current = settings.getStringOrNull(COMPUTE_KEY)?.let { runCatching { json.decodeFromString(serializer, it) }.getOrNull() }
+        if (incoming.relayUrl.isNotBlank() && !com.hereliesaz.geministrator.net.CleartextPolicy.allowsSecret(incoming.relayUrl)) {
+            skipped += "$COMPUTE_KEY: the compute relay must be https://"
+            return null
+        }
+        val moves = incoming.relayUrl.isNotBlank() && incoming.relayUrl != current?.relayUrl
+        // The pool token is sent to the relay. A relay from a file applies only together with the token the
+        // same file carries, so a token already on this device is never sent to a destination a file chose.
+        if (moves && secrets.distributedComputeToken == null) {
+            skipped += "$COMPUTE_KEY: the file moves the compute relay to ${incoming.relayUrl} without a compute token of its own, so your existing token stays with the relay it was set up for."
+            return null
+        }
+        if (moves) {
+            destinationChanges += "Compute relay: ${current?.relayUrl?.ifBlank { null } ?: "(none)"} -> ${incoming.relayUrl}"
+        }
+        return value
+    }
+
+    private fun mergePins(value: String): String? {
+        val serializer = kotlinx.serialization.builtins.MapSerializer(
+            String.serializer(),
+            String.serializer(),
+        )
+        val incoming = runCatching { json.decodeFromString(serializer, value) }.getOrNull() ?: return null
+        val existing = settings.getStringOrNull(PINS_KEY)
+            ?.let { runCatching { json.decodeFromString(serializer, it) }.getOrNull() }
+            .orEmpty()
+        // A pin is a trust anchor: a file may add pins for packages not pinned here, never replace one.
+        return json.encodeToString(serializer, incoming.filterValues(String::isNotBlank) + existing)
+    }
+
+    private fun mergeInstalledLlms(
+        value: String,
+        skipped: MutableList<String>,
+        destinationChanges: MutableList<String>,
+    ): String? {
+        val serializer = kotlinx.serialization.builtins.ListSerializer(com.hereliesaz.geministrator.azphalt.InstalledStoreLlm.serializer())
+        val incoming = runCatching { json.decodeFromString(serializer, value) }.getOrNull() ?: return null
+        val existing = settings.getStringOrNull(com.hereliesaz.geministrator.azphalt.StoreLlmProviders.STORAGE_KEY)
+            ?.let { runCatching { json.decodeFromString(serializer, it) }.getOrNull() }
+            .orEmpty()
+        val accepted = incoming.filter { entry ->
+            val local = existing.firstOrNull { it.packageId == entry.packageId }
+            when {
+                !com.hereliesaz.geministrator.net.CleartextPolicy.allowsSecret(entry.baseUrl) -> {
+                    skipped += "installed model ${entry.packageId}: its endpoint must be https://"
+                    false
+                }
+                local != null && local.baseUrl != entry.baseUrl -> {
+                    skipped += "installed model ${entry.packageId}: the file would move its endpoint from ${local.baseUrl} to ${entry.baseUrl}"
+                    false
+                }
+                else -> true
+            }
+        }
+        accepted.filter { entry -> existing.none { it.packageId == entry.packageId } }
+            .forEach { destinationChanges += "Language model endpoint added: ${it.packageId} -> ${it.baseUrl}" }
+        val kept = existing.filterNot { old -> accepted.any { it.packageId == old.packageId } }
+        return json.encodeToString(serializer, (kept + accepted).sortedBy { it.packageId })
     }
 
     private fun mergeInferenceRegistrations(imported: JsonObject) {
@@ -147,6 +276,8 @@ class SetupFileTransfer(
 }
 
 private const val GROUND_KEY = "aive.appearance.ground.v1"
+private const val PINS_KEY = "haive.azphalt.publisher-pins.v1"
+private const val COMPUTE_KEY = "haive.distributed-compute.configuration.v1"
 private const val INFERENCE_STATE_KEY = "haive.inference.fabric.v1"
 private const val TERRARIUM_LAYOUT_PREFIX = "haive.terrarium.layout.v1."
 
@@ -215,8 +346,8 @@ internal suspend fun importSetupFile(
     val decoded = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
         SetupFileCodec.decode(encoded, passphrase)
     }
-    val summary = SetupFileTransfer(persistence).apply(decoded.contents)
     val secrets = decoded.secrets
+    val summary = SetupFileTransfer(persistence).apply(decoded.contents, secrets)
     secretStore?.write(secrets)
     decoded.contents.crashReportingEnabled?.let { onCrashReportingChange?.invoke(it) }
     SetupFileTransfer.importedMemorySettings(decoded.contents)?.let { imported ->

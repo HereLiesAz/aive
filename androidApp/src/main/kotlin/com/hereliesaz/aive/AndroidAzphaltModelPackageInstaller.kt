@@ -422,8 +422,11 @@ internal class AndroidAzphaltModelPackageInstaller(
             require(it.matches(Regex("[0-9a-f]{64}"))) { "Invalid model SHA-256 checksum" }
         }
 
-    private fun safeSegment(value: String): String =
-        value.replace(Regex("[^A-Za-z0-9._-]"), "_").take(180).ifBlank { "model" }
+    private fun safeSegment(value: String): String {
+        // Belt and braces behind the verifier: "." / ".." must never name a directory (remove() deletes recursively).
+        require(value.isNotBlank() && value.trim('.').isNotEmpty()) { "Unsafe model package segment" }
+        return value.replace(Regex("[^A-Za-z0-9._-]"), "_").take(180).trim('.').ifBlank { "model" }
+    }
 
     private fun safeRelativePath(value: String): String {
         val normalized = value.replace('\\', '/').trimStart('/')
@@ -438,10 +441,25 @@ internal class AndroidAzphaltModelPackageInstaller(
         val encoded = prefs.getString(PREFS_KEY, null) ?: return emptyList()
         return runCatching {
             json.decodeFromString(ListSerializer(InstalledAzphaltModelPackage.serializer()), encoded)
-        }.getOrElse { emptyList() }
+        }.getOrElse {
+            // Keep the unreadable record: treating it as empty and overwriting it would orphan every installed model.
+            prefs.edit().putString("$PREFS_KEY.corrupt", encoded).commit()
+            emptyList()
+        }
     }
 
-    private fun writeInstalled(value: List<InstalledAzphaltModelPackage>): Boolean =
+    private fun writeInstalled(value: List<InstalledAzphaltModelPackage>): Boolean {
+        val existing = prefs.getString(PREFS_KEY, null)
+        if (existing != null && runCatching {
+                json.decodeFromString(ListSerializer(InstalledAzphaltModelPackage.serializer()), existing)
+            }.isFailure
+        ) {
+            return false
+        }
+        return writeInstalledUnchecked(value)
+    }
+
+    private fun writeInstalledUnchecked(value: List<InstalledAzphaltModelPackage>): Boolean =
         prefs.edit().putString(
             PREFS_KEY,
             json.encodeToString(ListSerializer(InstalledAzphaltModelPackage.serializer()), value),

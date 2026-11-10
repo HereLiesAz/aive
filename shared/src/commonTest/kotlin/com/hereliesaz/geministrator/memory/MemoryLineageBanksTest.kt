@@ -261,6 +261,37 @@ class MemoryLineageBanksTest {
         assertEquals(revisions, banks.known().associateWith { banks.store(it).read().revision })
     }
 
+    @Test
+    fun aSplitInterruptedBeforeItsReportDoesNotWipeWhatWasBankedSinceOnTheRerun() = runBlocking<Unit> {
+        val legacyStore = InMemoryMemoryStore(
+            MemorySnapshot(revision = 3, episodes = listOf(episode("a", "wa")), nodes = listOf(node("a", "Alpha."))),
+        )
+        val stores = HashMap<String, MemoryStore>()
+        var failRecord = true
+        val registry = object : MemoryBankRegistry {
+            private val inner = InMemoryMemoryBankRegistry()
+            override suspend fun known() = inner.known()
+            override suspend fun add(workflowId: String) = inner.add(workflowId)
+            override suspend fun migrationReport() = inner.migrationReport()
+            override suspend fun recordMigration(report: MemoryBankMigrationReport) {
+                if (failRecord) throw IllegalStateException("killed before the marker was written")
+                inner.recordMigration(report)
+            }
+        }
+        val banks = MemoryBanks({ key -> stores.getOrPut(key) { InMemoryMemoryStore(allowExternalReferences = true) } }, registry)
+        val lineage = MemoryLineage()
+        runCatching { migrateSharedMemoryToBanks(legacyStore, banks, lineage) }
+        // The app ran after the interrupted split and banked a later session.
+        val bank = banks.store("wa")
+        val later = episode("later", "wa", at = 9L)
+        bank.replace(bank.read().copy(episodes = bank.read().episodes + later))
+
+        failRecord = false
+        assertNotNull(migrateSharedMemoryToBanks(legacyStore, banks, lineage))
+
+        assertEquals(setOf("e-a", "e-later"), banks.store("wa").read().episodes.map { it.id.value }.toSet())
+    }
+
     // ---- the /deliberate session command -------------------------------------------------------
 
     @Test

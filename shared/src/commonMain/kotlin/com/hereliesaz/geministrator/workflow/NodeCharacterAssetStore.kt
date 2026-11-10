@@ -1,5 +1,7 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.persistence.refuseIfUnreadable
+import com.hereliesaz.geministrator.persistence.readQuarantining
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
@@ -64,13 +66,15 @@ class SettingsNodeCharacterAssetStore(
     }
 
     private fun readUnlocked(): List<NodeCharacterAssetRecord> {
-        val encoded = settings.getStringOrNull(storageKey) ?: return emptyList()
-        return runCatching {
-            json.decodeFromString(ListSerializer(NodeCharacterAssetRecord.serializer()), encoded)
-        }.getOrElse { emptyList() }
+        return settings.readQuarantining(storageKey) {
+            json.decodeFromString(ListSerializer(NodeCharacterAssetRecord.serializer()), it)
+        } ?: emptyList()
     }
 
     private fun writeUnlocked(records: List<NodeCharacterAssetRecord>) {
+        settings.refuseIfUnreadable(storageKey) {
+            json.decodeFromString(ListSerializer(NodeCharacterAssetRecord.serializer()), it)
+        }
         if (records.isEmpty()) {
             settings.remove(storageKey)
         } else {

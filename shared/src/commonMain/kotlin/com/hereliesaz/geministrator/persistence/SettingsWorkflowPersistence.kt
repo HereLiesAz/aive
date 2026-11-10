@@ -206,12 +206,6 @@ class SettingsWorkflowPersistence(
                 .flatMap { it.taskRuns.values }
                 .mapTo(linkedSetOf()) { it.id }
 
-            // Imported runs replace their own journal so repeated loads are idempotent.
-            importedRunIds.forEach { runId ->
-                val prefix = eventRunPrefix(runId)
-                settings.keys.filter { it.startsWith(prefix) }.forEach(settings::remove)
-            }
-
             val merged = current.copy(
                 version = CURRENT_SCHEMA_VERSION,
                 projects = imported.projects.fold(current.projects) { values, value ->
@@ -224,14 +218,20 @@ class SettingsWorkflowPersistence(
                     values.upsert(value) { it.id == value.id }
                 },
                 events = current.events.filterNot { it.workflowRunId in importedRunIds } + imported.events,
-                roles = imported.roles.fold(current.roles) { values, value ->
+                roles = quarantineImportedRoles(current.roles, imported.roles).fold(current.roles) { values, value ->
                     values.upsert(value) { it.id == value.id }
                 },
                 artifacts = current.artifacts.filterNot { it.taskRunId in importedTaskRunIds } + imported.artifacts,
                 approvalGates = current.approvalGates.filterNot { it.workflowRunId in importedRunIds } +
                     imported.approvalGates,
             )
+            // Write the new snapshot first: if it fails the existing journals are still intact. Imported
+            // runs then replace their own journal so repeated loads are idempotent.
             writeSnapshotUnlocked(merged)
+            importedRunIds.forEach { runId ->
+                val prefix = eventRunPrefix(runId)
+                settings.keys.filter { it.startsWith(prefix) }.forEach(settings::remove)
+            }
         }
         return project
     }
@@ -239,11 +239,12 @@ class SettingsWorkflowPersistence(
     override suspend fun importJson(encoded: String) {
         val migrated = decodeImportSnapshot(encoded, json)
         settingsWorkflowPersistenceMutex.withLock {
-            // Clear existing per-run journal entries before restoring to prevent event mixing.
+            // Restore first, then clear the old per-run journals (prevents event mixing without risking
+            // the only copy of the events if the restore write fails).
+            writeSnapshotUnlocked(migrated)
             settings.keys
                 .filter { it.startsWith(eventJournalRoot()) }
                 .forEach(settings::remove)
-            writeSnapshotUnlocked(migrated)
         }
     }
 

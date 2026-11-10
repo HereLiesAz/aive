@@ -1,5 +1,8 @@
 package com.hereliesaz.geministrator.memory
 
+import com.hereliesaz.geministrator.persistence.refuseIfUnreadable
+import com.hereliesaz.geministrator.persistence.readQuarantining
+import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -157,9 +160,10 @@ class InMemoryMemoryBankRegistry(initial: Set<String> = emptySet()) : MemoryBank
 }
 
 class SettingsMemoryBankRegistry(
-    private val settings: Settings,
+    settings: Settings,
     private val key: String = "${SettingsMemoryStore.DEFAULT_STORAGE_KEY}.banks",
 ) : MemoryBankRegistry {
+    private val settings: Settings = ChunkedStringSettings.unbounded(settings)
     private val mutex = Mutex()
     private val serializer = ListSerializer(String.serializer())
 
@@ -170,6 +174,7 @@ class SettingsMemoryBankRegistry(
             val current = load()
             val key = memoryBankKey(workflowId) ?: return@withLock
             if (key in current) return@withLock
+            settings.refuseIfUnreadable(this.key) { SettingsMemoryStore.defaultJson.decodeFromString(serializer, it) }
             settings.putString(this.key, SettingsMemoryStore.defaultJson.encodeToString(serializer, (current + key).toList()))
         }
     }
@@ -186,10 +191,10 @@ class SettingsMemoryBankRegistry(
         }
     }
 
-    private fun load(): Set<String> = settings.getStringOrNull(key)
-        ?.let { runCatching { SettingsMemoryStore.defaultJson.decodeFromString(serializer, it) }.getOrNull() }
-        .orEmpty()
-        .mapNotNullTo(linkedSetOf(), ::memoryBankKey)
+    private fun load(): Set<String> =
+        settings.readQuarantining(key) { SettingsMemoryStore.defaultJson.decodeFromString(serializer, it) }
+            .orEmpty()
+            .mapNotNullTo(linkedSetOf(), ::memoryBankKey)
 }
 
 // ---- one-time split of the old shared store -------------------------------------------------------
@@ -345,19 +350,37 @@ suspend fun migrateSharedMemoryToBanks(legacy: MemoryStore, banks: MemoryBanks, 
     split.banks.forEach { (bank, part) ->
         lineage.registerWorkflow(bank, split.projects[bank], atEpochMillis = part.episodes.minOfOrNull { it.createdAtEpochMillis } ?: 0L)
         val store = banks.store(bank)
-        if (!store.read().sameContent(part)) store.replace(part)
+        // A first launch killed before the report was recorded leaves live banks behind; a re-run must add
+        // only what is missing, never replace a bank with the older split and lose what was banked since.
+        val existing = store.read()
+        if (!existing.containsContent(part)) store.replace(existing.withMissingFrom(part))
     }
     split.banks.forEach { (bank, part) ->
-        check(banks.store(bank).read().sameContent(part)) { "Memory bank of workflow $bank did not verify after the split" }
+        check(banks.store(bank).read().containsContent(part)) { "Memory bank of workflow $bank did not verify after the split" }
     }
     banks.migrationState.recordMigration(split.report)
     return split.report
 }
 
-private fun MemorySnapshot.sameContent(other: MemorySnapshot): Boolean =
-    episodes.map { it.id }.toSet() == other.episodes.map { it.id }.toSet() &&
-        sections.map { it.id }.toSet() == other.sections.map { it.id }.toSet() &&
-        nodes.map { it.id }.toSet() == other.nodes.map { it.id }.toSet() &&
-        edges.map { it.id }.toSet() == other.edges.map { it.id }.toSet() &&
-        queue.toSet() == other.queue.toSet() &&
-        declinedCondensations.toSet() == other.declinedCondensations.toSet()
+private fun MemorySnapshot.containsContent(other: MemorySnapshot): Boolean =
+    episodes.map { it.id }.toSet().containsAll(other.episodes.map { it.id }) &&
+        sections.map { it.id }.toSet().containsAll(other.sections.map { it.id }) &&
+        nodes.map { it.id }.toSet().containsAll(other.nodes.map { it.id }) &&
+        edges.map { it.id }.toSet().containsAll(other.edges.map { it.id }) &&
+        queue.toSet().containsAll(other.queue) &&
+        declinedCondensations.toSet().containsAll(other.declinedCondensations)
+
+private fun MemorySnapshot.withMissingFrom(other: MemorySnapshot): MemorySnapshot {
+    val episodeIds = episodes.mapTo(hashSetOf()) { it.id }
+    val sectionIds = sections.mapTo(hashSetOf()) { it.id }
+    val nodeIds = nodes.mapTo(hashSetOf()) { it.id }
+    val edgeIds = edges.mapTo(hashSetOf()) { it.id }
+    return copy(
+        episodes = episodes + other.episodes.filter { it.id !in episodeIds },
+        sections = sections + other.sections.filter { it.id !in sectionIds },
+        nodes = nodes + other.nodes.filter { it.id !in nodeIds },
+        edges = edges + other.edges.filter { it.id !in edgeIds },
+        queue = queue + other.queue.filter { it !in queue },
+        declinedCondensations = declinedCondensations + other.declinedCondensations.filter { it !in declinedCondensations },
+    )
+}

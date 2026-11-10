@@ -220,4 +220,6 @@ private suspend fun setupSummaryText(summary: SetupImportSummary): String = buil
     )
     if (summary.computeToken) append("\n").append(getString(Res.string.settings_setup_imported_compute))
     if (summary.remoteRelay) append("\n").append(getString(Res.string.settings_setup_imported_relay))
+    summary.destinationChanges.forEach { append("\n").append(it) }
+    summary.skipped.forEach { append("\nNot imported: ").append(it) }
 }

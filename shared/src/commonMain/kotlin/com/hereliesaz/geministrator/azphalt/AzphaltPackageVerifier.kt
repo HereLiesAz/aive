@@ -107,6 +107,9 @@ class AzphaltPackageVerifier(
         } catch (failure: Exception) {
             throw IllegalArgumentException("azp: manifest.json is not valid Azphalt JSON: ${failure.message}", failure)
         }
+        // Ids and versions become directory names on some hosts ("..", "a/b"); reject on the shared repository grammar.
+        AzphaltRepositoryClient.requirePackageId(manifest.id)
+        AzphaltRepositoryClient.requireVersion(manifest.version)
         require(manifest.files.isNotEmpty()) { "azp: manifest.files is missing or empty" }
 
         val payload = entries.filterKeys { it != "manifest.json" && it != "signature.json" }
