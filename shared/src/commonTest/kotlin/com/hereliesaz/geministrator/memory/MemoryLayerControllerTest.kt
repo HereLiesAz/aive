@@ -154,6 +154,36 @@ class MemoryLayerControllerTest {
     }
 
     @Test
+    fun forgettingAnEpisodeAlsoDropsACondensedTextThatRestatesIt() {
+        val a = MemoryEpisodeId("a")
+        val b = MemoryEpisodeId("b")
+        fun node(id: String, text: String, vararg episodes: MemoryEpisodeId) =
+            MemoryNode(MemoryNodeId(id), MemoryNodeKind.Context, text, sourceEpisodeIds = episodes.toSet(), createdAtEpochMillis = 1L)
+        fun edge(from: String, to: String, relation: MemoryRelationKind) =
+            MemoryEdge(MemoryEdgeId("$from-$to-$relation"), MemoryNodeId(from), MemoryNodeId(to), relation, createdAtEpochMillis = 1L)
+        val snapshot = MemorySnapshot(
+            nodes = listOf(
+                node("a1", "The staging host is zebra-17.", a),
+                node("b1", "Deploys run from the main branch.", b),
+                node("m", "Deploys run from main and the staging host is zebra-17.", a, b),
+            ),
+            edges = listOf(
+                edge("m", "a1", MemoryRelationKind.CondensedFrom),
+                edge("m", "b1", MemoryRelationKind.CondensedFrom),
+                edge("m", "a1", MemoryRelationKind.Supersedes),
+                edge("m", "b1", MemoryRelationKind.Supersedes),
+            ),
+        )
+
+        val after = snapshot.without(a)
+
+        assertTrue(after.nodes.none { "zebra-17" in it.text }, after.nodes.joinToString { it.text })
+        // The surviving source is current again: nothing supersedes it any more.
+        assertEquals(listOf("b1"), after.nodes.map { it.id.value })
+        assertTrue(after.edges.isEmpty())
+    }
+
+    @Test
     fun exportImportRoundTripsAndClearEmpties() = runBlocking {
         val store = InMemoryMemoryStore()
         store.bank("a", "Memory export must round-trip exactly.")

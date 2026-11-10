@@ -1466,14 +1466,28 @@ internal fun MemorySnapshot.nextWorkable(policy: MemoryConsolidationPolicy): Mem
 fun MemorySnapshot.parked(policy: MemoryConsolidationPolicy): List<MemoryQueueEntry> =
     queue.filter { it.status == MemoryQueueStatus.Failed && it.attempt >= policy.maxAttempts }
 
-/** The graph without [episodeId] and anything derived only from it. */
+private val RESTATING_KINDS = setOf(
+    MemoryNodeKind.Context,
+    MemoryNodeKind.Summary,
+    MemoryNodeKind.Category,
+    MemoryNodeKind.PairSummary,
+)
+
+/**
+ * The graph without [episodeId] and anything derived from it: memories only from it, and memories whose
+ * text merges it with other episodes (they may restate it, so they cannot be kept merely re-attributed).
+ */
 internal fun MemorySnapshot.without(episodeId: MemoryEpisodeId): MemorySnapshot {
     val sections = sections.filter { it.episodeId != episodeId }
     val sectionIds = sections.mapTo(hashSetOf()) { it.id }
     val nodes = nodes.mapNotNull { node ->
         if (episodeId !in node.sourceEpisodeIds) return@mapNotNull node
         val remaining = node.sourceEpisodeIds - episodeId
-        if (remaining.isEmpty()) null else node.copy(
+        // A text drawn from several episodes (a condensed memory, a summary) may restate the forgotten
+        // one in its own words, so dropping the id from its provenance would leave the content behind.
+        // It goes; its other sources (kept through CondensedFrom) stay and, with their Supersedes edges
+        // gone, are current again. Tags and register entries are single words/frames, not restatements.
+        if (remaining.isEmpty() || node.kind in RESTATING_KINDS) null else node.copy(
             sourceEpisodeIds = remaining,
             sourceSectionIds = node.sourceSectionIds.filterTo(linkedSetOf()) { it in sectionIds },
         )
