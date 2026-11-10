@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hereliesaz.geministrator.a2a.A2aDrifters
 
-/** The creature a thing at the edge is drawn as: the same one every time for the same [key]. */
+/** Stable Store-offer creature selection: the same package key always maps to the same rig. */
 internal fun edgeCreatureFor(key: String): String = A2aDrifters.creatureFor(key)
 
 /** A row's name, bold. */
