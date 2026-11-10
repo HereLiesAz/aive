@@ -137,6 +137,9 @@ internal class AgentDirectory(
         val query = rawQuery.trim().take(MAX_QUERY_CHARS)
         if (query.length < 2) return AgentDirectoryResults(emptyList(), emptyList())
         val found = linkedMapOf<String, AgentDirectoryEntry>()
+        // Keep connected status independently of search relevance: a registry may match an
+        // already-connected agent by a skill that its saved local record does not contain.
+        val connectedByUrl = A2aAgentConnections.all().associateBy { it.cardUrl }
         val unavailable = mutableListOf<String>()
         for (source in sources) {
             val entries = try {
@@ -158,7 +161,8 @@ internal class AgentDirectory(
                 val existing = found[url]
                 found[url] = entry.copy(
                     cardUrl = url,
-                    connectedProviderId = existing?.connectedProviderId ?: entry.connectedProviderId,
+                    connectedProviderId = connectedByUrl[url]?.providerId
+                        ?: existing?.connectedProviderId ?: entry.connectedProviderId,
                 )
             }
         }
