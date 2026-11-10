@@ -649,6 +649,7 @@ internal fun ProviderSettingsScreen(
         val directory = remember { AgentDirectory() }
         var directoryQuery by remember { mutableStateOf("") }
         var directorySearching by remember { mutableStateOf(false) }
+        var directoryRevision by remember { mutableStateOf(0) }
         var directoryResults by remember { mutableStateOf<AgentDirectoryResults?>(null) }
         val dismissedSeeds by A2aDrifterSeeds.dismissed.collectAsState()
         val suggestions = remember(a2aAgents, dismissedSeeds) { A2aDrifterSeeds.pending(a2aAgents) }
@@ -681,6 +682,8 @@ internal fun ProviderSettingsScreen(
                 value = directoryQuery,
                 onValueChange = {
                     directoryQuery = it
+                    directoryRevision++
+                    directorySearching = false
                     directoryResults = null
                 },
                 label = stringResource(Res.string.keeper_agent_directory_query),
@@ -694,11 +697,15 @@ internal fun ProviderSettingsScreen(
                     if (!directorySearching && directoryQuery.trim().length >= 2) {
                         directorySearching = true
                         val query = directoryQuery
+                        val revision = ++directoryRevision
                         scope.launch {
                             try {
-                                directoryResults = directory.search(query)
+                                val results = directory.search(query)
+                                if (directoryRevision == revision && directoryQuery == query) {
+                                    directoryResults = results
+                                }
                             } finally {
-                                directorySearching = false
+                                if (directoryRevision == revision) directorySearching = false
                             }
                         }
                     }
