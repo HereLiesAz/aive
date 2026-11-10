@@ -6,6 +6,7 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.Url
 import io.ktor.http.headersOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
@@ -64,10 +65,12 @@ class AgentDirectoryTest {
         try {
             val result = PublicA2aRegistrySource(client).search("GDP and jobs")
             assertEquals(1, requested.size)
-            assertEquals(
-                "https://a2aregistry.org/api/agents?search=GDP+and+jobs&limit=20&offset=0",
-                requested.single(),
-            )
+            val requestUrl = Url(requested.single())
+            assertEquals("a2aregistry.org", requestUrl.host)
+            assertEquals("/api/agents", requestUrl.encodedPath)
+            assertEquals("GDP and jobs", requestUrl.parameters["search"])
+            assertEquals("20", requestUrl.parameters["limit"])
+            assertEquals("0", requestUrl.parameters["offset"])
             assertEquals(1, result.size)
             val lead = result.single()
             assertEquals("https://data.example.org/.well-known/agent-card.json", lead.cardUrl)
@@ -161,7 +164,8 @@ class AgentDirectoryTest {
         assertTrue(first.any { it.cardUrl == seed.cardUrl })
         A2aDrifterSeeds.dismiss(seed.cardUrl)
         assertFalse(LocalAgentDirectorySource.search("world").any { it.cardUrl == seed.cardUrl })
-        A2aAgentConnections.add(seed.cardUrl)
-        assertTrue(LocalAgentDirectorySource.search("world").any { it.connectedProviderId != null })
+        val connected = A2aAgentConnections.add(seed.cardUrl)
+        A2aAgentConnections.rename(connected.providerId, seed.name)
+        assertTrue(LocalAgentDirectorySource.search("world").any { it.connectedProviderId == connected.providerId })
     }
 }
