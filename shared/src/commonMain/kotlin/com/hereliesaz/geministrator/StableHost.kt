@@ -90,6 +90,13 @@ internal class StableHost(private val store: DurableUiStateStore = DurableUiStat
     private fun update(next: Stable) {
         if (next == stable) return
         stable = next
+        store.getString(KEY)?.let { raw ->
+            runCatching { json.decodeFromString(Stable.serializer(), raw) }.onFailure {
+                // Keep the unreadable stable; do not overwrite it with a reset one.
+                store.putString("$KEY.corrupt", raw)
+                return
+            }
+        }
         store.putString(KEY, json.encodeToString(Stable.serializer(), next))
     }
 

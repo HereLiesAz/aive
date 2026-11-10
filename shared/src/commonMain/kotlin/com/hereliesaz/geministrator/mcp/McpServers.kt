@@ -1,5 +1,7 @@
 package com.hereliesaz.geministrator.mcp
 
+import com.hereliesaz.geministrator.persistence.refuseIfUnreadable
+import com.hereliesaz.geministrator.persistence.readQuarantining
 import com.russhwolf.settings.Settings
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -58,13 +60,12 @@ class McpServerStore(
     private val serializer = ListSerializer(McpServerConfig.serializer())
 
     fun read(): List<McpServerConfig> {
-        val encoded = settings.getStringOrNull(storageKey) ?: return emptyList()
-        return runCatching { json.decodeFromString(serializer, encoded) }
-            .getOrDefault(emptyList())
+        return (settings.readQuarantining(storageKey) { json.decodeFromString(serializer, it) } ?: emptyList())
             .filter { runCatching { it.validate() }.isSuccess }
     }
 
     fun write(servers: List<McpServerConfig>) {
+        settings.refuseIfUnreadable(storageKey) { json.decodeFromString(serializer, it) }
         settings.putString(storageKey, json.encodeToString(serializer, servers))
     }
 

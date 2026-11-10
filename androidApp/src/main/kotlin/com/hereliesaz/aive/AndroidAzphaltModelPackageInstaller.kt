@@ -441,10 +441,25 @@ internal class AndroidAzphaltModelPackageInstaller(
         val encoded = prefs.getString(PREFS_KEY, null) ?: return emptyList()
         return runCatching {
             json.decodeFromString(ListSerializer(InstalledAzphaltModelPackage.serializer()), encoded)
-        }.getOrElse { emptyList() }
+        }.getOrElse {
+            // Keep the unreadable record: treating it as empty and overwriting it would orphan every installed model.
+            prefs.edit().putString("$PREFS_KEY.corrupt", encoded).commit()
+            emptyList()
+        }
     }
 
-    private fun writeInstalled(value: List<InstalledAzphaltModelPackage>): Boolean =
+    private fun writeInstalled(value: List<InstalledAzphaltModelPackage>): Boolean {
+        val existing = prefs.getString(PREFS_KEY, null)
+        if (existing != null && runCatching {
+                json.decodeFromString(ListSerializer(InstalledAzphaltModelPackage.serializer()), existing)
+            }.isFailure
+        ) {
+            return false
+        }
+        return writeInstalledUnchecked(value)
+    }
+
+    private fun writeInstalledUnchecked(value: List<InstalledAzphaltModelPackage>): Boolean =
         prefs.edit().putString(
             PREFS_KEY,
             json.encodeToString(ListSerializer(InstalledAzphaltModelPackage.serializer()), value),

@@ -1,5 +1,7 @@
 package com.hereliesaz.geministrator.memory
 
+import com.hereliesaz.geministrator.persistence.refuseIfUnreadable
+import com.hereliesaz.geministrator.persistence.readQuarantining
 import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.sync.Mutex
@@ -172,6 +174,7 @@ class SettingsMemoryBankRegistry(
             val current = load()
             val key = memoryBankKey(workflowId) ?: return@withLock
             if (key in current) return@withLock
+            settings.refuseIfUnreadable(this.key) { SettingsMemoryStore.defaultJson.decodeFromString(serializer, it) }
             settings.putString(this.key, SettingsMemoryStore.defaultJson.encodeToString(serializer, (current + key).toList()))
         }
     }
@@ -188,10 +191,10 @@ class SettingsMemoryBankRegistry(
         }
     }
 
-    private fun load(): Set<String> = settings.getStringOrNull(key)
-        ?.let { runCatching { SettingsMemoryStore.defaultJson.decodeFromString(serializer, it) }.getOrNull() }
-        .orEmpty()
-        .mapNotNullTo(linkedSetOf(), ::memoryBankKey)
+    private fun load(): Set<String> =
+        settings.readQuarantining(key) { SettingsMemoryStore.defaultJson.decodeFromString(serializer, it) }
+            .orEmpty()
+            .mapNotNullTo(linkedSetOf(), ::memoryBankKey)
 }
 
 // ---- one-time split of the old shared store -------------------------------------------------------
