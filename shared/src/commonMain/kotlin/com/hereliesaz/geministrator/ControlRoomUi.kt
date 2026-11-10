@@ -353,7 +353,7 @@ fun ControlRoom(
         // to the project of the live run that may be open behind it.
         repositoryName = when {
             restingShown -> null
-            liveWorkflow != null -> liveWorkflow.project.repository
+            liveWorkflow != null -> liveWorkflow.run.repositorySnapshot ?: liveWorkflow.project.repository
             runtimeState is ApplicationRuntimeState.NoRun -> runtimeState.project.repository
             else -> null
         }?.let(::shellRepositoryLabel),
