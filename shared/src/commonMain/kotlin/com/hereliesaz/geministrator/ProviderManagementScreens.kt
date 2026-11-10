@@ -47,6 +47,14 @@ import com.hereliesaz.geministrator.resources.keeper_a2a_agent_card_url
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_explain
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_invalid_url
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_remove
+import com.hereliesaz.geministrator.resources.keeper_a2a_agent_suggestions
+import com.hereliesaz.geministrator.resources.keeper_a2a_agent_unreachable
+import com.hereliesaz.geministrator.resources.keeper_a2a_agent_use_address
+import com.hereliesaz.geministrator.resources.hive_edge_drifter_bad_address
+import com.hereliesaz.geministrator.resources.hive_edge_drifter_no_card
+import com.hereliesaz.geministrator.resources.hive_edge_drifter_no_jsonrpc
+import com.hereliesaz.geministrator.resources.hive_edge_drifter_not_a_card
+import com.hereliesaz.geministrator.resources.hive_edge_drifter_reading
 import com.hereliesaz.geministrator.resources.keeper_add_a2a_agent
 import com.hereliesaz.geministrator.resources.keeper_add_a2a_agent_hint
 import com.hereliesaz.geministrator.resources.settings_a2a_lan_allow
@@ -76,6 +84,9 @@ import com.hereliesaz.geministrator.resources.settings_a2a_server_reset_token
 import com.hereliesaz.geministrator.resources.settings_a2a_server_temporary_token
 import com.hereliesaz.geministrator.resources.settings_a2a_server_warning
 import com.hereliesaz.geministrator.a2a.A2aAgentConnections
+import com.hereliesaz.geministrator.a2a.A2aDrifterSeeds
+import com.hereliesaz.geministrator.a2a.A2aDrifters
+import com.hereliesaz.geministrator.a2a.DrifterTrouble
 import com.hereliesaz.geministrator.resources.confirm_cancel
 import com.hereliesaz.geministrator.resources.confirm_disconnect_action
 import com.hereliesaz.geministrator.resources.confirm_disconnect_body
@@ -621,12 +632,20 @@ internal fun ProviderSettingsScreen(
             }
         }
 
-        // Remote A2A agents (docs/A2A.md): added by Agent Card URL, then linked like a provider,
-        // with an optional bearer token. Never chosen automatically; a role has to prefer one.
+        // A2A agents are independent remote services, not packages from the Azphalt Store.
+        // Preview their Agent Cards before linking; a role must explicitly select the provider.
         var addingA2aAgent by rememberDurableBooleanState("keeper.connections.adding-a2a-agent")
         var a2aUrlDraft by remember { mutableStateOf("") }
         var a2aUrlError by remember { mutableStateOf<String?>(null) }
+        var checkingA2aCard by remember { mutableStateOf(false) }
+        val dismissedSeeds by A2aDrifterSeeds.dismissed.collectAsState()
+        val suggestions = remember(a2aAgents, dismissedSeeds) { A2aDrifterSeeds.pending(a2aAgents) }
         val invalidA2aUrl = stringResource(Res.string.keeper_a2a_agent_invalid_url)
+        val badAddress = stringResource(Res.string.hive_edge_drifter_bad_address)
+        val unreachable = stringResource(Res.string.keeper_a2a_agent_unreachable)
+        val missingCard = stringResource(Res.string.hive_edge_drifter_no_card)
+        val invalidCard = stringResource(Res.string.hive_edge_drifter_not_a_card)
+        val incompatibleCard = stringResource(Res.string.hive_edge_drifter_no_jsonrpc)
         AddConnectionRow(
             label = stringResource(Res.string.keeper_add_a2a_agent),
             hint = stringResource(Res.string.keeper_add_a2a_agent_hint),
@@ -639,6 +658,32 @@ internal fun ProviderSettingsScreen(
                 style = AzphaltType.body,
                 color = azphaltOnSurface(),
             )
+            if (suggestions.isNotEmpty()) {
+                Text(stringResource(Res.string.keeper_a2a_agent_suggestions), style = AzphaltType.body, color = azphaltOnSurface())
+                suggestions.forEach { seed ->
+                    ConnectionRow(
+                        name = seed.name,
+                        detail = "${seed.about} · Run by ${seed.runBy}",
+                        status = null,
+                        connected = false,
+                        compact = compact,
+                    ) {
+                        AzphaltPill(
+                            label = stringResource(Res.string.keeper_a2a_agent_use_address),
+                            seed = "suggest-a2a-${seed.cardUrl}",
+                            onClick = {
+                                a2aUrlDraft = seed.cardUrl
+                                a2aUrlError = null
+                            },
+                        )
+                        AzphaltPill(
+                            label = stringResource(Res.string.common_dismiss),
+                            seed = "dismiss-a2a-${seed.cardUrl}",
+                            onClick = { A2aDrifterSeeds.dismiss(seed.cardUrl) },
+                        )
+                    }
+                }
+            }
             AzphaltTextField(
                 value = a2aUrlDraft,
                 onValueChange = {
@@ -650,17 +695,44 @@ internal fun ProviderSettingsScreen(
                 errorMessage = a2aUrlError,
             )
             AzphaltPill(
-                stringResource(Res.string.keeper_a2a_agent_add),
+                if (checkingA2aCard) stringResource(Res.string.hive_edge_drifter_reading)
+                else stringResource(Res.string.keeper_a2a_agent_add),
                 "add-a2a-agent",
                 onClick = {
-                    try {
-                        val agent = A2aAgentConnections.add(a2aUrlDraft)
-                        a2aUrlDraft = ""
-                        addingA2aAgent = false
-                        // Linking asks for the optional bearer token, as for any provider.
-                        onConfigureProvider(agent.providerId)
-                    } catch (_: IllegalArgumentException) {
-                        a2aUrlError = invalidA2aUrl
+                    if (!checkingA2aCard) {
+                        val url = a2aUrlDraft
+                        checkingA2aCard = true
+                        scope.launch {
+                            try {
+                                val candidate = A2aDrifters.read(url)
+                                if (!candidate.canBeLetIn) {
+                                    a2aUrlError = when (candidate.trouble) {
+                                        DrifterTrouble.BadAddress -> badAddress
+                                        DrifterTrouble.Unreachable -> unreachable
+                                        DrifterTrouble.NoCard -> missingCard
+                                        DrifterTrouble.NotACard -> invalidCard
+                                        DrifterTrouble.NoJsonRpc -> incompatibleCard
+                                        null -> invalidA2aUrl
+                                    }
+                                } else {
+                                    val agent = A2aAgentConnections.add(candidate.cardUrl)
+                                    A2aAgentConnections.rename(agent.providerId, candidate.name)
+                                    a2aUrlDraft = ""
+                                    a2aUrlError = null
+                                    addingA2aAgent = false
+                                    // Provider setup handles keyless connections and bearer credentials.
+                                    onConfigureProvider(agent.providerId)
+                                }
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: IllegalArgumentException) {
+                                a2aUrlError = invalidA2aUrl
+                            } catch (_: Exception) {
+                                a2aUrlError = unreachable
+                            } finally {
+                                checkingA2aCard = false
+                            }
+                        }
                     }
                 },
                 tone = PillTone.Primary,
