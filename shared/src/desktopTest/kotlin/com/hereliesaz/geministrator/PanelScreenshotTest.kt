@@ -108,7 +108,7 @@ class PanelScreenshotTest {
     @Test
     fun shootsTheWorkflowFlowchart() {
         val flow = WorkflowFlowchart.of(definition, run)
-        shoot("50-flowchart", 2900, 760) {
+        shoot("50-flowchart", 900, 1900) {
             WorkflowFlowchartView(flow, selectedTaskId = "review", onTaskSelected = {}, emptyText = "none", modifier = Modifier.fillMaxSize())
         }
     }
