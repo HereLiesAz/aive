@@ -92,6 +92,8 @@ class MemoryLayerController(
     /** Durable per-workflow procedural receipts; optional for tests/previews. Never an executor. */
     val procedureCatalog: ProcedureBankCatalog? = null,
     private val nowEpochMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+    /** The pre-banks shared store kept as the migration backup, where this platform has one. */
+    private val legacyBackup: LegacyMemoryBackup? = null,
 ) {
     private val drainMutex = Mutex()
     /** Prevent repeated terminal reconciliation from banking duplicate receipts in one process. */
@@ -126,6 +128,22 @@ class MemoryLayerController(
     private val mutableLineageLog = MutableStateFlow(MemoryLineageLog())
     /** Workflows, their parents, project membership and expansions, as last published. */
     val lineageLog: StateFlow<MemoryLineageLog> = mutableLineageLog.asStateFlow()
+
+    private val mutableLegacyBackupOffered = MutableStateFlow(false)
+    /**
+     * True when the old shared memory store is still on disk after its split into banks was verified.
+     * It is never touched by retention, Forget or Clear-all, so [deleteLegacyBackup] is offered.
+     */
+    val legacyBackupOffered: StateFlow<Boolean> = mutableLegacyBackupOffered.asStateFlow()
+
+    /** Deletes the old shared store, only once the split into banks has completed. Returns whether it was deleted. */
+    suspend fun deleteLegacyBackup(): Boolean {
+        val backup = legacyBackup ?: return false
+        if (banks.migrationState.migrationReport() == null) return false
+        backup.delete()
+        mutableLegacyBackupOffered.value = false
+        return true
+    }
 
     private val mutableActivity = MutableStateFlow(MemoryActivity())
     val activity: StateFlow<MemoryActivity> = mutableActivity.asStateFlow()
@@ -1363,6 +1381,10 @@ class MemoryLayerController(
         mutableSnapshot.value = selectedWorkflow()?.let { lineageStore(it).read() } ?: MemorySnapshot()
         mutableSummaryMetrics.value = selectedWorkflow()?.let { MemorySummaryMetricsView.of(layerFor(it).summaryMetrics) } ?: MemorySummaryMetricsView()
         mutableLineageLog.value = lineage.log()
+        val backup = legacyBackup
+        mutableLegacyBackupOffered.value = backup != null &&
+            banks.migrationState.migrationReport() != null &&
+            runCatching { backup.present() }.getOrDefault(false)
     }
 
     private companion object {

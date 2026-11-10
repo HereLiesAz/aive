@@ -125,6 +125,35 @@ class MemoryLayerControllerTest {
     }
 
     @Test
+    fun theOldSharedStoreIsOfferedForDeletionOnlyAfterTheSplitCompletes() = runBlocking {
+        var exists = true
+        val backup = object : LegacyMemoryBackup {
+            override suspend fun present() = exists
+            override suspend fun delete() { exists = false }
+        }
+        val banks = MemoryBanks.inMemory(mapOf(WORKFLOW to InMemoryMemoryStore()))
+        val controller = MemoryLayerController(
+            banks = banks,
+            settingsStore = MemoryLayerSettingsStore(MapSettings()),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            nowEpochMillis = { 1_000L },
+            legacyBackup = backup,
+        )
+        controller.drain()
+        assertEquals(false, controller.legacyBackupOffered.value, "no completed split yet")
+        assertEquals(false, controller.deleteLegacyBackup())
+        assertTrue(exists)
+
+        banks.migrationState.recordMigration(MemoryBankMigrationReport(0L, emptyMap(), emptyMap(), emptyList()))
+        controller.drain()
+        assertEquals(true, controller.legacyBackupOffered.value)
+        assertEquals(true, controller.deleteLegacyBackup())
+        assertEquals(false, exists)
+        assertEquals(false, controller.legacyBackupOffered.value)
+    }
+
+    @Test
     fun exportImportRoundTripsAndClearEmpties() = runBlocking {
         val store = InMemoryMemoryStore()
         store.bank("a", "Memory export must round-trip exactly.")
