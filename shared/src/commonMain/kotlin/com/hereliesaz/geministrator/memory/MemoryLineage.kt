@@ -149,7 +149,9 @@ class MemoryLineage(
     suspend fun readOnlyNeighboursOf(workflowId: String): List<String> {
         val project = projectOf(workflowId) ?: return emptyList()
         val lineage = (ancestorsOf(workflowId) + workflowId).toSet()
-        return projectWorkflows(project).filter { it !in lineage }
+        // Recall searches every neighbour's bank at each task start, and a project only gains workflows:
+        // the most recently registered [MAX_READ_ONLY_NEIGHBOURS] are searched, not all of them.
+        return projectWorkflows(project).filter { it !in lineage }.takeLast(MAX_READ_ONLY_NEIGHBOURS)
     }
 
     /**
@@ -187,6 +189,9 @@ class MemoryLineage(
     suspend fun isMerge(workflowId: String): Boolean = parentsOf(workflowId).size > 1
 
     companion object {
+        /** How many sibling workflows' banks one recall reads (the newest by registration). */
+        const val MAX_READ_ONLY_NEIGHBOURS: Int = 12
+
         /** The lineage persisted in the platform's default settings. */
         fun createDefault(): MemoryLineage = MemoryLineage(Settings())
     }
@@ -206,16 +211,26 @@ class MemoryLineage(
     private fun projectIn(log: MemoryLineageLog, workflowId: String): String? =
         log.workflows.lastOrNull { it.workflowId == workflowId && it.projectId != null }?.projectId
 
+    /** The log as last decoded, with the stored text it came from: every task start reads the log, and it only grows. */
+    private var decodedFrom: String? = null
+    private var decoded: MemoryLineageLog = MemoryLineageLog()
+
     private fun load(): MemoryLineageLog {
         val settings = settings ?: return memoryOnly
-        return settings.getStringOrNull(key)
-            ?.let { SettingsMemoryStore.defaultJson.decodeFromString(MemoryLineageLog.serializer(), it) }
-            ?: MemoryLineageLog()
+        val raw = settings.getStringOrNull(key) ?: return MemoryLineageLog()
+        if (raw == decodedFrom) return decoded
+        return SettingsMemoryStore.defaultJson.decodeFromString(MemoryLineageLog.serializer(), raw).also {
+            decodedFrom = raw
+            decoded = it
+        }
     }
 
     private fun save(log: MemoryLineageLog) {
         val settings = settings ?: run { memoryOnly = log; return }
-        settings.putString(key, SettingsMemoryStore.defaultJson.encodeToString(MemoryLineageLog.serializer(), log))
+        val raw = SettingsMemoryStore.defaultJson.encodeToString(MemoryLineageLog.serializer(), log)
+        settings.putString(key, raw)
+        decodedFrom = raw
+        decoded = log
     }
 }
 

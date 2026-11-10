@@ -76,6 +76,25 @@ class MemoryLineageBanksTest {
     // ---- lineage ----------------------------------------------------------------------------------
 
     @Test
+    fun aRecallReadsOnlyTheNewestSiblingBanksAndTheLogIsDecodedOncePerChange() = runBlocking {
+        val settings = MapSettings()
+        val lineage = MemoryLineage(settings)
+        lineage.registerWorkflow("me", "project-1", atEpochMillis = 1L)
+        repeat(MemoryLineage.MAX_READ_ONLY_NEIGHBOURS + 8) { lineage.registerWorkflow("sibling-$it", "project-1", atEpochMillis = 2L + it) }
+
+        val neighbours = lineage.readOnlyNeighboursOf("me")
+
+        assertEquals(MemoryLineage.MAX_READ_ONLY_NEIGHBOURS, neighbours.size)
+        assertEquals("sibling-${MemoryLineage.MAX_READ_ONLY_NEIGHBOURS + 7}", neighbours.last())
+        assertTrue("sibling-0" !in neighbours)
+        // A second instance over the same settings (another process view) still sees later writes.
+        val other = MemoryLineage(settings)
+        assertEquals(neighbours, other.readOnlyNeighboursOf("me"))
+        lineage.registerWorkflow("late", "project-1", atEpochMillis = 99L)
+        assertEquals("late", other.readOnlyNeighboursOf("me").last())
+    }
+
+    @Test
     fun aContinuationInheritsItsParentsBankAndContributesToItsOwn() = runBlocking<Unit> {
         val w = World()
         w.memory.registerWorkflow("root", "P")

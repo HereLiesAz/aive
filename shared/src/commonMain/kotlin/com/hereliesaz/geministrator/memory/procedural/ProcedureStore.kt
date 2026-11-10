@@ -193,13 +193,19 @@ class ProcedureBankCatalog(
         val banks = listOf(key) + lineage.ancestorsOf(key) + lineage.readOnlyNeighboursOf(key)
         return banks.distinct().flatMap { bank ->
             try {
-                own(bank).read().traces
+                // Newest receipts only: a habit forms from recent runs, and the work done at every task
+                // start must not grow with the bank's whole history.
+                own(bank).read().traces.sortedByDescending { it.recordedAtEpochMillis }.take(MAX_HABIT_TRACES_PER_BANK)
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
                 emptyList()
             }
         }
+    }
+
+    private companion object {
+        const val MAX_HABIT_TRACES_PER_BANK = 1_000
     }
 
     suspend fun lookup(workflowId: String, ref: ProcedureReference): ProcedureCandidate? =
