@@ -137,6 +137,29 @@ class HabitDecisionObserverTest {
     }
 
     @Test
+    fun aTaskThatReadUntrustedContentItselfRecordsNothingWhateverItsDeclaredInputs() {
+        val text = "HABIT-DECISION: $ci | supersedes | x."
+        val clean = run(text)
+        fun withOwn(vararg metadata: Pair<String, String>) = clean.copy(
+            taskRuns = clean.taskRuns + (analyze to clean.taskRuns.getValue(analyze).copy(
+                artifacts = listOf(art(text, trusted = true).copy(metadata = mapOf(*metadata))),
+            )),
+        )
+        // Its own artifact was made from external content (a tool read, not a declared input).
+        assertTrue(
+            observe(
+                withOwn(
+                    CONTEXT_PROVENANCE_METADATA_KEY to "AgentArtifact",
+                    com.hereliesaz.geministrator.domain.CONTEXT_UNTRUSTED_INPUT_METADATA_KEY to "true",
+                ),
+            ).isEmpty(),
+        )
+        // Or it is external, or unlabelled (which counts as external).
+        assertTrue(observe(withOwn(CONTEXT_PROVENANCE_METADATA_KEY to "ExternalContent")).isEmpty())
+        assertTrue(observe(withOwn()).isEmpty())
+    }
+
+    @Test
     fun unfinishedTasksAndPlainTextLeaveNothing() {
         assertTrue(observe(run("HABIT-DECISION: $ci | stands | x.", status = TaskRunStatus.Running)).isEmpty())
         assertTrue(observe(run("The build failed in step two.")).isEmpty())

@@ -17,7 +17,8 @@ import com.hereliesaz.geministrator.memory.procedural.ProcedureTraceSink
  * A model's written decision about a habit (see [HabitDecisions]) becomes a Deliberation receipt,
  * through the same opt-in sink as the rest, authored by the model's role.
  *
- * One rule guards it: a task that had untrusted content in front of it records nothing. A flag may
+ * One rule guards it: a task that had untrusted content in front of it (a declared input, or anything
+ * its own artifacts were made from) records nothing. A flag may
  * carry a taint mark because a flag only informs; a decision can end a habit's version or put an
  * override in front of every later use, and text read from outside must not be able to do that.
  * It reads only the run and the definition, runs nothing, and never affects the run. A decision is
@@ -38,6 +39,10 @@ class HabitDecisionObserver(
             val decisions = HabitDecisions.parse(text)
             if (decisions.isEmpty()) continue
             if (definition.taintInputs(run, task).any { it.isUntrustedContext() }) continue
+            // The declared inputs are not all a task reads: what it fetched itself reaches only its own
+            // artifacts, which are labelled external or made-from-untrusted-input at intake. The text
+            // read here is those artifacts, so any of them untrusted means the whole task is.
+            if (taskRun.artifacts.any { it.isUntrustedContext() }) continue
             val author = (taskRun.assignedRoleId ?: task.roleId)?.value ?: "agent"
             for (decision in decisions) {
                 val key = "${run.id.value}:${taskRun.id.value}:${taskRun.attempt}:${decision.operation}"
