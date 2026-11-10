@@ -492,6 +492,64 @@ class SettingsWorkflowPersistenceTest {
     }
 
     @Test
+    fun aFailedImportKeepsTheEventJournalsItWouldHaveReplaced() = runBlocking {
+        val project = Project(id = ProjectId("p-journal"), name = "J", createdAtEpochMillis = 1L, updatedAtEpochMillis = 2L)
+        val definition = WorkflowDefinition(
+            id = WorkflowDefinitionId("wf-journal"),
+            name = "J",
+            tasks = listOf(
+                TaskDefinition(
+                    id = TaskDefinitionId("t"),
+                    name = "T",
+                    objective = "o",
+                    roleId = BuiltInRoles.ImplementationEngineer.id,
+                ),
+            ),
+        )
+        val run = WorkflowRunFactory.create(
+            definition = definition,
+            workflowRunId = WorkflowRunId("run-journal"),
+            projectId = project.id,
+            objective = "o",
+            nowEpochMillis = 3L,
+            taskRunIdFactory = { TaskRunId("tr-journal") },
+        )
+        val source = SettingsWorkflowPersistence(MapSettings())
+        source.projects.put(project)
+        source.definitions.put(definition)
+        source.runs.put(run)
+        val encoded = source.exportProjectFile(project.id, savedAtEpochMillis = 4L)
+
+        val backing = MapSettings()
+        var failSnapshotWrites = false
+        val flaky = object : Settings by backing {
+            override fun putString(key: String, value: String) {
+                if (failSnapshotWrites && key.startsWith(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY)) {
+                    throw IllegalStateException("disk full")
+                }
+                backing.putString(key, value)
+            }
+        }
+        val destination = SettingsWorkflowPersistence(flaky)
+        destination.importProjectFile(encoded)
+        destination.events.append(
+            TaskStarted(
+                workflowRunId = run.id,
+                taskDefinitionId = TaskDefinitionId("t"),
+                attempt = 1,
+                occurredAtEpochMillis = 5L,
+            ),
+        )
+        assertEquals(1, destination.events.forRun(run.id).size)
+
+        failSnapshotWrites = true
+        assertFailsWith<IllegalStateException> { destination.importProjectFile(encoded) }
+        failSnapshotWrites = false
+
+        assertEquals(1, SettingsWorkflowPersistence(backing).events.forRun(run.id).size)
+    }
+
+    @Test
     fun importedRunsCarryNoApprovalsAndNothingResumesFromTheFile() = runBlocking {
         val approval = TaskDefinitionId("approve-push")
         val push = TaskDefinitionId("push")
