@@ -97,6 +97,92 @@ class MemoryLayerControllerTest {
         assertTrue(after.edges.all { it.from in nodeIds && it.to in nodeIds })
     }
 
+    /** A store that banks one more episode right after the first read, as a deposit landing mid-operation would. */
+    private class DepositingStore(val inner: InMemoryMemoryStore, val deposit: suspend () -> Unit) : MemoryStore {
+        var fired = true
+        override suspend fun read(): MemorySnapshot = inner.read().also {
+            if (!fired) { fired = true; deposit() }
+        }
+        override suspend fun commit(expectedRevision: Long, mutation: MemoryStoreMutation) = inner.commit(expectedRevision, mutation)
+        override suspend fun replace(snapshot: MemorySnapshot) = inner.replace(snapshot)
+        override suspend fun replaceIfRevision(expectedRevision: Long, snapshot: MemorySnapshot) =
+            inner.replaceIfRevision(expectedRevision, snapshot)
+    }
+
+    @Test
+    fun anEpisodeBankedWhileForgettingIsNotLost() = runBlocking {
+        val inner = InMemoryMemoryStore()
+        inner.bank("a", "The gradle build fails on Windows because of path length.")
+        inner.bank("b", "SettingsMemoryStore commits re-encode the whole snapshot.")
+        val depositing = DepositingStore(inner) { inner.bank("late", "A late deposit that must survive forgetting.") }
+        val controller = controller(depositing)
+        val forgotten = inner.read().episodes.first().id
+        depositing.fired = false
+        controller.forgetEpisode(forgotten)
+        val after = inner.read()
+        assertTrue(after.episodes.none { it.id == forgotten })
+        assertTrue(after.episodes.any { it.sourceSessionId == "late" }, "the deposit made during forgetting was lost")
+    }
+
+    @Test
+    fun theOldSharedStoreIsOfferedForDeletionOnlyAfterTheSplitCompletes() = runBlocking {
+        var exists = true
+        val backup = object : LegacyMemoryBackup {
+            override suspend fun present() = exists
+            override suspend fun delete() { exists = false }
+        }
+        val banks = MemoryBanks.inMemory(mapOf(WORKFLOW to InMemoryMemoryStore()))
+        val controller = MemoryLayerController(
+            banks = banks,
+            settingsStore = MemoryLayerSettingsStore(MapSettings()),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            nowEpochMillis = { 1_000L },
+            legacyBackup = backup,
+        )
+        controller.drain()
+        assertEquals(false, controller.legacyBackupOffered.value, "no completed split yet")
+        assertEquals(false, controller.deleteLegacyBackup())
+        assertTrue(exists)
+
+        banks.migrationState.recordMigration(MemoryBankMigrationReport(0L, emptyMap(), emptyMap(), emptyList()))
+        controller.drain()
+        assertEquals(true, controller.legacyBackupOffered.value)
+        assertEquals(true, controller.deleteLegacyBackup())
+        assertEquals(false, exists)
+        assertEquals(false, controller.legacyBackupOffered.value)
+    }
+
+    @Test
+    fun forgettingAnEpisodeAlsoDropsACondensedTextThatRestatesIt() {
+        val a = MemoryEpisodeId("a")
+        val b = MemoryEpisodeId("b")
+        fun node(id: String, text: String, vararg episodes: MemoryEpisodeId) =
+            MemoryNode(MemoryNodeId(id), MemoryNodeKind.Context, text, sourceEpisodeIds = episodes.toSet(), createdAtEpochMillis = 1L)
+        fun edge(from: String, to: String, relation: MemoryRelationKind) =
+            MemoryEdge(MemoryEdgeId("$from-$to-$relation"), MemoryNodeId(from), MemoryNodeId(to), relation, createdAtEpochMillis = 1L)
+        val snapshot = MemorySnapshot(
+            nodes = listOf(
+                node("a1", "The staging host is zebra-17.", a),
+                node("b1", "Deploys run from the main branch.", b),
+                node("m", "Deploys run from main and the staging host is zebra-17.", a, b),
+            ),
+            edges = listOf(
+                edge("m", "a1", MemoryRelationKind.CondensedFrom),
+                edge("m", "b1", MemoryRelationKind.CondensedFrom),
+                edge("m", "a1", MemoryRelationKind.Supersedes),
+                edge("m", "b1", MemoryRelationKind.Supersedes),
+            ),
+        )
+
+        val after = snapshot.without(a)
+
+        assertTrue(after.nodes.none { "zebra-17" in it.text }, after.nodes.joinToString { it.text })
+        // The surviving source is current again: nothing supersedes it any more.
+        assertEquals(listOf("b1"), after.nodes.map { it.id.value })
+        assertTrue(after.edges.isEmpty())
+    }
+
     @Test
     fun exportImportRoundTripsAndClearEmpties() = runBlocking {
         val store = InMemoryMemoryStore()

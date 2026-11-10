@@ -157,6 +157,9 @@ fun main() {
         engineProvider = DesktopMemoryEngineProvider(memoryEngines, memoryModelInstaller, memorySessions),
         scope = memoryScope,
         localModels = DesktopMemoryLocalModels(memoryModelInstaller, memoryScope),
+        legacyBackup = com.hereliesaz.geministrator.memory.DesktopLegacyMemoryBackup(
+            java.io.File(java.io.File(System.getProperty("user.home"), ".aive/memory"), "memory.db"),
+        ),
     ).also { it.attach() }
     val entireRecorder = EntireRecorder()
     val desktopEntire = DesktopEntire()

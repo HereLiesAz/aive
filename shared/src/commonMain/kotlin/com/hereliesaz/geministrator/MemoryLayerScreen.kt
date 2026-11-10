@@ -708,6 +708,23 @@ private fun DataSection(controller: MemoryLayerController) {
         }
     }
 
+    val legacyOffered by controller.legacyBackupOffered.collectAsState()
+    if (legacyOffered) {
+        Text(
+            "The memory kept before per-workflow banks is still on this device as a backup. It holds every workflow's " +
+                "history in one place that Forget, retention and Forget everything do not reach. Records listed in the " +
+                "migration report as drawn from several workflows exist only there.",
+            style = AzphaltType.body,
+            color = azphaltOnSurface(),
+        )
+        AzphaltPill("Delete the old memory backup", "memory-legacy-delete", onClick = {
+            scope.launch {
+                message = runCatching { controller.deleteLegacyBackup() }
+                    .fold({ if (it) "The old memory backup was deleted." else "The old memory backup was not deleted." }, { "Not deleted: ${it.message ?: "unknown error"}" })
+            }
+        }, tone = PillTone.Danger, modifier = Modifier.fillMaxWidth())
+    }
+
     if (!clearConfirm) {
         AzphaltPill(stringResource(Res.string.memory_forget_everything), "memory-clear", onClick = { clearConfirm = true }, modifier = Modifier.fillMaxWidth())
     } else {

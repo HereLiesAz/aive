@@ -74,8 +74,9 @@ class HallMonitorGovernanceService(
                         artifact.kind in setOf(ArtifactKind.HallMonitorReview, ArtifactKind.Review) &&
                             artifact.metadata[HALL_MONITOR_REVIEW_VERDICT_METADATA]
                                 .equals(HALL_MONITOR_REVIEW_PASS, ignoreCase = true) &&
-                            artifact.metadata[HALL_MONITOR_REPORT_ID_METADATA]
-                                .let { it == null || it == reportId }
+                            // A review that does not name its report passed nothing in particular: it
+                            // must not approve whichever report is checked first.
+                            artifact.metadata[HALL_MONITOR_REPORT_ID_METADATA] == reportId
                     } ?: continue
                 return pauseAfterAntagonistPass(
                     state = state,

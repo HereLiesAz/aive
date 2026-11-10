@@ -95,6 +95,11 @@ class WorkflowBankStore(
         delegate.replace(snapshot)
     }
 
+    override suspend fun replaceIfRevision(expectedRevision: Long, snapshot: MemorySnapshot): Boolean {
+        requireOwn(snapshot.episodes)
+        return delegate.replaceIfRevision(expectedRevision, snapshot)
+    }
+
     private fun requireOwn(episodes: List<MemoryEpisode>) {
         val foreign = episodes.filter { it.workflowRunId != workflowId }
         if (foreign.isNotEmpty()) {
@@ -107,6 +112,19 @@ class WorkflowBankStore(
 }
 
 class MemoryCrossBankException(message: String) : IllegalArgumentException(message)
+
+/**
+ * The old pre-banks shared memory store, left on disk untouched as the backup after the split. It
+ * holds every workflow's raw text in one place that retention, Forget and Clear-all never reach, so
+ * once the split is verified the keeper is offered its deletion ([MemoryLayerController.legacyBackupOffered]).
+ */
+interface LegacyMemoryBackup {
+    /** True while the old store still exists on this device. */
+    suspend fun present(): Boolean
+
+    /** Permanently removes the old store (every file/record of it). */
+    suspend fun delete()
+}
 
 /** Which banks exist, and the state of the one-time split of the old shared store. */
 interface MemoryBankRegistry {

@@ -665,6 +665,7 @@ internal class AndroidMemoryLayerRuntime(
         engineProvider = engineProvider,
         scope = scope,
         localModels = AndroidMemoryLocalModels(installer, scope),
+        legacyBackup = com.hereliesaz.geministrator.memory.AndroidLegacyMemoryBackup(context),
     )
 
     fun attach() = controller.attach()

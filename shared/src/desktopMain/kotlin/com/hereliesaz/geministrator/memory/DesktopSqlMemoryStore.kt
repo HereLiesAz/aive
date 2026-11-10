@@ -16,6 +16,18 @@ fun desktopSqlMemoryStore(
     return SqlMemoryStore(JdbcSqliteDriver(url, Properties(), MemoryDatabase.Schema.synchronous()), allowExternalReferences = allowExternalReferences)
 }
 
+/** The old shared database and its SQLite sidecar files, for deletion once the split into banks is verified. */
+class DesktopLegacyMemoryBackup(private val legacyFile: File) : LegacyMemoryBackup {
+    override suspend fun present(): Boolean = legacyFile.exists()
+
+    override suspend fun delete() {
+        listOf("", "-wal", "-shm", "-journal").forEach { suffix ->
+            val file = File(legacyFile.path + suffix)
+            if (file.exists() && !file.delete()) error("Could not delete ${file.name}")
+        }
+    }
+}
+
 /**
  * Every workflow's memory bank on desktop: one SQLite database per workflow run under
  * [directory]/banks. The old shared database ([legacyFile]) is split into workflow banks once

@@ -13,6 +13,9 @@ class DeferredMemoryStore(private val store: Deferred<MemoryStore>) : MemoryStor
         store.await().commit(expectedRevision, mutation)
 
     override suspend fun replace(snapshot: MemorySnapshot) = store.await().replace(snapshot)
+
+    override suspend fun replaceIfRevision(expectedRevision: Long, snapshot: MemorySnapshot): Boolean =
+        store.await().replaceIfRevision(expectedRevision, snapshot)
 }
 
 /** Project memory banks that are still opening; every call waits for them. */

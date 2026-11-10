@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.memory.procedural
 
+import com.hereliesaz.geministrator.control.ControlRedaction
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.RoleExecutionSource
@@ -464,9 +465,13 @@ class RoleInstructionProposalLedger(
 
 private const val MAX_DETAIL_CHARS = 200
 
-/** Collapses whitespace and bounds untrusted text before it is stored or quoted. */
+/**
+ * Scrubs key shapes ([ControlRedaction], before truncation so a cut cannot leave half a key that no
+ * longer matches), collapses whitespace and bounds untrusted text before it is stored or quoted into a
+ * proposed role-instruction line.
+ */
 private fun boundedDetail(text: String): String {
-    val collapsed = text.trim().replace(Regex("\\s+"), " ")
+    val collapsed = ControlRedaction.scrub(text).trim().replace(Regex("\\s+"), " ")
     return if (collapsed.length <= MAX_DETAIL_CHARS) collapsed else collapsed.take(MAX_DETAIL_CHARS - 1) + "…"
 }
 
@@ -475,4 +480,4 @@ internal fun normalizeFailure(detail: String): String =
     detail.lowercase().replace(Regex("[0-9]+"), "#").replace(Regex("\\s+"), " ").trim()
 
 /** Text quoted inside an instruction line keeps its own double quotes from closing the quote. */
-private fun quoted(detail: String): String = detail.replace('"', '\'')
+private fun quoted(detail: String): String = ControlRedaction.scrub(detail).replace('"', '\'')

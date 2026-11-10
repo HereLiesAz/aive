@@ -419,6 +419,33 @@ drawn from several workflows is placed in no bank and listed in the migration re
 deterministic, idempotent and crash-safe (each bank is written whole, then verified, and only then is
 the report recorded), and the old store is left untouched as the backup.
 
+### Hardening of the memory layer (F9)
+
+- **Condensation is checked after it is fitted.** A condensed memory is cut to its size limit by weight;
+  the claim-signature check (numbers, quoted strings, negation) runs again on the fitted text, and a
+  version that no longer states its sources' values ("Port 8080 is not exposed" cut to "Port 8080 is")
+  is declined for that cluster instead of superseding its sources. The clerk is never asked which claim is right.
+- **Forgetting and raw retention commit by compare-and-set.** `MemoryStore.replaceIfRevision` installs the
+  rewritten graph only if the store is still at the revision it was derived from (and stamps the next
+  one); a session banked in between makes the operation re-read and redo, so it is not lost.
+- **Forgetting an episode also drops merged text.** A Context/Summary/Category/PairSummary memory drawn from
+  the forgotten episode and others may restate it, so it is removed (its other sources, kept through
+  `CondensedFrom`, stay and are current again); tags and register entries only lose the episode from provenance.
+- **Banked text is scrubbed; recalled text is framed as untrusted.** Every banked envelope goes through
+  `ControlRedaction` (objective, role instructions, prompt blocks, artifacts, messages), as do the failure
+  reasons and keeper messages that role-instruction proposals quote. Recall blocks ("Relevant memory",
+  "Memory timeline", "Recalled on request") and the memory protocol say the text is untrusted data, not instructions.
+- **The memory marker is not an opt-out.** Only the exact text memory sent into a session (`noteIssued`) is
+  skipped when echoed; an agent message that merely starts with the marker is banked.
+- **The old shared store can be deleted once it is split.** After the split is verified and its report
+  recorded, the Memory screen offers **Delete the old memory backup** (`LegacyMemoryBackup`); the file is
+  outside retention, Forget and Forget everything, and records listed as excluded exist only in it.
+- **Bounded reads at task start.** The lineage log is decoded when its stored text changes, recall reads the
+  newest 12 sibling banks (`MemoryLineage.MAX_READ_ONLY_NEIGHBOURS`), and habit formation reads each bank's
+  newest 1000 receipts. The stored lineage and receipts are still add-only.
+- **Unreadable memory settings fail safe.** Stored settings that cannot be decoded leave memory off, are not
+  overwritten, and are copied to `aive.memory.layer-settings.v1.unreadable` before the keeper's first change.
+
 ## Memory flow
 
 The pipeline parses a banked episode in this order:

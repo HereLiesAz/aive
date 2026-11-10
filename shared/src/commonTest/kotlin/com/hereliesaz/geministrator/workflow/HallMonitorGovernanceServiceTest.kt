@@ -141,6 +141,31 @@ class HallMonitorGovernanceServiceTest {
     }
 
     @Test
+    fun aPassingReviewNamingTheReportPausesTheRunAutomatically() = runTest {
+        val fixture = fixture(verdict = "pass")
+        val service = HallMonitorGovernanceService(fixture.persistence)
+
+        val paused = assertNotNull(service.pauseIfApprovedReportReady(WorkflowRuntimeState(fixture.run), NoOpSessionGateway, 50L))
+
+        assertEquals(fixture.report.id, assertNotNull(paused.run.globalPause).reportArtifactId)
+    }
+
+    @Test
+    fun aPassingReviewThatNamesNoReportDoesNotPauseTheRun() = runTest {
+        val fixture = fixture(verdict = "pass")
+        val anonymousReview = fixture.review.copy(metadata = mapOf(HALL_MONITOR_REVIEW_VERDICT_METADATA to "pass"))
+        val run = fixture.run.copy(
+            taskRuns = fixture.run.taskRuns.mapValues { (task, taskRun) ->
+                if (task == fixture.reviewTask) taskRun.copy(artifacts = listOf(anonymousReview)) else taskRun
+            },
+        )
+        val service = HallMonitorGovernanceService(fixture.persistence)
+
+        // Which report a review passed is not known, so it cannot approve this one.
+        assertNull(service.pauseIfApprovedReportReady(WorkflowRuntimeState(run), NoOpSessionGateway, 50L))
+    }
+
+    @Test
     fun resumeRequiresBothReviews() = runTest {
         val fixture = fixture(verdict = "pass")
         val service = HallMonitorGovernanceService(fixture.persistence)

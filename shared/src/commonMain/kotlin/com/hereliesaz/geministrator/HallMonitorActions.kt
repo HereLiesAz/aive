@@ -59,7 +59,22 @@ data class HallMonitorPauseReviewState(
         get() = this == ApprovalGateStatus.Approved || this == ApprovalGateStatus.Rejected
 }
 
-/** Manual entry point retained for diagnostics; normal Hall Monitor workflows auto-open the pause. */
+/** Applies one of the keeper's explicit review steps from the pause screen. */
+internal suspend fun ApplicationRuntime.applyHallMonitorReviewStep(step: HallMonitorReviewStep, approved: Boolean) {
+    when (step) {
+        HallMonitorReviewStep.HumanReview -> decideHallMonitorUserReview(
+            approved = approved,
+            note = if (approved) "Recommendations approved in application" else "Recommendations rejected in application",
+        )
+        HallMonitorReviewStep.Resume -> resumeHallMonitorPause()
+    }
+}
+
+/**
+ * Manual entry point retained for diagnostics. The pause opens by itself: the runtime's cycle pauses a
+ * run once a Hall Monitor report has a passing Antagonist review and starts its Orchestrator review
+ * (ApplicationRuntime.governHallMonitorLocked); the keeper's review and the resume are explicit.
+ */
 suspend fun ApplicationRuntime.pauseForHallMonitorReview(
     reportArtifactId: ArtifactId,
     antagonistReviewArtifactId: ArtifactId,

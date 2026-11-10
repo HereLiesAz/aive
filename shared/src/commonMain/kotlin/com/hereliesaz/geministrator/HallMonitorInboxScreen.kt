@@ -45,6 +45,7 @@ internal fun HallMonitorPauseInboxScreen(
     presentation: LiveWorkflowPresentation,
     onTestSolution: (String, Int) -> Unit,
     modifier: Modifier = Modifier,
+    onReview: (HallMonitorReviewStep, Boolean) -> Unit = { _, _ -> },
 ) {
     val pause = requireNotNull(presentation.run.globalPause)
     val reportArtifact = presentation.run.taskRuns.values
@@ -125,6 +126,30 @@ internal fun HallMonitorPauseInboxScreen(
                                 }
                             }
                         }
+                    }
+
+                    Text(
+                        "Your review. The Orchestrator reviews the report on its own; recommendations are never applied " +
+                            "automatically. Resume continues the frozen workflow once both reviews are decided.",
+                        style = AzphaltType.body,
+                        color = azphaltOnSurface(),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AzphaltPill(
+                            label = "APPROVE RECOMMENDATIONS",
+                            seed = "hall-monitor-review-approve",
+                            onClick = { onReview(HallMonitorReviewStep.HumanReview, true) },
+                        )
+                        AzphaltPill(
+                            label = "REJECT",
+                            seed = "hall-monitor-review-reject",
+                            onClick = { onReview(HallMonitorReviewStep.HumanReview, false) },
+                        )
+                        AzphaltPill(
+                            label = "RESUME WORKFLOW",
+                            seed = "hall-monitor-review-resume",
+                            onClick = { onReview(HallMonitorReviewStep.Resume, true) },
+                        )
                     }
 
                     if (pause.solutionTrials.isNotEmpty()) {

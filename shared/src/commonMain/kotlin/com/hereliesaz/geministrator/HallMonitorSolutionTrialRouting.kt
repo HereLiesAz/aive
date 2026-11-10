@@ -6,6 +6,19 @@ import kotlinx.serialization.json.Json
 private const val HALL_MONITOR_TRIAL_LAUNCH_PREFIX = "__HAIVE_HALL_MONITOR_TEST_SOLUTION__"
 private const val HALL_MONITOR_TRIAL_ACTION_PREFIX = "__haive_hall_monitor_trial_action__"
 private const val HALL_MONITOR_TRIAL_LAUNCH_SEPARATOR = "::"
+private const val HALL_MONITOR_REVIEW_ACTION_PREFIX = "__haive_hall_monitor_review__"
+
+/** The keeper's two explicit steps out of a Hall Monitor pause. */
+internal enum class HallMonitorReviewStep { HumanReview, Resume }
+
+internal fun hallMonitorReviewActionId(step: HallMonitorReviewStep): String = HALL_MONITOR_REVIEW_ACTION_PREFIX + step.name
+
+internal fun parseHallMonitorReviewActionId(actionId: String): HallMonitorReviewStep? =
+    if (actionId.startsWith(HALL_MONITOR_REVIEW_ACTION_PREFIX)) {
+        HallMonitorReviewStep.entries.firstOrNull { it.name == actionId.removePrefix(HALL_MONITOR_REVIEW_ACTION_PREFIX) }
+    } else {
+        null
+    }
 
 internal data class HallMonitorTrialLaunchRequest(
     val findingId: String,
