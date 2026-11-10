@@ -488,6 +488,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="local_agents_test">Test</string>
     <string name="local_agents_keys_on">Passing its key variable</string>
     <string name="local_agents_keys_off">Using its login, not a key</string>
+    <string name="local_agents_project_on">Using repository settings</string>
+    <string name="local_agents_project_off">Refusing repository settings</string>
     <string name="keeper_schedules">Schedules</string>
     <string name="keeper_schedules_lead">Hives that start by themselves while the app is open. Each is off until you turn it on.</string>
     <string name="schedule_add_suite">Add the coding suite</string>

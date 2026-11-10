@@ -4,6 +4,7 @@ import com.hereliesaz.geministrator.providers.cli.CliAgentSpecs
 import java.io.File
 import java.util.UUID
 import java.util.prefs.Preferences
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -11,8 +12,17 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
 
 class DesktopCliAgentsTest {
+    private val nodes = mutableListOf<Preferences>()
+
+    /** Every preferences node a test made is removed, whether the test passed or failed. */
+    @AfterTest
+    fun removePreferenceNodes() {
+        nodes.forEach { node -> runCatching { node.removeNode(); node.flush() } }
+        nodes.clear()
+    }
+
     private fun settings(): CliAgentSettings {
-        val node = Preferences.userRoot().node("com/hereliesaz/geministrator/test-cli-host-${UUID.randomUUID()}")
+        val node = Preferences.userRoot().node("com/hereliesaz/geministrator/test-cli-host-${UUID.randomUUID()}").also { nodes += it }
         return CliAgentSettings { node }
     }
 
@@ -32,8 +42,9 @@ class DesktopCliAgentsTest {
     @Test
     fun everyKnownCliIsListedWithWhereItWasFoundAndIsOffUntilTurnedOn() = runBlocking {
         var changed = 0
+        val runner = Scripted(listOf("2.0.1 (Claude Code)"))
         val host = DesktopCliAgents(
-            settings = settings(), runner = Scripted(listOf("2.0.1 (Claude Code)")),
+            settings = settings(), runner = runner,
             locate = { spec -> if (spec.id == "cli-claude") File("/usr/local/bin/claude") else null }, onChanged = { changed += 1 },
         )
 
@@ -41,13 +52,36 @@ class DesktopCliAgentsTest {
         assertEquals(CliAgentSpecs.all.map { it.id }, before.map { it.spec.id })
         val claude = before.first { it.spec.id == "cli-claude" }
         assertEquals("/usr/local/bin/claude", claude.path)
-        assertEquals("2.0.1 (Claude Code)", claude.version)
-        assertFalse(claude.enabled || claude.passKeys, "off by default, and no key passed")
+        assertEquals(null, claude.version, "listing a CLI that is off does not run it")
+        assertEquals(emptyList(), runner.commands, "no program was started just to list the screen")
+        assertFalse(claude.enabled || claude.passKeys || claude.allowProjectConfig, "off by default, no key passed, no project settings")
         assertTrue(before.filter { it.spec.id != "cli-claude" }.all { it.path == null })
 
         host.setEnabled("cli-claude", true)
         assertEquals(1, changed, "the provider list is rebuilt")
-        assertTrue(host.statuses().first { it.spec.id == "cli-claude" }.enabled)
+        val after = host.statuses().first { it.spec.id == "cli-claude" }
+        assertTrue(after.enabled)
+        assertEquals("2.0.1 (Claude Code)", after.version, "once it is on, its version is asked")
+        assertEquals(1, runner.commands.size)
+    }
+
+    @Test
+    fun aCliThatWasTestedHasItsVersionAskedEvenWhileOff() = runBlocking {
+        val runner = Scripted(listOf(claudeAnswer))
+        val host = DesktopCliAgents(settings = settings(), runner = runner, locate = { File("/usr/local/bin/claude") })
+        assertEquals(null, host.statuses().first { it.spec.id == "cli-claude" }.version)
+        host.test("cli-claude")
+        val testedRuns = runner.commands.size
+        host.statuses()
+        assertEquals(testedRuns + 1, runner.commands.size, "one --version for the CLI the keeper tested")
+    }
+
+    @Test
+    fun theProjectSettingsSwitchIsOffUntilTheKeeperTurnsItOn() = runBlocking {
+        val host = DesktopCliAgents(settings = settings(), runner = Scripted(emptyList()), locate = { File("/usr/local/bin/claude") })
+        assertFalse(host.statuses().first { it.spec.id == "cli-claude" }.allowProjectConfig)
+        host.setAllowProjectConfig("cli-claude", true)
+        assertTrue(host.statuses().first { it.spec.id == "cli-claude" }.allowProjectConfig)
     }
 
     @Test
@@ -75,10 +109,10 @@ class DesktopCliAgentsTest {
 
     @Test
     fun onlyACliThatIsOnAndInstalledJoinsTheProviderList() {
-        val s = settings()
-        s.setEnabled("cli-claude", true)
-        // Not installed in the test environment: on but absent is still not registered.
-        assertEquals(emptyList(), configuredCliProviders(s).map { it.id.value }.filter { it == "cli-claude" && CliLocator.locate(CliAgentSpecs.Claude) == null })
-        assertEquals(emptyList(), configuredCliProviders(settings()).map { it.id.value }, "all off: none registered")
+        val on = settings().also { it.setEnabled("cli-claude", true) }
+        val installed = { spec: com.hereliesaz.geministrator.providers.cli.CliAgentSpec -> if (spec.id == "cli-claude") File("/usr/bin/claude") else null }
+        assertEquals(listOf("cli-claude"), configuredCliProviders(on, installed).map { it.id.value }, "on and installed: registered")
+        assertEquals(emptyList(), configuredCliProviders(on) { null }.map { it.id.value }, "on but not installed: not registered")
+        assertEquals(emptyList(), configuredCliProviders(settings(), installed).map { it.id.value }, "installed but off: not registered")
     }
 }

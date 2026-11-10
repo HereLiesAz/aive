@@ -26,6 +26,8 @@ import com.hereliesaz.geministrator.resources.local_agents_keys_on
 import com.hereliesaz.geministrator.resources.local_agents_never_tested
 import com.hereliesaz.geministrator.resources.local_agents_not_installed
 import com.hereliesaz.geministrator.resources.local_agents_note
+import com.hereliesaz.geministrator.resources.local_agents_project_off
+import com.hereliesaz.geministrator.resources.local_agents_project_on
 import com.hereliesaz.geministrator.resources.local_agents_off
 import com.hereliesaz.geministrator.resources.local_agents_on
 import com.hereliesaz.geministrator.resources.local_agents_test
@@ -60,6 +62,7 @@ internal fun LocalAgentsPart() {
                 host = host,
                 onToggle = { host.setEnabled(status.spec.id, !status.enabled); reload += 1 },
                 onKeys = { host.setPassKeys(status.spec.id, !status.passKeys); reload += 1 },
+                onProjectConfig = { host.setAllowProjectConfig(status.spec.id, !status.allowProjectConfig); reload += 1 },
                 onTest = {
                     scope.launch {
                         testing = status.spec.id
@@ -74,7 +77,9 @@ internal fun LocalAgentsPart() {
 }
 
 @Composable
-private fun CliCard(status: CliAgentStatus, testing: Boolean, host: CliAgentHost, onToggle: () -> Unit, onKeys: () -> Unit, onTest: () -> Unit) {
+private fun CliCard(
+    status: CliAgentStatus, testing: Boolean, host: CliAgentHost, onToggle: () -> Unit, onKeys: () -> Unit, onProjectConfig: () -> Unit, onTest: () -> Unit,
+) {
     val found = status.path != null
     val where = if (found) stringResource(Res.string.local_agents_found, status.path.orEmpty(), status.version ?: "") else stringResource(Res.string.local_agents_not_installed)
     val test = status.lastTest
@@ -97,6 +102,12 @@ private fun CliCard(status: CliAgentStatus, testing: Boolean, host: CliAgentHost
                         seed = "local-agent-toggle-${status.spec.id}", selected = status.enabled, onClick = onToggle,
                     )
                     AzphaltPill(label = stringResource(Res.string.local_agents_test), seed = "local-agent-test-${status.spec.id}", onClick = { if (!testing) onTest() })
+                    if (status.spec.projectConfig.isNotEmpty()) {
+                        AzphaltPill(
+                            label = stringResource(if (status.allowProjectConfig) Res.string.local_agents_project_on else Res.string.local_agents_project_off),
+                            seed = "local-agent-project-${status.spec.id}", selected = status.allowProjectConfig, onClick = onProjectConfig,
+                        )
+                    }
                     if (status.spec.optionalKeyEnvironment.isNotEmpty()) {
                         AzphaltPill(
                             label = stringResource(if (status.passKeys) Res.string.local_agents_keys_on else Res.string.local_agents_keys_off),

@@ -29,15 +29,22 @@ internal class DesktopCliAgents(
     private val versions = mutableMapOf<String, String?>()
     private val tests = mutableMapOf<String, CliTestResult>()
 
+    /**
+     * Where each CLI is, without running it. A program's `--version` is asked only for a CLI the keeper turned on or tested:
+     * merely listing the screen must not start programs the keeper never chose to run.
+     */
     override suspend fun statuses(): List<CliAgentStatus> = CliAgentSpecs.all.map { spec ->
         val program = locate(spec)
+        val enabled = settings.enabled(spec.id)
+        val mayRun = enabled || tests.containsKey(spec.id)
         CliAgentStatus(
             spec = spec,
             path = program?.absolutePath,
-            version = program?.let { versions.getOrPut(it.absolutePath) { version(spec, it) } },
-            enabled = settings.enabled(spec.id),
+            version = if (mayRun) program?.let { versions.getOrPut(it.absolutePath) { version(spec, it) } } else null,
+            enabled = enabled,
             passKeys = settings.passKeys(spec.id),
             lastTest = tests[spec.id],
+            allowProjectConfig = settings.allowProjectConfig(spec.id),
         )
     }
 
@@ -51,6 +58,11 @@ internal class DesktopCliAgents(
         onChanged()
     }
 
+    override fun setAllowProjectConfig(id: String, allow: Boolean) {
+        settings.setAllowProjectConfig(id, allow)
+        onChanged()
+    }
+
     override suspend fun test(id: String): CliTestResult {
         val spec = CliAgentSpecs.byId(id) ?: return CliTestResult(false, "Unknown CLI.", now(), 0)
         val program = locate(spec) ?: return CliTestResult(false, "${spec.displayName} is not installed (looked for ${spec.binaries.joinToString()}).", now(), 0)
@@ -59,8 +71,13 @@ internal class DesktopCliAgents(
         val result = try {
             val prompt = "Reply with the single word OK. Do not use any tools."
             val reader = CliOutputReader(spec.outputFormat)
+            val command = try {
+                CliLocator.commandFor(program, spec.arguments(CliRunMode.ReadOnly, folder.absolutePath, prompt))
+            } catch (refused: IllegalArgumentException) {
+                return CliTestResult(false, refused.message.orEmpty(), now(), 0).also { tests[id] = it }
+            }
             val process = runner.run(
-                listOf(program.absolutePath) + spec.arguments(CliRunMode.ReadOnly, folder.absolutePath, prompt),
+                command,
                 folder, cliEnvironmentFor(spec, settings, environment()),
                 if (spec.promptChannel == CliPromptChannel.Stdin) prompt else null, TEST_TIMEOUT_MILLIS,
             ) { line -> reader.read(line).filterIsInstance<CliEvent.Progress>() }
@@ -87,7 +104,7 @@ internal class DesktopCliAgents(
     private suspend fun version(spec: CliAgentSpec, program: File): String? = runCatching {
         val dir = File(System.getProperty("java.io.tmpdir").orEmpty())
         val lines = mutableListOf<String>()
-        runner.run(listOf(program.absolutePath) + spec.versionArgs, dir, cliEnvironmentFor(spec, settings, environment()), null, 15_000) { lines += it }
+        runner.run(CliLocator.commandFor(program, spec.versionArgs), dir, cliEnvironmentFor(spec, settings, environment()), null, 15_000) { lines += it }
         lines.firstOrNull { it.isNotBlank() }?.trim()?.take(80)
     }.getOrNull()
 
@@ -101,5 +118,8 @@ internal class DesktopCliAgents(
 }
 
 /** The CLI providers that are on and installed, ready to join the provider list. */
-internal fun configuredCliProviders(settings: CliAgentSettings = CliAgentSettings()): List<AgentProvider> =
-    CliAgentSpecs.all.filter { settings.enabled(it.id) && CliLocator.locate(it) != null }.map { CliAgentProvider(it, settings) }
+internal fun configuredCliProviders(
+    settings: CliAgentSettings = CliAgentSettings(),
+    locate: (CliAgentSpec) -> File? = { CliLocator.locate(it) },
+): List<AgentProvider> =
+    CliAgentSpecs.all.filter { settings.enabled(it.id) && locate(it) != null }.map { spec -> CliAgentProvider(spec, settings, locate = { locate(spec) }) }

@@ -12,6 +12,8 @@ data class CliAgentStatus(
     /** Whether the CLI is given its own API-key variable (off by default: it uses its login). */
     val passKeys: Boolean,
     val lastTest: CliTestResult? = null,
+    /** Whether a repository that tracks this CLI's own project settings may be run (off: it is refused). */
+    val allowProjectConfig: Boolean = false,
 )
 
 /** What the Test button saw: whether the installed CLI answered a tiny read-only prompt, and how. */
@@ -25,6 +27,9 @@ interface CliAgentHost {
     suspend fun statuses(): List<CliAgentStatus>
     fun setEnabled(id: String, enabled: Boolean)
     fun setPassKeys(id: String, passKeys: Boolean)
+
+    /** Lets a repository that tracks this CLI's project settings (which can make it run commands) be used. Off by default. */
+    fun setAllowProjectConfig(id: String, allow: Boolean) = Unit
 
     /** Runs the installed CLI read-only on a tiny prompt in an empty folder; uses the keeper's own quota. */
     suspend fun test(id: String): CliTestResult
