@@ -47,7 +47,6 @@ import com.hereliesaz.geministrator.resources.district_loading
 import com.hereliesaz.geministrator.resources.district_load_failed
 import com.hereliesaz.geministrator.resources.district_creatures
 import com.hereliesaz.geministrator.resources.district_empty
-import com.hereliesaz.geministrator.resources.district_import_agent
 import com.hereliesaz.geministrator.resources.hive_new
 import com.hereliesaz.geministrator.resources.hive_not_yet_run
 import com.hereliesaz.geministrator.resources.lineage_adopt
@@ -82,7 +81,6 @@ internal fun DistrictScreen(
     /** Runs grouped by the project they ran in; the whole hive is laid out by project. */
     onLoadRuns: suspend () -> List<Pair<String, List<WorkflowRun>>>,
     onEnterNeighbourhood: (Neighbourhood) -> Unit,
-    onImportAgent: () -> Unit,
     onNewHive: () -> Unit = {},
     /**
      * What deleting a hive does, for the long-press menu on each hive (HiveActionsMenu.kt); null offers no Delete.
@@ -93,13 +91,8 @@ internal fun DistrictScreen(
     importCard: (@Composable (open: Boolean, onOpenChange: (Boolean) -> Unit) -> Unit)? = null,
     roles: Collection<RoleDefinition> = emptyList(),
     onAdopt: (RoleDefinition) -> Unit = {},
-    /** The hive's edge: what the Store offers (HiveEdge), shown as a sheet over the district. */
-    edge: @Composable () -> Unit = {},
     modifier: Modifier = Modifier,
-    /** The edge's sheet is open from the start (screenshots). */
-    edgeOpenAtStart: Boolean = false,
 ) {
-    var edgeOpen by remember { mutableStateOf(edgeOpenAtStart) }
     var cardImportOpen by remember { mutableStateOf(false) }
     var district by remember { mutableStateOf<List<Neighbourhood>?>(null) }
     var projectOfRun by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -131,19 +124,7 @@ internal fun DistrictScreen(
     ) {
         AzphaltThemedSurface(Azphalt.Ink) {
             Text(stringResource(Res.string.district_your_swarm), style = AzphaltType.section, color = azphaltOnSurface())
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AzphaltPill(label = stringResource(Res.string.hive_new), seed = "hive-new", onClick = onNewHive)
-                // Drifters arrive at the hive's edge (the Store's agents and remote A2A ones): the
-                // cure for the clone trap. This opens the edge, a sheet over the district.
-                AzphaltPill(
-                    label = stringResource(Res.string.district_import_agent),
-                    seed = "district-import",
-                    onClick = {
-                        onImportAgent()
-                        edgeOpen = true
-                    },
-                )
-            }
+            AzphaltPill(label = stringResource(Res.string.hive_new), seed = "hive-new", onClick = onNewHive)
             loadFailure?.let { message ->
                 Text(stringResource(Res.string.district_load_failed, message), style = AzphaltType.body, color = azphaltOnSurface())
             }
@@ -183,7 +164,6 @@ internal fun DistrictScreen(
             Lineage(roles, onAdopt)
         }
     }
-    if (edgeOpen) HiveEdgeSheet(onClose = { edgeOpen = false }) { edge() }
     menuFor?.let { hive ->
         HiveActionsMenu(
             name = hive.name,
