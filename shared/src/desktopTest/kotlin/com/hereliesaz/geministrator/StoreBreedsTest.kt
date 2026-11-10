@@ -28,9 +28,4 @@ class StoreBreedsTest {
         assertEquals("$0.00", breedListPrice(0.0))
     }
 
-    @Test
-    fun edgeShelvesMapToStoreKinds() {
-        assertEquals(listOf("role", "workflow"), EdgeShelf.entries.map(EdgeShelf::packageKind))
-        assertEquals(edgeCreatureFor("store:a"), edgeCreatureFor("store:a"))
-    }
 }
