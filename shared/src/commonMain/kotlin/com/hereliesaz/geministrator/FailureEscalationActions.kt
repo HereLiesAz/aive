@@ -70,6 +70,10 @@ suspend fun ApplicationRuntime.decideFailureEscalation(
     approved: Boolean,
     note: String? = null,
 ) {
+    parseHallMonitorReviewActionId(taskDefinitionId.value)?.let { step ->
+        applyHallMonitorReviewStep(step, approved)
+        return
+    }
     parseHallMonitorTrialActionId(taskDefinitionId.value)?.let {
         error(
             "Hall Monitor solution testing requires the orchestration model runtime on this platform. " +

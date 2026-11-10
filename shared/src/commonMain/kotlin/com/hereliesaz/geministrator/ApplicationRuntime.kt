@@ -53,6 +53,7 @@ import com.hereliesaz.geministrator.workflow.DelegationEligibility
 import com.hereliesaz.geministrator.workflow.DelegationKey
 import com.hereliesaz.geministrator.workflow.DelegationPolicy
 import com.hereliesaz.geministrator.workflow.GateDelegationContext
+import com.hereliesaz.geministrator.workflow.HallMonitorGovernanceService
 import com.hereliesaz.geministrator.workflow.LiveDefinitionEdit
 import com.hereliesaz.geministrator.workflow.LiveEditMerge
 import com.hereliesaz.geministrator.workflow.ProgressiveDelegationStore
@@ -851,6 +852,31 @@ class ApplicationRuntime private constructor(
         }
     }
 
+    /**
+     * The Hall Monitor escalation path, advanced once per cycle: a run already globally paused has its
+     * Orchestrator review reconciled (the review session is started, followed and decided here); a run
+     * that is not yet paused is paused once a Hall Monitor report has a passing Antagonist review. The
+     * keeper's own review and the resume stay explicit ([decideHallMonitorUserReview], [resumeHallMonitorPause]).
+     * A governance failure never stops the cycle: the run stays as persisted and is tried again.
+     */
+    private suspend fun governHallMonitorLocked(project: Project, state: WorkflowRuntimeState): WorkflowRuntimeState {
+        if (state.run.status.isTerminal()) return state
+        return try {
+            val governance = HallMonitorGovernanceService(persistence)
+            val now = nowEpochMillis()
+            if (state.run.globalPause != null) {
+                val reconciled = governance.reconcileOrchestratorReview(project, state.run, sessionGateway, now)
+                if (reconciled === state.run) state else state.copy(run = reconciled)
+            } else {
+                governance.pauseIfApprovedReportReady(state, sessionGateway, now) ?: state
+            }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            state
+        }
+    }
+
     private fun startCycling() {
         if (cycleJob?.isActive == true) return
         cycleJob = runtimeScope.launch {
@@ -873,7 +899,8 @@ class ApplicationRuntime private constructor(
                             artifactIdFactory = ::artifactId,
                         )
                         if (currentGeneration != snapshotGeneration || current !== snapshot) return@withLock
-                        replaceCurrent(snapshot.copy(state = nextState))
+                        val governed = governHallMonitorLocked(snapshot.project, nextState)
+                        replaceCurrent(snapshot.copy(state = governed))
                         publishCurrent()
                         approveDelegatedGatesLocked()
                     } catch (cancellation: CancellationException) {

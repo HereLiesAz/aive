@@ -127,6 +127,7 @@ internal fun LiveInboxScreen(
                 onTestSolution = { findingId, solutionIndex ->
                     onResolveEscalation(hallMonitorTrialActionId(findingId, solutionIndex), true)
                 },
+                onReview = { step, approved -> onResolveEscalation(hallMonitorReviewActionId(step), approved) },
                 modifier = modifier,
             )
 

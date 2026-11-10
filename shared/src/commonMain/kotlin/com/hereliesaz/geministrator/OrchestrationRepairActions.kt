@@ -29,6 +29,10 @@ suspend fun ApplicationRuntime.repairFailureEscalation(
     orchestrationRuntime: OrchestrationAgentRuntime,
     note: String = "Failure escalation approved; repaired plan scheduled",
 ) {
+    parseHallMonitorReviewActionId(taskDefinitionId.value)?.let { step ->
+        applyHallMonitorReviewStep(step, approved = true)
+        return
+    }
     parseHallMonitorTrialActionId(taskDefinitionId.value)?.let { trial ->
         testHallMonitorSolution(
             findingId = trial.findingId,

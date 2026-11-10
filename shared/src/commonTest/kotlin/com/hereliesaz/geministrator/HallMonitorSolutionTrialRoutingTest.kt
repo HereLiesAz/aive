@@ -15,6 +15,16 @@ class HallMonitorSolutionTrialRoutingTest {
     }
 
     @Test
+    fun reviewStepsRoundTripAndDoNotCollideWithTrialsOrTasks() {
+        HallMonitorReviewStep.entries.forEach { step ->
+            val id = hallMonitorReviewActionId(step)
+            assertEquals(step, parseHallMonitorReviewActionId(id))
+            assertNull(parseHallMonitorTrialActionId(id))
+        }
+        assertNull(parseHallMonitorReviewActionId("implementation"))
+    }
+
+    @Test
     fun ordinaryTaskIdIsNotATrialAction() {
         assertNull(parseHallMonitorTrialActionId("implementation"))
     }
