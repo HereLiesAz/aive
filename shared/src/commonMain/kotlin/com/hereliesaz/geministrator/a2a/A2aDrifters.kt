@@ -37,9 +37,9 @@ enum class DrifterTrouble {
 }
 
 /**
- * A remote A2A agent at the hive's edge (docs/Swarm-OS.md, drifters): read from its Agent Card,
- * not yet let in. [card] is null while it is being read or when it could not be; [trouble] says why.
- * Everything from the card is remote text: it is shown, bounded, and never followed as instructions.
+ * A remote A2A Agent Card validation result. Connections uses [A2aDrifters.read] to inspect a
+ * service before saving it as a provider. [trouble] explains a missing, unreachable or incompatible
+ * card; content read from the card remains untrusted and is never followed as instructions.
  */
 data class A2aDrifter(
     /** The normalized card URL, or what the keeper typed when it is not an address at all. */
@@ -69,9 +69,9 @@ data class A2aDrifter(
 }
 
 /**
- * The drifters waiting at the hive's edge, and the rules for reading and letting one in. Waiting
- * drifters live for the session; one that is let in becomes an [A2aAgentConnection] (the same list
- * the Keeper's room shows) and a role in the swarm that prefers its provider.
+ * Validates remote Agent Cards before Providers connects them. The older waiting-drifter cache and
+ * role-conversion helpers are retained for compatibility with existing callers/tests; the hive-edge
+ * discovery UI no longer exists, and no role is created implicitly when adding a provider.
  */
 object A2aDrifters {
     /** The most drifters that wait at the edge at once; the oldest leaves first. */
