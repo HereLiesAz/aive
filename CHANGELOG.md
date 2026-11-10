@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- **One clear route for remote agents.** Removed the duplicate hive-edge marketplace and the district's Bring in a drifter button. The Azphalt Store installs signed packages; Keeper's room › Connections now contains the optional independent A2A agent suggestions and the single Agent Card connection form. It validates card compatibility before adding a provider. No automatic role assignment or changes to stored agents, roles, and workflows.
 - **Hive edge labels.** The two shelves now read **Drifters** and **Swarms**; the Agent Card entry button is **Adoption**. Actions and admission checks are unchanged, and **Bring in a drifter** on the district still opens the edge.
 - **Store signature verification on Android.** Explicitly select bundled BouncyCastle to verify Ed25519-signed Azphalt packages instead of depending on Android's default JDK cryptography provider. A fixed signature vector from Azphalt guards against signing-format drift; manifest digests, signer identity and revocations are still enforced.
 - **Plain-text breadcrumbs.** A hive's breadcrumb shows its linked GitHub, GitLab or local Git repository/folder before its name. Objective-generated hives use the project's name instead of the full launch prompt. The new-hive breadcrumb is text-only too.
