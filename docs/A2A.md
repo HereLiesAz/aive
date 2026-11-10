@@ -11,19 +11,14 @@ The existing duplex MCP channel ([DUPLEX_MCP](architecture/DUPLEX_MCP.md)) is se
 
 ## Client: remote agents as providers
 
-**Connecting one.** In **Keeper's room › Connections › Add an A2A agent**, paste the Agent Card URL. A bare address (`https://agent.example`) means its `/.well-known/agent-card.json`. The Aive then asks for an optional bearer token, as it does for any provider key. Leaving it blank links the agent without a token.
+**Connecting one.** In **Keeper's room › Connections › Connect remote agent**, paste the Agent Card URL. A bare address (`https://agent.example`) means its `/.well-known/agent-card.json`. Aive reads the card without credentials or redirects and requires a usable JSON-RPC interface before adding the provider. It displays an address, response or compatibility error when validation fails. Next, provider setup handles keyless use or an optional bearer token. A remote agent is never selected automatically: assign its provider to a role in **Swarm** to use it.
 
 - The URL is kept in Settings (`A2aAgentConnections`). The token goes in the platform credential store under the provider id `a2a:<host>`.
 - Disconnecting an agent forgets both.
 
-**Drifters at the hive's edge.** The other way in is the hive's edge (`Swarm-OS.md`): **Adoption** opens the Agent Card address field, and **Read its card** fetches the card without a token or redirects (`A2aDrifters.read`). The drifter waits at the edge, drawn as a creature picked by a stable hash of its card URL, with its name, description and skill names (one bounded line each; the card is remote text). What went wrong lands on it in plain words: not an address it can be reached at, nothing answered (with the HTTP status or error kind), no Agent Card there (404/410), not an Agent Card, or a card with no `JSONRPC` interface. Waiting drifters last for the session.
+**One connection path, not an adoption marketplace.** A remote A2A agent is a service hosted by its operator, not an Azphalt role/workflow package. The old hive-edge sheet once combined Store packages with public A2A drifters to make both discoverable; it was removed because the Store and Connections already perform those jobs. The Agent Card is read in Connections using `A2aDrifters.read`, and only its validated name and URL become a connection. No role is created implicitly; the user can assign the connected provider to a role in Swarm. The remote provider cannot approve Aive's gates or gain repository authority. Disconnecting it removes its credential and connection as before. Existing roles and saved connections are preserved.
 
-- **Let it in** adds the card to `A2aAgentConnections` (the same list the Keeper's room shows; nothing is duplicated), names it after the card, and adds a role `drifter-<host>` to the swarm. The role prefers the drifter's `a2a:<host>` provider, needs only `Research`, and has no authorities, so it can never approve a plan, gate or release. Its description quotes the card's description and skills, bounded and on one line.
-- A card with no bearer scheme is linked keyless at once. One that declares `Bearer` comes in waiting for its token: **Give it its token** opens the same credential step as the Keeper's room, which keeps it in the platform credential store under `a2a:<host>`.
-- **Send it away** on a waiting drifter just drops it. On one already in, it unlinks the provider, forgets the connection and takes its role out of the swarm.
-- Nothing can be let in while no runtime is awake; the drifter says so.
-
-**Seeded drifters.** A few public A2A agents wait at the edge from the first launch, with no setup (`a2a/A2aDrifterSeeds.kt`, `SEEDS`). They are third-party agents, not The Aive's. Until the keeper acts they show only the seed's own name, a line about them and who runs them: their card is read only on **Let it in**, so nothing is fetched from them before then, and a failure then lands on the seed. **Send it away** dismisses a seed for good on this device (Settings key `aive.a2a.drifters.dismissed-seeds.v1`); so does sending away a seed that was let in. A seed already let in is not offered again.
+**Suggested remote agents.** The two independently hosted A2A examples in `A2aDrifterSeeds.SEEDS` are listed only when **Connect remote agent** is expanded, excluding already connected or dismissed services. **Use address** fills the Agent Card field; it does not contact that agent or grant access. **Connect agent** validates the card before adding it. **Dismiss** hides a suggestion on this device using the existing `aive.a2a.drifters.dismissed-seeds.v1` preference. Nothing is fetched from a suggestion unless the keeper connects it.
 
 A seed must need no key, serve its JSON-RPC endpoint on its card's origin, and answer `SendMessage` with something useful for free. Each entry records when and how it was checked. Current seeds, checked 2026-11-02 by reading the card without a token (no security schemes) and sending one real `SendMessage`; both were listed as reachable and passing by [a2aregistry.org](https://a2aregistry.org/):
 
@@ -32,7 +27,7 @@ A seed must need no key, serve its JSON-RPC endpoint on its card's origin, and a
 | World Bank Indicators | `https://agentbazaar.tech/a2a/connectors/worldbank/.well-known/agent.json` | AgentBazaar (JNK Corp.), not affiliated with the World Bank | JSON-RPC 1.0 and 0.3; "GDP of France" completed with a World Bank API recipe |
 | The Moorish Times | `https://mcp.moorish.cloud/.well-known/agent-card.json` | The Moorish Times | JSON-RPC 1.0; "latest news" answered with linked news briefs |
 
-No official a2aproject agent is hosted publicly; its samples run locally. Public agents come and go: if a seed stops answering, its failure shows on it, and it should be taken out of `SEEDS`.
+No official a2aproject agent is hosted publicly; its samples run locally. Public agents come and go: if a suggested agent stops answering, the Agent Card validation reports a failure, and the entry should be taken out of `SEEDS`.
 
 **When it runs.** `A2aAgentProvider` is `explicitOnly`. The router never picks it on its own; it runs only for roles that prefer it, or tasks that require it by id. Choose it as the role's provider in the swarm. It offers `PlanGeneration`, `PlanApproval` (through the engine-owned plan gate), `Messaging` and `Research`, and no repository access.
 
