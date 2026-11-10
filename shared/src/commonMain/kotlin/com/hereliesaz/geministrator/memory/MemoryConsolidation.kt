@@ -335,6 +335,19 @@ class MemoryConsolidator(
                 // A memory never grows: the condensed version is fitted to its sources by weight, whatever
                 // clerk wrote it, and the detail it drops becomes a separate linked memory.
                 val fitted = if (entry.stage == MemoryConsolidationStage.Condensation) fitCondensation(latest, plan, batch) else batch
+                // Fitting can cut a claim ("Port 8080 is not exposed" -> "Port 8080 is"). The signature
+                // check in validateBatch ran on the unfitted text, so it is repeated on what is committed;
+                // a fitted version that no longer states its sources' values is declined, never superseding.
+                if (entry.stage == MemoryConsolidationStage.Condensation) {
+                    val committed = fitted.nodesToAdd.firstOrNull()
+                    if (committed != null &&
+                        memoryClaimSignature(committed.text) != memoryClaimSignature(plan.packet.items.first().text)
+                    ) {
+                        val reason = "Condensation fitted to its size limit no longer restates its sources' values"
+                        decline(processing, requireNotNull(plan.clusterKey), reason)
+                        return MemoryConsolidationResult.Declined(entry.id, reason)
+                    }
+                }
                 if (
                     store.commit(
                         expectedRevision = latest.revision,

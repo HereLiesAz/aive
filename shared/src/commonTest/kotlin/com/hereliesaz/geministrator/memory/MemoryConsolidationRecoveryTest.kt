@@ -154,6 +154,42 @@ class MemoryConsolidationRecoveryTest {
     }
 
     @Test
+    fun aCondensationFittedToItsLimitThatLosesANegationIsDeclinedNotSuperseding() = runBlocking {
+        val store = condensationStore(
+            texts = listOf(
+                "Ops verified port 8080 externally: it is not open.",
+                "Ops verified port 8080 externally: it is not open now.",
+                "Ops verified port 8080 externally: it is not open here.",
+            ),
+        )
+        val manager = object : MemoryManagerAgent {
+            override suspend fun process(packet: MemoryWorkPacket): MemoryMutationBatch {
+                val merged = MemoryNode(
+                    id = MemoryNodeId("merged"),
+                    kind = MemoryNodeKind.Context,
+                    text = "Ops team verified port 8080 externally from outside: it is not open.",
+                    sourceEpisodeIds = setOf(MemoryEpisodeId("source")),
+                    createdAtEpochMillis = 10L,
+                )
+                val edges = packet.items.map { item ->
+                    MemoryEdge(MemoryEdgeId("${item.id}-from"), merged.id, MemoryNodeId(item.id), MemoryRelationKind.CondensedFrom, createdAtEpochMillis = 10L)
+                }
+                return MemoryMutationBatch(nodesToAdd = listOf(merged), edgesToAdd = edges)
+            }
+        }
+
+        assertIs<MemoryConsolidationResult.Declined>(MemoryConsolidator(store, manager, policy).processNext(10L))
+
+        val snapshot = store.read()
+        val sourceSignature = memoryClaimSignature("it is not 8080")
+        // Whatever was committed must still assert what the sources assert; otherwise nothing is committed.
+        snapshot.nodes.filter { it.id.value == "merged" }.forEach {
+            assertEquals(sourceSignature, memoryClaimSignature(it.text), "fitted text: ${it.text}")
+        }
+        assertTrue(snapshot.edges.none { it.relation == MemoryRelationKind.Supersedes } || snapshot.nodes.none { it.id.value == "merged" }, snapshot.nodes.joinToString { it.id.value + "=" + it.text })
+    }
+
+    @Test
     fun associationNeighborsOfTheSameKindComeFirstAndOtherKindsStillFollow() = runBlocking {
         val old = episode("old")
         val current = episode("current")
