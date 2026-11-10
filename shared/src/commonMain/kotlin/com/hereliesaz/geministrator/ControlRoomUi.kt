@@ -81,7 +81,6 @@ import com.hereliesaz.geministrator.distributed.DistributedComputeConfiguration
 import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import com.hereliesaz.geministrator.domain.ROLE_COLLECTION_MARKER_ID
 import com.hereliesaz.geministrator.resources.Res
-import com.hereliesaz.geministrator.resources.flowchart_empty
 import com.hereliesaz.geministrator.resources.nav_runtime
 import com.hereliesaz.geministrator.resources.nav_runtime_disconnected
 import com.hereliesaz.geministrator.resources.nav_runtime_loading
@@ -1117,17 +1116,6 @@ private fun MainDestination(
                                             taskOfSession = com.hereliesaz.geministrator.log.sessionTask(
                                                 live.run.taskRuns.values.associate { it.id to it.taskDefinitionId.value },
                                             ),
-                                        )
-                                    },
-                                    flowchartContent = {
-                                        WorkflowFlowchartView(
-                                            flow = remember(live.definition, live.run) {
-                                                com.hereliesaz.geministrator.workflow.WorkflowFlowchart.of(live.definition, live.run)
-                                            },
-                                            selectedTaskId = selectedTaskId,
-                                            onTaskSelected = onTaskSelected,
-                                            emptyText = stringResource(Res.string.flowchart_empty),
-                                            modifier = Modifier.fillMaxSize(),
                                         )
                                     },
                                     memoryContent = {
