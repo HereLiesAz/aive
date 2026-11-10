@@ -66,7 +66,11 @@ class ShellRailTest {
             objective = prompt, status = WorkflowRunStatus.Running,
             taskRuns = emptyMap(), createdAtEpochMillis = 1, updatedAtEpochMillis = 1,
         )
-        val legacy = WorkflowDefinition(run.workflowDefinitionId, prompt.take(80), tasks = emptyList())
+        val legacy = WorkflowDefinition(
+            run.workflowDefinitionId,
+            "Inspect the memory layer, revise its structure, and carefully optimize each stag",
+            tasks = emptyList(),
+        )
         assertEquals("Memory Audit", shellHiveLabel(legacy, run, project))
         val named = legacy.copy(name = "Memory Refinement")
         assertEquals("Memory Refinement", shellHiveLabel(named, run, project))
