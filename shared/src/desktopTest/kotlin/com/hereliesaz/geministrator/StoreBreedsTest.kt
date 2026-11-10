@@ -27,5 +27,4 @@ class StoreBreedsTest {
         assertEquals("$0.50", breedListPrice(0.5))
         assertEquals("$0.00", breedListPrice(0.0))
     }
-
 }
