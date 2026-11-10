@@ -71,24 +71,44 @@ class MemoryLayerSettingsStore(
     private val settings: Settings,
     private val key: String = DEFAULT_KEY,
 ) {
+    /** The stored text that could not be read, until the keeper's first explicit change replaces it. */
+    private var unreadableRaw: String? = null
     private val mutable = MutableStateFlow(load())
     val state: StateFlow<MemoryLayerSettings> = mutable.asStateFlow()
 
+    private val mutableUnreadable = MutableStateFlow(unreadableRaw != null)
+
+    /** True when stored settings exist but could not be read: memory is off until the keeper sets it up again. */
+    val unreadable: StateFlow<Boolean> = mutableUnreadable.asStateFlow()
+
     fun update(transform: (MemoryLayerSettings) -> MemoryLayerSettings): MemoryLayerSettings {
         val next = transform(mutable.value)
+        // What could not be read is the keeper's own retention choice: it is kept aside, not overwritten.
+        unreadableRaw?.let { raw ->
+            if (settings.getStringOrNull(UNREADABLE_BACKUP_KEY) == null) settings.putString(UNREADABLE_BACKUP_KEY, raw)
+            unreadableRaw = null
+            mutableUnreadable.value = false
+        }
         settings.putString(key, json.encodeToString(MemoryLayerSettings.serializer(), next))
         mutable.value = next
         return next
     }
 
-    /** Unreadable settings fall back to defaults rather than disabling memory. */
-    private fun load(): MemoryLayerSettings =
-        settings.getStringOrNull(key)
-            ?.let { runCatching { json.decodeFromString(MemoryLayerSettings.serializer(), it) }.getOrNull() }
-            ?: MemoryLayerSettings()
+    /**
+     * Settings that exist but cannot be read (a newer version's value, damage) must not silently become
+     * the defaults: that would turn a chosen raw-history retention into keep-everything and keep banking
+     * under it. Memory stays off (stored memory is kept, nothing new is banked), the stored text is left
+     * as it is, and [unreadable] says so. Absent settings are the defaults.
+     */
+    private fun load(): MemoryLayerSettings {
+        val raw = settings.getStringOrNull(key) ?: return MemoryLayerSettings()
+        return runCatching { json.decodeFromString(MemoryLayerSettings.serializer(), raw) }.getOrNull()
+            ?: MemoryLayerSettings(enabled = false).also { unreadableRaw = raw }
+    }
 
     companion object {
         const val DEFAULT_KEY: String = "aive.memory.layer-settings.v1"
+        const val UNREADABLE_BACKUP_KEY: String = "aive.memory.layer-settings.v1.unreadable"
 
         fun createDefault(): MemoryLayerSettingsStore = MemoryLayerSettingsStore(Settings())
         private val json = Json {

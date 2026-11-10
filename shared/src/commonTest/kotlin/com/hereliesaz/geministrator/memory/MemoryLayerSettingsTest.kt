@@ -71,4 +71,24 @@ class MemoryLayerSettingsTest {
         assertEquals(MemoryEngineKind.LocalModel, reopened.engineFor(MemoryMicroAgentRole.CategoryClassifier).kind)
         assertTrue(reopened.consolidationPaused)
     }
+
+    @Test
+    fun unreadableSettingsFailSafeAndAreNotOverwrittenUntilTheKeeperChangesThem() {
+        val settings = MapSettings()
+        val stored = """{"enabled":true,"rawRetention":"""
+        settings.putString(MemoryLayerSettingsStore.DEFAULT_KEY, stored)
+
+        val store = MemoryLayerSettingsStore(settings)
+
+        // Not a silent reset to "keep everything, bank everything": nothing new is banked until it is resolved.
+        assertEquals(false, store.state.value.enabled)
+        assertTrue(store.unreadable.value)
+        assertEquals(stored, settings.getString(MemoryLayerSettingsStore.DEFAULT_KEY, ""))
+
+        // The keeper's first explicit change replaces it, but what was there is kept.
+        store.update { it.copy(enabled = true) }
+        assertEquals(false, store.unreadable.value)
+        assertEquals(stored, settings.getString(MemoryLayerSettingsStore.UNREADABLE_BACKUP_KEY, ""))
+        assertTrue(MemoryLayerSettingsStore(settings).state.value.enabled)
+    }
 }
