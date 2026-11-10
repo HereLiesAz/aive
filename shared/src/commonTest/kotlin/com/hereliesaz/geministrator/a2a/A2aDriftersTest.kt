@@ -92,6 +92,15 @@ class A2aDriftersTest {
     }
 
     @Test
+    fun aCardIsCappedInBytesNotCharacters() = runTest {
+        // 100k characters is 300k bytes: past the 256 KB cap, though under it as a character count.
+        val wide = """{"name":"${"€".repeat(100_000)}","supportedInterfaces":[{"url":"https://agent.example","protocolBinding":"JSONRPC"}]}"""
+        val drifter = A2aDrifters.read("https://agent.example", client { HttpStatusCode.OK to wide })
+        assertEquals(DrifterTrouble.NotACard, drifter.trouble)
+        assertEquals("too large", drifter.detail)
+    }
+
+    @Test
     fun theSameCardIsAlwaysTheSameCreature() {
         val one = A2aDrifters.creatureFor("https://agent.example/.well-known/agent-card.json")
         assertEquals(one, A2aDrifters.creatureFor("https://AGENT.example/.well-known/agent-card.json"))

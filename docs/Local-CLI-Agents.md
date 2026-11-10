@@ -19,8 +19,8 @@ Turn one on in **Keeper's room › Local agents**. It is off until you do. It th
 | CLI | Headless form | Edits | Notes |
 |---|---|---|---|
 | Claude Code | `claude -p`, stream-json, prompt on stdin | `acceptEdits`; allowed tools Read, Glob, Grep, Edit, Write; Bash and web tools disallowed | No shell, so it only edits files. Read-only uses `plan`. |
-| Codex | `codex exec --json -C <tree> -`, prompt on stdin | its own `workspace-write` sandbox (commands inside the tree, no network); `read-only` otherwise | The only one that claims shell execution and testing. |
-| Gemini CLI | `gemini --approval-mode auto_edit -p <prompt>` | file edits approved; shell not (denied headless) | Output is plain text. |
+| Codex | `codex exec --json -C <tree> -`, prompt on stdin | its own `workspace-write` sandbox (commands inside the tree; its network setting is Codex's own, not set by the app); `read-only` otherwise | The only one that claims shell execution and testing. |
+| Gemini CLI | `gemini --approval-mode auto_edit -p <fixed sentence>`, task on stdin | file edits approved; shell not (denied headless) | Output is plain text. |
 | Qwen Code | the same flags as Gemini CLI | the same | A Gemini CLI fork. |
 
 Adding another CLI is adding a spec (`CliAgentSpecs`): its binary, its headless flags, how to read its output.

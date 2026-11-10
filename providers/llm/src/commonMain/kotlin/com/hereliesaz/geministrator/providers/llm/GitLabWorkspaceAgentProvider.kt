@@ -57,9 +57,12 @@ class GitLabWorkspaceAgentProvider(
     private val displayName: String,
     private val api: TextGenerationApi,
     private val tokenProvider: GitLabWorkspaceTokenProvider,
-    private val httpClient: HttpClient = defaultGitLabWorkspaceHttpClient(),
+    httpClient: HttpClient = defaultGitLabWorkspaceHttpClient(),
     private val json: Json = gitLabWorkspaceJson,
 ) : AgentProvider {
+    // A redirect would carry the token to another host; none is followed, whatever client was given.
+    private val httpClient: HttpClient = httpClient.config { followRedirects = false }
+
     private enum class Phase { AwaitingApproval, Ready, Cancelled }
 
     private data class WorkspacePlan(
@@ -899,6 +902,7 @@ private suspend fun HttpResponse.requireSuccessBody(operation: String): String {
 }
 
 private fun defaultGitLabWorkspaceHttpClient(): HttpClient = HttpClient {
+    followRedirects = false
     install(HttpTimeout) {
         requestTimeoutMillis = 30_000L
         connectTimeoutMillis = 10_000L

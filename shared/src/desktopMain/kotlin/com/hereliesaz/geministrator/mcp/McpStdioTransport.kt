@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.mcp
 
+import com.hereliesaz.geministrator.net.ChildProcessEnvironment
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -118,13 +119,22 @@ class McpStdioTransport private constructor(
         private const val MAX_LINE_CHARS = 8_000_000
 
         /** Starts [command] directly (no shell); throws when it cannot be started. */
-        fun start(command: List<String>, workingDirectory: File = File(System.getProperty("user.home"))): McpStdioTransport {
+        fun start(
+            command: List<String>,
+            workingDirectory: File = File(System.getProperty("user.home")),
+            inheritedEnvironment: Map<String, String> = System.getenv(),
+        ): McpStdioTransport {
             McpCommandLine.requireUsable(command)
-            val process = ProcessBuilder(command)
+            val builder = ProcessBuilder(command)
                 .directory(workingDirectory.takeIf(File::isDirectory))
                 .redirectError(ProcessBuilder.Redirect.DISCARD)
-                .start()
-            return McpStdioTransport(process)
+            // The server gets the same allowlisted environment a CLI agent gets, not everything the app was started with
+            // (API keys, repository tokens); a server that needs a secret takes it on its own command line or in its own config.
+            builder.environment().apply {
+                clear()
+                putAll(ChildProcessEnvironment.allowed(inheritedEnvironment))
+            }
+            return McpStdioTransport(builder.start())
         }
     }
 }

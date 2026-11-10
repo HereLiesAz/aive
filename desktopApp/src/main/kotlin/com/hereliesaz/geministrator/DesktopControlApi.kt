@@ -80,6 +80,7 @@ internal class DesktopControlApi(
     fun start() {
         if (http != null) return
         token.set(loadOrCreateToken())
+        HttpRequestGuard.applyRequestTimeout()
         val server = HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), port), 0)
         val pool = Executors.newFixedThreadPool(4) { r -> Thread(r, "aive-control").apply { isDaemon = true } }
         server.executor = pool
@@ -137,19 +138,28 @@ internal class DesktopControlApi(
 
     private fun serve(exchange: HttpExchange) {
         try {
-            val bytes = exchange.requestBody.readNBytes(ControlApi.MAX_BODY_BYTES + 1)
-            val response = if (bytes.size > ControlApi.MAX_BODY_BYTES) {
-                ControlHttpResponse(413, """{"ok":false,"error":{"code":"too_large","message":"Request body is too large"}}""")
-            } else {
-                val headers = exchange.requestHeaders.entries.associate { (name, values) -> name to values.firstOrNull().orEmpty() }
-                val remote = exchange.remoteAddress?.address
-                val caller = ControlCaller(remote?.hostAddress.orEmpty(), remote?.isLoopbackAddress == true)
-                runCatching {
-                    runBlocking {
-                        api.handle(exchange.requestMethod, exchange.requestURI.rawPath + (exchange.requestURI.rawQuery?.let { "?$it" } ?: ""), headers, bytes.decodeToString(), caller)
+            val headers = exchange.requestHeaders.entries.associate { (name, values) -> name to values.firstOrNull().orEmpty() }
+            val remote = exchange.remoteAddress?.address
+            val caller = ControlCaller(remote?.hostAddress.orEmpty(), remote?.isLoopbackAddress == true)
+            val tooLarge = ControlHttpResponse(413, """{"ok":false,"error":{"code":"too_large","message":"Request body is too large"}}""")
+            // Loopback, Host and the bearer token are judged from the headers; a refused caller's body is never read.
+            val refused = api.refusalBeforeBody(headers, caller)
+            val response = when {
+                refused != null -> refused
+                HttpRequestGuard.declaresTooLarge(exchange, ControlApi.MAX_BODY_BYTES) -> tooLarge
+                else -> {
+                    val bytes = HttpRequestGuard.readBody(exchange, ControlApi.MAX_BODY_BYTES)
+                    if (bytes.size > ControlApi.MAX_BODY_BYTES) {
+                        tooLarge
+                    } else {
+                        runCatching {
+                            runBlocking {
+                                api.handle(exchange.requestMethod, exchange.requestURI.rawPath + (exchange.requestURI.rawQuery?.let { "?$it" } ?: ""), headers, bytes.decodeToString(), caller)
+                            }
+                        }.getOrElse {
+                            ControlHttpResponse(500, """{"ok":false,"error":{"code":"internal","message":"internal error"}}""")
+                        }
                     }
-                }.getOrElse {
-                    ControlHttpResponse(500, """{"ok":false,"error":{"code":"internal","message":"internal error"}}""")
                 }
             }
             val body = response.body.encodeToByteArray()

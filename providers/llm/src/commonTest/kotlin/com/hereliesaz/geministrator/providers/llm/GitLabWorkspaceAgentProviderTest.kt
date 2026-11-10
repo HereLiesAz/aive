@@ -115,6 +115,27 @@ class GitLabWorkspaceAgentProviderTest {
     }
 
     @Test
+    fun aRedirectIsNeverFollowedSoTheTokenStaysOnGitLab() = runTest {
+        val requests = mutableListOf<HttpRequestData>()
+        val engine = MockEngine { request ->
+            requests += request
+            respond(
+                content = "",
+                status = HttpStatusCode.Found,
+                headers = headersOf(HttpHeaders.Location, "https://evil.example/steal"),
+            )
+        }
+        val api = QueueTextApi(TextGenerationResult(text = "Update README.\nFILES:\nREADME.md", inputTokens = 1, outputTokens = 1))
+        val provider = provider(api, HttpClient(engine), "redirect-gitlab")
+
+        val handle = provider.start(request(TaskRunId("task-redirect")))
+        provider.observe(handle.providerRunId).toList()
+
+        assertTrue(requests.isNotEmpty())
+        assertTrue(requests.none { it.url.host == "evil.example" }, requests.map { it.url.toString() }.toString())
+    }
+
+    @Test
     fun approvalPreventsBranchAndCommitUntilAccepted() = runTest {
         val requests = mutableListOf<HttpRequestData>()
         val engine = MockEngine { request ->

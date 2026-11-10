@@ -28,4 +28,30 @@ internal object CliLocator {
             .flatMap { dir -> names.asSequence().map { File(dir, it) } }
             .firstOrNull { it.isFile && it.canExecute() }
     }
+
+    /** True for a Windows command script, which the OS runs through `cmd.exe`. */
+    fun isWindowsShim(program: File): Boolean = program.name.lowercase().let { it.endsWith(".cmd") || it.endsWith(".bat") }
+
+    /**
+     * The command line to start [program] with [arguments]. A `.cmd`/`.bat` shim (how npm installs most CLIs on Windows) is
+     * run by `cmd.exe`, which re-reads the line and obeys `&`, `|`, `%` and the like inside an argument, so an argument that
+     * contains one is **refused** rather than quoted: there is no quoting that every `cmd.exe` agrees on. A real executable
+     * takes its arguments as they are.
+     *
+     * @throws IllegalArgumentException when [program] is a shim and the line has such a character.
+     */
+    fun commandFor(program: File, arguments: List<String>): List<String> {
+        if (isWindowsShim(program)) {
+            // A folder like "Program Files (x86)" is ordinary, so the program's own path is checked against the characters that chain commands only.
+            val unsafe = program.path.takeIf { path -> path.any { it in PATH_METACHARACTERS || it.isISOControl() } }
+                ?: arguments.firstOrNull { argument -> argument.any { it in SHELL_METACHARACTERS || it.isISOControl() } }
+            require(unsafe == null) {
+                "${program.name} is a Windows command script, which would pass this to cmd.exe: \"${unsafe?.take(40)}\". Install the program's .exe, or use a plainer folder name."
+            }
+        }
+        return listOf(program.absolutePath) + arguments
+    }
+
+    private const val PATH_METACHARACTERS = "&|<>^%!\""
+    private const val SHELL_METACHARACTERS = "&|<>^%!\"'`()=;,"
 }

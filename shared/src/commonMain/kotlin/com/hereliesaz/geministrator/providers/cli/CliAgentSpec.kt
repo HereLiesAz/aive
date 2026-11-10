@@ -49,14 +49,30 @@ data class CliAgentSpec(
     val optionalKeyEnvironment: List<String> = emptyList(),
     /** What the CLI's own sandbox does, in words, for the keeper and the docs. */
     val sandboxNote: String,
+    /**
+     * Paths in a repository that this CLI reads as its own project settings (hooks, MCP servers, tool permissions), so a
+     * checkout that tracks one can make it run commands. A path ending in `/` is a folder; any other entry matches a path
+     * that starts with it. Matched at any depth and without regard to case.
+     */
+    val projectConfig: List<String> = emptyList(),
     private val build: (CliAgentSpec, CliRunMode, String) -> List<String>,
 ) {
+    /** The arguments (after the program) for [mode], without the prompt; [workingDirectory] is where it runs. Pure. */
+    fun fixedArguments(mode: CliRunMode, workingDirectory: String): List<String> = build(this, mode, workingDirectory)
+
     /** The arguments (after the program) for [mode]; [workingDirectory] is where it runs. Pure. */
     fun arguments(mode: CliRunMode, workingDirectory: String, prompt: String): List<String> =
-        build(this, mode, workingDirectory) + if (promptChannel == CliPromptChannel.Argument) listOf(prompt.take(MAX_ARGUMENT_PROMPT_CHARS)) else emptyList()
+        fixedArguments(mode, workingDirectory) + if (promptChannel == CliPromptChannel.Argument) listOf(prompt.take(MAX_ARGUMENT_PROMPT_CHARS)) else emptyList()
+
+    /** Whether [path] (relative to a checkout, `/`-separated) is one of this CLI's project settings ([projectConfig]). */
+    fun isProjectConfig(path: String): Boolean {
+        val where = "/" + path.lowercase().trimStart('/')
+        return projectConfig.any { entry -> where.contains("/" + entry.lowercase()) }
+    }
 
     companion object {
-        const val MAX_ARGUMENT_PROMPT_CHARS = 100_000
+        /** An argument prompt shares the process list and the operating system's command-line limit (about 32 K on Windows). */
+        const val MAX_ARGUMENT_PROMPT_CHARS = 24_000
         const val MAX_STDIN_PROMPT_CHARS = 400_000
     }
 }
@@ -71,6 +87,34 @@ object CliAgentSpecs {
         "danger-full-access", "--allow-all-tools", "--force", "bypassPermissions", "--approval-mode=yolo",
     )
 
+    /** Options whose value lifts a check, in either spelling (`--approval-mode=yolo` and `--approval-mode yolo`). */
+    val FORBIDDEN_OPTION_VALUES: Map<String, Set<String>> = mapOf(
+        "--approval-mode" to setOf("yolo"),
+        "--permission-mode" to setOf("bypassPermissions"),
+        "--sandbox" to setOf("danger-full-access"),
+        "-s" to setOf("danger-full-access"),
+    )
+
+    /**
+     * The first thing in [arguments] (a fixed command line, not a prompt) that skips a CLI's own checks, or null: a
+     * forbidden flag anywhere in an argument, or a forbidden value for an option written as `--option=value` or as
+     * `--option value`. Structural, so a spec cannot slip one past by changing how it spells the option.
+     */
+    fun violation(arguments: List<String>): String? {
+        arguments.forEachIndexed { index, argument ->
+            FORBIDDEN_FLAGS.firstOrNull { argument.contains(it, ignoreCase = true) }?.let { return it }
+            val joined = argument.contains('=')
+            val option = argument.substringBefore('=').lowercase()
+            val forbidden = FORBIDDEN_OPTION_VALUES[option] ?: return@forEachIndexed
+            val value = if (joined) argument.substringAfter('=') else arguments.getOrNull(index + 1).orEmpty()
+            if (forbidden.any { it.equals(value, ignoreCase = true) }) return "$option $value"
+        }
+        return null
+    }
+
+    /** What `-p` carries when the real task arrives on standard input. */
+    const val STDIN_TASK_SENTENCE = "Carry out the task given on standard input."
+
     private val claudeEdit = "Read,Glob,Grep,Edit,Write"
     private val claudeRead = "Read,Glob,Grep"
 
@@ -84,7 +128,9 @@ object CliAgentSpecs {
         ),
         authEnvironment = listOf("CLAUDE_CONFIG_DIR"),
         optionalKeyEnvironment = listOf("ANTHROPIC_API_KEY"),
-        sandboxNote = "Allowed tools are Read, Glob, Grep and, when it may edit, Edit and Write. It has no shell and no web tool.",
+        sandboxNote = "The app passes only Read, Glob, Grep and, when it may edit, Edit and Write as allowed tools, and disallows its shell and web tools on the command line. " +
+            "Settings in the repository could change that, so a repository that tracks Claude Code settings is refused unless you allow project settings.",
+        projectConfig = listOf(".claude/settings", ".mcp.json"),
         build = { _, mode, _ ->
             listOf(
                 "-p", "--output-format", "stream-json", "--verbose",
@@ -95,7 +141,7 @@ object CliAgentSpecs {
         },
     )
 
-    /** Codex CLI. `codex exec -` reads stdin; its own OS sandbox confines commands to the workspace with no network. */
+    /** Codex CLI. `codex exec -` reads stdin; its own OS sandbox confines writes to the workspace (its network setting is Codex's own). */
     val Codex = CliAgentSpec(
         id = "cli-codex", displayName = "Codex", binaries = listOf("codex"),
         promptChannel = CliPromptChannel.Stdin, outputFormat = CliOutputFormat.CodexJsonl,
@@ -105,7 +151,9 @@ object CliAgentSpecs {
         ),
         authEnvironment = listOf("CODEX_HOME"),
         optionalKeyEnvironment = listOf("OPENAI_API_KEY"),
-        sandboxNote = "Its own sandbox (workspace-write) lets it run commands inside the worktree with no network; read-only when it may not edit.",
+        sandboxNote = "Its own sandbox (workspace-write) lets it run commands inside the worktree and write only there; read-only when it may not edit. " +
+            "Whether those commands can reach the network follows Codex's own configuration, which the app does not set.",
+        projectConfig = listOf(".codex/"),
         build = { _, mode, dir ->
             listOf(
                 "exec", "--json", "--color", "never", "--sandbox", if (mode == CliRunMode.EditFiles) "workspace-write" else "read-only",
@@ -114,30 +162,38 @@ object CliAgentSpecs {
         },
     )
 
-    /** Gemini CLI. `gemini -p <prompt>`; `auto_edit` approves file edits only, and shell commands stay unapproved (denied headless). */
+    /**
+     * Gemini CLI. The task goes to standard input and `-p` carries only a fixed sentence (Gemini appends stdin to the `-p` text),
+     * so the task is neither in the process list nor limited by the command-line size. `auto_edit` approves file edits only,
+     * and shell commands stay unapproved (denied headless).
+     */
     val Gemini = CliAgentSpec(
         id = "cli-gemini", displayName = "Gemini CLI", binaries = listOf("gemini"),
-        promptChannel = CliPromptChannel.Argument, outputFormat = CliOutputFormat.PlainText,
+        promptChannel = CliPromptChannel.Stdin, outputFormat = CliOutputFormat.PlainText,
         capabilities = setOf(
             AgentCapability.RepositoryRead, AgentCapability.RepositoryWrite, AgentCapability.PlanGeneration,
             AgentCapability.PlanApproval, AgentCapability.TestAuthoring,
         ),
         authEnvironment = listOf("GEMINI_CONFIG_DIR"),
         optionalKeyEnvironment = listOf("GEMINI_API_KEY", "GOOGLE_API_KEY"),
-        sandboxNote = "File edits are approved automatically; shell commands are not, so headless it cannot run them.",
+        sandboxNote = "File edits are approved automatically; shell commands are not, so headless it cannot run them. " +
+            "A repository that tracks Gemini settings is refused unless you allow project settings.",
+        projectConfig = listOf(".gemini/"),
         build = { _, mode, _ ->
-            listOf("--approval-mode", if (mode == CliRunMode.EditFiles) "auto_edit" else "default", "-p")
+            listOf("--approval-mode", if (mode == CliRunMode.EditFiles) "auto_edit" else "default", "-p", STDIN_TASK_SENTENCE)
         },
     )
 
     /** Qwen Code, a fork of Gemini CLI with the same headless flags. */
     val Qwen = CliAgentSpec(
         id = "cli-qwen", displayName = "Qwen Code", binaries = listOf("qwen"),
-        promptChannel = CliPromptChannel.Argument, outputFormat = CliOutputFormat.PlainText,
+        promptChannel = CliPromptChannel.Stdin, outputFormat = CliOutputFormat.PlainText,
         capabilities = Gemini.capabilities,
         optionalKeyEnvironment = listOf("OPENAI_API_KEY"),
-        sandboxNote = Gemini.sandboxNote,
-        build = { _, mode, _ -> listOf("--approval-mode", if (mode == CliRunMode.EditFiles) "auto_edit" else "default", "-p") },
+        sandboxNote = "File edits are approved automatically; shell commands are not, so headless it cannot run them. " +
+            "A repository that tracks Qwen settings is refused unless you allow project settings.",
+        projectConfig = listOf(".qwen/"),
+        build = { _, mode, _ -> listOf("--approval-mode", if (mode == CliRunMode.EditFiles) "auto_edit" else "default", "-p", STDIN_TASK_SENTENCE) },
     )
 
     /** Every CLI the app knows how to drive. Adding one is adding a spec here. */

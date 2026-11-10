@@ -80,7 +80,8 @@ interface GitHubActionsClient {
 
 class GitHubRestActionsClient(
     private val tokenProvider: GitHubTokenProvider,
-    private val httpClient: HttpClient = HttpClient {
+    httpClient: HttpClient = HttpClient {
+        followRedirects = false
         install(HttpTimeout) {
             requestTimeoutMillis = 30_000L
             connectTimeoutMillis = 10_000L
@@ -89,6 +90,9 @@ class GitHubRestActionsClient(
     private val baseUrl: String = "https://api.github.com",
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) : GitHubActionsClient {
+    // A redirect would carry the token to another host; none is followed, whatever client was given.
+    private val httpClient: HttpClient = httpClient.config { followRedirects = false }
+
     override suspend fun dispatch(request: GitHubWorkflowDispatchRequest): GitHubWorkflowRun {
         val token = requireToken()
         val repository = request.repository

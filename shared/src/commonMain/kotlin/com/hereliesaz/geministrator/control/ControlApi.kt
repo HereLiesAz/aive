@@ -78,6 +78,25 @@ class ControlApi(
         } catch (_: Throwable) {
             fail(ControlErrorCode.Internal, "The app could not complete this request", null)
         }
+        return finish(response, secret)
+    }
+
+    /**
+     * The refusal this request earns from who is asking alone (not this computer, a browser, the wrong Host, no
+     * valid token), or null. A server calls it **before it reads the body**, so an unauthenticated caller costs
+     * nothing but the headers; [handle] makes the same checks again.
+     */
+    fun refusalBeforeBody(headers: Map<String, String>, caller: ControlCaller): ControlHttpResponse? {
+        val secret = token()
+        return try {
+            check(caller, headers, secret)
+            null
+        } catch (failure: ControlException) {
+            finish(fail(failure.code, failure.message, failure.details), secret)
+        }
+    }
+
+    private fun finish(response: ControlHttpResponse, secret: String?): ControlHttpResponse {
         val scrubbed = ControlRedaction.scrub(response.body, listOfNotNull(secret))
         return response.copy(
             body = scrubbed,

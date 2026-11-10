@@ -10,7 +10,8 @@ import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
 import io.ktor.client.request.header
-import io.ktor.client.statement.bodyAsText
+import com.hereliesaz.geministrator.net.ResponseTooLargeException
+import com.hereliesaz.geministrator.net.boundedText
 import io.ktor.http.HttpHeaders
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -150,13 +151,14 @@ object A2aDrifters {
                 status !in 200..299 ->
                     return A2aDrifter(cardUrl, trouble = DrifterTrouble.Unreachable, detail = "HTTP $status")
             }
-            response.bodyAsText()
+            response.boundedText(MAX_CARD_BYTES)
         } catch (cancelled: CancellationException) {
             throw cancelled
+        } catch (_: ResponseTooLargeException) {
+            return A2aDrifter(cardUrl, trouble = DrifterTrouble.NotACard, detail = "too large")
         } catch (failure: Exception) {
             return A2aDrifter(cardUrl, trouble = DrifterTrouble.Unreachable, detail = failure::class.simpleName)
         }
-        if (body.length > MAX_CARD_BYTES) return A2aDrifter(cardUrl, trouble = DrifterTrouble.NotACard, detail = "too large")
         val card = runCatching { A2aCodec.decodeCard(json.parseToJsonElement(body)) }.getOrNull()
             ?.takeIf { it.name.isNotBlank() || it.interfaces.isNotEmpty() }
             ?: return A2aDrifter(cardUrl, trouble = DrifterTrouble.NotACard)
