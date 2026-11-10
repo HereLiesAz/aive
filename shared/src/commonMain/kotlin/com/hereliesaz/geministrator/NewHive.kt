@@ -53,6 +53,7 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.build_build
 import com.hereliesaz.geministrator.resources.build_live
+import com.hereliesaz.geministrator.resources.hive_view_flowchart
 import com.hereliesaz.geministrator.resources.hive_new_build_help
 import com.hereliesaz.geministrator.resources.hive_new_build_title
 import com.hereliesaz.geministrator.resources.hive_new_build_title_only
@@ -116,11 +117,13 @@ internal fun NewHiveCrumb(name: String, onSurface: () -> Unit, modifier: Modifie
     }
 }
 
-/** Live and Build as one Ink capsule, the open one filled; each is a radio button of the pair. */
+/** Live, Build and Flowchart share an Ink capsule; only one view is selected. */
 @Composable
 internal fun TerrariumModeSegments(
     building: Boolean,
     onBuildingChange: (Boolean) -> Unit,
+    flowchart: Boolean,
+    onFlowchartSelected: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     AzphaltThemedSurface(Azphalt.Ink) {
@@ -132,8 +135,11 @@ internal fun TerrariumModeSegments(
                 .padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            listOf(false to Res.string.build_live, true to Res.string.build_build).forEach { (forBuild, label) ->
-                val open = building == forBuild
+            listOf(
+                Triple("live", Res.string.build_live, !building && !flowchart),
+                Triple("build", Res.string.build_build, building && !flowchart),
+                Triple("flowchart", Res.string.hive_view_flowchart, flowchart),
+            ).forEach { (mode, label, open) ->
                 val fill = if (open) azphaltStrong() else Azphalt.Ink
                 val text = stringResource(label)
                 Box(
@@ -143,11 +149,14 @@ internal fun TerrariumModeSegments(
                             selected = open
                             contentDescription = text
                         }
-                        // With the capsule's own 4dp each side, the pair stands 48dp tall.
+                        // With the capsule's own 4dp each side, the control stands 48dp tall.
                         .height(AzphaltMinTouchTarget - 8.dp)
                         .clip(RoundedCornerShape(999.dp))
                         .background(fill)
-                        .clickable { onBuildingChange(forBuild) }
+                        .clickable {
+                            if (mode == "flowchart") onFlowchartSelected()
+                            else onBuildingChange(mode == "build")
+                        }
                         .padding(horizontal = 14.dp),
                     contentAlignment = Alignment.Center,
                 ) {
