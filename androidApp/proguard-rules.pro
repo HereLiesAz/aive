@@ -54,4 +54,9 @@
 -dontwarn okio.**
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**
+# The Store verifies Ed25519 with the bundled BouncyCastle JCA provider. BouncyCastle registers
+# its EdEC mapping and signature/key factories by class-name strings; R8 cannot trace them.
+# Keep only those provider entry points, not the entire BouncyCastle implementation.
+-keep class org.bouncycastle.jcajce.provider.asymmetric.EdEC$Mappings { *; }
+-keep class org.bouncycastle.jcajce.provider.asymmetric.edec.** { *; }
 -dontwarn org.openjsse.**
