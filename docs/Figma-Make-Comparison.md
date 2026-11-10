@@ -79,7 +79,7 @@ Verdicts:
 | "Stable": a page of role lineages with CREATE ROLE | Three things in two places: creature bodies in the district (`StableScreens.kt:83-130`, `Breeds.kt:84-96`), the lineage of hatched configs (`DistrictScreen.kt:243-263`), and roles in the Swarm (`CompanyCustomizationScreen.kt:807-831`, Add role) | **Redesign — look into** |
 | Filters All / Producers / Reviewers / At risk | No filter on roles. Reviewer kinds are already classified (`CreatureNeeds.kt:46-54`) | **New — port** (port 10; "At risk" excluded, see below) |
 | Card: "GEN n", kind, name, "N hives · Integrity x%", health bar, THRIVING / LOW ECHO | Body tiles show generation, rarity and count (`StableScreens.kt:113-128`). A role row shows department, execution, authority and Working/Available (`CompanyCustomizationScreen.kt:810-831`). How many hives use a role is not shown | "N hives": **New — port** (port 10). Integrity, health and THRIVING: **Mock-only**: Integrity is defined per task in one run (`CreatureNeeds.kt:95-98`); a role score across runs would need its own definition over run history |
-| "Bring in a drifter: add a different model lineage" | District "Import agent" and the hive's edge Drifters shelf (`DistrictScreen.kt:117-122`, `HiveEdge.kt:28-100`) | **Same** |
+| "Bring in a drifter: add a different model lineage" | Retired duplicate district edge. External A2A agents are connected from Keeper's room › Connections (`ProviderManagementScreens.kt`); Azphalt packages remain in the Store. | **Simplified** — no separate adoption shelf |
 
 ## Memory
 
