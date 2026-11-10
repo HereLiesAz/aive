@@ -45,16 +45,15 @@ import com.hereliesaz.geministrator.resources.keeper_add_provider
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_add
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_card_url
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_explain
-import com.hereliesaz.geministrator.resources.keeper_a2a_agent_invalid_url
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_remove
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_suggestions
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_unreachable
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_use_address
-import com.hereliesaz.geministrator.resources.hive_edge_drifter_bad_address
-import com.hereliesaz.geministrator.resources.hive_edge_drifter_no_card
-import com.hereliesaz.geministrator.resources.hive_edge_drifter_no_jsonrpc
-import com.hereliesaz.geministrator.resources.hive_edge_drifter_not_a_card
-import com.hereliesaz.geministrator.resources.hive_edge_drifter_reading
+import com.hereliesaz.geministrator.resources.keeper_a2a_agent_invalid_url
+import com.hereliesaz.geministrator.resources.keeper_a2a_agent_missing_card
+import com.hereliesaz.geministrator.resources.keeper_a2a_agent_unsupported_binding
+import com.hereliesaz.geministrator.resources.keeper_a2a_agent_invalid_card
+import com.hereliesaz.geministrator.resources.keeper_a2a_agent_checking
 import com.hereliesaz.geministrator.resources.keeper_add_a2a_agent
 import com.hereliesaz.geministrator.resources.keeper_add_a2a_agent_hint
 import com.hereliesaz.geministrator.resources.settings_a2a_lan_allow
@@ -641,11 +640,11 @@ internal fun ProviderSettingsScreen(
         val dismissedSeeds by A2aDrifterSeeds.dismissed.collectAsState()
         val suggestions = remember(a2aAgents, dismissedSeeds) { A2aDrifterSeeds.pending(a2aAgents) }
         val invalidA2aUrl = stringResource(Res.string.keeper_a2a_agent_invalid_url)
-        val badAddress = stringResource(Res.string.hive_edge_drifter_bad_address)
+        val badAddress = invalidA2aUrl
         val unreachable = stringResource(Res.string.keeper_a2a_agent_unreachable)
-        val missingCard = stringResource(Res.string.hive_edge_drifter_no_card)
-        val invalidCard = stringResource(Res.string.hive_edge_drifter_not_a_card)
-        val incompatibleCard = stringResource(Res.string.hive_edge_drifter_no_jsonrpc)
+        val missingCard = stringResource(Res.string.keeper_a2a_agent_missing_card)
+        val invalidCard = stringResource(Res.string.keeper_a2a_agent_invalid_card)
+        val incompatibleCard = stringResource(Res.string.keeper_a2a_agent_unsupported_binding)
         AddConnectionRow(
             label = stringResource(Res.string.keeper_add_a2a_agent),
             hint = stringResource(Res.string.keeper_add_a2a_agent_hint),
@@ -695,7 +694,7 @@ internal fun ProviderSettingsScreen(
                 errorMessage = a2aUrlError,
             )
             AzphaltPill(
-                if (checkingA2aCard) stringResource(Res.string.hive_edge_drifter_reading)
+                if (checkingA2aCard) stringResource(Res.string.keeper_a2a_agent_checking)
                 else stringResource(Res.string.keeper_a2a_agent_add),
                 "add-a2a-agent",
                 onClick = {
