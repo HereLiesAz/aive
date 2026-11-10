@@ -9,9 +9,9 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 
 /**
- * A public A2A agent that waits at the hive's edge with no setup (docs/A2A.md, Seeded drifters).
- * [name] and [about] are shown until the keeper acts; the card itself is read only when the keeper
- * lets it in, so nothing is fetched from a third party before then.
+ * An independently hosted A2A agent suggested under Keeper's room › Connections (docs/A2A.md).
+ * Its [name], [about] and operator are local catalog text. The card is fetched only after
+ * the keeper chooses its address and presses Connect, never on rendering the suggestion.
  */
 data class A2aDrifterSeed(
     /** The Agent Card URL, already normalized (https, explicit card path). */
@@ -25,10 +25,9 @@ data class A2aDrifterSeed(
 )
 
 /**
- * The seed list. Edit [SEEDS] to add or remove one; the tests check every entry is a normalized
- * https card URL. Keep it to agents that need no key, answer `SendMessage` with something useful
- * for free, and serve their JSON-RPC endpoint on the card's own origin. A keeper can dismiss a seed
- * for good; that is remembered on this device.
+ * Optional third-party A2A suggestions in Providers. Edit [SEEDS] to add or remove one; tests
+ * require normalized HTTPS card URLs. Each must answer `SendMessage` without a key and serve a
+ * JSON-RPC endpoint on its card's origin. The keeper can hide a suggestion on this device.
  */
 object A2aDrifterSeeds {
     val SEEDS: List<A2aDrifterSeed> = listOf(
@@ -59,20 +58,20 @@ object A2aDrifterSeeds {
     private val settings: Settings? get() = settingsOverride ?: defaultSettings
     private val state: MutableStateFlow<Set<String>> by lazy { MutableStateFlow(read()) }
 
-    /** Card URLs of seeds the keeper sent away for good. */
+    /** Card URLs of suggestions dismissed on this device. */
     val dismissed: StateFlow<Set<String>> get() = state
 
     fun isSeed(cardUrl: String): Boolean = SEEDS.any { it.cardUrl == cardUrl }
 
     fun seedFor(cardUrl: String): A2aDrifterSeed? = SEEDS.firstOrNull { it.cardUrl == cardUrl }
 
-    /** Seeds still to show: neither dismissed nor already connected. */
+    /** Provider suggestions not dismissed and not already connected. */
     fun pending(connected: Collection<A2aAgentConnection> = A2aAgentConnections.all()): List<A2aDrifterSeed> {
         val connectedUrls = connected.mapTo(hashSetOf()) { it.cardUrl }
         return SEEDS.filter { it.cardUrl !in state.value && it.cardUrl !in connectedUrls }
     }
 
-    /** The seed at [cardUrl] never comes back to the edge on this device. Not a seed: nothing. */
+    /** Hide a suggested agent on this device. Unknown addresses are ignored. */
     fun dismiss(cardUrl: String) {
         if (!isSeed(cardUrl)) return
         state.update { it + cardUrl }
