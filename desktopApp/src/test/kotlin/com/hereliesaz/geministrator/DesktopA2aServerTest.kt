@@ -95,6 +95,31 @@ class DesktopA2aServerTest {
         assertNull(a2a.listeningAddress)
     }
 
+    /** Sends headers that promise [declared] body bytes, then no body at all; reads the answer (the socket times out at 5 s). */
+    private fun rawPostPromisingABody(port: Int, host: String, token: String?, declared: Int): Int =
+        Socket(InetAddress.getLoopbackAddress(), port).use { socket ->
+            socket.soTimeout = 5_000
+            val auth = token?.let { "Authorization: Bearer $it\r\n" }.orEmpty()
+            socket.getOutputStream().apply {
+                write("POST /a2a HTTP/1.1\r\nHost: $host\r\n${auth}Content-Type: application/json\r\nContent-Length: $declared\r\nConnection: close\r\n\r\n".toByteArray())
+                flush()
+            }
+            socket.getInputStream().bufferedReader().readLine().substringAfter(' ').substringBefore(' ').toInt()
+        }
+
+    @Test
+    fun aCallerThatWouldBeRefusedIsAnsweredBeforeItsBodyIsReadAndABodyOverTheCapIsRefusedUnread() {
+        val a2a = server()
+        assertIs<A2aServerStatus.Listening>(a2a.startForStatus())
+        val port = a2a.boundPort
+        // No token: refused at once, though it promised 900 KB it never sends (a read would block until the socket timed out).
+        assertEquals(401, rawPostPromisingABody(port, "127.0.0.1:$port", token = null, declared = 1_500_000))
+        // A foreign Host header: refused before any body.
+        assertEquals(403, rawPostPromisingABody(port, "evil.example", token = a2a.currentToken(), declared = 1_500_000))
+        // Authorised but declaring more than the cap: 413 without reading it.
+        assertEquals(413, rawPostPromisingABody(port, "127.0.0.1:$port", token = a2a.currentToken(), declared = 1_500_000))
+    }
+
     @Test
     fun theFirstStartCreatesTheTokenAndLaterStartsKeepIt() {
         val store = MemoryTokenStore()

@@ -251,6 +251,7 @@ internal class DesktopA2aServer(
         if (http != null) return
         token.set(loadOrCreateToken())
         val bindAddress = if (lan) InetAddress.getByName("0.0.0.0") else InetAddress.getLoopbackAddress()
+        HttpRequestGuard.applyRequestTimeout()
         val server = HttpServer.create(InetSocketAddress(bindAddress, port), 0)
         val pool = Executors.newFixedThreadPool(4) { runnable -> Thread(runnable, "aive-a2a").apply { isDaemon = true } }
         server.executor = pool
@@ -296,22 +297,31 @@ internal class DesktopA2aServer(
 
     private fun serve(exchange: HttpExchange) {
         try {
-            val bytes = exchange.requestBody.readNBytes(A2aServer.MAX_BODY_BYTES + 1)
-            val response = if (bytes.size > A2aServer.MAX_BODY_BYTES) {
-                A2aHttpResponse(413, """{"error":"request too large"}""")
-            } else {
-                val headers = exchange.requestHeaders.entries.associate { (name, values) -> name to values.firstOrNull().orEmpty() }
-                val remote = exchange.remoteAddress?.address
-                val caller = A2aCaller(
-                    address = remote?.hostAddress.orEmpty(),
-                    isLoopback = remote?.isLoopbackAddress == true,
-                )
-                runCatching {
-                    runBlocking {
-                        core.handle(exchange.requestMethod, exchange.requestURI.rawPath, headers, bytes.decodeToString(), caller)
+            val headers = exchange.requestHeaders.entries.associate { (name, values) -> name to values.firstOrNull().orEmpty() }
+            val remote = exchange.remoteAddress?.address
+            val caller = A2aCaller(
+                address = remote?.hostAddress.orEmpty(),
+                isLoopback = remote?.isLoopbackAddress == true,
+            )
+            val path = exchange.requestURI.rawPath
+            // Who is asking, the Host and the token are judged from the headers; a refused caller's body is never read.
+            val refused = core.refusalBeforeBody(exchange.requestMethod, path, headers, caller)
+            val response = when {
+                refused != null -> refused
+                HttpRequestGuard.declaresTooLarge(exchange, A2aServer.MAX_BODY_BYTES) -> A2aHttpResponse(413, """{"error":"request too large"}""")
+                else -> {
+                    val bytes = HttpRequestGuard.readBody(exchange, A2aServer.MAX_BODY_BYTES)
+                    if (bytes.size > A2aServer.MAX_BODY_BYTES) {
+                        A2aHttpResponse(413, """{"error":"request too large"}""")
+                    } else {
+                        runCatching {
+                            runBlocking {
+                                core.handle(exchange.requestMethod, path, headers, bytes.decodeToString(), caller)
+                            }
+                        }.getOrElse {
+                            A2aHttpResponse(500, """{"error":"internal error"}""")
+                        }
                     }
-                }.getOrElse {
-                    A2aHttpResponse(500, """{"error":"internal error"}""")
                 }
             }
             val body = response.body.encodeToByteArray()

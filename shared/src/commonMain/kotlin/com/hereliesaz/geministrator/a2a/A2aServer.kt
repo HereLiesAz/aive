@@ -215,14 +215,10 @@ class A2aServer(
         body: String,
         caller: A2aCaller = A2aCaller.Loopback,
     ): A2aHttpResponse {
+        refusalBeforeBody(method, path, headers, caller)?.let { return it }
         val header = { name: String -> headers.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value }
         val open = lanOpen()
-        if (!caller.isLoopback && !open) return A2aHttpResponse(403, """{"error":"forbidden"}""")
-        val requestHost = a2aHostOf(header("Host"))
-        val lanHost = requestHost?.takeIf { open && !isLoopbackHost(header("Host")) && it in lanHosts() }
-        if (loopbackOnly && !isLoopbackHost(header("Host")) && lanHost == null) {
-            return A2aHttpResponse(403, """{"error":"forbidden"}""")
-        }
+        val lanHost = a2aHostOf(header("Host"))?.takeIf { open && !isLoopbackHost(header("Host")) && it in lanHosts() }
         val route = path.substringBefore('?')
         return when (route) {
             A2aCodec.WELL_KNOWN_CARD_PATH, A2aCodec.LEGACY_WELL_KNOWN_CARD_PATH ->
@@ -232,12 +228,6 @@ class A2aServer(
                     A2aHttpResponse(405, """{"error":"method not allowed"}""", headers = mapOf("Allow" to "GET"))
                 }
             RPC_PATH -> when {
-                !method.equals("POST", ignoreCase = true) ->
-                    A2aHttpResponse(405, """{"error":"method not allowed"}""", headers = mapOf("Allow" to "POST"))
-                !authorized(header("Authorization")) ->
-                    A2aHttpResponse(401, """{"error":"unauthorized"}""", headers = mapOf("WWW-Authenticate" to "Bearer"))
-                !caller.isLoopback && !clientAllowed(caller) ->
-                    A2aHttpResponse(403, """{"error":"not allowed yet: the keeper must allow this computer in The Aive"}""")
                 body.encodeToByteArray().size > MAX_BODY_BYTES ->
                     A2aHttpResponse(413, """{"error":"request too large"}""")
                 else -> try {
@@ -248,6 +238,32 @@ class A2aServer(
                 }
             }
             else -> A2aHttpResponse(404, """{"error":"not found"}""")
+        }
+    }
+
+    /**
+     * The refusal this request earns from who is asking and what it asks for, before any body is read: not
+     * allowed on this network, the wrong Host, a wrong method on the RPC route, no valid token, or a computer the
+     * keeper has not let in. A server calls it **before it reads the body** (an unauthenticated caller then costs
+     * only its headers); [handle] makes the same checks first. Null means the body may be read.
+     */
+    fun refusalBeforeBody(method: String, path: String, headers: Map<String, String>, caller: A2aCaller = A2aCaller.Loopback): A2aHttpResponse? {
+        val header = { name: String -> headers.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value }
+        val open = lanOpen()
+        if (!caller.isLoopback && !open) return A2aHttpResponse(403, """{"error":"forbidden"}""")
+        val lanHost = a2aHostOf(header("Host"))?.takeIf { open && !isLoopbackHost(header("Host")) && it in lanHosts() }
+        if (loopbackOnly && !isLoopbackHost(header("Host")) && lanHost == null) {
+            return A2aHttpResponse(403, """{"error":"forbidden"}""")
+        }
+        if (path.substringBefore('?') != RPC_PATH) return null
+        return when {
+            !method.equals("POST", ignoreCase = true) ->
+                A2aHttpResponse(405, """{"error":"method not allowed"}""", headers = mapOf("Allow" to "POST"))
+            !authorized(header("Authorization")) ->
+                A2aHttpResponse(401, """{"error":"unauthorized"}""", headers = mapOf("WWW-Authenticate" to "Bearer"))
+            !caller.isLoopback && !clientAllowed(caller) ->
+                A2aHttpResponse(403, """{"error":"not allowed yet: the keeper must allow this computer in The Aive"}""")
+            else -> null
         }
     }
 
