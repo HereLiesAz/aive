@@ -88,6 +88,29 @@ control plane. This keeps the architecture compatible with external
 Kubernetes-native agents and gateways through standard MCP and A2A, while
 Aive retains its native execution and authority model.
 
+## Interoperability with external MCP registries and gateways
+
+The [agentregistry](https://github.com/agentregistry-dev/agentregistry)
+implementation provides an **opt-in** MCP Registry v0.1 compatibility
+read API. It is disabled by default; an operator enabling
+`AGENT_REGISTRY_MCP_REGISTRY_COMPAT_ENABLED=true` can configure the
+Azphalt storefront's fixed `MCP_REGISTRY_BASE_URL` to the public HTTPS
+registry base (including the optional compatibility path prefix).
+Azphalt then queries `/v0.1/servers`. Aive's existing **Search catalog**
+shows credential-stripped public Streamable HTTP leads. **Use address**
+only fills the connection form and clears previous credentials; adding
+a server and granting per-run tool consent are separate actions.
+
+AgentRegistry's `/v0/agents`, `/v0/skills` and `/v0/prompts` are its
+native resource APIs, not MCP server connection URLs. Its server catalogue
+may contain synthesized localhost endpoints: these are intentionally
+discarded by Azphalt and Aive's public URL filters. The upstream
+[agentgateway](https://github.com/agentgateway/agentgateway) can front an
+MCP server; Aive connects through a keeper-approved HTTPS Streamable HTTP
+endpoint exposed by that gateway, without adopting its own authentication
+or policy decisions as Aive permissions. Neither project is a mandatory
+runtime or privileged control plane for Aive.
+
 ## The loop
 
 `TextLlmProvider` takes an optional `McpToolSource`. A run's toolbox is offered when three things hold: the API implements `ToolCallingTextGenerationApi`, the run has no provider-side plan gate, and a server lists at least one tool. Today that means Anthropic Messages (`tool_use`), OpenAI-compatible chat (`tools`, so every hosted provider and store `llm` package) and Gemini (`functionDeclarations` with `parametersJsonSchema`; thought signatures are replayed). OpenAI and xAI Responses and the workspace agents get no tools yet.
