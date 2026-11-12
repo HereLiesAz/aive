@@ -435,6 +435,13 @@ class SettingsWorkflowPersistence(
             }
             val had = snapshotSettings.hasKey(storageKey) ||
                 settings.hasKey(LEGACY_STORAGE_KEY_V1)
+            // Recovery clears the damaged snapshot; keep its raw text first so it can still be inspected or repaired.
+            val raw = runCatching { snapshotSettings.getStringOrNull(storageKey) }.getOrNull()
+                ?: runCatching { settings.getStringOrNull(LEGACY_STORAGE_KEY_V1) }.getOrNull()
+            if (raw != null) {
+                val backupKey = "$storageKey.corrupt"
+                runCatching { ChunkedStringSettings(settings, setOf(backupKey)).putString(backupKey, raw) }
+            }
             snapshotSettings.remove(storageKey)
             settings.remove(LEGACY_STORAGE_KEY_V1)
             decodedText = null

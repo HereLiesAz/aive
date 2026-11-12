@@ -550,6 +550,18 @@ class SettingsWorkflowPersistenceTest {
     }
 
     @Test
+    fun recoveringFromCorruptionKeepsTheDamagedTextFirst() = runBlocking {
+        val backing = MapSettings()
+        backing.putString(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY, "{not json")
+        val store = SettingsWorkflowPersistence(backing)
+
+        assertTrue(store.recoverFromCorruption())
+
+        val key = SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY + ".corrupt"
+        assertEquals("{not json", ChunkedStringSettings(backing, setOf(key)).getStringOrNull(key))
+    }
+
+    @Test
     fun importedRunsCarryNoApprovalsAndNothingResumesFromTheFile() = runBlocking {
         val approval = TaskDefinitionId("approve-push")
         val push = TaskDefinitionId("push")
