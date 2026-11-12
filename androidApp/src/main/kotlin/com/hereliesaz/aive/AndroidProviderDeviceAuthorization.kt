@@ -84,11 +84,11 @@ internal class AndroidProviderDeviceAuthorization(
             }
         }
         val payload = json.parseToJsonElement(response.bodyAsText()).jsonObject
-        val error = payload["error"]?.jsonPrimitive?.contentOrNull
-        if (error == "authorization_pending" || error == "slow_down") return null
-        if (error != null || response.status.value !in 200..299) {
+        val providerError = payload["error"]?.jsonPrimitive?.contentOrNull
+        if (providerError == "authorization_pending" || providerError == "slow_down") return null
+        if (providerError != null || response.status.value !in 200..299) {
             sessions.remove(providerId)
-            error("Authorization failed or expired; start again (${error ?: "HTTP ${response.status.value}"})")
+            error("Authorization failed or expired; start again (${providerError ?: "HTTP ${response.status.value}"})")
         }
         val key = payload["access_token"]?.jsonPrimitive?.contentOrNull
             ?.takeIf { it.isNotBlank() } ?: error("Provider returned no access token")
