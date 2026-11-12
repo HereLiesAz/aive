@@ -35,8 +35,9 @@ SearchA2A is the discovery system shared with the Azphalt Store, avoiding an
 independently maintained registry parser and crawler inside Aive. The old direct
 `a2aregistry.org` adapter has been removed.
 
-SearchA2A reads its published metadata-only index (mirrored to the `agent-feed`
-branch) and returns up to 20 matches. It uses Workers AI embeddings with semantic
+SearchA2A's unified ANS directory ranks visible candidates from its persistent,
+curated registry and returns up to 20 matches. The independent `agent-feed`
+branch remains a bounded fallback snapshot. It uses Workers AI embeddings with semantic
 similarity when available, reporting `match_mode: semantic`. Otherwise the
 service reports `keyword-fallback`; Aive labels this honestly. Both are only
 relative relevance rankings, never reliability, identity, or permission scores.
@@ -70,6 +71,9 @@ quota, governed by SearchA2A's public per-IP limiter.
 2. **Connect agent** fetches that card independently, with no credentials,
    redirect following or implicit permissions. It requires a compatible JSON-RPC
    interface before storing the URL and sanitized name in `A2aAgentConnections`.
+   If the keeper explicitly selected an ANS-discovered address and the independently
+   fetched card is for that address, the publisher's ANS name and explicit host are
+   also saved as **unverified provenance**, not an authentication credential.
    The optional bearer credential follows the existing platform credential flow.
 3. In the Swarm role editor the keeper explicitly assigns that connected
    provider. No role is invented from registry text.
@@ -77,10 +81,20 @@ quota, governed by SearchA2A's public per-IP limiter.
    the endpoint's scheme and same-origin restriction before forwarding approved
    context or the token. There is no silent substitute on provider failure.
 
-The local `a2a:<host>` ID is a stable connection key, **not a globally
-authenticated agent name**. Fetching an Agent Card proves reachability and
-protocol compatibility, not publisher identity. There is currently no certificate,
-signature chain, DNS ANS verification or trust federation for A2A operators.
+The local `a2a:<host>` ID remains the stable connection key, **not a globally
+authenticated agent name**. SearchA2A's indexed `ans` and Azphalt snapshot's
+`ans_claim` are accepted only when they explicitly say `unverified`, the version
+and host consist of DNS-compatible labels, and the versioned name ends with the
+declared host. Aive preserves the publisher-chosen dotted version exactly:
+`ans://nightly.2026-Q4.agent.example.org` is legitimate metadata. An invalid
+or mismatched claim is omitted without discarding the underlying Agent Card lead.
+Editing a suggested address removes its pending claim. A subsequent successful
+explicit connection stores this claim, but neither uses it as a provider ID nor
+as a source of runtime permissions.
+
+Fetching an Agent Card proves reachability and protocol compatibility, not
+publisher identity. There is currently no certificate, DNSSEC, transparency log,
+signature chain or federated ANS identity verifier for A2A operators.
 
 ## Extending safely
 
