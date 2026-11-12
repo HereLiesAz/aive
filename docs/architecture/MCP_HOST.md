@@ -77,8 +77,10 @@ Streamable HTTP endpoint. It rejects credential-bearing or private URLs,
 forged verification status and non-HTTP transports. Publisher versions are
 opaque strings retained as metadata, not converted into ANS identities.
 Search results are leads only; **Use address** fills the existing name and
-address fields, but **Add** is still required to connect. The existing
-per-run MCP tool consent remains unchanged.
+address fields and **clears any previously entered bearer token or command**
+so credentials intended for another destination cannot follow the selection.
+**Add** is still required to connect. The existing per-run MCP tool consent
+remains unchanged.
 
 There is no vendor-branded execution runtime, automatic installation,
 provider promotion, tool-permission inheritance or mandatory external
