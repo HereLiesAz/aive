@@ -670,7 +670,6 @@ internal fun ProviderSettingsScreen(
         val incompatibleCard = stringResource(Res.string.keeper_a2a_agent_unsupported_binding)
         val connectedLabel = stringResource(Res.string.common_connected)
         val directoryReportedTested = stringResource(Res.string.keeper_agent_directory_reported_tested)
-        val directoryAnsUnverified = stringResource(Res.string.keeper_agent_directory_ans_unverified)
         AddConnectionRow(
             label = stringResource(Res.string.keeper_add_a2a_agent),
             hint = stringResource(Res.string.keeper_add_a2a_agent_hint),
