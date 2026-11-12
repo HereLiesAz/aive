@@ -61,9 +61,14 @@ internal class AndroidProviderDeviceAuthorization(
             ?.takeIf { it.isNotBlank() } ?: error("Authorization response omitted device code")
         val userCode = payload["user_code"]?.jsonPrimitive?.contentOrNull
             ?.takeIf { it.isNotBlank() } ?: error("Authorization response omitted user code")
+        val expectedOrigin = when (providerId) {
+            "huggingface" -> "https://huggingface.co/"
+            "pollinations" -> "https://enter.pollinations.ai/"
+            else -> error("Unsupported device authorization provider")
+        }
         val url = (payload["verification_uri_complete"] ?: payload["verification_uri"])
-            ?.jsonPrimitive?.contentOrNull?.takeIf { it.startsWith("https://") }
-            ?: error("Authorization response omitted secure verification URL")
+            ?.jsonPrimitive?.contentOrNull?.takeIf { it.startsWith(expectedOrigin) }
+            ?: error("Provider returned an untrusted verification URL")
         sessions[providerId] = Session(deviceCode, clientId, tokenUrl)
         return Challenge(url, userCode)
     }
