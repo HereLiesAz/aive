@@ -29,7 +29,7 @@ class AndroidOpenRouterAccountAuthorizationTest {
         assertTrue(first.contains("code_challenge_method=S256"))
         assertFalse(first.contains("code_verifier"))
         assertFalse(first.contains("callback_url"))
-        assertTrue(first != second, "Each authorization must generate a fresh challenge")
+        assertTrue("Each authorization must generate a fresh challenge", first != second)
         assertEquals("sk-or-v1-test", auth.exchange("one-time-code"))
         assertEquals(1, exchanges)
         try {
