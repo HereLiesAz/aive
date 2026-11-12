@@ -117,3 +117,4 @@ include(":webApp")
 
 include(":computeRelay")
 include(":mcpBridge")
+include(":cliApp")

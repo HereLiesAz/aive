@@ -57,6 +57,10 @@ AIVE_CONTROL_API=on ./the-aive        # or set the preference com/hereliesaz/hai
 
    `AIVE_CONTROL_TOKEN` (the token itself) is also read if set, for setups where a file is awkward. The bridge refuses any address that is not on this computer, so it can never send the token elsewhere.
 
+## The Aive CLI
+
+The companion `aive` terminal executable calls this same authenticated control API, reusing the bridge's route definitions and approval restrictions. It is installed separately with `./gradlew :cliApp:installDist`. See [CLI.md](CLI.md) for commands and script examples.
+
 ## What is exposed
 
 The words are the app's: a **hive** is a workflow, a **creature** is one of its steps, a **role** is the kind of agent a creature is.

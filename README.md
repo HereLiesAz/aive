@@ -24,6 +24,7 @@ Workflow nodes may be performed by AI providers such as specialized model agents
 - `providers/` — provider adapters: `llm/` (native OpenAI, Anthropic, Gemini, and xAI adapters, OpenAI-compatible hosted providers, GitLab workspace agent)
 - `androidApp/` — Android launcher
 - `desktopApp/` — Desktop launcher
+- `cliApp/` — The Aive command-line client (authenticated desktop control API)
 - `webApp/` — browser launcher (includes `mesh-crypto.js`, the Web Crypto AES-GCM backend for `MeshCrypto` on JS/Wasm)
 - `computeRelay/` — Ktor WebSocket relay server for [distributed compute](docs/architecture/DISTRIBUTED_COMPUTE.md)
 - `buildSrc/` — Gradle build logic for generating and verifying brand assets
@@ -44,6 +45,7 @@ Requirements: JDK 21, the Android SDK (the project reads `local.properties` or `
 ./gradlew test                              # unit tests, all targets that run on the host
 ./gradlew :androidApp:assemblePlayDebug     # or assembleGithubDebug
 ./gradlew :desktopApp:run                   # desktop app
+./gradlew :cliApp:installDist               # terminal client: cliApp/build/install/aive/bin/aive
 npm --prefix relay test                     # relay Worker tests (Node 20+, no install step)
 node tools/puppet-rig/test/rig-core.mjs     # puppet-rig editor tests
 ~~~
@@ -64,6 +66,7 @@ Start with [`docs/README.md`](docs/README.md).
 - [Remote API (Android)](docs/Remote-API.md)
 - [A2A (Agent2Agent)](docs/A2A.md)
 - [MCP server (bridge and control API)](docs/MCP.md)
+- [The Aive CLI](docs/CLI.md)
 - [Branding](docs/BRANDING.md)
 - [Privacy policy](docs/PRIVACY.md)
 

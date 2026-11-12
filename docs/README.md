@@ -165,3 +165,5 @@ The product name is **The Aive**. Technical artifact names may use `haive`. The 
 [`A2A.md`](A2A.md) defines The Aive's Agent2Agent support: remote A2A agents as explicit-only providers, and the opt-in, loopback, token-protected desktop A2A server that launches workflows.
 
 [`MCP.md`](MCP.md) describes the standalone MCP bridge and the desktop control API behind it: what an external agent can read and author, how runs are controlled, and why approvals stay in the app.
+
+[`CLI.md`](CLI.md) documents the standalone The Aive terminal client, its authenticated loopback connection, supported commands, JSON input/output, exit codes and inherited approval restrictions.
