@@ -1,6 +1,6 @@
 # Agent Directory
 
-Status: **implemented initial discovery and local federation; semantic embeddings, federated identity and gateway failover are not implemented**.
+Status: **SearchA2A-backed indexed semantic discovery and local federation implemented; publisher identity verification and cross-endpoint gateway failover are not implemented**. Semantic ranking depends on SearchA2A Workers AI availability; explicit keyword fallback is labeled.
 
 The Agent Directory lives under **Keeper's room › Connections › Connect remote agent**.
 It is not an Azphalt Store category or a second agent-adoption screen.
@@ -17,7 +17,7 @@ The directory has three layers:
 
 | Layer | Implementation | Scope |
 |---|---|---|
-| Discovery / inventory | `a2a/AgentDirectory.kt` | Local connected agents, dismissible built-in examples, public A2A Registry search |
+| Discovery / inventory | `a2a/AgentDirectory.kt` | Local connections and suggestions; SearchA2A's public indexed semantic search with a read-only published-catalog fallback |
 | Agent identity and connection | `a2a/A2aAgentConnections.kt`, `A2aDrifters.read` | Stable local `a2a:` ID, stored Agent Card URL, current card validation |
 | Endpoint resolution and gateway | `providers/llm/.../A2aAgentProvider.kt` (`A2aClientApi`), `workflow/AgentProviderRegistry.kt` | Resolve first supported JSON-RPC endpoint from fresh card; enforce same origin, secure transport and explicit-only selection |
 
@@ -27,35 +27,42 @@ context-taint gates and repository permissions stay engine-owned.
 
 ## Discovering agents
 
-No registry is contacted on opening the page. Search requires a deliberate
-**Search directory** action and at least two characters. That action sends
-the search terms only, over HTTPS, to:
+No external service is contacted on opening the page. **Search directory** under
+Keeper's room › Connections requires at least two typed characters and an explicit
+keeper action. Aive sends only those search terms to SearchA2A's public HTTPS
+`GET https://searcha2a-api.hereliesaz.workers.dev/api/v1/directory?q=...`.
+SearchA2A is the discovery system shared with the Azphalt Store, avoiding an
+independently maintained registry parser and crawler inside Aive. The old direct
+`a2aregistry.org` adapter has been removed.
 
-`https://a2aregistry.org/api/agents?search=<query>&limit=20&offset=0`
+SearchA2A reads its published metadata-only index (mirrored to the `agent-feed`
+branch) and returns up to 20 matches. It uses Workers AI embeddings with semantic
+similarity when available, reporting `match_mode: semantic`. Otherwise the
+service reports `keyword-fallback`; Aive labels this honestly. Both are only
+relative relevance rankings, never reliability, identity, or permission scores.
 
-The public API is documented in
-[prassanna-ravishankar/a2a-registry](https://github.com/prassanna-ravishankar/a2a-registry).
-It is a third-party service, independent of Aive. No token, app history, workflow
-prompt, artifact or connected-provider list goes with the search. It sees the
-network request, including the client IP. Its own terms apply. If unavailable,
-local matches remain visible and the source failure is reported by name.
+If the SearchA2A Worker is unavailable or rate-limited, Aive can still read
+`https://raw.githubusercontent.com/HereLiesAz/searcha2a/agent-feed/site/api/v1/azphalt-listings.json`,
+filtering that published snapshot using local deterministic keyword relevance
+and labelling the result **cached catalog**. It does not send the search terms
+to that GitHub raw-CDN URL, though the network request reveals the client IP.
+Failure of both sources leaves local connected-provider and suggestion matches
+available, with the SearchA2A source shown as unavailable.
 
-`AgentDirectorySource` is the adapter seam for additional registries.
-`LocalAgentDirectorySource` reads the stored connections and optional examples
-without network access. `PublicA2aRegistrySource` parses the public registry's
-`PaginatedAgents.agents` records (not an invented A2A wire operation). Every
-registry-supplied Agent Card URL must be a public HTTPS domain; local IPs,
-loopback/private hostnames, credentials, query strings, fragments, malformed
-ports and oversized URLs are rejected. HTTP redirects are not followed, and
-responses are capped at 384 KiB with a 15-second timeout. Only the first 20
-registry records are considered. Results are deduplicated by card URL.
+`AgentDirectorySource` remains the adapter seam for testability. The implementation
+is `SearchA2aDirectorySource`, not a second registry. Responses are capped at
+900 KiB, must declare `schema: 1` and `source: searcha2a`, and only
+`kind: a2a-agent`, `installable: false`, `verification: card_read_only`
+records are accepted. Invalid HTTPS hosts, IP literals, private/local hostnames,
+credentials, query strings, fragments, malformed ports, and oversized URLs are
+rejected. Redirects are not followed. Results are deduplicated by Agent Card URL,
+with locally approved connection state preserved independently of the search hit.
 
-Search relevance is currently **deterministic word matching** against name, skills
-and description. It is not vector/embedding semantic search and it does not infer
-a skill or grant authority. Registry health and task-test fields are displayed
-only as **registry-reported** observations, never as verified trust or a guarantee
-of endpoint availability. A registry can supply false or stale metadata.
-
+No credential, workflow prompt, task artifact or connected-provider inventory is
+sent to SearchA2A. The query and caller IP reach the SearchA2A gateway. The indexed
+catalog is stale until the next crawl and its card metadata is not evidence of
+agent uptime or publisher identity. Workers AI may consume Cloudflare inference
+quota, governed by SearchA2A's public per-IP limiter.
 ## Resolving and connecting
 
 1. **Use address** copies a candidate's card URL into the ordinary connection
@@ -78,13 +85,12 @@ signature chain, DNS ANS verification or trust federation for A2A operators.
 ## Extending safely
 
 A new `AgentDirectorySource` can supply candidates and report failures; it
-cannot write connections or control provider routing. A future semantic search
-backend may rank candidates, but user consent and card revalidation remain
-separate operations. A federated ANS implementation will need explicit
+cannot write connections or control provider routing. SearchA2A may rank candidates semantically, but user consent and independent
+Agent Card revalidation remain separate operations. A federated ANS implementation will need explicit
 identity bindings and renewal/revocation semantics. Gateway endpoint failover
 will require independently governed origin/credential constraints and must not
 move a pinned role to another operator without authorization.
 
 Tests: `AgentDirectoryTest`, `A2aDriftersTest`,
-`A2aAgentConnectionsTest`, `A2aAgentProviderTest`. The independent public
-registry schema is the `PaginatedAgents` model from the linked project.
+`A2aAgentConnectionsTest`, `A2aAgentProviderTest`. The upstream response schemas
+are defined in [SearchA2A's API reference](https://github.com/HereLiesAz/searcha2a/blob/main/docs/API.md).
