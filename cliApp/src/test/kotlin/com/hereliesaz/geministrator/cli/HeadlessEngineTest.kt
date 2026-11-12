@@ -42,7 +42,7 @@ class HeadlessEngineTest {
         assertTrue("gh-secret" !in keys.values)
     }
 
-    @Test fun localControlServerUsesTheHeadlessStateAndRejectsBadCredentials() = runBlocking {
+    @Test fun localControlServerUsesTheHeadlessStateAndRejectsBadCredentials(): Unit = runBlocking {
         val directory = Files.createTempDirectory("aive-headless-control-").toFile()
         try {
             HeadlessEngine.open(directory, emptyMap()).use { engine ->
@@ -60,9 +60,10 @@ class HeadlessEngineTest {
         } finally {
             directory.deleteRecursively()
         }
+        Unit
     }
 
-    @Test fun separateEngineProcessCannotOwnTheSameStateDirectory() = runBlocking {
+    @Test fun separateEngineProcessCannotOwnTheSameStateDirectory(): Unit = runBlocking {
         val directory = Files.createTempDirectory("aive-headless-lock-").toFile()
         try {
             HeadlessEngine.open(directory, emptyMap()).use {
@@ -73,9 +74,10 @@ class HeadlessEngineTest {
         } finally {
             directory.deleteRecursively()
         }
+        Unit
     }
 
-    @Test fun humanApprovalTaskActuallyRunsAndSurvivesRestartWithoutDesktopApp() = runBlocking {
+    @Test fun humanApprovalTaskActuallyRunsAndSurvivesRestartWithoutDesktopApp(): Unit = runBlocking {
         val directory = Files.createTempDirectory("aive-headless-run-").toFile()
         try {
             val runId = HeadlessEngine.open(directory, emptyMap()).use { engine ->
@@ -113,6 +115,7 @@ class HeadlessEngineTest {
         } finally {
             directory.deleteRecursively()
         }
+        Unit
     }
 
     @Test fun clientDoesNotFallBackToTheGraphicalDesktopControlServer() {
