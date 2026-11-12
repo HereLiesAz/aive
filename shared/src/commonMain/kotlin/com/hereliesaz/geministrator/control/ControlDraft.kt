@@ -12,7 +12,7 @@ sealed interface ControlDraftOutcome {
 }
 
 /** Maps the app's swarm draft onto a [ControlDraftOutcome]; a provider's own message is never passed on. */
-internal fun controlDraftOutcome(result: SwarmDraftResult): ControlDraftOutcome = when (result) {
+fun controlDraftOutcome(result: SwarmDraftResult): ControlDraftOutcome = when (result) {
     is SwarmDraftResult.Ready -> ControlDraftOutcome.Ready(result.suggestedName, result.notes, result.tasks)
     is SwarmDraftResult.Problem -> ControlDraftOutcome.Failed(
         ControlErrorCode.InvalidArgument,

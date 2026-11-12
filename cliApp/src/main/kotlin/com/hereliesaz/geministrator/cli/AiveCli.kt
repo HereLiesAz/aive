@@ -271,7 +271,7 @@ class AiveCli(
         append("The Aive CLI\n\nUsage: aive <command> [options]\n\nCommands:\n")
         Commands.all.forEach { append("  ").append(it.words.joinToString(" ")).append('\n') }
         append("\nRun 'aive <command> --help' for arguments.\n")
-        append("Commands connect to a running desktop The Aive with AIVE_CONTROL_API=on.\n")
+        append("Commands connect to the independent 'aive serve' headless runtime.\n")
         append("All approvals remain read-only in the CLI.\n")
     }
 }

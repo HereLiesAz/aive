@@ -2,7 +2,7 @@
 
 External agents can read and steer a running The Aive desktop app through the Model Context Protocol. It is two parts:
 
-- **The control API** (in the app): a small JSON API on `127.0.0.1`, off by default, protected by a per-install bearer token. Code: `shared/.../control/` (`ControlApi`, `RuntimeControlHost`) and `desktopApp/.../DesktopControlApi.kt`.
+- **The control API** (in the desktop app or a separate headless engine): a small JSON API on `127.0.0.1`, off by default, protected by a per-install bearer token. Code: `shared/.../control/` (`ControlApi`, `RuntimeControlHost`) and `desktopApp/.../DesktopControlApi.kt`.
 - **The bridge** (`mcpBridge`, a separate Gradle module and process): an MCP server over stdio that turns tool calls and resource reads into control API calls. It shares no code with the app and adds no dependency beyond kotlinx.serialization.
 
 This is separate from [A2A](A2A.md), which lets agents hand The Aive a workflow to run. MCP is for reading and authoring: it can look at everything, edit hives and start or stop a run, and it can never approve anything.
@@ -59,7 +59,7 @@ AIVE_CONTROL_API=on ./the-aive        # or set the preference com/hereliesaz/hai
 
 ## The Aive CLI
 
-The companion `aive` terminal executable calls this same authenticated control API, reusing the bridge's route definitions and approval restrictions. It is installed separately with `./gradlew :cliApp:installDist`. See [CLI.md](CLI.md) for commands and script examples.
+The companion `aive` executable now runs an independent headless orchestration engine. `aive serve` hosts the same control API on a distinct local port/database, and `aive run` and `aive resume` operate without an HTTP server or desktop app. CLI control commands now target the headless service. The MCP bridge may target headless using its explicit `AIVE_CONTROL_URL` and `AIVE_CONTROL_TOKEN_FILE` overrides. Owner approvals are confined to the headless process's local terminal. See [CLI.md](CLI.md).
 
 ## What is exposed
 

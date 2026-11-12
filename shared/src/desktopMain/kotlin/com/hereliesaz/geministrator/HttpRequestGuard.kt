@@ -3,11 +3,11 @@ package com.hereliesaz.geministrator
 import com.sun.net.httpserver.HttpExchange
 
 /**
- * What the desktop's two loopback servers do before they trust a request's body: nothing is read for a caller
+ * What JVM loopback control servers do before they trust a request's body: nothing is read for a caller
  * that would be refused anyway (the server asks its core first, from the headers alone), a declared length over
  * the cap is refused unread, and a body that dribbles in is cut off by the JDK server's own request timer.
  */
-internal object HttpRequestGuard {
+object HttpRequestGuard {
     /** How long, in seconds, one request may take to arrive before the server drops its connection. */
     const val MAX_REQUEST_SECONDS = 15
 
