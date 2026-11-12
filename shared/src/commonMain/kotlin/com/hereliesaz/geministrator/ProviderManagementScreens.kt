@@ -572,13 +572,18 @@ internal fun ProviderSettingsScreen(
         // Read as state so adding or removing an A2A agent recomposes the lists built from the catalog.
         val a2aAgents by A2aAgentConnections.connections.collectAsState()
         val a2aAgentIds = a2aAgents.mapTo(hashSetOf()) { it.providerId }
+        val directoryAnsUnverified = stringResource(Res.string.keeper_agent_directory_ans_unverified)
+
         ProviderCatalog.entries.filter { it.id in connectedProviderIds }.forEach { entry ->
             val healthRaw = healthResults?.get(entry.id)
             val health = healthRaw?.substringBefore('\n')
             val healthDetails = healthRaw?.substringAfter('\n', "")
             ConnectionRow(
                 name = entry.displayName,
-                detail = health ?: stringResource(Res.string.settings_credential_configured),
+                detail = (health ?: stringResource(Res.string.settings_credential_configured)) +
+                    (a2aAgents.firstOrNull { it.providerId == entry.id }?.ansName?.let {
+                        " · $directoryAnsUnverified: $it"
+                    } ?: ""),
                 status = health?.substringBefore(" ·") ?: stringResource(Res.string.common_connected),
                 connected = true,
                 compact = compact,
