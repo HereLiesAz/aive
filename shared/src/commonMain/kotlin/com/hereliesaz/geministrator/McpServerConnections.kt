@@ -227,6 +227,9 @@ internal fun McpServerConnections(host: McpHost, compact: Boolean) {
                         label = stringResource(Res.string.mcp_registry_use_address),
                         seed = "mcp-catalog-${lead.url}",
                         onClick = {
+                            // Credentials belong to the old destination, never a catalog suggestion.
+                            token = ""
+                            command = ""
                             name = lead.name
                             url = lead.url
                             byCommand = false
