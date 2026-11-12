@@ -111,6 +111,8 @@ internal class SearchA2aDirectorySource(
         // before applying the result cap so a later catalog entry is never silently lost.
         return entries(listings, "SearchA2A · cached catalog", false)
             .filter { directoryRelevance(query, it) > 0 }
+            .sortedWith(compareByDescending<AgentDirectoryEntry> { directoryRelevance(query, it) }
+                .thenBy { it.name.lowercase() })
             .take(MAX_RESULTS)
     }
 
@@ -175,7 +177,7 @@ internal class SearchA2aDirectorySource(
         const val INDEXED_SEARCH_URL = "https://searcha2a-api.hereliesaz.workers.dev/api/v1/directory"
         const val PUBLISHED_FEED_URL =
             "https://raw.githubusercontent.com/HereLiesAz/searcha2a/agent-feed/site/api/v1/azphalt-listings.json"
-        const val MAX_RESPONSE_BYTES = 900_000
+        const val MAX_RESPONSE_BYTES = 16_777_216
         const val MAX_RESULTS = 70
     }
 }
@@ -205,7 +207,14 @@ internal class AgentDirectory(
                 unavailable += source.name
                 continue
             }
-            for (entry in entries.take(MAX_ENTRIES_PER_SOURCE)) {
+            // Apply source quotas *after* relevance; an alphabetical snapshot can
+            // otherwise evict exact matches beyond the first 30 entries.
+            val ordered = entries.sortedWith(
+                compareByDescending<AgentDirectoryEntry> { it.connectedProviderId != null }
+                    .thenByDescending { it.matchScore ?: -1.0 }
+                    .thenByDescending { directoryRelevance(query, it) },
+            )
+            for (entry in ordered.take(MAX_ENTRIES_PER_SOURCE)) {
                 // User-connected loopback agents are legitimate local entries; a public registry
                 // must never supply such an address for the user to fetch.
                 val url = if (source === LocalAgentDirectorySource) {
@@ -267,14 +276,20 @@ internal fun directoryPublicCardUrl(raw: String): String? {
     if (host.length > 253 || !host.contains('.') ||
         host == "localhost" || host.endsWith(".localhost") || host.endsWith(".local") ||
         host.endsWith(".internal") || host.split('.').any { it.isBlank() || !it.matches(Regex("[a-z0-9-]+")) } ||
-        host.split('.').all { it.toIntOrNull() != null }
+        // Browser URL parsers also interpret 0x7f.0.0.1 and 0177.0.0.1
+        // as private IPv4 literals. Never let numeric host spellings enter
+        // a public registry lead before the keeper chooses to connect.
+        host.split('.').all { it.matches(Regex("(?:[0-9]+|0x[0-9a-f]+)")) }
     ) return null
     return runCatching { A2aAgentConnections.normalizeCardUrl(raw) }.getOrNull()
 }
 
 /** Deterministic skill/name/description relevance, not an embedding or an authorization decision. */
 internal fun directoryRelevance(query: String, entry: AgentDirectoryEntry): Int {
-    val words = query.lowercase().split(Regex("[^a-z0-9]+")).filter { it.length > 1 }
+    // Char.isLetterOrDigit is portable across JVM, JS and Wasm; an ASCII-only
+    // splitter silently discarded Japanese, Chinese and Cyrillic agent names.
+    val words = query.lowercase().map { if (it.isLetterOrDigit()) it else ' ' }
+        .joinToString("").split(' ').filter { it.length > 1 }
     if (words.isEmpty()) return 0
     val name = entry.name.lowercase()
     val skills = entry.skills.joinToString(" ").lowercase()
