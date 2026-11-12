@@ -80,7 +80,7 @@ internal fun publicRegistryMcpEndpoint(raw: String): String? {
     val host = url.host.lowercase()
     val label = Regex("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
     if (url.protocol != URLProtocol.HTTPS || url.user != null || url.password != null ||
-        url.port != 443 || url.parameters.isNotEmpty() || url.fragment.isNotEmpty() ||
+        url.port != 443 || url.parameters.names().isNotEmpty() || url.fragment.isNotEmpty() ||
         !host.contains('.') || host.split('.').any { !label.matches(it) } ||
         host.substringAfterLast('.').all(Char::isDigit) ||
         host.endsWith(".local") || host.endsWith(".internal") ||
