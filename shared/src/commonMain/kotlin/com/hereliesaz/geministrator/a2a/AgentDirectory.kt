@@ -25,6 +25,8 @@ internal data class AgentDirectoryEntry(
     val registryReportsHealthy: Boolean = false,
     val registryReportsTaskTested: Boolean = false,
     val connectedProviderId: String? = null,
+    /** A SearchA2A match score is ranking metadata, never an identity or trust rating. */
+    val matchScore: Double? = null,
 )
 
 internal data class AgentDirectoryResults(
@@ -70,58 +72,90 @@ internal object LocalAgentDirectorySource : AgentDirectorySource {
 }
 
 /**
- * Public A2A Registry adapter, GET /api/agents?search=... .
- * See https://github.com/prassanna-ravishankar/a2a-registry (PaginatedAgents).
- * Aive never sends credentials or task contents to the registry and never contacts returned cards
- * while searching. A keeper must select a result and explicitly connect it in Providers.
+ * Aive's only external discovery backend is SearchA2A, which also publishes Azphalt listings.
+ * SearchA2A ranks its indexed metadata with embeddings when available. If its public Worker
+ * is down or rate-limited, use the published, read-only GitHub catalog with keyword matching.
+ * Search never contacts advertised Agent Cards or enrolls providers.
  */
-internal class PublicA2aRegistrySource(
+internal class SearchA2aDirectorySource(
     private val http: HttpClient = sharedDirectoryClient,
 ) : AgentDirectorySource {
-    override val name: String = "A2A Registry"
+    override val name: String = "SearchA2A"
 
     override suspend fun search(query: String): List<AgentDirectoryEntry> {
-        val response = http.get("https://a2aregistry.org/api/agents") {
-            url {
-                parameters.append("search", query)
-                parameters.append("limit", "20")
-                parameters.append("offset", "0")
+        try {
+            val root = fetch(INDEXED_SEARCH_URL, query)
+            require(root["schema"].valueText() == "1" && root["source"].valueText() == "searcha2a") {
+                "Invalid SearchA2A search response"
             }
+            val mode = root["match_mode"].valueText()
+            require(mode == "semantic" || mode == "keyword-fallback") { "Unknown SearchA2A ranking mode" }
+            val items = root["results"] as? JsonArray ?: error("Missing SearchA2A results")
+            return entries(items, if (mode == "semantic") "SearchA2A · semantic" else "SearchA2A · keywords", true)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // A static published snapshot is useful without granting a second discovery service
+            // control over the connected providers. It does not provide semantic ranking.
         }
-        if (response.status != HttpStatusCode.OK) error("Registry unavailable: HTTP ${response.status.value}")
-        val body = try {
-            response.boundedText(MAX_REGISTRY_BYTES)
-        } catch (_: ResponseTooLargeException) {
-            error("Registry response exceeds the directory size limit")
+        val root = fetch(PUBLISHED_FEED_URL)
+        require(root["schema"].valueText() == "1" && root["source"].valueText() == "searcha2a") {
+            "Invalid SearchA2A published catalog"
         }
-        val root = Json.parseToJsonElement(body) as? JsonObject ?: error("Invalid registry response")
-        val agents = root["agents"] as? JsonArray ?: error("Missing registry agent list")
-        return agents.take(MAX_RESULTS).mapNotNull { entry ->
-            val record = entry as? JsonObject ?: return@mapNotNull null
-            val cardUrl = directoryPublicCardUrl(record.string("wellKnownURI").orEmpty()) ?: return@mapNotNull null
-            val skills = (record["skills"] as? JsonArray).orEmpty().mapNotNull { skill ->
-                val item = skill as? JsonObject ?: return@mapNotNull null
-                val label = item.string("name") ?: item.string("id") ?: return@mapNotNull null
-                A2aDrifters.cleanCardText(label, 80).takeIf(String::isNotBlank)
-            }.distinct().take(8)
-            AgentDirectoryEntry(
-                cardUrl = cardUrl,
-                name = A2aDrifters.cleanCardText(record.string("name").orEmpty(), 60)
-                    .ifBlank { A2aDrifters.hostOf(cardUrl) },
-                description = A2aDrifters.cleanCardText(record.string("description").orEmpty(), 240),
-                skills = skills,
-                source = name,
-                // These are observations claimed by the registry, not Aive's own health or trust checks.
-                registryReportsHealthy = (record["is_healthy"] as? JsonPrimitive)?.content == "true",
-                registryReportsTaskTested =
-                    ((record["task_conformance"] as? JsonObject)?.get("passed") as? JsonPrimitive)?.content == "true",
-            )
-        }
+        val listings = root["listings"] as? JsonArray ?: error("Missing SearchA2A catalog listings")
+        return entries(listings, "SearchA2A · cached catalog", false)
+            .filter { directoryRelevance(query, it) > 0 }
     }
 
+    private suspend fun fetch(endpoint: String, query: String? = null): JsonObject {
+        val response = http.get(endpoint) {
+            if (query != null) url { parameters.append("q", query) }
+        }
+        if (response.status != HttpStatusCode.OK) error("Directory source unavailable")
+        val body = try {
+            response.boundedText(MAX_RESPONSE_BYTES)
+        } catch (_: ResponseTooLargeException) {
+            error("Directory response too large")
+        }
+        return Json.parseToJsonElement(body) as? JsonObject ?: error("Invalid directory response")
+    }
+
+    private fun entries(items: JsonArray, sourceLabel: String, ranked: Boolean): List<AgentDirectoryEntry> =
+        items.take(MAX_RESULTS).mapNotNull { element ->
+            val record = element as? JsonObject ?: return@mapNotNull null
+            if (record["kind"].valueText() != "a2a-agent" ||
+                record["installable"].valueText() != "false" ||
+                record["verification"].valueText() != "card_read_only"
+            ) return@mapNotNull null
+            val cardUrl = directoryPublicCardUrl(record["source_url"].valueText().orEmpty())
+                ?: return@mapNotNull null
+            val skills = (record["skills"] as? JsonArray).orEmpty().mapNotNull { item ->
+                val skill = item as? JsonObject ?: return@mapNotNull null
+                A2aDrifters.cleanCardText(skill["name"].valueText().orEmpty(), 80)
+                    .takeIf(String::isNotBlank)
+            }.distinct().take(8)
+            val match = if (ranked) record["match_score"].valueText()?.toDoubleOrNull()
+                ?.takeIf { it.isFinite() && it in 0.0..1.0 } else null
+            AgentDirectoryEntry(
+                cardUrl = cardUrl,
+                name = A2aDrifters.cleanCardText(record["name"].valueText().orEmpty(), 60)
+                    .ifBlank { A2aDrifters.hostOf(cardUrl) },
+                description = A2aDrifters.cleanCardText(record["description"].valueText().orEmpty(), 240),
+                skills = skills,
+                source = sourceLabel,
+                matchScore = match,
+            )
+        }
+
+    private fun kotlinx.serialization.json.JsonElement?.valueText(): String? =
+        (this as? JsonPrimitive)?.content
+
     private companion object {
-        const val MAX_RESULTS = 20
-        const val MAX_REGISTRY_BYTES = 384 * 1024
+        const val INDEXED_SEARCH_URL = "https://searcha2a-api.hereliesaz.workers.dev/api/v1/directory"
+        const val PUBLISHED_FEED_URL =
+            "https://raw.githubusercontent.com/HereLiesAz/searcha2a/agent-feed/site/api/v1/azphalt-listings.json"
+        const val MAX_RESPONSE_BYTES = 900_000
+        const val MAX_RESULTS = 70
     }
 }
 
@@ -131,7 +165,7 @@ internal class PublicA2aRegistrySource(
  * normalized card URL, retaining local connection approval if a registry also lists the agent.
  */
 internal class AgentDirectory(
-    private val sources: List<AgentDirectorySource> = listOf(LocalAgentDirectorySource, PublicA2aRegistrySource()),
+    private val sources: List<AgentDirectorySource> = listOf(LocalAgentDirectorySource, SearchA2aDirectorySource()),
 ) {
     suspend fun search(rawQuery: String): AgentDirectoryResults {
         val query = rawQuery.trim().take(MAX_QUERY_CHARS)
@@ -169,6 +203,7 @@ internal class AgentDirectory(
         return AgentDirectoryResults(
             entries = found.values.sortedWith(
                 compareByDescending<AgentDirectoryEntry> { it.connectedProviderId != null }
+                    .thenByDescending { it.matchScore ?: -1.0 }
                     .thenByDescending { directoryRelevance(query, it) }
                     .thenByDescending { it.registryReportsTaskTested }
                     .thenBy { it.name.lowercase() },
@@ -184,7 +219,7 @@ internal class AgentDirectory(
     }
 }
 
-/** Explicitly reject registry-supplied localhost, IP literals, credentials and disguised origins. */
+/** Reject registry-supplied private, credential-bearing, or ambiguous Agent Card origins. */
 internal fun directoryPublicCardUrl(raw: String): String? {
     if (raw.length > 2048 || !raw.startsWith("https://", ignoreCase = true)) return null
     if (raw.any(Char::isWhitespace) || raw.any { it in "@?#\\%" }) return null
