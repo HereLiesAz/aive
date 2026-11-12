@@ -12,6 +12,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,10 +45,16 @@ fun ProviderCredentialSetup(
     providerId: String,
     onSave: (String) -> Unit,
     onCancel: () -> Unit,
+    onStartAccountSignIn: (() -> Unit)? = null,
+    onCompleteAccountSignIn: (suspend (String) -> String)? = null,
 ) {
     val entry = ProviderCatalog.entry(providerId)
         ?: error("Unknown provider $providerId")
     val uriHandler = LocalUriHandler.current
+    val scope = rememberCoroutineScope()
+    var authorizationCode by remember(providerId) { mutableStateOf("") }
+    var accountSignInInProgress by remember(providerId) { mutableStateOf(false) }
+    var exchangingCode by remember(providerId) { mutableStateOf(false) }
     var apiKey by remember(providerId) { mutableStateOf("") }
     var errorMessage by remember(providerId) { mutableStateOf<String?>(null) }
     var keylessConfirm by remember(providerId) { mutableStateOf(false) }
@@ -91,6 +99,56 @@ fun ProviderCredentialSetup(
                         )
                     },
                 )
+
+                if (onStartAccountSignIn != null && onCompleteAccountSignIn != null) {
+                    AzphaltPill(
+                        label = "Sign in with OpenRouter",
+                        seed = "account-sign-in-${entry.id}",
+                        onClick = {
+                            authorizationCode = ""
+                            errorMessage = null
+                            accountSignInInProgress = true
+                            onStartAccountSignIn()
+                        },
+                    )
+                    if (accountSignInInProgress) {
+                        Text(
+                            "Authorize Aive in your browser, then copy the one-time code shown by OpenRouter. Your OpenRouter account may use Google sign-in. Model usage is billed to that account.",
+                            style = AzphaltType.body,
+                            color = azphaltOnSurface(),
+                        )
+                        AzphaltTextField(
+                            value = authorizationCode,
+                            onValueChange = {
+                                authorizationCode = it
+                                errorMessage = null
+                            },
+                            label = "One-time authorization code",
+                            errorMessage = errorMessage,
+                        )
+                        AzphaltPill(
+                            label = if (exchangingCode) "Connecting…" else "Connect account",
+                            seed = "account-exchange-${entry.id}",
+                            onClick = {
+                                if (!exchangingCode && authorizationCode.isNotBlank()) {
+                                    exchangingCode = true
+                                    scope.launch {
+                                        try {
+                                            val key = onCompleteAccountSignIn(authorizationCode.trim())
+                                            onSave(key)
+                                        } catch (cancelled: kotlin.coroutines.cancellation.CancellationException) {
+                                            throw cancelled
+                                        } catch (failure: Exception) {
+                                            errorMessage = failure.message ?: "Account authorization failed"
+                                        } finally {
+                                            exchangingCode = false
+                                        }
+                                    }
+                                }
+                            },
+                        )
+                    }
+                }
 
                 Text(
                     stringResource(Res.string.provider_credential_credential),

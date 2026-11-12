@@ -48,6 +48,27 @@ remain in their platform credential stores. On Android their writes are synchron
 reports the value as saved. Unsaved password/token text is never copied into the general Settings
 store.
 
+## Provider account authorization
+
+Android OpenRouter account authorization uses OpenRouter's headless browser PKCE S256 flow.
+The app generates a fresh one-time code verifier with SecureRandom, opens the provider's
+own login page in the system browser, and accepts the single-use authorization code
+copied back by the user. The verifier is consumed before the token exchange and remains
+in process memory only; process death requires starting authorization again. OpenRouter
+may offer Google login itself, but Aive never receives or uses a Google access token
+to call OpenRouter.
+
+An exchanged user-controlled OpenRouter credential is written through the existing
+`AndroidProviderCredentialStore` encrypted Android Keystore-backed storage. It uses
+the same provider id as a manually entered OpenRouter API key, so existing routing
+and disconnect behavior remain unchanged. Aive does not persist an OAuth code,
+verifier, access token, or refresh token in workflow persistence. The connection
+may incur charges against the user's OpenRouter account.
+
+This does not authorize other providers. Hugging Face and Pollinations require
+their own registered public OAuth clients and provider-specific permissions,
+budgets, and token handling before account sign-in can be enabled for them.
+
 A product rename must never rename a persistence key merely for cosmetic consistency. Existing
 `haive.*` and `geministrator.*` keys are compatibility identifiers and remain valid storage
 names unless an explicit read-old/write-new migration is shipped.

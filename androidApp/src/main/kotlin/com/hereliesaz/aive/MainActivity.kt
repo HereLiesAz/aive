@@ -178,6 +178,7 @@ class MainActivity : ComponentActivity() {
         // Remote access is opt-in; this only restarts a link the user already turned on.
         remoteAccessController.resumeIfEnabled()
         val providerCredentialStore = AndroidProviderCredentialStore(this)
+        val openRouterAuthorization = AndroidOpenRouterAccountAuthorization(repositoryHttpClient)
         val repositoryCredentialStore = AndroidRepositoryCredentialStore(this)
         // Register file pickers before the Activity reaches STARTED.
         val projectFileService = AndroidProjectFileService(this)
@@ -499,6 +500,12 @@ class MainActivity : ComponentActivity() {
                     )
                     providerId != null -> ProviderCredentialSetup(
                         providerId = providerId,
+                        onStartAccountSignIn = if (providerId == ProviderCatalog.OPENROUTER_ID) {
+                            { startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(openRouterAuthorization.begin()))) }
+                        } else null,
+                        onCompleteAccountSignIn = if (providerId == ProviderCatalog.OPENROUTER_ID) {
+                            { code -> openRouterAuthorization.exchange(code) }
+                        } else null,
                         onSave = { key ->
                             providerCredentialStore.write(providerId, key)
                             credentials = providerCredentialStore.readAll()
