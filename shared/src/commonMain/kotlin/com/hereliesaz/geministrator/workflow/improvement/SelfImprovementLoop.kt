@@ -143,6 +143,9 @@ object LoopIntegrity {
     private const val NO_APPROVAL = "The loop must not hold anything up: it has no approval step."
     private const val READS_ONLY = "The loop only reads and reports: no repository, script, deployment, action, test, external-service, nested-workflow or distributed step."
 
+    /** The role a step really runs as: the one dispatch uses ([TaskExecutor.RoleAgent]) before the step's own [TaskDefinition.roleId]. */
+    private fun effectiveRole(task: TaskDefinition) = (task.executor as? TaskExecutor.RoleAgent)?.roleId ?: task.roleId
+
     /** The ways [definition] is not the loop. [roles] (the installed roles) lets the roles its steps use be checked too; empty skips that. */
     fun violations(definition: WorkflowDefinition, roles: Collection<RoleDefinition> = emptyList()): List<String> {
         val problems = linkedSetOf<String>()
@@ -156,14 +159,14 @@ object LoopIntegrity {
         if (examine == null || examine.objective.isBlank()) {
             problems += "The loop must examine itself (a step 'examine-loop' with its own objective)."
         } else {
-            val author = examine.roleId
-            if (author == null || author == HallMonitorRole.id || ancestors(tasks, examine.id).any { byId[it.value]?.roleId == HallMonitorRole.id }) {
+            val author = effectiveRole(examine)
+            if (author == null || author == HallMonitorRole.id || ancestors(tasks, examine.id).any { byId[it.value]?.let(::effectiveRole) == HallMonitorRole.id }) {
                 problems += "The loop must examine itself independently of the Hall Monitor: 'examine-loop' is not the Hall Monitor's step and does not wait on its report."
             }
         }
         if (challenge == null || challenge.dependsOn.none { it.value == "examine-loop" }) {
             problems += "The loop's examination of itself must be challenged ('challenge-loop' after 'examine-loop')."
-        } else if (examine != null && challenge.roleId != null && challenge.roleId == examine.roleId) {
+        } else if (examine != null && effectiveRole(challenge) != null && effectiveRole(challenge) == effectiveRole(examine)) {
             problems += "The loop's examination of itself must be challenged by a different role than the one that made it."
         }
         if (propose == null || !carries(propose, ImprovementParser.NO_CHANGE_PREFIX) || !carries(propose, ImprovementParser.LINE_PREFIX) || !SelfImprovementLoop.metaKinds.any { it in propose.objective }) {
@@ -196,7 +199,7 @@ object LoopIntegrity {
             (task.providerConstraints as? ProviderConstraints.RequireCapabilities)?.let { needs ->
                 if (needs.capabilities.any { it in writeCapabilities }) problems += "The loop changes nothing: '${task.id.value}' asks for a provider that can write, run commands or open a pull request."
             }
-            val roleId = (task.executor as? TaskExecutor.RoleAgent)?.roleId ?: task.roleId
+            val roleId = effectiveRole(task)
             roles.firstOrNull { it.id == roleId }?.let { role ->
                 if (role.capabilitiesRequired.any { it in writeCapabilities } || role.authorities.any { it in changingAuthorities } || role.executionSource != RoleExecutionSource.Agent) {
                     problems += "The loop changes nothing: the role '${role.id.value}' used by '${task.id.value}' can write, run commands or release, or is not a plain agent."
