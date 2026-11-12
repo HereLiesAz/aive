@@ -143,6 +143,7 @@ internal class SearchA2aDirectorySource(
             }.distinct().take(8)
             val match = if (ranked) record["match_score"].valueText()?.toDoubleOrNull()
                 ?.takeIf { it.isFinite() && it in 0.0..1.0 } else null
+            val ansClaim = directoryAnsClaim(record)
             AgentDirectoryEntry(
                 cardUrl = cardUrl,
                 name = A2aDrifters.cleanCardText(record["name"].valueText().orEmpty(), 60)
@@ -151,8 +152,8 @@ internal class SearchA2aDirectorySource(
                 skills = skills,
                 source = sourceLabel,
                 matchScore = match,
-                ansName = directoryAnsClaim(record)?.first,
-                ansHost = directoryAnsClaim(record)?.second,
+                ansName = ansClaim?.first,
+                ansHost = ansClaim?.second,
             )
         }
 
