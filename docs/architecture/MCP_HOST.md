@@ -60,6 +60,32 @@ Keeper's room › Connections › **MCP servers** (`McpServerConnections`). A se
 - On the web, a server is reachable only if its CORS policy admits The Aive's origin.
 - Tokens are not part of the setup file.
 
+## Read-only MCP catalog discovery
+
+Keeper's room › Connections › **MCP servers › Add an MCP server** offers an
+explicit **Search catalog** action for public MCP servers. The query is sent
+only on keeper action (at least three characters), over HTTPS to
+`https://azphalt.store/api/mcp/servers?search=...`. The Store's adapter
+consumes the standard MCP Registry v0.1 read API, supporting public and
+deployer-configured compatible registry origins. Search does not contact the
+advertised server, run tools, send a bearer token or add a connection.
+
+`mcp/McpRegistryDirectory.kt` accepts only `schema:1`,
+`source:mcp-registry-v0.1`, `kind:mcp-server`, `installable:false`,
+`verification:registry_metadata_only` entries with a usable public HTTPS
+Streamable HTTP endpoint. It rejects credential-bearing or private URLs,
+forged verification status and non-HTTP transports. Publisher versions are
+opaque strings retained as metadata, not converted into ANS identities.
+Search results are leads only; **Use address** fills the existing name and
+address fields, but **Add** is still required to connect. The existing
+per-run MCP tool consent remains unchanged.
+
+There is no vendor-branded execution runtime, automatic installation,
+provider promotion, tool-permission inheritance or mandatory external
+control plane. This keeps the architecture compatible with external
+Kubernetes-native agents and gateways through standard MCP and A2A, while
+Aive retains its native execution and authority model.
+
 ## The loop
 
 `TextLlmProvider` takes an optional `McpToolSource`. A run's toolbox is offered when three things hold: the API implements `ToolCallingTextGenerationApi`, the run has no provider-side plan gate, and a server lists at least one tool. Today that means Anthropic Messages (`tool_use`), OpenAI-compatible chat (`tools`, so every hosted provider and store `llm` package) and Gemini (`functionDeclarations` with `parametersJsonSchema`; thought signatures are replayed). OpenAI and xAI Responses and the workspace agents get no tools yet.
