@@ -71,6 +71,8 @@ private suspend fun migrate(driver: SqlDriver) {
     when {
         current == 0L -> schema.create(driver).await()
         current < schema.version -> schema.migrate(driver, current, schema.version).await()
+        // A newer build wrote this database; reading it with an older schema could corrupt it.
+        current > schema.version -> error("Unsupported memory schema version $current (this build knows ${schema.version})")
         else -> return
     }
     driver.execute(null, "PRAGMA user_version = ${schema.version};", 0).await()
