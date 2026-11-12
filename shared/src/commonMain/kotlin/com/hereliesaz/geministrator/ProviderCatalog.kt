@@ -19,6 +19,8 @@ data class ProviderCatalogEntry(
 
 object ProviderCatalog {
     const val OPENAI_ID = "openai"
+    const val AI_HORDE_ID = "aihorde"
+    const val FAL_ID = "fal"
     const val ANTHROPIC_ID = "anthropic"
     const val GEMINI_ID = "gemini"
     const val XAI_ID = "xai"
@@ -52,6 +54,21 @@ object ProviderCatalog {
 
     /** The providers built into Aive. */
     val builtInEntries: List<ProviderCatalogEntry> = listOf(
+        ProviderCatalogEntry(
+            id = AI_HORDE_ID,
+            displayName = "AI Horde Images",
+            apiKeyUrl = "https://aihorde.net/",
+            credentialLabel = "AI Horde key (optional)",
+            description = "Community-hosted text-to-image generation. Anonymous requests need no key, have lowest queue priority, and are shared with volunteer workers. No guaranteed editing or transparency.",
+            keyOptional = true,
+        ),
+        ProviderCatalogEntry(
+            id = FAL_ID,
+            displayName = "fal Images",
+            apiKeyUrl = "https://fal.ai/dashboard/keys",
+            credentialLabel = "fal API key",
+            description = "Hosted FLUX image generation. Requires an API key; usage can incur charges. The Schnell model does not promise image editing or transparency.",
+        ),
         ProviderCatalogEntry(
             id = OPENAI_ID,
             displayName = "OpenAI / Codex",
