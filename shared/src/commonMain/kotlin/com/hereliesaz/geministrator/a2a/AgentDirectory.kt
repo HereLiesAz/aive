@@ -27,6 +27,9 @@ internal data class AgentDirectoryEntry(
     val connectedProviderId: String? = null,
     /** A SearchA2A match score is ranking metadata, never an identity or trust rating. */
     val matchScore: Double? = null,
+    /** Unverified publisher name claim from SearchA2A, never a provider permission. */
+    val ansName: String? = null,
+    val ansHost: String? = null,
 )
 
 internal data class AgentDirectoryResults(
@@ -148,8 +151,30 @@ internal class SearchA2aDirectorySource(
                 skills = skills,
                 source = sourceLabel,
                 matchScore = match,
+                ansName = directoryAnsClaim(record)?.first,
+                ansHost = directoryAnsClaim(record)?.second,
             )
         }
+
+    /** Parse SearchA2A's indexed `ans` and Azphalt's cached `ans_claim` without upgrading trust. */
+    private fun directoryAnsClaim(record: JsonObject): Pair<String, String>? {
+        val raw = (record["ans"] as? JsonObject) ?: (record["ans_claim"] as? JsonObject)
+            ?: return null
+        if (raw["verification"].valueText() != "unverified") return null
+        val name = raw["name"].valueText() ?: return null
+        val host = raw["agent_host"].valueText() ?: return null
+        if (name.length > 259 || host.length > 237 || !name.startsWith("ans://")) return null
+        val suffix = "." + host.lowercase()
+        if (!name.lowercase().endsWith(suffix)) return null
+        val version = name.substring(6, name.length - suffix.length)
+        val validLabel = Regex("[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?")
+        val labels = host.split('.') + version.split('.')
+        if (host.split('.').size < 2 || labels.any { !validLabel.matches(it) } ||
+            host.endsWith(".localhost", true) || host.endsWith(".internal", true) ||
+            host.endsWith(".local", true) || host.substringAfterLast('.').all(Char::isDigit)
+        ) return null
+        return name to host
+    }
 
     private fun kotlinx.serialization.json.JsonElement?.valueText(): String? =
         (this as? JsonPrimitive)?.content
