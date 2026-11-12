@@ -65,6 +65,7 @@ import com.hereliesaz.geministrator.providers.llm.GitLabWorkspaceAgentProvider
 import com.hereliesaz.geministrator.providers.llm.GitLabWorkspaceTokenProvider
 import com.hereliesaz.geministrator.providers.llm.HostedLlmProviders
 import com.hereliesaz.geministrator.providers.llm.LlmApiKeyProvider
+import com.hereliesaz.geministrator.providers.llm.HostedImageGenerationExecutorIntegration
 import com.hereliesaz.geministrator.providers.llm.NodeCharacterImagePipelineExecutorIntegration
 import com.hereliesaz.geministrator.providers.llm.StoreNodeCharacterRigPipelineExecutorIntegration
 import com.hereliesaz.geministrator.providers.llm.OpenAiProvider
@@ -361,8 +362,14 @@ class MainActivity : ComponentActivity() {
                         roleSurfaceRuntime = roleSurfaceRuntime,
                         localRepositories = localRepositories,
                     )
+                    val imageIntegrations = configured.withPriorityIntegration(
+                        HostedImageGenerationExecutorIntegration(
+                            falKey = { credentials.cleanKey(ProviderCatalog.FAL_ID) },
+                            hordeKey = { credentials.cleanKey(ProviderCatalog.AI_HORDE_ID)?.takeUnless { it == ProviderCatalog.ANONYMOUS_CREDENTIAL } },
+                        ),
+                    )
                     credentials.cleanKey(ProviderCatalog.OPENAI_ID)?.let { key ->
-                        configured
+                        imageIntegrations
                             .withPriorityIntegration(
                                 NodeCharacterImagePipelineExecutorIntegration(
                                     apiKeyProvider = LlmApiKeyProvider { key },
@@ -373,7 +380,7 @@ class MainActivity : ComponentActivity() {
                                     apiKeyProvider = LlmApiKeyProvider { key },
                                 ),
                             )
-                    } ?: configured
+                    } ?: imageIntegrations
                 }
                 val computeSession = remember(computeConfiguration, computeToken, baseExecutorIntegrations) {
                     val token = computeToken
