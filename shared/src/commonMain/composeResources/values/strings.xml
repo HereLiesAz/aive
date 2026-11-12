@@ -121,6 +121,13 @@
     <string name="keeper_local_git_note">Local Git folders need no account: pick one when you launch.</string>
     <string name="mcp_servers">MCP servers</string>
     <string name="mcp_servers_lead">Tool servers your agents can call while they work. Each server's tools run only after you allow them, once per run or always.</string>
+    <string name="mcp_registry_search_query">Find MCP servers (3+ characters)</string>
+    <string name="mcp_registry_search">Search catalog</string>
+    <string name="mcp_registry_searching">Searching catalog…</string>
+    <string name="mcp_registry_unavailable">MCP catalog unavailable.</string>
+    <string name="mcp_registry_no_results">No connectable MCP servers found.</string>
+    <string name="mcp_registry_unverified">Registry metadata only, not verified</string>
+    <string name="mcp_registry_use_address">Use address</string>
     <string name="mcp_add_server">Add an MCP server</string>
     <string name="mcp_add_server_hint">By address, or by command on this computer</string>
     <string name="mcp_add_server_hint_remote">By address</string>
