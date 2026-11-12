@@ -59,7 +59,7 @@ internal class HeadlessForeground(
             "There is already an unfinished run. Use 'aive resume' instead."
         }
         val objective = options.objective?.trim()
-        val provenance = if (console == null) ContextProvenance.ExternalContent else ContextProvenance.KeeperWritten
+        val provenance = ContextProvenance.ExternalContent
         if (options.hiveId != null) {
             val definition = engine.runtime.persistence.definitions.get(WorkflowDefinitionId(options.hiveId))
                 ?: error("No hive ${options.hiveId}")
