@@ -95,11 +95,13 @@ internal class AndroidAzphaltHost(
         scope.cancel()
     }
 
+    // The activity is exported: any app can send it any URI. Only content:// is read (the sender grants
+    // access); file:// would let a sender make this app open its own private files.
     private fun Intent.azphaltUri(): Uri? = when (action) {
         Intent.ACTION_VIEW -> data
         Intent.ACTION_SEND -> sharedStreamUri()
         else -> null
-    }
+    }?.takeIf { isAcceptableAzphaltUriScheme(it.scheme) }
 
     @Suppress("DEPRECATION")
     private fun Intent.sharedStreamUri(): Uri? = getParcelableExtra(Intent.EXTRA_STREAM) as? Uri
@@ -133,3 +135,6 @@ internal class AndroidAzphaltHost(
         }
     }
 }
+
+/** Only a content URI (a grant from the sender) may be opened as an Azphalt package. */
+internal fun isAcceptableAzphaltUriScheme(scheme: String?): Boolean = scheme.equals("content", ignoreCase = true)
