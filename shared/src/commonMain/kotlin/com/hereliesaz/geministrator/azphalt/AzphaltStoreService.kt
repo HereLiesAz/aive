@@ -442,6 +442,7 @@ class AzphaltStoreService(
         packageId: String,
         requestedVersion: String? = null,
         entitlementToken: String? = null,
+        allowDowngrade: Boolean = false,
     ): AzphaltPreparedInstall {
         val detail = repository.detail(packageId)
         require(detail.kind == "workflow" || detail.kind == "role") {
@@ -469,6 +470,7 @@ class AzphaltStoreService(
         require(compat) {
             "Package ${manifest.id} requires Azphalt host ${manifest.compat}; Haive implements $HAIVE_AZPHALT_API_VERSION"
         }
+        if (!allowDowngrade) requireNotDowngrade(manifest.id, installStore.get(manifest.id)?.version, manifest.version)
         val plan = installer.inspect(verification)
         val dependencies = resolveDependencies(plan.dependencies)
         return AzphaltPreparedInstall(
@@ -490,6 +492,7 @@ class AzphaltStoreService(
         val signingKeys = runCatching { repositoryIndex().signingKeys }.getOrDefault(emptyList())
         val verified = verifier.verify(bytes, signingKeys)
         val manifest = verified.packageContents.manifest
+        requireNotDowngrade(manifest.id, installStore.get(manifest.id)?.version, manifest.version)
         val revocationResult = runCatching { revocations() }
         revocationResult.getOrNull()?.let { known ->
             requireNotRevoked(manifest.id, manifest.version, known)
@@ -747,5 +750,25 @@ internal fun dependencyVersionSatisfies(version: String, requirement: String?): 
         "<" -> comparison < 0
         "=" -> comparison == 0
         else -> false
+    }
+}
+
+/** Dotted numeric core of a version ("1.2.3-rc1+b" -> [1,2,3]), or null when it is not numeric. */
+internal fun azphaltVersionCore(version: String): List<Int>? =
+    version.substringBefore('+').substringBefore('-').split('.').map { it.toIntOrNull() ?: return null }
+
+/**
+ * An older package must not silently replace a newer installed one (a replayed old signed package would
+ * reinstate a fixed vulnerability). Versions that cannot be compared are not blocked.
+ */
+internal fun requireNotDowngrade(packageId: String, installed: String?, incoming: String) {
+    val have = installed?.let(::azphaltVersionCore) ?: return
+    val next = azphaltVersionCore(incoming) ?: return
+    val size = maxOf(have.size, next.size)
+    for (i in 0 until size) {
+        val x = have.getOrElse(i) { 0 }
+        val y = next.getOrElse(i) { 0 }
+        if (y < x) throw IllegalArgumentException("$packageId $incoming is older than the installed $installed; downgrades need explicit approval")
+        if (y > x) return
     }
 }
