@@ -16,6 +16,7 @@ Workflow nodes may be performed by AI providers such as specialized model agents
 
 - Android — application ID `com.hereliesaz.aive` (Google Play); GitHub-release builds keep `com.hereliesaz.haive` permanently so existing installs upgrade in place
 - Desktop JVM
+- Independent headless JVM (CLI and daemon)
 - Web — JavaScript and WebAssembly
 
 ## Repository map
@@ -24,7 +25,7 @@ Workflow nodes may be performed by AI providers such as specialized model agents
 - `providers/` — provider adapters: `llm/` (native OpenAI, Anthropic, Gemini, and xAI adapters, OpenAI-compatible hosted providers, GitLab workspace agent)
 - `androidApp/` — Android launcher
 - `desktopApp/` — Desktop launcher
-- `cliApp/` — The Aive command-line client (authenticated desktop control API)
+- `cliApp/` — independent The Aive headless engine and command-line interface (no desktop process)
 - `webApp/` — browser launcher (includes `mesh-crypto.js`, the Web Crypto AES-GCM backend for `MeshCrypto` on JS/Wasm)
 - `computeRelay/` — Ktor WebSocket relay server for [distributed compute](docs/architecture/DISTRIBUTED_COMPUTE.md)
 - `buildSrc/` — Gradle build logic for generating and verifying brand assets
@@ -45,7 +46,7 @@ Requirements: JDK 21, the Android SDK (the project reads `local.properties` or `
 ./gradlew test                              # unit tests, all targets that run on the host
 ./gradlew :androidApp:assemblePlayDebug     # or assembleGithubDebug
 ./gradlew :desktopApp:run                   # desktop app
-./gradlew :cliApp:installDist               # terminal client: cliApp/build/install/aive/bin/aive
+./gradlew :cliApp:installDist               # headless engine: cliApp/build/install/aive/bin/aive
 npm --prefix relay test                     # relay Worker tests (Node 20+, no install step)
 node tools/puppet-rig/test/rig-core.mjs     # puppet-rig editor tests
 ~~~

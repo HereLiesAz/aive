@@ -27,6 +27,7 @@ The Aive is not an IDE. Source editing, terminals, and generic filesystem toolin
 
 - Android — namespace `com.hereliesaz.aive`; application ID `com.hereliesaz.aive` for the `play` flavor and `com.hereliesaz.haive` for the `github` release flavor, kept permanently so GitHub-release installs upgrade in place
 - Desktop JVM
+- Independent headless JVM runtime (`cliApp/`), sharing the same engine and policy boundary
 - Web JavaScript
 - WebAssembly
 
@@ -40,6 +41,7 @@ providers/    provider adapters: llm (native and OpenAI-compatible hosted adapte
 computeRelay/ distributed compute relay server
 androidApp/   Android launcher
 desktopApp/   Desktop launcher
+cliApp/       Headless JVM runtime, terminal launcher and local control daemon
 webApp/       browser launcher
 ~~~
 

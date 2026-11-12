@@ -166,4 +166,4 @@ The product name is **The Aive**. Technical artifact names may use `haive`. The 
 
 [`MCP.md`](MCP.md) describes the standalone MCP bridge and the desktop control API behind it: what an external agent can read and author, how runs are controlled, and why approvals stay in the app.
 
-[`CLI.md`](CLI.md) documents the standalone The Aive terminal client, its authenticated loopback connection, supported commands, JSON input/output, exit codes and inherited approval restrictions.
+[`CLI.md`](CLI.md) documents the independent headless JVM engine, foreground planning/execution, resumable daemon, CLI commands, provider configuration and keeper-only approval boundary.

@@ -428,7 +428,7 @@ suspend fun ApplicationRuntime.resumePendingPlanLaunch(
  * Asks the planner to propose a swarm for [prompt] and returns it for the keeper to edit. A draft
  * only proposes: no project, run or repository is created or read, and nothing is saved here.
  */
-internal suspend fun ApplicationRuntime.draftSwarm(
+suspend fun ApplicationRuntime.draftSwarm(
     prompt: String,
     orchestrationRuntime: OrchestrationAgentRuntime,
     /** Reviews the draft before it is shown; what it said is added to the draft's notes. Null drafts unreviewed. */

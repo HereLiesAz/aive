@@ -19,7 +19,7 @@ import java.util.prefs.Preferences
 import kotlinx.coroutines.runBlocking
 
 /**
- * The control API's desktop server (docs/MCP.md): [ControlApi] over HTTP on loopback only
+ * Shared JVM control server for The Aive desktop and independent headless engine (docs/MCP.md): [ControlApi] over HTTP on loopback only
  * (127.0.0.1), for the standalone MCP bridge. Off unless the keeper turns it on, with the
  * `AIVE_CONTROL_API=on` environment variable or the preference `enabled` in the node
  * `com/hereliesaz/haive/control-api`.
@@ -29,7 +29,7 @@ import kotlinx.coroutines.runBlocking
  * Windows). The token is never logged, never shown, and never written to `control.json`, the
  * discovery file the bridge reads to find the address.
  */
-internal class DesktopControlApi(
+class DesktopControlApi(
     val dir: File = defaultDir(),
     /** The configured port; 0 picks a free one (tests). */
     val port: Int = configuredPort(),
@@ -103,7 +103,9 @@ internal class DesktopControlApi(
     private fun loadOrCreateToken(): String {
         secureDir()
         runCatching { tokenFile.readText().trim() }.getOrNull()?.takeIf { it.length >= 32 }?.let { return it }
-        val fresh = DesktopA2aServer.newToken()
+        val fresh = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(
+            ByteArray(32).also { java.security.SecureRandom().nextBytes(it) },
+        )
         writePrivate(tokenFile, fresh)
         return fresh
     }
