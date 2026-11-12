@@ -32,9 +32,9 @@ object CycleIngest {
      * A finished cycle whose last step left no stored text is skipped, not recorded as a cycle that proposed nothing.
      */
     suspend fun backfill(store: ImprovementStore, history: List<WorkflowRun>): List<WorkflowRun> {
-        val seen = store.state().cycles.mapTo(hashSetOf()) { it.runId }
+        val state = store.state()
         return history
-            .filter { isFinishedCycle(it) && it.id.value !in seen && finalText(it).isNotBlank() }
+            .filter { isFinishedCycle(it) && !state.hasIngested(it.id.value) && finalText(it).isNotBlank() }
             .sortedByDescending { it.updatedAtEpochMillis }
             .take(MAX_BACKFILL)
             .sortedBy { it.updatedAtEpochMillis }

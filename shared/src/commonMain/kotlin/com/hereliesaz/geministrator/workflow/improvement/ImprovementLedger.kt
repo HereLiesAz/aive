@@ -111,7 +111,21 @@ object MetaNoChange {
 data class ImprovementState(
     val proposals: List<ImprovementProposal> = emptyList(),
     val cycles: List<CycleRecord> = emptyList(),
-)
+    /**
+     * Run ids of every cycle ever read, kept apart from the bounded [cycles] so that a cycle older than the retained
+     * records is still recognised as read (otherwise startup backfill re-imports its proposals as Proposed again,
+     * resurrecting dismissed ones and duplicating adopted ones). Itself capped at [MAX_INGESTED_IDS], oldest first.
+     */
+    val ingestedRunIds: List<String> = emptyList(),
+) {
+    /** True when the cycle of [runId] has been read, whether or not its record is still retained. */
+    fun hasIngested(runId: String): Boolean = ingestedRunIds.contains(runId) || cycles.any { it.runId == runId }
+
+    companion object {
+        const val MAX_CYCLES = 200
+        const val MAX_INGESTED_IDS = 5_000
+    }
+}
 
 /** The proposal lines of a cycle's last step, read into records. Deterministic; no model. */
 object ImprovementParser {
@@ -272,8 +286,14 @@ class SettingsImprovementStore(
 
     override suspend fun ingest(cycle: CycleRecord, proposals: List<ImprovementProposal>): Boolean = mutex.withLock {
         val now = read()
-        if (now.cycles.any { it.runId == cycle.runId }) return@withLock false
-        write(ImprovementState(ProposalRetention.bound(now.proposals + proposals), (now.cycles + cycle).takeLast(200)))
+        if (now.hasIngested(cycle.runId)) return@withLock false
+        write(
+            ImprovementState(
+                ProposalRetention.bound(now.proposals + proposals),
+                (now.cycles + cycle).takeLast(ImprovementState.MAX_CYCLES),
+                (now.ingestedRunIds + now.cycles.map { it.runId } + cycle.runId).distinct().takeLast(ImprovementState.MAX_INGESTED_IDS),
+            ),
+        )
         true
     }
 
@@ -308,8 +328,12 @@ class InMemoryImprovementStore : ImprovementStore {
     private var state = ImprovementState()
     override suspend fun state() = state
     override suspend fun ingest(cycle: CycleRecord, proposals: List<ImprovementProposal>): Boolean {
-        if (state.cycles.any { it.runId == cycle.runId }) return false
-        state = ImprovementState(ProposalRetention.bound(state.proposals + proposals), state.cycles + cycle)
+        if (state.hasIngested(cycle.runId)) return false
+        state = ImprovementState(
+            ProposalRetention.bound(state.proposals + proposals),
+            (state.cycles + cycle).takeLast(ImprovementState.MAX_CYCLES),
+            (state.ingestedRunIds + cycle.runId).distinct().takeLast(ImprovementState.MAX_INGESTED_IDS),
+        )
         return true
     }
     override suspend fun decide(id: String, expected: ProposalStatus, update: (ImprovementProposal) -> ImprovementProposal): Boolean {
