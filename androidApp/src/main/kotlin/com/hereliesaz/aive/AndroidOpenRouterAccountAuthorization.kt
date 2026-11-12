@@ -1,6 +1,6 @@
 package com.hereliesaz.aive
 
-import android.util.Base64
+import java.util.Base64
 import io.ktor.client.HttpClient
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -31,9 +31,9 @@ internal class AndroidOpenRouterAccountAuthorization(
     fun begin(): String {
         val bytes = ByteArray(32)
         random.nextBytes(bytes)
-        val secret = Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
+        val secret = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
         val hash = MessageDigest.getInstance("SHA-256").digest(secret.toByteArray(Charsets.US_ASCII))
-        val challenge = Base64.encodeToString(hash, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
+        val challenge = Base64.getUrlEncoder().withoutPadding().encodeToString(hash)
         verifier = secret
         return "https://openrouter.ai/auth?code_challenge=$challenge&code_challenge_method=S256&key_label=Aive"
     }
