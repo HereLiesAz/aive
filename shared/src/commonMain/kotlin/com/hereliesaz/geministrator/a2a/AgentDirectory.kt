@@ -245,7 +245,7 @@ internal class AgentDirectory(
  * transparency proofs have NOT been checked. The version is opaque and may span DNS labels.
  */
 internal fun publicAnsClaimName(name: String, host: String): Boolean {
-    if (name.length > 259 || host.length > 237 || !name.startsWith("ans://")) return false
+    if (name.length > 259 || host.length > 251 || !name.startsWith("ans://")) return false
     val suffix = "." + host.lowercase()
     if (!name.lowercase().endsWith(suffix)) return false
     val version = name.substring(6, name.length - suffix.length)
