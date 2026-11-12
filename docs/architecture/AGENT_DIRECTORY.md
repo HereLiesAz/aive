@@ -44,7 +44,7 @@ relative relevance rankings, never reliability, identity, or permission scores.
 
 If the SearchA2A Worker is unavailable or rate-limited, Aive can still read
 `https://raw.githubusercontent.com/HereLiesAz/searcha2a/agent-feed/site/api/v1/azphalt-listings.json`,
-filtering that published snapshot using local deterministic keyword relevance
+filtering that published snapshot using local deterministic keyword relevance, sorting matches before applying either per-source or overall result limits
 and labelling the result **cached catalog**. It does not send the search terms
 to that GitHub raw-CDN URL, though the network request reveals the client IP.
 Failure of both sources leaves local connected-provider and suggestion matches
@@ -52,14 +52,16 @@ available, with the SearchA2A source shown as unavailable.
 
 `AgentDirectorySource` remains the adapter seam for testability. The implementation
 is `SearchA2aDirectorySource`, not a second registry. Responses are capped at
-900 KiB, must declare `schema: 1` and `source: searcha2a`, and only
+16 MiB to support the expanded, bounded SearchA2A snapshot, must declare `schema: 1` and `source: searcha2a`, and only
 `kind: a2a-agent`, `installable: false`, `verification: card_read_only`
 records are accepted. Invalid HTTPS hosts, IP literals, private/local hostnames,
-credentials, query strings, fragments, malformed ports, and oversized URLs are
-rejected. Redirects are not followed. Results are deduplicated by Agent Card URL,
+credentials, query strings, fragments, malformed ports, alternate IPv4 forms
+(including hexadecimal and octal labels), and oversized URLs are rejected. Redirects are not followed. Results are deduplicated by Agent Card URL,
 with locally approved connection state preserved independently of the search hit.
 
-No credential, workflow prompt, task artifact or connected-provider inventory is
+Unicode letters and digits are preserved by local relevance scoring, so connected
+agents with non-English names remain searchable. No credential, workflow prompt,
+task artifact or connected-provider inventory is
 sent to SearchA2A. The query and caller IP reach the SearchA2A gateway. The indexed
 catalog is stale until the next crawl and its card metadata is not evidence of
 agent uptime or publisher identity. Workers AI may consume Cloudflare inference
