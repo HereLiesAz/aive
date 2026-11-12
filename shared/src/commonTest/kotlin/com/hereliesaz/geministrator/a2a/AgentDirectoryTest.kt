@@ -135,6 +135,36 @@ class AgentDirectoryTest {
     }
 
     @Test
+    fun catalogFallbackSearchesBeyondTheFirstSeventyUnfilteredEntries() = runTest {
+        val unrelated = (1..70).joinToString(",") { index ->
+            """{"name":"Unrelated $index","description":"No relevant skills",
+                "source_url":"https://unrelated$index.example.org/card",
+                "skills":[{"name":"General"}],
+                "kind":"a2a-agent","installable":false,"verification":"card_read_only"}""".trimIndent()
+        }
+        val catalog = """{"schema":1,"source":"searcha2a","listings":[
+            $unrelated,
+            {"name":"Weather Agent","description":"Weather forecasts",
+             "source_url":"https://weather.example.org/card","skills":[{"name":"Precipitation"}],
+             "kind":"a2a-agent","installable":false,"verification":"card_read_only"}
+        ]}""".trimIndent()
+        val client = HttpClient(MockEngine { request ->
+            if (request.url.host == "searcha2a-api.hereliesaz.workers.dev") {
+                respond("API unavailable", HttpStatusCode.ServiceUnavailable)
+            } else {
+                respond(catalog, HttpStatusCode.OK)
+            }
+        })
+        try {
+            val matches = SearchA2aDirectorySource(client).search("weather")
+            assertEquals(listOf("Weather Agent"), matches.map { it.name })
+            assertEquals("SearchA2A · cached catalog", matches.single().source)
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
     fun rankedSearchIsNotReducedToNameOrKeywordMatching() = runTest {
         val names = mutableListOf<String>()
         val client = HttpClient(MockEngine { call ->
