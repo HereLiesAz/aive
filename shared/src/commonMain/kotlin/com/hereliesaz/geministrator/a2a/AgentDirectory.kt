@@ -177,7 +177,7 @@ internal class SearchA2aDirectorySource(
         const val INDEXED_SEARCH_URL = "https://searcha2a-api.hereliesaz.workers.dev/api/v1/directory"
         const val PUBLISHED_FEED_URL =
             "https://raw.githubusercontent.com/HereLiesAz/searcha2a/agent-feed/site/api/v1/azphalt-listings.json"
-        const val MAX_RESPONSE_BYTES = 900_000
+        const val MAX_RESPONSE_BYTES = 16_777_216
         const val MAX_RESULTS = 70
     }
 }
