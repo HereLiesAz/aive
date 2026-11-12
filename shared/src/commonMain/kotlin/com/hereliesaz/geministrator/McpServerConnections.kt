@@ -27,6 +27,8 @@ import com.hereliesaz.geministrator.mcp.CodeExecutionToolSource
 import com.hereliesaz.geministrator.mcp.McpCommandLine
 import com.hereliesaz.geministrator.mcp.McpConsentDecision
 import com.hereliesaz.geministrator.mcp.McpHost
+import com.hereliesaz.geministrator.mcp.McpRegistryDirectory
+import com.hereliesaz.geministrator.mcp.McpRegistryLead
 import com.hereliesaz.geministrator.mcp.PromptingMcpConsentGate
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.common_remove
@@ -64,6 +66,13 @@ import com.hereliesaz.geministrator.resources.mcp_server_token
 import com.hereliesaz.geministrator.resources.mcp_server_url
 import com.hereliesaz.geministrator.resources.mcp_servers
 import com.hereliesaz.geministrator.resources.mcp_servers_lead
+import com.hereliesaz.geministrator.resources.mcp_registry_search_query
+import com.hereliesaz.geministrator.resources.mcp_registry_search
+import com.hereliesaz.geministrator.resources.mcp_registry_searching
+import com.hereliesaz.geministrator.resources.mcp_registry_unavailable
+import com.hereliesaz.geministrator.resources.mcp_registry_no_results
+import com.hereliesaz.geministrator.resources.mcp_registry_unverified
+import com.hereliesaz.geministrator.resources.mcp_registry_use_address
 import com.hereliesaz.geministrator.resources.mcp_status_allowed
 import com.hereliesaz.geministrator.resources.mcp_status_asks
 import com.hereliesaz.geministrator.resources.mcp_tool_count
@@ -97,6 +106,14 @@ internal fun McpServerConnections(host: McpHost, compact: Boolean) {
     var addError by remember { mutableStateOf<String?>(null) }
     var removeId by remember { mutableStateOf<String?>(null) }
     var checks by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    // Catalog searches require a keeper action; suggestions never install or connect tools.
+    val catalog = remember { McpRegistryDirectory() }
+    var catalogQuery by remember { mutableStateOf("") }
+    var catalogSearching by remember { mutableStateOf(false) }
+    var catalogResults by remember { mutableStateOf<List<McpRegistryLead>?>(null) }
+    var catalogError by remember { mutableStateOf(false) }
+    val catalogUnavailableText = stringResource(Res.string.mcp_registry_unavailable)
+    val catalogMetadataOnly = stringResource(Res.string.mcp_registry_unverified)
     val checkingText = stringResource(Res.string.mcp_checking)
 
     ProviderSectionLabel(stringResource(Res.string.mcp_servers))
@@ -152,6 +169,70 @@ internal fun McpServerConnections(host: McpHost, compact: Boolean) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AzphaltPill(stringResource(Res.string.mcp_by_address), "mcp-mode-address", selected = !byCommand, onClick = { byCommand = false })
                     AzphaltPill(stringResource(Res.string.mcp_by_command), "mcp-mode-command", selected = byCommand, onClick = { byCommand = true })
+                }
+            }
+            AzphaltTextField(
+                value = catalogQuery,
+                onValueChange = {
+                    catalogQuery = it
+                    catalogResults = null
+                    catalogError = false
+                },
+                label = stringResource(Res.string.mcp_registry_search_query),
+            )
+            AzphaltPill(
+                label = if (catalogSearching) stringResource(Res.string.mcp_registry_searching)
+                else stringResource(Res.string.mcp_registry_search),
+                seed = "search-mcp-registry",
+                onClick = {
+                    if (!catalogSearching && catalogQuery.trim().length in 3..120) {
+                        catalogSearching = true
+                        catalogError = false
+                        val searched = catalogQuery
+                        scope.launch {
+                            try {
+                                val results = catalog.search(searched)
+                                if (catalogQuery == searched) catalogResults = results
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                if (catalogQuery == searched) {
+                                    catalogResults = null
+                                    catalogError = true
+                                }
+                            } finally {
+                                catalogSearching = false
+                            }
+                        }
+                    }
+                },
+            )
+            if (catalogError) {
+                Text(catalogUnavailableText, style = AzphaltType.body, color = azphaltOnSurface())
+            }
+            if (catalogResults?.isEmpty() == true) {
+                Text(stringResource(Res.string.mcp_registry_no_results),
+                    style = AzphaltType.body, color = azphaltOnSurface())
+            }
+            catalogResults?.forEach { lead ->
+                ConnectionRow(
+                    name = lead.name,
+                    detail = listOf(lead.version, lead.description, lead.url)
+                        .filter(String::isNotBlank).joinToString(" · "),
+                    status = catalogMetadataOnly,
+                    connected = false,
+                    compact = compact,
+                ) {
+                    AzphaltPill(
+                        label = stringResource(Res.string.mcp_registry_use_address),
+                        seed = "mcp-catalog-${lead.url}",
+                        onClick = {
+                            name = lead.name
+                            url = lead.url
+                            byCommand = false
+                            addError = null
+                        },
+                    )
                 }
             }
             AzphaltTextField(value = name, onValueChange = { name = it; addError = null }, label = stringResource(Res.string.mcp_server_name))
