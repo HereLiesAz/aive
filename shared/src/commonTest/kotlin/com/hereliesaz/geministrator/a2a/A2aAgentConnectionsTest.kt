@@ -28,6 +28,28 @@ class A2aAgentConnectionsTest {
     }
 
     @Test
+    fun opaqueAnsClaimsPersistWithoutBecomingProviderIdentity() {
+        val settings = MapSettings()
+        A2aAgentConnections.useSettings(settings)
+        val agent = A2aAgentConnections.add("https://agent.example.org")
+        A2aAgentConnections.setAnsClaim(
+            agent.providerId, "ans://nightly.2026-Q4.agent.example.org", "agent.example.org",
+        )
+        val connected = A2aAgentConnections.byProviderId(agent.providerId)!!
+        assertEquals("ans://nightly.2026-Q4.agent.example.org", connected.ansName)
+        assertEquals("agent.example.org", connected.ansHost)
+        assertEquals("a2a:agent.example.org", connected.providerId)
+        A2aAgentConnections.useSettings(settings)
+        assertEquals(connected, A2aAgentConnections.byProviderId(agent.providerId))
+        assertFailsWith<IllegalArgumentException> {
+            A2aAgentConnections.setAnsClaim(
+                agent.providerId, "ans://1.0.0.attacker.example.org", "agent.example.org",
+            )
+        }
+        assertEquals(connected, A2aAgentConnections.byProviderId(agent.providerId))
+    }
+
+    @Test
     fun cleartextIsOnlyForLocalHosts() {
         assertFailsWith<IllegalArgumentException> { A2aAgentConnections.add("http://agent.example") }
         assertFailsWith<IllegalArgumentException> { A2aAgentConnections.add("ftp://agent.example") }

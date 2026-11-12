@@ -39,6 +39,9 @@ class AgentDirectoryTest {
               "source_url": "https://meteo.example.org/.well-known/agent-card.json",
               "skills": [{"name": "Atmospheric science"}],
               "kind": "a2a-agent", "installable": false, "verification": "card_read_only",
+              "ans": {"name": "ans://release.2026.meteo.example.org",
+                      "agent_host": "meteo.example.org", "version": "release.2026",
+                      "verification": "unverified"},
               "match_score": 0.92
             },
             {
@@ -66,7 +69,9 @@ class AgentDirectoryTest {
               "description": "Weather forecasts",
               "source_url": "https://weather.example.org/.well-known/agent-card.json",
               "skills": [{"name": "Precipitation"}],
-              "kind": "a2a-agent", "installable": false, "verification": "card_read_only"
+              "kind": "a2a-agent", "installable": false, "verification": "card_read_only",
+              "ans_claim": {"name": "ans://rc3.weather.example.org",
+                            "agent_host": "weather.example.org", "verification": "unverified"}
             },
             {
               "name": "Finance Agent",
@@ -98,10 +103,35 @@ class AgentDirectoryTest {
             assertEquals("https://meteo.example.org/.well-known/agent-card.json", lead.cardUrl)
             assertEquals(listOf("Atmospheric science"), lead.skills)
             assertEquals(0.92, lead.matchScore)
+            assertEquals("ans://release.2026.meteo.example.org", lead.ansName)
+            assertEquals("meteo.example.org", lead.ansHost)
             assertEquals("SearchA2A · semantic", lead.source)
             assertFalse(lead.registryReportsHealthy)
             assertFalse(lead.registryReportsTaskTested)
             assertNull(lead.connectedProviderId, "a directory result is never an approved provider")
+            assertTrue(A2aAgentConnections.all().isEmpty())
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun forgedOrInvalidAnsClaimsNeverBecomeTrustedDirectoryIdentities() = runTest {
+        val invalid = """
+            {"schema":1,"source":"searcha2a","match_mode":"keyword-fallback","results":[
+              {"kind":"a2a-agent","installable":false,"verification":"card_read_only",
+               "name":"Weather","source_url":"https://weather.example.org/card","skills":[{"name":"forecast"}],
+               "ans":{"name":"ans://rc3.attacker.example","agent_host":"weather.example.org","verification":"verified"}}
+            ]}
+        """.trimIndent()
+        val client = HttpClient(MockEngine {
+            respond(invalid, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+        })
+        try {
+            val found = SearchA2aDirectorySource(client).search("weather")
+            assertEquals(1, found.size)
+            assertNull(found.single().ansName)
+            assertNull(found.single().ansHost)
             assertTrue(A2aAgentConnections.all().isEmpty())
         } finally {
             client.close()
@@ -123,6 +153,8 @@ class AgentDirectoryTest {
             val result = SearchA2aDirectorySource(client).search("weather")
             assertEquals(listOf("Weather Agent"), result.map { it.name })
             assertEquals("SearchA2A · cached catalog", result.single().source)
+            assertEquals("ans://rc3.weather.example.org", result.single().ansName)
+            assertEquals("weather.example.org", result.single().ansHost)
             assertNull(result.single().matchScore, "cached metadata never pretends to be semantic ranking")
             assertEquals(2, requested.size)
             assertEquals("raw.githubusercontent.com", Url(requested[1]).host)

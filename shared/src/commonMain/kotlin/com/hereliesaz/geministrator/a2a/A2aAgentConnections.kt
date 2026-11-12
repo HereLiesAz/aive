@@ -21,6 +21,9 @@ data class A2aAgentConnection(
     val slug: String,
     val cardUrl: String,
     val name: String,
+    /** Registry-discovered ANS name claim. Unverified, never used as a provider identity key. */
+    val ansName: String? = null,
+    val ansHost: String? = null,
 ) {
     val providerId: String get() = providerIdFor(slug)
 
@@ -76,6 +79,21 @@ object A2aAgentConnections {
     fun rename(providerId: String, name: String) {
         val clean = name.trim().take(80).ifBlank { return }
         state.update { current -> current.map { if (it.providerId == providerId) it.copy(name = clean) else it } }
+        write(state.value)
+    }
+
+    /**
+     * Retain the discovery claim after the keeper explicitly connects a freshly fetched Agent Card.
+     * This stores provenance only: it cannot verify DNS identity or authorize provider execution.
+     */
+    fun setAnsClaim(providerId: String, name: String, host: String) {
+        require(publicAnsClaimName(name, host)) { "Invalid ANS name claim" }
+        require(all().any { it.providerId == providerId }) { "Agent connection not found" }
+        state.update { current ->
+            current.map {
+                if (it.providerId == providerId) it.copy(ansName = name, ansHost = host) else it
+            }
+        }
         write(state.value)
     }
 

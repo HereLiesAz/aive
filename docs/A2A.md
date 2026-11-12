@@ -13,7 +13,7 @@ The existing duplex MCP channel ([DUPLEX_MCP](architecture/DUPLEX_MCP.md)) is se
 
 **Connecting one.** In **Keeper's room › Connections › Connect remote agent**, paste the Agent Card URL. A bare address (`https://agent.example`) means its `/.well-known/agent-card.json`. Aive reads the card without credentials or redirects and requires a usable JSON-RPC interface before adding the provider. It displays an address, response or compatibility error when validation fails. Next, provider setup handles keyless use or an optional bearer token. A remote agent is never selected automatically: assign its provider to a role in **Swarm** to use it.
 
-- The URL is kept in Settings (`A2aAgentConnections`). The token goes in the platform credential store under the provider id `a2a:<host>`.
+- The URL is kept in Settings (`A2aAgentConnections`). The token goes in the platform credential store under the provider id `a2a:<host>`. If the keeper picked the address from SearchA2A's ANS results, its publisher-defined versioned name and explicit host are also retained after successful Agent Card validation, labeled **unverified**. The name never replaces the local provider ID or becomes authorization.
 - Disconnecting an agent forgets both.
 
 **Agent Directory.** Under the same **Connect remote agent** form,
