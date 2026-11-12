@@ -54,6 +54,7 @@ import com.hereliesaz.geministrator.resources.keeper_agent_directory_searching
 import com.hereliesaz.geministrator.resources.keeper_agent_directory_no_results
 import com.hereliesaz.geministrator.resources.keeper_agent_directory_unavailable
 import com.hereliesaz.geministrator.resources.keeper_agent_directory_reported_tested
+import com.hereliesaz.geministrator.resources.keeper_agent_directory_ans_unverified
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_unreachable
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_use_address
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_invalid_url
@@ -571,13 +572,18 @@ internal fun ProviderSettingsScreen(
         // Read as state so adding or removing an A2A agent recomposes the lists built from the catalog.
         val a2aAgents by A2aAgentConnections.connections.collectAsState()
         val a2aAgentIds = a2aAgents.mapTo(hashSetOf()) { it.providerId }
+        val directoryAnsUnverified = stringResource(Res.string.keeper_agent_directory_ans_unverified)
+
         ProviderCatalog.entries.filter { it.id in connectedProviderIds }.forEach { entry ->
             val healthRaw = healthResults?.get(entry.id)
             val health = healthRaw?.substringBefore('\n')
             val healthDetails = healthRaw?.substringAfter('\n', "")
             ConnectionRow(
                 name = entry.displayName,
-                detail = health ?: stringResource(Res.string.settings_credential_configured),
+                detail = (health ?: stringResource(Res.string.settings_credential_configured)) +
+                    (a2aAgents.firstOrNull { it.providerId == entry.id }?.ansName?.let {
+                        " · $directoryAnsUnverified: $it"
+                    } ?: ""),
                 status = health?.substringBefore(" ·") ?: stringResource(Res.string.common_connected),
                 connected = true,
                 compact = compact,
@@ -644,6 +650,9 @@ internal fun ProviderSettingsScreen(
         // Preview their Agent Cards before linking; a role must explicitly select the provider.
         var addingA2aAgent by rememberDurableBooleanState("keeper.connections.adding-a2a-agent")
         var a2aUrlDraft by remember { mutableStateOf("") }
+        // The keeper may carry a registry claim through the existing, independently checked
+        // connection flow. This never elevates a discovery result into verified identity.
+        var chosenAnsClaim by remember { mutableStateOf<Pair<String, String>?>(null) }
         var a2aUrlError by remember { mutableStateOf<String?>(null) }
         var checkingA2aCard by remember { mutableStateOf(false) }
         val directory = remember { AgentDirectory() }
@@ -747,6 +756,12 @@ internal fun ProviderSettingsScreen(
                                 append(" · ")
                                 append(entry.skills.joinToString(", "))
                             }
+                            if (entry.ansName != null) {
+                                append(" · ")
+                                append(directoryAnsUnverified)
+                                append(": ")
+                                append(entry.ansName)
+                            }
                         },
                         status = if (entry.connectedProviderId != null) connectedLabel else null,
                         connected = entry.connectedProviderId != null,
@@ -758,6 +773,8 @@ internal fun ProviderSettingsScreen(
                                 seed = "directory-agent-${entry.cardUrl}",
                                 onClick = {
                                     a2aUrlDraft = entry.cardUrl
+                                    chosenAnsClaim = if (entry.ansName != null && entry.ansHost != null)
+                                        entry.ansName to entry.ansHost else null
                                     a2aUrlError = null
                                 },
                             )
@@ -780,6 +797,7 @@ internal fun ProviderSettingsScreen(
                             seed = "suggest-a2a-${seed.cardUrl}",
                             onClick = {
                                 a2aUrlDraft = seed.cardUrl
+                                chosenAnsClaim = null
                                 a2aUrlError = null
                             },
                         )
@@ -795,6 +813,7 @@ internal fun ProviderSettingsScreen(
                 value = a2aUrlDraft,
                 onValueChange = {
                     a2aUrlDraft = it
+                    chosenAnsClaim = null
                     a2aUrlError = null
                 },
                 label = stringResource(Res.string.keeper_a2a_agent_card_url),
@@ -808,6 +827,7 @@ internal fun ProviderSettingsScreen(
                 onClick = {
                     if (!checkingA2aCard) {
                         val url = a2aUrlDraft
+                        val claim = chosenAnsClaim
                         checkingA2aCard = true
                         scope.launch {
                             try {
@@ -824,6 +844,10 @@ internal fun ProviderSettingsScreen(
                                 } else {
                                     val agent = A2aAgentConnections.add(candidate.cardUrl)
                                     A2aAgentConnections.rename(agent.providerId, candidate.name)
+                                    if (claim != null && candidate.cardUrl == A2aAgentConnections.normalizeCardUrl(url)) {
+                                        A2aAgentConnections.setAnsClaim(agent.providerId, claim.first, claim.second)
+                                    }
+                                    chosenAnsClaim = null
                                     a2aUrlDraft = ""
                                     a2aUrlError = null
                                     addingA2aAgent = false

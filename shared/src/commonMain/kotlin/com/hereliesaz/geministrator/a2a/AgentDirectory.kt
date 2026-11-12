@@ -27,6 +27,9 @@ internal data class AgentDirectoryEntry(
     val connectedProviderId: String? = null,
     /** A SearchA2A match score is ranking metadata, never an identity or trust rating. */
     val matchScore: Double? = null,
+    /** Unverified publisher name claim from SearchA2A, never a provider permission. */
+    val ansName: String? = null,
+    val ansHost: String? = null,
 )
 
 internal data class AgentDirectoryResults(
@@ -78,7 +81,7 @@ internal object LocalAgentDirectorySource : AgentDirectorySource {
  * Search never contacts advertised Agent Cards or enrolls providers.
  */
 internal class SearchA2aDirectorySource(
-    private val http: HttpClient = sharedDirectoryClient,
+    private val http: HttpClient = sharedExternalDiscoveryClient,
 ) : AgentDirectorySource {
     override val name: String = "SearchA2A"
 
@@ -140,6 +143,7 @@ internal class SearchA2aDirectorySource(
             }.distinct().take(8)
             val match = if (ranked) record["match_score"].valueText()?.toDoubleOrNull()
                 ?.takeIf { it.isFinite() && it in 0.0..1.0 } else null
+            val ansClaim = directoryAnsClaim(record)
             AgentDirectoryEntry(
                 cardUrl = cardUrl,
                 name = A2aDrifters.cleanCardText(record["name"].valueText().orEmpty(), 60)
@@ -148,8 +152,21 @@ internal class SearchA2aDirectorySource(
                 skills = skills,
                 source = sourceLabel,
                 matchScore = match,
+                ansName = ansClaim?.first,
+                ansHost = ansClaim?.second,
             )
         }
+
+    /** Parse SearchA2A's indexed `ans` and Azphalt's cached `ans_claim` without upgrading trust. */
+    private fun directoryAnsClaim(record: JsonObject): Pair<String, String>? {
+        val raw = (record["ans"] as? JsonObject) ?: (record["ans_claim"] as? JsonObject)
+            ?: return null
+        if (raw["verification"].valueText() != "unverified") return null
+        val name = raw["name"].valueText() ?: return null
+        val host = raw["agent_host"].valueText() ?: return null
+        if (!publicAnsClaimName(name, host)) return null
+        return name to host
+    }
 
     private fun kotlinx.serialization.json.JsonElement?.valueText(): String? =
         (this as? JsonPrimitive)?.content
@@ -223,6 +240,22 @@ internal class AgentDirectory(
     }
 }
 
+/**
+ * Validate publisher-controlled ANS claim syntax. It is lexical only; DNS, certificates and
+ * transparency proofs have NOT been checked. The version is opaque and may span DNS labels.
+ */
+internal fun publicAnsClaimName(name: String, host: String): Boolean {
+    if (name.length > 259 || host.length > 251 || !name.startsWith("ans://")) return false
+    val suffix = "." + host.lowercase()
+    if (!name.lowercase().endsWith(suffix)) return false
+    val version = name.substring(6, name.length - suffix.length)
+    val validLabel = Regex("[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?")
+    val labels = host.split('.') + version.split('.')
+    return host.split('.').size >= 2 && labels.all { validLabel.matches(it) } &&
+        !host.endsWith(".localhost", true) && !host.endsWith(".internal", true) &&
+        !host.endsWith(".local", true) && !host.substringAfterLast('.').all(Char::isDigit)
+}
+
 /** Reject registry-supplied private, credential-bearing, or ambiguous Agent Card origins. */
 internal fun directoryPublicCardUrl(raw: String): String? {
     if (raw.length > 2048 || !raw.startsWith("https://", ignoreCase = true)) return null
@@ -256,7 +289,7 @@ internal fun directoryRelevance(query: String, entry: AgentDirectoryEntry): Int 
     }
 }
 
-private val sharedDirectoryClient: HttpClient by lazy {
+internal val sharedExternalDiscoveryClient: HttpClient by lazy {
     HttpClient {
         expectSuccess = false
         followRedirects = false
