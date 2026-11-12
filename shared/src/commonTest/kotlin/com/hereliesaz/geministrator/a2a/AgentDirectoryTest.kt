@@ -197,6 +197,46 @@ class AgentDirectoryTest {
     }
 
     @Test
+    fun catalogFallbackRanksExactNamesAheadOfThirtyWeakDescriptionMatches() = runTest {
+        val weak = (1..35).joinToString(",") { index ->
+            """{"name":"Archive $index","description":"weather mentioned here",
+                 "source_url":"https://archive$index.example.org/card",
+                 "skills":[{"name":"Generic"}],
+                 "kind":"a2a-agent","installable":false,"verification":"card_read_only"}""".trimIndent()
+        }
+        val catalog = """{"schema":1,"source":"searcha2a","listings":[
+            $weak,
+            {"name":"Weather","description":"Exact match",
+             "source_url":"https://weather.example.org/card",
+             "skills":[{"name":"Forecast"}],
+             "kind":"a2a-agent","installable":false,"verification":"card_read_only"}
+        ]}""".trimIndent()
+        val client = HttpClient(MockEngine { request ->
+            if (request.url.host == "searcha2a-api.hereliesaz.workers.dev") {
+                respond("Unavailable", HttpStatusCode.ServiceUnavailable)
+            } else respond(catalog, HttpStatusCode.OK)
+        })
+        try {
+            val matches = AgentDirectory(listOf(SearchA2aDirectorySource(client))).search("weather")
+            assertEquals(30, matches.entries.size)
+            assertEquals("Weather", matches.entries.first().name)
+            assertEquals("SearchA2A · cached catalog", matches.entries.first().source)
+        } finally { client.close() }
+    }
+
+    @Test
+    fun unicodeAgentNamesAreMatchedWithoutAsciiTokenLoss() {
+        val japanese = AgentDirectoryEntry(
+            cardUrl = "https://translate.example.org/card", name = "翻訳エージェント",
+            description = "", skills = emptyList(), source = "On this device",
+        )
+        val cyrillic = japanese.copy(name = "Переводчик")
+        assertEquals(5, directoryRelevance("翻訳エージェント", japanese))
+        assertEquals(5, directoryRelevance("Переводчик", cyrillic))
+        assertEquals(0, directoryRelevance("неизвестно", cyrillic))
+    }
+
+    @Test
     fun rankedSearchIsNotReducedToNameOrKeywordMatching() = runTest {
         val names = mutableListOf<String>()
         val client = HttpClient(MockEngine { call ->
@@ -220,6 +260,10 @@ class AgentDirectoryTest {
             "http://public.example.org/.well-known/agent-card.json",
             "https://localhost/.well-known/agent-card.json",
             "https://127.0.0.1/card",
+            "https://0x7f.0.0.1/card",
+            "https://0xa.0.0.1/card",
+            "https://0177.0.0.1/card",
+            "https://127.1/card",
             "https://[::1]/card",
             "https://machine.local/card",
             "https://user:password@agent.example.org/card",
