@@ -46,7 +46,7 @@ class AiveCliTest {
         backend.reply = ControlReply(200, """{"ok":true,"result":{"runtimeReady":true}}""")
         assertEquals(0, run("status", "--json"))
         assertEquals("{\"runtimeReady\":true}\n", output.toString())
-        assertEquals(listOf(Triple("GET", "/status", null)), backend.calls)
+        assertEquals(listOf(Triple<String, String, String?>("GET", "/status", null)), backend.calls)
     }
 
     @Test fun startRunSendsRealObjectiveWithoutForgingApproval() {
@@ -81,7 +81,7 @@ class AiveCliTest {
         assertTrue(errors.contains("--yes"))
         assertTrue(backend.calls.isEmpty())
         assertEquals(0, run("hives", "delete", "docs", "--yes"))
-        assertEquals(Triple("DELETE", "/hives/docs", null), backend.calls.single())
+        assertEquals(Triple<String, String, String?>("DELETE", "/hives/docs", null), backend.calls.single())
     }
 
     @Test fun roleProviderCanBeClearedWithJsonNull() {
@@ -91,7 +91,7 @@ class AiveCliTest {
 
     @Test fun approvalsAreReadOnlyAndNoOtherApprovalCommandExists() {
         assertEquals(0, run("approvals"))
-        assertEquals(Triple("GET", "/approvals", null), backend.calls.single())
+        assertEquals(Triple<String, String, String?>("GET", "/approvals", null), backend.calls.single())
         assertEquals(2, run("approvals", "grant", "task"))
         assertEquals(1, backend.calls.size)
     }
