@@ -29,56 +29,153 @@ class AgentDirectoryTest {
     @AfterTest
     fun reset() = isolate()
 
-    private val registryResponse = """
+    private val semanticResponse = """
         {
-          "total": 3, "limit": 20, "offset": 0,
-          "agents": [
+          "schema": 1, "source": "searcha2a", "match_mode": "semantic",
+          "results": [
             {
-              "name": "Economic Indicators",
-              "description": "Find GDP and employment rates for countries",
-              "wellKnownURI": "https://data.example.org/.well-known/agent-card.json",
-              "skills": [{"id":"gdp", "name":"Economic research", "tags":["economics"]}],
-              "is_healthy": true,
-              "task_conformance": {"passed": true}
+              "name": "Meteorology Agent",
+              "description": "Rain and precipitation forecasts",
+              "source_url": "https://meteo.example.org/.well-known/agent-card.json",
+              "skills": [{"name": "Atmospheric science"}],
+              "kind": "a2a-agent", "installable": false, "verification": "card_read_only",
+              "match_score": 0.92
             },
             {
               "name": "Private Probe",
-              "wellKnownURI": "https://127.0.0.1/admin",
-              "is_healthy": true
+              "source_url": "https://127.0.0.1/admin",
+              "kind": "a2a-agent", "installable": false, "verification": "card_read_only",
+              "match_score": 0.95
             },
             {
-              "name": "Credential Trap",
-              "wellKnownURI": "https://user:secret@agent.example.com/card",
-              "is_healthy": true
+              "name": "Fake Package",
+              "source_url": "https://fake.example.org/card",
+              "kind": "a2a-agent", "installable": true, "verification": "card_read_only",
+              "match_score": 0.99
+            }
+          ]
+        }
+    """.trimIndent()
+
+    private val publishedCatalog = """
+        {
+          "schema": 1, "source": "searcha2a", "generated_at": "2026-11-12T11:12:20Z",
+          "listings": [
+            {
+              "name": "Weather Agent",
+              "description": "Weather forecasts",
+              "source_url": "https://weather.example.org/.well-known/agent-card.json",
+              "skills": [{"name": "Precipitation"}],
+              "kind": "a2a-agent", "installable": false, "verification": "card_read_only"
+            },
+            {
+              "name": "Finance Agent",
+              "description": "Stock market",
+              "source_url": "https://finance.example.org/.well-known/agent-card.json",
+              "skills": [{"name": "Economics"}],
+              "kind": "a2a-agent", "installable": false, "verification": "card_read_only"
             }
           ]
         }
     """.trimIndent()
 
     @Test
-    fun publicRegistryUsesOnlyItsSearchEndpointAndTreatsHealthAsAnUntrustedReport() = runTest {
+    fun searchA2aWorkerProvidesSemanticMatchesWithoutContactingAgentCards() = runTest {
         val requested = mutableListOf<String>()
         val client = HttpClient(MockEngine { request ->
             requested += request.url.toString()
-            respond(registryResponse, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+            respond(semanticResponse, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
         })
         try {
-            val result = PublicA2aRegistrySource(client).search("GDP and jobs")
+            val result = SearchA2aDirectorySource(client).search("sky outlook")
             assertEquals(1, requested.size)
             val requestUrl = Url(requested.single())
-            assertEquals("a2aregistry.org", requestUrl.host)
-            assertEquals("/api/agents", requestUrl.encodedPath)
-            assertEquals("GDP and jobs", requestUrl.parameters["search"])
-            assertEquals("20", requestUrl.parameters["limit"])
-            assertEquals("0", requestUrl.parameters["offset"])
+            assertEquals("searcha2a-api.hereliesaz.workers.dev", requestUrl.host)
+            assertEquals("/api/v1/directory", requestUrl.encodedPath)
+            assertEquals("sky outlook", requestUrl.parameters["q"])
             assertEquals(1, result.size)
             val lead = result.single()
-            assertEquals("https://data.example.org/.well-known/agent-card.json", lead.cardUrl)
-            assertEquals("Economic research", lead.skills.single())
-            assertTrue(lead.registryReportsHealthy)
-            assertTrue(lead.registryReportsTaskTested)
-            assertNull(lead.connectedProviderId, "a registry listing never connects or approves an agent")
+            assertEquals("https://meteo.example.org/.well-known/agent-card.json", lead.cardUrl)
+            assertEquals(listOf("Atmospheric science"), lead.skills)
+            assertEquals(0.92, lead.matchScore)
+            assertEquals("SearchA2A · semantic", lead.source)
+            assertFalse(lead.registryReportsHealthy)
+            assertFalse(lead.registryReportsTaskTested)
+            assertNull(lead.connectedProviderId, "a directory result is never an approved provider")
             assertTrue(A2aAgentConnections.all().isEmpty())
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun inaccessibleSemanticGatewayFallsBackToPublishedSnapshotWithoutAnotherRegistry() = runTest {
+        val requested = mutableListOf<String>()
+        val client = HttpClient(MockEngine { request ->
+            requested += request.url.toString()
+            if (request.url.host == "searcha2a-api.hereliesaz.workers.dev") {
+                respond("Unavailable", HttpStatusCode.ServiceUnavailable)
+            } else {
+                respond(publishedCatalog, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+            }
+        })
+        try {
+            val result = SearchA2aDirectorySource(client).search("weather")
+            assertEquals(listOf("Weather Agent"), result.map { it.name })
+            assertEquals("SearchA2A · cached catalog", result.single().source)
+            assertNull(result.single().matchScore, "cached metadata never pretends to be semantic ranking")
+            assertEquals(2, requested.size)
+            assertEquals("raw.githubusercontent.com", Url(requested[1]).host)
+            assertEquals("/HereLiesAz/searcha2a/agent-feed/site/api/v1/azphalt-listings.json",
+                Url(requested[1]).encodedPath)
+            assertTrue(A2aAgentConnections.all().isEmpty())
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun catalogFallbackSearchesBeyondTheFirstSeventyUnfilteredEntries() = runTest {
+        val unrelated = (1..70).joinToString(",") { index ->
+            """{"name":"Unrelated $index","description":"No relevant skills",
+                "source_url":"https://unrelated$index.example.org/card",
+                "skills":[{"name":"General"}],
+                "kind":"a2a-agent","installable":false,"verification":"card_read_only"}""".trimIndent()
+        }
+        val catalog = """{"schema":1,"source":"searcha2a","listings":[
+            $unrelated,
+            {"name":"Weather Agent","description":"Weather forecasts",
+             "source_url":"https://weather.example.org/card","skills":[{"name":"Precipitation"}],
+             "kind":"a2a-agent","installable":false,"verification":"card_read_only"}
+        ]}""".trimIndent()
+        val client = HttpClient(MockEngine { request ->
+            if (request.url.host == "searcha2a-api.hereliesaz.workers.dev") {
+                respond("API unavailable", HttpStatusCode.ServiceUnavailable)
+            } else {
+                respond(catalog, HttpStatusCode.OK)
+            }
+        })
+        try {
+            val matches = SearchA2aDirectorySource(client).search("weather")
+            assertEquals(listOf("Weather Agent"), matches.map { it.name })
+            assertEquals("SearchA2A · cached catalog", matches.single().source)
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun rankedSearchIsNotReducedToNameOrKeywordMatching() = runTest {
+        val names = mutableListOf<String>()
+        val client = HttpClient(MockEngine { call ->
+            names += call.url.host
+            respond(semanticResponse, HttpStatusCode.OK)
+        })
+        try {
+            val result = AgentDirectory(listOf(SearchA2aDirectorySource(client))).search("sky outlook")
+            assertEquals(listOf("Meteorology Agent"), result.entries.map { it.name })
+            assertTrue(result.unavailableSources.isEmpty())
+            assertEquals(listOf("searcha2a-api.hereliesaz.workers.dev"), names)
         } finally {
             client.close()
         }
