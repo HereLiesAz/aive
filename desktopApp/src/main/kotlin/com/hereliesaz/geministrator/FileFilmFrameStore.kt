@@ -112,7 +112,13 @@ internal class FileFilmFrameStore(private val root: File = defaultRoot()) : Film
                 Files.deleteIfExists(file)
             } else {
                 prepare(folder)
-                Files.write(file, updated.sorted())
+                val temp = Files.createTempFile(folder, ".pending-", ".tmp")
+                try {
+                    Files.write(temp, updated.sorted())
+                    Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING)
+                } finally {
+                    Files.deleteIfExists(temp)
+                }
             }
         }
     }

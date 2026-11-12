@@ -402,14 +402,13 @@ class AzphaltWorkflowPackageInstaller(
 
         plan.roles.forEach { role ->
             val existing = persistence.roles.get(role.id)
-            val preferredProvider = existing?.preferredProviderId ?: role.preferredProviderId
-            persistence.roles.put(role.copy(enabled = true, preferredProviderId = preferredProvider))
+            persistence.roles.put(clampInstalledPackageRole(role, existing))
         }
     }
 
     private fun sameReusableRole(left: RoleDefinition, right: RoleDefinition): Boolean =
-        left.copy(enabled = true, preferredProviderId = null) ==
-            right.copy(enabled = true, preferredProviderId = null)
+        left.copy(enabled = true, preferredProviderId = null, authorities = emptySet()) ==
+            right.copy(enabled = true, preferredProviderId = null, authorities = emptySet())
 
     private inline fun <reified T> decodeUtf8(bytes: ByteArray, path: String): T = try {
         json.decodeFromString(bytes.decodeToString())
@@ -443,3 +442,15 @@ class AzphaltWorkflowPackageInstaller(
                 path.split('/').none { it.isBlank() || it == "." || it == ".." }
     }
 }
+
+/**
+ * A role a package installs into the global roster arrives with no authorities of its own: plan
+ * approval and rejection, and every other power, stay what the keeper already granted that role id
+ * (nothing, for a new one). The package can describe the role; it cannot make it a gatekeeper.
+ */
+internal fun clampInstalledPackageRole(role: RoleDefinition, existing: RoleDefinition?): RoleDefinition =
+    role.copy(
+        enabled = true,
+        preferredProviderId = existing?.preferredProviderId ?: role.preferredProviderId,
+        authorities = existing?.authorities.orEmpty(),
+    )

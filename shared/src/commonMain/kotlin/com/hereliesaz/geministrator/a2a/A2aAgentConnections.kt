@@ -68,7 +68,9 @@ object A2aAgentConnections {
         val base = slugOf(host)
         var slug = base
         var n = 2
-        while (all().any { it.slug == slug }) slug = "$base-${n++}"
+        // Compare as the drifter's role id will be derived (punctuation collapsed), so "agent.example.com" and
+        // "agent-example.com" cannot end up sharing one role.
+        while (all().any { roleKey(it.slug) == roleKey(slug) }) slug = "$base-${n++}"
         val connection = A2aAgentConnection(slug = slug, cardUrl = cardUrl, name = "A2A · $host")
         state.update { it + connection }
         write(state.value)
@@ -119,6 +121,8 @@ object A2aAgentConnections {
         val hasPath = afterScheme.contains('/') && afterScheme.substringAfter('/').isNotBlank()
         return if (hasPath) trimmed else trimmed.trimEnd('/') + A2aCodec.WELL_KNOWN_CARD_PATH
     }
+
+    private fun roleKey(slug: String): String = slug.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
 
     private fun hostOf(url: String): String =
         url.substringAfter("://").substringBefore('/').substringBefore('?').substringAfterLast('@').lowercase()

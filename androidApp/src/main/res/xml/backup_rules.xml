@@ -9,5 +9,6 @@
     <exclude domain="sharedpref" path="aive.remote-relay.settings.xml" />
     <exclude domain="file" path="haive/memory" />
     <exclude domain="file" path="haive/orchestration-specialists" />
+    <exclude domain="sharedpref" path="aive_azphalt_models.xml" />
     <exclude domain="file" path="azphalt/models" />
 </full-backup-content>

@@ -50,6 +50,13 @@ class A2aAgentConnectionsTest {
     }
 
     @Test
+    fun hostsThatDifferOnlyByPunctuationGetDistinctDrifterRoles() {
+        val a = A2aAgentConnections.add("https://agent.example.com/")
+        val b = A2aAgentConnections.add("https://agent-example.com/")
+        assertNotEquals(A2aDrifters.roleIdFor(a.providerId), A2aDrifters.roleIdFor(b.providerId))
+    }
+
+    @Test
     fun cleartextIsOnlyForLocalHosts() {
         assertFailsWith<IllegalArgumentException> { A2aAgentConnections.add("http://agent.example") }
         assertFailsWith<IllegalArgumentException> { A2aAgentConnections.add("ftp://agent.example") }
