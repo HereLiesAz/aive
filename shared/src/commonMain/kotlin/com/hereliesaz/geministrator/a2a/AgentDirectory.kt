@@ -92,6 +92,7 @@ internal class SearchA2aDirectorySource(
             require(mode == "semantic" || mode == "keyword-fallback") { "Unknown SearchA2A ranking mode" }
             val items = root["results"] as? JsonArray ?: error("Missing SearchA2A results")
             return entries(items, if (mode == "semantic") "SearchA2A · semantic" else "SearchA2A · keywords", true)
+                .take(MAX_RESULTS)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
@@ -103,8 +104,11 @@ internal class SearchA2aDirectorySource(
             "Invalid SearchA2A published catalog"
         }
         val listings = root["listings"] as? JsonArray ?: error("Missing SearchA2A catalog listings")
+        // The full response is byte-bounded, but its items are not query-filtered. Match
+        // before applying the result cap so a later catalog entry is never silently lost.
         return entries(listings, "SearchA2A · cached catalog", false)
             .filter { directoryRelevance(query, it) > 0 }
+            .take(MAX_RESULTS)
     }
 
     private suspend fun fetch(endpoint: String, query: String? = null): JsonObject {
@@ -121,7 +125,7 @@ internal class SearchA2aDirectorySource(
     }
 
     private fun entries(items: JsonArray, sourceLabel: String, ranked: Boolean): List<AgentDirectoryEntry> =
-        items.take(MAX_RESULTS).mapNotNull { element ->
+        items.mapNotNull { element ->
             val record = element as? JsonObject ?: return@mapNotNull null
             if (record["kind"].valueText() != "a2a-agent" ||
                 record["installable"].valueText() != "false" ||
