@@ -179,6 +179,13 @@ class MainActivity : ComponentActivity() {
         remoteAccessController.resumeIfEnabled()
         val providerCredentialStore = AndroidProviderCredentialStore(this)
         val openRouterAuthorization = AndroidOpenRouterAccountAuthorization(repositoryHttpClient)
+        val deviceAuthorization = AndroidProviderDeviceAuthorization(
+            client = repositoryHttpClient,
+            clientIds = mapOf(
+                ProviderCatalog.HUGGING_FACE_ID to getString(R.string.aive_huggingface_oauth_client_id),
+                ProviderCatalog.POLLINATIONS_ID to getString(R.string.aive_pollinations_oauth_client_id),
+            ),
+        )
         val repositoryCredentialStore = AndroidRepositoryCredentialStore(this)
         // Register file pickers before the Activity reaches STARTED.
         val projectFileService = AndroidProjectFileService(this)
@@ -505,6 +512,12 @@ class MainActivity : ComponentActivity() {
                         } else null,
                         onCompleteAccountSignIn = if (providerId == ProviderCatalog.OPENROUTER_ID) {
                             { code -> openRouterAuthorization.exchange(code) }
+                        } else null,
+                        onStartDeviceSignIn = if (deviceAuthorization.configured(providerId)) {
+                            { deviceAuthorization.begin(providerId).let { it.verificationUrl to it.userCode } }
+                        } else null,
+                        onCheckDeviceSignIn = if (deviceAuthorization.configured(providerId)) {
+                            { deviceAuthorization.check(providerId) }
                         } else null,
                         onSave = { key ->
                             providerCredentialStore.write(providerId, key)
