@@ -98,6 +98,27 @@ Fetching an Agent Card proves reachability and protocol compatibility, not
 publisher identity. There is currently no certificate, DNSSEC, transparency log,
 signature chain or federated ANS identity verifier for A2A operators.
 
+## Operator-managed agentgateway interoperability
+
+The upstream [agentgateway](https://github.com/agentgateway/agentgateway)
+can proxy standard A2A traffic. Its A2A policy advertises a gateway-facing
+Agent Card and rewrites advertised service URLs so clients use the gateway
+instead of bypassing the operator's access policies. An Aive keeper should
+connect to the **public gateway Agent Card URL**, not the hidden backend's
+URL, using the existing **Connect agent** flow. Aive re-fetches and checks
+the card and endpoint as usual; gateway auth, Aive provider selection and
+Aive permissions remain independently enforced. Gateways are optional and
+do not become discovery authority or automatic failover targets.
+
+The upstream [agentregistry](https://github.com/agentregistry-dev/agentregistry)
+serves resource descriptions at `/v0/agents`. Those native Agent resources
+reference models, MCP servers and skills, but **are not necessarily A2A
+Agent Cards**. Neither the SearchA2A crawler nor Aive should synthesize
+A2A identities or usable endpoints from that metadata. A separately
+advertised public Agent Card can still be indexed through SearchA2A.
+Version strings and `ans://version.agent.example.com` claims remain
+publisher-defined and unverified until independently checked.
+
 ## Extending safely
 
 A new `AgentDirectorySource` can supply candidates and report failures; it
