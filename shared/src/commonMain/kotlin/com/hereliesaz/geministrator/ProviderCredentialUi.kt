@@ -47,12 +47,18 @@ fun ProviderCredentialSetup(
     onCancel: () -> Unit,
     onStartAccountSignIn: (() -> Unit)? = null,
     onCompleteAccountSignIn: (suspend (String) -> String)? = null,
+    onStartDeviceSignIn: (suspend () -> Pair<String, String>)? = null,
+    onCheckDeviceSignIn: (suspend () -> String?)? = null,
 ) {
     val entry = ProviderCatalog.entry(providerId)
         ?: error("Unknown provider $providerId")
     val uriHandler = LocalUriHandler.current
     val scope = rememberCoroutineScope()
     var authorizationCode by remember(providerId) { mutableStateOf("") }
+    var deviceVerificationUrl by remember(providerId) { mutableStateOf<String?>(null) }
+    var deviceUserCode by remember(providerId) { mutableStateOf<String?>(null) }
+    var deviceBusy by remember(providerId) { mutableStateOf(false) }
+    var deviceHint by remember(providerId) { mutableStateOf<String?>(null) }
     var accountSignInInProgress by remember(providerId) { mutableStateOf(false) }
     var exchangingCode by remember(providerId) { mutableStateOf(false) }
     var apiKey by remember(providerId) { mutableStateOf("") }
@@ -100,6 +106,73 @@ fun ProviderCredentialSetup(
                     },
                 )
 
+                if (onStartDeviceSignIn != null && onCheckDeviceSignIn != null) {
+                    AzphaltPill(
+                        label = "Sign in with ${entry.displayName}",
+                        seed = "device-login-${entry.id}",
+                        onClick = {
+                            if (!deviceBusy) {
+                                deviceBusy = true
+                                deviceHint = null
+                                deviceVerificationUrl = null
+                                scope.launch {
+                                    try {
+                                        val (url, code) = onStartDeviceSignIn()
+                                        deviceVerificationUrl = url
+                                        deviceUserCode = code
+                                        uriHandler.openUri(url)
+                                    } catch (cancelled: kotlin.coroutines.cancellation.CancellationException) {
+                                        throw cancelled
+                                    } catch (failure: Exception) {
+                                        deviceHint = failure.message ?: "Could not start account sign-in"
+                                    } finally {
+                                        deviceBusy = false
+                                    }
+                                }
+                            }
+                        },
+                    )
+                    if (deviceVerificationUrl != null) {
+                        Text(
+                            "Enter code ${deviceUserCode.orEmpty()} on the provider's authorization page. The provider controls login and any Google sign-in. Charges may apply.",
+                            style = AzphaltType.body,
+                            color = azphaltOnSurface(),
+                        )
+                        AzphaltPill(
+                            label = "Open authorization page",
+                            seed = "device-open-${entry.id}",
+                            onClick = { deviceVerificationUrl?.let(uriHandler::openUri) },
+                        )
+                        AzphaltPill(
+                            label = if (deviceBusy) "Checking…" else "I've authorized",
+                            seed = "device-check-${entry.id}",
+                            onClick = {
+                                if (!deviceBusy) {
+                                    deviceBusy = true
+                                    scope.launch {
+                                        try {
+                                            val credential = onCheckDeviceSignIn()
+                                            if (credential == null) {
+                                                deviceHint = "Authorization is still pending. Complete it in your browser."
+                                            } else {
+                                                onSave(credential)
+                                            }
+                                        } catch (cancelled: kotlin.coroutines.cancellation.CancellationException) {
+                                            throw cancelled
+                                        } catch (failure: Exception) {
+                                            deviceHint = failure.message ?: "Account authorization failed"
+                                        } finally {
+                                            deviceBusy = false
+                                        }
+                                    }
+                                }
+                            },
+                        )
+                    }
+                    if (deviceHint != null) {
+                        Text(deviceHint.orEmpty(), style = AzphaltType.body, color = azphaltOnSurface())
+                    }
+                }
                 if (onStartAccountSignIn != null && onCompleteAccountSignIn != null) {
                     AzphaltPill(
                         label = "Sign in with OpenRouter",
