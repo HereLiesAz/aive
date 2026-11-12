@@ -16,7 +16,16 @@ The existing duplex MCP channel ([DUPLEX_MCP](architecture/DUPLEX_MCP.md)) is se
 - The URL is kept in Settings (`A2aAgentConnections`). The token goes in the platform credential store under the provider id `a2a:<host>`.
 - Disconnecting an agent forgets both.
 
-**Agent Directory.** Under the same **Connect remote agent** form, **Search directory** sends only the search phrase, on explicit request, to the public A2A Registry. Aive combines returned listings with the names of its connected agents and the optional local examples. It ranks by matching words in agent names, skills and descriptions (not embeddings); it does not download their Agent Cards or connect them during search. Registry-reported health/task-test observations are not verified trust. **Use address** copies a discovered URL into the existing Agent Card form, and **Connect agent** still independently reads and validates the card before adding a provider. The runtime re-resolves an approved provider's JSON-RPC endpoint from its card under same-origin and transport restrictions. See [Agent Directory](architecture/AGENT_DIRECTORY.md).
+**Agent Directory.** Under the same **Connect remote agent** form,
+**Search directory** sends only the search phrase on explicit request to
+[SearchA2A](https://searcha2a.azphalt.store/), which shares its public Agent Card
+inventory with Azphalt Store. The primary HTTPS API ranks indexed agent skills
+and descriptions with embeddings when available, or explicitly labelled keyword
+matching when not. If unavailable, Aive keyword-filters SearchA2A's published
+read-only catalog from GitHub. It no longer calls a2aregistry.org directly.
+Local connections and suggestions remain available if both network sources fail.
+Search results never connect or auto-assign an agent; choosing **Use address**
+fills the same independently validated Agent Card form.
 
 **One connection path, not an adoption marketplace.** A remote A2A agent is a service hosted by its operator, not an Azphalt role/workflow package. The old hive-edge sheet once combined Store packages with public A2A drifters to make both discoverable; it was removed because the Store and Connections already perform those jobs. The Agent Card is read in Connections using `A2aDrifters.read`, and only its validated name and URL become a connection. No role is created implicitly; the user can assign the connected provider to a role in Swarm. The remote provider cannot approve Aive's gates or gain repository authority. Disconnecting it removes its credential and connection as before. Existing roles and saved connections are preserved.
 
