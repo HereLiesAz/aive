@@ -81,7 +81,7 @@ internal object LocalAgentDirectorySource : AgentDirectorySource {
  * Search never contacts advertised Agent Cards or enrolls providers.
  */
 internal class SearchA2aDirectorySource(
-    private val http: HttpClient = sharedDirectoryClient,
+    private val http: HttpClient = sharedExternalDiscoveryClient,
 ) : AgentDirectorySource {
     override val name: String = "SearchA2A"
 
@@ -289,7 +289,7 @@ internal fun directoryRelevance(query: String, entry: AgentDirectoryEntry): Int 
     }
 }
 
-private val sharedDirectoryClient: HttpClient by lazy {
+internal val sharedExternalDiscoveryClient: HttpClient by lazy {
     HttpClient {
         expectSuccess = false
         followRedirects = false
