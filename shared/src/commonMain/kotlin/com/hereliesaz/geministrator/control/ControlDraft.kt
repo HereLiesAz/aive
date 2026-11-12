@@ -2,6 +2,10 @@ package com.hereliesaz.geministrator.control
 
 import com.hereliesaz.geministrator.SwarmDraftProblem
 import com.hereliesaz.geministrator.SwarmDraftResult
+import com.hereliesaz.geministrator.ApplicationRuntime
+import com.hereliesaz.geministrator.draftSwarm
+import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
+import com.hereliesaz.geministrator.orchestration.PlanReviewer
 import com.hereliesaz.geministrator.classifyError
 import com.hereliesaz.geministrator.domain.TaskDefinition
 
@@ -12,7 +16,7 @@ sealed interface ControlDraftOutcome {
 }
 
 /** Maps the app's swarm draft onto a [ControlDraftOutcome]; a provider's own message is never passed on. */
-fun controlDraftOutcome(result: SwarmDraftResult): ControlDraftOutcome = when (result) {
+internal fun controlDraftOutcome(result: SwarmDraftResult): ControlDraftOutcome = when (result) {
     is SwarmDraftResult.Ready -> ControlDraftOutcome.Ready(result.suggestedName, result.notes, result.tasks)
     is SwarmDraftResult.Problem -> ControlDraftOutcome.Failed(
         ControlErrorCode.InvalidArgument,
@@ -31,3 +35,10 @@ fun controlDraftOutcome(result: SwarmDraftResult): ControlDraftOutcome = when (r
     SwarmDraftResult.Unavailable ->
         ControlDraftOutcome.Failed(ControlErrorCode.Unavailable, "No planner is linked; connect a provider in the app")
 }
+
+/** Public headless/desktop adapter without leaking the internal swarm draft model. */
+suspend fun ApplicationRuntime.draftForControl(
+    prompt: String,
+    planner: OrchestrationAgentRuntime,
+    reviewer: PlanReviewer? = null,
+): ControlDraftOutcome = controlDraftOutcome(draftSwarm(prompt, planner, reviewer))

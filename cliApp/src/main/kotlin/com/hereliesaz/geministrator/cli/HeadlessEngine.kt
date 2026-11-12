@@ -1,13 +1,12 @@
 package com.hereliesaz.geministrator.cli
 
 import com.hereliesaz.geministrator.ApplicationRuntime
-import com.hereliesaz.geministrator.draftSwarm
 import com.hereliesaz.geministrator.ProviderCatalog
 import com.hereliesaz.geministrator.RepositoryServiceCatalog
 import com.hereliesaz.geministrator.azphalt.SettingsAuthoredWorkflowStore
 import com.hereliesaz.geministrator.control.ControlDraftOutcome
 import com.hereliesaz.geministrator.control.RuntimeControlHost
-import com.hereliesaz.geministrator.control.controlDraftOutcome
+import com.hereliesaz.geministrator.control.draftForControl
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.persistence.desktopSqlWorkflowPersistence
 import com.hereliesaz.geministrator.providers.AgentProvider
@@ -115,7 +114,7 @@ class HeadlessEngine private constructor(
                 )
                 val draft: (suspend (String) -> ControlDraftOutcome)? =
                     if (planner == null) null else {
-                        { prompt: String -> controlDraftOutcome(runtime.draftSwarm(prompt, planner, reviewer)) }
+                        { prompt: String -> runtime.draftForControl(prompt, planner, reviewer) }
                     }
                 val host = RuntimeControlHost(
                     runtime = { runtime },
