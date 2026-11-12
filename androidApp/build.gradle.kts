@@ -85,6 +85,10 @@ android {
         applicationId = "com.hereliesaz.aive"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
+        // Public OAuth app identifiers, never user secrets. Builds without registered apps
+        // retain manual-token login and do not advertise a broken sign-in button.
+        resValue("string", "aive_huggingface_oauth_client_id", providers.gradleProperty("aive.huggingfaceOAuthClientId").orElse("").get())
+        resValue("string", "aive_pollinations_oauth_client_id", providers.gradleProperty("aive.pollinationsOAuthClientId").orElse("").get())
         versionCode = providers.gradleProperty("app.versionCode").get().toInt()
         versionName = providers.gradleProperty("app.versionName").get()
     }
