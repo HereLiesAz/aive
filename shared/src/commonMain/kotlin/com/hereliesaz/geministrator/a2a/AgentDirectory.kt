@@ -164,16 +164,7 @@ internal class SearchA2aDirectorySource(
         if (raw["verification"].valueText() != "unverified") return null
         val name = raw["name"].valueText() ?: return null
         val host = raw["agent_host"].valueText() ?: return null
-        if (name.length > 259 || host.length > 237 || !name.startsWith("ans://")) return null
-        val suffix = "." + host.lowercase()
-        if (!name.lowercase().endsWith(suffix)) return null
-        val version = name.substring(6, name.length - suffix.length)
-        val validLabel = Regex("[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?")
-        val labels = host.split('.') + version.split('.')
-        if (host.split('.').size < 2 || labels.any { !validLabel.matches(it) } ||
-            host.endsWith(".localhost", true) || host.endsWith(".internal", true) ||
-            host.endsWith(".local", true) || host.substringAfterLast('.').all(Char::isDigit)
-        ) return null
+        if (!publicAnsClaimName(name, host)) return null
         return name to host
     }
 
@@ -247,6 +238,22 @@ internal class AgentDirectory(
         const val MAX_ENTRIES_PER_SOURCE = 30
         const val MAX_ENTRIES = 30
     }
+}
+
+/**
+ * Validate publisher-controlled ANS claim syntax. It is lexical only; DNS, certificates and
+ * transparency proofs have NOT been checked. The version is opaque and may span DNS labels.
+ */
+internal fun publicAnsClaimName(name: String, host: String): Boolean {
+    if (name.length > 259 || host.length > 237 || !name.startsWith("ans://")) return false
+    val suffix = "." + host.lowercase()
+    if (!name.lowercase().endsWith(suffix)) return false
+    val version = name.substring(6, name.length - suffix.length)
+    val validLabel = Regex("[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?")
+    val labels = host.split('.') + version.split('.')
+    return host.split('.').size >= 2 && labels.all { validLabel.matches(it) } &&
+        !host.endsWith(".localhost", true) && !host.endsWith(".internal", true) &&
+        !host.endsWith(".local", true) && !host.substringAfterLast('.').all(Char::isDigit)
 }
 
 /** Reject registry-supplied private, credential-bearing, or ambiguous Agent Card origins. */
