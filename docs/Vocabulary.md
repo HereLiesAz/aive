@@ -7,6 +7,7 @@ protocol fields do not follow it.
 | The app says | The code and technical docs say | Where you meet it |
 | --- | --- | --- |
 | **Story** | timeline (`RunTimeline`, `overview.timeline.*` keys) | The hive's **Story** pill: Waterfall, Events, Memory, Log, Flowchart. |
+| **Edit** | Build (the view of a swarm, `building` state, `build_*` keys; not Setup: the setup file keeps that word) | The Live / Edit switch; the editor of the swarm on the hive (creatures, links, jobs). The verb "build" and a build version are not this. |
 | **Source** | provider (`AgentProvider`, `ProviderCatalog`, `preferredProviderId`; the A2A Agent Card `provider:` skills) | A creature's **Source** row, Connections ("Add a source"), **AI Sources**, the Roster's source routing. |
 | **Messages** | inbox (`LiveInboxScreen`, `InboxReadLog`) | The header's **Messages** button and the rail's Messages place: everything waiting on you. |
 | **Nanny** | Hall Monitor (`HallMonitorRole`, `HallMonitorGovernanceService`, the `hall-monitor` role id) | The role that watches the swarm's efficiency and can pause the hive for your review. |
