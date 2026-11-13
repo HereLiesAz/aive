@@ -29,7 +29,7 @@ internal fun PromptHistorySettingsSection(store: PromptHistoryStore = PromptHist
     ProviderSectionLabel(stringResource(Res.string.prompt_remember_title))
     Text(stringResource(Res.string.prompt_remember_intro), style = AzphaltType.body, color = azphaltOnSurface())
     val on = store.enabled()
-    AzphaltPill(
+    AzphaltToggle(
         stringResource(if (on) Res.string.prompt_remember_on else Res.string.prompt_remember_off),
         "prompt-history-toggle",
         selected = on,

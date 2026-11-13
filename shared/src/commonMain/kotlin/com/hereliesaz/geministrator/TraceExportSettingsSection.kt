@@ -72,7 +72,7 @@ internal fun TraceExportSettingsSection(
         errorMessage = if (!headersValid) stringResource(Res.string.settings_trace_export_headers_invalid) else null,
     )
     Text(stringResource(Res.string.settings_trace_export_headers_note), style = AzphaltType.body, color = azphaltOnSurface())
-    AzphaltPill(
+    AzphaltToggle(
         if (settings.enabled) stringResource(Res.string.settings_trace_export_on) else stringResource(Res.string.settings_trace_export_off),
         "trace-export-toggle",
         selected = settings.enabled,
@@ -88,7 +88,7 @@ internal fun TraceExportSettingsSection(
         modifier = Modifier.fillMaxWidth(),
     )
     if (settings.enabled) {
-        AzphaltPill(
+        AzphaltToggle(
             if (settings.includeContent) {
                 stringResource(Res.string.settings_trace_export_content_on)
             } else {

@@ -378,7 +378,7 @@ internal fun ProviderSettingsScreen(
         // Keyless sources start on; this one switch turns them all off (or back on). A single source is
         // disconnected on its own row below. What a keyless source is sent leaves the device: said once, here.
         var keylessOff by remember { mutableStateOf(KeylessDefaults.allOff()) }
-        AzphaltPill(
+        AzphaltToggle(
             if (keylessOff) stringResource(Res.string.keyless_sources_off) else stringResource(Res.string.keyless_sources_on),
             "keyless-sources-switch",
             selected = !keylessOff,
@@ -783,7 +783,7 @@ internal fun ProviderSettingsScreen(
                     color = azphaltOnSurface(),
                 )
             }
-            AzphaltPill(
+            AzphaltToggle(
                 if (setting.enabled) stringResource(Res.string.settings_automatic_crash_reports_on) else stringResource(Res.string.settings_automatic_crash_reports_off),
                 "crash-reporting-toggle",
                 selected = setting.enabled,
@@ -804,7 +804,7 @@ internal fun ProviderSettingsScreen(
                 style = AzphaltType.body,
                 color = azphaltOnSurface(),
             )
-            AzphaltPill(
+            AzphaltToggle(
                 if (setting.enabled) stringResource(Res.string.settings_remote_access_on) else stringResource(Res.string.settings_remote_access_off),
                 "remote-access-toggle",
                 selected = setting.enabled,
@@ -901,7 +901,7 @@ internal fun ProviderSettingsScreen(
                 style = AzphaltType.body,
                 color = azphaltOnSurface(),
             )
-            AzphaltPill(
+            AzphaltToggle(
                 if (setting.enabled) stringResource(Res.string.settings_a2a_server_on) else stringResource(Res.string.settings_a2a_server_off),
                 "a2a-server-toggle",
                 selected = setting.enabled,
@@ -966,7 +966,7 @@ internal fun ProviderSettingsScreen(
             }
             setting.lan?.takeIf { setting.enabled }?.let { lan -> A2aLanControls(lan) }
             setting.providerCard?.takeIf { setting.enabled }?.let { card ->
-                AzphaltPill(
+                AzphaltToggle(
                     if (card.described) stringResource(Res.string.settings_a2a_providers_on) else stringResource(Res.string.settings_a2a_providers_off),
                     "a2a-providers-toggle",
                     selected = card.described,
@@ -1097,7 +1097,7 @@ internal fun ProviderSettingsScreen(
                     color = azphaltOnSurface(),
                 )
             }
-            AzphaltPill(
+            AzphaltToggle(
                 if (setting.enabled) stringResource(Res.string.settings_on_device_small_tasks_on) else stringResource(Res.string.settings_on_device_small_tasks_off),
                 "on-device-small-tasks-toggle",
                 selected = setting.enabled,
@@ -1209,7 +1209,7 @@ internal fun ProviderSettingsScreen(
             modifier = Modifier.fillMaxWidth(),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AzphaltPill(
+            AzphaltToggle(
                 if (sharingEnabledDraft) stringResource(Res.string.settings_sharing_compute_on) else stringResource(Res.string.settings_sharing_compute_off),
                 "distributed-sharing-toggle",
                 selected = sharingEnabledDraft,
@@ -1681,7 +1681,7 @@ private suspend fun <T> settingsActionOrNull(label: String, action: suspend () -
 /** **Open to this network** under the A2A server (docs/A2A.md); the cleartext warning sits beside the switch. */
 @Composable
 private fun A2aLanControls(lan: A2aLanSetting) {
-    AzphaltPill(
+    AzphaltToggle(
         if (lan.enabled) stringResource(Res.string.settings_a2a_lan_on) else stringResource(Res.string.settings_a2a_lan_off),
         "a2a-lan-toggle",
         selected = lan.enabled,
