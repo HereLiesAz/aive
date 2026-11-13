@@ -184,6 +184,7 @@ object RoleTemplates {
 
 object StepInstantiation {
     private const val MAX_INPUT_CHARS = 4_000
+    private const val INPUTS_MARK = "Inputs:"
 
     fun roleFor(hint: String): RoleDefinitionId = when (hint) {
         "reviewer" -> BuiltInRoles.Reviewer.id
@@ -210,14 +211,7 @@ object StepInstantiation {
         inputs: Map<String, String>,
         tool: String? = null,
     ): TaskDefinition {
-        val literals = inputs.filterValues { boundTask(it) == null }
-        val objective = buildString {
-            append(base.body.wording)
-            if (literals.isNotEmpty()) {
-                append("\n\nInputs:")
-                literals.forEach { (port, value) -> append("\n- ").append(port).append(": ").append(value.take(MAX_INPUT_CHARS)) }
-            }
-        }
+        val objective = objectiveWith(base.body.wording, inputs)
         val tools = if (template.toolPick == ToolPick.None) base.body.allowedTools else listOfNotNull(tool)
         val effectful = template.effectful
         return TaskDefinition(
@@ -241,6 +235,21 @@ object StepInstantiation {
             ),
         )
     }
+
+    /** [wording] followed by the literal [inputs] (a binding to another step is not text). */
+    fun objectiveWith(wording: String, inputs: Map<String, String>): String {
+        val literals = inputs.filterValues { boundTask(it) == null }
+        return buildString {
+            append(wording)
+            if (literals.isNotEmpty()) {
+                append("\n\n").append(INPUTS_MARK)
+                literals.forEach { (port, value) -> append("\n- ").append(port).append(": ").append(value.take(MAX_INPUT_CHARS)) }
+            }
+        }
+    }
+
+    /** [objective] without the inputs block [objectiveWith] appended. */
+    fun wordingOf(objective: String): String = objective.substringBefore("\n\n$INPUTS_MARK")
 
     /** The ports of [contract]'s template that are required and have no value: the sentence the step is held with. */
     fun missingInputs(contract: TaskContract): List<String> {

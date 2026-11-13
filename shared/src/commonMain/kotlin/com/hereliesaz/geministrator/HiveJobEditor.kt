@@ -81,6 +81,18 @@ import com.hereliesaz.geministrator.resources.job_then_ask
 import com.hereliesaz.geministrator.resources.job_then_reassign
 import com.hereliesaz.geministrator.resources.job_then_stop
 import com.hereliesaz.geministrator.resources.job_tries
+import com.hereliesaz.geministrator.resources.step_always_asks
+import com.hereliesaz.geministrator.resources.step_effects_label
+import com.hereliesaz.geministrator.resources.step_input_from
+import com.hereliesaz.geministrator.resources.step_input_optional
+import com.hereliesaz.geministrator.resources.step_tool_label
+import com.hereliesaz.geministrator.resources.step_tool_name_hint
+import com.hereliesaz.geministrator.resources.step_tool_none
+import com.hereliesaz.geministrator.domain.TaskContract
+import com.hereliesaz.geministrator.template.BuiltInTemplates
+import com.hereliesaz.geministrator.template.StepInstantiation
+import com.hereliesaz.geministrator.template.ToolPick
+import com.hereliesaz.geministrator.workflow.isEffectfulStep
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -182,6 +194,7 @@ internal fun HiveJobEditor(
                 )
             }
         }
+        task.contract?.let { contract -> StepContractRows(definition, task, contract, onEdit) }
         // Approval is a switch: the safety setting of the step, so it says it is on or off and asks before going off.
         var confirmingApprovalOff by remember(task.id) { mutableStateOf(false) }
         if (confirmingApprovalOff) {
@@ -211,7 +224,7 @@ internal fun HiveJobEditor(
                 selected = asksPerson,
                 endCap = stringResource(if (asksPerson) Res.string.job_switch_on else Res.string.job_switch_off),
                 role = Role.Switch,
-                enabled = onEdit != null,
+                enabled = onEdit != null && !task.isEffectfulStep(),
                 onClick = {
                     if (approvalChangeNeedsConfirm(asksPerson)) {
                         confirmingApprovalOff = true
@@ -433,5 +446,86 @@ private fun JobValueRow(label: String, value: String, onClick: (() -> Unit)?) {
     ) {
         Text(label, style = AzphaltType.body, color = azphaltMutedOnSurface(), modifier = Modifier.weight(1f))
         Text(value, style = AzphaltType.body.copy(fontWeight = FontWeight.ExtraBold), color = azphaltOnSurface())
+    }
+}
+
+/**
+ * The rows a step made from a template adds to its job: one per input (a well for a literal, or the creature that feeds
+ * it), what it may change in plain words, and the one tool it may use when it takes one. Read-only without [onEdit].
+ * No new screen: these are rows of the same job.
+ */
+@Composable
+private fun StepContractRows(
+    definition: WorkflowDefinition,
+    task: TaskDefinition,
+    contract: TaskContract,
+    onEdit: ((TerrariumDependencyEditResult) -> Unit)?,
+) {
+    val template = BuiltInTemplates.byId[contract.template.id] ?: return
+    template.inputs.forEach { port ->
+        val label = stepPortLabel(port.name)
+        val optional = stringResource(Res.string.step_input_optional)
+        JobLabel((if (port.required) label else "$label ($optional)").uppercase())
+        val current = contract.inputs[port.name].orEmpty()
+        val feeder = StepInstantiation.boundTask(current)
+        if (feeder != null) {
+            val feederName = definition.tasks.firstOrNull { it.id == feeder }?.name ?: feeder.value
+            JobValueRow(label = label, value = stringResource(Res.string.step_input_from, feederName), onClick = null)
+        } else {
+            var draft by remember(task.id, port.name, current) { mutableStateOf(current) }
+            JobWell {
+                BasicTextField(
+                    value = draft,
+                    onValueChange = { draft = it },
+                    readOnly = onEdit == null,
+                    textStyle = AzphaltType.body.copy(color = azphaltOnSurface()),
+                    cursorBrush = SolidColor(azphaltOnSurface()),
+                    modifier = Modifier.fillMaxWidth().semantics { contentDescription = label },
+                )
+            }
+            if (onEdit != null && draft != current) {
+                AzphaltPill(
+                    label = stringResource(Res.string.job_apply),
+                    seed = "job-input-${task.id.value}-${port.name}",
+                    tone = PillTone.Primary,
+                    onClick = { onEdit(setTerrariumContractInput(definition, task.id, port.name, draft)) },
+                )
+            }
+        }
+    }
+    val effects = contract.effects.map { stepEffectLabel(it) }
+    JobValueRow(label = stringResource(Res.string.step_effects_label), value = effects.joinToString(", "), onClick = null)
+    if (task.isEffectfulStep()) {
+        Text(stringResource(Res.string.step_always_asks), style = AzphaltType.body, color = azphaltMutedOnSurface())
+    }
+    if (template.toolPick != ToolPick.None) {
+        val chosen = contract.allowedTools.firstOrNull()
+        JobValueRow(
+            label = stringResource(Res.string.step_tool_label),
+            value = chosen ?: stringResource(Res.string.step_tool_none),
+            onClick = null,
+        )
+        if (onEdit != null) {
+            val hint = stringResource(Res.string.step_tool_name_hint)
+            var toolDraft by remember(task.id, chosen) { mutableStateOf(chosen.orEmpty()) }
+            JobWell {
+                BasicTextField(
+                    value = toolDraft,
+                    onValueChange = { toolDraft = it },
+                    singleLine = true,
+                    textStyle = AzphaltType.body.copy(color = azphaltOnSurface()),
+                    cursorBrush = SolidColor(azphaltOnSurface()),
+                    modifier = Modifier.fillMaxWidth().semantics { contentDescription = hint },
+                )
+            }
+            if (toolDraft != chosen.orEmpty()) {
+                AzphaltPill(
+                    label = stringResource(Res.string.job_apply),
+                    seed = "job-tool-${task.id.value}",
+                    tone = PillTone.Primary,
+                    onClick = { onEdit(setTerrariumContractTool(definition, task.id, toolDraft)) },
+                )
+            }
+        }
     }
 }

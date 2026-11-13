@@ -22,6 +22,7 @@ import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.build_add_connection
 import com.hereliesaz.geministrator.resources.build_add_creature
 import com.hereliesaz.geministrator.resources.build_add_from_steps
+import com.hereliesaz.geministrator.resources.build_add_from_templates
 import com.hereliesaz.geministrator.resources.build_add_from_swarm
 import com.hereliesaz.geministrator.resources.build_add_hint
 import com.hereliesaz.geministrator.resources.build_step_repo_fetch
@@ -276,6 +277,20 @@ private fun TerrariumAddCreature(
                     ),
                     seed = "add-step-${step.idStem}",
                     onClick = { onEdit(addTerrariumCreature(definition, TerrariumNewcomer.Step(step))) },
+                )
+            }
+        }
+        // Steps for a creature: a task with a contract around it, made at the version the catalog has now.
+        Text(stringResource(Res.string.build_add_from_templates), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            com.hereliesaz.geministrator.template.BuiltInTemplates.all.forEach { template ->
+                val title = stepTemplateTitle(template)
+                AzphaltPill(
+                    label = title,
+                    seed = "add-template-${template.id}",
+                    onClick = {
+                        onEdit(addTerrariumCreature(definition, TerrariumNewcomer.FromTemplate(template, template.base(), title)))
+                    },
                 )
             }
         }
