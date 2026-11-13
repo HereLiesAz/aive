@@ -30,6 +30,7 @@ import com.hereliesaz.geministrator.resources.improvement_replaces
 import com.hereliesaz.geministrator.resources.improvement_save_failed
 import com.hereliesaz.geministrator.resources.improvement_would_break_loop
 import com.hereliesaz.geministrator.resources.improvement_add_to_hive
+import com.hereliesaz.geministrator.resources.improvement_source_queen
 import com.hereliesaz.geministrator.resources.improvement_source_habit
 import com.hereliesaz.geministrator.resources.improvement_source_loop
 import com.hereliesaz.geministrator.resources.improvement_source_role
