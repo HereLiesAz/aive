@@ -42,6 +42,8 @@ fun queenUpdate(
     missing: List<Missing> = emptyList(),
     /** What she says about disputes she could not settle herself (see [disputeNotes]); always said. */
     disputes: List<QueenNote> = emptyList(),
+    /** Her suggestions still waiting on the keeper ([queenSuggestionNotes]); never while frozen, stopped or finished. */
+    suggestions: List<QueenNote> = emptyList(),
 ): List<QueenNote> {
     if (run.status.finished()) return listOf(finishNote(definition, run))
     val lead = missingNotes(run.id.value, missing, level) + disputes
@@ -53,7 +55,9 @@ fun queenUpdate(
     researchNote(run, research, level)?.let { notes += it }
     notes += waitSentences(definition, run, roles)
     notes += nannyRelay(definition, run, review)
-    if (nannyPhase(definition, run) == NannyPhase.None && definition.tasks.none { it.roleId == com.hereliesaz.geministrator.domain.HallMonitorRole.id }) {
+    notes += suggestions
+    // A suggestion already says what she noticed, so her "I noticed" line does not say it twice.
+    if (suggestions.isEmpty() && nannyPhase(definition, run) == NannyPhase.None && definition.tasks.none { it.roleId == com.hereliesaz.geministrator.domain.HallMonitorRole.id }) {
         watchRelay(definition, run, queenSignals(definition, run, roles))?.let { notes += it }
     }
     if (level == QueenLevel.Helpful) {

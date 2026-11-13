@@ -73,6 +73,14 @@ enum class QueenVoice(val relay: QueenRelay?) {
     DisputeTesting(QueenRelay.Dispute),
     DisputeStillUnsure(QueenRelay.Dispute),
     DisputeCannotInvestigate(QueenRelay.Dispute),
+
+    // --- Mid-run suggestions (queen/QueenSuggestions.kt). Kept together, after every other voice. ---
+    SuggestRedoStep(QueenRelay.Watch),
+    SuggestSwapSource(QueenRelay.Watch),
+    SuggestRaiseBudget(QueenRelay.Watch),
+    SuggestRaiseAllowance(QueenRelay.Allowance),
+    SuggestRestNanny(QueenRelay.Nanny),
+    SuggestRewordStep(QueenRelay.Watch),
 }
 
 /** Where a note leads: an existing place, never a new one. */
@@ -100,7 +108,7 @@ sealed interface QueenLink {
 }
 
 /** What a quoted line is, so the keeper can see whose words they are. */
-enum class QueenQuoteLabel { NannyFinding, QueenReason, PracticeSolution, QueenApproach, Objection, StillMissing }
+enum class QueenQuoteLabel { NannyFinding, QueenReason, PracticeSolution, QueenApproach, Objection, StillMissing, QueenWording }
 
 /** Text taken from the run, shown on its own labeled line: escaped, capped, never part of a sentence. */
 data class QueenQuote(val label: QueenQuoteLabel, val text: String)
@@ -121,7 +129,11 @@ data class QueenNote(
     val attachedTo: String? = null,
     /** A second sentence on the same note. */
     val extra: QueenVoice? = null,
+    /** Set for a suggestion: the ledger row the keeper decides. Only a suggestion counts toward the badge. */
+    val suggestion: QueenSuggestionRef? = null,
+    /** A suggestion resting on content from outside the keeper's own: labelled, and it asks before it applies. */
+    val outside: Boolean = false,
 ) {
     val relay: QueenRelay? get() = voice.relay
-    val countsToBadge: Boolean get() = false
+    val countsToBadge: Boolean get() = suggestion != null
 }
