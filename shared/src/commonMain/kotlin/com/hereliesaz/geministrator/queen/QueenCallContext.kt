@@ -3,6 +3,7 @@ package com.hereliesaz.geministrator.queen
 import com.hereliesaz.geministrator.workflow.KeylessPacing
 import com.hereliesaz.geministrator.workflow.QUEEN_PACE_CALL_MILLIS
 import com.hereliesaz.geministrator.workflow.QUEEN_PACE_TOTAL_MILLIS
+import kotlinx.coroutines.withContext
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
@@ -20,11 +21,23 @@ class QueenCallContext(
 ) : AbstractCoroutineContextElement(Key) {
     private var waitedMillis = 0L
 
+    /** What the current call (one stage's answer, across every Source it tries) has waited; null until [beginCall]. */
+    private var callWaitedMillis: Long? = null
+
+    /** A new call (one dispute stage's answer) starts: the per-call cap counts afresh, however many Sources it tries. */
+    fun beginCall() {
+        callWaitedMillis = 0L
+    }
+
     /** True when a call through this context may have to wait for a Source's turn. */
     val paces: Boolean get() = pacing != null
 
     /** The most one call may wait for a turn: her call limit, and what is left of the dispute's total. */
-    fun callBudgetMillis(): Long = pacingBudget(totalWaitMillis, waitedMillis, callWaitMillis)
+    fun callBudgetMillis(): Long {
+        val dispute = pacingBudget(totalWaitMillis, waitedMillis, callWaitMillis)
+        val spent = callWaitedMillis ?: return dispute
+        return minOf(dispute, maxOf(0L, callWaitMillis - spent))
+    }
 
     /**
      * Waits for [providerId]'s turn; true when it may be asked now (the wait counts as hers), false when its turn is further
@@ -34,6 +47,7 @@ class QueenCallContext(
         val gate = pacing ?: return true
         val waited = gate.await(providerId, callBudgetMillis()) ?: return false
         waitedMillis += waited
+        callWaitedMillis = callWaitedMillis?.plus(waited)
         return true
     }
 
@@ -48,3 +62,14 @@ fun pacingBudget(totalMillis: Long, waitedMillis: Long, callMillis: Long): Long 
 
 /** The enclosing dispute's call context, if any. */
 suspend fun currentQueenCallContext(): QueenCallContext? = coroutineContext[QueenCallContext]
+
+/**
+ * [base] whose every answer runs in its own fresh [QueenCallContext] on [pacing], so a long run of calls (a tutorial's plan and
+ * lessons) keeps each Source's request limit with a full wait budget per call instead of one shared dispute total.
+ */
+fun pacedPerCall(base: QueenModel, pacing: KeylessPacing?): QueenModel = object : QueenModel {
+    override val uses: List<ModelUse> get() = base.uses
+
+    override suspend fun answer(prompt: String): String =
+        withContext(QueenCallContext(pacing)) { base.answer(prompt) }
+}

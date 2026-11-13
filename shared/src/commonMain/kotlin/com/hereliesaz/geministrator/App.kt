@@ -491,7 +491,9 @@ fun App(
                 }
                 val active = runtime
                 // Her calls here are held to the keeper's hourly spend cap, as in a dispute (a call it leaves no room for fails).
-                val capped = if (active == null) base else com.hereliesaz.geministrator.queen.cappedModel(base) { active.queenCallAllowed() }
+                val allowed = if (active == null) base else com.hereliesaz.geministrator.queen.cappedModel(base) { active.queenCallAllowed() }
+                // Each call keeps the Source's request limit (a 2-per-minute keyless Source waits its turn, never fails a lesson).
+                val capped = com.hereliesaz.geministrator.queen.pacedPerCall(allowed, active?.providerRegistry?.sourcePacing)
                 val outcome = com.hereliesaz.geministrator.intro.TutorialLaunch.run(
                     goal = objective,
                     base = capped,

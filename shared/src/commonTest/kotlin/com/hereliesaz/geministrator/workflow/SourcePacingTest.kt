@@ -2,6 +2,9 @@ package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.ProviderCatalog
 import com.hereliesaz.geministrator.queen.QueenCallContext
+import com.hereliesaz.geministrator.queen.QueenModel
+import com.hereliesaz.geministrator.queen.currentQueenCallContext
+import com.hereliesaz.geministrator.queen.pacedPerCall
 import com.hereliesaz.geministrator.queen.QueenLink
 import com.hereliesaz.geministrator.queen.QueenVoice
 import com.hereliesaz.geministrator.queen.pacingBudget
@@ -82,6 +85,34 @@ class SourcePacingTest {
         // The next turn is 60 s off, more than the 40 s of the total left: she does not wait for it.
         assertTrue(context.awaitTurn("ovh"))
         assertFalse(context.awaitTurn("ovh"))
+    }
+
+    @Test
+    fun theCallCapCountsAcrossSourcesOfOneCallAndRestartsWithTheNextCall() = runTest {
+        val pacer = KeylessPacer(now = { testScheduler.currentTime }, limitOf = { twoAMinute })
+        val context = QueenCallContext(KeylessPacing(pacer, Mutex()), totalWaitMillis = 100_000L, callWaitMillis = 90_000L)
+        context.beginCall()
+        assertTrue(context.awaitTurn("ovh"))
+        assertTrue(context.awaitTurn("ovh"))
+        assertTrue(context.awaitTurn("ovh"))
+        // 60 s of this call's 90 s are spent, so the next Source tried gets 30 s, not a fresh 90 s.
+        assertEquals(30_000L, context.callBudgetMillis())
+        context.beginCall()
+        assertEquals(40_000L, context.callBudgetMillis())
+    }
+
+    @Test
+    fun everyAnswerOfAPacedModelRunsInItsOwnFreshContext() = runTest {
+        val seen = mutableListOf<QueenCallContext?>()
+        val base = QueenModel { seen += currentQueenCallContext(); "ok" }
+        val pacer = KeylessPacer(now = { testScheduler.currentTime }, limitOf = { twoAMinute })
+        val model = pacedPerCall(base, KeylessPacing(pacer, Mutex()))
+        model.answer("a")
+        model.answer("b")
+        assertEquals(2, seen.size)
+        assertTrue(seen.all { it != null && it.paces })
+        assertTrue(seen[0] !== seen[1])
+        assertNull(currentQueenCallContext())
     }
 
     @Test

@@ -302,7 +302,9 @@ internal fun approachOf(dispute: Dispute, outcome: DisputeOutcome): Approach? = 
 internal suspend fun askWithin(model: QueenModel, prompt: String, timeoutMillis: Long, mayCall: () -> Boolean): String? {
     if (!mayCall()) return null
     // Waiting for a Source's turn is her wait (bounded in QueenCallContext), not the answer's time: the answer keeps its own limit.
-    val turnWait = currentQueenCallContext()?.takeIf { it.paces }?.callBudgetMillis() ?: 0L
+    // The 90 s cap is for the whole answer of this stage, however many Sources it tries.
+    val callContext = currentQueenCallContext()?.also { it.beginCall() }
+    val turnWait = callContext?.takeIf { it.paces }?.callBudgetMillis() ?: 0L
     return try {
         kotlinx.coroutines.withTimeoutOrNull(timeoutMillis + turnWait) { model.answer(prompt) }
     } catch (cancelled: kotlinx.coroutines.CancellationException) {
