@@ -71,3 +71,30 @@ class PromptingMcpConsentGate(
         current.value?.second?.complete(decision)
     }
 }
+
+/**
+ * What the approval shows of a call's [arguments]: the first [maxChars] characters and, when there is more, how many
+ * characters there are in all and a fingerprint of the whole text, so a long argument cannot hide its tail.
+ */
+internal fun mcpArgumentsPreview(arguments: kotlinx.serialization.json.JsonObject, maxChars: Int = 600): String {
+    val text = arguments.toString()
+    if (text.length <= maxChars) return text
+    var hash = -0x340d631b7bdddcdbL
+    for (char in text) {
+        hash = hash xor char.code.toLong()
+        hash *= 0x100000001b3L
+    }
+    return text.take(maxChars) + "… [${text.length} characters in all, fingerprint ${hash.toULong().toString(16).padStart(16, '0')}]"
+}
+
+private val DESTRUCTIVE_WORDS = Regex("(^|[^a-z])(delete|remove|drop|destroy|wipe|erase|purge|truncate|overwrite)([^a-z]|$)")
+
+/**
+ * True when a tool's name or its (untrusted) annotation says it destroys data. Only ever used to ask more often:
+ * such a call needs its own approval even after the server was allowed for the run. A server that says nothing is
+ * judged by its name alone.
+ */
+internal fun mcpLooksDestructive(toolName: String, annotations: kotlinx.serialization.json.JsonObject?): Boolean {
+    val hint = (annotations?.get("destructiveHint") as? kotlinx.serialization.json.JsonPrimitive)?.content
+    return hint == "true" || DESTRUCTIVE_WORDS.containsMatchIn(toolName.lowercase())
+}
