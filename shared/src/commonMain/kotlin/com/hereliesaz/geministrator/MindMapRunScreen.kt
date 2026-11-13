@@ -42,6 +42,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.first_hive_default_name
+import com.hereliesaz.geministrator.resources.prompt_starter_goal
+import com.hereliesaz.geministrator.prompts.PromptEntry
+import com.hereliesaz.geministrator.prompts.PromptHistoryRules
+import com.hereliesaz.geministrator.prompts.PromptKind
+import com.hereliesaz.geministrator.prompts.PromptSuggestBox
+import com.hereliesaz.geministrator.prompts.PromptSuggestions
+import com.hereliesaz.geministrator.prompts.rememberPromptHistory
 import com.hereliesaz.geministrator.resources.common_dismiss
 import com.hereliesaz.geministrator.resources.overview_has_no_persisted_workflow_run
 import com.hereliesaz.geministrator.resources.overview_a_workflow_gate_is_waiting_for
@@ -208,10 +215,18 @@ internal fun MindMapRunScreen(
     val repositorySource = selectableRepositorySources
         .firstOrNull { it.name == repositorySourceName }
         ?: selectableRepositorySources.first()
-    var repositoryLocator by rememberDurableStringState(
+    var repositoryLocatorDraft by rememberDurableStringState(
         key = "overview.$draftScope.repository-locator",
         initialValue = existingRepository?.locatorInput().orEmpty(),
     )
+    // A remembered repository the field was filled with. It is held apart from the draft, so one the keeper
+    // never edited is not saved as a draft; what the field holds is the draft, or the seed while it is empty.
+    var seededRepositoryLocator by remember(draftScope) { mutableStateOf("") }
+    val repositoryLocator = repositoryLocatorDraft.ifBlank { seededRepositoryLocator }
+    fun setRepositoryLocator(value: String) {
+        repositoryLocatorDraft = value
+        seededRepositoryLocator = ""
+    }
     var defaultBranch by rememberDurableStringState(
         key = "overview.$draftScope.default-branch",
         initialValue = existingRepository?.defaultBranch.orEmpty(),
@@ -231,10 +246,16 @@ internal fun MindMapRunScreen(
     var repositorySearchError by remember(runtimeState) { mutableStateOf<String?>(null) }
     var repositorySuggestions by remember(runtimeState) { mutableStateOf<List<RepositorySuggestion>>(emptyList()) }
     var repositoryMenuExpanded by remember(runtimeState) { mutableStateOf(false) }
-    var objective by rememberDurableStringState(
+    var objectiveDraft by rememberDurableStringState(
         key = "overview.$draftScope.objective",
         initialValue = "",
     )
+    // The goal the field was filled with (what was fed last, else a starting suggestion). Held apart from the
+    // draft, so a seed the keeper never edited is not saved as one.
+    var seededObjective by remember(draftScope) { mutableStateOf("") }
+    val objective = objectiveDraft.ifBlank { seededObjective }
+    val objectiveHistory = rememberPromptHistory(PromptKind.Objective)
+    val repositoryHistory = rememberPromptHistory(PromptKind.Repository)
     var lineage by remember(draftScope) { mutableStateOf(LaunchLineageState()) }
     var launchableRuns by remember(runtimeState) { mutableStateOf<List<LaunchableRun>?>(null) }
     LaunchedEffect(runtimeState, lineage.mode) {
@@ -411,6 +432,18 @@ internal fun MindMapRunScreen(
                         selectableRepositorySources.firstOrNull { it in usable }?.let { repositorySourceName = it.name }
                     }
                 }
+                val repositorySourceKind = when (repositorySource) {
+                    RepositorySource.GitHub -> PromptSuggestions.LocatorSource.GitHub
+                    RepositorySource.GitLab -> PromptSuggestions.LocatorSource.GitLab
+                    RepositorySource.Local -> PromptSuggestions.LocatorSource.Local
+                }
+                val repositoryEntryFilter: (PromptEntry) -> Boolean = { PromptSuggestions.locatorSource(it.text) == repositorySourceKind }
+                // The repository last used with this kind of source, for a project that has none yet.
+                val repositorySeed = if (existingRepository == null) {
+                    PromptSuggestions.repositoryEntries(repositoryHistory.entries, repositorySourceKind).firstOrNull()?.text
+                } else {
+                    null
+                }
                 val repositoryFields: @Composable () -> Unit = {
                 Text(
                     stringResource(Res.string.overview_link_repository),
@@ -434,7 +467,7 @@ internal fun MindMapRunScreen(
                             onClick = {
                                 if (repositorySource != source) {
                                     repositorySourceName = source.name
-                                    repositoryLocator = ""
+                                    setRepositoryLocator("")
                                     repositoryError = null
                                     repositorySearchError = null
                                     repositorySuggestions = emptyList()
@@ -454,7 +487,7 @@ internal fun MindMapRunScreen(
                                 runCatching { onPickLocalRepository() }
                                     .onSuccess { path ->
                                         path?.let {
-                                            repositoryLocator = it
+                                            setRepositoryLocator(it)
                                             repositoryError = null
                                         }
                                     }
@@ -466,15 +499,32 @@ internal fun MindMapRunScreen(
                 }
 
                 if (repositorySearchConnected) {
+                    PromptSuggestBox(
+                        kind = PromptKind.Repository,
+                        value = repositoryLocator,
+                        onValueChange = {
+                            setRepositoryLocator(it)
+                            repositoryError = null
+                            repositoryMenuExpanded = true
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        seed = repositorySeed,
+                        onSeeded = { seededRepositoryLocator = it },
+                        resetKey = draftScope,
+                        entryFilter = repositoryEntryFilter,
+                        showMenu = false,
+                    ) { field ->
+                    // Locators used before come first in the search menu, then what the search finds.
+                    val recentLocators = PromptHistoryRules.suggestions(
+                        repositoryHistory.entries.filter(repositoryEntryFilter),
+                        repositoryLocator,
+                        limit = 3,
+                    )
                     Box(modifier = Modifier.fillMaxWidth()) {
                         OutlinedTextField(
                             colors = azphaltTextFieldColors(),
-                            value = repositoryLocator,
-                            onValueChange = {
-                                repositoryLocator = it
-                                repositoryError = null
-                                repositoryMenuExpanded = true
-                            },
+                            value = field.value,
+                            onValueChange = field.onValueChange,
                             label = {
                                 Text(
                                     when (repositorySource) {
@@ -487,6 +537,7 @@ internal fun MindMapRunScreen(
                             singleLine = true,
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .then(field.modifier)
                                 .onFocusChanged { focus ->
                                     if (focus.isFocused) repositoryMenuExpanded = true
                                 },
@@ -496,13 +547,24 @@ internal fun MindMapRunScreen(
                             },
                         )
                         DropdownMenu(
-                            expanded = repositoryMenuExpanded && repositorySuggestions.isNotEmpty(),
+                            expanded = repositoryMenuExpanded && (repositorySuggestions.isNotEmpty() || recentLocators.isNotEmpty()),
                             onDismissRequest = { repositoryMenuExpanded = false },
                             modifier = Modifier.fillMaxWidth(),
                             // Suggestions arrive while the keeper types: a focusable popup would take focus
                             // from the field on the first result and swallow the next keystroke.
                             properties = androidx.compose.ui.window.PopupProperties(focusable = false),
                         ) {
+                            recentLocators.forEach { recent ->
+                                DropdownMenuItem(
+                                    text = { Text(recent) },
+                                    onClick = {
+                                        setRepositoryLocator(recent)
+                                        repositoryError = null
+                                        repositorySearchError = null
+                                        repositoryMenuExpanded = false
+                                    },
+                                )
+                            }
                             repositorySuggestions.forEach { suggestion ->
                                 DropdownMenuItem(
                                     text = {
@@ -523,7 +585,7 @@ internal fun MindMapRunScreen(
                                         }
                                     },
                                     onClick = {
-                                        repositoryLocator = suggestion.webUrl
+                                        setRepositoryLocator(suggestion.webUrl)
                                         defaultBranch = suggestion.defaultBranch.orEmpty()
                                         repositoryError = null
                                         repositorySearchError = null
@@ -533,14 +595,25 @@ internal fun MindMapRunScreen(
                             }
                         }
                     }
+                    }
                 } else {
-                    OutlinedTextField(
-                        colors = azphaltTextFieldColors(),
+                    PromptSuggestBox(
+                        kind = PromptKind.Repository,
                         value = repositoryLocator,
                         onValueChange = {
-                            repositoryLocator = it
+                            setRepositoryLocator(it)
                             repositoryError = null
                         },
+                        modifier = Modifier.fillMaxWidth(),
+                        seed = repositorySeed,
+                        onSeeded = { seededRepositoryLocator = it },
+                        resetKey = draftScope,
+                        entryFilter = repositoryEntryFilter,
+                    ) { field ->
+                    OutlinedTextField(
+                        colors = azphaltTextFieldColors(),
+                        value = field.value,
+                        onValueChange = field.onValueChange,
                         label = {
                             Text(
                                 when (repositorySource) {
@@ -551,12 +624,13 @@ internal fun MindMapRunScreen(
                             )
                         },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().then(field.modifier),
                         isError = repositoryError != null,
                         supportingText = repositoryError?.let { message ->
                             { Text(message, modifier = Modifier.azphaltLiveRegion()) }
                         },
                     )
+                    }
                 }
                 if (!repositoryGated) OutlinedTextField(
                     colors = azphaltTextFieldColors(),
@@ -579,17 +653,35 @@ internal fun MindMapRunScreen(
                     color = azphaltOnSurface(),
                 )
                 }
-                OutlinedTextField(
-                    colors = azphaltTextFieldColors(),
+                // Filled in with what was fed last, else a starting goal for the linked repository (a static template,
+                // no model call), selected so typing replaces it.
+                val starterLabel = PromptSuggestions.repositoryLabel(repositoryLocator)
+                val objectiveSeed = PromptSuggestions.firstObjective(
+                    objectiveHistory.entries,
+                    starterLabel?.let { stringResource(Res.string.prompt_starter_goal, it) },
+                )
+                PromptSuggestBox(
+                    kind = PromptKind.Objective,
                     value = objective,
                     onValueChange = {
-                        objective = it
+                        objectiveDraft = it
+                        seededObjective = ""
                         onDismissLaunchError()
                     },
-                    label = { Text(stringResource(if (firstLaunch) Res.string.first_hive_objective else Res.string.overview_objective)) },
-                    minLines = if (compact) 2 else 3,
                     modifier = Modifier.fillMaxWidth(),
-                )
+                    seed = objectiveSeed,
+                    onSeeded = { seededObjective = it },
+                    resetKey = draftScope,
+                ) { field ->
+                    OutlinedTextField(
+                        colors = azphaltTextFieldColors(),
+                        value = field.value,
+                        onValueChange = field.onValueChange,
+                        label = { Text(stringResource(if (firstLaunch) Res.string.first_hive_objective else Res.string.overview_objective)) },
+                        minLines = if (compact) 2 else 3,
+                        modifier = Modifier.fillMaxWidth().then(field.modifier),
+                    )
+                }
                 AzphaltPill(
                     label = stringResource(if (firstLaunch) Res.string.first_hive_options else Res.string.overview_options),
                     seed = "launch-options",
@@ -703,6 +795,7 @@ internal fun MindMapRunScreen(
                         if (firstLaunch) stableHost?.takeIf { it.stable.starter == null }?.let { host -> pickedStarter?.let(host::chooseStarter) }
                         if (locator.isEmpty()) {
                             repositoryError = null
+                            objectiveHistory.record(objective)
                             onLaunchWorkflow(name, objective.trim(), null, parents)
                         } else {
                             runCatching {
@@ -714,6 +807,8 @@ internal fun MindMapRunScreen(
                             }.fold(
                                 onSuccess = { repository ->
                                     repositoryError = null
+                                    objectiveHistory.record(objective)
+                                    repositoryHistory.record(locator)
                                     onLaunchWorkflow(name, objective.trim(), repository, parents)
                                 },
                                 onFailure = { failure ->
