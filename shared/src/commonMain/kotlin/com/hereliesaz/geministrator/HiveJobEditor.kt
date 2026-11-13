@@ -41,6 +41,8 @@ import com.hereliesaz.geministrator.distributed.isComputeDelegatable
 import com.hereliesaz.geministrator.domain.ApprovalPolicy
 import com.hereliesaz.geministrator.domain.EscalationPolicy
 import com.hereliesaz.geministrator.domain.TaskDefinition
+import com.hereliesaz.geministrator.domain.TaskExecutor
+import com.hereliesaz.geministrator.domain.TimeLimit
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.job_add
@@ -56,6 +58,14 @@ import com.hereliesaz.geministrator.resources.job_job
 import com.hereliesaz.geministrator.resources.job_objective
 import com.hereliesaz.geministrator.resources.job_remove
 import com.hereliesaz.geministrator.resources.job_retries_label
+import com.hereliesaz.geministrator.resources.job_time_auto
+import com.hereliesaz.geministrator.resources.job_time_choice_auto
+import com.hereliesaz.geministrator.resources.job_time_choice_off
+import com.hereliesaz.geministrator.resources.job_time_label
+import com.hereliesaz.geministrator.resources.job_time_minutes
+import com.hereliesaz.geministrator.resources.job_time_nested
+import com.hereliesaz.geministrator.resources.job_time_off
+import com.hereliesaz.geministrator.resources.job_time_person
 import com.hereliesaz.geministrator.resources.job_retries_value
 import com.hereliesaz.geministrator.resources.job_runs_any
 import com.hereliesaz.geministrator.resources.job_runs_chosen
@@ -242,6 +252,46 @@ internal fun HiveJobEditor(
                 }
             }
         }
+        // Time allowed: how long this creature may work before the queen says it is slow. Active time only.
+        val untimed = task.executor is TaskExecutor.HumanApproval || task.executor is TaskExecutor.NestedWorkflow
+        val timeLimit = task.timeLimit
+        JobValueRow(
+            label = stringResource(Res.string.job_time_label),
+            value = stringResource(
+                when {
+                    task.executor is TaskExecutor.HumanApproval -> Res.string.job_time_person
+                    task.executor is TaskExecutor.NestedWorkflow -> Res.string.job_time_nested
+                    timeLimit == TimeLimit.Auto -> Res.string.job_time_auto
+                    timeLimit == TimeLimit.Off -> Res.string.job_time_off
+                    else -> Res.string.job_time_minutes
+                },
+                *(if (timeLimit is TimeLimit.Minutes && !untimed) arrayOf(timeLimit.value.toString()) else emptyArray()),
+            ),
+            onClick = null,
+        )
+        if (onEdit != null && !untimed) {
+            Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                JOB_TIME_CHOICES.forEach { choice ->
+                    val label = when (choice) {
+                        TimeLimit.Auto -> stringResource(Res.string.job_time_choice_auto)
+                        TimeLimit.Off -> stringResource(Res.string.job_time_choice_off)
+                        is TimeLimit.Minutes -> choice.value.toString()
+                    }
+                    AzphaltPill(
+                        label = label,
+                        seed = "job-time-${task.id.value}-$label",
+                        selected = choice == timeLimit,
+                        role = Role.RadioButton,
+                        description = if (choice is TimeLimit.Minutes) {
+                            stringResource(Res.string.job_time_minutes, choice.value.toString())
+                        } else {
+                            label
+                        },
+                        onClick = { if (choice != timeLimit) onEdit(setTerrariumJob(definition, task.id, timeLimit = choice)) },
+                    )
+                }
+            }
+        }
         val runsOn = task.computeDelegationTarget()
         JobValueRow(
             label = stringResource(Res.string.job_runs_on),
@@ -281,6 +331,10 @@ internal fun HiveJobEditor(
 internal fun approvalChangeNeedsConfirm(asksPersonNow: Boolean): Boolean = asksPersonNow
 
 private val JOB_TRY_CHOICES = 1..5
+
+/** The pills of "Time allowed": the queen's own figure, a few common ones, and no limit. */
+private val JOB_TIME_CHOICES: List<TimeLimit> =
+    listOf(TimeLimit.Auto) + listOf(5, 15, 30, 60).map(TimeLimit::minutes) + TimeLimit.Off
 
 /** A label on the left and its control on the right. */
 @Composable
