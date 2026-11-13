@@ -148,4 +148,45 @@ class ImprovementTemplateTest {
         assertEquals(listOf(2, 3), lineage.map { it.version })
         assertEquals(3, catalog().current(TemplateKind.Step, "write-document")!!.version)
     }
+    @Test
+    fun theKeeperSelectsACandidateGenerationAndRevertArchivesItSoTheParentRunsAgain() = runTest {
+        val target = "step:write-document@1"
+        waiting(proposal("g2", target, draft(target, mode = RevisionMode.Genetic, steps = 12)))
+        assertEquals(AdoptionResult.Done, adoption.adopt("g2"))
+        assertEquals(1, catalog().current(TemplateKind.Step, "write-document")!!.version)
+
+        assertEquals(AdoptionResult.Done, adoption.select("g2"))
+        assertEquals(TemplateStatus.Approved, templates.revisions().single().status)
+        assertEquals(2, catalog().current(TemplateKind.Step, "write-document")!!.version)
+        assertEquals(AdoptionResult.AlreadyDecided, adoption.select("g2"), "nothing left to select")
+
+        assertEquals(AdoptionResult.Done, adoption.revert("g2"))
+        assertEquals(TemplateStatus.Reverted, templates.revisions().single().status, "archived, never deleted")
+        assertEquals(1, catalog().current(TemplateKind.Step, "write-document")!!.version)
+    }
+
+    @Test
+    fun aQuickChangeHasNothingToSelectAndAnUnadoptedProposalCannotBeSelected() = runTest {
+        val target = "step:write-document@1"
+        waiting(proposal("q1", target, draft(target)), proposal("q2", target, draft(target, mode = RevisionMode.Genetic, steps = 12)))
+        assertEquals(AdoptionResult.AlreadyDecided, adoption.select("q2"), "still only proposed")
+        assertEquals(AdoptionResult.Done, adoption.adopt("q1"))
+        assertEquals(AdoptionResult.AlreadyDecided, adoption.select("q1"))
+    }
+
+    @Test
+    fun selectingTheLaterSiblingMakesItTheOneNewStepsUse() {
+        val base = BuiltInTemplates.WriteDocument.base()
+        fun candidate(version: Int, at: Long) = com.hereliesaz.geministrator.template.TemplateRevision(
+            kind = base.kind, templateId = base.id, version = version, parentVersion = 1, generation = 2,
+            mutation = setOf(com.hereliesaz.geministrator.template.TunableField.Wording), body = base.body.copy(wording = "v$version"),
+            locked = base.locked, before = "b", after = "v$version", fitness = "f", proposalId = "p$version",
+            status = TemplateStatus.Candidate, adoptedAtEpochMillis = at,
+        )
+        val all = listOf(candidate(2, 10), candidate(3, 20))
+        val first = TemplateCatalog.select(all, TemplateKind.Step, "write-document", 3, 10, now = 100)!!
+        val second = TemplateCatalog.select(first, TemplateKind.Step, "write-document", 2, 10, now = 200)!!
+        assertEquals(2, TemplateCatalog(BuiltInTemplates.bases(), second).current(TemplateKind.Step, "write-document")!!.version)
+        assertEquals(null, TemplateCatalog.select(all, TemplateKind.Step, "write-document", 2, 9, now = 100))
+    }
 }

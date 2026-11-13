@@ -606,6 +606,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="improvement_adopt">Approve and apply</string>
     <string name="improvement_dismiss">Dismiss</string>
     <string name="improvement_revert">Revert</string>
+    <string name="improvement_select_generation">Use this generation</string>
     <string name="improvement_replaces">Replaces the step's current text: %1$s</string>
     <string name="improvement_would_break_loop">Adopting this would leave the loop breaking its own rules, so it will be refused: %1$s</string>
     <string name="improvement_breaks_loop">Not applied. It would leave the self-improvement cycle breaking its own rules: %1$s</string>
