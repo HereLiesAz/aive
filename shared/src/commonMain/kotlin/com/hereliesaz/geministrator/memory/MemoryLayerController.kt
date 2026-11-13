@@ -1253,8 +1253,8 @@ class MemoryLayerController(
     // ---- recall triggers in the agent's own thinking -------------------------------------------
 
     /**
-     * Reads a chunk of an agent's thinking or output. Triggers (#tag, "what I remember about …",
-     * an echoed cue, a doubled word) recall summaries; otherwise the text's uncommon words may draw
+     * Reads a chunk of an agent's thinking or output. Triggers (an echoed cue, a doubled word, or a
+     * #tag or "what I remember about …" the agent happens to write) recall summaries; otherwise the text's uncommon words may draw
      * an ambient cue cloud of #tags. Both go back into the session through [reply]; a provider that
      * cannot take a message mid-session gets them with its next turn's prompt.
      */
@@ -1278,31 +1278,6 @@ class MemoryLayerController(
                 session.pending += message
                 while (session.pending.size > MAX_PENDING_RECALLS) session.pending.removeAt(0)
             }
-        }
-
-        // Deliberations the agent records with the /deliberate session command.
-        MemoryDeliberationCommand.parse(text).forEach { parsed ->
-            val outcome = parsed.mapCatching { command ->
-                val request = session.request
-                tool.deliberate(
-                    command.toRequest(
-                        sourceSessionId = agentId,
-                        scope = MemoryBankScope(
-                            projectId = request?.orchestrationContext?.projectId?.value,
-                            workflowRunId = workflow,
-                            taskRunId = agentId,
-                        ),
-                        atEpochMillis = nowEpochMillis(),
-                    ),
-                )
-            }
-            deliver(
-                outcome.fold(
-                    onSuccess = { node -> "$MEMORY_MESSAGE_MARKER deliberation recorded (memory-node:${node.id.value})" },
-                    onFailure = { error -> "$MEMORY_MESSAGE_MARKER deliberation not recorded: ${error.message}" },
-                ),
-            )
-            if (outcome.isSuccess) publish()
         }
 
         if (triggers.isNotEmpty()) {
@@ -1462,11 +1437,10 @@ class MemoryLayerController(
          * A hint, not a requirement: recall runs on what an agent thinks and writes anyway (cue
          * clouds, echoes, doubled words). This only tells it what the marked lines are, once.
          */
-        val MEMORY_PROTOCOL = "Lines starting $MEMORY_MESSAGE_MARKER are your memory. #tags are things you remember; " +
-            "dwell on one (or write \"Let me see what I remember about …\") and more of it comes back. " +
-            "When memories diverge, record your conclusion on its own line: " +
-            "${MemoryDeliberationCommand.COMMAND} memory-node:<a> memory-node:<b> chosen=memory-node:<a> | <why> " +
-            "(chosen=none if it stays unresolved). Both memories are kept either way. " +
+        val MEMORY_PROTOCOL = "Lines starting $MEMORY_MESSAGE_MARKER are your memory. It arrives by itself as you think and write, " +
+            "and goes deeper the longer you stay on a topic; it is gist, never exact. " +
+            "If memories disagree, reason it out loud and state the resolution plainly. " +
+            "A line of just ${MemoryRemindMeCommand.COMMAND} sends this session so far to memory. " +
             RECALL_UNTRUSTED_NOTE
 
         const val RECALL_UNTRUSTED_NOTE: String =
@@ -1582,9 +1556,6 @@ internal fun MemoryRecallHit.divergenceLines(): String = buildString {
         append("\n  ↔ diverges (same subject, different content; both remembered): ").append(partner.text)
     }
     deliberations.forEach { append("\n  ✎ earlier deliberation: ").append(it.text) }
-    if (conflicts.isNotEmpty() && resolution == null) {
-        append("\n  ⚖ to deliberate: ").append(MemoryDeliberationCommand.template(node.id, conflicts.map { it.id }))
-    }
     // The summary of each link delivered with the hit, and the hit's summary-tree levels.
     pairSummaries.forEach { pair ->
         append("\n  ⇄ ").append(pair.relation.name).append(" link, together: ").append(pair.summary.text.replace('\n', ' '))
