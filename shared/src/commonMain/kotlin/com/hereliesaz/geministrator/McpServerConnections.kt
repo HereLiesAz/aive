@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -361,8 +364,10 @@ internal fun McpConsentDialog(gate: PromptingMcpConsentGate) {
             shape = RoundedCornerShape(AzphaltShapes.dialogCorner),
             title = { Text(stringResource(Res.string.mcp_consent_title, current.serverName), fontWeight = FontWeight.Black) },
             text = {
+                // A long argument scrolls inside the dialog, so the three answers always stay on screen.
                 Text(
-                    stringResource(
+                    modifier = Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
+                    text = stringResource(
                         Res.string.mcp_consent_body,
                         current.toolName,
                         current.serverName,
