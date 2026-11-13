@@ -135,8 +135,19 @@ internal class AndroidResumableFileDownloader(
                     }
                     if (knownTotal == null) knownTotal = reportedTotal
 
+                    // Refuse before writing when the device cannot hold the rest of the file.
+                    val startingBytes = if (append) requestedOffset else 0L
+                    knownTotal?.let { total ->
+                        val free = (partial.parentFile ?: output.parentFile)?.usableSpace ?: Long.MAX_VALUE
+                        if (!hasRoomFor(total - startingBytes, free)) {
+                            throw IOException("Not enough free storage to download ${output.name}")
+                        }
+                    }
+                    val byteLimit = downloadByteLimit(knownTotal)
+
                     // A 200 after a Range request means the origin ignored Range. Start clean rather
                     // than appending a second full copy of the asset.
+                    var written = startingBytes
                     FileOutputStream(partial, append).buffered().use { stream ->
                         val channel = response.bodyAsChannel()
                         val buffer = ByteArray(256 * 1024)
@@ -144,6 +155,11 @@ internal class AndroidResumableFileDownloader(
                             val count = channel.readAvailable(buffer, 0, buffer.size)
                             if (count < 0) break
                             if (count == 0) continue
+                            written += count
+                            // The declared size bounds the stream: a body that keeps going is cut off.
+                            if (written > byteLimit) {
+                                throw IOException("Oversized download for ${output.name}: more than $byteLimit bytes")
+                            }
                             stream.write(buffer, 0, count)
                         }
                     }
@@ -254,3 +270,15 @@ internal class AndroidResumableFileDownloader(
         val CONTENT_RANGE_REGEX = Regex("bytes\\s+(\\d+)-(\\d+)/(\\d+|\\*)")
     }
 }
+
+private const val SIZE_SLACK_BYTES = 64L * 1024L
+private const val UNKNOWN_SIZE_CAP_BYTES = 4L * 1024L * 1024L * 1024L
+private const val FREE_SPACE_RESERVE_BYTES = 16L * 1024L * 1024L
+
+/** The most bytes a download may hold: the declared size plus a little slack, or a fixed cap when none is declared. */
+internal fun downloadByteLimit(declaredTotal: Long?): Long =
+    if (declaredTotal != null) declaredTotal + SIZE_SLACK_BYTES else UNKNOWN_SIZE_CAP_BYTES
+
+/** Whether [freeBytes] holds [neededBytes] and still leaves a reserve for the device. */
+internal fun hasRoomFor(neededBytes: Long, freeBytes: Long): Boolean =
+    neededBytes <= 0L || freeBytes - FREE_SPACE_RESERVE_BYTES >= neededBytes
