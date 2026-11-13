@@ -4,7 +4,9 @@ The owner's model (authoritative, verbatim):
 
 > Agent is supposed to reason through the contradiction out loud and that resolution will be condensed into the memory layer like everything else. The memory layer is not a tool that can be called on with a command. Keyword clouds are posted to the agents thought process as they are triggered by the thought process itself, or by what the agent says in chat. The more that the agent lingers on thoughts involving those keywords and the key phrases and the summaries that the memory layer will be injecting into the chat log where the agent can see it, the more and more precise and complete injections will come from the memory layer. Because of compounding and how memories condense around commonalities, actual precision isn't possible, just like with human memories.
 
-Reduced to tests: (1) no commands; (2) passive and associative, triggered by the agent's own thinking and chat; (3) injects keyword clouds, key phrases and summaries into the chat log; (4) lingering makes injections more precise and complete (compounding); (5) memories condense around commonalities, so recall is gist-like, never exact; (6) contradictions are reasoned out loud and the resolution is condensed like everything else.
+Owner addition (intent, verbatim summary): `/remindme` is the one sanctioned agent command. It is a plant, not a recall: it submits the conversation up to that point with the agent's own note of what it wanted to remember, as a reminder seed. It returns nothing and looks nothing up; the layer condenses it like everything else, and it resurfaces through the normal associative injection, as a reminder, when similar surrounding conditions recur.
+
+Reduced to tests: (1) no retrieval commands (the only command plants a reminder); (2) passive and associative, triggered by the agent's own thinking and chat; (3) injects keyword clouds, key phrases and summaries into the chat log; (4) lingering makes injections more precise and complete (compounding); (5) memories condense around commonalities, so recall is gist-like, never exact; (6) contradictions are reasoned out loud and the resolution is condensed like everything else.
 
 Paths below are under `shared/src/commonMain/kotlin/com/hereliesaz/geministrator/memory/` unless stated. Nothing was compiled or run; this is a source read.
 
@@ -26,6 +28,7 @@ Paths below are under `shared/src/commonMain/kotlin/com/hereliesaz/geministrator
 | `MemoryDeliberationCommand` | CONTRADICTS | `MemoryDeliberationCommand.kt`, `respondToThought`, `MEMORY_PROTOCOL`, `divergenceLines` | A `/deliberate` command, taught in the protocol and templated under divergent hits (`⚖ to deliberate:`). The model has no commands. |
 | `MemoryDeliberationAbsorber` | PARTLY | `MemoryDeliberationAbsorber.kt` | The absorption fits: a resolution becomes the current version, losers become history, size fitted by `MemoryRewrite`. The input does not: it needs a structured `Deliberation` node with `chosen` and cited ids, which only the command creates. |
 | `RoleLessonBank` | PARTLY | `RoleLessonBank.kt`, `bankRoleLessons`, `roleLessons` | A passive per-role bank (fits) filled by keeper approval, not by experience, and injected unconditionally and verbatim every prompt rather than by association. Keeper-approved training is a separate deliberate path; it can stay, but delivery should follow the cue path. |
+| Prospective memory / reminder, salience boost, command parser for `/remindme` | CONTRADICTS (absence) | `MemoryBankRequest`, `MemoryConsolidation.enqueueBank`, `MemoryLayerController.respondToThought`, `MemorySalienceFeatures.kt` | None exists. The only command parser is `/deliberate` (`MemoryDeliberationCommand.parse`). The nearest thing, a deliberate in-session bank (`MemoryTool.bank`, `MemoryBankRequest`), is documented to gain queue priority only and to keep "no special reminder or retrieval semantics", the opposite of a reminder seed. Salience is a stored clerk score (`MemorySalienceFeatures`) with no input from an agent's intent. Reminder, seed flag, per-run caps and a labelled injection must all be added. |
 | Queen's memory | CONTRADICTS (absence) | `orchestration/OrchestrationRuntime.kt` `retrievedMemory` | Field exists, nothing fills it. Not a model conflict, but the queen does not benefit from the background. |
 
 ## Direct answers
@@ -34,6 +37,8 @@ Paths below are under `shared/src/commonMain/kotlin/com/hereliesaz/geministrator
 - **Strengthened by lingering?** Detected (doubling, echo) but not compounded per topic. Co-recall links exist but are in-process and slow. No.
 - **Gist-level rather than exact?** Condensed storage, exact rendering and value-preserving condensation. PARTLY.
 - **Resolution from out-loud reasoning rather than a command?** No. Only `/deliberate`.
+
+- **A command that plants a reminder?** Not present. Only `/deliberate` is parsed today.
 
 ## Three biggest gaps
 
@@ -53,6 +58,20 @@ Paths below are under `shared/src/commonMain/kotlin/com/hereliesaz/geministrator
 6. Feedback stays passive and quiet: no "deliberation recorded" message. If recall later shows the resolved memory it is just the condensed current version.
 7. Optional, later and gated by price/allowance: a model-backed reader behind the same interface for resolutions the keyword pass misses. Do not add a model call by default.
 8. Update `docs/Memory-layer.md` (the "Agents record deliberations" paragraph and the protocol text) and `MemoryHabitsSection`/`deliberateHabit` wording if it names the command.
+
+### A2. `/remindme` (a plant, never a recall)
+
+Retires nothing by itself; it replaces `/deliberate` as the only command. Order with A: add A2's parser as the new and only command parser when `MemoryDeliberationCommand` is deleted.
+
+1. **Parser.** New pure `MemoryRemindmeCommand.parse(text)` (test first), same shape as `MemoryDeliberationCommand.parse`: a line `/remindme <sentence>`; blank, over-long (cap, for example 280 characters) or malformed notes are dropped. Called from `respondToThought` on the agent's thinking/output, only for text that does not start with `MEMORY_MESSAGE_MARKER`.
+2. **What is stored.** One episode through the existing queue (`MemoryBankRequest`, `MemorySourceKind.AgentNote`, `label = "Reminder"`), whose text is the note plus the preceding context window: the last N characters of the agent's own captured session text (N about 4,000), taken from the `QueuedMemorySessionObserver` capture so no second copy is kept. Both pass through `ControlRedaction.scrub` exactly as banked sessions do. The marker lines of memory itself are excluded as for all banking.
+3. **Seed, not special storage.** Mark the node `metadata["reminder"]="true"` and give it a salience/reinforcement seed: a stored floor in `salienceFeatures` (a recorded term, auditable like the rest) and an initial `Recalled`-style weight (see B) so it is not outranked by ordinary memories. It is then condensed like any memory. Condensation and the size curve are unchanged; the note sentence is kept as a protected head so it survives condensation.
+4. **Cues.** The preceding context is the cue: the existing tagger and keyword table index it with the rest of the episode, so it resurfaces when similar conditions recur. No new index.
+5. **Caps.** At most 2 reminders per step and 8 per run (counters on `CueSession`, per-run in the workflow's bank); excess is dropped silently. Identical notes in a run are deduplicated. Memory off means the line is ignored.
+6. **Injection.** When a hit with `reminder=true` surfaces (cloud, summary or prompt block), render it as its own labelled line, `⟦memory⟧ reminder: <note>`, ahead of ordinary hits, and subject to the same dial and novelty rules, so a reminder cannot flood. It is still untrusted data (the note is the agent's own, but the context may have carried hostile text), so the `RECALL_UNTRUSTED_NOTE` framing stays.
+7. **No reply.** The parser sends nothing back (unlike `/deliberate`, which answers "deliberation recorded"). A silent plant keeps the model honest: it never returns anything.
+8. **Docs and tests.** Update `docs/Memory-layer.md` and the memory protocol text (replace the `/deliberate` sentence with the `/remindme` sentence); tests for the parser, caps, redaction of the stored context, the labelled injection and that nothing is returned.
+9. **Open:** whether a reminder should be allowed to fade after being surfaced several times (like resolved notes, `RESOLVED_NOTE_RECALLS`), or persist until the keeper forgets it.
 
 ### B. Reinforcement (lingering compounds)
 
