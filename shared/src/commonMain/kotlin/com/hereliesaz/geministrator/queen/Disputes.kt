@@ -87,9 +87,9 @@ enum class InvestigationKind { Research, Test }
 data class InvestigationRequest(val kind: InvestigationKind, val missingFact: String, val optionIds: List<String>)
 
 /**
- * Starts an investigation as a small swarm and returns the id of its run, or null when it cannot. TODO(queen-investigation-launcher):
- * nothing implements this yet. The existing research step only looks up tool leads before planning (it returns no findings
- * with sources), and no code generates a swarm from a request, so an agreed investigation is put to the keeper instead.
+ * Starts an agreed investigation and returns an id for it, or null when it cannot ([DisputeInvestigator] implements it: a
+ * research through the existing research step, a test as a small generated swarm whose id is its run's). Null puts the dispute
+ * to the keeper as "cannot investigate".
  */
 fun interface InvestigationLauncher {
     suspend fun launch(request: InvestigationRequest): String?
@@ -415,7 +415,7 @@ internal fun disputeNotes(
                     queenNoteId(runId, "dispute", disputeKey, voice.name),
                     voice,
                     listOf(first, second),
-                    link = investigationRunId?.let { QueenLink.Run(it) },
+                    link = investigationRunId?.takeIf { request.kind == InvestigationKind.Test }?.let { QueenLink.Run(it) },
                     quotes = listOf(QueenQuote(QueenQuoteLabel.StillMissing, queenQuoteText(request.missingFact, MAX_MISSING_CHARS))),
                 ),
             )
