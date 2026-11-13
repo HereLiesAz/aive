@@ -55,6 +55,13 @@ import org.jetbrains.compose.resources.stringResource
 internal val LocalReleaseCreature = staticCompositionLocalOf<((String) -> Unit)?> { null }
 
 /**
+ * The shell's own handle on whether the Flowchart view is showing (the durable "hive.view.flow" flag), so it
+ * can tell Live and Build, where a creature's phone sheet opens, from Flowchart, where a card's detail panel
+ * answers the tap. Null where nothing outside the terrarium needs to know: the view then keeps its own.
+ */
+internal val LocalHiveFlowchartView = staticCompositionLocalOf<androidx.compose.runtime.MutableState<Boolean>?> { null }
+
+/**
  * Production workflow view: the DAG is a living node-creature map rather than a diagram.
  *
  * Habitat movement is presentation-only and persisted independently; bodies never edit the
@@ -148,7 +155,7 @@ internal fun GeministratorWorkflowTerrarium(
     // Who shares a creature: ordered tasks of one role. Build and the Swarm view keep one creature per task.
     val roaming = remember(stagedDefinition, run) { projectRoaming(stagedDefinition, run) }
     val swarmView = rememberDurableBooleanState("hive.view.swarm")
-    val flowView = rememberDurableBooleanState("hive.view.flow")
+    val flowView = LocalHiveFlowchartView.current ?: rememberDurableBooleanState("hive.view.flow")
     var hiveMenu by remember { mutableStateOf(false) }
     var hiveDeleting by remember { mutableStateOf(false) }
     val animatedRelationships = remember(projection.relationships, run) {
@@ -349,19 +356,32 @@ internal fun GeministratorWorkflowTerrarium(
         }
         // The single Flowchart mode shows the staged hive and run states without editing either.
         val flowField: @Composable () -> Unit = {
-            WorkflowFlowchartView(
-                flow = remember(stagedDefinition, run, roles) {
-                    com.hereliesaz.geministrator.workflow.WorkflowFlowchart.of(
-                        stagedDefinition,
-                        run,
-                        roleName = { id -> roles.firstOrNull { it.id == id }?.name ?: id.value },
+            Column(Modifier.fillMaxSize()) {
+                WorkflowFlowchartView(
+                    flow = remember(stagedDefinition, run, roles) {
+                        com.hereliesaz.geministrator.workflow.WorkflowFlowchart.of(
+                            stagedDefinition,
+                            run,
+                            roleName = { id -> roles.firstOrNull { it.id == id }?.name ?: id.value },
+                        )
+                    },
+                    selectedTaskId = selectedTaskId,
+                    onTaskSelected = onTaskSelected,
+                    emptyText = stringResource(Res.string.flowchart_empty),
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                )
+                // The tapped card says what is active or what holds it, and links to where that is unblocked.
+                selectedTaskId?.let { taskId ->
+                    FlowchartCardDetailPanel(
+                        taskId = taskId,
+                        definition = stagedDefinition,
+                        run = run,
+                        roles = roles,
+                        onShowStep = onTaskSelected,
+                        modifier = Modifier.padding(8.dp),
                     )
-                },
-                selectedTaskId = selectedTaskId,
-                onTaskSelected = onTaskSelected,
-                emptyText = stringResource(Res.string.flowchart_empty),
-                modifier = Modifier.fillMaxSize(),
-            )
+                }
+            }
         }
         val field: @Composable () -> Unit = {
           // Programmatic steps, local or remote, wear the neuron: the swarm reads as a flowchart.

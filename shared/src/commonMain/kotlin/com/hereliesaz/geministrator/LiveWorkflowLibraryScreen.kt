@@ -455,7 +455,7 @@ internal fun LiveWorkflowLibraryScreen(
                             // Phase 1 of docs/Fishbowl-Builder.md: the bowl with no run. Dropping one
                             // creature on another edits the unsaved draft; Save persists it.
                             // The shell's release (LocalReleaseCreature) clears the Overview's selection, not this editor's.
-                            CompositionLocalProvider(LocalReleaseCreature provides null) {
+                            CompositionLocalProvider(LocalReleaseCreature provides null, LocalFlowchartLinks provides null, LocalHiveFlowchartView provides null) {
                             GeministratorWorkflowTerrarium(
                                 definition = currentDraft,
                                 liveRun = remember(currentDraft.id) { restingWorkflowRun(currentDraft) },

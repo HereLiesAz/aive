@@ -267,6 +267,9 @@ fun ControlRoom(
     val restingShown = restingHive.value.isNotBlank()
     // The hive's Timeline, held here so a creature's "Open its trace" can open it.
     val showTimeline = rememberDurableBooleanState("overview.timeline")
+    // Whether the hive is in Flowchart (not Live or Build): held here, shared with the terrarium, so the phone's
+    // creature sheet can stay out of it (a card's own detail panel answers the tap there).
+    val flowchartView = rememberDurableBooleanState("hive.view.flow")
     // A creature whose panel was set aside for its trace: still selected on the Timeline, its panel
     // closed. Selecting another creature (or none) forgets it; tapping it again reopens its panel.
     var panelSetAside by remember { mutableStateOf<String?>(null) }
@@ -329,22 +332,41 @@ fun ControlRoom(
         val run = liveWorkflow?.run ?: return@LaunchedEffect
         if (inspectorVisible && selectedTaskId != null) inboxReadLog.markRead(inboxItemKeys(run, selectedTaskId))
     }
+    // A creature's Needs, where a decision it waits on is made. Leaves Flowchart: its sheet is for Live and Build.
+    val openCreatureOn: (String, CreatureTab) -> Unit = { id, tab ->
+        district.value = false
+        flowchartView.value = false
+        if (selectedTaskId != id) onTaskSelected(id)
+        // The panel belongs to the live hive: a resting hive left open would hide it.
+        restingHive.value = ""
+        panelSetAside = null
+        creatureTabName = tab.name
+        creatureTabTask = id
+        onDestinationSelected(ControlRoomDestination.Overview)
+    }
     val openInbox = {
         val waiting = liveWorkflow?.takeUnless { it.run.globalPause != null || it.run.spendPause != null || isHallMonitorTrial(it) }
             ?.let { live -> firstCreatureNeedingYou(live, unseen = { key -> key !in inboxReadLog.read }) }
         if (waiting != null) {
-            district.value = false
-            if (selectedTaskId != waiting) onTaskSelected(waiting)
-            // The panel belongs to the live hive: a resting hive left open would hide it.
-            restingHive.value = ""
-            panelSetAside = null
-            creatureTabName = CreatureTab.Needs.name
-            creatureTabTask = waiting
-            onDestinationSelected(ControlRoomDestination.Overview)
+            openCreatureOn(waiting, CreatureTab.Needs)
         } else {
             onDestinationSelected(ControlRoomDestination.Inbox)
         }
     }
+    // Where the spend caps are: Limits on a wide window, This device on a phone.
+    val openLimits = { openSpendLimits(compact, keeperSectionName, keeperOpen, onDestinationSelected) }
+    val flowchartLinks = FlowchartLinks(
+        openInbox = { id -> if (id != null) openCreatureOn(id, CreatureTab.Needs) else openInbox() },
+        openLimits = openLimits,
+        openCompute = if (ControlRoomDestination.Compute in destinations) {
+            { onDestinationSelected(ControlRoomDestination.Compute) }
+        } else {
+            null
+        },
+        openConnections = openConnectionsFromPanel,
+        reconfigureProvider = onReconfigureProvider,
+        openCreature = { id, tab -> openCreatureOn(id, tab) },
+    )
     // Back zooms out of a hive to the district before it leaves the app; the panel and other places
     // handle Back themselves first.
     PlatformBackHandler(
@@ -457,7 +479,11 @@ fun ControlRoom(
         panelSetAside = null
         onTaskSelected(id)
     }
-    CompositionLocalProvider(LocalReleaseCreature provides releaseCreature) {
+    CompositionLocalProvider(
+        LocalReleaseCreature provides releaseCreature,
+        LocalHiveFlowchartView provides flowchartView,
+        LocalFlowchartLinks provides flowchartLinks,
+    ) {
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
@@ -602,7 +628,7 @@ fun ControlRoom(
         // The once-per-streak offer to stop asking for a non-mutating gate (workflow/ProgressiveDelegation.kt).
         delegations?.let { DelegationOfferDialog(it) }
 
-        if (inspectorVisible && compact) {
+        if (inspectorVisible && compact && creatureSheetAllowed(flowchart = flowchartView.value)) {
             selectedTaskId?.let { taskId ->
                 ModalBottomSheet(
                     onDismissRequest = { closePanel(taskId) },
@@ -622,6 +648,18 @@ fun ControlRoom(
         }
     }
     }
+}
+
+/** Opens the spend caps in the Keeper's room: Limits on a wide window, This device on a phone. */
+internal fun openSpendLimits(
+    compact: Boolean,
+    keeperSectionName: MutableState<String>,
+    keeperOpen: MutableState<Boolean>,
+    onDestinationSelected: (ControlRoomDestination) -> Unit,
+) {
+    keeperSectionName.value = (if (compact) KeeperSection.Device else KeeperSection.Limits).name
+    keeperOpen.value = true
+    onDestinationSelected(ControlRoomDestination.Settings)
 }
 
 /** A repository's source and short, credential-free name; local Git uses its folder name. */
@@ -1196,11 +1234,7 @@ private fun MainDestination(
                 )
                 ControlRoomDestination.Inbox -> LiveInboxScreen(
                     runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize(), onLiftSpendStop,
-                    onOpenLimits = {
-                        keeperSectionName.value = (if (compact) KeeperSection.Device else KeeperSection.Limits).name
-                        keeperOpen.value = true
-                        onDestinationSelected(ControlRoomDestination.Settings)
-                    },
+                    onOpenLimits = { openSpendLimits(compact, keeperSectionName, keeperOpen, onDestinationSelected) },
                 )
                 ControlRoomDestination.Stable -> Column(
                     Modifier.fillMaxSize().verticalScroll(rememberScrollState())
