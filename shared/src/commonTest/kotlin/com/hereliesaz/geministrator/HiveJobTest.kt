@@ -81,4 +81,10 @@ class HiveJobTest {
         assertEquals(3, edited.retryPolicy.maxAttempts)
         assertEquals(implement.executor, edited.executor)
     }
+
+    @Test
+    fun turningAPersonsApprovalOffAsksFirstAndTurningItOnDoesNot() {
+        kotlin.test.assertTrue(approvalChangeNeedsConfirm(asksPersonNow = true))
+        kotlin.test.assertFalse(approvalChangeNeedsConfirm(asksPersonNow = false))
+    }
 }

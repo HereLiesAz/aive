@@ -87,4 +87,9 @@
     <string name="semantics_move_node_right">Move right</string>
     <string name="semantics_move_node_up">Move up</string>
     <string name="semantics_move_node_down">Move down</string>
+    <string name="job_switch_on">On</string>
+    <string name="job_switch_off">Off</string>
+    <string name="job_approval_off_title">Stop asking you first?</string>
+    <string name="job_approval_off_body">This step will run without waiting for your OK. Nothing it does will be held for you to approve.</string>
+    <string name="job_approval_off_action">Turn off</string>
 </resources>

@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -57,6 +58,12 @@ import com.hereliesaz.geministrator.resources.job_retries_label
 import com.hereliesaz.geministrator.resources.job_retries_value
 import com.hereliesaz.geministrator.resources.job_runs_any
 import com.hereliesaz.geministrator.resources.job_runs_chosen
+import com.hereliesaz.geministrator.resources.confirm_cancel
+import com.hereliesaz.geministrator.resources.job_approval_off_action
+import com.hereliesaz.geministrator.resources.job_approval_off_body
+import com.hereliesaz.geministrator.resources.job_approval_off_title
+import com.hereliesaz.geministrator.resources.job_switch_off
+import com.hereliesaz.geministrator.resources.job_switch_on
 import com.hereliesaz.geministrator.resources.job_runs_here
 import com.hereliesaz.geministrator.resources.job_runs_on
 import com.hereliesaz.geministrator.resources.job_then_ask
@@ -156,22 +163,51 @@ internal fun HiveJobEditor(
                 )
             }
         }
-        JobValueRow(
-            label = stringResource(Res.string.job_approval),
-            value = stringResource(
-                when (task.approvalPolicy) {
-                    ApprovalPolicy.HumanApproval -> Res.string.job_approval_person
-                    is ApprovalPolicy.RoleApproval -> Res.string.job_approval_role
-                    ApprovalPolicy.None -> Res.string.job_approval_none
+        // Approval is a switch: the safety setting of the step, so it says it is on or off and asks before going off.
+        var confirmingApprovalOff by remember(task.id) { mutableStateOf(false) }
+        if (confirmingApprovalOff) {
+            AzphaltAlertDialog(
+                title = stringResource(Res.string.job_approval_off_title),
+                text = stringResource(Res.string.job_approval_off_body),
+                confirmLabel = stringResource(Res.string.job_approval_off_action),
+                onConfirm = {
+                    confirmingApprovalOff = false
+                    onEdit?.invoke(setTerrariumJob(definition, task.id, humanApproval = false))
                 },
-            ),
-            onClick = onEdit?.let { edit -> { edit(setTerrariumJob(definition, task.id, humanApproval = !asksPerson)) } },
+                onDismissRequest = { confirmingApprovalOff = false },
+                dismissLabel = stringResource(Res.string.confirm_cancel),
+            )
+        }
+        val approvalValue = stringResource(
+            when (task.approvalPolicy) {
+                ApprovalPolicy.HumanApproval -> Res.string.job_approval_person
+                is ApprovalPolicy.RoleApproval -> Res.string.job_approval_role
+                ApprovalPolicy.None -> Res.string.job_approval_none
+            },
         )
+        JobControlRow(label = stringResource(Res.string.job_approval)) {
+            AzphaltPill(
+                label = approvalValue,
+                seed = "job-approval-${task.id.value}",
+                selected = asksPerson,
+                endCap = stringResource(if (asksPerson) Res.string.job_switch_on else Res.string.job_switch_off),
+                role = Role.Switch,
+                enabled = onEdit != null,
+                onClick = {
+                    if (approvalChangeNeedsConfirm(asksPerson)) {
+                        confirmingApprovalOff = true
+                    } else {
+                        onEdit?.invoke(setTerrariumJob(definition, task.id, humanApproval = true))
+                    }
+                },
+            )
+        }
+        val tries = task.retryPolicy.maxAttempts
         JobValueRow(
             label = stringResource(Res.string.job_retries_label),
             value = stringResource(
                 Res.string.job_retries_value,
-                pluralStringResource(Res.plurals.job_tries, task.retryPolicy.maxAttempts, task.retryPolicy.maxAttempts),
+                pluralStringResource(Res.plurals.job_tries, tries, tries),
                 stringResource(
                     when (task.escalationPolicy) {
                         EscalationPolicy.FailWorkflow -> Res.string.job_then_stop
@@ -180,13 +216,24 @@ internal fun HiveJobEditor(
                     },
                 ),
             ),
-            // Tapping steps through 1..5 tries.
-            onClick = onEdit?.let { edit ->
-                { edit(setTerrariumJob(definition, task.id, maxAttempts = task.retryPolicy.maxAttempts % 5 + 1)) }
-            },
+            onClick = null,
         )
+        if (onEdit != null) {
+            // Choosing the number of tries: one pill each, the current one filled.
+            Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                JOB_TRY_CHOICES.forEach { choice ->
+                    AzphaltPill(
+                        label = choice.toString(),
+                        seed = "job-tries-${task.id.value}-$choice",
+                        selected = choice == tries,
+                        role = Role.RadioButton,
+                        description = pluralStringResource(Res.plurals.job_tries, choice, choice),
+                        onClick = { if (choice != tries) onEdit(setTerrariumJob(definition, task.id, maxAttempts = choice)) },
+                    )
+                }
+            }
+        }
         val runsOn = task.computeDelegationTarget()
-        val nextRunsOn = nextRunsOn(runsOn, remoteAvailable).takeIf { task.isComputeDelegatable() }
         JobValueRow(
             label = stringResource(Res.string.job_runs_on),
             value = stringResource(
@@ -196,12 +243,42 @@ internal fun HiveJobEditor(
                     is ComputeDelegationTarget.Node -> Res.string.job_runs_chosen
                 },
             ),
-            onClick = if (onEdit != null && nextRunsOn != null) {
-                { onEdit(setTerrariumJob(definition, task.id, runsOn = nextRunsOn)) }
-            } else {
-                null
-            },
+            onClick = null,
         )
+        // Where it runs, as two choices; offered only when there is somewhere else to go (or back from).
+        if (onEdit != null && task.isComputeDelegatable() && (remoteAvailable || runsOn != ComputeDelegationTarget.Local)) {
+            Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AzphaltPill(
+                    label = stringResource(Res.string.job_runs_here),
+                    seed = "job-runs-local-${task.id.value}",
+                    selected = runsOn == ComputeDelegationTarget.Local,
+                    role = Role.RadioButton,
+                    onClick = { if (runsOn != ComputeDelegationTarget.Local) onEdit(setTerrariumJob(definition, task.id, runsOn = ComputeDelegationTarget.Local)) },
+                )
+                AzphaltPill(
+                    label = stringResource(Res.string.job_runs_any),
+                    seed = "job-runs-any-${task.id.value}",
+                    selected = runsOn == ComputeDelegationTarget.AnyRemote,
+                    role = Role.RadioButton,
+                    enabled = remoteAvailable,
+                    onClick = { if (runsOn != ComputeDelegationTarget.AnyRemote) onEdit(setTerrariumJob(definition, task.id, runsOn = ComputeDelegationTarget.AnyRemote)) },
+                )
+            }
+        }
+    }
+}
+
+/** Turning a person's approval off removes the safety check on a step, so it asks first; turning it on does not. */
+internal fun approvalChangeNeedsConfirm(asksPersonNow: Boolean): Boolean = asksPersonNow
+
+private val JOB_TRY_CHOICES = 1..5
+
+/** A label on the left and its control on the right. */
+@Composable
+private fun JobControlRow(label: String, control: @Composable () -> Unit) {
+    JobRow {
+        Text(label, style = AzphaltType.body, color = azphaltMutedOnSurface(), modifier = Modifier.weight(1f))
+        control()
     }
 }
 
