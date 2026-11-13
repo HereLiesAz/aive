@@ -70,17 +70,6 @@ suspend fun ApplicationRuntime.decideFailureEscalation(
     approved: Boolean,
     note: String? = null,
 ) {
-    parseHallMonitorReviewActionId(taskDefinitionId.value)?.let { step ->
-        applyHallMonitorReviewStep(step, approved)
-        return
-    }
-    parseHallMonitorTrialActionId(taskDefinitionId.value)?.let {
-        error(
-            "Nanny solution testing requires the orchestration model runtime on this platform. " +
-                "The paused workflow and recommendation were not changed.",
-        )
-    }
-
     withActiveRun { run ->
         val taskRun = requireNotNull(run.taskRuns[taskDefinitionId]) {
             "Task ${taskDefinitionId.value} has no runtime state"

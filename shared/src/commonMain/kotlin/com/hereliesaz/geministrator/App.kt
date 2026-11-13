@@ -173,6 +173,7 @@ fun App(
     val workflowPersistence = remember(persistence) { persistence ?: com.hereliesaz.geministrator.persistence.WorkflowPersistenceFactory.durable }
     // The keeper's spend caps (Keeper's room, This device), read by the runtime every cycle.
     val spendCapStore = remember { SpendCapStore(com.russhwolf.settings.Settings()) }
+    val queenLevelStore = remember { QueenLevelStore(com.russhwolf.settings.Settings()) }
     // A reviewed plan waiting for the keeper, kept across a restart; outside workflow persistence and every export.
     val planStore = remember { com.hereliesaz.geministrator.orchestration.ReviewedPlanStore(com.russhwolf.settings.Settings()) }
     // The keeper's approval habits, on this device only (workflow/ProgressiveDelegation.kt).
@@ -215,6 +216,7 @@ fun App(
                     listOf(com.hereliesaz.geministrator.retrieval.ArtifactChunkSource) + contextChunkSources,
                 ),
                 spendCaps = { spendCapStore.caps },
+                queenLevel = { queenLevelStore.level },
                 traceExport = com.hereliesaz.geministrator.telemetry.WorkflowTraceExport.durable,
                 delegations = delegations,
                 // The runtime's cycle and its saves are not UI work.
@@ -846,6 +848,35 @@ fun App(
                                             },
                                         )
                                     }
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    actionFailure = actionFailureOf(getString(Res.string.app_escalation_decision_failed), failure)
+                                }
+                            }
+                        },
+                        onNannyReview = { step, approved ->
+                            scope.launch {
+                                try {
+                                    val activeRuntime = runtime ?: error("Runtime is unavailable")
+                                    activeRuntime.applyHallMonitorReviewStep(step, approved)
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    actionFailure = actionFailureOf(getString(Res.string.app_escalation_decision_failed), failure)
+                                }
+                            }
+                        },
+                        onNannyTestSolution = { findingId, solutionIndex ->
+                            scope.launch {
+                                try {
+                                    val activeRuntime = runtime ?: error("Runtime is unavailable")
+                                    val planner = orchestrationRuntime
+                                        ?: error(
+                                            "Nanny solution testing requires the orchestration model runtime on this platform. " +
+                                                "The paused workflow and recommendation were not changed.",
+                                        )
+                                    activeRuntime.testHallMonitorSolution(findingId, solutionIndex, planner)
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {

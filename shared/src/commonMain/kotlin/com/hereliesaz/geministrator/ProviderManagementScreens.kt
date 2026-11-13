@@ -733,6 +733,7 @@ internal fun ProviderSettingsScreen(
       // Limits (wide): the spend caps. A phone has no Limits part and keeps them in This device.
       if (section == KeeperSection.Limits || (section == KeeperSection.Device && compact)) {
         SpendCapsSettings()
+        QueenLevelSettings()
       }
 
       if (section == KeeperSection.About) {

@@ -66,17 +66,25 @@ private val inboxReadRevision = mutableIntStateOf(0)
 internal fun inboxItemKeys(run: WorkflowRun): List<String> {
     val pause = run.globalPause
     if (pause != null) {
-        return listOf(inboxKey("pause", run.id.value, pause.reportArtifactId.value))
+        return listOf(pauseInboxKey(run, pause))
     }
     val spendStop = run.spendPause
     if (spendStop != null) {
-        return listOf(inboxKey("spend-stop", run.id.value, spendStop.pausedAtEpochMillis.toString()))
+        return listOf(spendStopInboxKey(run, spendStop))
     }
     return run.taskRuns.values
         .filter(::creatureNeedsYou)
         .sortedBy { it.taskDefinitionId.value }
         .map { inboxKey(run, it) }
 }
+
+/** The Messages key of the run's Nanny freeze. One definition, shared by the badge and the Messages rows. */
+internal fun pauseInboxKey(run: WorkflowRun, pause: com.hereliesaz.geministrator.domain.WorkflowGlobalPause): String =
+    inboxKey("pause", run.id.value, pause.reportArtifactId.value)
+
+/** The Messages key of the run's spend cap stop. One definition, shared by the badge and the Messages rows. */
+internal fun spendStopInboxKey(run: WorkflowRun, stop: com.hereliesaz.geministrator.domain.WorkflowSpendPause): String =
+    inboxKey("spend-stop", run.id.value, stop.pausedAtEpochMillis.toString())
 
 /** The Inbox items one creature, [taskId], stands for: its wait on the keeper, if it is waiting. */
 internal fun inboxItemKeys(run: WorkflowRun, taskId: String): List<String> =

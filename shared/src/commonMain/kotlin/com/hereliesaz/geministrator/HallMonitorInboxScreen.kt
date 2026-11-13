@@ -17,7 +17,7 @@ import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.hall_monitor_resume_workflow
 import com.hereliesaz.geministrator.resources.hall_monitor_approve_recommendations
-import com.hereliesaz.geministrator.resources.hall_monitor_your_review
+import com.hereliesaz.geministrator.resources.queen_review_line
 import com.hereliesaz.geministrator.resources.common_approve
 import com.hereliesaz.geministrator.resources.common_inbox
 import com.hereliesaz.geministrator.resources.common_reject
@@ -48,12 +48,15 @@ internal fun isHallMonitorTrial(presentation: LiveWorkflowPresentation): Boolean
         it.startsWith(HALL_MONITOR_TRIAL_DESCRIPTION_PREFIX) || it.startsWith(LEGACY_HALL_MONITOR_TRIAL_DESCRIPTION_PREFIX)
     } == true
 
+/** The detail of Messages' freeze row: the Nanny's report, its solutions, and the keeper's review. */
 @Composable
-internal fun HallMonitorPauseInboxScreen(
+internal fun HallMonitorPauseDetail(
     presentation: LiveWorkflowPresentation,
     onTestSolution: (String, Int) -> Unit,
     modifier: Modifier = Modifier,
     onReview: (HallMonitorReviewStep, Boolean) -> Unit = { _, _ -> },
+    /** The queen's words on this freeze: what froze, her take, the practice runs. */
+    says: @Composable () -> Unit = {},
 ) {
     val pause = requireNotNull(presentation.run.globalPause)
     val reportArtifact = presentation.run.taskRuns.values
@@ -63,25 +66,18 @@ internal fun HallMonitorPauseInboxScreen(
     val reportResult = runCatching { decodeHallMonitorReportPayload(reportArtifact?.textContent.orEmpty()) }
     val report = reportResult.getOrNull()
 
-    Column(
-        modifier = modifier
-            .fillMaxHeight()
-            .verticalScroll(rememberScrollState())
-            .padding(26.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text(stringResource(Res.string.common_inbox), style = AzphaltType.hero, color = azphaltOnSurface())
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         AzphaltRecord(
             seed = "hall-monitor-global-pause",
             eyebrow = stringResource(Res.string.hall_monitor_global_pause),
             title = report?.title ?: stringResource(Res.string.hall_monitor_hall_monitor_review),
-            body = buildString {
-                append(pause.reason)
-                append(stringResource(Res.string.hall_monitor_the_original_run_remains_frozen_while))
-            },
+            body = stringResource(Res.string.hall_monitor_the_original_run_remains_frozen_while).trim(),
             endCap = stringResource(Res.string.hall_monitor_paused),
             well = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    says()
+                    // The reason is a technical line (it names the report by an id the Nanny chose), not a sentence.
+                    ErrorDetailsToggle(raw = pause.reason, seed = "hall-monitor-reason")
                     if (report == null) {
                         Text(
                             reportResult.exceptionOrNull()?.message
@@ -92,7 +88,7 @@ internal fun HallMonitorPauseInboxScreen(
                     } else {
                         report.findings.forEach { finding ->
                             Text(
-                                "${finding.scope.name.uppercase()} · ${finding.subject}",
+                                "${plainScope(finding.scope)} · ${finding.subject}".uppercase(),
                                 style = AzphaltType.eyebrow,
                                 color = azphaltOnSurface(),
                             )
@@ -109,7 +105,7 @@ internal fun HallMonitorPauseInboxScreen(
                                         color = azphaltOnSurface(),
                                     )
                                     Text(
-                                        "${solution.action.name.uppercase()} · ${solution.target}",
+                                        "${plainAction(solution.action)} · ${solution.target}".uppercase(),
                                         style = AzphaltType.eyebrow,
                                         color = azphaltOnSurface(),
                                     )
@@ -137,7 +133,7 @@ internal fun HallMonitorPauseInboxScreen(
                     }
 
                     Text(
-                        stringResource(Res.string.hall_monitor_your_review),
+                        stringResource(Res.string.queen_review_line),
                         style = AzphaltType.body,
                         color = azphaltOnSurface(),
                     )
@@ -165,7 +161,7 @@ internal fun HallMonitorPauseInboxScreen(
                             AzphaltNote(
                                 seed = "hall-monitor-trial-${trial.id}",
                                 label = trial.solutionTitle,
-                                value = "${trial.action.name} · ${trial.workflowRunId.value}",
+                                value = "${plainAction(trial.action)} · ${trial.workflowRunId.value}",
                             )
                         }
                     }
@@ -175,25 +171,21 @@ internal fun HallMonitorPauseInboxScreen(
     }
 }
 
+/**
+ * The detail of Messages' practice-run row: how far the isolated run of one of the Nanny's solutions
+ * has got, creature by creature. It decides nothing: a creature of it that waits on the keeper is a
+ * row of its own, with its own buttons.
+ */
 @Composable
-internal fun HallMonitorTrialInboxScreen(
+internal fun HallMonitorTrialDetail(
     presentation: LiveWorkflowPresentation,
-    onApproveTask: (String) -> Unit,
-    onRejectPlan: (String) -> Unit,
-    onResolveEscalation: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val taskRuns = presentation.run.taskRuns.values
     val completed = taskRuns.count { it.status == TaskRunStatus.Completed }
     val artifacts = taskRuns.flatMap { it.artifacts }
 
-    Column(
-        modifier = modifier
-            .fillMaxHeight()
-            .verticalScroll(rememberScrollState())
-            .padding(26.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(stringResource(Res.string.hall_monitor_test_solution), style = AzphaltType.hero, color = azphaltOnSurface())
         AzphaltRecord(
             seed = presentation.run.id.value,
@@ -219,9 +211,7 @@ internal fun HallMonitorTrialInboxScreen(
                             title = task?.name ?: taskRun.taskDefinitionId.value,
                             body = taskRun.progressMessage ?: task?.objective.orEmpty(),
                             endCap = taskRun.progress?.let { "${(it * 100).toInt()}%" },
-                            well = if (taskRun.artifacts.isEmpty() &&
-                                taskRun.status !in setOf(TaskRunStatus.AwaitingApproval, TaskRunStatus.Escalated)
-                            ) {
+                            well = if (taskRun.artifacts.isEmpty()) {
                                 null
                             } else {
                                 {
@@ -234,28 +224,6 @@ internal fun HallMonitorTrialInboxScreen(
                                                     ?: artifact.uri
                                                     ?: "stored",
                                             )
-                                        }
-                                        if (taskRun.status == TaskRunStatus.AwaitingApproval) {
-                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                AzphaltPill(stringResource(Res.string.common_approve), "trial-approve-${taskRun.id.value}", onClick = {
-                                                    onApproveTask(taskRun.taskDefinitionId.value)
-                                                })
-                                                if (taskRun.assignedProviderId != null) {
-                                                    AzphaltPill(stringResource(Res.string.common_reject), "trial-reject-${taskRun.id.value}", onClick = {
-                                                        onRejectPlan(taskRun.taskDefinitionId.value)
-                                                    })
-                                                }
-                                            }
-                                        }
-                                        if (taskRun.status == TaskRunStatus.Escalated) {
-                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                AzphaltPill(stringResource(Res.string.common_retry), "trial-retry-${taskRun.id.value}", onClick = {
-                                                    onResolveEscalation(taskRun.taskDefinitionId.value, true)
-                                                })
-                                                AzphaltPill(stringResource(Res.string.hall_monitor_stop), "trial-stop-${taskRun.id.value}", onClick = {
-                                                    onResolveEscalation(taskRun.taskDefinitionId.value, false)
-                                                })
-                                            }
                                         }
                                     }
                                 }

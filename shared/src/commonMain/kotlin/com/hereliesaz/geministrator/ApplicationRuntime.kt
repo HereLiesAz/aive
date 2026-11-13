@@ -139,7 +139,19 @@ class ApplicationRuntime private constructor(
     private val nestedWorkflows: WorkflowRunNestedWorkflowClient? = null,
     /** The keeper's approval habits and delegations; null turns progressive delegation off. */
     val delegations: ProgressiveDelegationStore? = null,
+    /** How much the queen tells the keeper in Messages; read at each publish, so a change applies at the next cycle. */
+    private val queenLevel: () -> com.hereliesaz.geministrator.queen.QueenLevel = { com.hereliesaz.geministrator.queen.QueenLevel.Quiet },
 ) {
+    private data class QueenReview(
+        val runId: String,
+        val reportId: String,
+        val loadedAtEpochMillis: Long,
+        val state: HallMonitorPauseReviewState?,
+    )
+
+    /** The freeze review the queen last read; refreshed by the cycle while frozen, so publishing stays pure. */
+    private var queenReview: QueenReview? = null
+
     private data class Current(
         val project: Project,
         val definition: WorkflowDefinition,
@@ -877,6 +889,42 @@ class ApplicationRuntime private constructor(
         }
     }
 
+    /**
+     * The queen's tick, in the same cycle: while a run is frozen, re-read its review (the Orchestrator's
+     * verdict and the practice runs live in persistence) at most every two seconds. Everything else she
+     * says is computed from the run when it is published. Never awaits a model; a failure is swallowed.
+     */
+    private suspend fun queenTickLocked(run: WorkflowRun) {
+        val pause = run.globalPause
+        if (pause == null) {
+            queenReview = null
+            return
+        }
+        val now = nowEpochMillis()
+        val cached = queenReview
+        if (cached != null && cached.runId == run.id.value && cached.reportId == pause.reportArtifactId.value &&
+            now - cached.loadedAtEpochMillis < QUEEN_REVIEW_REFRESH_MILLIS
+        ) return
+        try {
+            val loaded = loadHallMonitorPauseReviewState(run)
+            queenReview = QueenReview(run.id.value, pause.reportArtifactId.value, now, loaded)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            queenReview = QueenReview(run.id.value, pause.reportArtifactId.value, now, null)
+        }
+    }
+
+    private fun queenNotesFor(definition: WorkflowDefinition, run: WorkflowRun): List<com.hereliesaz.geministrator.queen.QueenNote> =
+        try {
+            val review = queenReview?.takeIf { it.runId == run.id.value }?.state
+            com.hereliesaz.geministrator.queen.queenUpdate(definition, run, roles, queenLevel(), review)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            emptyList()
+        }
+
     private fun startCycling() {
         if (cycleJob?.isActive == true) return
         cycleJob = runtimeScope.launch {
@@ -900,6 +948,7 @@ class ApplicationRuntime private constructor(
                         )
                         if (currentGeneration != snapshotGeneration || current !== snapshot) return@withLock
                         val governed = governHallMonitorLocked(snapshot.project, nextState)
+                        queenTickLocked(governed.run)
                         replaceCurrent(snapshot.copy(state = governed))
                         publishCurrent()
                         approveDelegatedGatesLocked()
@@ -937,6 +986,7 @@ class ApplicationRuntime private constructor(
                         definition = viewing.definition,
                         run = viewing.run,
                         roles = roles,
+                        queen = queenNotesFor(viewing.definition, viewing.run),
                     ),
                 ),
             )
@@ -950,6 +1000,7 @@ class ApplicationRuntime private constructor(
                     definition = snapshot.definition,
                     run = snapshot.state.run,
                     roles = roles,
+                    queen = queenNotesFor(snapshot.definition, snapshot.state.run),
                 ),
             ),
         )
@@ -1230,6 +1281,7 @@ class ApplicationRuntime private constructor(
 
     companion object {
         private const val CYCLE_INTERVAL_MILLIS = 1_000L
+        private const val QUEEN_REVIEW_REFRESH_MILLIS = 2_000L
         private const val RETRY_BACKOFF_MILLIS = 2_000L
         private const val MAX_BACKOFF_MULTIPLIER = 15
         private const val TRANSIENT_FAILURE_LIMIT = 3
@@ -1272,6 +1324,8 @@ class ApplicationRuntime private constructor(
                 ),
             /** The keeper's spend caps (Keeper's room, This device); none unless provided. */
             spendCaps: () -> SpendCaps = { SpendCaps() },
+            /** How much the queen tells the keeper in Messages (Keeper's room, This device); Quiet unless provided. */
+            queenLevel: () -> com.hereliesaz.geministrator.queen.QueenLevel = { com.hereliesaz.geministrator.queen.QueenLevel.Quiet },
             /** Opt-in OTLP trace export of finished runs (docs/architecture/OBSERVABILITY.md); null exports nothing. */
             traceExport: com.hereliesaz.geministrator.telemetry.WorkflowTraceExport? = null,
             /** The keeper's approval habits (workflow/ProgressiveDelegation.kt); null leaves every gate asking. */
@@ -1349,6 +1403,7 @@ class ApplicationRuntime private constructor(
                     roles,
                     nestedWorkflows,
                     delegations,
+                    queenLevel,
                 )
             }
 
