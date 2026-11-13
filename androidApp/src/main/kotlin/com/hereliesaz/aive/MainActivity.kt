@@ -74,6 +74,7 @@ import com.hereliesaz.geministrator.providers.llm.OpenAiResponsesApi
 import com.hereliesaz.geministrator.providers.llm.TextGenerationApi
 import com.hereliesaz.geministrator.providers.llm.TextGenerationOrchestrationAgentRuntime
 import com.hereliesaz.geministrator.providers.llm.configuredPlanReviewer
+import com.hereliesaz.geministrator.providers.llm.configuredQueenModel
 import com.hereliesaz.geministrator.providers.llm.configuredPlanningRuntime
 import com.hereliesaz.geministrator.providers.llm.memoryTextApi
 import com.hereliesaz.geministrator.providers.llm.TextLlmProvider
@@ -363,6 +364,8 @@ class MainActivity : ComponentActivity() {
                 }
                 // The plan is read by a reviewer before a run exists; the keeper then has the final say.
                 val planReviewer = remember(credentials) { configuredPlanReviewer(credentials) }
+                // The queen's own model for disputes (and the Nanny's and Antagonist's voices): the Source pinned on her role, else automatic.
+                val queenModelFor = remember(credentials) { { pin: String? -> configuredQueenModel(credentials, pin) } }
                 val roleSurfaceRuntime = remember {
                     RoleSurfaceRuntimeRegistry(
                         listOf(AndroidRoleSurfaceIntegration(this, repositoryHttpClient)),
@@ -547,6 +550,7 @@ class MainActivity : ComponentActivity() {
                         roleSurfaceRuntime = roleSurfaceRuntime,
                         orchestrationRuntime = planningRuntime,
                         planReviewer = planReviewer,
+                        queenModelFor = queenModelFor,
                         persistence = azphaltHost.persistence,
                         projectFileService = projectFileService,
                         azphaltStoreService = azphaltHost.service,

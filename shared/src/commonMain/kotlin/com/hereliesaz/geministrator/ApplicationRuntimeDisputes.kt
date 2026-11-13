@@ -48,6 +48,8 @@ internal suspend fun ApplicationRuntime.raiseDispute(
     /** The findings a research left under the id [launcher] returned; they become listed facts for one more ruling. */
     findingsOf: (String) -> List<String> = { emptyList() },
     mayCall: () -> Boolean = { true },
+    /** Reads a started test swarm's results back as listed facts (see [readBackTestReport]); null when they cannot be read. */
+    testFacts: (suspend (String) -> List<String>?)? = null,
 ): DisputeResolution {
     var resolution = settleWithAgreement(dispute, parties, queenModel, voices, allowInvestigation = !investigated, mayCall = mayCall)
     var investigationRunId: String? = null
@@ -72,7 +74,34 @@ internal suspend fun ApplicationRuntime.raiseDispute(
         resolution = settleWithAgreement(dispute.withFindings(found), parties, queenModel, voices, allowInvestigation = false, mayCall = mayCall)
         rememberDisputeNotes(runId, disputeNotes(runId, dispute.question, parties, resolution, null))
     }
+    val testRun = investigationRunId
+    if (request?.kind == InvestigationKind.Test && testRun != null && testFacts != null && resolution is DisputeResolution.Agreed) {
+        val read = testFacts(testRun).orEmpty()
+        if (read.isNotEmpty()) {
+            // One more agreed ruling on what the test found; she may not commission another investigation.
+            resolution = settleWithAgreement(dispute.withFindings(read), parties, queenModel, voices, allowInvestigation = false, mayCall = mayCall)
+            rememberDisputeNotes(runId, disputeNotes(runId, dispute.question, parties, resolution, null))
+        }
+    }
     return resolution
+}
+
+/** How long a finished test report is waited for, and how often it is looked for. The keeper's own waiting is not counted against any creature. */
+private const val TEST_READ_BACK_POLLS = 120
+private const val TEST_READ_BACK_POLL_MILLIS = 5_000L
+
+/**
+ * The results of the test swarm [testRunId] as listed facts, once its Reviewer report is complete ([testReportFacts]); empty when the
+ * run ended without one, null when it is still not complete after about ten minutes (the keeper still has the run to open). The
+ * test run is cycled when the keeper opens it; this only reads it.
+ */
+internal suspend fun ApplicationRuntime.readBackTestReport(testRunId: String): List<String>? {
+    repeat(TEST_READ_BACK_POLLS) {
+        val run = persistence.runs.get(WorkflowRunId(testRunId)) ?: return null
+        com.hereliesaz.geministrator.queen.testReportFacts(run)?.let { return it }
+        kotlinx.coroutines.delay(TEST_READ_BACK_POLL_MILLIS)
+    }
+    return null
 }
 
 /**
