@@ -127,6 +127,8 @@ Feed it is gated on what the connected agents can reach (`ProviderReach`, `FeedG
 
 Pressing a gated Feed it shows the gate's message and starts nothing. A launch that fails stays beside Feed it, the objective still typed, until the next edit or launch.
 
+**The tour.** The first goal is seeded with "Teach me how to use the Aive". Feeding it (or any goal that asks to be taught the app) starts the hive as usual and a hint layer over the real controls: one small step at a time, each ringing one real control, written by the queen's Planner and a writer with a Reviewer and the Antagonist checking the plan. Nothing is prewritten, so two keepers get different tours; it needs a working Source and says nothing when there is none. Check-ins ("Are you with me so far?") are never graded; they only pace the next steps. Escape, the Back gesture or Stop hides the layer and the hive carries on.
+
 ## Budgets and spend caps
 
 Three circuit breakers stop spending; none guesses at what a source has not reported (`SpendCircuitBreakers.kt`). A role's token budget does set aside what its running tasks are expected to spend (their input) so that tasks of one role do not all start together; it counts the tokens reported once they land.
