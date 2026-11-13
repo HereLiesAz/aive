@@ -141,4 +141,13 @@
     <string name="memory_retention_keep_all">keep all</string>
     <string name="memory_retention_50m">50 M characters</string>
     <string name="memory_retention_90d">90 days</string>
+    <string name="prompt_starter_goal">Look through %1$s and fix the most important problem you find</string>
+    <string name="prompt_starter_swarm">Plan, build and review changes to %1$s</string>
+    <string name="prompt_retry_with">Retry with: %1$s</string>
+    <string name="prompt_remember_title">Remembered text</string>
+    <string name="prompt_remember_intro">Fields for a goal, a repository, a hive name or a message start with what you typed there before, or a starting suggestion made on this device. Up to 12 recent entries per kind are kept here, are never sent anywhere and are not in setup files. Fields for keys, tokens, pairing codes and the setup passphrase are never filled in or remembered.</string>
+    <string name="prompt_remember_on">Remembering text: on</string>
+    <string name="prompt_remember_off">Remembering text: off</string>
+    <string name="prompt_remember_clear">Clear remembered text</string>
+    <string name="prompt_remember_cleared">Remembered text cleared.</string>
 </resources>
