@@ -348,9 +348,11 @@ class WorkflowRuntimeCoordinator(
                 continue
             }
             val previousStatus = state.run.taskRuns[taskId]?.status
-            val retryReason = when (previousStatus) {
-                TaskRunStatus.Verifying -> RetryReason.VerificationFailed
-                TaskRunStatus.Planning -> RetryReason.PlanRejected
+            val outputRejected = nextRun.taskRuns[taskId]?.blockingReason?.takeIf { it.code == TASK_OUTPUT_REJECTED }
+            val retryReason = when {
+                outputRejected != null -> RetryReason.VerificationFailed
+                previousStatus == TaskRunStatus.Verifying -> RetryReason.VerificationFailed
+                previousStatus == TaskRunStatus.Planning -> RetryReason.PlanRejected
                 else -> RetryReason.ProviderFailure
             }
             // The executor's last status line; for provider sessions this is the provider's failure reason.
@@ -358,6 +360,8 @@ class WorkflowRuntimeCoordinator(
                 ?.takeIf { it.isNotBlank() }
                 ?.let { "Executor failed. Last status: $it" }
                 ?: "Executor failed"
+            // A turned-back output says what to fix, not that the executor failed.
+            outputRejected?.let { failureReason = it.message }
             // A provider's own failure (credit, key, rate limit, offline, 5xx) mid-task restarts the
             // task on another provider when the keeper left the choice to the app; a pinned
             // creature, or one with nothing left to switch to, fails with a message naming who and what to do.

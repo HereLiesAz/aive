@@ -33,6 +33,8 @@ import com.hereliesaz.geministrator.events.RetryScheduled
 import com.hereliesaz.geministrator.events.TaskCompleted
 import com.hereliesaz.geministrator.events.TaskEscalated
 import com.hereliesaz.geministrator.events.TaskFailed
+import com.hereliesaz.geministrator.events.VerificationFailed
+import com.hereliesaz.geministrator.domain.VerificationPolicy
 import com.hereliesaz.geministrator.events.TaskStarted
 import com.hereliesaz.geministrator.events.TaskCancelled
 import com.hereliesaz.geministrator.events.WorkflowCancelled
@@ -71,6 +73,8 @@ class WorkflowEngine(
     private val orchestrationUtilities: LocalOrchestrationUtilityFamily =
         DeterministicLocalOrchestrationUtilities,
     private val surfaceRuntime: RoleSurfaceRuntimeRegistry = RoleSurfaceRuntimeRegistry.Empty,
+    /** The compiled output checks a step may name with [VerificationPolicy.Deterministic]; none by default. */
+    private val outputValidators: TaskOutputValidatorRegistry = TaskOutputValidatorRegistry.Empty,
 ) {
     private val rolesById: Map<RoleDefinitionId, RoleDefinition> = roles.associateBy { it.id }
 
@@ -772,7 +776,7 @@ class WorkflowEngine(
             updatedAtEpochMillis = nowEpochMillis,
         )
         nextRun = refreshReadiness(definition, nextRun, nowEpochMillis)
-        val status = deriveWorkflowStatus(nextRun)
+        val status = deriveWorkflowStatus(definition, nextRun)
         if (status == WorkflowRunStatus.Completed) {
             eventSink.append(WorkflowCompleted(nextRun.id, nowEpochMillis))
         }
@@ -866,7 +870,15 @@ class WorkflowEngine(
                 ?.takeIf { status == ManagedSessionStatus.Completed && gateVerdict == null }
                 ?.let { checkStepOutputs(it, mergeArtifacts(taskRun.artifacts, durableArtifacts)) }
                 .orEmpty()
-            val mappedStatus = if (gateVerdict != null || contractViolations.isNotEmpty()) {
+            // A step that named a deterministic check must hand back output that passes it (TaskOutputValidators.kt).
+            val outputProblems = (producingTask?.verificationPolicy as? VerificationPolicy.Deterministic)
+                ?.takeIf { status == ManagedSessionStatus.Completed && gateVerdict == null && contractViolations.isEmpty() }
+                ?.let { outputValidators.problems(it.validatorId, mergeArtifacts(taskRun.artifacts, durableArtifacts)) }
+                .orEmpty()
+            if (outputProblems.isNotEmpty() && taskRun.status != TaskRunStatus.Failed) {
+                eventSink.append(VerificationFailed(nextRun.id, taskId, taskOutputRejectedMessage(outputProblems), nowEpochMillis))
+            }
+            val mappedStatus = if (gateVerdict != null || contractViolations.isNotEmpty() || outputProblems.isNotEmpty()) {
                 TaskRunStatus.Failed
             } else {
                 when (status) {
@@ -927,6 +939,11 @@ class WorkflowEngine(
                                 code = OUTPUT_CONTRACT_VIOLATION,
                                 message = contractViolationMessage(contractViolations),
                             )
+                        } else if (outputProblems.isNotEmpty()) {
+                            BlockingReason(
+                                code = TASK_OUTPUT_REJECTED,
+                                message = taskOutputRejectedMessage(outputProblems),
+                            )
                         } else {
                             taskRun.blockingReason
                         },
@@ -954,7 +971,7 @@ class WorkflowEngine(
             .filter { (id, taskRun) -> taskRun.status == TaskRunStatus.Failed && run.taskRuns[id]?.status != TaskRunStatus.Failed }
             .keys
         nextRun = refreshReadiness(definition, nextRun, nowEpochMillis, failedThisPass)
-        val workflowStatus = deriveWorkflowStatus(nextRun)
+        val workflowStatus = deriveWorkflowStatus(definition, nextRun)
         if (workflowStatus == WorkflowRunStatus.Completed && run.status != WorkflowRunStatus.Completed) {
             eventSink.append(WorkflowCompleted(nextRun.id, nowEpochMillis))
         }
@@ -1066,12 +1083,15 @@ class WorkflowEngine(
         val taskRun = requireNotNull(run.taskRuns[taskDefinitionId]) {
             "Task run ${taskDefinitionId.value} is missing"
         }
-        val decision = FailurePolicyEvaluator.decide(
+        val decided = FailurePolicyEvaluator.decide(
             taskRun = taskRun,
             retryPolicy = if (allowRetry) task.retryPolicy else task.retryPolicy.copy(retryOn = emptySet()),
             escalationPolicy = task.escalationPolicy,
             reason = retryReason,
         )
+        // An optional creature is tried as often as its retry policy says, then skipped: it is never a reason to stop the run
+        // or to ask the keeper (docs/Keepers-Room.md, optional creatures).
+        val decision = if (task.optional && decided !is FailureDecision.Retry) FailureDecision.FailWorkflow else decided
 
         return when (decision) {
             is FailureDecision.Retry -> {
@@ -1094,6 +1114,10 @@ class WorkflowEngine(
                             progressMessage = null,
                             providerPlan = null,
                             keeperQuestion = null,
+                            // A turned-back output is told to the next attempt (RetryPolicy.includeFailureContext).
+                            lastFailure = reason.takeIf {
+                                retryReason == RetryReason.VerificationFailed && task.retryPolicy.includeFailureContext
+                            },
                         )
                     ),
                     updatedAtEpochMillis = nowEpochMillis,
@@ -1145,6 +1169,18 @@ class WorkflowEngine(
                     TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Failed)
                 }
                 eventSink.append(TaskFailed(run.id, taskDefinitionId, reason, nowEpochMillis))
+                if (task.optional) {
+                    // Skipped: the step keeps its reason, and the run goes on (deriveWorkflowStatus does not count it).
+                    return run.copy(
+                        taskRuns = run.taskRuns + (
+                            taskDefinitionId to taskRun.copy(
+                                status = TaskRunStatus.Failed,
+                                blockingReason = BlockingReason(OPTIONAL_STEP_SKIPPED, reason),
+                            )
+                        ),
+                        updatedAtEpochMillis = nowEpochMillis,
+                    )
+                }
                 eventSink.append(WorkflowFailed(run.id, reason, nowEpochMillis))
                 run.copy(
                     status = WorkflowRunStatus.Failed,
@@ -1334,11 +1370,16 @@ class WorkflowEngine(
         )
     }
 
-    private fun deriveWorkflowStatus(run: WorkflowRun): WorkflowRunStatus {
+    private fun deriveWorkflowStatus(definition: WorkflowDefinition, run: WorkflowRun): WorkflowRunStatus {
         if (run.status.isTerminal()) return run.status
-        val statuses = run.taskRuns.values.map { it.status }
+        val optionalIds = definition.tasks.filter { it.optional }.mapTo(mutableSetOf()) { it.id }
+        // A skipped optional creature is neither a failure nor unfinished work: it counts as set aside.
+        val statuses = run.taskRuns.values.map {
+            if (it.status == TaskRunStatus.Failed && it.taskDefinitionId in optionalIds) TaskRunStatus.Cancelled else it.status
+        }
+        val skippedOnly = run.taskRuns.values.all { it.status == TaskRunStatus.Failed && it.taskDefinitionId in optionalIds }
         return when {
-            statuses.isNotEmpty() && statuses.all { it == TaskRunStatus.Cancelled } -> WorkflowRunStatus.Cancelled
+            statuses.isNotEmpty() && statuses.all { it == TaskRunStatus.Cancelled } && !skippedOnly -> WorkflowRunStatus.Cancelled
             statuses.isNotEmpty() && statuses.all { it == TaskRunStatus.Completed || it == TaskRunStatus.Cancelled } -> WorkflowRunStatus.Completed
             statuses.any { it == TaskRunStatus.AwaitingApproval || it == TaskRunStatus.Escalated } -> WorkflowRunStatus.AwaitingHuman
             statuses.any { it == TaskRunStatus.Failed } -> WorkflowRunStatus.Failed

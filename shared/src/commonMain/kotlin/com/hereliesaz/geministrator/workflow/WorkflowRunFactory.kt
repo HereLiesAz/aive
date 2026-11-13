@@ -174,7 +174,7 @@ object WorkflowRunFactory {
             // that no completed branch reaches is skipped instead of waiting forever.
             val conditionUnreachable = if (task.condition is TaskCondition.Always) {
                 allTerminal && !conditionMet &&
-                    dependencyRuns.all { it.status == TaskRunStatus.Completed || it.status == TaskRunStatus.Cancelled }
+                    dependencyRuns.all { it.status == TaskRunStatus.Completed || it.status == TaskRunStatus.Cancelled || it.isSkippedOptional() }
             } else {
                 conditionSettled && !conditionMet
             }
@@ -300,5 +300,9 @@ object WorkflowRunFactory {
     }
 
     private fun TaskRun.isSkippedBranch() =
-        status == TaskRunStatus.Cancelled && blockingReason?.code == CONDITION_NOT_MET
+        (status == TaskRunStatus.Cancelled && blockingReason?.code == CONDITION_NOT_MET) || isSkippedOptional()
+
+    /** An optional creature that failed for good and was set aside (the engine's handleFailure): nothing waits on it. */
+    private fun TaskRun.isSkippedOptional() =
+        status == TaskRunStatus.Failed && blockingReason?.code == OPTIONAL_STEP_SKIPPED
 }

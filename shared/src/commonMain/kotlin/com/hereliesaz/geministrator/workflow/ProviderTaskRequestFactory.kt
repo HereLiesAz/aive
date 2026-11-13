@@ -108,6 +108,10 @@ internal fun buildProviderTaskRequest(
             dynamicContext = buildList {
                 add(PromptContextBlock("Task", objective, ContextProvenance.KeeperWritten))
                 add(PromptContextBlock("Attempt", taskRun.attempt.toString(), ContextProvenance.KeeperWritten))
+                // What the last attempt got wrong, so this one can fix it (RetryPolicy.includeFailureContext).
+                taskRun.lastFailure?.takeIf { it.isNotBlank() && taskRun.attempt > 1 }?.let {
+                    add(PromptContextBlock("Last attempt was turned back", it, ContextProvenance.AgentArtifact))
+                }
                 if (resolvedSurfaces.isNotEmpty()) {
                     add(
                         PromptContextBlock(
