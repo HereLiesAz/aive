@@ -10,6 +10,7 @@ import com.hereliesaz.geministrator.DurableUiStateStore
 import com.russhwolf.settings.Settings
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import kotlin.concurrent.Volatile
 
 /**
  * Remembered text, kept with the app's other interface drafts (`aive.ui-state.v1`): on this device only, never

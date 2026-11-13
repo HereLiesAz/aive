@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.persistence
 
 import com.russhwolf.settings.Settings
+import kotlin.concurrent.Volatile
 
 /**
  * A platform that can keep some settings in a file of its own sets [separate], before anything reads them. Android
