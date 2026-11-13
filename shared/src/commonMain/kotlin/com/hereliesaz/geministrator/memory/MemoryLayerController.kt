@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlin.math.roundToInt
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import com.hereliesaz.geministrator.orchestration.MemoryResolution as QueryResolution
@@ -1191,7 +1190,7 @@ class MemoryLayerController(
                     PromptContextBlock(
                         "Relevant memory",
                         untrustedRecall(
-                            relevant.map { "[${it.score.twoDecimals()}] ${it.sourceLabel()}${it.node.kind.name}: ${it.node.text}${it.divergenceLines()}" }
+                            relevant.map { "${it.sourceLabel()}${it.node.kind.name}: ${gistOf(it.node.text)}${it.gistNotes()}" }
                                 .joinWholeUnits(MAX_RECALL_CHARS),
                         ),
                     ),
@@ -1203,7 +1202,7 @@ class MemoryLayerController(
                         "Memory timeline",
                         untrustedRecall(
                             timeline.sortedWith(compareBy<MemoryRecallHit> { it.node.createdAtEpochMillis }.thenBy { it.node.id.value })
-                                .map { "${it.sourceLabel()}${it.node.kind.name}: ${it.node.text}${it.divergenceLines()}" }
+                                .map { "${it.sourceLabel()}${it.node.kind.name}: ${gistOf(it.node.text)}${it.gistNotes()}" }
                                 .joinWholeUnits(MAX_RECALL_CHARS),
                         ),
                     ),
@@ -1257,7 +1256,7 @@ class MemoryLayerController(
                     deliver(
                         buildString {
                             append(MEMORY_MESSAGE_MARKER).append(' ').append(MemoryCueWatcher.hashtag(trigger.subject)).append('\n')
-                            shown.forEach { append("- ").append(it.sourceLabel()).append(it.node.text.take(MAX_SUMMARY_CHARS)).append(it.divergenceLines()).append('\n') }
+                            shown.forEach { append("- ").append(it.sourceLabel()).append(gistOf(it.node.text, if (depth == MemoryDepth.Detail) DETAIL_GIST_CHARS else GIST_CHARS)).append(it.gistNotes()).append('\n') }
                         }.trimEnd(),
                     )
                 }
@@ -1416,7 +1415,6 @@ class MemoryLayerController(
         const val MAX_TRIGGER_SUMMARIES = 3
         /** Finer summaries and sources: how many more may come back once the agent has lingered. */
         const val DEEPER_EXTRA_SUMMARIES = 2
-        const val MAX_SUMMARY_CHARS = 400
         const val MAX_PENDING_RECALLS = 8
         const val MAX_CLOUD_QUERY_WORDS = 12
         /** Three-letter function words, which keyword lookup (unlike the searched cue words) would otherwise keep. */
@@ -1596,9 +1594,4 @@ internal fun List<String>.joinWholeUnits(maxChars: Int, separator: String = "\n\
         if (isNotEmpty()) append(separator)
         append(unit)
     }
-}
-
-private fun Float.twoDecimals(): String {
-    val hundredths = (this * 100).roundToInt()
-    return "${hundredths / 100}.${(hundredths % 100).toString().padStart(2, '0')}"
 }
