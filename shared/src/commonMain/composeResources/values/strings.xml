@@ -2092,6 +2092,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="step_template_text_to_table">Turn text into a table</string>
     <string name="step_template_check_work">Check the work</string>
     <string name="step_template_read_connected">Read from a connected tool</string>
+    <string name="step_template_make_diagram">Draw a diagram</string>
+    <string name="step_template_prepare_files">Prepare files for a repository</string>
     <string name="step_template_change_connected">Change something in a connected tool</string>
     <string name="step_port_brief">Brief</string>
     <string name="step_port_sources">Sources</string>

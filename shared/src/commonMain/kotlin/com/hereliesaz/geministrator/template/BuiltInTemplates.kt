@@ -145,10 +145,46 @@ object BuiltInTemplates {
         ),
     )
 
-    /** The six templates of the first slice. */
-    val all: List<StepTemplate> = listOf(WriteDocument, MakePage, TextToTable, CheckWork, ReadConnectedSource, ChangeConnectedSource)
+    val MakeDiagram = StepTemplate(
+        id = "make-diagram", version = 1, titleKey = "step_template_make_diagram", roleHint = "worker",
+        inputs = listOf(PortSpec("brief", PortType.Text, true), PortSpec("content", PortType.Any, false)),
+        outputs = listOf(out("diagram", ArtifactKind.Design, "text/vnd.mermaid", "mermaid/v1", StepOutputValidators.MERMAID_FLOWCHART)),
+        effects = setOf(StepEffect.None), planGate = false, toolPick = ToolPick.None,
+        body = body(
+            "Draw the diagram the brief asks for as a Mermaid flowchart. Begin with a line such as `flowchart TD`, then " +
+                "one node or one edge per line (`A[Start] --> B[Next]`). Use the content given. Hand back the Mermaid " +
+                "text and nothing else.",
+            mapOf("diagram" to StepOutputValidators.MERMAID_FLOWCHART),
+        ),
+    )
 
-    val byId: Map<String, StepTemplate> = all.associateBy { it.id }
+    val PrepareFilesForRepository = StepTemplate(
+        id = "prepare-files-for-repository", version = 1, titleKey = "step_template_prepare_files", roleHint = "engineer",
+        inputs = listOf(
+            PortSpec("brief", PortType.Text, true),
+            PortSpec("content", PortType.Any, false),
+            PortSpec("target", PortType.Text, false),
+        ),
+        outputs = listOf(out("change", ArtifactKind.CodeChange, "text/plain", "files/v1", StepOutputValidators.FILES_CHANGE)),
+        effects = setOf(StepEffect.WritesRepositoryBranch), planGate = true, toolPick = ToolPick.None,
+        body = body(
+            "Write the files the brief asks for, using the content given. Write them on a new dedicated branch (the target " +
+                "names it if it is given, otherwise start the name with `aive/`), never on the default or a shared branch. " +
+                "Do not push and do not merge: the later steps that ask the keeper do that. Hand back two lines, " +
+                "`BRANCH: <the branch>` and `FILES: <the files written, comma-separated>`.",
+            mapOf("change" to StepOutputValidators.FILES_CHANGE),
+            attempts = 1,
+        ),
+    )
+
+    /** The templates a keeper adds in Edit; the presets in [StepPresets] are variants of these (same executors, different data). */
+    val all: List<StepTemplate> = listOf(
+        WriteDocument, MakePage, TextToTable, CheckWork, ReadConnectedSource, ChangeConnectedSource,
+        MakeDiagram, PrepareFilesForRepository,
+    )
+
+    /** Every template and preset by id: the closed catalog a step or a blocker may start from. */
+    val byId: Map<String, StepTemplate> by lazy { (all + StepPresets.all).associateBy { it.id } }
 
     /** The steps the queen may make by herself: those that change nothing outside their own output. */
     val queenMayMake: List<StepTemplate> get() = all.filter { !it.effectful }
@@ -172,7 +208,7 @@ object BuiltInTemplates {
 
     /** Every built-in as a catalog base. */
     fun bases(roles: Collection<RoleDefinition> = BuiltInRoles.all): List<TemplateBase> =
-        all.map(StepTemplate::base) + roles.map(RoleTemplates::base)
+        (all + StepPresets.all).map(StepTemplate::base) + roles.map(RoleTemplates::base)
 }
 
 object RoleTemplates {
@@ -206,6 +242,7 @@ object StepInstantiation {
     fun roleFor(hint: String): RoleDefinitionId = when (hint) {
         "reviewer" -> BuiltInRoles.Reviewer.id
         "researcher" -> BuiltInRoles.Researcher.id
+        "engineer" -> BuiltInRoles.ImplementationEngineer.id
         else -> BuiltInRoles.Worker.id
     }
 

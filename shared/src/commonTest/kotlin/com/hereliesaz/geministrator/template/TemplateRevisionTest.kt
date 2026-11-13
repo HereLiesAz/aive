@@ -218,6 +218,6 @@ class TemplateRevisionTest {
     fun theQueenMayMakeOnlyStepsThatChangeNothing() {
         assertTrue(BuiltInTemplates.queenMayMake.none { it.effectful })
         assertTrue(BuiltInTemplates.ChangeConnectedSource !in BuiltInTemplates.queenMayMake)
-        assertEquals(6, BuiltInTemplates.all.size)
+        assertEquals(8, BuiltInTemplates.all.size)
     }
 }
