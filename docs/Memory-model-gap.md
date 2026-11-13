@@ -6,7 +6,7 @@ The owner's model (authoritative, verbatim):
 
 Owner addition (intent, verbatim summary): `/remindme` is the one sanctioned agent command. It is a plant, not a recall: it submits the conversation up to that point with the agent's own note of what it wanted to remember, as a reminder seed. It returns nothing and looks nothing up; the layer condenses it like everything else, and it resurfaces through the normal associative injection, as a reminder, when similar surrounding conditions recur.
 
-Reduced to tests: (1) no retrieval commands (the only command plants a reminder); (2) passive and associative, triggered by the agent's own thinking and chat; (3) injects keyword clouds, key phrases and summaries into the chat log; (4) lingering makes injections more precise and complete (compounding); (5) memories condense around commonalities, so recall is gist-like, never exact; (6) contradictions are reasoned out loud and the resolution is condensed like everything else.
+Reduced to tests: (1) no retrieval commands (the only command plants a reminder); (2) passive and associative, triggered by the agent's own thinking and chat; (3) injects keyword clouds, key phrases and summaries into the chat log; (4) lingering on a topic (the agent's thinking and chat keep hitting its keywords) brings further, deeper injections: gist and keyword cloud first, then key phrases, then finer summaries and the detail the memories were condensed from; surfacing never changes a stored memory, and "compounding" belongs to storage (memories condense around commonalities over time, so precision is impossible), not to recall; (5) memories condense around commonalities, so recall is gist-like, never exact; (6) contradictions are reasoned out loud and the resolution is condensed like everything else.
 
 Paths below are under `shared/src/commonMain/kotlin/com/hereliesaz/geministrator/memory/` unless stated. Nothing was compiled or run; this is a source read.
 
@@ -14,7 +14,7 @@ Paths below are under `shared/src/commonMain/kotlin/com/hereliesaz/geministrator
 
 | Part | Verdict | Where | Why, and what would have to change |
 |---|---|---|---|
-| Memory package as a whole | PARTLY | `memory/` | Passive banking and cue machinery exist and fit. A command surface, exact-text recall and no compounding per topic do not. See rows below. |
+| Memory package as a whole | PARTLY | `memory/` | Passive banking and cue machinery exist and fit. A command surface, exact-text recall and no depth ladder per topic do not. See rows below. |
 | `MemoryLayerController` (observer) | MATCHES | `MemoryLayerController.observer` | Hooks session start, every Message/Thinking/PlanGenerated event (`respondToThought`), user messages (`annotateUserMessage`) and finish. Nothing is called by the agent. Wired for all sessions at `ProviderBackedManagedSessionGateway` (`memoryObserver.onSessionEvent(handle, effectiveEvent) { message(...) }`). |
 | Session observer / banking | MATCHES | `MemorySessionObserver.kt`, `QueuedMemorySessionObserver` | Banks the whole session after the step, scrubbed. Memory's own lines carry `MEMORY_MESSAGE_MARKER` and are not re-banked. This is how reasoning "gets condensed like everything else". |
 | `recallForPrompt` and its seven blocks | PARTLY | `MemoryLayerController.recallForPrompt` | Runs only when the Query Composer plan says memory is needed (`recallMemory = !enoughEvidence && queries.isNotEmpty()`), so the prompt's cloud is skipped with it. `Memory protocol` teaches `/deliberate` (contradicts). `Relevant memory` and `Memory timeline` print verbatim text with numeric scores and node ids (not gist). `Role lessons` is unconditional and verbatim. `Memory`, `Recalled on request` and `Habits` fit. |
@@ -22,8 +22,8 @@ Paths below are under `shared/src/commonMain/kotlin/com/hereliesaz/geministrator
 | Key phrases | PARTLY | `MemoryCueWatcher` (`Phrase`), `MemoryResolution.Phrase` | The cloud carries tags only. Phrases appear only as a trigger the agent writes ("Let me see what I remember about X"), not as something memory injects. |
 | Triggers from thinking and chat | PARTLY | `MemoryCueWatcher.read` | Echo and doubling are associative and fire without any syntax. `#tag` and the "what I remember about" phrase are command-like, and they bypass the dial and the frequency filter. Providers that cannot take a mid-session message get recalls as `pending` on the next prompt only. |
 | Summaries, consolidation, condensation | PARTLY | `MemoryConsolidation.kt`, `MemoryRewrite.kt`, `MemorySummaryTree.kt` | Memories fold into one shorter current version; size shrinks along an S-curve and never grows. But condensation "must restate its sources' values unchanged", so it is lossless on claimed values, not gist-like. Summaries are fine; what is shown is the stored text. |
-| Attention-gated recall dial | PARTLY | `AttentionGatedRecall.kt`, `MemoryAttention.kt` | A rate limiter (threshold, token-bucket interval, hysteresis, novelty window). It is passive, which fits. It does not implement "linger, get more": novelty (`noveltyCueIntervals`) suppresses repeats, and thresholds do not move with dwelling. |
-| Lingering and compounding | PARTLY | `MemoryCoRecall.kt`, `MemoryAssociationStrength.kt`, `recordAccess` | Co-recall adds an `AssociatedWith` edge (weight 0.3) every 3rd co-delivery, max 4 per pair; strength accumulates as `1 - Π(1 - w)`. Counts are in-process only (lost on restart). `recordAccess` writes `Recalled` edges only for resolved memories and only to fade their contradiction note. There is no per-agent, per-topic dwell counter, no reinforcement of the recalled memory or of the cue->memory link, and no decay by disuse. Injection size is fixed (`MAX_TRIGGERS_PER_THOUGHT` 3, `MAX_TRIGGER_SUMMARIES` 3, `MAX_SUMMARY_CHARS` 400). |
+| Attention-gated recall dial | PARTLY | `AttentionGatedRecall.kt`, `MemoryAttention.kt` | A rate limiter (threshold, token-bucket interval, hysteresis, novelty window). It is passive, which fits. It does not implement "linger, go deeper": novelty (`noveltyCueIntervals`) suppresses repeats of a memory whatever the depth, and thresholds do not move with dwelling. |
+| Lingering brings deeper injections | CONTRADICTS | `MemoryCueWatcher.kt`, `AttentionGatedRecall.kt`, `MemoryCoRecall.kt`, `recordAccess` | Judged against the model (lingering = further, deeper injections; stored memories unchanged by surfacing). There is no per-topic dwell notion that escalates depth: echo and doubling only detect that a word recurred and fire one fixed-depth recall (`MAX_TRIGGERS_PER_THOUGHT` 3, `MAX_TRIGGER_SUMMARIES` 3, `MAX_SUMMARY_CHARS` 400; the cloud is always tags). The opposite is true: the novelty window (`noveltyCueIntervals`) holds back re-surfacing, and the token-bucket interval throttles it. And surfacing changes stored memory, which the model does not call for: `MemoryCoRecall` adds an `AssociatedWith` edge (weight 0.3) every 3rd co-delivery (max 4 per pair, counted in process), a strengthening-like side effect, and `recordAccess` adds `Recalled` edges for resolved memories to fade their contradiction note. |
 | Gist-level recall | PARTLY | `recallSummaries`, `MemoryRecallHit.divergenceLines` | Summary resolution and outline levels exist. Output is still verbatim text (400 chars), with `[0.87]` scores and ids, which presents recall as exact. |
 | `MemoryDeliberationCommand` | CONTRADICTS | `MemoryDeliberationCommand.kt`, `respondToThought`, `MEMORY_PROTOCOL`, `divergenceLines` | A `/deliberate` command, taught in the protocol and templated under divergent hits (`⚖ to deliberate:`). The model has no commands. |
 | `MemoryDeliberationAbsorber` | PARTLY | `MemoryDeliberationAbsorber.kt` | The absorption fits: a resolution becomes the current version, losers become history, size fitted by `MemoryRewrite`. The input does not: it needs a structured `Deliberation` node with `chosen` and cited ids, which only the command creates. |
@@ -34,7 +34,7 @@ Paths below are under `shared/src/commonMain/kotlin/com/hereliesaz/geministrator
 ## Direct answers
 
 - **Per-turn from the agent's own thinking/chat?** Mostly yes mid-session (every Message, Thinking, PlanGenerated event and user message). Prompt-time recall is gated by a query plan, and `#tag`/phrase are explicit syntax. PARTLY.
-- **Strengthened by lingering?** Detected (doubling, echo) but not compounded per topic. Co-recall links exist but are in-process and slow. No.
+- **Does lingering bring further, deeper injections?** No. Lingering is detected (doubling, echo) but never escalates depth; the novelty window holds repeats back. Separately, co-recall edges strengthen memories on surfacing, which this model does not call for.
 - **Gist-level rather than exact?** Condensed storage, exact rendering and value-preserving condensation. PARTLY.
 - **Resolution from out-loud reasoning rather than a command?** No. Only `/deliberate`.
 
@@ -43,7 +43,7 @@ Paths below are under `shared/src/commonMain/kotlin/com/hereliesaz/geministrator
 ## Three biggest gaps
 
 1. **The `/deliberate` command is the only way a resolution is condensed.** Prose reasoning is never read as a resolution.
-2. **No compounding from lingering.** Nothing makes injections more complete or precise as an agent dwells; novelty suppression does the opposite, and the association counts are lost on restart.
+2. **No depth ladder.** Nothing makes injections go deeper as an agent dwells on a topic; novelty suppression does the opposite. And surfacing writes to stored memory (co-recall and access edges), which the model does not call for.
 3. **Recall renders as exact.** Verbatim text, scores and ids, and value-preserving condensation, where the model wants gist. Also: prompt-time recall is skipped when the query plan says no.
 
 ## Minimal change plan (not done; no code changed)
@@ -65,7 +65,7 @@ Retires nothing by itself; it replaces `/deliberate` as the only command. Order 
 
 1. **Parser.** New pure `MemoryRemindmeCommand.parse(text)` (test first), same shape as `MemoryDeliberationCommand.parse`: a line `/remindme <sentence>`; blank, over-long (cap, for example 280 characters) or malformed notes are dropped. Called from `respondToThought` on the agent's thinking/output, only for text that does not start with `MEMORY_MESSAGE_MARKER`.
 2. **What is stored.** One episode through the existing queue (`MemoryBankRequest`, `MemorySourceKind.AgentNote`, `label = "Reminder"`), whose text is the note plus the preceding context window: the last N characters of the agent's own captured session text (N about 4,000), taken from the `QueuedMemorySessionObserver` capture so no second copy is kept. Both pass through `ControlRedaction.scrub` exactly as banked sessions do. The marker lines of memory itself are excluded as for all banking.
-3. **Seed, not special storage.** Mark the node `metadata["reminder"]="true"` and give it a salience/reinforcement seed: a stored floor in `salienceFeatures` (a recorded term, auditable like the rest) and an initial `Recalled`-style weight (see B) so it is not outranked by ordinary memories. It is then condensed like any memory. Condensation and the size curve are unchanged; the note sentence is kept as a protected head so it survives condensation.
+3. **Seed, not special storage.** Mark the node `metadata["reminder"]="true"` and give it a salience/reinforcement seed: a stored floor in `salienceFeatures` (a recorded term, auditable like the rest) and an initial `Recalled`-style weight so it is not outranked by ordinary memories. It is then condensed like any memory. Condensation and the size curve are unchanged; the note sentence is kept as a protected head so it survives condensation.
 4. **Cues.** The preceding context is the cue: the existing tagger and keyword table index it with the rest of the episode, so it resurfaces when similar conditions recur. No new index.
 5. **Caps.** At most 2 reminders per step and 8 per run (counters on `CueSession`, per-run in the workflow's bank); excess is dropped silently. Identical notes in a run are deduplicated. Memory off means the line is ignored.
 6. **Injection.** When a hit with `reminder=true` surfaces (cloud, summary or prompt block), render it as its own labelled line, `⟦memory⟧ reminder: <note>`, ahead of ordinary hits, and subject to the same dial and novelty rules, so a reminder cannot flood. It is still untrusted data (the note is the agent's own, but the context may have carried hostile text), so the `RECALL_UNTRUSTED_NOTE` framing stays.
@@ -73,17 +73,19 @@ Retires nothing by itself; it replaces `/deliberate` as the only command. Order 
 8. **Docs and tests.** Update `docs/Memory-layer.md` and the memory protocol text (replace the `/deliberate` sentence with the `/remindme` sentence); tests for the parser, caps, redaction of the stored context, the labelled injection and that nothing is returned.
 9. **Open:** whether a reminder should be allowed to fade after being surfaced several times (like resolved notes, `RESOLVED_NOTE_RECALLS`), or persist until the keeper forgets it.
 
-### B. Reinforcement (lingering compounds)
+### B. A depth ladder (lingering goes deeper; nothing stored changes)
 
-1. Add a per-agent, per-topic dwell counter in `CueSession` (key = normalized tag). Increment on every trigger that fires for the topic (explicit, echo, doubled) and on every cloud cue the agent echoes. Decay it with tokens consumed (`consumeTokens` already runs).
-2. Let dwell widen the injection: `MAX_TRIGGER_SUMMARIES` becomes `1 + min(dwell, 3)`, and summary resolution deepens (Tag, then Summary, then outline levels) as dwell grows. This is the "more precise and complete".
-3. Let dwell lower the dial threshold for that topic and replace the novelty block for it: a dwelt-on topic may surface new, not-yet-shown memories, but still not the same text twice.
-4. Persist reinforcement as add-only edges in the bank: extend `recordAccess` to write a `Recalled` edge for every delivered hit (not only resolved ones), and make `MemoryCoRecall` counts derive from stored edges, so they survive restart. Retrieval scoring uses `accumulateAssociationEvidence` over these, so repeated use ranks higher and rewrite weight (`MemoryRewrite`) already uses strength.
-5. Decay by disuse, deterministically: a read-time factor on `Recalled` edges by age, never deleting anything (history stays).
+Model: the longer the agent dwells on a topic (its thinking and chat keep hitting the topic's keywords), the more injections arrive and each goes deeper down the condensation. Surfacing never changes a stored memory.
+
+1. **Dwell counter, session only.** In `CueSession` keep a map from normalized topic (tag) to a small state: a dwell count and the depth last delivered. It is not persisted and never written to the bank. Increment it whenever a trigger (explicit, echo, doubled) or a cloud cue fires for the topic; let it fall back as tokens pass (`consumeTokens` already runs), so a topic left alone resets to the top of the ladder. Pure function, test first.
+2. **The ladder.** Depth level from dwell: 0 keyword cloud and gist (today's cloud and one summary), 1 key phrases (`MemoryResolution.Phrase`), 2 finer summaries (`MemoryResolution.Summary` with the outline levels, more of them), 3 the detail the memories were condensed from (follow `CondensedFrom` one step down). Repeated cue hits raise the level by one; the number of injections may also rise with it (`MAX_TRIGGER_SUMMARIES` as a function of level, with a hard cap). The existing per-thought and pending caps stay.
+3. **Novelty window: keep it, key it by depth.** Under this model the same text must not be shown twice, but going deeper must not be blocked. Change the key of `surfacedAt` from the memory id to (memory id, depth level), so a memory shown as gist can later be followed by its phrases and its detail, while a repeat at the same depth is still held back. Nothing else in the gate changes (threshold, interval and hysteresis stay: they are rate limits, not storage).
+4. **Co-recall edges: stop writing them.** Decide: remove the call to `recordCoRecall` (and leave `MemoryCoRecall` unused, to be deleted later). Adding `AssociatedWith` links as a side effect of surfacing is a strengthening-like change to stored memory that this model does not call for. Existing edges stay as stored (they are history); no migration. Likewise remove the call to `recordAccess` (the `Recalled` edges and the access-count fade of a resolved memory's note); the resolved note itself goes away under A and C, because a resolved memory is just the condensed current version.
+5. **Tests.** Pure tests for the dwell function (rise, fall, reset), for the novelty key (same depth held back, deeper allowed), and a test that a recall leaves the store's snapshot unchanged.
 
 ### C. Gist, not exact
 
-1. In `recallForPrompt` and `respondToThought`, stop printing `[score]` and node ids; show time range and lineage only. Render summary-level text and trim to the first sentence or the outline level unless dwell is high.
+1. In `recallForPrompt` and `respondToThought`, stop printing `[score]` and node ids; show time range and lineage only. Render summary-level text and trim to the first sentence or the outline level; deeper levels come from the depth ladder (B).
 2. Rename the blocks' framing to say recalled gist, not facts. Condensation that must "restate values unchanged" can stay as the stored invariant; the rendering is what loosens. Decide with the owner whether storage should also stop promising value fidelity (this would be a larger change; see open questions).
 
 ### D. Triggers and the prompt path
@@ -95,7 +97,7 @@ Retires nothing by itself; it replaces `/deliberate` as the only command. Order 
 
 ### E. Order and tests
 
-A first (removes the contradiction), then B, then C and D. Each step: pure-function tests first (`MemoryResolutionReader`, dwell counter, renderer), then wiring. CI compiles; nothing was compiled for this plan.
+A first (removes the contradiction), then B (depth ladder), then C and D. Each step: pure-function tests first (`MemoryResolutionReader`, dwell counter, renderer), then wiring. CI compiles; nothing was compiled for this plan.
 
 ## Could not determine
 
