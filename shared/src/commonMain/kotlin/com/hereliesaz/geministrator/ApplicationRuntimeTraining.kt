@@ -14,6 +14,7 @@ import com.hereliesaz.geministrator.queen.TRAINING_LESSONS_ID
 import com.hereliesaz.geministrator.queen.TrainingRoles
 import com.hereliesaz.geministrator.queen.adoptSpecialist
 import com.hereliesaz.geministrator.queen.defaultTrainingLimits
+import com.hereliesaz.geministrator.queen.draftSpecialistRole
 import com.hereliesaz.geministrator.queen.parseLessons
 import com.hereliesaz.geministrator.queen.parseTrainerLimit
 import com.hereliesaz.geministrator.queen.tightenLimits
@@ -64,14 +65,18 @@ internal suspend fun ApplicationRuntime.launchTrainingSwarm(
         WorkflowDefinitionId("train-$now"), domain, parent, training, limits, round, findings,
     ) ?: return null
     val runId = WorkflowRunId("train-run-$now")
-    val used = listOf(parent, training.planner, training.researcher, training.trainer, training.reviewer, training.antagonist, training.nanny, training.queen)
+    val draft = draftSpecialistRole(parent)
+    val used = listOf(parent, draft, training.planner, training.researcher, training.trainer, training.reviewer, training.antagonist, training.nanny, training.queen)
         .distinctBy { it.id }
+    // The draft specialist lives in this run only (its snapshot); it is never stored as a role until the keeper approves adopting it.
+    val stored = used.filter { it.id != draft.id }
     return try {
         WorkflowLaunchService(
             preparer = WorkflowDefinitionPreparer(providerRegistry, used),
             persistence = persistence,
             eventSink = RepositoryWorkflowEventSink(persistence.events),
             roles = used,
+            rolesToPersist = stored,
         ).launch(
             project = project,
             definition = definition,
