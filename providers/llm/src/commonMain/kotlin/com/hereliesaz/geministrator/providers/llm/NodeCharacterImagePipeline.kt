@@ -10,6 +10,7 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.workflow.NODE_CHARACTER_IMAGE_PIPELINE_SERVICE
 import com.hereliesaz.geministrator.workflow.NodeCharacterAssetRecord
 import com.hereliesaz.geministrator.workflow.NodeCharacterAssetStore
+import com.hereliesaz.geministrator.workflow.NodeCharacterImageStore
 import com.hereliesaz.geministrator.workflow.SettingsNodeCharacterAssetStore
 import com.hereliesaz.geministrator.workflow.TaskExecutorContext
 import com.hereliesaz.geministrator.workflow.TaskExecutorExecution
@@ -31,6 +32,8 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * Image-capable executor for the Node Creature generation workflow.
@@ -46,6 +49,8 @@ class NodeCharacterImagePipelineExecutorIntegration(
     private val maxVisualAttempts: Int = 3,
     /** The most paid calls (image and vision, every attempt) one dispatch may make; the pipeline's worst case is 12. */
     private val maxCallsPerDispatch: Int = NODE_CHARACTER_CALL_BUDGET_DEFAULT,
+    /** Where the two pictures are kept as files; null keeps them in the artifact as data URIs (the web build has no files). */
+    private val imageStore: NodeCharacterImageStore? = null,
 ) : TaskExecutorIntegration {
     init {
         require(maxVisualAttempts >= 1) { "maxVisualAttempts must be at least one" }
@@ -188,6 +193,8 @@ class NodeCharacterImagePipelineExecutorIntegration(
         }
 
         val base = context.taskRun.id.value
+        val sourceUri = imageUri("$base:node-character:source", source)
+        val rigUri = imageUri("$base:node-character:rig", rig)
         val commonMetadata = mapOf(
             "nodeCharacterRoleId" to operation.roleId,
             "nodeCharacterRoleLabel" to roleLabel,
@@ -198,7 +205,7 @@ class NodeCharacterImagePipelineExecutorIntegration(
             kind = ArtifactKind.Media,
             taskRunId = context.taskRun.id,
             label = "$roleLabel · source character",
-            uri = source.dataUri(),
+            uri = sourceUri,
             mediaType = "image/png",
             metadata = commonMetadata + mapOf(
                 "stage" to "source-character",
@@ -211,7 +218,7 @@ class NodeCharacterImagePipelineExecutorIntegration(
             kind = ArtifactKind.Media,
             taskRunId = context.taskRun.id,
             label = "$roleLabel · 2D rig sheet",
-            uri = rig.dataUri(),
+            uri = rigUri,
             mediaType = "image/png",
             metadata = commonMetadata + mapOf(
                 "stage" to "rig-sheet",
@@ -262,6 +269,13 @@ class NodeCharacterImagePipelineExecutorIntegration(
             progressMessage = "Generated and visually verified $roleLabel",
             usage = meter.usage(),
         )
+    }
+
+    /** The reference an artifact keeps for [image]: a stored file when there is a store, else the data URI itself. */
+    @OptIn(ExperimentalEncodingApi::class)
+    private suspend fun imageUri(key: String, image: GeneratedNodeImage): String {
+        val store = imageStore ?: return image.dataUri()
+        return store.save(key, Base64.decode(image.base64Png))
     }
 
     private suspend fun register(

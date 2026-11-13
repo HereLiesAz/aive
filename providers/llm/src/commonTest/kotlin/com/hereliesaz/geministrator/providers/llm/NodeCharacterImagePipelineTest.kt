@@ -90,7 +90,11 @@ class NodeCharacterImagePipelineTest {
         var count = 0
     }
 
-    private fun integration(calls: Calls, budget: Int = NODE_CHARACTER_CALL_BUDGET_DEFAULT): NodeCharacterImagePipelineExecutorIntegration {
+    private fun integration(
+        calls: Calls,
+        budget: Int = NODE_CHARACTER_CALL_BUDGET_DEFAULT,
+        imageStore: com.hereliesaz.geministrator.workflow.NodeCharacterImageStore? = null,
+    ): NodeCharacterImagePipelineExecutorIntegration {
         val engine = MockEngine { request ->
             calls.count += 1
             val body = (request.body as TextContent).text
@@ -109,6 +113,7 @@ class NodeCharacterImagePipelineTest {
             assetStore = noStore,
             api = api,
             maxCallsPerDispatch = budget,
+            imageStore = imageStore,
         )
     }
 
@@ -138,5 +143,24 @@ class NodeCharacterImagePipelineTest {
         val usage = assertNotNull(execution.usage)
         assertEquals(1000L + 2000L + 1000L, usage.inputTokens)
         assertTrue(usage.costUnknown)
+    }
+
+    @Test
+    fun withAnImageStoreTheArtifactsKeepAReferenceAndNotTheImage() = runTest {
+        val store = com.hereliesaz.geministrator.workflow.InMemoryNodeCharacterImageStore()
+        val execution = integration(Calls(true), imageStore = store).dispatch(context())
+        val media = execution.artifacts.filter { it.kind == ArtifactKind.Media }
+        assertEquals(2, media.size)
+        media.forEach { assertTrue(it.uri.orEmpty().startsWith("memory:"), "a reference, not base64: ${it.uri?.take(40)}") }
+        assertEquals(2, store.images.size)
+        assertEquals("ABC", store.images.values.first().decodeToString(), "the stored bytes are the decoded PNG")
+    }
+
+    @Test
+    fun withoutAnImageStoreTheArtifactsStillCarryTheDataUri() = runTest {
+        val execution = integration(Calls(true)).dispatch(context())
+        execution.artifacts.filter { it.kind == ArtifactKind.Media }.forEach {
+            assertTrue(it.uri.orEmpty().startsWith("data:image/png;base64,"))
+        }
     }
 }

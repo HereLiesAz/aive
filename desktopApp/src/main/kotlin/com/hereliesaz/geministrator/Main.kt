@@ -230,6 +230,7 @@ fun main() {
                             .withPriorityIntegration(
                                 NodeCharacterImagePipelineExecutorIntegration(
                                     apiKeyProvider = LlmApiKeyProvider { key },
+                                    imageStore = FileNodeCharacterImageStore(),
                                 ),
                             )
                             .withPriorityIntegration(
