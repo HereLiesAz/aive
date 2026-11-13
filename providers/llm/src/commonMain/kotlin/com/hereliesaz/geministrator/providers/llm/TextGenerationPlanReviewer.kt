@@ -47,3 +47,33 @@ class TextGenerationPlanReviewer(private val candidates: List<PlanningApiEntry>)
 /** The plan reviewer for the linked LLMs; null when none is linked. */
 fun configuredPlanReviewer(linked: Map<String, String>): PlanReviewer? =
     configuredPlanningApis(linked).takeIf { it.isNotEmpty() }?.let(::TextGenerationPlanReviewer)
+
+/**
+ * The queen's model: asked in turn the linked LLMs, or only [pinnedProviderId] when her role pins one (it never
+ * switches silently). Her answer is validated by `acceptRuling`; this only carries text.
+ */
+class TextGenerationQueenModel(
+    private val candidates: List<PlanningApiEntry>,
+    private val pinnedProviderId: String? = null,
+) : com.hereliesaz.geministrator.queen.QueenModel {
+    override suspend fun answer(prompt: String): String {
+        val order = if (pinnedProviderId == null) candidates else candidates.filter { it.id == pinnedProviderId }
+        if (order.isEmpty()) error("No linked LLM can answer for the queen")
+        var last: Throwable? = null
+        for (candidate in order) {
+            try {
+                return candidate.api.generate(prompt).text
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Throwable) {
+                last = failure
+                if (pinnedProviderId != null) throw failure
+            }
+        }
+        throw last ?: error("No linked LLM can answer for the queen")
+    }
+}
+
+/** The queen's model for the linked LLMs; null when none is linked. */
+fun configuredQueenModel(linked: Map<String, String>, pinnedProviderId: String? = null): com.hereliesaz.geministrator.queen.QueenModel? =
+    configuredPlanningApis(linked).takeIf { it.isNotEmpty() }?.let { TextGenerationQueenModel(it, pinnedProviderId) }
