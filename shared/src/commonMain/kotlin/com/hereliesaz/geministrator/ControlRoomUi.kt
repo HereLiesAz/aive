@@ -1067,12 +1067,14 @@ private fun MainDestination(
                         seed = "hive-pause-run",
                         selected = paused,
                         onClick = { onPauseRun(!paused) },
+                        modifier = Modifier.tourTarget(TourTargetId.HIVE_PAUSE),
                     )
                     AzphaltPill(
                         label = stringResource(Res.string.hive_stop_run),
                         seed = "hive-stop-run",
                         tone = PillTone.Danger,
                         onClick = { confirmingStopRun = true },
+                        modifier = Modifier.tourTarget(TourTargetId.HIVE_STOP),
                     )
                 }
             }

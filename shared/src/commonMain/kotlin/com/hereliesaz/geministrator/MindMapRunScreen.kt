@@ -1,5 +1,7 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.tour.tourTarget
+import com.hereliesaz.geministrator.tour.TourTargetId
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -686,7 +688,7 @@ internal fun MindMapRunScreen(
                         onValueChange = field.onValueChange,
                         label = { Text(stringResource(if (firstLaunch) Res.string.first_hive_objective else Res.string.overview_objective)) },
                         minLines = if (compact) 2 else 3,
-                        modifier = Modifier.fillMaxWidth().then(field.modifier),
+                        modifier = Modifier.fillMaxWidth().then(field.modifier).tourTarget(TourTargetId.GOAL_FIELD),
                     )
                 }
                 AzphaltPill(
@@ -694,7 +696,7 @@ internal fun MindMapRunScreen(
                     seed = "launch-options",
                     selected = optionsOpen,
                     onClick = { optionsOpen = !optionsOpen },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().tourTarget(TourTargetId.OPTIONS_PILL),
                 )
                 if (optionsOpen) {
                 if (firstLaunch) projectFields()
@@ -844,7 +846,7 @@ internal fun MindMapRunScreen(
                             )
                         }
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().tourTarget(TourTargetId.FEED_IT_BUTTON),
                 )
                 (launchFieldsError ?: launchError)?.let { message ->
                     PackedFailureText(message, seed = "launch-error", modifier = Modifier.azphaltLiveRegion())

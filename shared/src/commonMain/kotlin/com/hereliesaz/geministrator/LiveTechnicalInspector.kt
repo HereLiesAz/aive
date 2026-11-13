@@ -1,5 +1,7 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.tour.tourTarget
+import com.hereliesaz.geministrator.tour.TourTargetId
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -993,6 +995,11 @@ private fun CreatureTabs(tab: CreatureTab, onTabChange: (CreatureTab) -> Unit, p
                 endCap = if (entry == CreatureTab.Mind && pendingProposals > 0) pendingProposals.toString() else null,
                 role = Role.Tab,
                 onClick = { onTabChange(entry) },
+                modifier = when (entry) {
+                    CreatureTab.Needs -> Modifier.tourTarget(TourTargetId.CREATURE_TAB_NEEDS)
+                    CreatureTab.Work -> Modifier.tourTarget(TourTargetId.CREATURE_TAB_WORK)
+                    CreatureTab.Mind -> Modifier.tourTarget(TourTargetId.CREATURE_TAB_MIND)
+                },
             )
         }
     }

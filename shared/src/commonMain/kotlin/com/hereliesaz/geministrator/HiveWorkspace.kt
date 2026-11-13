@@ -1,5 +1,7 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.tour.tourTarget
+import com.hereliesaz.geministrator.tour.TourTargetId
 import com.hereliesaz.geministrator.prompts.PromptKind
 import com.hereliesaz.geministrator.prompts.PromptSuggestBox
 import com.hereliesaz.geministrator.prompts.PromptSuggestions
@@ -363,9 +365,9 @@ internal fun HiveControlsBar(
                         .selectableGroup(),
                 ) {
                     runSegmentText(LocalRunSegment.current)?.let { label ->
-                        ModeSegment(label, selected = !building) { onBuildingChange(false) }
+                        ModeSegment(label, selected = !building, modifier = Modifier.tourTarget(TourTargetId.VIEW_LIVE)) { onBuildingChange(false) }
                     }
-                    ModeSegment(stringResource(Res.string.build_build), selected = building) { onBuildingChange(true) }
+                    ModeSegment(stringResource(Res.string.build_build), selected = building, modifier = Modifier.tourTarget(TourTargetId.VIEW_EDIT)) { onBuildingChange(true) }
                 }
             }
             val statusLine: @Composable (Modifier) -> Unit = { statusModifier ->
@@ -428,9 +430,9 @@ internal fun HiveControlsBar(
 private val HiveControlsOneLineFrom = 560.dp
 
 @Composable
-private fun ModeSegment(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun ModeSegment(label: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .heightIn(min = AzphaltMinTouchTarget)
             .clip(RoundedCornerShape(24.dp))
             .background(if (selected) azphaltStrong() else Color.Transparent)
