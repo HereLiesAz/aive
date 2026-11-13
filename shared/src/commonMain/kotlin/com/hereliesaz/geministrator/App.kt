@@ -396,6 +396,9 @@ fun App(
         bridgeEnabled = researchBridgeOn,
     )
 
+    // Where an adopted specialist's lessons are banked: the memory layer's per-role bank.
+    LaunchedEffect(runtime, memoryLayer) { runtime?.attachRoleLessonBank(memoryLayer) }
+
     // Her models for disputes between creatures (queen/Disputes.kt): the keeper's linked Sources, the research she may commission.
     LaunchedEffect(runtime, researchStep, researchContext, queenModelFor) {
         val active = runtime ?: return@LaunchedEffect

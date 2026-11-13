@@ -98,8 +98,8 @@ internal fun trainerLimitOf(run: com.hereliesaz.geministrator.domain.WorkflowRun
  * Adopts the specialist a finished training run offered, only through the queen's gate ([adoptSpecialist]): the keeper's recorded
  * approval of exactly this specialist (the approved offer step in Messages) is required, the generic role is never edited, and the
  * variant is a new role with the generic role as its parent and the run that hatched it recorded. [bankLessons] is the seam to the
- * role's memory bank: it must store the lessons (each with its source and date) and say whether it did. Until the memory layer
- * can bank lessons per role it has no default, and without it nothing is adopted.
+ * role's memory bank: it must store the lessons (each with its source and date) and say whether it did. It defaults to the memory
+ * layer's per-role bank ([roleLessonBank]); with neither, nothing is adopted.
  */
 @OptIn(ExperimentalTime::class)
 internal suspend fun ApplicationRuntime.adoptTrainedSpecialist(
@@ -112,18 +112,36 @@ internal suspend fun ApplicationRuntime.adoptTrainedSpecialist(
     val lessons = trainingStepText(run, TRAINING_LESSONS_ID)?.let(::parseLessons).orEmpty()
     val adoption = trainingAdoption(parentRoleId, domain, lessons) ?: return null
     val approval = trainingApproval(run, adoption, Clock.System.now().toEpochMilliseconds())
+    val lessonBank = roleLessonBank
     return adoptSpecialist(adoption, approval) { chosen ->
         val parent = persistence.roles.get(RoleDefinitionId(chosen.parentRoleId)) ?: BuiltInRoles.all.firstOrNull { it.id.value == chosen.parentRoleId }
         val id = RoleDefinitionId(chosen.roleId)
-        if (bankLessons == null || parent == null || persistence.roles.get(id) != null) {
-            false
-        } else if (!bankLessons(id, chosen.lessons)) {
+        if (parent == null || persistence.roles.get(id) != null) {
             false
         } else {
-            persistence.roles.put(
-                parent.copy(id = id, name = "${parent.name} · ${domain.trim().take(40)}", enabled = true, parents = listOf(parent.id), hatchedFromRunId = trainingRunId),
-            )
-            true
+            val banked = when {
+                bankLessons != null -> bankLessons(id, chosen.lessons)
+                lessonBank != null -> lessonBank.bank(id, parent.id, chosen.lessons)
+                else -> false
+            }
+            if (!banked) {
+                false
+            } else {
+                persistence.roles.put(
+                    parent.copy(id = id, name = "${parent.name} · ${domain.trim().take(40)}", enabled = true, parents = listOf(parent.id), hatchedFromRunId = trainingRunId),
+                )
+                true
+            }
         }
     }
+}
+
+/** The seam to the memory layer's per-role bank: stores a specialist's lessons under its role, the generic role as lineage parent. */
+fun interface RoleLessonBank {
+    suspend fun bank(roleId: RoleDefinitionId, parentRoleId: RoleDefinitionId, lessons: List<String>): Boolean
+}
+
+/** Wires the runtime's role-lesson bank to [layer] (null: no memory layer, so nothing is adopted). */
+internal fun ApplicationRuntime.attachRoleLessonBank(layer: com.hereliesaz.geministrator.memory.MemoryLayerController?) {
+    roleLessonBank = layer?.let { l -> RoleLessonBank { id, parent, lessons -> l.bankRoleLessons(id.value, parent.value, lessons) } }
 }

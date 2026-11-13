@@ -307,6 +307,38 @@ class MemoryLayerController(
         if (change.newParents.isNotEmpty() && lineage.isMerge(workflowId)) markMergeContrasts(workflowId)
     }
 
+    /**
+     * Banks a specialist role's [lessons] (each already with its source and fetch date) into that role's own memory bank, with the
+     * generic [parentRoleId]'s bank as its lineage parent (the same bank and lineage mechanism as a workflow's; nothing is copied
+     * and the parent's bank is never written). False when there is nothing to bank, the ids are blank or equal, or it failed.
+     */
+    suspend fun bankRoleLessons(roleId: String, parentRoleId: String, lessons: List<String>): Boolean {
+        val bank = roleBankId(roleId)
+        val parentBank = roleBankId(parentRoleId)
+        val requests = roleLessonRequests(roleId, lessons, nowEpochMillis())
+        if (bank.isEmpty() || parentBank.isEmpty() || bank == parentBank || requests.isEmpty()) return false
+        return try {
+            registerWorkflow(parentBank, null)
+            registerWorkflow(bank, null, listOf(parentBank))
+            val tool = layerFor(bank).tool
+            requests.forEach { tool.bank(it) }
+            drainSoon()
+            publish()
+            true
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /** The lessons banked for [roleId] (its own and its generic parent's); empty when the role has no bank. */
+    suspend fun roleLessons(roleId: String): List<String> {
+        val bank = roleBankId(roleId)
+        if (bank.isEmpty() || bank !in banks.known()) return emptyList()
+        return roleLessonsIn(lineageStore(bank).read())
+    }
+
     /** Appends: [projectId] now also includes every workflow of [incorporatesProjectId]. */
     suspend fun expandProject(projectId: String, incorporatesProjectId: String, by: String, reason: String): MemoryProjectExpansion =
         lineage.expandProject(projectId, incorporatesProjectId, by, reason, nowEpochMillis()).also { publish() }
@@ -1171,6 +1203,9 @@ class MemoryLayerController(
         val (timeline, relevant) = hits.partition { it.node.id.value in chronological }
         val blocks = buildList {
             if (firstPrompt) add(PromptContextBlock("Memory protocol", MEMORY_PROTOCOL))
+            // A specialist role's own lessons (each with its source and fetch date): reference data, never instructions.
+            runCatching { roleLessons(request.orchestrationContext.roleId?.value.orEmpty()) }.getOrNull()?.takeIf { it.isNotEmpty() }
+                ?.let { add(PromptContextBlock("Role lessons", untrustedRecall(it.joinToString("\n") { line -> "- $line" }.take(MAX_RECALL_CHARS)))) }
             // The user's prompt draws its own cue cloud, like any thought.
             runCatching { cueCloud(request.taskRunId.value, request.objective, request, alongside = true) }.getOrNull()?.let { add(PromptContextBlock("Memory", it)) }
             if (pending.isNotEmpty()) {

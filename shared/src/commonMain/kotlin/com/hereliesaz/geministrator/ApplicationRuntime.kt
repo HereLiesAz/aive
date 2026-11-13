@@ -209,6 +209,9 @@ class ApplicationRuntime private constructor(
      */
     var disputeModelSource: com.hereliesaz.geministrator.queen.DisputeModelSource? = null
 
+    /** Where an adopted specialist's lessons are banked (the memory layer's per-role bank); null where there is no memory layer. */
+    internal var roleLessonBank: RoleLessonBank? = null
+
     /** The disputes already raised (run and report), so each is raised once, also after a restart. */
     private val raisedDisputes = com.hereliesaz.geministrator.queen.RaisedDisputes(
         load = { DurableUiState.store.getString(RAISED_DISPUTES_KEY) },
