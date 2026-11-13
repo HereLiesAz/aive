@@ -51,6 +51,15 @@ jobs:
           path: vendor/conveyance-h2g2/vendor/Conveyance
 
       - name: Install stable Rust
+        id: retry4
+        continue-on-error: true
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+          components: clippy, rustfmt
+
+      - name: Install stable Rust (retry after a failed download)
+        if: steps.retry4.outcome == 'failure'
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
           toolchain: stable

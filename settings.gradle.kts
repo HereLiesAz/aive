@@ -101,7 +101,11 @@ dependencyResolutionManagement {
         if (useMavenLocalH2g2) mavenLocal()
         google()
         mavenCentral()
-        maven("https://jitpack.io")
+        // Scoped: JitPack only serves this account's own artifacts, so every other coordinate
+        // is never requested from it (an unscoped JitPack made unrelated resolutions fail on its 504s).
+        maven("https://jitpack.io") {
+            content { includeGroupAndSubgroups("com.github.HereLiesAz") }
+        }
     }
 }
 
