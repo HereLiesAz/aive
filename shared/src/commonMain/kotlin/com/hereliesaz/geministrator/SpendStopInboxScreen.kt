@@ -58,7 +58,8 @@ internal fun SpendStopDetail(
             well = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     says()
-                    Text(stringResource(Res.string.spend_stop_how_to_lift, stringResource(spendLimitsSection(compact).title)), style = AzphaltType.body, color = azphaltOnSurface())
+                    // The sentence names where the cap is changed, so it is the link there (the pill below says the same in a button).
+                    LinkText(stringResource(Res.string.spend_stop_how_to_lift, stringResource(spendLimitsSection(compact).title)), onClick = onOpenLimits)
                     AzphaltPill(
                         label = stringResource(Res.string.spend_stop_lift),
                         seed = "spend-stop-lift",

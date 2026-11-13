@@ -324,15 +324,14 @@ fun ControlRoom(
     val latestOpenConnectionsAt by rememberUpdatedState(openConnectionsAt)
     val latestReconfigureProvider by rememberUpdatedState(onReconfigureProvider)
     val latestDestinationSelected by rememberUpdatedState(onDestinationSelected)
-    val latestSelected by rememberUpdatedState(selectedTaskId)
+    // The one route to any Destination (Destination.kt); filled in below, once the creature links it needs exist.
+    val goHolder = remember { arrayOf<(Destination) -> Unit>({}) }
     val placeLinks = remember {
         PlaceLinks(
+            open = { d -> goHolder[0](d) },
             openConnections = { address -> latestOpenConnectionsAt(address) },
             openSource = { id -> latestReconfigureProvider(id) },
-            openRole = { roleId ->
-                RosterRequests.roleId = roleId
-                latestDestinationSelected(ControlRoomDestination.Company)
-            },
+            openRole = { roleId -> goHolder[0](Destination.Role(roleId)) },
             openDelegations = {
                 openKeeperPartPlace(KeeperSection.Delegations, keeperSectionName, keeperOpen) { latestDestinationSelected(it) }
             },
@@ -341,12 +340,7 @@ fun ControlRoom(
                 openKeeperPartPlace(part, keeperSectionName, keeperOpen) { latestDestinationSelected(it) }
             },
             openPlace = { place -> latestDestinationSelected(place) },
-            openSwarmEditor = {
-                // The editor is on the hive: show it, the creature stays selected, its sheet set aside.
-                SwarmEditRequests.pending = true
-                showTimeline.value = false
-                latestSelected?.let { panelSetAside = it }
-            },
+            openSwarmEditor = { goHolder[0](Destination.SwarmEditor) },
         )
     }
     val inspectorVisible = selectedTaskId != null &&
@@ -406,6 +400,32 @@ fun ControlRoom(
         // From a flipped card's button: the sheet opens up to the creature's own tabs.
         if (flipHost.editing) flipHost.send(CardFlipEvent.SheetExpanded)
         onDestinationSelected(ControlRoomDestination.Overview)
+    }
+    // Every Destination, applied: the place it lands on, then the part, role, field or creature it names.
+    val go: (Destination) -> Unit = { d ->
+        when (d) {
+            is Destination.Place -> onDestinationSelected(d.destination)
+            is Destination.KeeperPart ->
+                openKeeperPartPlace(d.section, keeperSectionName, keeperOpen, onDestinationSelected)
+            is Destination.Connections -> openConnectionsAt(d.a2aAddress)
+            is Destination.Role -> {
+                RosterRequests.roleId = d.roleId
+                RosterRequests.field = d.field
+                onDestinationSelected(ControlRoomDestination.Company)
+            }
+            is Destination.Task -> openCreatureOn(d.taskId, d.tab ?: CreatureTab.Work)
+            is Destination.Hive -> openHivePlace(d.definitionId, district, restingHive, onDestinationSelected)
+            Destination.SwarmEditor -> {
+                SwarmEditRequests.pending = true
+                showTimeline.value = false
+                selectedTaskId?.let { panelSetAside = it }
+            }
+        }
+    }
+    goHolder[0] = go
+    // A destination the app shell was asked to go to (the MCP consent dialog's server name) is applied here.
+    LaunchedEffect(PendingDestination.request) {
+        PendingDestination.take()?.let { go(it) }
     }
     // The Inbox lists everything waiting on the keeper, every row leading to where it is resolved; the header's
     // badge and the rail open that list, not the first creature that waits.

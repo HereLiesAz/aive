@@ -28,6 +28,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.AgentCapability
@@ -373,6 +375,22 @@ internal fun CustomCompanyProviderScreen(
             visibleRoles.firstOrNull { it.id.value == requestedRole }?.let { editRole(it) }
         }
     }
+    // A link that named a field of the form (a creature's budget line) puts the cursor there once the form is open.
+    val instructionsFocus = remember { FocusRequester() }
+    val tokenBudgetFocus = remember { FocusRequester() }
+    val requestedField = RosterRequests.field
+    LaunchedEffect(requestedField, showRoleForm) {
+        if (requestedField != null && showRoleForm) {
+            val target = when (requestedField) {
+                RoleField.Instructions -> instructionsFocus
+                RoleField.TokenBudget -> tokenBudgetFocus
+                RoleField.Source -> null
+            }
+            RosterRequests.takeField()
+            // Not placed yet on the first frame of the form: a missed focus leaves the form open, nothing lost.
+            runCatching { target?.requestFocus() }
+        }
+    }
     val activeRoleIds = liveWorkflow?.run?.taskRuns?.values
         ?.filter {
             it.status in setOf(
@@ -536,7 +554,7 @@ internal fun CustomCompanyProviderScreen(
                     onValueChange = field.onValueChange,
                     label = { Text(stringResource(Res.string.swarm_standing_instructions)) },
                     minLines = 5,
-                    modifier = Modifier.fillMaxWidth().then(field.modifier),
+                    modifier = Modifier.fillMaxWidth().focusRequester(instructionsFocus).then(field.modifier),
                 )
             }
             OutlinedTextField(
@@ -546,7 +564,7 @@ internal fun CustomCompanyProviderScreen(
                 label = { Text(stringResource(Res.string.swarm_token_budget)) },
                 supportingText = { Text(stringResource(Res.string.swarm_token_budget_hint)) },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().focusRequester(tokenBudgetFocus),
             )
 
             CompanySectionLabel(stringResource(Res.string.swarm_execution_source))

@@ -171,6 +171,7 @@
     <string name="mcp_status_asks">Asks</string>
     <string name="mcp_remove_title">Remove %1$s?</string>
     <string name="mcp_remove_body">Agents lose its tools, and its token is deleted from this device.</string>
+    <string name="mcp_consent_open_server">Open %1$s in Connections</string>
     <string name="mcp_consent_title">Let agents use %1$s?</string>
     <string name="mcp_consent_body">An agent wants to call %1$s on %2$s (%3$s) with:
 %4$s

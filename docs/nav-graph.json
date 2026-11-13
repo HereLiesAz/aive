@@ -1,0 +1,5565 @@
+{
+ "start": "app.start",
+ "nodes": [
+  {
+   "id": "app.start",
+   "kind": "external",
+   "area": "Entry",
+   "label": "App launch",
+   "source": "App.kt:1169",
+   "reachable_via": "process start (startupControlRoomDestination = Overview)",
+   "files": [
+    "App.kt"
+   ],
+   "symbols": [
+    "ControlRoomSession"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "",
+   "source_resolved": true
+  },
+  {
+   "id": "ext.intent",
+   "kind": "external",
+   "area": "Entry",
+   "label": "Package import intent (Android filter / azphaltPackageImportRequest)",
+   "source": "App.kt:536",
+   "reachable_via": "OS intent for package mime types",
+   "files": [
+    "AndroidManifest.xml"
+   ],
+   "symbols": [],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": ""
+  },
+  {
+   "id": "ext.openuri",
+   "kind": "external",
+   "area": "Entry",
+   "label": "External URL (PR / branch / Get API key)",
+   "source": "RepositoryProgressUi.kt:51",
+   "reachable_via": "openUri link",
+   "files": [
+    "RepositoryProgressUi.kt"
+   ],
+   "symbols": [
+    "RepositoryProgressRecord"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "",
+   "source_resolved": true
+  },
+  {
+   "id": "web.terrarium",
+   "kind": "external",
+   "area": "Debug",
+   "label": "Web ?terrariumPreview=1",
+   "source": "TerrariumPreview.kt:40",
+   "reachable_via": "URL query string on web build",
+   "files": [
+    "TerrariumPreview.kt"
+   ],
+   "symbols": [
+    "TerrariumVisualProofScreen"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "",
+   "source_resolved": true
+  },
+  {
+   "id": "web.rigs",
+   "kind": "external",
+   "area": "Debug",
+   "label": "Web ?creatureRigs=1",
+   "source": "CreatureRigGallery.kt:46",
+   "reachable_via": "URL query string on web build",
+   "files": [
+    "CreatureRigGallery.kt"
+   ],
+   "symbols": [
+    "CreatureRigGalleryScreen"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "",
+   "source_resolved": true
+  },
+  {
+   "id": "addon.host",
+   "kind": "place",
+   "area": "Debug",
+   "label": "Addon host screen",
+   "source": "addons/AddonHostScreen.kt:44",
+   "reachable_via": "no caller found in app code",
+   "files": [
+    "addons/AddonHostScreen.kt"
+   ],
+   "symbols": [
+    "AddonHostScreen"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "",
+   "source_resolved": true
+  },
+  {
+   "id": "shell.rail",
+   "kind": "panel",
+   "area": "Shell",
+   "label": "Shell rail / phone places row",
+   "source": "ShellRail.kt:170",
+   "reachable_via": "always visible chrome",
+   "files": [
+    "ShellRail.kt"
+   ],
+   "symbols": [
+    "ShellRail",
+    "RailButton",
+    "RailKeeper"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "",
+   "source_resolved": true
+  },
+  {
+   "id": "shell.crumbs",
+   "kind": "panel",
+   "area": "Shell",
+   "label": "Breadcrumb (shellCrumbs)",
+   "source": "ControlRoomUi.kt:727",
+   "reachable_via": "always visible chrome",
+   "files": [
+    "ControlRoomUi.kt"
+   ],
+   "symbols": [
+    "Breadcrumb",
+    "ShellHeader",
+    "WideCrumbs"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "",
+   "source_resolved": true
+  },
+  {
+   "id": "hive.live",
+   "kind": "place",
+   "area": "Hive",
+   "label": "Live hive (Overview destination)",
+   "source": "ControlRoomUi.kt:803",
+   "reachable_via": "default; rail Hive",
+   "files": [
+    "ControlRoomUi.kt",
+    "MindMapRunScreen.kt",
+    "HiveWorkspace.kt"
+   ],
+   "symbols": [
+    "MainDestination",
+    "MindMapRunScreen",
+    "ControlRoomDestination.Overview"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "app.start",
+   "source_resolved": true
+  },
+  {
+   "id": "hive.build",
+   "kind": "place",
+   "area": "Hive",
+   "label": "Build mode (terrarium editor)",
+   "source": "WorkflowTerrarium.kt:65",
+   "reachable_via": "Mode segment Live/Build/Flowchart",
+   "files": [
+    "WorkflowTerrarium.kt",
+    "TerrariumConnections.kt",
+    "WorkflowTerrariumAuthoring.kt",
+    "MascotNodeTerrarium.kt"
+   ],
+   "symbols": [
+    "GeministratorWorkflowTerrarium",
+    "ModeSegment"
+   ],
+   "edits": [
+    "workflow.structure"
+   ],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "hive.flow",
+   "kind": "place",
+   "area": "Hive",
+   "label": "Flowchart mode",
+   "source": "WorkflowFlowchartView.kt:1",
+   "reachable_via": "Mode segment",
+   "files": [
+    "WorkflowFlowchartView.kt",
+    "MermaidFlowchartPreview.kt"
+   ],
+   "symbols": [],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live"
+  },
+  {
+   "id": "hive.district",
+   "kind": "place",
+   "area": "Hive",
+   "label": "District (all hives, New hive, Lineage)",
+   "source": "DistrictScreen.kt:79",
+   "reachable_via": "Hives pill; zoomOut; crumb Hive",
+   "files": [
+    "DistrictScreen.kt",
+    "NewHive.kt",
+    "ClosestHives.kt"
+   ],
+   "symbols": [
+    "DistrictScreen"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "hive.resting",
+   "kind": "place",
+   "area": "Hive",
+   "label": "Resting hive",
+   "source": "HiveScreens.kt:283",
+   "reachable_via": "district cell; New hive; HiveCard import",
+   "files": [
+    "HiveScreens.kt"
+   ],
+   "symbols": [
+    "RestingHive"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.district",
+   "source_resolved": true
+  },
+  {
+   "id": "hive.timeline",
+   "kind": "panel",
+   "area": "Hive",
+   "label": "Timeline",
+   "source": "HiveScreens.kt:143",
+   "reachable_via": "Timeline pill (overview.timeline)",
+   "files": [
+    "HiveScreens.kt"
+   ],
+   "symbols": [
+    "RunTimeline"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "tl.overview",
+   "kind": "panel",
+   "area": "Hive",
+   "label": "Timeline > Overview tab",
+   "source": "HiveScreens.kt:143",
+   "reachable_via": "Timeline tabs",
+   "files": [
+    "HiveScreens.kt"
+   ],
+   "symbols": [],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.timeline"
+  },
+  {
+   "id": "tl.waterfall",
+   "kind": "panel",
+   "area": "Hive",
+   "label": "Timeline > Waterfall",
+   "source": "RunWaterfallChart.kt:126",
+   "reachable_via": "Timeline tabs",
+   "files": [
+    "RunWaterfallChart.kt"
+   ],
+   "symbols": [
+    "RunWaterfallChart"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.timeline",
+   "source_resolved": true
+  },
+  {
+   "id": "tl.events",
+   "kind": "panel",
+   "area": "Hive",
+   "label": "Timeline > Events",
+   "source": "HiveScreens.kt:96",
+   "reachable_via": "Timeline tabs",
+   "files": [
+    "HiveScreens.kt"
+   ],
+   "symbols": [],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.timeline"
+  },
+  {
+   "id": "tl.log",
+   "kind": "panel",
+   "area": "Hive",
+   "label": "Timeline > Log",
+   "source": "LogView.kt:83",
+   "reachable_via": "Timeline tabs",
+   "files": [
+    "LogView.kt"
+   ],
+   "symbols": [
+    "RunLogView"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.timeline",
+   "source_resolved": true
+  },
+  {
+   "id": "tl.memory",
+   "kind": "panel",
+   "area": "Hive",
+   "label": "Timeline > Memory tab",
+   "source": "ControlRoomUi.kt:1136",
+   "reachable_via": "Timeline tabs (memoryContent)",
+   "files": [
+    "ControlRoomUi.kt"
+   ],
+   "symbols": [],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.timeline"
+  },
+  {
+   "id": "hive.runscars",
+   "kind": "panel",
+   "area": "Hive",
+   "label": "Run scars (past runs of the hive)",
+   "source": "RunScars.kt:30",
+   "reachable_via": "in hive",
+   "files": [
+    "RunScars.kt"
+   ],
+   "symbols": [
+    "RunScars"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "hive.launchbar",
+   "kind": "panel",
+   "area": "Hive",
+   "label": "Launch bar / options",
+   "source": "HiveScreens.kt:56",
+   "reachable_via": "in hive",
+   "files": [
+    "HiveScreens.kt"
+   ],
+   "symbols": [
+    "HiveLaunchBar"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "hive.continue",
+   "kind": "panel",
+   "area": "Hive",
+   "label": "Continue run panel",
+   "source": "RunLineageLaunch.kt:199",
+   "reachable_via": "in hive",
+   "files": [
+    "RunLineageLaunch.kt"
+   ],
+   "symbols": [
+    "ContinueRunPanel"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "hive.rerun",
+   "kind": "panel",
+   "area": "Hive",
+   "label": "Rerun from task panel",
+   "source": "RunLineageLaunch.kt:254",
+   "reachable_via": "in hive",
+   "files": [
+    "RunLineageLaunch.kt"
+   ],
+   "symbols": [
+    "RerunFromTaskPanel"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "hive.planning",
+   "kind": "panel",
+   "area": "Hive",
+   "label": "Planning overlay",
+   "source": "PlanningOverlay.kt:42",
+   "reachable_via": "run start",
+   "files": [
+    "PlanningOverlay.kt"
+   ],
+   "symbols": [
+    "PlanningOverlay"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "hive.plandecision",
+   "kind": "panel",
+   "area": "Hive",
+   "label": "Plan decision overlay",
+   "source": "PlanDecisionOverlay.kt:39",
+   "reachable_via": "plan awaiting review",
+   "files": [
+    "PlanDecisionOverlay.kt"
+   ],
+   "symbols": [
+    "PlanDecisionContent"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "hive.agentq",
+   "kind": "panel",
+   "area": "Hive",
+   "label": "Agent question panel",
+   "source": "AgentQuestionPanel.kt:54",
+   "reachable_via": "agent asks keeper",
+   "files": [
+    "AgentQuestionPanel.kt"
+   ],
+   "symbols": [
+    "AgentQuestionPanel"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "hive.steps",
+   "kind": "panel",
+   "area": "Hive",
+   "label": "Launch steps overlay",
+   "source": "LiveStepsFeed.kt:197",
+   "reachable_via": "launch",
+   "files": [
+    "LiveStepsFeed.kt"
+   ],
+   "symbols": [
+    "LaunchStepsOverlay"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "hive.share",
+   "kind": "panel",
+   "area": "Hive",
+   "label": "Share hive card panel",
+   "source": "HiveCardPanels.kt:77",
+   "reachable_via": "Share pill (sharingHiveCard)",
+   "files": [
+    "HiveCardPanels.kt"
+   ],
+   "symbols": [
+    "HiveCardSharePanel"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "hive.import",
+   "kind": "panel",
+   "area": "Hive",
+   "label": "Import hive card panel",
+   "source": "HiveCardPanels.kt:128",
+   "reachable_via": "District Import (importCard)",
+   "files": [
+    "HiveCardPanels.kt"
+   ],
+   "symbols": [
+    "HiveCardImportPanel"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.district",
+   "source_resolved": true
+  },
+  {
+   "id": "hive.rolepreview",
+   "kind": "sheet",
+   "area": "Hive",
+   "label": "Role preview sheet (new hive roles)",
+   "source": "NewHiveRoles.kt:290",
+   "reachable_via": "New hive role suggestions",
+   "files": [
+    "NewHiveRoles.kt"
+   ],
+   "symbols": [
+    "RolePreviewSheet"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.resting",
+   "source_resolved": true
+  },
+  {
+   "id": "hive.actions",
+   "kind": "dialog",
+   "area": "Hive",
+   "label": "Hive options menu (long-press)",
+   "source": "HiveActionsMenu.kt:26",
+   "reachable_via": "long-press hive",
+   "files": [
+    "HiveActionsMenu.kt"
+   ],
+   "symbols": [
+    "HiveActionsMenu"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "hive.delete",
+   "kind": "dialog",
+   "area": "Hive",
+   "label": "Delete hive dialog",
+   "source": "HiveDeletion.kt:93",
+   "reachable_via": "Delete pill / menu",
+   "files": [
+    "HiveDeletion.kt"
+   ],
+   "symbols": [
+    "DeleteHiveControl",
+    "HiveDeleteRequest"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.actions",
+   "source_resolved": true
+  },
+  {
+   "id": "dlg.stoprun",
+   "kind": "dialog",
+   "area": "Hive",
+   "label": "Stop run confirm",
+   "source": "ControlRoomUi.kt:988",
+   "reachable_via": "Stop pill",
+   "files": [
+    "ControlRoomUi.kt"
+   ],
+   "symbols": [],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live"
+  },
+  {
+   "id": "dlg.mindmap",
+   "kind": "dialog",
+   "area": "Hive",
+   "label": "Hive confirm dialog (MindMapRunScreen)",
+   "source": "MindMapRunScreen.kt:306",
+   "reachable_via": "in hive",
+   "files": [
+    "MindMapRunScreen.kt"
+   ],
+   "symbols": [],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live"
+  },
+  {
+   "id": "creature.sheet",
+   "kind": "sheet",
+   "area": "Creature",
+   "label": "Creature sheet (phone ModalBottomSheet)",
+   "source": "ControlRoomUi.kt:607",
+   "reachable_via": "tap creature on phone",
+   "files": [
+    "ControlRoomUi.kt"
+   ],
+   "symbols": [
+    "ModalBottomSheet"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live"
+  },
+  {
+   "id": "creature.panel",
+   "kind": "panel",
+   "area": "Creature",
+   "label": "Creature panel (wide dock / sheet content)",
+   "source": "LiveTechnicalInspector.kt:854",
+   "reachable_via": "tap creature (selectCreature)",
+   "files": [
+    "LiveTechnicalInspector.kt",
+    "HiveWorkspace.kt"
+   ],
+   "symbols": [
+    "CreatureTab",
+    "DockedCreatureCard",
+    "DockedCreatureHead",
+    "CreatureUnderlineTabs"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "creature.needs",
+   "kind": "panel",
+   "area": "Creature",
+   "label": "Creature > Needs tab",
+   "source": "CreatureNeedsPanel.kt:49",
+   "reachable_via": "panel tab / Inbox badge",
+   "files": [
+    "CreatureNeedsPanel.kt"
+   ],
+   "symbols": [
+    "CreatureNeedsPanel",
+    "CreatureTab.Needs"
+   ],
+   "edits": [
+    "gate.decision"
+   ],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "creature.panel",
+   "source_resolved": true
+  },
+  {
+   "id": "creature.work",
+   "kind": "panel",
+   "area": "Creature",
+   "label": "Creature > Work tab",
+   "source": "LiveTechnicalInspector.kt:431",
+   "reachable_via": "panel tab",
+   "files": [
+    "LiveTechnicalInspector.kt"
+   ],
+   "symbols": [
+    "CreatureTab.Work"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "creature.panel"
+  },
+  {
+   "id": "creature.mind",
+   "kind": "panel",
+   "area": "Creature",
+   "label": "Creature > Mind tab",
+   "source": "HiveWorkspace.kt:685",
+   "reachable_via": "panel tab",
+   "files": [
+    "LiveTechnicalInspector.kt",
+    "HiveWorkspace.kt"
+   ],
+   "symbols": [
+    "CreatureTab.Mind",
+    "MindDefinitionList"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "creature.panel",
+   "source_resolved": true
+  },
+  {
+   "id": "creature.jobeditor",
+   "kind": "entity-editor",
+   "area": "Creature",
+   "label": "Job editor in Work tab (objective, criteria, approval, retries, runs-on)",
+   "source": "HiveJobEditor.kt:79",
+   "reachable_via": "Work tab",
+   "files": [
+    "HiveJobEditor.kt"
+   ],
+   "symbols": [
+    "HiveJobEditor"
+   ],
+   "edits": [
+    "task.job",
+    "task.approval",
+    "task.runsOn"
+   ],
+   "canonical_for": [],
+   "inplace_editor": true,
+   "back_to": "creature.work",
+   "source_resolved": true
+  },
+  {
+   "id": "creature.providerrow",
+   "kind": "entity-editor",
+   "area": "Creature",
+   "label": "Provider picker row in Work tab",
+   "source": "CreatureProviderRow.kt:29",
+   "reachable_via": "Work tab",
+   "files": [
+    "CreatureProviderRow.kt",
+    "ProviderChoiceRow.kt"
+   ],
+   "symbols": [
+    "CreatureProviderRow",
+    "ProviderChoiceRow"
+   ],
+   "edits": [
+    "role.provider"
+   ],
+   "canonical_for": [],
+   "inplace_editor": true,
+   "back_to": "creature.work",
+   "source_resolved": true
+  },
+  {
+   "id": "creature.mind.roleform",
+   "kind": "entity-editor",
+   "area": "Creature",
+   "label": "Role form embedded in Mind tab",
+   "source": "LiveTechnicalInspector.kt:698",
+   "reachable_via": "Mind tab (focusRole)",
+   "files": [
+    "CompanyCustomizationScreen.kt"
+   ],
+   "symbols": [
+    "focusRole"
+   ],
+   "edits": [
+    "role.provider",
+    "role.tokenBudget",
+    "role.instructions"
+   ],
+   "canonical_for": [],
+   "inplace_editor": true,
+   "back_to": "creature.mind"
+  },
+  {
+   "id": "creature.mind.proposals",
+   "kind": "entity-editor",
+   "area": "Creature",
+   "label": "Role-instruction proposals in Mind tab",
+   "source": "RoleInstructionProposalPanel.kt:66",
+   "reachable_via": "Mind tab",
+   "files": [
+    "RoleInstructionProposalPanel.kt"
+   ],
+   "symbols": [
+    "RoleInstructionProposalPanel"
+   ],
+   "edits": [
+    "role.instructions"
+   ],
+   "canonical_for": [],
+   "inplace_editor": true,
+   "back_to": "creature.mind",
+   "source_resolved": true
+  },
+  {
+   "id": "creature.mind.stablepicker",
+   "kind": "entity-editor",
+   "area": "Creature",
+   "label": "Stable creature picker in Mind tab",
+   "source": "StableScreens.kt:563",
+   "reachable_via": "Mind tab",
+   "files": [
+    "StableScreens.kt"
+   ],
+   "symbols": [
+    "CreaturePicker",
+    "PickerRow"
+   ],
+   "edits": [
+    "role.stableCreature"
+   ],
+   "canonical_for": [],
+   "inplace_editor": true,
+   "back_to": "creature.mind",
+   "source_resolved": true
+  },
+  {
+   "id": "build.jobeditor",
+   "kind": "entity-editor",
+   "area": "Hive",
+   "label": "Job editor in Build side panel (canonical for tasks)",
+   "source": "TerrariumConnections.kt:234",
+   "reachable_via": "Build mode, select creature",
+   "files": [
+    "TerrariumConnections.kt"
+   ],
+   "symbols": [],
+   "edits": [
+    "task.job",
+    "task.approval",
+    "task.runsOn"
+   ],
+   "canonical_for": [
+    "task.job",
+    "task.approval"
+   ],
+   "inplace_editor": false,
+   "back_to": "hive.build"
+  },
+  {
+   "id": "dlg.confirm.inspector",
+   "kind": "dialog",
+   "area": "Creature",
+   "label": "Reject plan / Stop workflow confirm",
+   "source": "LiveTechnicalInspector.kt:326",
+   "reachable_via": "Needs tab",
+   "files": [
+    "LiveTechnicalInspector.kt"
+   ],
+   "symbols": [],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "creature.needs"
+  },
+  {
+   "id": "wf.library",
+   "kind": "place",
+   "area": "Workflows",
+   "label": "Workflows > Library",
+   "source": "LiveWorkflowLibraryScreen.kt:100",
+   "reachable_via": "More editing pill",
+   "files": [
+    "LiveWorkflowLibraryScreen.kt",
+    "WorkflowLibraryTabs.kt"
+   ],
+   "symbols": [
+    "LiveWorkflowLibraryScreen",
+    "WorkflowLibraryTab.Library",
+    "ControlRoomDestination.Workflows"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "wf.store",
+   "kind": "place",
+   "area": "Workflows",
+   "label": "Workflows > Store tab (second Store copy)",
+   "source": "LiveWorkflowLibraryScreen.kt:319",
+   "reachable_via": "Workflows tab strip",
+   "files": [
+    "LiveWorkflowLibraryScreen.kt"
+   ],
+   "symbols": [
+    "WorkflowLibraryTab.Store"
+   ],
+   "edits": [
+    "package.install"
+   ],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "wf.library"
+  },
+  {
+   "id": "wf.overview",
+   "kind": "place",
+   "area": "Workflows",
+   "label": "Workflows > Overview tab",
+   "source": "WorkflowLibraryTabs.kt:13",
+   "reachable_via": "More editing pill (openWorkflowsOn)",
+   "files": [
+    "WorkflowLibraryTabs.kt"
+   ],
+   "symbols": [
+    "WorkflowLibraryTab.Overview"
+   ],
+   "edits": [
+    "workflow.structure"
+   ],
+   "canonical_for": [
+    "workflow.metadata"
+   ],
+   "inplace_editor": false,
+   "back_to": "wf.library"
+  },
+  {
+   "id": "wf.bowl",
+   "kind": "place",
+   "area": "Workflows",
+   "label": "Workflows > Bowl tab",
+   "source": "WorkflowLibraryTabs.kt:15",
+   "reachable_via": "tab strip",
+   "files": [
+    "WorkflowLibraryTabs.kt"
+   ],
+   "symbols": [
+    "WorkflowLibraryTab.Bowl"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "wf.library"
+  },
+  {
+   "id": "wf.tasks",
+   "kind": "place",
+   "area": "Workflows",
+   "label": "Workflows > Tasks tab",
+   "source": "WorkflowLibraryTabs.kt:16",
+   "reachable_via": "tab strip",
+   "files": [
+    "WorkflowLibraryTabs.kt"
+   ],
+   "symbols": [
+    "WorkflowLibraryTab.Tasks"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "wf.library"
+  },
+  {
+   "id": "wf.combine",
+   "kind": "place",
+   "area": "Workflows",
+   "label": "Workflows > Combine tab",
+   "source": "WorkflowLibraryTabs.kt:17",
+   "reachable_via": "tab strip",
+   "files": [
+    "WorkflowLibraryTabs.kt"
+   ],
+   "symbols": [
+    "WorkflowLibraryTab.Combine"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "wf.library"
+  },
+  {
+   "id": "wf.save",
+   "kind": "place",
+   "area": "Workflows",
+   "label": "Workflows > Save tab",
+   "source": "WorkflowLibraryTabs.kt:18",
+   "reachable_via": "tab strip",
+   "files": [
+    "WorkflowLibraryTabs.kt"
+   ],
+   "symbols": [
+    "WorkflowLibraryTab.Save"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "wf.library"
+  },
+  {
+   "id": "wf.tasks.editor",
+   "kind": "entity-editor",
+   "area": "Workflows",
+   "label": "Task row editor (reassign role, expand into hive)",
+   "source": "LiveWorkflowLibraryScreen.kt:474",
+   "reachable_via": "Tasks tab",
+   "files": [
+    "LiveWorkflowLibraryScreen.kt"
+   ],
+   "symbols": [
+    "workflows.selected-task-id"
+   ],
+   "edits": [
+    "role.assignment",
+    "workflow.structure"
+   ],
+   "canonical_for": [],
+   "inplace_editor": true,
+   "back_to": "wf.tasks"
+  },
+  {
+   "id": "roster",
+   "kind": "place",
+   "area": "Roster",
+   "label": "Roster / Swarm",
+   "source": "CompanyCustomizationScreen.kt:212",
+   "reachable_via": "rail Swarm; phone row",
+   "files": [
+    "CompanyCustomizationScreen.kt"
+   ],
+   "symbols": [
+    "CustomCompanyProviderScreen",
+    "ControlRoomDestination.Company"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "roster.card",
+   "kind": "entity-editor",
+   "area": "Roster",
+   "label": "Role card (provider pills in well)",
+   "source": "CompanyCustomizationScreen.kt:955",
+   "reachable_via": "Roster list",
+   "files": [
+    "CompanyCustomizationScreen.kt"
+   ],
+   "symbols": [],
+   "edits": [
+    "role.provider"
+   ],
+   "canonical_for": [],
+   "inplace_editor": true,
+   "back_to": "roster"
+  },
+  {
+   "id": "roster.role",
+   "kind": "entity-editor",
+   "area": "Roster",
+   "label": "Role form (canonical role editor)",
+   "source": "CompanyCustomizationScreen.kt:438",
+   "reachable_via": "tap role card",
+   "files": [
+    "CompanyCustomizationScreen.kt"
+   ],
+   "symbols": [],
+   "edits": [
+    "role.provider",
+    "role.tokenBudget",
+    "role.instructions",
+    "role.stableCreature"
+   ],
+   "canonical_for": [
+    "role.provider",
+    "role.tokenBudget",
+    "role.instructions",
+    "role.stableCreature"
+   ],
+   "inplace_editor": false,
+   "back_to": "roster"
+  },
+  {
+   "id": "roster.policies",
+   "kind": "panel",
+   "area": "Roster",
+   "label": "Workflow policies (read-only records)",
+   "source": "CompanyCustomizationScreen.kt:996",
+   "reachable_via": "Roster list",
+   "files": [
+    "CompanyCustomizationScreen.kt"
+   ],
+   "symbols": [],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "roster"
+  },
+  {
+   "id": "stable",
+   "kind": "place",
+   "area": "Stable",
+   "label": "Stable",
+   "source": "StableScreens.kt:129",
+   "reachable_via": "rail Stable; District section",
+   "files": [
+    "StableScreens.kt",
+    "StableHost.kt"
+   ],
+   "symbols": [
+    "StableSection",
+    "StableCreature",
+    "ControlRoomDestination.Stable"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "inbox",
+   "kind": "place",
+   "area": "Inbox",
+   "label": "Inbox",
+   "source": "ControlRoomScreens.kt:173",
+   "reachable_via": "rail / badge (openInbox)",
+   "files": [
+    "ControlRoomScreens.kt"
+   ],
+   "symbols": [
+    "InboxScreen",
+    "ControlRoomDestination.Inbox"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "inbox.list",
+   "kind": "panel",
+   "area": "Inbox",
+   "label": "Inbox list (wide/phone)",
+   "source": "LiveInboxScreen.kt:106",
+   "reachable_via": "Inbox",
+   "files": [
+    "LiveInboxScreen.kt"
+   ],
+   "symbols": [
+    "LiveInboxScreen"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "inbox",
+   "source_resolved": true
+  },
+  {
+   "id": "inbox.detail",
+   "kind": "panel",
+   "area": "Inbox",
+   "label": "Inbox detail / actions",
+   "source": "LiveInboxScreen.kt:284",
+   "reachable_via": "select entry (inbox.selected)",
+   "files": [
+    "LiveInboxScreen.kt"
+   ],
+   "symbols": [
+    "WideInboxPage"
+   ],
+   "edits": [
+    "gate.decision"
+   ],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "inbox.list",
+   "source_resolved": true
+  },
+  {
+   "id": "inbox.spend",
+   "kind": "panel",
+   "area": "Inbox",
+   "label": "Spend stop inbox",
+   "source": "SpendStopInboxScreen.kt:34",
+   "reachable_via": "spend cap hit",
+   "files": [
+    "SpendStopInboxScreen.kt"
+   ],
+   "symbols": [
+    "SpendStopInboxScreen"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "inbox",
+   "source_resolved": true
+  },
+  {
+   "id": "inbox.hallpause",
+   "kind": "panel",
+   "area": "Inbox",
+   "label": "Hall Monitor pause",
+   "source": "HallMonitorInboxScreen.kt:47",
+   "reachable_via": "Hall Monitor pause",
+   "files": [
+    "HallMonitorInboxScreen.kt"
+   ],
+   "symbols": [
+    "HallMonitorPauseInboxScreen"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "inbox",
+   "source_resolved": true
+  },
+  {
+   "id": "inbox.halltrial",
+   "kind": "panel",
+   "area": "Inbox",
+   "label": "Hall Monitor solution trial",
+   "source": "HallMonitorInboxScreen.kt:174",
+   "reachable_via": "Hall Monitor trial",
+   "files": [
+    "HallMonitorInboxScreen.kt"
+   ],
+   "symbols": [
+    "HallMonitorTrialInboxScreen"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "inbox",
+   "source_resolved": true
+  },
+  {
+   "id": "dlg.confirm.inbox",
+   "kind": "dialog",
+   "area": "Inbox",
+   "label": "Inbox confirm dialog",
+   "source": "LiveInboxScreen.kt:298",
+   "reachable_via": "Inbox actions",
+   "files": [
+    "LiveInboxScreen.kt"
+   ],
+   "symbols": [],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "inbox.detail"
+  },
+  {
+   "id": "dlg.confirm.inbox2",
+   "kind": "dialog",
+   "area": "Inbox",
+   "label": "Inbox screen confirm dialog",
+   "source": "ControlRoomScreens.kt:189",
+   "reachable_via": "Inbox actions",
+   "files": [
+    "ControlRoomScreens.kt"
+   ],
+   "symbols": [],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "inbox"
+  },
+  {
+   "id": "compute",
+   "kind": "place",
+   "area": "Keeper",
+   "label": "Compute (retired destination)",
+   "source": "ComputeDelegationScreen.kt:73",
+   "reachable_via": "creature Work onOpenCompute",
+   "files": [
+    "ComputeDelegationScreen.kt"
+   ],
+   "symbols": [
+    "ComputeDelegationScreen",
+    "ControlRoomDestination.Compute"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "memory",
+   "kind": "place",
+   "area": "Memory",
+   "label": "Memory swarm",
+   "source": "MemoryLayerScreen.kt:176",
+   "reachable_via": "rail Memory",
+   "files": [
+    "MemoryLayerScreen.kt",
+    "MemorySimpleView.kt"
+   ],
+   "symbols": [
+    "MemoryLayerScreen",
+    "MemoryView",
+    "ControlRoomDestination.Memory"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "memory.engine",
+   "kind": "entity-editor",
+   "area": "Memory",
+   "label": "Memory stage engine (provider + model)",
+   "source": "MemoryLayerScreen.kt:409",
+   "reachable_via": "Memory screen",
+   "files": [
+    "MemoryLayerScreen.kt"
+   ],
+   "symbols": [],
+   "edits": [
+    "memory.engine"
+   ],
+   "canonical_for": [
+    "memory.engine"
+   ],
+   "inplace_editor": true,
+   "back_to": "memory"
+  },
+  {
+   "id": "store",
+   "kind": "place",
+   "area": "Store",
+   "label": "Azphalt Store",
+   "source": "AzphaltStoreScreen.kt:213",
+   "reachable_via": "rail Store; package import",
+   "files": [
+    "AzphaltStoreScreen.kt"
+   ],
+   "symbols": [
+    "AzphaltStoreScreen",
+    "AzphaltStoreCategory",
+    "ControlRoomDestination.AddOns"
+   ],
+   "edits": [
+    "package.install"
+   ],
+   "canonical_for": [
+    "package.install"
+   ],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "store.breeds",
+   "kind": "panel",
+   "area": "Store",
+   "label": "Store breeds panel",
+   "source": "StoreBreeds.kt:83",
+   "reachable_via": "Store category Breeds",
+   "files": [
+    "StoreBreeds.kt"
+   ],
+   "symbols": [
+    "StorePanel"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "store",
+   "source_resolved": true
+  },
+  {
+   "id": "store.llm",
+   "kind": "panel",
+   "area": "Store",
+   "label": "Store LLMs / models panels",
+   "source": "AzphaltStoreScreen.kt:951",
+   "reachable_via": "Store categories Models, LLMs",
+   "files": [
+    "AzphaltStoreScreen.kt"
+   ],
+   "symbols": [
+    "PreparedStoreLlmPanel",
+    "PreparedAzphaltModelInstallPanel"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "store",
+   "source_resolved": true
+  },
+  {
+   "id": "dlg.store.install",
+   "kind": "dialog",
+   "area": "Store",
+   "label": "Store install/remove confirm",
+   "source": "AzphaltStoreScreen.kt:604",
+   "reachable_via": "Store actions",
+   "files": [
+    "AzphaltStoreScreen.kt"
+   ],
+   "symbols": [],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "store"
+  },
+  {
+   "id": "keeper",
+   "kind": "place",
+   "area": "Keeper",
+   "label": "Keeper's room (part list)",
+   "source": "KeeperRoom.kt:118",
+   "reachable_via": "gear; rail foot",
+   "files": [
+    "KeeperRoom.kt"
+   ],
+   "symbols": [
+    "KeeperRoom",
+    "KeeperNav",
+    "KeeperSectionList",
+    "ControlRoomDestination.Settings"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "keeper.connections",
+   "kind": "place",
+   "area": "Keeper",
+   "label": "Keeper > Connections",
+   "source": "ProviderManagementScreens.kt:558",
+   "reachable_via": "keeper.section=Connections",
+   "files": [
+    "ProviderManagementScreens.kt"
+   ],
+   "symbols": [
+    "KeeperSection.Connections"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "keeper"
+  },
+  {
+   "id": "keeper.compute",
+   "kind": "place",
+   "area": "Keeper",
+   "label": "Keeper > Compute",
+   "source": "ComputeDelegationScreen.kt:73",
+   "reachable_via": "keeper.section=Compute",
+   "files": [
+    "ComputeDelegationScreen.kt"
+   ],
+   "symbols": [
+    "KeeperSection.Compute"
+   ],
+   "edits": [
+    "task.runsOn"
+   ],
+   "canonical_for": [
+    "task.runsOn"
+   ],
+   "inplace_editor": false,
+   "back_to": "keeper"
+  },
+  {
+   "id": "keeper.projects",
+   "kind": "place",
+   "area": "Keeper",
+   "label": "Keeper > Projects",
+   "source": "ProviderManagementScreens.kt:1462",
+   "reachable_via": "keeper.section=Projects",
+   "files": [
+    "ProviderManagementScreens.kt"
+   ],
+   "symbols": [
+    "KeeperSection.Projects"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "keeper"
+  },
+  {
+   "id": "keeper.delegations",
+   "kind": "place",
+   "area": "Keeper",
+   "label": "Keeper > Delegations",
+   "source": "DelegationsPart.kt:65",
+   "reachable_via": "keeper.section=Delegations",
+   "files": [
+    "DelegationsPart.kt"
+   ],
+   "symbols": [
+    "KeeperSection.Delegations",
+    "DelegationsPart"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "keeper",
+   "source_resolved": true
+  },
+  {
+   "id": "keeper.schedules",
+   "kind": "place",
+   "area": "Keeper",
+   "label": "Keeper > Schedules",
+   "source": "SchedulesPart.kt:121",
+   "reachable_via": "keeper.section=Schedules",
+   "files": [
+    "SchedulesPart.kt"
+   ],
+   "symbols": [
+    "KeeperSection.Schedules",
+    "SchedulesPart"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "keeper",
+   "source_resolved": true
+  },
+  {
+   "id": "keeper.localagents",
+   "kind": "place",
+   "area": "Keeper",
+   "label": "Keeper > Local agents (desktop)",
+   "source": "LocalAgentsPart.kt:48",
+   "reachable_via": "keeper.section=LocalAgents",
+   "files": [
+    "LocalAgentsPart.kt"
+   ],
+   "symbols": [
+    "KeeperSection.LocalAgents",
+    "LocalAgentsPart"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "keeper",
+   "source_resolved": true
+  },
+  {
+   "id": "keeper.improvement",
+   "kind": "place",
+   "area": "Keeper",
+   "label": "Keeper > Improvement",
+   "source": "ImprovementPart.kt:90",
+   "reachable_via": "keeper.section=Improvement",
+   "files": [
+    "ImprovementPart.kt"
+   ],
+   "symbols": [
+    "KeeperSection.Improvement",
+    "ImprovementPart"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "keeper",
+   "source_resolved": true
+  },
+  {
+   "id": "keeper.limits",
+   "kind": "place",
+   "area": "Keeper",
+   "label": "Keeper > Limits (wide)",
+   "source": "SpendCapsSettings.kt:23",
+   "reachable_via": "keeper.section=Limits",
+   "files": [
+    "SpendCapsSettings.kt"
+   ],
+   "symbols": [
+    "KeeperSection.Limits",
+    "SpendCapsSettings"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "keeper",
+   "source_resolved": true
+  },
+  {
+   "id": "keeper.device",
+   "kind": "place",
+   "area": "Keeper",
+   "label": "Keeper > Device",
+   "source": "KeeperRoom.kt:93",
+   "reachable_via": "keeper.section=Device",
+   "files": [
+    "KeeperRoom.kt"
+   ],
+   "symbols": [
+    "KeeperSection.Device"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "keeper"
+  },
+  {
+   "id": "keeper.appearance",
+   "kind": "place",
+   "area": "Keeper",
+   "label": "Keeper > Appearance",
+   "source": "KeeperRoom.kt:94",
+   "reachable_via": "keeper.section=Appearance",
+   "files": [
+    "KeeperRoom.kt"
+   ],
+   "symbols": [
+    "KeeperSection.Appearance"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "keeper"
+  },
+  {
+   "id": "keeper.about",
+   "kind": "place",
+   "area": "Keeper",
+   "label": "Keeper > About",
+   "source": "KeeperRoom.kt:95",
+   "reachable_via": "keeper.section=About",
+   "files": [
+    "KeeperRoom.kt"
+   ],
+   "symbols": [
+    "KeeperSection.About"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "keeper"
+  },
+  {
+   "id": "keeper.provider",
+   "kind": "entity-editor",
+   "area": "Keeper",
+   "label": "Provider rows (reconfigure / disconnect / health)",
+   "source": "ProviderManagementScreens.kt:465",
+   "reachable_via": "Connections",
+   "files": [
+    "ProviderManagementScreens.kt"
+   ],
+   "symbols": [
+    "ProviderSettingsScreen"
+   ],
+   "edits": [
+    "provider.connection"
+   ],
+   "canonical_for": [
+    "provider.connection"
+   ],
+   "inplace_editor": false,
+   "back_to": "keeper.connections",
+   "source_resolved": true
+  },
+  {
+   "id": "keeper.a2a",
+   "kind": "entity-editor",
+   "area": "Keeper",
+   "label": "A2A agent rows",
+   "source": "ProviderManagementScreens.kt:640",
+   "reachable_via": "Connections",
+   "files": [],
+   "symbols": [],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "keeper.connections"
+  },
+  {
+   "id": "keeper.repo",
+   "kind": "entity-editor",
+   "area": "Keeper",
+   "label": "Repository service connections",
+   "source": "RepositoryServiceScreen.kt:54",
+   "reachable_via": "Connections",
+   "files": [
+    "RepositoryServiceScreen.kt"
+   ],
+   "symbols": [
+    "RepositoryConnections",
+    "EntireConnection"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "keeper.connections",
+   "source_resolved": true
+  },
+  {
+   "id": "keeper.mcp",
+   "kind": "entity-editor",
+   "area": "Keeper",
+   "label": "MCP server rows (Always allow switch)",
+   "source": "McpServerConnections.kt:97",
+   "reachable_via": "Connections",
+   "files": [
+    "McpServerConnections.kt"
+   ],
+   "symbols": [
+    "McpServerConnections"
+   ],
+   "edits": [
+    "mcp.alwaysAllow"
+   ],
+   "canonical_for": [
+    "mcp.alwaysAllow"
+   ],
+   "inplace_editor": false,
+   "back_to": "keeper.connections",
+   "source_resolved": true
+  },
+  {
+   "id": "keeper.schedule.card",
+   "kind": "entity-editor",
+   "area": "Keeper",
+   "label": "Schedule card (on/off, run now, cadence)",
+   "source": "SchedulesPart.kt:121",
+   "reachable_via": "Schedules",
+   "files": [
+    "SchedulesPart.kt"
+   ],
+   "symbols": [],
+   "edits": [
+    "schedule"
+   ],
+   "canonical_for": [
+    "schedule"
+   ],
+   "inplace_editor": false,
+   "back_to": "keeper.schedules"
+  },
+  {
+   "id": "keeper.delegation.row",
+   "kind": "entity-editor",
+   "area": "Keeper",
+   "label": "Delegation rows",
+   "source": "DelegationsPart.kt:70",
+   "reachable_via": "Delegations",
+   "files": [
+    "DelegationsPart.kt"
+   ],
+   "symbols": [],
+   "edits": [
+    "delegation"
+   ],
+   "canonical_for": [
+    "delegation"
+   ],
+   "inplace_editor": false,
+   "back_to": "keeper.delegations"
+  },
+  {
+   "id": "keeper.improvement.proposal",
+   "kind": "entity-editor",
+   "area": "Keeper",
+   "label": "Improvement proposal cards (Adopt / Dismiss)",
+   "source": "ImprovementPart.kt:256",
+   "reachable_via": "Improvement",
+   "files": [
+    "ImprovementPart.kt"
+   ],
+   "symbols": [
+    "onSaveRoleInstructions"
+   ],
+   "edits": [
+    "role.instructions"
+   ],
+   "canonical_for": [],
+   "inplace_editor": true,
+   "back_to": "keeper.improvement"
+  },
+  {
+   "id": "keeper.limits.caps",
+   "kind": "entity-editor",
+   "area": "Keeper",
+   "label": "Spend caps editor",
+   "source": "SpendCapsSettings.kt:23",
+   "reachable_via": "Limits (wide) or Device (phone)",
+   "files": [
+    "SpendCapsSettings.kt"
+   ],
+   "symbols": [
+    "SpendCapsSettings"
+   ],
+   "edits": [
+    "spend.caps"
+   ],
+   "canonical_for": [
+    "spend.caps"
+   ],
+   "inplace_editor": false,
+   "back_to": "keeper.limits",
+   "source_resolved": true
+  },
+  {
+   "id": "provider.credential",
+   "kind": "dialog",
+   "area": "Keeper",
+   "label": "Provider credential setup dialog",
+   "source": "ProviderCredentialUi.kt:44",
+   "reachable_via": "onReconfigureProvider(id) / onConnectFreeProvider",
+   "files": [
+    "ProviderCredentialUi.kt"
+   ],
+   "symbols": [
+    "ProviderCredentialSetup"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "keeper.provider",
+   "source_resolved": true
+  },
+  {
+   "id": "repo.credential",
+   "kind": "dialog",
+   "area": "Keeper",
+   "label": "Repository credential dialog",
+   "source": "RepositoryServiceScreen.kt:94",
+   "reachable_via": "Repository connection",
+   "files": [
+    "RepositoryServiceScreen.kt"
+   ],
+   "symbols": [],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "keeper.repo"
+  },
+  {
+   "id": "dlg.provider.confirm",
+   "kind": "dialog",
+   "area": "Keeper",
+   "label": "Provider/Projects management dialogs",
+   "source": "ProviderManagementScreens.kt:874",
+   "reachable_via": "Connections / Limits / Projects",
+   "files": [
+    "ProviderManagementScreens.kt"
+   ],
+   "symbols": [],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "keeper.connections"
+  },
+  {
+   "id": "dlg.mcpserver",
+   "kind": "dialog",
+   "area": "Keeper",
+   "label": "MCP server add/remove dialog",
+   "source": "McpServerConnections.kt:287",
+   "reachable_via": "MCP rows",
+   "files": [
+    "McpServerConnections.kt"
+   ],
+   "symbols": [],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "keeper.mcp"
+  },
+  {
+   "id": "dlg.mcpconsent",
+   "kind": "dialog",
+   "area": "Dialogs",
+   "label": "MCP consent dialog",
+   "source": "McpServerConnections.kt:329",
+   "reachable_via": "MCP tool call needs consent",
+   "files": [
+    "McpServerConnections.kt"
+   ],
+   "symbols": [
+    "McpConsentDialog"
+   ],
+   "edits": [
+    "mcp.alwaysAllow"
+   ],
+   "canonical_for": [],
+   "inplace_editor": true,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "dlg.mcpelicit",
+   "kind": "dialog",
+   "area": "Dialogs",
+   "label": "MCP elicitation dialog",
+   "source": "McpElicitationDialog.kt:82",
+   "reachable_via": "MCP server asks keeper",
+   "files": [
+    "McpElicitationDialog.kt"
+   ],
+   "symbols": [
+    "McpElicitationDialog"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "dlg.delegationoffer",
+   "kind": "dialog",
+   "area": "Dialogs",
+   "label": "Delegation offer dialog",
+   "source": "DelegationsPart.kt:47",
+   "reachable_via": "gate approved: offer to delegate",
+   "files": [
+    "DelegationsPart.kt"
+   ],
+   "symbols": [
+    "DelegationOfferDialog"
+   ],
+   "edits": [
+    "delegation"
+   ],
+   "canonical_for": [],
+   "inplace_editor": true,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
+   "id": "android.splash",
+   "kind": "panel",
+   "area": "Entry",
+   "label": "Android splash (until startup ready)",
+   "source": "androidApp/.../MainActivity.kt:790",
+   "reachable_via": "Android cold start",
+   "files": [
+    "MainActivity.kt"
+   ],
+   "symbols": [
+    "HaiveSplashScreen"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": ""
+  },
+  {
+   "id": "dlg.android.crash",
+   "kind": "dialog",
+   "area": "Dialogs",
+   "label": "Crash report sent notice (Android)",
+   "source": "androidApp/.../MainActivity.kt:678",
+   "reachable_via": "after a crash report is sent",
+   "files": [
+    "MainActivity.kt"
+   ],
+   "symbols": [],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live"
+  },
+  {
+   "id": "dlg.android.update",
+   "kind": "dialog",
+   "area": "Dialogs",
+   "label": "Update available / error prompt (Android)",
+   "source": "androidApp/.../AndroidUpdateUi.kt:23",
+   "reachable_via": "update check result",
+   "files": [
+    "AndroidUpdateUi.kt"
+   ],
+   "symbols": [
+    "AndroidUpdatePrompt"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live"
+  },
+  {
+   "id": "dlg.azphalt",
+   "kind": "dialog",
+   "area": "Dialogs",
+   "label": "Azphalt alert dialog (shared component)",
+   "source": "AzphaltDialog.kt:20",
+   "reachable_via": "generic confirm",
+   "files": [
+    "AzphaltDialog.kt"
+   ],
+   "symbols": [
+    "AzphaltAlertDialog"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  }
+ ],
+ "edges": [
+  {
+   "from": "app.start",
+   "to": "hive.live",
+   "trigger": "launch lands on Overview",
+   "callback": "startupControlRoomDestination",
+   "source": "App.kt:1178",
+   "kind": "system",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "app.start",
+   "to": "ext.intent",
+   "trigger": "package file opened from OS",
+   "callback": "azphaltPackageImportRequest",
+   "source": "AndroidManifest.xml:46",
+   "kind": "system",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "ext.intent",
+   "to": "store",
+   "trigger": "package import forces Store",
+   "callback": "azphaltPackageImportRequest",
+   "source": "App.kt:536",
+   "kind": "system",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "app.start",
+   "to": "android.splash",
+   "trigger": "Android cold start",
+   "callback": "setContent",
+   "source": "MainActivity.kt:231",
+   "kind": "system",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "android.splash",
+   "to": "hive.live",
+   "trigger": "startup ready",
+   "callback": "HaiveSplashScreen",
+   "source": "MainActivity.kt:231",
+   "kind": "system",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "dlg.android.crash",
+   "trigger": "crash report sent",
+   "callback": "AzphaltAlertDialog",
+   "source": "MainActivity.kt:678",
+   "kind": "system",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "dlg.android.update",
+   "trigger": "update check finishes",
+   "callback": "AndroidUpdatePrompt",
+   "source": "AndroidUpdateUi.kt:23",
+   "kind": "system",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "app.start",
+   "to": "web.terrarium",
+   "trigger": "web ?terrariumPreview=1",
+   "callback": "window.location.search",
+   "source": "webApp/.../Main.kt:89",
+   "kind": "system",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "app.start",
+   "to": "web.rigs",
+   "trigger": "web ?creatureRigs=1",
+   "callback": "window.location.search",
+   "source": "webApp/.../Main.kt:93",
+   "kind": "system",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "shell.rail",
+   "trigger": "rail always shown",
+   "callback": "ShellRail",
+   "source": "ShellRail.kt:90",
+   "kind": "system",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "shell.crumbs",
+   "trigger": "breadcrumb always shown",
+   "callback": "shellCrumbs",
+   "source": "ControlRoomUi.kt:480",
+   "kind": "system",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "shell.rail",
+   "to": "hive.live",
+   "trigger": "tap Hive",
+   "callback": "railHiveStep / onPlace",
+   "source": "ShellRail.kt:133",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "shell.rail",
+   "to": "hive.district",
+   "trigger": "tap Hives pill",
+   "callback": "zoomOut",
+   "source": "ControlRoomUi.kt:301",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "shell.rail",
+   "to": "roster",
+   "trigger": "tap Swarm",
+   "callback": "onPlace(Swarm)",
+   "source": "ShellRail.kt:90",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "shell.rail",
+   "to": "stable",
+   "trigger": "tap Stable",
+   "callback": "onPlace(Stable)",
+   "source": "ShellRail.kt:90",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "shell.rail",
+   "to": "inbox",
+   "trigger": "tap Inbox",
+   "callback": "openInbox",
+   "source": "ControlRoomUi.kt:332",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "shell.rail",
+   "to": "creature.needs",
+   "trigger": "tap Inbox badge when a creature waits",
+   "callback": "openInbox",
+   "source": "ControlRoomUi.kt:332",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "shell.rail",
+   "to": "memory",
+   "trigger": "tap Memory",
+   "callback": "onPlace(Memory)",
+   "source": "ShellRail.kt:90",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "shell.rail",
+   "to": "store",
+   "trigger": "tap Store",
+   "callback": "onPlace(AddOns)",
+   "source": "ShellRail.kt:90",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "shell.rail",
+   "to": "keeper",
+   "trigger": "tap gear / rail foot",
+   "callback": "openKeeper",
+   "source": "ControlRoomUi.kt:448",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "shell.rail",
+   "to": "wf.library",
+   "trigger": "add Workflows to the rail",
+   "callback": "(none)",
+   "source": "ShellRail.kt:90",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "shell.crumbs",
+   "to": "hive.district",
+   "trigger": "tap Hive crumb (inside a hive)",
+   "callback": "onOpenDistrict",
+   "source": "ControlRoomUi.kt:480",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "shell.crumbs",
+   "to": "hive.live",
+   "trigger": "tap hive-name crumb",
+   "callback": "onOpenHive",
+   "source": "ControlRoomUi.kt:480",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "shell.crumbs",
+   "to": "keeper",
+   "trigger": "tap Keeper's room crumb (phone)",
+   "callback": "onCloseKeeperPart",
+   "source": "KeeperRoom.kt:144",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "shell.crumbs",
+   "to": "keeper.repo",
+   "trigger": "tap repository crumb (today plain text)",
+   "callback": "(none)",
+   "source": "ControlRoomUi.kt:480",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "shell.crumbs",
+   "to": "hive.timeline",
+   "trigger": "tap timeline crumb (today plain text)",
+   "callback": "(none)",
+   "source": "ControlRoomUi.kt:480",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "shell.crumbs",
+   "to": "creature.work",
+   "trigger": "tap creature-tab crumb (today plain text)",
+   "callback": "(none)",
+   "source": "ControlRoomUi.kt:480",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "hive.build",
+   "trigger": "Mode segment: Build",
+   "callback": "ModeSegment",
+   "source": "HiveWorkspace.kt:1",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "hive.flow",
+   "trigger": "Mode segment: Flowchart",
+   "callback": "ModeSegment",
+   "source": "HiveWorkspace.kt:1",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.build",
+   "to": "hive.live",
+   "trigger": "Mode segment: Live",
+   "callback": "ModeSegment",
+   "source": "HiveWorkspace.kt:1",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.flow",
+   "to": "hive.live",
+   "trigger": "Mode segment: Live",
+   "callback": "ModeSegment",
+   "source": "HiveWorkspace.kt:1",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "hive.district",
+   "trigger": "Hives pill",
+   "callback": "zoomOut",
+   "source": "ControlRoomUi.kt:301",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.district",
+   "to": "hive.live",
+   "trigger": "tap live hive cell",
+   "callback": "onEnterNeighbourhood",
+   "source": "ControlRoomUi.kt:960",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.district",
+   "to": "hive.resting",
+   "trigger": "tap resting hive cell / New hive",
+   "callback": "onEnterNeighbourhood",
+   "source": "ControlRoomUi.kt:957",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.district",
+   "to": "stable",
+   "trigger": "embedded Stable section",
+   "callback": "StableSection",
+   "source": "DistrictScreen.kt:1",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.district",
+   "to": "hive.import",
+   "trigger": "Import card",
+   "callback": "importCard",
+   "source": "HiveCardPanels.kt:128",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.district",
+   "to": "keeper.projects",
+   "trigger": "tap project group header (today plain text)",
+   "callback": "(none)",
+   "source": "DistrictScreen.kt:1",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "hive.share",
+   "trigger": "Share card pill",
+   "callback": "sharingHiveCard",
+   "source": "HiveCardPanels.kt:77",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "hive.actions",
+   "trigger": "long-press hive",
+   "callback": "HiveActionsMenu",
+   "source": "HiveActionsMenu.kt:26",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.actions",
+   "to": "hive.delete",
+   "trigger": "Delete",
+   "callback": "DeleteHiveControl",
+   "source": "HiveDeletion.kt:134",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.delete",
+   "to": "store",
+   "trigger": "\"Remove the package in the Store\" (today prose)",
+   "callback": "(none)",
+   "source": "HiveDeletion.kt:134",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "dlg.stoprun",
+   "trigger": "Stop pill",
+   "callback": "stop confirm",
+   "source": "ControlRoomUi.kt:988",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "hive.launchbar",
+   "trigger": "launch bar in page",
+   "callback": "HiveLaunchBar",
+   "source": "HiveScreens.kt:56",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "hive.runscars",
+   "trigger": "run scars in page",
+   "callback": "RunScars",
+   "source": "RunScars.kt:30",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "hive.continue",
+   "trigger": "continue panel",
+   "callback": "ContinueRunPanel",
+   "source": "RunLineageLaunch.kt:199",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "hive.rerun",
+   "trigger": "rerun from task",
+   "callback": "RerunFromTaskPanel",
+   "source": "RunLineageLaunch.kt:254",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "hive.planning",
+   "trigger": "run starts planning",
+   "callback": "PlanningOverlay",
+   "source": "PlanningOverlay.kt:42",
+   "kind": "system",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.planning",
+   "to": "hive.plandecision",
+   "trigger": "plan ready for review",
+   "callback": "PlanDecisionContent",
+   "source": "PlanDecisionOverlay.kt:39",
+   "kind": "system",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "hive.agentq",
+   "trigger": "agent asks a question",
+   "callback": "AgentQuestionPanel",
+   "source": "AgentQuestionPanel.kt:54",
+   "kind": "system",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "hive.steps",
+   "trigger": "launch steps feed",
+   "callback": "LaunchStepsOverlay",
+   "source": "LiveStepsFeed.kt:197",
+   "kind": "system",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "dlg.mindmap",
+   "trigger": "in-hive confirm",
+   "callback": "AzphaltAlertDialog",
+   "source": "MindMapRunScreen.kt:306",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.resting",
+   "to": "hive.rolepreview",
+   "trigger": "tap suggested role",
+   "callback": "RolePreviewSheet",
+   "source": "NewHiveRoles.kt:290",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.resting",
+   "to": "wf.overview",
+   "trigger": "More editing pill",
+   "callback": "openHiveInWorkflows",
+   "source": "ControlRoomUi.kt:901",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "wf.overview",
+   "trigger": "More editing pill",
+   "callback": "openHiveInWorkflows",
+   "source": "ControlRoomUi.kt:901",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "wf.overview",
+   "trigger": "validation error: Edit workflow",
+   "callback": "onEditWorkflow",
+   "source": "MindMapRunScreen.kt:891",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "hive.timeline",
+   "trigger": "Timeline pill",
+   "callback": "showTimeline",
+   "source": "ControlRoomUi.kt:350",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.timeline",
+   "to": "tl.overview",
+   "trigger": "Overview tab",
+   "callback": "RunTimeline",
+   "source": "HiveScreens.kt:143",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.timeline",
+   "to": "tl.waterfall",
+   "trigger": "Waterfall tab",
+   "callback": "RunTimeline",
+   "source": "HiveScreens.kt:143",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.timeline",
+   "to": "tl.events",
+   "trigger": "Events tab",
+   "callback": "RunTimeline",
+   "source": "HiveScreens.kt:143",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.timeline",
+   "to": "tl.log",
+   "trigger": "Log tab",
+   "callback": "RunTimeline",
+   "source": "HiveScreens.kt:143",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.timeline",
+   "to": "tl.memory",
+   "trigger": "Memory tab",
+   "callback": "memoryContent",
+   "source": "ControlRoomUi.kt:1136",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "tl.memory",
+   "to": "memory",
+   "trigger": "embeds the Memory screen",
+   "callback": "MemoryLayerScreen",
+   "source": "ControlRoomUi.kt:1136",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "tl.waterfall",
+   "to": "creature.panel",
+   "trigger": "tap a bar (toggles!)",
+   "callback": "selectCreature",
+   "source": "RunWaterfallChart.kt:169",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "tl.events",
+   "to": "creature.panel",
+   "trigger": "tap an event row",
+   "callback": "selectCreature",
+   "source": "HiveScreens.kt:96",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "tl.log",
+   "to": "creature.panel",
+   "trigger": "tap a log row",
+   "callback": "selectCreature",
+   "source": "LogView.kt:187",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "tl.events",
+   "to": "keeper.delegations",
+   "trigger": "\"Approved by delegation\" event line (today text)",
+   "callback": "(none)",
+   "source": "HiveScreens.kt:96",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "creature.panel",
+   "trigger": "tap creature cell (wide)",
+   "callback": "selectCreature",
+   "source": "ControlRoomUi.kt:274",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "creature.sheet",
+   "trigger": "tap creature cell (phone)",
+   "callback": "selectCreature",
+   "source": "ControlRoomUi.kt:607",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "creature.sheet",
+   "to": "creature.panel",
+   "trigger": "sheet hosts the panel",
+   "callback": "ModalBottomSheet",
+   "source": "ControlRoomUi.kt:607",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "creature.needs",
+   "trigger": "owner-attention card / status line",
+   "callback": "openCreature",
+   "source": "ControlRoomUi.kt:283",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "creature.panel",
+   "to": "creature.needs",
+   "trigger": "Needs tab",
+   "callback": "CreatureTab.Needs",
+   "source": "LiveTechnicalInspector.kt:854",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "creature.panel",
+   "to": "creature.work",
+   "trigger": "Work tab",
+   "callback": "CreatureTab.Work",
+   "source": "LiveTechnicalInspector.kt:854",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "creature.panel",
+   "to": "creature.mind",
+   "trigger": "Mind tab",
+   "callback": "CreatureTab.Mind",
+   "source": "LiveTechnicalInspector.kt:854",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "creature.needs",
+   "to": "dlg.confirm.inspector",
+   "trigger": "Reject plan / Stop workflow",
+   "callback": "AzphaltAlertDialog",
+   "source": "LiveTechnicalInspector.kt:326",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "creature.needs",
+   "to": "creature.mind",
+   "trigger": "Budget meter / Raise its budget",
+   "callback": "onOpenMind",
+   "source": "CreatureNeedsPanel.kt:54",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "creature.needs",
+   "to": "roster.role",
+   "trigger": "Raise budget goes straight to the role budget field",
+   "callback": "Role(roleId, TokenBudget)",
+   "source": "LiveTechnicalInspector.kt:417",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "creature.work",
+   "to": "creature.jobeditor",
+   "trigger": "job fields edited in place",
+   "callback": "HiveJobEditor",
+   "source": "LiveTechnicalInspector.kt:431",
+   "kind": "inline-edit",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "creature.work",
+   "to": "creature.providerrow",
+   "trigger": "provider picked in place",
+   "callback": "CreatureProviderRow",
+   "source": "LiveTechnicalInspector.kt:440",
+   "kind": "inline-edit",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "creature.jobeditor",
+   "to": "build.jobeditor",
+   "trigger": "link to the task's canonical editor",
+   "callback": "Task(defId, taskId, field)",
+   "source": "HiveJobEditor.kt:79",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "creature.jobeditor",
+   "to": "keeper.compute",
+   "trigger": "Runs on row links to Compute instead of cycling",
+   "callback": "Compute(task)",
+   "source": "HiveJobEditor.kt:195",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "creature.providerrow",
+   "to": "roster.role",
+   "trigger": "link to the role's provider field",
+   "callback": "Role(roleId, Provider)",
+   "source": "CreatureProviderRow.kt:36",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "creature.providerrow",
+   "to": "keeper.connections",
+   "trigger": "unconnected pinned provider",
+   "callback": "onOpenConnections",
+   "source": "CreatureProviderRow.kt:60",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "creature.work",
+   "to": "keeper.connections",
+   "trigger": "Provider line",
+   "callback": "onOpenConnections",
+   "source": "LiveTechnicalInspector.kt:512",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "creature.work",
+   "to": "keeper.provider",
+   "trigger": "Provider line goes to the provider itself",
+   "callback": "Provider(providerId)",
+   "source": "LiveTechnicalInspector.kt:512",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "creature.work",
+   "to": "compute",
+   "trigger": "Runs on / executor lines / REMOTE_COMPUTE_UNAVAILABLE",
+   "callback": "onOpenCompute",
+   "source": "ControlRoomUi.kt:427",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "creature.work",
+   "to": "keeper.repo",
+   "trigger": "GitHubAction / ExternalService executor line",
+   "callback": "onOpenConnections",
+   "source": "LiveTechnicalInspector.kt:500",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "creature.work",
+   "to": "hive.timeline",
+   "trigger": "Open its trace",
+   "callback": "onOpenTrace",
+   "source": "ControlRoomUi.kt:433",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "creature.work",
+   "to": "roster.role",
+   "trigger": "Responsible role / payload context (today text)",
+   "callback": "Role(roleId)",
+   "source": "LiveTechnicalInspector.kt:510",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "creature.work",
+   "to": "wf.overview",
+   "trigger": "payload redaction policy (today text)",
+   "callback": "Workflow(defId, Overview)",
+   "source": "LiveTechnicalInspector.kt:662",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "creature.panel",
+   "to": "keeper.provider",
+   "trigger": "header \"state . provider . 3 of 5\" provider segment",
+   "callback": "Provider(id)",
+   "source": "LiveTechnicalInspector.kt:309",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "creature.panel",
+   "to": "hive.timeline",
+   "trigger": "header state segment opens trace",
+   "callback": "onOpenTrace",
+   "source": "LiveTechnicalInspector.kt:309",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "creature.panel",
+   "to": "creature.work",
+   "trigger": "header line (today only Work tab)",
+   "callback": "onTabChange(Work)",
+   "source": "LiveTechnicalInspector.kt:309",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "creature.mind",
+   "to": "creature.mind.roleform",
+   "trigger": "role form embedded",
+   "callback": "focusRole",
+   "source": "LiveTechnicalInspector.kt:698",
+   "kind": "inline-edit",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "creature.mind",
+   "to": "creature.mind.proposals",
+   "trigger": "proposal panel embedded",
+   "callback": "RoleInstructionProposalPanel",
+   "source": "LiveTechnicalInspector.kt:695",
+   "kind": "inline-edit",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "creature.mind",
+   "to": "creature.mind.stablepicker",
+   "trigger": "creature picker embedded",
+   "callback": "CreaturePicker",
+   "source": "LiveTechnicalInspector.kt:690",
+   "kind": "inline-edit",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "creature.mind",
+   "to": "roster.role",
+   "trigger": "Mind becomes a summary list linking each row to the role",
+   "callback": "Role(roleId, field)",
+   "source": "LiveTechnicalInspector.kt:687",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "creature.mind.roleform",
+   "to": "roster.role",
+   "trigger": "link to the canonical role page",
+   "callback": "Role(roleId)",
+   "source": "LiveTechnicalInspector.kt:698",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "creature.mind.proposals",
+   "to": "keeper.improvement.proposal",
+   "trigger": "proposals live in one ledger",
+   "callback": "Keeper(Improvement, proposalId)",
+   "source": "RoleInstructionProposalPanel.kt:66",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "creature.mind.stablepicker",
+   "to": "roster.role",
+   "trigger": "stable creature belongs on the role page",
+   "callback": "Role(roleId, StableCreature)",
+   "source": "StableScreens.kt:563",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "hive.build",
+   "to": "build.jobeditor",
+   "trigger": "select creature in Build",
+   "callback": "HiveJobEditor",
+   "source": "TerrariumConnections.kt:234",
+   "kind": "inline-edit",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.build",
+   "to": "wf.overview",
+   "trigger": "Build links to the Workflows editor",
+   "callback": "openHiveInWorkflows",
+   "source": "WorkflowTerrarium.kt:1",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "wf.overview",
+   "to": "hive.build",
+   "trigger": "Workflows links to Build for structure",
+   "callback": "Hive(defId, Build)",
+   "source": "WorkflowLibraryTabs.kt:94",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "hive.build",
+   "to": "roster.role",
+   "trigger": "terrarium badge \"Pinned: Claude / Auto\"",
+   "callback": "Role(roleId, Provider)",
+   "source": "MascotNodeTerrarium.kt:822",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "keeper.schedules",
+   "trigger": "hive shows \"Scheduled\" note",
+   "callback": "Schedule(id)",
+   "source": "HiveWorkspace.kt:1",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "keeper.repo",
+   "trigger": "repository progress record title",
+   "callback": "Connection(repoServiceId)",
+   "source": "RepositoryProgressUi.kt:105",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "ext.openuri",
+   "trigger": "PR / branch link",
+   "callback": "openUri",
+   "source": "RepositoryProgressUi.kt:105",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "creature.work",
+   "trigger": "\"What it made\" artifacts (today text)",
+   "callback": "Artifact(taskId, artifactId)",
+   "source": "MindMapRunScreen.kt:830",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "keeper.connections",
+   "trigger": "\"Check connections\" on feed errors",
+   "callback": "onOpenConnections",
+   "source": "HiveWorkspace.kt:555",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "provider.credential",
+   "trigger": "first-run free gateway pills",
+   "callback": "onConnectFreeProvider",
+   "source": "MindMapRunScreen.kt:735",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "dlg.mcpconsent",
+   "trigger": "MCP tool call needs consent",
+   "callback": "McpConsentDialog",
+   "source": "App.kt:721",
+   "kind": "system",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "dlg.mcpelicit",
+   "trigger": "MCP server asks a question",
+   "callback": "McpElicitationDialog",
+   "source": "App.kt:722",
+   "kind": "system",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "dlg.delegationoffer",
+   "trigger": "offer after a gate is approved",
+   "callback": "DelegationOfferDialog",
+   "source": "ControlRoomUi.kt:603",
+   "kind": "system",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "dlg.azphalt",
+   "trigger": "generic confirm",
+   "callback": "AzphaltAlertDialog",
+   "source": "AzphaltDialog.kt:20",
+   "kind": "system",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "dlg.delegationoffer",
+   "to": "keeper.delegations",
+   "trigger": "offer links to the delegation it creates",
+   "callback": "Keeper(Delegations, key)",
+   "source": "DelegationsPart.kt:47",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "dlg.mcpconsent",
+   "to": "keeper.mcp",
+   "trigger": "server name links to its row",
+   "callback": "McpServer(id)",
+   "source": "McpServerConnections.kt:329",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "wf.overview",
+   "to": "wf.library",
+   "trigger": "Library tab",
+   "callback": "WorkflowLibraryTab.Library",
+   "source": "WorkflowLibraryTabs.kt:11",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "wf.library",
+   "to": "wf.store",
+   "trigger": "Store tab",
+   "callback": "WorkflowLibraryTab.Store",
+   "source": "WorkflowLibraryTabs.kt:12",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "wf.library",
+   "to": "wf.overview",
+   "trigger": "Overview tab",
+   "callback": "WorkflowLibraryTab.Overview",
+   "source": "WorkflowLibraryTabs.kt:13",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "wf.library",
+   "to": "wf.bowl",
+   "trigger": "Bowl tab",
+   "callback": "WorkflowLibraryTab.Bowl",
+   "source": "WorkflowLibraryTabs.kt:15",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "wf.library",
+   "to": "wf.tasks",
+   "trigger": "Tasks tab",
+   "callback": "WorkflowLibraryTab.Tasks",
+   "source": "WorkflowLibraryTabs.kt:16",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "wf.library",
+   "to": "wf.combine",
+   "trigger": "Combine tab",
+   "callback": "WorkflowLibraryTab.Combine",
+   "source": "WorkflowLibraryTabs.kt:17",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "wf.library",
+   "to": "wf.save",
+   "trigger": "Save tab",
+   "callback": "WorkflowLibraryTab.Save",
+   "source": "WorkflowLibraryTabs.kt:18",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "wf.tasks",
+   "to": "wf.tasks.editor",
+   "trigger": "expand a task row",
+   "callback": "workflows.selected-task-id",
+   "source": "LiveWorkflowLibraryScreen.kt:474",
+   "kind": "inline-edit",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "wf.tasks.editor",
+   "to": "roster.role",
+   "trigger": "role name label links to the role",
+   "callback": "Role(roleId)",
+   "source": "LiveWorkflowLibraryScreen.kt:511",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "wf.store",
+   "to": "store",
+   "trigger": "replace the second Store with a link",
+   "callback": "Store(category)",
+   "source": "LiveWorkflowLibraryScreen.kt:319",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "wf.tasks",
+   "to": "hive.build",
+   "trigger": "Tasks tab opens task in Build",
+   "callback": "Task(defId, taskId)",
+   "source": "LiveWorkflowLibraryScreen.kt:474",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "roster",
+   "to": "roster.role",
+   "trigger": "tap role card",
+   "callback": "focusRole",
+   "source": "CompanyCustomizationScreen.kt:438",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "roster",
+   "to": "roster.card",
+   "trigger": "role card provider pills",
+   "callback": "CompanyCustomizationScreen.kt",
+   "source": "CompanyCustomizationScreen.kt:955",
+   "kind": "inline-edit",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "roster",
+   "to": "roster.policies",
+   "trigger": "workflow policies records",
+   "callback": "CompanyCustomizationScreen.kt",
+   "source": "CompanyCustomizationScreen.kt:996",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "roster.card",
+   "to": "roster.role",
+   "trigger": "card well collapses to the role form",
+   "callback": "Role(roleId, Provider)",
+   "source": "CompanyCustomizationScreen.kt:955",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "roster.policies",
+   "to": "wf.overview",
+   "trigger": "policies link to where they change",
+   "callback": "Workflow(defId, Overview)",
+   "source": "CompanyCustomizationScreen.kt:996",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "roster",
+   "to": "wf.overview",
+   "trigger": "\"in N hives\" opens the list of hives (today text)",
+   "callback": "Workflow(defId)",
+   "source": "CompanyCustomizationScreen.kt:886",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "stable",
+   "to": "roster.role",
+   "trigger": "\"living in agent X\" caption (today text)",
+   "callback": "Role(roleId)",
+   "source": "StableScreens.kt:563",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "inbox",
+   "to": "inbox.list",
+   "trigger": "list",
+   "callback": "LiveInboxScreen",
+   "source": "LiveInboxScreen.kt:106",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "inbox.list",
+   "to": "inbox.detail",
+   "trigger": "select entry",
+   "callback": "inbox.selected",
+   "source": "LiveInboxScreen.kt:284",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "inbox",
+   "to": "inbox.spend",
+   "trigger": "spend cap stop",
+   "callback": "SpendStopInboxScreen",
+   "source": "SpendStopInboxScreen.kt:34",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "inbox",
+   "to": "inbox.hallpause",
+   "trigger": "Hall Monitor pause",
+   "callback": "HallMonitorPauseInboxScreen",
+   "source": "HallMonitorInboxScreen.kt:47",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "inbox",
+   "to": "inbox.halltrial",
+   "trigger": "Hall Monitor trial",
+   "callback": "HallMonitorTrialInboxScreen",
+   "source": "HallMonitorInboxScreen.kt:174",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "inbox",
+   "to": "dlg.confirm.inbox2",
+   "trigger": "stop/reject confirm",
+   "callback": "AzphaltAlertDialog",
+   "source": "ControlRoomScreens.kt:189",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "inbox.detail",
+   "to": "dlg.confirm.inbox",
+   "trigger": "Reject / Stop confirm",
+   "callback": "AzphaltAlertDialog",
+   "source": "LiveInboxScreen.kt:298",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "inbox.spend",
+   "to": "keeper.limits",
+   "trigger": "change caps",
+   "callback": "onOpenLimits",
+   "source": "ControlRoomUi.kt:1199",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "inbox.detail",
+   "to": "creature.needs",
+   "trigger": "Open creature (every entry)",
+   "callback": "Creature(taskId, Needs)",
+   "source": "LiveInboxScreen.kt:284",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "inbox.detail",
+   "to": "roster.role",
+   "trigger": "BudgetSpent: Raise the budget (today prose only)",
+   "callback": "Role(roleId, TokenBudget)",
+   "source": "LiveInboxScreen.kt:293",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "inbox.detail",
+   "to": "creature.work",
+   "trigger": "artifact cards open the creature's Work",
+   "callback": "Artifact(taskId, id)",
+   "source": "LiveInboxScreen.kt:284",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "inbox.hallpause",
+   "to": "creature.needs",
+   "trigger": "finding.subject (today text)",
+   "callback": "Creature(...)",
+   "source": "HallMonitorInboxScreen.kt:85",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "inbox.hallpause",
+   "to": "roster.role",
+   "trigger": "solution.target (today text)",
+   "callback": "Role(...)",
+   "source": "HallMonitorInboxScreen.kt:125",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "inbox.halltrial",
+   "to": "wf.overview",
+   "trigger": "solution.target (today text)",
+   "callback": "Workflow(...)",
+   "source": "HallMonitorInboxScreen.kt:174",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "compute",
+   "to": "keeper.compute",
+   "trigger": "retired destination aliases the Keeper part",
+   "callback": "KeeperSection.of(Compute)",
+   "source": "KeeperRoom.kt:96",
+   "kind": "system",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper.compute",
+   "to": "wf.overview",
+   "trigger": "workflow rows (today text)",
+   "callback": "Workflow(defId)",
+   "source": "ComputeDelegationScreen.kt:190",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "keeper.compute",
+   "to": "roster.role",
+   "trigger": "role rows (today text)",
+   "callback": "Role(roleId)",
+   "source": "ComputeDelegationScreen.kt:230",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "keeper.compute",
+   "to": "creature.work",
+   "trigger": "task rows (today text)",
+   "callback": "Creature(taskId, Work)",
+   "source": "ComputeDelegationScreen.kt:268",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "keeper.compute",
+   "to": "creature.work",
+   "trigger": "Back returns to the creature + tab it was opened from (B1)",
+   "callback": "history snapshot",
+   "source": "App.kt:738",
+   "kind": "back",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "keeper.connections",
+   "to": "creature.work",
+   "trigger": "Back returns to the creature + tab it was opened from (B1)",
+   "callback": "history snapshot",
+   "source": "App.kt:738",
+   "kind": "back",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "keeper.limits",
+   "to": "creature.work",
+   "trigger": "Back returns to the creature + tab it was opened from (B1)",
+   "callback": "history snapshot",
+   "source": "App.kt:738",
+   "kind": "back",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "memory",
+   "to": "memory.engine",
+   "trigger": "stage engine provider + model pills",
+   "callback": "MemoryLayerScreen",
+   "source": "MemoryLayerScreen.kt:409",
+   "kind": "inline-edit",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "memory.engine",
+   "to": "keeper.provider",
+   "trigger": "unconnected provider chip links to the provider",
+   "callback": "Provider(id)",
+   "source": "MemoryLayerScreen.kt:455",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "store",
+   "to": "store.breeds",
+   "trigger": "Breeds category",
+   "callback": "AzphaltStoreCategory.Breeds",
+   "source": "AzphaltStoreScreen.kt:172",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "store",
+   "to": "store.llm",
+   "trigger": "Models / LLMs categories",
+   "callback": "AzphaltStoreCategory.Llms",
+   "source": "AzphaltStoreScreen.kt:175",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "store",
+   "to": "dlg.store.install",
+   "trigger": "install / remove confirm",
+   "callback": "AzphaltAlertDialog",
+   "source": "AzphaltStoreScreen.kt:604",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "store",
+   "to": "provider.credential",
+   "trigger": "Connect / Disconnect LLM",
+   "callback": "onReconfigureProvider",
+   "source": "AzphaltStoreScreen.kt:771",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "stable",
+   "to": "store",
+   "trigger": "breeds are bought in the Store",
+   "callback": "StoreBreeds",
+   "source": "StoreBreeds.kt:83",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "keeper",
+   "to": "keeper.connections",
+   "trigger": "part: Connections",
+   "callback": "keeper.section",
+   "source": "KeeperRoom.kt:96",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper",
+   "to": "keeper.compute",
+   "trigger": "part: Compute",
+   "callback": "keeper.section",
+   "source": "KeeperRoom.kt:96",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper",
+   "to": "keeper.projects",
+   "trigger": "part: Projects",
+   "callback": "keeper.section",
+   "source": "KeeperRoom.kt:96",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper",
+   "to": "keeper.delegations",
+   "trigger": "part: Delegations",
+   "callback": "keeper.section",
+   "source": "KeeperRoom.kt:96",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper",
+   "to": "keeper.schedules",
+   "trigger": "part: Schedules",
+   "callback": "keeper.section",
+   "source": "KeeperRoom.kt:96",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper",
+   "to": "keeper.localagents",
+   "trigger": "part: Local agents (desktop)",
+   "callback": "keeper.section",
+   "source": "KeeperRoom.kt:96",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper",
+   "to": "keeper.improvement",
+   "trigger": "part: Improvement",
+   "callback": "keeper.section",
+   "source": "KeeperRoom.kt:96",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper",
+   "to": "keeper.limits",
+   "trigger": "part: Limits (wide)",
+   "callback": "keeper.section",
+   "source": "KeeperRoom.kt:96",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper",
+   "to": "keeper.device",
+   "trigger": "part: Device",
+   "callback": "keeper.section",
+   "source": "KeeperRoom.kt:96",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper",
+   "to": "keeper.appearance",
+   "trigger": "part: Appearance",
+   "callback": "keeper.section",
+   "source": "KeeperRoom.kt:96",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper",
+   "to": "keeper.about",
+   "trigger": "part: About",
+   "callback": "keeper.section",
+   "source": "KeeperRoom.kt:96",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper.connections",
+   "to": "keeper.provider",
+   "trigger": "provider rows",
+   "callback": "ProviderManagementScreens",
+   "source": "ProviderManagementScreens.kt:558",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper.connections",
+   "to": "keeper.a2a",
+   "trigger": "A2A agent rows",
+   "callback": "ProviderManagementScreens",
+   "source": "ProviderManagementScreens.kt:640",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper.connections",
+   "to": "keeper.repo",
+   "trigger": "repository service rows",
+   "callback": "RepositoryConnections",
+   "source": "RepositoryServiceScreen.kt:1",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper.connections",
+   "to": "keeper.mcp",
+   "trigger": "MCP server rows",
+   "callback": "McpServerConnections",
+   "source": "McpServerConnections.kt:1",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper.connections",
+   "to": "dlg.provider.confirm",
+   "trigger": "disconnect confirm",
+   "callback": "AzphaltAlertDialog",
+   "source": "ProviderManagementScreens.kt:874",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper.provider",
+   "to": "provider.credential",
+   "trigger": "Reconfigure / Connect",
+   "callback": "onReconfigureProvider",
+   "source": "ProviderManagementScreens.kt:558",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper.repo",
+   "to": "repo.credential",
+   "trigger": "configure repository service",
+   "callback": "onConfigureRepositoryService",
+   "source": "RepositoryServiceScreen.kt:94",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper.mcp",
+   "to": "dlg.mcpserver",
+   "trigger": "add / remove server",
+   "callback": "AzphaltAlertDialog",
+   "source": "McpServerConnections.kt:287",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper.schedules",
+   "to": "keeper.schedule.card",
+   "trigger": "schedule cards",
+   "callback": "SchedulesPart",
+   "source": "SchedulesPart.kt:121",
+   "kind": "inline-edit",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper.schedule.card",
+   "to": "wf.overview",
+   "trigger": "card title opens its hive",
+   "callback": "Workflow(workflowId)",
+   "source": "SchedulesPart.kt:121",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "keeper.delegations",
+   "to": "keeper.delegation.row",
+   "trigger": "delegation rows",
+   "callback": "DelegationsPart",
+   "source": "DelegationsPart.kt:65",
+   "kind": "inline-edit",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper.delegation.row",
+   "to": "roster.role",
+   "trigger": "role name (today text)",
+   "callback": "Role(roleId)",
+   "source": "DelegationsPart.kt:70",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "keeper.delegation.row",
+   "to": "keeper.provider",
+   "trigger": "provider label (today text)",
+   "callback": "Provider(id)",
+   "source": "DelegationsPart.kt:39",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "keeper.improvement",
+   "to": "keeper.improvement.proposal",
+   "trigger": "proposal cards",
+   "callback": "ImprovementPart",
+   "source": "ImprovementPart.kt:256",
+   "kind": "inline-edit",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper.improvement.proposal",
+   "to": "roster.role",
+   "trigger": "proposal target / Adopt shows diff on the role page",
+   "callback": "Role(roleId, Instructions)",
+   "source": "ImprovementPart.kt:256",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "keeper.improvement.proposal",
+   "to": "wf.overview",
+   "trigger": "\"Add to <hive>\" / target hive (today text)",
+   "callback": "Workflow(id)",
+   "source": "ImprovementPart.kt:256",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "keeper.improvement",
+   "to": "store",
+   "trigger": "\"Add the coding suite\" (today prose)",
+   "callback": "Store(Workflows)",
+   "source": "strings.xml:571",
+   "kind": "link",
+   "status": "missing",
+   "auto": false
+  },
+  {
+   "from": "keeper.limits",
+   "to": "keeper.limits.caps",
+   "trigger": "caps editor",
+   "callback": "SpendCapsSettings",
+   "source": "SpendCapsSettings.kt:23",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper.device",
+   "to": "keeper.limits.caps",
+   "trigger": "phone: caps live in Device",
+   "callback": "SpendCapsSettings",
+   "source": "ProviderManagementScreens.kt:917",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "app.start",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "ControlRoomUi.kt:803",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "hive.build",
+   "to": "hive.live",
+   "trigger": "Back / rail Hive (pops navigationHistory, else Overview)",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "hive.flow",
+   "to": "hive.live",
+   "trigger": "Back / rail Hive (pops navigationHistory, else Overview)",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "hive.district",
+   "to": "hive.live",
+   "trigger": "Back / rail Hive (pops navigationHistory, else Overview)",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "hive.resting",
+   "to": "hive.district",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "HiveScreens.kt:283",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "hive.timeline",
+   "to": "hive.live",
+   "trigger": "Back / rail Hive (pops navigationHistory, else Overview)",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "tl.overview",
+   "to": "hive.timeline",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "HiveScreens.kt:143",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "tl.waterfall",
+   "to": "hive.timeline",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "RunWaterfallChart.kt:126",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "tl.events",
+   "to": "hive.timeline",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "HiveScreens.kt:96",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "tl.log",
+   "to": "hive.timeline",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "LogView.kt:83",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "tl.memory",
+   "to": "hive.timeline",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "ControlRoomUi.kt:1136",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "hive.runscars",
+   "to": "hive.live",
+   "trigger": "Back / rail Hive (pops navigationHistory, else Overview)",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "hive.launchbar",
+   "to": "hive.live",
+   "trigger": "Back / rail Hive (pops navigationHistory, else Overview)",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "hive.continue",
+   "to": "hive.live",
+   "trigger": "Back / rail Hive (pops navigationHistory, else Overview)",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "hive.rerun",
+   "to": "hive.live",
+   "trigger": "Back / rail Hive (pops navigationHistory, else Overview)",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "hive.planning",
+   "to": "hive.live",
+   "trigger": "Back / rail Hive (pops navigationHistory, else Overview)",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "hive.plandecision",
+   "to": "hive.live",
+   "trigger": "Back / rail Hive (pops navigationHistory, else Overview)",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "hive.agentq",
+   "to": "hive.live",
+   "trigger": "Back / rail Hive (pops navigationHistory, else Overview)",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "hive.steps",
+   "to": "hive.live",
+   "trigger": "Back / rail Hive (pops navigationHistory, else Overview)",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "hive.share",
+   "to": "hive.live",
+   "trigger": "Back / rail Hive (pops navigationHistory, else Overview)",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "hive.import",
+   "to": "hive.district",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "HiveCardPanels.kt:128",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "hive.rolepreview",
+   "to": "hive.resting",
+   "trigger": "swipe down / Back",
+   "callback": "onDismissRequest",
+   "source": "NewHiveRoles.kt:290",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "hive.actions",
+   "to": "hive.live",
+   "trigger": "dismiss / confirm / cancel",
+   "callback": "onDismissRequest",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "hive.delete",
+   "to": "hive.actions",
+   "trigger": "dismiss / confirm / cancel",
+   "callback": "onDismissRequest",
+   "source": "HiveDeletion.kt:93",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "dlg.stoprun",
+   "to": "hive.live",
+   "trigger": "dismiss / confirm / cancel",
+   "callback": "onDismissRequest",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "dlg.mindmap",
+   "to": "hive.live",
+   "trigger": "dismiss / confirm / cancel",
+   "callback": "onDismissRequest",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "creature.sheet",
+   "to": "hive.live",
+   "trigger": "swipe down / Back",
+   "callback": "onDismissRequest",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "creature.panel",
+   "to": "hive.live",
+   "trigger": "Back / rail Hive (pops navigationHistory, else Overview)",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "creature.needs",
+   "to": "creature.panel",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "CreatureNeedsPanel.kt:49",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "creature.work",
+   "to": "creature.panel",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "LiveTechnicalInspector.kt:431",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "creature.mind",
+   "to": "creature.panel",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "HiveWorkspace.kt:685",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "creature.jobeditor",
+   "to": "creature.work",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "HiveJobEditor.kt:79",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "creature.providerrow",
+   "to": "creature.work",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "CreatureProviderRow.kt:29",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "creature.mind.roleform",
+   "to": "creature.mind",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "LiveTechnicalInspector.kt:698",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "creature.mind.proposals",
+   "to": "creature.mind",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "RoleInstructionProposalPanel.kt:66",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "creature.mind.stablepicker",
+   "to": "creature.mind",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "StableScreens.kt:563",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "build.jobeditor",
+   "to": "hive.build",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "TerrariumConnections.kt:234",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "dlg.confirm.inspector",
+   "to": "creature.needs",
+   "trigger": "dismiss / confirm / cancel",
+   "callback": "onDismissRequest",
+   "source": "LiveTechnicalInspector.kt:326",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "wf.library",
+   "to": "hive.live",
+   "trigger": "Back / rail Hive (pops navigationHistory, else Overview)",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "wf.store",
+   "to": "wf.library",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "LiveWorkflowLibraryScreen.kt:319",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "wf.overview",
+   "to": "wf.library",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "WorkflowLibraryTabs.kt:13",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "wf.bowl",
+   "to": "wf.library",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "WorkflowLibraryTabs.kt:15",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "wf.tasks",
+   "to": "wf.library",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "WorkflowLibraryTabs.kt:16",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "wf.combine",
+   "to": "wf.library",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "WorkflowLibraryTabs.kt:17",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "wf.save",
+   "to": "wf.library",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "WorkflowLibraryTabs.kt:18",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "wf.tasks.editor",
+   "to": "wf.tasks",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "LiveWorkflowLibraryScreen.kt:474",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "roster",
+   "to": "hive.live",
+   "trigger": "Back / rail Hive (pops navigationHistory, else Overview)",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "roster.card",
+   "to": "roster",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "CompanyCustomizationScreen.kt:955",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "roster.role",
+   "to": "roster",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "CompanyCustomizationScreen.kt:438",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "roster.policies",
+   "to": "roster",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "CompanyCustomizationScreen.kt:996",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "stable",
+   "to": "hive.live",
+   "trigger": "Back / rail Hive (pops navigationHistory, else Overview)",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "inbox",
+   "to": "hive.live",
+   "trigger": "Back / rail Hive (pops navigationHistory, else Overview)",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "inbox.list",
+   "to": "inbox",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "LiveInboxScreen.kt:106",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "inbox.detail",
+   "to": "inbox.list",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "LiveInboxScreen.kt:284",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "inbox.spend",
+   "to": "inbox",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "SpendStopInboxScreen.kt:34",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "inbox.hallpause",
+   "to": "inbox",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "HallMonitorInboxScreen.kt:47",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "inbox.halltrial",
+   "to": "inbox",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "HallMonitorInboxScreen.kt:174",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "dlg.confirm.inbox",
+   "to": "inbox.detail",
+   "trigger": "dismiss / confirm / cancel",
+   "callback": "onDismissRequest",
+   "source": "LiveInboxScreen.kt:298",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "dlg.confirm.inbox2",
+   "to": "inbox",
+   "trigger": "dismiss / confirm / cancel",
+   "callback": "onDismissRequest",
+   "source": "ControlRoomScreens.kt:189",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "compute",
+   "to": "hive.live",
+   "trigger": "Back / rail Hive (pops navigationHistory, else Overview)",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "memory",
+   "to": "hive.live",
+   "trigger": "Back / rail Hive (pops navigationHistory, else Overview)",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "memory.engine",
+   "to": "memory",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "MemoryLayerScreen.kt:409",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "store",
+   "to": "hive.live",
+   "trigger": "Back / rail Hive (pops navigationHistory, else Overview)",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "store.breeds",
+   "to": "store",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "StoreBreeds.kt:83",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "store.llm",
+   "to": "store",
+   "trigger": "Back / close",
+   "callback": "PlatformBackHandler",
+   "source": "AzphaltStoreScreen.kt:951",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "dlg.store.install",
+   "to": "store",
+   "trigger": "dismiss / confirm / cancel",
+   "callback": "onDismissRequest",
+   "source": "AzphaltStoreScreen.kt:604",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "keeper",
+   "to": "hive.live",
+   "trigger": "Back / rail Hive (pops navigationHistory, else Overview)",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "keeper.connections",
+   "to": "keeper",
+   "trigger": "Back closes the part (phone) / pick another part",
+   "callback": "PlatformBackHandler",
+   "source": "ProviderManagementScreens.kt:558",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "keeper.compute",
+   "to": "keeper",
+   "trigger": "Back closes the part (phone) / pick another part",
+   "callback": "PlatformBackHandler",
+   "source": "ComputeDelegationScreen.kt:73",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "keeper.projects",
+   "to": "keeper",
+   "trigger": "Back closes the part (phone) / pick another part",
+   "callback": "PlatformBackHandler",
+   "source": "ProviderManagementScreens.kt:1462",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "keeper.delegations",
+   "to": "keeper",
+   "trigger": "Back closes the part (phone) / pick another part",
+   "callback": "PlatformBackHandler",
+   "source": "DelegationsPart.kt:65",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "keeper.schedules",
+   "to": "keeper",
+   "trigger": "Back closes the part (phone) / pick another part",
+   "callback": "PlatformBackHandler",
+   "source": "SchedulesPart.kt:121",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "keeper.localagents",
+   "to": "keeper",
+   "trigger": "Back closes the part (phone) / pick another part",
+   "callback": "PlatformBackHandler",
+   "source": "LocalAgentsPart.kt:48",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "keeper.improvement",
+   "to": "keeper",
+   "trigger": "Back closes the part (phone) / pick another part",
+   "callback": "PlatformBackHandler",
+   "source": "ImprovementPart.kt:90",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "keeper.limits",
+   "to": "keeper",
+   "trigger": "Back closes the part (phone) / pick another part",
+   "callback": "PlatformBackHandler",
+   "source": "SpendCapsSettings.kt:23",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "keeper.device",
+   "to": "keeper",
+   "trigger": "Back closes the part (phone) / pick another part",
+   "callback": "PlatformBackHandler",
+   "source": "KeeperRoom.kt:93",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "keeper.appearance",
+   "to": "keeper",
+   "trigger": "Back closes the part (phone) / pick another part",
+   "callback": "PlatformBackHandler",
+   "source": "KeeperRoom.kt:94",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "keeper.about",
+   "to": "keeper",
+   "trigger": "Back closes the part (phone) / pick another part",
+   "callback": "PlatformBackHandler",
+   "source": "KeeperRoom.kt:95",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "keeper.provider",
+   "to": "keeper.connections",
+   "trigger": "Back closes the part (phone) / pick another part",
+   "callback": "PlatformBackHandler",
+   "source": "ProviderManagementScreens.kt:465",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "keeper.a2a",
+   "to": "keeper.connections",
+   "trigger": "Back closes the part (phone) / pick another part",
+   "callback": "PlatformBackHandler",
+   "source": "ProviderManagementScreens.kt:640",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "keeper.repo",
+   "to": "keeper.connections",
+   "trigger": "Back closes the part (phone) / pick another part",
+   "callback": "PlatformBackHandler",
+   "source": "RepositoryServiceScreen.kt:54",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "keeper.mcp",
+   "to": "keeper.connections",
+   "trigger": "Back closes the part (phone) / pick another part",
+   "callback": "PlatformBackHandler",
+   "source": "McpServerConnections.kt:97",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "keeper.schedule.card",
+   "to": "keeper.schedules",
+   "trigger": "Back closes the part (phone) / pick another part",
+   "callback": "PlatformBackHandler",
+   "source": "SchedulesPart.kt:121",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "keeper.delegation.row",
+   "to": "keeper.delegations",
+   "trigger": "Back closes the part (phone) / pick another part",
+   "callback": "PlatformBackHandler",
+   "source": "DelegationsPart.kt:70",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "keeper.improvement.proposal",
+   "to": "keeper.improvement",
+   "trigger": "Back closes the part (phone) / pick another part",
+   "callback": "PlatformBackHandler",
+   "source": "ImprovementPart.kt:256",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "keeper.limits.caps",
+   "to": "keeper.limits",
+   "trigger": "Back closes the part (phone) / pick another part",
+   "callback": "PlatformBackHandler",
+   "source": "SpendCapsSettings.kt:23",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "provider.credential",
+   "to": "keeper.provider",
+   "trigger": "dismiss / confirm / cancel",
+   "callback": "onDismissRequest",
+   "source": "ProviderCredentialUi.kt:44",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "repo.credential",
+   "to": "keeper.repo",
+   "trigger": "dismiss / confirm / cancel",
+   "callback": "onDismissRequest",
+   "source": "RepositoryServiceScreen.kt:94",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "dlg.provider.confirm",
+   "to": "keeper.connections",
+   "trigger": "dismiss / confirm / cancel",
+   "callback": "onDismissRequest",
+   "source": "ProviderManagementScreens.kt:874",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "dlg.mcpserver",
+   "to": "keeper.mcp",
+   "trigger": "dismiss / confirm / cancel",
+   "callback": "onDismissRequest",
+   "source": "McpServerConnections.kt:287",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "dlg.mcpconsent",
+   "to": "hive.live",
+   "trigger": "dismiss / confirm / cancel",
+   "callback": "onDismissRequest",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "dlg.mcpelicit",
+   "to": "hive.live",
+   "trigger": "dismiss / confirm / cancel",
+   "callback": "onDismissRequest",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "dlg.delegationoffer",
+   "to": "hive.live",
+   "trigger": "dismiss / confirm / cancel",
+   "callback": "onDismissRequest",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "dlg.android.crash",
+   "to": "hive.live",
+   "trigger": "dismiss / confirm / cancel",
+   "callback": "onDismissRequest",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "dlg.android.update",
+   "to": "hive.live",
+   "trigger": "dismiss / confirm / cancel",
+   "callback": "onDismissRequest",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "dlg.azphalt",
+   "to": "hive.live",
+   "trigger": "dismiss / confirm / cancel",
+   "callback": "onDismissRequest",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  }
+ ],
+ "flows": [
+  {
+   "n": 1,
+   "name": "First launch: connect a free provider",
+   "steps": [
+    "app.start",
+    "hive.live",
+    "provider.credential"
+   ],
+   "edge_status": [
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 2,
+   "name": "Run a hive and review its plan",
+   "steps": [
+    "hive.live",
+    "hive.planning",
+    "hive.plandecision"
+   ],
+   "edge_status": [
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 3,
+   "name": "Approve a gate in the hive",
+   "steps": [
+    "hive.live",
+    "creature.panel",
+    "creature.needs"
+   ],
+   "edge_status": [
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 4,
+   "name": "Approve a gate from the Inbox",
+   "steps": [
+    "shell.rail",
+    "inbox",
+    "inbox.list",
+    "inbox.detail"
+   ],
+   "edge_status": [
+    "present",
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 5,
+   "name": "Jump to the waiting creature from the Inbox badge",
+   "steps": [
+    "shell.rail",
+    "creature.needs"
+   ],
+   "edge_status": [
+    "present"
+   ]
+  },
+  {
+   "n": 6,
+   "name": "Reject a plan",
+   "steps": [
+    "creature.needs",
+    "dlg.confirm.inspector"
+   ],
+   "edge_status": [
+    "present"
+   ]
+  },
+  {
+   "n": 7,
+   "name": "Raise a role budget (today)",
+   "steps": [
+    "creature.needs",
+    "creature.mind",
+    "creature.mind.roleform"
+   ],
+   "edge_status": [
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 8,
+   "name": "Raise a role budget (proposed: direct to role page)",
+   "steps": [
+    "creature.needs",
+    "roster.role"
+   ],
+   "edge_status": [
+    "missing"
+   ]
+  },
+  {
+   "n": 9,
+   "name": "Raise a role budget from Inbox BudgetSpent (proposed)",
+   "steps": [
+    "inbox.detail",
+    "roster.role"
+   ],
+   "edge_status": [
+    "missing"
+   ]
+  },
+  {
+   "n": 10,
+   "name": "Change a role's provider from a creature (today)",
+   "steps": [
+    "hive.live",
+    "creature.panel",
+    "creature.work",
+    "creature.providerrow"
+   ],
+   "edge_status": [
+    "present",
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 11,
+   "name": "Change a role's provider from a creature (proposed)",
+   "steps": [
+    "creature.work",
+    "creature.providerrow",
+    "roster.role"
+   ],
+   "edge_status": [
+    "present",
+    "missing"
+   ]
+  },
+  {
+   "n": 12,
+   "name": "Edit a task's job from a creature (today)",
+   "steps": [
+    "hive.live",
+    "creature.panel",
+    "creature.work",
+    "creature.jobeditor"
+   ],
+   "edge_status": [
+    "present",
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 13,
+   "name": "Edit a task's job in Build (canonical)",
+   "steps": [
+    "hive.live",
+    "hive.build",
+    "build.jobeditor"
+   ],
+   "edge_status": [
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 14,
+   "name": "Edit a task's job (proposed: creature links to Build)",
+   "steps": [
+    "creature.jobeditor",
+    "build.jobeditor"
+   ],
+   "edge_status": [
+    "missing"
+   ]
+  },
+  {
+   "n": 15,
+   "name": "Change where a task runs (proposed: link to Compute)",
+   "steps": [
+    "creature.jobeditor",
+    "keeper.compute"
+   ],
+   "edge_status": [
+    "missing"
+   ]
+  },
+  {
+   "n": 16,
+   "name": "Edit a role",
+   "steps": [
+    "shell.rail",
+    "roster",
+    "roster.role"
+   ],
+   "edge_status": [
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 17,
+   "name": "Edit a role from the Mind tab (today)",
+   "steps": [
+    "creature.panel",
+    "creature.mind",
+    "creature.mind.roleform"
+   ],
+   "edge_status": [
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 18,
+   "name": "Connect a provider in the Keeper's room",
+   "steps": [
+    "shell.rail",
+    "keeper",
+    "keeper.connections",
+    "keeper.provider",
+    "provider.credential"
+   ],
+   "edge_status": [
+    "present",
+    "present",
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 19,
+   "name": "Connect a provider from the Store",
+   "steps": [
+    "shell.rail",
+    "store",
+    "provider.credential"
+   ],
+   "edge_status": [
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 20,
+   "name": "Connect a repository service",
+   "steps": [
+    "keeper",
+    "keeper.connections",
+    "keeper.repo",
+    "repo.credential"
+   ],
+   "edge_status": [
+    "present",
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 21,
+   "name": "Handle a spend-cap stop",
+   "steps": [
+    "inbox",
+    "inbox.spend",
+    "keeper.limits",
+    "keeper.limits.caps"
+   ],
+   "edge_status": [
+    "present",
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 22,
+   "name": "Set spend caps on a phone",
+   "steps": [
+    "keeper",
+    "keeper.device",
+    "keeper.limits.caps"
+   ],
+   "edge_status": [
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 23,
+   "name": "Edit a workflow's tasks",
+   "steps": [
+    "hive.live",
+    "wf.overview",
+    "wf.library",
+    "wf.tasks",
+    "wf.tasks.editor"
+   ],
+   "edge_status": [
+    "present",
+    "present",
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 24,
+   "name": "Reach Workflows from the rail (proposed)",
+   "steps": [
+    "shell.rail",
+    "wf.library"
+   ],
+   "edge_status": [
+    "missing"
+   ]
+  },
+  {
+   "n": 25,
+   "name": "Switch hive from the district",
+   "steps": [
+    "hive.live",
+    "hive.district",
+    "hive.resting"
+   ],
+   "edge_status": [
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 26,
+   "name": "Import a hive card",
+   "steps": [
+    "hive.district",
+    "hive.import"
+   ],
+   "edge_status": [
+    "present"
+   ]
+  },
+  {
+   "n": 27,
+   "name": "Share a hive card",
+   "steps": [
+    "hive.live",
+    "hive.share"
+   ],
+   "edge_status": [
+    "present"
+   ]
+  },
+  {
+   "n": 28,
+   "name": "Delete a hive",
+   "steps": [
+    "hive.live",
+    "hive.actions",
+    "hive.delete"
+   ],
+   "edge_status": [
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 29,
+   "name": "Stop a run",
+   "steps": [
+    "hive.live",
+    "dlg.stoprun"
+   ],
+   "edge_status": [
+    "present"
+   ]
+  },
+  {
+   "n": 30,
+   "name": "Read a run's timeline and open a creature",
+   "steps": [
+    "hive.live",
+    "hive.timeline",
+    "tl.waterfall",
+    "creature.panel"
+   ],
+   "edge_status": [
+    "present",
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 31,
+   "name": "Open a creature's trace",
+   "steps": [
+    "creature.work",
+    "hive.timeline"
+   ],
+   "edge_status": [
+    "present"
+   ]
+  },
+  {
+   "n": 32,
+   "name": "Inspect memory",
+   "steps": [
+    "shell.rail",
+    "memory",
+    "memory.engine"
+   ],
+   "edge_status": [
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 33,
+   "name": "Install a package in the Store",
+   "steps": [
+    "shell.rail",
+    "store",
+    "dlg.store.install"
+   ],
+   "edge_status": [
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 34,
+   "name": "Open a package file from the OS",
+   "steps": [
+    "app.start",
+    "ext.intent",
+    "store"
+   ],
+   "edge_status": [
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 35,
+   "name": "Keep or hatch a creature",
+   "steps": [
+    "shell.rail",
+    "stable"
+   ],
+   "edge_status": [
+    "present"
+   ]
+  },
+  {
+   "n": 36,
+   "name": "Compute from a creature (today)",
+   "steps": [
+    "creature.work",
+    "compute",
+    "keeper.compute"
+   ],
+   "edge_status": [
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 37,
+   "name": "Compute from the Keeper's room",
+   "steps": [
+    "keeper",
+    "keeper.compute"
+   ],
+   "edge_status": [
+    "present"
+   ]
+  },
+  {
+   "n": 38,
+   "name": "Manage schedules",
+   "steps": [
+    "keeper",
+    "keeper.schedules",
+    "keeper.schedule.card"
+   ],
+   "edge_status": [
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 39,
+   "name": "Open a schedule's hive (proposed)",
+   "steps": [
+    "keeper.schedule.card",
+    "wf.overview"
+   ],
+   "edge_status": [
+    "missing"
+   ]
+  },
+  {
+   "n": 40,
+   "name": "Delegate a gate",
+   "steps": [
+    "hive.live",
+    "dlg.delegationoffer",
+    "keeper.delegations"
+   ],
+   "edge_status": [
+    "present",
+    "missing"
+   ]
+  },
+  {
+   "n": 41,
+   "name": "Review delegations",
+   "steps": [
+    "keeper",
+    "keeper.delegations",
+    "keeper.delegation.row"
+   ],
+   "edge_status": [
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 42,
+   "name": "Allow an MCP server tool",
+   "steps": [
+    "hive.live",
+    "dlg.mcpconsent",
+    "keeper.mcp"
+   ],
+   "edge_status": [
+    "present",
+    "missing"
+   ]
+  },
+  {
+   "n": 43,
+   "name": "Answer an MCP elicitation",
+   "steps": [
+    "hive.live",
+    "dlg.mcpelicit"
+   ],
+   "edge_status": [
+    "present"
+   ]
+  },
+  {
+   "n": 44,
+   "name": "Adopt an improvement proposal",
+   "steps": [
+    "keeper",
+    "keeper.improvement",
+    "keeper.improvement.proposal"
+   ],
+   "edge_status": [
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 45,
+   "name": "Handle Hall Monitor findings",
+   "steps": [
+    "inbox",
+    "inbox.hallpause",
+    "creature.needs"
+   ],
+   "edge_status": [
+    "present",
+    "missing"
+   ]
+  },
+  {
+   "n": 46,
+   "name": "Preview a role on the phone sheet",
+   "steps": [
+    "hive.live",
+    "creature.sheet",
+    "creature.panel",
+    "creature.needs"
+   ],
+   "edge_status": [
+    "present",
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 47,
+   "name": "Preview a suggested role in a new hive",
+   "steps": [
+    "hive.district",
+    "hive.resting",
+    "hive.rolepreview"
+   ],
+   "edge_status": [
+    "present",
+    "present"
+   ]
+  },
+  {
+   "n": 48,
+   "name": "Rerun from a task",
+   "steps": [
+    "hive.live",
+    "hive.rerun"
+   ],
+   "edge_status": [
+    "present"
+   ]
+  },
+  {
+   "n": 49,
+   "name": "Return from Connections to the creature (proposed)",
+   "steps": [
+    "creature.work",
+    "keeper.connections",
+    "creature.work"
+   ],
+   "edge_status": [
+    "present",
+    "missing"
+   ]
+  },
+  {
+   "n": 50,
+   "name": "Developer previews (web)",
+   "steps": [
+    "app.start",
+    "web.terrarium"
+   ],
+   "edge_status": [
+    "present"
+   ]
+  }
+ ],
+ "meta": {
+  "source": "navigation-map.md",
+  "generated_by": "build_graph.py",
+  "exempt": {
+   "addon.host": "debug only: AddonHostScreen has no caller in app code"
+  }
+ }
+}

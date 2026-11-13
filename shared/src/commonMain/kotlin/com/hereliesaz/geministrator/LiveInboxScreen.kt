@@ -754,7 +754,7 @@ private fun MessageActionRow(
     roleId: String? = null,
 ) {
     val id = entry.taskId
-    val openRole = LocalPlaceLinks.current.openRole
+    val placeLinks = LocalPlaceLinks.current
     val buttons = messageActions(entry.kind)
     if (buttons.isEmpty()) return
     Row(Modifier.widthIn(max = 440.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -766,7 +766,11 @@ private fun MessageActionRow(
                 MessageAction.Stop -> ({ onConfirm(id to true) })
                 MessageAction.Answer -> ({ actions.openCreature(id, CreatureTab.Needs) })
                 // The budget is the role's: the button goes to where it is changed, the creature's Mind only when there is no Roster link.
-                MessageAction.RaiseBudget -> ({ if (roleId != null && openRole != null) openRole(roleId) else actions.openCreature(id, CreatureTab.Mind) })
+                MessageAction.RaiseBudget -> ({
+                    if (roleId == null || !placeLinks.openRoleAt(roleId, RoleField.TokenBudget)) {
+                        actions.openCreature(id, CreatureTab.Mind)
+                    }
+                })
             }
             // The first button is the main one, filled; the other is outlined.
             InboxAction(messageActionLabel(action), index == 0, onClick, Modifier.weight(1f))
