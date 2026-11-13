@@ -35,6 +35,12 @@ interface SetupSecretStore {
      */
     fun heldRelayChange(secrets: SetupSecrets): String? = null
 
+    /**
+     * Whether this host keeps a remote-relay pairing at all (Android does; the remote host service is its own). A host that
+     * does not never has a pairing to hold, move or confirm, so the import summary must not say one was imported.
+     */
+    val storesRemotePairing: Boolean get() = true
+
     /** Applies the pairing [heldRelayChange] named, after the keeper confirmed it on the import summary. */
     fun confirmRelayChange(secrets: SetupSecrets) {}
 }
@@ -391,7 +397,7 @@ internal suspend fun importSetupFile(
         providers = secrets.providerCredentials.size,
         repositories = secrets.repositoryCredentials.size,
         computeToken = secrets.distributedComputeToken != null,
-        remoteRelay = secrets.remoteRelayPairing != null && heldRelay == null,
+        remoteRelay = secretStore.storesRemotePairing && secrets.remoteRelayPairing != null && heldRelay == null,
         held = heldRelay?.let { relay -> HeldSetupChange(relay) { secretStore.confirmRelayChange(secrets) } },
     )
 }

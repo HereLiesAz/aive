@@ -130,6 +130,18 @@ class SetupFileTest {
     }
 
     @Test
+    fun aHostWithoutAPairingStoreDoesNotReportOneImported() = runBlocking {
+        val encoded = exportFrom(SourceSetup.create())
+        val withStore = importSetupFile(InMemoryWorkflowPersistence(), FakeSecretStore(), encoded, PASSPHRASE, onCrashReportingChange = null, memoryLayer = null)
+        val without = importSetupFile(
+            InMemoryWorkflowPersistence(), FakeSecretStore(pairing = false), encoded, PASSPHRASE, onCrashReportingChange = null, memoryLayer = null,
+        )
+        assertTrue(withStore.remoteRelay)
+        assertFalse(without.remoteRelay)
+        assertNull(without.held)
+    }
+
+    @Test
     fun wrongPassphraseIsRejectedWithNothingWritten() = runBlocking {
         val encoded = exportFrom(SourceSetup.create())
         val target = InMemoryWorkflowPersistence()
@@ -218,7 +230,8 @@ class SetupFileTest {
     private fun rewrite(encoded: String, transform: (JsonObject) -> JsonObject): String =
         transform(Json.parseToJsonElement(encoded).jsonObject).toString()
 
-    private class FakeSecretStore(private val stored: SetupSecrets = SetupSecrets()) : SetupSecretStore {
+    private class FakeSecretStore(private val stored: SetupSecrets = SetupSecrets(), pairing: Boolean = true) : SetupSecretStore {
+        override val storesRemotePairing: Boolean = pairing
         var written: SetupSecrets? = null
         override fun read(): SetupSecrets = stored
         override fun write(secrets: SetupSecrets) {

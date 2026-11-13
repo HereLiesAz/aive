@@ -636,6 +636,9 @@ fun main() {
                         ),
                         memoryLayer = memoryLayer,
                         setupSecretStore = object : SetupSecretStore {
+                            // No remote-relay pairing lives on the desktop, so a pairing in a file is neither held nor reported as imported.
+                            override val storesRemotePairing: Boolean get() = false
+
                             // Only stored credentials: keys from environment variables stay there.
                             override fun read(): SetupSecrets = SetupSecrets(
                                 providerCredentials = providerCredentialStore.readAll(),
