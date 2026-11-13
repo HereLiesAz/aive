@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -334,56 +335,81 @@ internal fun HiveControlsBar(
     modifier: Modifier = Modifier,
 ) {
     AzphaltThemedSurface(Azphalt.Ink) {
-        Row(
-            modifier = modifier
+        BoxWithConstraints(modifier.fillMaxWidth()) {
+            // The mode switch, status line and up to five round buttons need about 410dp on one line;
+            // narrower than that the status drops to a line of its own instead of being clipped.
+            val narrow = maxWidth < HiveControlsOneLineFrom
+            val modeSwitch: @Composable () -> Unit = {
+                Row(
+                    Modifier
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(AzphaltLiftedInk)
+                        .padding(4.dp)
+                        .selectableGroup(),
+                ) {
+                    ModeSegment(stringResource(Res.string.build_live), selected = !building && !flowchart) { onBuildingChange(false) }
+                    ModeSegment(stringResource(Res.string.build_build), selected = building && !flowchart) { onBuildingChange(true) }
+                    ModeSegment(stringResource(Res.string.hive_view_flowchart), selected = flowchart, onClick = onFlowchartSelected)
+                }
+            }
+            val statusLine: @Composable (Modifier) -> Unit = { statusModifier ->
+                Row(
+                    modifier = statusModifier
+                        .heightIn(min = AzphaltMinTouchTarget)
+                        .then(if (onStatusClick != null) Modifier.clickable(role = Role.Button, onClick = onStatusClick) else Modifier)
+                        // Not a live region: this line changes with every thought a creature has, and announcing
+                        // each one talks over the keeper. It reads when focused.
+                        .padding(horizontal = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Box(Modifier.size(7.dp).clip(CircleShape).background(Azphalt.Yellow))
+                    Text(
+                        status,
+                        style = AzphaltType.body.copy(fontSize = 13.sp, fontWeight = FontWeight.Medium),
+                        color = azphaltMutedOnSurface(),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            val buttons: @Composable () -> Unit = {
+                if (building) {
+                    RoundGlyphButton(HiveGlyph.Undo, stringResource(Res.string.build_undo), enabled = canUndo, onClick = onUndo)
+                    RoundGlyphButton(HiveGlyph.Redo, stringResource(Res.string.build_redo), enabled = canRedo, onClick = onRedo)
+                }
+                RoundGlyphButton(HiveGlyph.Target, stringResource(Res.string.hive_centre), onClick = camera::centre)
+                RoundGlyphButton(HiveGlyph.ZoomOut, stringResource(Res.string.terrarium_zoom_out), onClick = { camera.stepOut(onSurface) })
+                RoundGlyphButton(HiveGlyph.ZoomIn, stringResource(Res.string.terrarium_zoom_in), onClick = camera::stepIn)
+            }
+            val frameModifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(topStart = FrameCorner, topEnd = FrameCorner))
                 .background(Azphalt.Ink)
                 .heightIn(min = 64.dp)
-                .padding(start = 8.dp, end = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(
-                Modifier
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(AzphaltLiftedInk)
-                    .padding(4.dp)
-                    .selectableGroup(),
-            ) {
-                ModeSegment(stringResource(Res.string.build_live), selected = !building && !flowchart) { onBuildingChange(false) }
-                ModeSegment(stringResource(Res.string.build_build), selected = building && !flowchart) { onBuildingChange(true) }
-                ModeSegment(stringResource(Res.string.hive_view_flowchart), selected = flowchart, onClick = onFlowchartSelected)
+                .padding(start = 8.dp, end = 8.dp)
+            if (narrow) {
+                Column(frameModifier) {
+                    Row(Modifier.fillMaxWidth().heightIn(min = 64.dp), verticalAlignment = Alignment.CenterVertically) {
+                        modeSwitch()
+                        Spacer(Modifier.weight(1f))
+                        buttons()
+                    }
+                    statusLine(Modifier.fillMaxWidth())
+                }
+            } else {
+                Row(frameModifier, verticalAlignment = Alignment.CenterVertically) {
+                    modeSwitch()
+                    statusLine(Modifier.weight(1f))
+                    buttons()
+                }
             }
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = AzphaltMinTouchTarget)
-                    .then(if (onStatusClick != null) Modifier.clickable(role = Role.Button, onClick = onStatusClick) else Modifier)
-                    // Not a live region: this line changes with every thought a creature has, and announcing
-                    // each one talks over the keeper. It reads when focused.
-                    .padding(horizontal = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Box(Modifier.size(7.dp).clip(CircleShape).background(Azphalt.Yellow))
-                Text(
-                    status,
-                    style = AzphaltType.body.copy(fontSize = 13.sp, fontWeight = FontWeight.Medium),
-                    color = azphaltMutedOnSurface(),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (building) {
-                RoundGlyphButton(HiveGlyph.Undo, stringResource(Res.string.build_undo), enabled = canUndo, onClick = onUndo)
-                RoundGlyphButton(HiveGlyph.Redo, stringResource(Res.string.build_redo), enabled = canRedo, onClick = onRedo)
-            }
-            RoundGlyphButton(HiveGlyph.Target, stringResource(Res.string.hive_centre), onClick = camera::centre)
-            RoundGlyphButton(HiveGlyph.ZoomOut, stringResource(Res.string.terrarium_zoom_out), onClick = { camera.stepOut(onSurface) })
-            RoundGlyphButton(HiveGlyph.ZoomIn, stringResource(Res.string.terrarium_zoom_in), onClick = camera::stepIn)
         }
     }
 }
+
+/** The controls bar keeps its status on the same line from this width up. */
+private val HiveControlsOneLineFrom = 560.dp
 
 @Composable
 private fun ModeSegment(label: String, selected: Boolean, onClick: () -> Unit) {

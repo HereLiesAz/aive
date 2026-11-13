@@ -290,6 +290,8 @@ internal fun RestingHive(
     /** The hive was deleted from its page: leave it for the hives list. */
     onDeleted: () -> Unit = onSurface,
     onOpenConnections: (() -> Unit)? = null,
+    /** A phone: the shorter field. */
+    compact: Boolean = false,
 ) {
     val host = LocalWorkflowLibraryHost.current
     // The hive as opened: the field's tide starts from it, so saving an edit never resets undo.
@@ -320,6 +322,7 @@ internal fun RestingHive(
             roles = roles.value,
             selectedTaskId = selectedTaskId,
             onTaskSelected = onTaskSelected,
+            compact = compact,
             // Every edit keeps the name the keeper gave, so undo never takes the name back.
             onStageDefinition = host?.let { h ->
                 { candidate -> h.saveAuthored(candidate.copy(name = (latest ?: start).name)).also { latest = it } }

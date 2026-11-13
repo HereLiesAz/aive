@@ -1072,6 +1072,7 @@ private fun MainDestination(
                                     onZoomOut()
                                 },
                                 onOpenConnections = openConnections,
+                                compact = compact,
                             )
                             AzphaltPill(
                                 label = stringResource(Res.string.hive_more_editing),

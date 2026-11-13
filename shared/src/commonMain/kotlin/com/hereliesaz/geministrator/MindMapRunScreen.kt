@@ -28,6 +28,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.WorkflowRunId
@@ -496,6 +497,9 @@ internal fun MindMapRunScreen(
                             expanded = repositoryMenuExpanded && repositorySuggestions.isNotEmpty(),
                             onDismissRequest = { repositoryMenuExpanded = false },
                             modifier = Modifier.fillMaxWidth(),
+                            // Suggestions arrive while the keeper types: a focusable popup would take focus
+                            // from the field on the first result and swallow the next keystroke.
+                            properties = androidx.compose.ui.window.PopupProperties(focusable = false),
                         ) {
                             repositorySuggestions.forEach { suggestion ->
                                 DropdownMenuItem(
@@ -793,7 +797,8 @@ internal fun MindMapRunScreen(
             )
         } else {
         // The breadcrumb names the hive; here, what it was fed and how far along it is.
-        Text(run.objective, style = AzphaltType.section, color = azphaltOnSurface())
+        // A pasted brief can run to pages: cap the 28sp heading, the full text is in the run itself.
+        Text(run.objective, style = AzphaltType.section, color = azphaltOnSurface(), maxLines = 4, overflow = TextOverflow.Ellipsis)
         Text(
             "${run.status.label()} · $completed/$total".uppercase(),
             style = AzphaltType.eyebrow,
@@ -912,6 +917,8 @@ internal fun MindMapRunScreen(
             selectedTaskId = selectedTaskId,
             onTaskSelected = onTaskSelected,
             modifier = Modifier.fillMaxWidth(),
+            // The phone's field: the shorter one. (branchIsolation is what the terrarium reads as compact.)
+            branchIsolation = true,
             onSurface = onSurface,
             hiveDeletion = liveHiveDeletion,
         )
