@@ -242,8 +242,14 @@ fun ControlRoom(
     // A hive that never ran opens at rest (its id here); a hive that ran opens on its latest swarm.
     val restingHive = rememberDurableStringState("overview.resting-hive")
     val restingDefinition by produceState<WorkflowDefinition?>(null, restingHive.value) {
-        value = restingHive.value.takeIf(String::isNotBlank)?.let { id ->
-            runCatching { onLoadWorkflowDefinitions() }.getOrDefault(emptyList()).firstOrNull { it.id.value == id }
+        val id = restingHive.value.takeIf(String::isNotBlank)
+        val loaded = id?.let { runCatching { onLoadWorkflowDefinitions() }.getOrNull() }
+        value = id?.let { want -> loaded?.firstOrNull { it.id.value == want } }
+        // A wipe, import or recovery can replace every stored hive while one is remembered at rest: forget it
+        // so the shell is not stuck on a hive that no longer exists.
+        if (restingHiveAfterLoad(restingHive.value, loaded).isEmpty() && restingHive.value.isNotBlank()) {
+            restingHive.value = ""
+            district.value = true
         }
     }
     // The Keeper's room's open part, held here so the breadcrumb can name it.
@@ -302,6 +308,8 @@ fun ControlRoom(
     var creatureTabTask by rememberDurableStringState("creature.panel.task")
     val creatureTab = CreatureTab.entries.firstOrNull { it.name == creatureTabName } ?: CreatureTab.Work
     LaunchedEffect(selectedTaskId) {
+        // Deselecting forgets the remembered creature, so reselecting it picks its opening tab again.
+        if (selectedTaskId == null && creatureTabTask.isNotEmpty()) creatureTabTask = ""
         if (selectedTaskId != null && selectedTaskId != creatureTabTask) {
             creatureTabName = openingTab(liveWorkflow?.run?.taskRuns?.get(TaskDefinitionId(selectedTaskId))).name
             creatureTabTask = selectedTaskId
@@ -327,6 +335,8 @@ fun ControlRoom(
         if (waiting != null) {
             district.value = false
             if (selectedTaskId != waiting) onTaskSelected(waiting)
+            // The panel belongs to the live hive: a resting hive left open would hide it.
+            restingHive.value = ""
             panelSetAside = null
             creatureTabName = CreatureTab.Needs.name
             creatureTabTask = waiting
@@ -1062,6 +1072,7 @@ private fun MainDestination(
                                     onZoomOut()
                                 },
                                 onOpenConnections = openConnections,
+                                compact = compact,
                             )
                             AzphaltPill(
                                 label = stringResource(Res.string.hive_more_editing),
@@ -1093,7 +1104,13 @@ private fun MainDestination(
                                     selectedTaskId = selectedTaskId,
                                     onTaskSelected = onTaskSelected,
                                     onShowHive = { showTimeline = false },
-                                    logSources = remember(live.run.id, live.definition, memoryLayer) {
+                                    logSources = remember(
+                                        live.run.id,
+                                        live.definition,
+                                        memoryLayer,
+                                        // A reassigned creature moves its log lines to the new role.
+                                        live.run.taskRuns.values.map { Triple(it.id, it.taskDefinitionId, it.assignedRoleId) },
+                                    ) {
                                         val taskRunNames = live.run.taskRuns.values.associate { taskRun ->
                                             taskRun.id to (live.definition.tasks.firstOrNull { it.id == taskRun.taskDefinitionId }?.name ?: taskRun.taskDefinitionId.value)
                                         }
@@ -1336,3 +1353,10 @@ private fun swarmRoles(state: ApplicationRuntimeState): List<RoleDefinition> = w
     is ApplicationRuntimeState.ResumeFailed,
     -> emptyList()
 }
+
+/**
+ * The resting hive to keep after loading the stored hives: the remembered id while it still exists (or while the
+ * load itself failed, [definitions] null, so a transient error never forgets it), else none.
+ */
+internal fun restingHiveAfterLoad(restingId: String, definitions: List<WorkflowDefinition>?): String =
+    if (restingId.isBlank() || definitions == null || definitions.any { it.id.value == restingId }) restingId else ""

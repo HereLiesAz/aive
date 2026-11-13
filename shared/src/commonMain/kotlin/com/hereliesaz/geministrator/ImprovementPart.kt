@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.log.formatLogTime
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.improvement_evidence
 import com.hereliesaz.geministrator.resources.improvement_adopt
 import com.hereliesaz.geministrator.resources.improvement_already_decided
 import com.hereliesaz.geministrator.resources.improvement_breaks_loop
@@ -240,8 +241,9 @@ private suspend fun adoptHabit(
         is com.hereliesaz.geministrator.memory.procedural.HabitInvocation.Result.Proposed -> {
             val saved = runCatching { host.addProposedTasks(hive.id, listOf(result.task)) }
             saved.exceptionOrNull()?.let { return it.message ?: getString(Res.string.improvement_habit_no_memory) }
+            val addedNote = getString(Res.string.improvement_habit_added, hive.name)
             val decided = store.decide(proposal.id) {
-                it.copy(status = ProposalStatus.Adopted, decidedAtEpochMillis = currentEpochMillis(), note = "Added to ${hive.name}, behind its own approval step.")
+                it.copy(status = ProposalStatus.Adopted, decidedAtEpochMillis = currentEpochMillis(), note = addedNote)
             }
             appLog("Improvement", "Adopted: ${proposal.summary} (into ${hive.id.value})")
             if (decided) getString(Res.string.improvement_habit_added, hive.name) else getString(Res.string.improvement_not_recorded)
@@ -289,7 +291,7 @@ private fun ProposalCard(
             proposal.expectedEffect, proposal.undo, proposal.newText.ifBlank { "-" }, formatLogTime(proposal.createdAtEpochMillis),
         ) + (preview?.let { "\n" + stringResource(Res.string.improvement_replaces, it.before) } ?: "") +
             (preview?.loopViolations?.takeIf { it.isNotEmpty() }?.let { "\n" + stringResource(Res.string.improvement_would_break_loop, it.joinToString(" ")) } ?: "") +
-            (proposal.evidence.takeIf { it.isNotBlank() }?.let { "\nEvidence: $it" } ?: "") + (proposal.note?.let { "\n$it" } ?: ""),
+            (proposal.evidence.takeIf { it.isNotBlank() }?.let { "\n" + stringResource(Res.string.improvement_evidence, it) } ?: "") + (proposal.note?.let { "\n$it" } ?: ""),
         well = if (proposal.status != ProposalStatus.Proposed && !(proposal.status == ProposalStatus.Adopted && proposal.appliedBefore != null)) null else {
             {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

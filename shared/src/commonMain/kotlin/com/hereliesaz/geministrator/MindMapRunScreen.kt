@@ -28,6 +28,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.WorkflowRunId
@@ -40,6 +41,7 @@ import com.hereliesaz.geministrator.domain.parseRepositoryRef
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.first_hive_default_name
 import com.hereliesaz.geministrator.resources.common_dismiss
 import com.hereliesaz.geministrator.resources.overview_has_no_persisted_workflow_run
 import com.hereliesaz.geministrator.resources.overview_a_workflow_gate_is_waiting_for
@@ -219,6 +221,7 @@ internal fun MindMapRunScreen(
     val missingNameMessage = stringResource(Res.string.overview_enter_name)
     val missingObjectiveMessage = stringResource(Res.string.overview_enter_objective)
     val invalidRepositoryMessage = stringResource(Res.string.overview_invalid_repository_location)
+    val firstHiveFallback = stringResource(Res.string.first_hive_default_name)
     var optionsOpen by rememberDurableBooleanState(
         key = "overview.$draftScope.options-open",
         initialValue = existingRepository != null,
@@ -496,6 +499,9 @@ internal fun MindMapRunScreen(
                             expanded = repositoryMenuExpanded && repositorySuggestions.isNotEmpty(),
                             onDismissRequest = { repositoryMenuExpanded = false },
                             modifier = Modifier.fillMaxWidth(),
+                            // Suggestions arrive while the keeper types: a focusable popup would take focus
+                            // from the field on the first result and swallow the next keystroke.
+                            properties = androidx.compose.ui.window.PopupProperties(focusable = false),
                         ) {
                             repositorySuggestions.forEach { suggestion ->
                                 DropdownMenuItem(
@@ -667,7 +673,7 @@ internal fun MindMapRunScreen(
                         // A first hive needs no name to start: it takes one from what it was fed, once
                         // it has been fed (an empty tap must not name it "First hive" for good).
                         val name = projectName.trim().ifBlank {
-                            if (firstLaunch && objective.isNotBlank()) firstHiveName(objective) else ""
+                            if (firstLaunch && objective.isNotBlank()) firstHiveName(objective, firstHiveFallback) else ""
                         }
                         // Permanent diagnostic: distinguishes "tap never arrived" from "tap arrived
                         // but launch failed" in any future "nothing happens" report.
@@ -793,7 +799,8 @@ internal fun MindMapRunScreen(
             )
         } else {
         // The breadcrumb names the hive; here, what it was fed and how far along it is.
-        Text(run.objective, style = AzphaltType.section, color = azphaltOnSurface())
+        // A pasted brief can run to pages: cap the 28sp heading, the full text is in the run itself.
+        Text(run.objective, style = AzphaltType.section, color = azphaltOnSurface(), maxLines = 4, overflow = TextOverflow.Ellipsis)
         Text(
             "${run.status.label()} · $completed/$total".uppercase(),
             style = AzphaltType.eyebrow,
@@ -912,6 +919,8 @@ internal fun MindMapRunScreen(
             selectedTaskId = selectedTaskId,
             onTaskSelected = onTaskSelected,
             modifier = Modifier.fillMaxWidth(),
+            // The phone's field: the shorter one. (branchIsolation is what the terrarium reads as compact.)
+            branchIsolation = true,
             onSurface = onSurface,
             hiveDeletion = liveHiveDeletion,
         )
@@ -939,8 +948,9 @@ internal fun MindMapRunScreen(
                 value = detail,
                 // A link: what it says is acted on in the creature's panel (its provider, its job).
                 onClick = { openCreature(task.id.value) },
+                // Not live regions: several of these update at once while a swarm works, and each
+                // announcement would interrupt the last. They read when focused.
                 modifier = Modifier
-                    .azphaltLiveRegion()
                     .azphaltEntrance(activityEntrance, index, recentTasks.size.coerceAtLeast(1)),
             )
         }
@@ -1050,5 +1060,5 @@ private fun TaskRunStatus.activityRank(): Int = when (this) {
 private const val MADE_PREVIEW_CHARS = 2_400
 
 /** A first hive's name, from the first words of what it was fed. */
-internal fun firstHiveName(objective: String): String =
-    objective.trim().split(Regex("\\s+")).take(4).joinToString(" ").take(40).trim().ifBlank { "First hive" }
+internal fun firstHiveName(objective: String, fallback: String = "First hive"): String =
+    objective.trim().split(Regex("\\s+")).take(4).joinToString(" ").take(40).trim().ifBlank { fallback }

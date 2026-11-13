@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -440,29 +442,27 @@ internal fun AzphaltRecord(
     // Selected Yellow can sit on a yellow ground: outline it in the ground's content colour.
     val outline = azphaltOnSurface()
     val radius = animatedRecordRadius(selected)
-    val description = buildString {
-        append(title)
-        if (eyebrow.isNotBlank()) append(", $eyebrow")
-        endCap?.takeIf(String::isNotBlank)?.let { append(", $it") }
-    }
-    val semanticsMod = if (onClick != null) {
-        modifier.semantics(mergeDescendants = true) {
-            role = Role.Button
-            this.selected = selected
-            contentDescription = description
-        }
+    val description = recordDescription(title, eyebrow, endCap, richBody?.text ?: body)
+    // A clickable record is one button: its text reads as one label. A record that is not clickable is
+    // not merged at all, so its own text and any controls in its well stay separately reachable. When
+    // a clickable record has a well, only its text header is the button: the well's controls (a field,
+    // Approve, Reject) must not be swallowed into it, or a screen reader can never reach them.
+    val buttonMod = if (onClick != null) {
+        Modifier
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                this.selected = selected
+                contentDescription = description
+            }
+            .defaultMinSize(minHeight = AzphaltMinTouchTarget)
+            .clickable(onClick = onClick)
     } else {
-        modifier.semantics(mergeDescendants = true) {
-            contentDescription = description
-        }
+        Modifier
     }
-    val interactive = if (onClick == null) {
-        semanticsMod
-    } else {
-        semanticsMod.defaultMinSize(minHeight = AzphaltMinTouchTarget).clickable(onClick = onClick)
-    }
+    val wholeIsButton = well == null
     Column(
-        modifier = interactive
+        modifier = modifier
+            .then(if (wholeIsButton) buttonMod else Modifier)
             .azphaltSelectedTransform(selected)
             .fillMaxWidth()
             .clip(RoundedCornerShape(radius))
@@ -471,30 +471,35 @@ internal fun AzphaltRecord(
             .padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        AzphaltSurface(hue) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(eyebrow.uppercase(), style = AzphaltType.eyebrow, color = content)
-                if (endCap != null) {
-                    val cap = content
-                    Box(
-                        modifier = Modifier.clip(RoundedCornerShape(999.dp)).background(cap).padding(horizontal = 8.dp, vertical = 4.dp),
-                    ) {
-                        Text(endCap.uppercase(), style = AzphaltType.endCap, color = cap.onOpposite())
+        Column(
+            modifier = (if (wholeIsButton) Modifier else buttonMod).fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            AzphaltSurface(hue) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(eyebrow.uppercase(), style = AzphaltType.eyebrow, color = content)
+                    if (endCap != null) {
+                        val cap = content
+                        Box(
+                            modifier = Modifier.clip(RoundedCornerShape(999.dp)).background(cap).padding(horizontal = 8.dp, vertical = 4.dp),
+                        ) {
+                            Text(endCap.uppercase(), style = AzphaltType.endCap, color = cap.onOpposite())
+                        }
                     }
                 }
             }
-        }
-        // Body text is the full opposite of the record, not a faded copy of it: a translucent
-        // tint of the content colour would drop below 4.5:1 on the mid-tone hues.
-        Text(title, style = AzphaltType.lead, color = content)
-        if (richBody != null) {
-            Text(richBody, style = AzphaltType.body, color = content)
-        } else if (body != null) {
-            Text(body, style = AzphaltType.body, color = content)
+            // Body text is the full opposite of the record, not a faded copy of it: a translucent
+            // tint of the content colour would drop below 4.5:1 on the mid-tone hues.
+            Text(title, style = AzphaltType.lead, color = content)
+            if (richBody != null) {
+                Text(richBody, style = AzphaltType.body, color = content)
+            } else if (body != null) {
+                Text(body, style = AzphaltType.body, color = content)
+            }
         }
         AzphaltChildBand(visible = well != null) {
             Box(
@@ -506,6 +511,14 @@ internal fun AzphaltRecord(
             }
         }
     }
+}
+
+/** What a screen reader says for a record as a button: its title, kind and cap, then its body. */
+internal fun recordDescription(title: String, eyebrow: String, endCap: String?, body: String?): String = buildString {
+    append(title)
+    if (eyebrow.isNotBlank()) append(", $eyebrow")
+    endCap?.takeIf(String::isNotBlank)?.let { append(", $it") }
+    body?.takeIf(String::isNotBlank)?.let { append(". $it") }
 }
 
 /** Ink one step lighter: a card on an Ink surface, and the well inside an Ink card. */
@@ -534,15 +547,29 @@ internal fun AzphaltNote(
     onClick: (() -> Unit)? = null,
 ) {
     val hue = recordFill(selected = false)
-    Column(
+    Row(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
             .background(hue)
-            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
+            .then(
+                if (onClick != null) {
+                    // A link needs a target of at least 48dp and a cue that it is one.
+                    Modifier.defaultMinSize(minHeight = AzphaltMinTouchTarget).clickable(role = Role.Button, onClick = onClick)
+                } else {
+                    Modifier
+                },
+            )
             .padding(horizontal = 14.dp, vertical = 11.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(label.uppercase(), style = AzphaltType.eyebrow, color = hue.onOpposite())
-        Text(value, style = AzphaltType.body, color = hue.onOpposite())
+        Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(label.uppercase(), style = AzphaltType.eyebrow, color = hue.onOpposite())
+            Text(value, style = AzphaltType.body, color = hue.onOpposite())
+        }
+        if (onClick != null) {
+            Spacer(Modifier.weight(1f))
+            Text("\u203A", style = AzphaltType.lead, color = hue.onOpposite(), modifier = Modifier.clearAndSetSemantics {})
+        }
     }
 }

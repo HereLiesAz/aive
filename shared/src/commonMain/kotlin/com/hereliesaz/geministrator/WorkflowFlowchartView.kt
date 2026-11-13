@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -146,7 +147,10 @@ private fun FlowBox(node: FlowNode, selected: Boolean, onClick: () -> Unit, modi
             .background(fill)
             .border(if (selected) 3.dp else 1.dp, if (selected) azphaltStrong() else Color.White.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
             .clickable(role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = description }
+            .semantics {
+                contentDescription = description
+                this.selected = selected
+            }
             .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
         Text(node.name, style = AzphaltType.body.copy(fontSize = 13.sp), color = text, maxLines = 2, overflow = TextOverflow.Ellipsis)

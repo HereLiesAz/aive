@@ -46,6 +46,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 class FilmFramesExecutorIntegrationTest {
     private val pngHead = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
@@ -471,6 +474,9 @@ class FilmFramesExecutorIntegrationTest {
         assertContentEquals(picture, api.generate("a lighthouse"))
         val sent = bodies.single()
         assertTrue("1536x1024" in sent && "\"opaque\"" in sent && "a lighthouse" in sent, sent)
+        // OpenAI rejects the call with 400 "Missing required parameter: 'tools[0].type'" without this.
+        val tool = Json.parseToJsonElement(sent).jsonObject.getValue("tools").jsonArray.single().jsonObject
+        assertEquals("image_generation", tool.getValue("type").jsonPrimitive.content, sent)
     }
 
     @Test

@@ -68,6 +68,17 @@ class HiveWorkspaceTest {
     }
 
     @Test
+    fun aQueuedFeedIsOnlyDroppedOnceItsLaunchStartedANewRun() {
+        val queued = QueuedFeed("r1", "Write the release notes")
+        // Fired but the launch has not produced a new run (refused, failed, still going): keep it.
+        assertEquals(false, queuedFeedSettled(queued, "r1", run("r1", WorkflowRunStatus.Completed)))
+        // Never fired (the keeper just switched to another run while it waits): keep it.
+        assertEquals(false, queuedFeedSettled(queued, null, run("r2", WorkflowRunStatus.Running)))
+        assertEquals(false, queuedFeedSettled(null, "r1", run("r2", WorkflowRunStatus.Running)))
+        assertEquals(true, queuedFeedSettled(queued, "r1", run("r2", WorkflowRunStatus.Running)))
+    }
+
+    @Test
     fun aQueuedObjectiveIsDueOnlyOnceItsOwnRunHasFinished() {
         val queued = QueuedFeed("r1", "Write the release notes")
         assertNull(queuedFeedDue(queued, run("r1", WorkflowRunStatus.Running)))

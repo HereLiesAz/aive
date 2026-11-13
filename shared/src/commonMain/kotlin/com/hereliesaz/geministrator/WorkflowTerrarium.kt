@@ -32,6 +32,9 @@ import com.hereliesaz.geministrator.resources.hive_view_label
 import com.hereliesaz.geministrator.resources.flowchart_empty
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.semantics
+import com.hereliesaz.geministrator.resources.hive_menu_options
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.withTimeoutOrNull
 import com.hereliesaz.geministrator.resources.hive_new_empty
@@ -225,7 +228,8 @@ internal fun GeministratorWorkflowTerrarium(
     LaunchedEffect(stagedDefinition.tasks) {
         val remaining = stagedDefinition.tasks.map { it.id.value }.toSet()
         if (remaining != knownTaskIds) {
-            selectedTaskId?.takeIf { it in knownTaskIds && it !in remaining }?.let(onTaskSelected)
+            // Release, not select: a shell's select treats a re-tap of a set-aside creature as "reopen".
+            selectedTaskId?.takeIf { it in knownTaskIds && it !in remaining }?.let(releaseCreature)
             grouping?.let { gathered ->
                 val kept = selectionAfterRemoval(gathered, remaining)
                 if (kept != gathered) grouping = kept
@@ -438,8 +442,12 @@ internal fun GeministratorWorkflowTerrarium(
             baseField
         } else {
             {
+                val hiveOptionsLabel = stringResource(Res.string.hive_menu_options)
                 Box(
-                    Modifier.fillMaxSize().pointerInput(Unit) {
+                    Modifier.fillMaxSize()
+                        // The same menu for a screen reader or keyboard, which cannot long-press the field.
+                        .semantics { onLongClick(hiveOptionsLabel) { hiveMenu = true; true } }
+                        .pointerInput(Unit) {
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
                             val ended = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {

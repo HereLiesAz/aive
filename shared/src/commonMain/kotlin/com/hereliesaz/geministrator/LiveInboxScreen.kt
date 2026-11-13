@@ -504,8 +504,11 @@ private fun InboxDetail(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
-            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(30.dp).azphaltLiveRegion()) {
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(30.dp)) {
                 val strong = azphaltStrong()
+                // The decision announces itself as one message; its buttons stay outside the merge, or they
+                // could not be reached on their own.
+                Column(Modifier.azphaltLiveRegion()) {
                 Text("${inboxKindLabel(entry.kind)} · ${entry.role}".uppercase(), style = AzphaltType.eyebrow, color = strong)
                 Spacer(Modifier.height(10.dp))
                 Text(
@@ -539,6 +542,7 @@ private fun InboxDetail(
                             Text(it, style = AzphaltType.body, color = azphaltMutedOnSurface())
                         }
                     }
+                }
                 }
                 Spacer(Modifier.height(11.dp))
                 InboxDetailActions(entry, onApprove, onRejectPlan, onRetry, onStop)

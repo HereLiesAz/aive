@@ -160,6 +160,13 @@ internal fun RunLogView(
     }
 }
 
+/** A row's first line: its time, then its scope and its role, each only when it has one. */
+internal fun logRowHeader(time: String, scope: String, role: String?): String = buildString {
+    append(time)
+    if (scope.isNotEmpty()) append("  ·  ").append(scope)
+    if (!role.isNullOrEmpty()) append("  ·  ").append(role)
+}
+
 /** One identity per line: its time, scope and text, with a count to tell identical lines apart. */
 internal fun stableLogKeys(lines: List<LogLine>): List<String> {
     val seen = HashMap<String, Int>()
@@ -184,8 +191,7 @@ private fun LogRow(line: LogLine, onTaskSelected: ((String) -> Unit)?) {
         ),
     ) {
         Text(
-            text = formatLogTime(line.atEpochMillis) + if (line.scope.isEmpty()) "" else "  ·  ${line.scope}" +
-                (line.role?.let { "  ·  $it" } ?: ""),
+            text = logRowHeader(formatLogTime(line.atEpochMillis), line.scope, line.role),
             style = AzphaltType.endCap,
             color = azphaltOnSurface(),
         )

@@ -60,6 +60,7 @@ import com.hereliesaz.geministrator.resources.inspector_budget_spent
 import com.hereliesaz.geministrator.resources.inspector_raise_budget
 import com.hereliesaz.geministrator.agentui.awaitsKeeperAnswer
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.size
@@ -89,6 +90,9 @@ import com.hereliesaz.geministrator.workflow.SessionActivityKind
 import com.hereliesaz.geministrator.workflow.attemptsOf
 import com.hereliesaz.geministrator.log.formatLogTime
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.inspector_payload_role_instructions
+import com.hereliesaz.geministrator.resources.inspector_payload_redacted
+import com.hereliesaz.geministrator.resources.inspector_payload_objective
 import com.hereliesaz.geministrator.resources.inspector_activity
 import com.hereliesaz.geministrator.resources.inspector_shared_creature
 import com.hereliesaz.geministrator.resources.inspector_shared_creature_here
@@ -233,7 +237,7 @@ internal fun TechnicalInspector(
     // stays as it was, so a change takes effect from its next run. Without the library (previews)
     // the job shows but does not change.
     val library = LocalWorkflowLibraryHost.current
-    var savedJob by remember(liveWorkflow.definition) { mutableStateOf<WorkflowDefinition?>(null) }
+    var savedJob by remember(liveWorkflow.definition.id) { mutableStateOf<WorkflowDefinition?>(null) }
     var jobStatus by remember(selectedTaskId) { mutableStateOf<String?>(null) }
     LaunchedEffect(library, liveWorkflow.definition.id) {
         val stored = library?.let { host ->
@@ -617,10 +621,24 @@ internal fun TechnicalInspector(
                     if (!liveWorkflow.run.status.isFinished()) {
                         var rewindMessage by remember(taskId) { mutableStateOf<String?>(null) }
                         val rewindScope = rememberCoroutineScope()
+                        // A second tap while the first is running would rewind it twice.
+                        var rewinding by remember(taskId) { mutableStateOf(false) }
                         AzphaltPill(
                             label = stringResource(Res.string.inspector_rewind),
                             seed = "inspector-rewind",
-                            onClick = { rewindScope.launch { rewindMessage = onRewindTask(taskId.value) } },
+                            enabled = !rewinding,
+                            onClick = {
+                                if (!rewinding) {
+                                    rewinding = true
+                                    rewindScope.launch {
+                                        try {
+                                            rewindMessage = onRewindTask(taskId.value)
+                                        } finally {
+                                            rewinding = false
+                                        }
+                                    }
+                                }
+                            },
                         )
                         Text(stringResource(Res.string.inspector_rewind_note), style = AzphaltType.body, color = azphaltOnSurface())
                         rewindMessage?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface()) }
@@ -643,12 +661,12 @@ internal fun TechnicalInspector(
                     val sentArtifacts = allContextArtifacts.filter { it.kind !in redaction.excludedArtifactKinds }
                     LiveInspectorLine(stringResource(Res.string.inspector_payload_context), buildString {
                         append(stringResource(Res.string.inspector_role, roleForPayload.name))
-                        append("\nObjective: ${if (redaction.redactObjective) "[redacted by policy]" else task.objective.take(120) + if (task.objective.length > 120) "…" else ""}")
+                        append(stringResource(Res.string.inspector_payload_objective, if (redaction.redactObjective) stringResource(Res.string.inspector_payload_redacted) else task.objective.take(120) + if (task.objective.length > 120) "…" else ""))
                         if (task.acceptanceCriteria.isNotEmpty()) {
                             append(pluralStringResource(Res.plurals.inspector_acceptance_criteria_count, task.acceptanceCriteria.size, task.acceptanceCriteria.size))
                         }
                         if (!redaction.redactRoleInstructions && roleForPayload.instructions.isNotBlank()) {
-                            append("\nRole instructions: ${roleForPayload.instructions.take(80)}${if (roleForPayload.instructions.length > 80) "…" else ""}")
+                            append(stringResource(Res.string.inspector_payload_role_instructions, roleForPayload.instructions.take(80) + if (roleForPayload.instructions.length > 80) "…" else ""))
                         } else if (redaction.redactRoleInstructions) {
                             append(stringResource(Res.string.inspector_role_instructions_redacted_by_policy))
                         }
@@ -810,10 +828,22 @@ private fun LiveInspectorLine(label: String, value: String, live: Boolean = fals
     Column(
         verticalArrangement = Arrangement.spacedBy(3.dp),
         modifier = (if (live) Modifier.semantics { liveRegion = LiveRegionMode.Polite } else Modifier)
-            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier),
+            .then(
+                if (onClick != null) {
+                    Modifier.defaultMinSize(minHeight = AzphaltMinTouchTarget).clickable(role = Role.Button, onClick = onClick)
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         Text(label, style = AzphaltType.eyebrow, color = azphaltOnSurface())
-        Text(value, style = AzphaltType.body, color = azphaltOnSurface())
+        // A link reads as one: underlined.
+        Text(
+            value,
+            style = AzphaltType.body,
+            color = azphaltOnSurface(),
+            textDecoration = if (onClick != null) androidx.compose.ui.text.style.TextDecoration.Underline else null,
+        )
     }
 }
 

@@ -99,6 +99,13 @@ class AzphaltContrastTest {
     }
 
     @Test
+    fun secondaryTextClearsFourPointFiveOnEverySurface() {
+        surfaces.forEach { (name, surface) ->
+            assertTrue(contrastRatio(secondaryTextOn(surface), surface) >= AZPHALT_MIN_TEXT_CONTRAST, "$name secondary text under 4.5:1")
+        }
+    }
+
+    @Test
     fun mutedContentAtTextContrastNeverDropsUnderFourPointFive() {
         surfaces.forEach { (name, surface) ->
             val muted = surface.mutedOnOpposite(AZPHALT_MIN_TEXT_CONTRAST)

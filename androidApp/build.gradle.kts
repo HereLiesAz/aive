@@ -81,6 +81,11 @@ android {
     namespace = "com.hereliesaz.aive"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
+    buildFeatures {
+        // AGP 8+ defaults this off; the OAuth client ids below are generated string resources.
+        resValues = true
+    }
+
     defaultConfig {
         applicationId = "com.hereliesaz.aive"
         minSdk = libs.versions.android.minSdk.get().toInt()
