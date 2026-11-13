@@ -68,7 +68,6 @@ data class OrchestrationPacket(
     val availableTemplates: List<OrchestrationTemplate> = emptyList(),
     val availableModels: List<String> = emptyList(),
     val resourceConstraints: Map<String, String> = emptyMap(),
-    val retrievedMemory: List<String> = emptyList(),
     val artifacts: List<String> = emptyList(),
     val previousSteps: List<String> = emptyList(),
     val currentPlan: List<OrchestrationPlanStep> = emptyList(),

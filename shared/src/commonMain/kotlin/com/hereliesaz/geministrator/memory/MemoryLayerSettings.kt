@@ -76,6 +76,9 @@ class MemoryLayerSettingsStore(
     private val mutable = MutableStateFlow(load())
     val state: StateFlow<MemoryLayerSettings> = mutable.asStateFlow()
 
+    /** Where sessions' not-yet-sent memory is kept against a crash: the same settings, under its own key. */
+    val captureJournal: MemoryCaptureJournal by lazy { SettingsMemoryCaptureJournal(settings) }
+
     private val mutableUnreadable = MutableStateFlow(unreadableRaw != null)
 
     /** True when stored settings exist but could not be read: memory is off until the keeper sets it up again. */

@@ -101,4 +101,58 @@ class MemorySessionObserverTest {
         assertEquals(2, store.read().episodes.size)
         assertEquals(listOf("Failed"), partTexts(store.read().episodes.single { "Failed" in partTexts(it) }))
     }
+
+    @Test
+    fun onlyTheFirstEnvelopeOfASessionCarriesItsUserPrompt() = runBlocking {
+        val (store, observer, handle) = fixture()
+        observer.onSessionStarted(handle, request())
+        observer.onSessionEvent(handle, AgentEvent.Message(handle.providerRunId, "alpha finding"))
+        observer.onRemindMe(handle)
+        observer.onSessionEvent(handle, AgentEvent.Message(handle.providerRunId, "beta finding"))
+        observer.onSessionFinished(handle, ManagedSessionStatus.Completed)
+
+        val episodes = store.read().episodes
+        val first = episodes.single { "alpha finding" in partTexts(it).joinToString("\n") }
+        val last = episodes.single { "beta finding" in partTexts(it).joinToString("\n") }
+        assertTrue(first.chunks.any { it.kind == MemorySourceKind.UserPrompt })
+        assertTrue(last.chunks.none { it.kind == MemorySourceKind.UserPrompt }, "the prompt is not sent again")
+        assertEquals("Fix the build", last.userPrompt, "the episode still says which session's prompt it belongs to")
+    }
+
+    private class FakeJournal : MemoryCaptureJournal {
+        val entries = mutableMapOf<String, MemorySessionEnvelope>()
+        override suspend fun record(key: String, unsent: MemorySessionEnvelope?) {
+            if (unsent == null) entries.remove(key) else entries[key] = unsent
+        }
+        override suspend fun pending(): Map<String, MemorySessionEnvelope> = entries.toMap()
+    }
+
+    @Test
+    fun theJournalHoldsOnlyWhatHasNotBeenSentAndLetsGoOnceItIsQueued() = runBlocking {
+        val (_, _, handle) = fixture()
+        val fakeJournal = FakeJournal()
+        val journaling = QueuedMemorySessionObserver(MemoryConsolidationQueue(InMemoryMemoryStore()), nowEpochMillis = { 5L }, journalIntervalMillis = 0L)
+        journaling.journal = fakeJournal
+        val runId = handle.providerRunId.value
+
+        journaling.onSessionStarted(handle, request())
+        assertEquals(listOf("Fix the build", "Implement the change."), fakeJournal.entries.getValue(runId).parts.map { it.text })
+        journaling.onSessionEvent(handle, AgentEvent.Message(handle.providerRunId, "alpha finding with Authorization: Bearer $key"))
+        val held = fakeJournal.entries.getValue(runId)
+        assertEquals(3, held.parts.size)
+        assertTrue("alpha finding" in held.parts.last().text)
+        assertFalse(key in held.parts.joinToString { it.text }, "the journal is scrubbed like the queue")
+        assertEquals(0, held.sequence)
+
+        journaling.onRemindMe(handle)
+        assertTrue(fakeJournal.entries.isEmpty(), "sent, so no longer held")
+
+        journaling.onSessionEvent(handle, AgentEvent.Message(handle.providerRunId, "beta finding"))
+        val later = fakeJournal.entries.getValue(runId)
+        assertEquals(listOf("beta finding"), later.parts.map { it.text }, "only what came after the cursor")
+        assertEquals(1, later.sequence)
+
+        journaling.onSessionFinished(handle, ManagedSessionStatus.Completed)
+        assertTrue(fakeJournal.entries.isEmpty())
+    }
 }

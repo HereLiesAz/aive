@@ -132,7 +132,6 @@ Design a canonical input schema containing fields such as:
   "availableTools": [],
   "availableModels": [],
   "resourceConstraints": {},
-  "retrievedMemory": [],
   "artifacts": [],
   "previousSteps": [],
   "currentPlan": [],
@@ -140,7 +139,7 @@ Design a canonical input schema containing fields such as:
   "instruction": ""
 }
 
-Not every role receives every field.
+Not every role receives every field. The packet carries no retrieved memory: a hive has no memory bank or session when the queen plans it, and memory text in the planning prompt would reach a model that designs steps (an injection and data-flow channel). Memory reaches the agents the queen creates, through the cue path, and not the queen.
 
 Each model must receive only what its job requires.
 

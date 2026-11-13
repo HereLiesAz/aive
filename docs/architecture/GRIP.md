@@ -1,3 +1,5 @@
+> **Superseded where it conflicts with [Memory-for-agents.md](../Memory-for-agents.md) and the owner's model: memory is not a tool; the only command is a bare `/remindme`; keyword clouds arrive by themselves in the agent's thinking and chat and go deeper the longer it lingers; recall is gist, never exact; a contradiction is reasoned out loud and its resolution is condensed like everything else.** Contradicted here: *Public verbs* (`bank`, `grip`, `expand` are a backend API only; no agent calls them), *Recall triggers* (following a cue by `#tag` or "Let me see what I remember about" and the rule that explicit ones bypass the dial and the frequency filter), *Hebbian co-recall* and the `Recalled` edges of a resolved memory (surfacing writes nothing to a stored memory; these writes are no longer made), and *Attention* where novelty alone suppresses a memory (novelty is now kept per memory and depth, so lingering goes deeper). Prompt rendering with scores, ids and full text is superseded by gist rendering.
+
 # GRIP memory recall
 
 GRIP is The Aive's memory-specific direct-recall operation.

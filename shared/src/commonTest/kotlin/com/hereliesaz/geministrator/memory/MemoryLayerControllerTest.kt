@@ -220,4 +220,34 @@ class MemoryLayerControllerTest {
         assertEquals(1, store.read().episodes.size)
         assertEquals(exported, controller.exportJson())
     }
+
+    @Test
+    fun partsLeftBehindByACrashAreSentOnceAtTheNextStart() = runBlocking {
+        val settings = MapSettings()
+        val store = InMemoryMemoryStore()
+        SettingsMemoryCaptureJournal(settings).record(
+            "run-1",
+            MemorySessionEnvelope(
+                sourceSessionId = "run-1",
+                workflowRunId = WORKFLOW,
+                userPrompt = "Fix the build",
+                parts = listOf(MemorySessionPart(MemorySourceKind.Message, "Agent message", "gamma finding about the gradle cache")),
+                closedAtEpochMillis = 7L,
+                sequence = 1,
+            ),
+        )
+        val controller = MemoryLayerController(
+            banks = MemoryBanks.inMemory(mapOf(WORKFLOW to store)),
+            settingsStore = MemoryLayerSettingsStore(settings),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            nowEpochMillis = { 1_000L },
+        )
+        assertEquals(1, controller.recoverCapturedSessions())
+        val episode = store.read().episodes.single()
+        assertTrue(episode.chunks.any { "gamma finding about the gradle cache" in it.text })
+        assertTrue(SettingsMemoryCaptureJournal(settings).pending().isEmpty(), "the journal let go of it")
+        assertEquals(0, controller.recoverCapturedSessions(), "nothing is sent twice")
+        assertEquals(1, store.read().episodes.size)
+    }
 }

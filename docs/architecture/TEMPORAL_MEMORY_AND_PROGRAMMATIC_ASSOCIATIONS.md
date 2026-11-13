@@ -1,3 +1,5 @@
+> **Superseded where it conflicts with [Memory-for-agents.md](../Memory-for-agents.md) and the owner's model: memory is not a tool; the only command is a bare `/remindme`; keyword clouds arrive by themselves in the agent's thinking and chat and go deeper the longer it lingers; recall is gist, never exact; a contradiction is reasoned out loud and its resolution is condensed like everything else.** Contradicted here: only the sentence in *Condensation* that a contrast is consolidated "only by absorbing a deliberation that chose a side" (a resolution is reasoned out loud and condensed like everything else; no command and no special reader writes it). The time and association rules are unaffected.
+
 # Temporal memory and programmatic associations
 
 This document defines The Aive's deterministic time-bucketing and non-model association rules. It is normative for memory-backend work.
