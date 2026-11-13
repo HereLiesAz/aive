@@ -7,6 +7,8 @@ import com.hereliesaz.geministrator.distributed.ComputeRelayClientMessage
 import com.hereliesaz.geministrator.distributed.ComputeRelayHttpError
 import com.hereliesaz.geministrator.distributed.ComputeRelayServerMessage
 import com.hereliesaz.geministrator.distributed.DISTRIBUTED_COMPUTE_PROTOCOL_VERSION
+import com.hereliesaz.geministrator.net.ResponseTooLargeException
+import com.hereliesaz.geministrator.net.readAllBounded
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -18,7 +20,7 @@ import io.ktor.server.application.install
 import io.ktor.server.cio.CIO
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.request.contentLength
-import io.ktor.server.request.receiveText
+import io.ktor.server.request.receiveChannel
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
@@ -63,8 +65,14 @@ class ComputeRelayHub(
     // node would register on an orphan and the next connection would build a second pool.
     private val handedOutAt = ConcurrentHashMap<String, Long>()
 
+    /** The pool [poolId] if it already exists. Unauthenticated requests use this and never create one. */
+    fun existingPool(poolId: String): RelayPool? = pools[poolId]?.also { handedOutAt[poolId] = nowEpochMillis() }
+
+    /** Creates the pool on first use; only an authenticated enrolment calls this. Bounded by [MAX_POOLS]. */
     fun pool(poolId: String): RelayPool {
         handedOutAt[poolId] = nowEpochMillis()
+        pools[poolId]?.let { return it }
+        check(pools.size < MAX_POOLS) { "This relay has reached its limit of $MAX_POOLS pools" }
         return pools.computeIfAbsent(poolId) { RelayPool(poolId, nowEpochMillis, stateStore) }
     }
 
@@ -84,6 +92,7 @@ class ComputeRelayHub(
 
     private companion object {
         const val POOL_REMOVAL_GRACE_MILLIS = 60_000L
+        const val MAX_POOLS = 256
     }
 }
 
@@ -166,7 +175,13 @@ fun Application.computeRelayModule(
                 call.respondRelayError(HttpStatusCode.PayloadTooLarge, ComputeNodeAuth.ERROR_BAD_REQUEST, "Enrolment request is too large")
                 return@post
             }
-            val body = call.receiveText()
+            // The cap is enforced while reading, so a chunked body with no length cannot get past it.
+            val body = try {
+                call.receiveChannel().readAllBounded(MAX_ENROLMENT_BODY_BYTES.toInt()).toString(Charsets.UTF_8)
+            } catch (_: ResponseTooLargeException) {
+                call.respondRelayError(HttpStatusCode.PayloadTooLarge, ComputeNodeAuth.ERROR_BAD_REQUEST, "Enrolment request is too large")
+                return@post
+            }
             val request = runCatching {
                 relayJson.decodeFromString(ComputeNodeEnrolmentRequest.serializer(), body)
             }.getOrNull()
@@ -176,8 +191,14 @@ fun Application.computeRelayModule(
             }
             val ownerAuthority = ownerToken != null &&
                 isAuthorized(call.request.headers[ComputeNodeAuth.HEADER_OWNER_TOKEN]?.let { "Bearer $it" }, ownerToken)
+            val enrolPool = try {
+                hub.pool(poolId)
+            } catch (_: IllegalStateException) {
+                call.respondRelayError(HttpStatusCode.ServiceUnavailable, ComputeNodeAuth.ERROR_POOL_FULL, "The relay cannot take another pool")
+                return@post
+            }
             try {
-                val enrolled = hub.pool(poolId).enrol(request, ownerAuthority)
+                val enrolled = enrolPool.enrol(request, ownerAuthority)
                 call.respondText(
                     relayJson.encodeToString(
                         ComputeNodeEnrolmentResponse.serializer(),
@@ -207,8 +228,23 @@ fun Application.computeRelayModule(
                 close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Unauthorized"))
                 return@webSocket
             }
-            val pool = hub.pool(poolId)
-            val authentication = pool.authenticate(nodeIdHeader, timestampHeader, nonceHeader, signatureHeader)
+            // A session never creates a pool: only an authenticated enrolment does.
+            val existing = hub.existingPool(poolId)
+            val authentication = existing?.authenticate(nodeIdHeader, timestampHeader, nonceHeader, signatureHeader)
+                ?: NodeAuthentication.NotEnrolled
+            val pool = existing ?: run {
+                send(
+                    relayJson.encodeToString(
+                        ComputeRelayServerMessage.serializer(),
+                        ComputeRelayServerMessage.Error(
+                            code = authentication.errorCode,
+                            message = "This device is not enrolled in this pool",
+                        ),
+                    ),
+                )
+                close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Unauthorized"))
+                return@webSocket
+            }
             if (authentication != NodeAuthentication.Authenticated) {
                 // Not-enrolled and revoked are told to the client so it can enrol again or stop.
                 if (authentication == NodeAuthentication.NotEnrolled || authentication == NodeAuthentication.Revoked) {
