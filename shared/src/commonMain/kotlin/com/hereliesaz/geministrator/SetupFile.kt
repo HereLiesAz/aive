@@ -128,7 +128,7 @@ object SetupFileCodec {
         val salt = random.nextBytes(SALT_BYTES)
         val iv = random.nextBytes(IV_BYTES)
         val ciphertext = crypto {
-            aesGcm(passphrase, salt, ITERATIONS).encryptWithIv(
+            aesGcm(normalizeNfc(passphrase), salt, ITERATIONS).encryptWithIv(
                 iv,
                 json.encodeToString(SetupSecrets.serializer(), secrets).encodeToByteArray(),
                 setupJson.encodeToByteArray(),
@@ -186,16 +186,25 @@ object SetupFileCodec {
         } catch (failure: Exception) {
             throw SetupFileException(SetupFileFailure.NotASetupFile, "Setup file settings are unreadable: ${failure.detail()}", failure)
         }
-        val cipher = crypto { aesGcm(passphrase, salt, sealed.iterations) }
-        val plaintext = run {
+        // The passphrase is used in Unicode form C. Files sealed before that kept the typed form, so a passphrase that
+        // changes under normalization is tried that way second.
+        val candidates = listOf(normalizeNfc(passphrase), passphrase).distinct()
+        var plaintext: ByteArray? = null
+        var failed: Exception? = null
+        for (candidate in candidates) {
+            val cipher = crypto { aesGcm(candidate, salt, sealed.iterations) }
             try {
-                cipher.decryptWithIv(iv, ciphertext, document.setupJson.encodeToByteArray())
+                plaintext = cipher.decryptWithIv(iv, ciphertext, document.setupJson.encodeToByteArray())
+                break
             } catch (failure: CancellationException) {
                 throw failure
             } catch (failure: Exception) {
-                // GCM cannot tell a wrong passphrase from a tampered file; both mean "do not trust it".
-                throw SetupFileException(SetupFileFailure.WrongPassphrase, "Wrong passphrase or damaged setup file", failure)
+                failed = failure
             }
+        }
+        if (plaintext == null) {
+            // GCM cannot tell a wrong passphrase from a tampered file; both mean "do not trust it".
+            throw SetupFileException(SetupFileFailure.WrongPassphrase, "Wrong passphrase or damaged setup file", failed)
         }
         val secrets = try {
             json.decodeFromString(SetupSecrets.serializer(), plaintext.decodeToString())
