@@ -225,7 +225,8 @@ internal fun GeministratorWorkflowTerrarium(
     LaunchedEffect(stagedDefinition.tasks) {
         val remaining = stagedDefinition.tasks.map { it.id.value }.toSet()
         if (remaining != knownTaskIds) {
-            selectedTaskId?.takeIf { it in knownTaskIds && it !in remaining }?.let(onTaskSelected)
+            // Release, not select: a shell's select treats a re-tap of a set-aside creature as "reopen".
+            selectedTaskId?.takeIf { it in knownTaskIds && it !in remaining }?.let(releaseCreature)
             grouping?.let { gathered ->
                 val kept = selectionAfterRemoval(gathered, remaining)
                 if (kept != gathered) grouping = kept

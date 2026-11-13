@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -453,6 +454,8 @@ internal fun LiveWorkflowLibraryScreen(
                         WorkflowLibraryTab.Bowl -> if (currentDraft != null) {
                             // Phase 1 of docs/Fishbowl-Builder.md: the bowl with no run. Dropping one
                             // creature on another edits the unsaved draft; Save persists it.
+                            // The shell's release (LocalReleaseCreature) clears the Overview's selection, not this editor's.
+                            CompositionLocalProvider(LocalReleaseCreature provides null) {
                             GeministratorWorkflowTerrarium(
                                 definition = currentDraft,
                                 liveRun = remember(currentDraft.id) { restingWorkflowRun(currentDraft) },
@@ -465,6 +468,7 @@ internal fun LiveWorkflowLibraryScreen(
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                             )
+                            }
                         }
 
                         WorkflowLibraryTab.Tasks -> if (currentDraft != null) {
