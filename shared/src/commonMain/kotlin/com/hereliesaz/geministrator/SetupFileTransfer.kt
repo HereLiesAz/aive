@@ -28,7 +28,23 @@ interface SetupSecretStore {
      * provider registry), so imported providers register immediately.
      */
     fun write(secrets: SetupSecrets)
+
+    /**
+     * The relay a pairing in [secrets] would move this device to, when [write] leaves it out because the device
+     * is already paired with another relay; null otherwise. The import summary offers it to the keeper.
+     */
+    fun heldRelayChange(secrets: SetupSecrets): String? = null
+
+    /** Applies the pairing [heldRelayChange] named, after the keeper confirmed it on the import summary. */
+    fun confirmRelayChange(secrets: SetupSecrets) {}
 }
+
+/** A change an import held back until the keeper confirms it on the summary. */
+class HeldSetupChange(
+    /** The relay the file would move the pairing to. */
+    val relayUrl: String,
+    val confirm: () -> Unit,
+)
 
 /** What an import wrote, for the summary shown afterwards. */
 data class SetupImportSummary(
@@ -44,6 +60,8 @@ data class SetupImportSummary(
     val skipped: List<String> = emptyList(),
     /** Network destinations the import changed (old to new), shown so a changed relay or endpoint is seen. */
     val destinationChanges: List<String> = emptyList(),
+    /** A pairing relay change the file asked for, held until the keeper confirms it on the summary. */
+    val held: HeldSetupChange? = null,
 )
 
 /**
@@ -361,6 +379,8 @@ internal suspend fun importSetupFile(
     }
     val secrets = decoded.secrets
     val summary = SetupFileTransfer(persistence).apply(decoded.contents, secrets)
+    // Read before writing: write() leaves a pairing for another relay alone, and the keeper may confirm it.
+    val heldRelay = secretStore?.heldRelayChange(secrets)
     secretStore?.write(secrets)
     decoded.contents.crashReportingEnabled?.let { onCrashReportingChange?.invoke(it) }
     SetupFileTransfer.importedMemorySettings(decoded.contents)?.let { imported ->
@@ -371,6 +391,7 @@ internal suspend fun importSetupFile(
         providers = secrets.providerCredentials.size,
         repositories = secrets.repositoryCredentials.size,
         computeToken = secrets.distributedComputeToken != null,
-        remoteRelay = secrets.remoteRelayPairing != null,
+        remoteRelay = secrets.remoteRelayPairing != null && heldRelay == null,
+        held = heldRelay?.let { relay -> HeldSetupChange(relay) { secretStore.confirmRelayChange(secrets) } },
     )
 }

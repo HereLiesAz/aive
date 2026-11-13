@@ -70,13 +70,20 @@ internal class RemoteRelayStore(context: Context) {
      * Restores a pairing from a setup file without turning Remote access on; [enable] then reuses
      * it because it is for the same relay. Throws [IllegalArgumentException] when it is unreadable.
      */
-    fun restore(relayUrl: String?, storedPairing: String) {
+    fun restore(relayUrl: String?, storedPairing: String, replaceExisting: Boolean = false) {
         val pairing = requireNotNull(RemoteRelayPairing.fromStorage(storedPairing)) { "Remote access pairing is unreadable" }
         // A file never moves an existing pairing to another relay: that needs a fresh pairing.
         val current = pairing()
-        if (current != null && current.relay != pairing.relay) return
+        if (!replaceExisting && current != null && current.relay != pairing.relay) return
         this.relayUrl = pairing.relay
         secrets.writeToken(pairing.toStorage())
+    }
+
+    /** The relay a setup file's pairing names when it differs from this device's current pairing; null otherwise. */
+    fun relayChangeOf(storedPairing: String): String? {
+        val incoming = RemoteRelayPairing.fromStorage(storedPairing) ?: return null
+        val current = pairing() ?: return null
+        return incoming.relay.takeIf { current.relay != it }
     }
 
     /** Turns Remote access off and forgets the pairing; returns it so its room can be deleted. */

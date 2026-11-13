@@ -569,6 +569,17 @@ class MainActivity : ComponentActivity() {
                                 remoteRelayPairing = remoteAccessController.store.pairing()?.toStorage(),
                             )
 
+                            override fun heldRelayChange(secrets: SetupSecrets): String? =
+                                secrets.remoteRelayPairing?.let { remoteAccessController.store.relayChangeOf(it) }
+
+                            override fun confirmRelayChange(secrets: SetupSecrets) {
+                                secrets.remoteRelayPairing?.let { pairing ->
+                                    remoteAccessController.store.restore(secrets.remoteRelayUrl, pairing, replaceExisting = true)
+                                    remoteRelayUrl = remoteAccessController.store.relayUrl
+                                    remoteAccess = remoteAccessController.store.snapshot()
+                                }
+                            }
+
                             override fun write(secrets: SetupSecrets) {
                                 // Ids this build does not know are skipped, not fatal.
                                 secrets.providerCredentials

@@ -28,7 +28,9 @@ import com.hereliesaz.geministrator.resources.settings_setup_import_failed
 import com.hereliesaz.geministrator.resources.settings_setup_imported
 import com.hereliesaz.geministrator.resources.settings_setup_imported_compute
 import com.hereliesaz.geministrator.resources.settings_setup_imported_relay
+import com.hereliesaz.geministrator.resources.settings_setup_held_relay
 import com.hereliesaz.geministrator.resources.settings_setup_imported_summary
+import com.hereliesaz.geministrator.resources.settings_setup_use_relay
 import com.hereliesaz.geministrator.resources.settings_setup_no_credentials_here
 import com.hereliesaz.geministrator.resources.settings_setup_not_a_setup_file
 import com.hereliesaz.geministrator.resources.settings_setup_passphrase
@@ -73,6 +75,7 @@ internal fun SetupFileSection(
     var confirmation by remember { mutableStateOf("") }
     var working by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<Pair<String, String?>?>(null) }
+    var heldChange by remember { mutableStateOf<HeldSetupChange?>(null) }
     var validation by remember { mutableStateOf<String?>(null) }
 
     fun close() {
@@ -158,6 +161,7 @@ internal fun SetupFileSection(
                                 } else {
                                     val opened = projectFileService.chooseAndReadSetupFile() ?: return@launch
                                     val summary = actions.import(opened.content, passphrase)
+                                    heldChange = summary.held
                                     getString(Res.string.settings_setup_imported) to setupSummaryText(summary)
                                 }
                                 close()
@@ -192,6 +196,16 @@ internal fun SetupFileSection(
             endCap = stringResource(Res.string.settings_ok),
             onClick = { message = null },
         )
+        heldChange?.let { held ->
+            AzphaltPill(
+                label = stringResource(Res.string.settings_setup_use_relay, held.relayUrl),
+                seed = "setup-use-relay",
+                onClick = {
+                    held.confirm()
+                    heldChange = null
+                },
+            )
+        }
     }
 }
 
@@ -219,6 +233,7 @@ private suspend fun setupSummaryText(summary: SetupImportSummary): String = buil
         ),
     )
     if (summary.computeToken) append("\n").append(getString(Res.string.settings_setup_imported_compute))
+    summary.held?.let { append("\n").append(getString(Res.string.settings_setup_held_relay, it.relayUrl)) }
     if (summary.remoteRelay) append("\n").append(getString(Res.string.settings_setup_imported_relay))
     summary.destinationChanges.forEach { append("\n").append(it) }
     summary.skipped.forEach { append("\nNot imported: ").append(it) }

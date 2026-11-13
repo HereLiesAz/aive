@@ -1569,6 +1569,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_setup_imported">Setup file imported</string>
     <string name="settings_setup_imported_summary">Projects: %1$d · Swarms: %2$d · Roles: %3$d · Settings: %4$d · Source keys: %5$d · Repository accounts: %6$d</string>
     <string name="settings_setup_imported_compute">Compute pool token restored.</string>
+    <string name="settings_setup_held_relay">This file would move Remote access to %1$s. It was not applied.</string>
+    <string name="settings_setup_use_relay">Use the relay %1$s</string>
     <string name="settings_setup_imported_relay">Remote access pairing restored. Turn Remote access on to use it.</string>
     <string name="settings_provider">Source</string>
     <string name="settings_ready">Ready</string>
