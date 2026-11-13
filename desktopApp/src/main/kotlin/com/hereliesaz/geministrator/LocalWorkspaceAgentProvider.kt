@@ -114,9 +114,9 @@ internal class LocalWorkspaceAgentProvider(
     private val sessions = mutableMapOf<ProviderRunId, Session>()
 
     override suspend fun capabilities(): AgentCapabilities = AgentCapabilities(
-        supported = setOf(
+        supported = setOfNotNull(
             AgentCapability.RepositoryRead,
-            AgentCapability.RepositoryWrite,
+            AgentCapability.RepositoryWrite.takeUnless { WorkspaceAgentMode.readOnly.value },
             AgentCapability.PlanGeneration,
             AgentCapability.PlanApproval,
             AgentCapability.TestAuthoring,
@@ -304,6 +304,31 @@ internal class LocalWorkspaceAgentProvider(
 
             if (session.phase.value == Phase.Cancelled) {
                 emit(AgentEvent.Failed(runId, "$displayName workspace session cancelled"))
+                return@flow
+            }
+
+            if (WorkspaceAgentMode.readOnly.value) {
+                // Read-only: the repository was read and the plan made; nothing is written or committed.
+                emit(AgentEvent.Progress(runId, "Read-only: the repository was read and no change was made"))
+                emit(
+                    AgentEvent.ArtifactProduced(
+                        runId,
+                        ProviderArtifact(
+                            kind = ArtifactKind.TaskPlan,
+                            label = "Plan (read-only, nothing changed)",
+                            textContent = approvedPlan.text,
+                            mediaType = "text/markdown",
+                            metadata = mapOf("provider" to id.value, "mode" to "read-only"),
+                        ),
+                    ),
+                )
+                emit(
+                    AgentEvent.Failed(
+                        runId,
+                        "$displayName workspace agent is read-only, so it made no change. " +
+                            "Turn read-only off under Local agents in the Keeper's room to let it write.",
+                    ),
+                )
                 return@flow
             }
 

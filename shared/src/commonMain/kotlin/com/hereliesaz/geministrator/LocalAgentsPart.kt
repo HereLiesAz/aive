@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,6 +32,9 @@ import com.hereliesaz.geministrator.resources.local_agents_project_on
 import com.hereliesaz.geministrator.resources.local_agents_off
 import com.hereliesaz.geministrator.resources.local_agents_on
 import com.hereliesaz.geministrator.resources.local_agents_test
+import com.hereliesaz.geministrator.resources.local_agents_workspace_note
+import com.hereliesaz.geministrator.resources.local_agents_workspace_read_only
+import com.hereliesaz.geministrator.resources.local_agents_workspace_writes
 import com.hereliesaz.geministrator.resources.local_agents_test_ok
 import com.hereliesaz.geministrator.resources.local_agents_test_failed
 import com.hereliesaz.geministrator.resources.local_agents_testing
@@ -55,6 +59,14 @@ internal fun LocalAgentsPart() {
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(stringResource(Res.string.local_agents_note), style = AzphaltType.body, color = azphaltOnSurface())
+        val readOnly by WorkspaceAgentMode.readOnly.collectAsState()
+        AzphaltPill(
+            label = stringResource(if (readOnly) Res.string.local_agents_workspace_read_only else Res.string.local_agents_workspace_writes),
+            seed = "workspace-agent-read-only",
+            selected = readOnly,
+            onClick = { WorkspaceAgentMode.setReadOnly(!readOnly) },
+        )
+        Text(stringResource(Res.string.local_agents_workspace_note), style = AzphaltType.body, color = azphaltOnSurface())
         statuses.forEach { status ->
             CliCard(
                 status = status,
