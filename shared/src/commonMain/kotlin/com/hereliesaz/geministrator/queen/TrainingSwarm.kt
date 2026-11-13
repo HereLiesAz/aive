@@ -73,7 +73,7 @@ fun trainingRunInfo(definition: WorkflowDefinition): TrainingRunInfo? {
     if (!definition.name.startsWith("TRAIN · ")) return null
     val domain = definition.name.removePrefix("TRAIN · ").trim().takeIf { it.isNotEmpty() } ?: return null
     val parent = definition.tasks.firstOrNull { it.id.value == TRAINING_GENERIC_ID }?.roleId?.value ?: return null
-    val round = roundInDescription.find(definition.description)?.groupValues?.get(1)?.toIntOrNull() ?: 1
+    val round = roundInDescription.find(definition.description.orEmpty())?.groupValues?.get(1)?.toIntOrNull() ?: 1
     return TrainingRunInfo(domain, parent, round)
 }
 
