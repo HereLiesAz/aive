@@ -190,6 +190,9 @@ jobs:
       - name: Test shared domain
         run: ./gradlew :shared:desktopTest
 
+      - name: Test desktop app
+        run: ./gradlew :desktopApp:test
+
       - name: Test distributed compute relay
         run: ./gradlew :computeRelay:test
 
