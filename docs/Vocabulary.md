@@ -10,6 +10,7 @@ protocol fields do not follow it.
 | **Source** | provider (`AgentProvider`, `ProviderCatalog`, `preferredProviderId`; the A2A Agent Card `provider:` skills) | A creature's **Source** row, Connections ("Add a source"), **AI Sources**, the Roster's source routing. |
 | **Messages** | inbox (`LiveInboxScreen`, `InboxReadLog`) | The header's **Messages** button and the rail's Messages place: everything waiting on you. |
 | **Nanny** | Hall Monitor (`HallMonitorRole`, `HallMonitorGovernanceService`, the `hall-monitor` role id) | The role that watches the swarm's efficiency and can pause the hive for your review. |
+| **Host** | where an agent runs (`TaskExecutor`, the Compute part, an orphan's endpoint host) | A creature's **Runs on** row and an orphan's **Host:** line: your device, a paired machine, or the orphan's own server. Different from its **Source** (what it thinks with). |
 | **Orphan** | drifter (`A2aDrifters`, `DrifterTrouble`, `drifter-` role ids) | A remote A2A agent you can bring in and connect. |
 
 Kept as they are: **Memory**, **Breed**.

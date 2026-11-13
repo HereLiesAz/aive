@@ -215,21 +215,44 @@ internal fun HiveCardImportPanel(
 /** What an import will do, in plain words: counts, what is pinned, and what this device lacks. */
 @Composable
 private fun HiveCardSummaryLines(summary: HiveCardSummary) {
-    val lines = buildList {
-        add(stringResource(Res.string.hive_card_ready, summary.hiveName, summary.creatures, summary.strandsKept))
-        summary.pinned.take(MAX_SUMMARY_LINES).forEach { pin ->
-            add(stringResource(Res.string.hive_card_pinned, pin.creatureName, providerName(pin.providerId)))
-        }
-        summary.needsProviders.take(MAX_SUMMARY_LINES).forEach { add(stringResource(Res.string.hive_card_needs_provider, providerName(it))) }
-        summary.drifterCards.take(MAX_SUMMARY_LINES).forEach { url ->
-            add(stringResource(Res.string.hive_card_drifter, url))
-        }
-        summary.needsRoles.take(MAX_SUMMARY_LINES).forEach { add(stringResource(Res.string.hive_card_needs_role, it)) }
-        if (summary.leftOut > 0) add(stringResource(Res.string.hive_card_left_out, summary.leftOut))
-        if (summary.strandsDropped > 0) add(stringResource(Res.string.hive_card_strands_dropped, summary.strandsDropped))
-    }
+    // Every line that names a source or an orphan is a link to where it is set up: the source's own screen, or
+    // Connect remote agent with the orphan's address filled in. A screen without the links shows plain lines.
+    val links = LocalPlaceLinks.current
+    val openSource = links.openSource
+    val openConnections = links.openConnections
     Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.azphaltLiveRegion()) {
-        lines.forEach { Text(it, style = AzphaltType.body, color = azphaltOnSurface()) }
+        Text(
+            stringResource(Res.string.hive_card_ready, summary.hiveName, summary.creatures, summary.strandsKept),
+            style = AzphaltType.body,
+            color = azphaltOnSurface(),
+        )
+        summary.pinned.take(MAX_SUMMARY_LINES).forEach { pin ->
+            LinkText(
+                stringResource(Res.string.hive_card_pinned, pin.creatureName, providerName(pin.providerId)),
+                onClick = openSource?.let { open -> { open(pin.providerId) } },
+            )
+        }
+        summary.needsProviders.take(MAX_SUMMARY_LINES).forEach { id ->
+            LinkText(
+                stringResource(Res.string.hive_card_needs_provider, providerName(id)),
+                onClick = openSource?.let { open -> { open(id) } },
+            )
+        }
+        summary.drifterCards.take(MAX_SUMMARY_LINES).forEach { url ->
+            LinkText(
+                stringResource(Res.string.hive_card_drifter, url),
+                onClick = openConnections?.let { open -> { open(url) } },
+            )
+        }
+        summary.needsRoles.take(MAX_SUMMARY_LINES).forEach {
+            Text(stringResource(Res.string.hive_card_needs_role, it), style = AzphaltType.body, color = azphaltOnSurface())
+        }
+        if (summary.leftOut > 0) {
+            Text(stringResource(Res.string.hive_card_left_out, summary.leftOut), style = AzphaltType.body, color = azphaltOnSurface())
+        }
+        if (summary.strandsDropped > 0) {
+            Text(stringResource(Res.string.hive_card_strands_dropped, summary.strandsDropped), style = AzphaltType.body, color = azphaltOnSurface())
+        }
     }
 }
 

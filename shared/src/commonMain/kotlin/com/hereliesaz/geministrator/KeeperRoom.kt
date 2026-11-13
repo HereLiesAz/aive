@@ -318,6 +318,8 @@ internal fun ConnectionRow(
     status: String?,
     connected: Boolean,
     compact: Boolean,
+    /** Makes the detail line a link to where it can be changed (a row's source, its role); null leaves it plain. */
+    onDetailClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     actions: @Composable () -> Unit,
 ) {
@@ -341,7 +343,7 @@ internal fun ConnectionRow(
                 if (wide) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                         Column(Modifier.width(170.dp)) { ConnectionName(name) }
-                        Column(Modifier.weight(1f)) { detail?.let { ConnectionDetail(it) } }
+                        Column(Modifier.weight(1f)) { detail?.let { ConnectionDetail(it, onDetailClick) } }
                         status?.let { ConnectionStatus(it) }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { actions() }
                     }
@@ -351,7 +353,7 @@ internal fun ConnectionRow(
                             Box(Modifier.weight(1f)) { ConnectionName(name) }
                             status?.let { ConnectionStatus(it) }
                         }
-                        detail?.let { ConnectionDetail(it) }
+                        detail?.let { ConnectionDetail(it, onDetailClick) }
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { actions() }
                     }
                 }
@@ -364,7 +366,7 @@ internal fun ConnectionRow(
 private fun ConnectionName(name: String) = Text(name, style = AzphaltType.lead, color = azphaltOnSurface())
 
 @Composable
-private fun ConnectionDetail(detail: String) = Text(detail, style = AzphaltType.body, color = azphaltOnSurface())
+private fun ConnectionDetail(detail: String, onClick: (() -> Unit)? = null) = LinkText(detail, onClick)
 
 @Composable
 private fun ConnectionStatus(status: String) {

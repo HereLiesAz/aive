@@ -12,6 +12,7 @@ import com.hereliesaz.geministrator.resources.hive_stop_text
 import com.hereliesaz.geministrator.resources.hive_stop_title
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -259,12 +260,20 @@ fun ControlRoom(
     // The Keeper's room's open part, held here so the breadcrumb can name it.
     val keeperSectionName = rememberDurableStringState("keeper.section", KeeperSection.Connections.name)
     val keeperOpen = rememberDurableBooleanState("keeper.open")
-    // The creature's panel links a provider or integration to Connections itself, not to whichever
-    // Keeper's room section was left open last.
-    val openConnectionsFromPanel: () -> Unit = {
-        keeperSectionName.value = KeeperSection.Connections.name
-        keeperOpen.value = true
-        onDestinationSelected(ControlRoomDestination.Settings)
+    // Every link to Connections, from the creature's panel or anywhere else, goes through the one
+    // openConnectionsPlace: Connections itself, not whichever Keeper's room section was left open last.
+    val openConnectionsAt: (String?) -> Unit = { address ->
+        openConnectionsPlace(keeperSectionName, keeperOpen, address, onDestinationSelected)
+    }
+    val openConnections: () -> Unit = { openConnectionsAt(null) }
+    // Built once and reading the latest callbacks, so providing it never recomposes everything under it.
+    val latestOpenConnectionsAt by rememberUpdatedState(openConnectionsAt)
+    val latestReconfigureProvider by rememberUpdatedState(onReconfigureProvider)
+    val placeLinks = remember {
+        PlaceLinks(
+            openConnections = { address -> latestOpenConnectionsAt(address) },
+            openSource = { id -> latestReconfigureProvider(id) },
+        )
     }
     // The hive on screen: a resting hive when one is open (it shows even while another run is live),
     // else the live run's. The breadcrumb and the panel follow what is shown.
@@ -361,7 +370,7 @@ fun ControlRoom(
         } else {
             null
         },
-        openConnections = openConnectionsFromPanel,
+        openConnections = openConnections,
         reconfigureProvider = onReconfigureProvider,
         openCreature = { id, tab -> openCreatureOn(id, tab) },
     )
@@ -443,7 +452,7 @@ fun ControlRoom(
                 roleSurfaceFilePicker = roleSurfaceFilePicker,
                 computeAvailable = ControlRoomDestination.Compute in destinations,
                 onSelectTask = onTaskSelected,
-                onOpenConnections = openConnectionsFromPanel,
+                onOpenConnections = openConnections,
                 onOpenCompute = if (ControlRoomDestination.Compute in destinations) {
                     { onDestinationSelected(ControlRoomDestination.Compute) }
                 } else {
@@ -481,6 +490,7 @@ fun ControlRoom(
         LocalReleaseCreature provides releaseCreature,
         LocalHiveFlowchartView provides flowchartView,
         LocalFlowchartLinks provides flowchartLinks,
+        LocalPlaceLinks provides placeLinks,
     ) {
     BoxWithConstraints(
         modifier = Modifier
@@ -534,7 +544,7 @@ fun ControlRoom(
             Row(Modifier.weight(1f).fillMaxWidth()) {
             MainDestination(
                 destination = destination,
-                onOpenSettings = { onDestinationSelected(ControlRoomDestination.Settings) },
+                onOpenConnections = openConnections,
                 computeAvailable = ControlRoomDestination.Compute in destinations,
                 onDestinationSelected = onDestinationSelected,
                 selectedTaskId = selectedTaskId,
@@ -915,7 +925,8 @@ private fun MainDestination(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
     runtimeState: ApplicationRuntimeState,
-    onOpenSettings: () -> Unit = {},
+    /** Opens Connections: the one route, held by the ControlRoom (see [openConnectionsPlace]). */
+    onOpenConnections: () -> Unit = {},
     onDestinationSelected: (ControlRoomDestination) -> Unit = {},
     computeAvailable: Boolean = true,
     district: MutableState<Boolean> = remember { mutableStateOf(false) },
@@ -933,13 +944,6 @@ private fun MainDestination(
     val hiveScope = rememberCoroutineScope()
     // Stop run's confirmation: stopping cancels every unfinished creature, so it asks first.
     var confirmingStopRun by remember { mutableStateOf(false) }
-    // Every "check your connections" link lands on the Connections section itself, not on whichever
-    // Keeper's room section was left open last.
-    val openConnections: () -> Unit = {
-        keeperSectionName.value = KeeperSection.Connections.name
-        keeperOpen.value = true
-        onOpenSettings()
-    }
     // Workflows, opened on a hive: its workflow is selected first (and a draft left from another hive is
     // dropped, so Save cannot write to it), so the library shows the hive the keeper came from and not
     // whichever it showed last. The hive on screen unless one is named: the resting hive names itself.
@@ -1118,7 +1122,7 @@ private fun MainDestination(
                                     restingHiveId = ""
                                     onZoomOut()
                                 },
-                                onOpenConnections = openConnections,
+                                onOpenConnections = onOpenConnections,
                                 compact = compact,
                             )
                             AzphaltPill(
@@ -1199,7 +1203,7 @@ private fun MainDestination(
                             onImportProjectFile = onImportProjectFile,
                             onRecoverFromCorruption = onRecoverFromCorruption,
                             onRetryRuntime = onRetryRuntime,
-                            onOpenSettings = openConnections,
+                            onOpenSettings = onOpenConnections,
                             onValidateWorkflow = onValidateWorkflow,
                             availableRepositorySources = availableRepositorySources,
                             onPickLocalRepository = onPickLocalRepository,

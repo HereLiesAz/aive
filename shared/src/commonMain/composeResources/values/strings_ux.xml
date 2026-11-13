@@ -62,12 +62,8 @@
     <string name="overview_enter_name">Enter a project name to start a run.</string>
     <string name="overview_enter_objective">Enter an objective to start a run.</string>
     <string name="overview_invalid_repository_location">Invalid repository location</string>
-    <string name="firstrun_title">Try it free, no key</string>
-    <string name="firstrun_body">No account needed. Pick one of these to get started; you can add a stronger source later.</string>
     <string name="keyless_sources_on">Keyless sources: on</string>
     <string name="keyless_sources_off">Keyless sources: off</string>
-    <string name="firstrun_connect">Connect %1$s</string>
-    <string name="firstrun_connect_hint">Opens a screen where you confirm. No key is needed.</string>
     <string name="remote_access_enter_code">Enter this code in IDEaz on your other device: Settings → The Aive.</string>
     <string name="remote_access_advanced">Advanced: relay server</string>
     <string name="remote_access_advanced_explain">The relay is a server that passes encrypted messages between your devices. Leave it blank to use the default relay run by the developer.</string>
