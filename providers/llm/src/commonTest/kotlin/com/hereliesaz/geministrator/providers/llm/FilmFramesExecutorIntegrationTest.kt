@@ -33,6 +33,7 @@ import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -51,6 +52,21 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 class FilmFramesExecutorIntegrationTest {
+    // An engine left open outlives the test and can report its failure to whichever test runs next
+    // (kotlinx.coroutines.test.UncaughtExceptionsBeforeTest), so every client a test made is closed.
+    private val opened = mutableListOf<HttpClient>()
+
+    private fun trackedClient(
+        engine: io.ktor.client.engine.HttpClientEngine,
+        config: io.ktor.client.HttpClientConfig<*>.() -> Unit = {},
+    ): HttpClient = HttpClient(engine, config).also { opened += it }
+
+    @AfterTest
+    fun closeOpenedClients() {
+        opened.forEach { it.close() }
+        opened.clear()
+    }
+
     private val pngHead = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
 
     private fun png(tag: Int) = pngHead + byteArrayOf(tag.toByte(), 1, 2, 3)
@@ -468,7 +484,7 @@ class FilmFramesExecutorIntegrationTest {
                 headers = headersOf(HttpHeaders.ContentType, "application/json"),
             )
         }
-        val client = HttpClient(engine) { install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) } }
+        val client = trackedClient(engine) { install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) } }
         val api = OpenAiFilmImageApi(LlmApiKeyProvider { "present" }, OpenAiNodeCharacterImageApi(LlmApiKeyProvider { "present" }, client = client))
 
         assertContentEquals(picture, api.generate("a lighthouse"))
@@ -482,7 +498,7 @@ class FilmFramesExecutorIntegrationTest {
     @Test
     fun theOpenAiAdapterNamesTheMissingConnectionBeforeAnyRequest() = runTest {
         var requests = 0
-        val client = HttpClient(MockEngine { requests += 1; respond("{}") })
+        val client = trackedClient(MockEngine { requests += 1; respond("{}") })
         val api = OpenAiFilmImageApi(LlmApiKeyProvider { " " }, OpenAiNodeCharacterImageApi(LlmApiKeyProvider { " " }, client = client))
         val failure = assertFailsWith<IllegalArgumentException> { api.generate("x") }
         assertTrue("Connect OpenAI" in failure.message.orEmpty())

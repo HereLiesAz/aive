@@ -9,16 +9,32 @@ import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 
 class McpTransportBoundsTest {
+    // An engine left open outlives the test and can report its failure to whichever test runs next
+    // (kotlinx.coroutines.test.UncaughtExceptionsBeforeTest), so every client a test made is closed.
+    private val opened = mutableListOf<HttpClient>()
+
+    private fun trackedClient(
+        engine: io.ktor.client.engine.HttpClientEngine,
+        config: io.ktor.client.HttpClientConfig<*>.() -> Unit = {},
+    ): HttpClient = HttpClient(engine, config).also { opened += it }
+
+    @AfterTest
+    fun closeOpenedClients() {
+        opened.forEach { it.close() }
+        opened.clear()
+    }
+
     private val request = McpOutgoing(buildJsonObject { put("jsonrpc", "2.0"); put("id", 1); put("method", "ping") })
 
     private fun transport(body: String, type: String, maxBytes: Int) = McpStreamableHttpTransport(
-        HttpClient(MockEngine { respond(body, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, type)) }),
+        trackedClient(MockEngine { respond(body, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, type)) }),
         "https://mcp.example/mcp", maxResponseBytes = maxBytes,
     )
 

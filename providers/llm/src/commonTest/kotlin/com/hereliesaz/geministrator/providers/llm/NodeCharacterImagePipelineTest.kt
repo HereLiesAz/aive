@@ -29,6 +29,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -38,6 +39,21 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 
 class NodeCharacterImagePipelineTest {
+    // An engine left open outlives the test and can report its failure to whichever test runs next
+    // (kotlinx.coroutines.test.UncaughtExceptionsBeforeTest), so every client a test made is closed.
+    private val opened = mutableListOf<HttpClient>()
+
+    private fun trackedClient(
+        engine: io.ktor.client.engine.HttpClientEngine,
+        config: io.ktor.client.HttpClientConfig<*>.() -> Unit = {},
+    ): HttpClient = HttpClient(engine, config).also { opened += it }
+
+    @AfterTest
+    fun closeOpenedClients() {
+        opened.forEach { it.close() }
+        opened.clear()
+    }
+
     private val noStore = object : NodeCharacterAssetStore {
         override suspend fun get(roleId: com.hereliesaz.geministrator.domain.RoleDefinitionId): NodeCharacterAssetRecord? = null
         override suspend fun all(): List<NodeCharacterAssetRecord> = emptyList()
@@ -106,7 +122,7 @@ class NodeCharacterImagePipelineTest {
             }
             respond(payload, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
         }
-        val client = HttpClient(engine) { install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) } }
+        val client = trackedClient(engine) { install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) } }
         val api = OpenAiNodeCharacterImageApi(LlmApiKeyProvider { "k" }, client = client)
         return NodeCharacterImagePipelineExecutorIntegration(
             apiKeyProvider = LlmApiKeyProvider { "k" },

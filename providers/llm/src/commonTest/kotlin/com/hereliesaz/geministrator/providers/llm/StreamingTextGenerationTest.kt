@@ -23,6 +23,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -31,6 +32,21 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class StreamingTextGenerationTest {
+    // An engine left open outlives the test and can report its failure to whichever test runs next
+    // (kotlinx.coroutines.test.UncaughtExceptionsBeforeTest), so every client a test made is closed.
+    private val opened = mutableListOf<HttpClient>()
+
+    private fun trackedClient(
+        engine: io.ktor.client.engine.HttpClientEngine,
+        config: io.ktor.client.HttpClientConfig<*>.() -> Unit = {},
+    ): HttpClient = HttpClient(engine, config).also { opened += it }
+
+    @AfterTest
+    fun closeOpenedClients() {
+        opened.forEach { it.close() }
+        opened.clear()
+    }
+
     @Test
     fun anthropicStreamsSummarizedThinkingThenText() = runTest {
         val bodies = mutableListOf<String>()
@@ -384,7 +400,7 @@ class StreamingTextGenerationTest {
     private fun sseClient(
         bodies: MutableList<String>,
         handler: suspend MockRequestHandleScope.(String) -> HttpResponseData,
-    ): HttpClient = HttpClient(
+    ): HttpClient = trackedClient(
         MockEngine { request: HttpRequestData ->
             val body = when (val content = request.body) {
                 is OutgoingContent.ByteArrayContent -> content.bytes().decodeToString()

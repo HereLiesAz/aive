@@ -9,6 +9,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.test.runTest
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -17,10 +18,25 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class GitHubActionsRedirectTest {
+    // An engine left open outlives the test and can report its failure to whichever test runs next
+    // (kotlinx.coroutines.test.UncaughtExceptionsBeforeTest), so every client a test made is closed.
+    private val opened = mutableListOf<HttpClient>()
+
+    private fun trackedClient(
+        engine: io.ktor.client.engine.HttpClientEngine,
+        config: io.ktor.client.HttpClientConfig<*>.() -> Unit = {},
+    ): HttpClient = HttpClient(engine, config).also { opened += it }
+
+    @AfterTest
+    fun closeOpenedClients() {
+        opened.forEach { it.close() }
+        opened.clear()
+    }
+
     private val repository = RepositoryRef("o", "r", defaultBranch = "main")
 
     private fun client(location: String, seen: MutableList<HttpRequestData>): GitHubRestActionsClient {
-        val http = HttpClient(MockEngine { request ->
+        val http = trackedClient(MockEngine { request ->
             seen += request
             if (request.url.host == "api.github.com") {
                 respond("", HttpStatusCode.Found, headersOf(HttpHeaders.Location, location))

@@ -12,12 +12,28 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.headersOf
 import kotlinx.coroutines.runBlocking
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ContextRetrievalTest {
+    // An engine left open outlives the test and can report its failure to whichever test runs next
+    // (kotlinx.coroutines.test.UncaughtExceptionsBeforeTest), so every client a test made is closed.
+    private val opened = mutableListOf<HttpClient>()
+
+    private fun trackedClient(
+        engine: io.ktor.client.engine.HttpClientEngine,
+        config: io.ktor.client.HttpClientConfig<*>.() -> Unit = {},
+    ): HttpClient = HttpClient(engine, config).also { opened += it }
+
+    @AfterTest
+    fun closeOpenedClients() {
+        opened.forEach { it.close() }
+        opened.clear()
+    }
+
     private fun request(objective: String, repository: RepositoryRef? = null) = AgentTaskRequest(
         taskRunId = TaskRunId("t"),
         objective = objective,
@@ -130,7 +146,7 @@ class ContextRetrievalTest {
             }
             respond(body, headers = headersOf(HttpHeaders.ContentType, "application/json"))
         }
-        val source = GitHubRepositoryChunkSource(GitHubTokenProvider { "token" }, HttpClient(engine))
+        val source = GitHubRepositoryChunkSource(GitHubTokenProvider { "token" }, trackedClient(engine))
         val repository = RepositoryRef(owner = "az", name = "app", defaultBranch = "main")
 
         val chunks = source.chunks(request("Migrate the workflow database", repository))
@@ -144,7 +160,7 @@ class ContextRetrievalTest {
 
     @Test
     fun githubSourceIgnoresOtherRepositoryKinds() = runBlocking {
-        val source = GitHubRepositoryChunkSource(GitHubTokenProvider { "token" }, HttpClient(MockEngine { error("no request expected") }))
+        val source = GitHubRepositoryChunkSource(GitHubTokenProvider { "token" }, trackedClient(MockEngine { error("no request expected") }))
         assertTrue(source.chunks(request("anything")).isEmpty())
     }
 }

@@ -20,6 +20,7 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -27,6 +28,21 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 
 class HostedImageGenerationTest {
+    // An engine left open outlives the test and can report its failure to whichever test runs next
+    // (kotlinx.coroutines.test.UncaughtExceptionsBeforeTest), so every client a test made is closed.
+    private val opened = mutableListOf<HttpClient>()
+
+    private fun trackedClient(
+        engine: io.ktor.client.engine.HttpClientEngine,
+        config: io.ktor.client.HttpClientConfig<*>.() -> Unit = {},
+    ): HttpClient = HttpClient(engine, config).also { opened += it }
+
+    @AfterTest
+    fun closeOpenedClients() {
+        opened.forEach { it.close() }
+        opened.clear()
+    }
+
     private fun context(
         operation: String,
         objective: String = "Draw one butterfly",
@@ -75,7 +91,7 @@ class HostedImageGenerationTest {
     @Test
     fun hordeDispatchAndReconcileReturnVerifiedRemoteArtifacts() = runTest {
         val requests = mutableListOf<String>()
-        val http = HttpClient(MockEngine { request ->
+        val http = trackedClient(MockEngine { request ->
             requests += request.url.toString()
             val content = when {
                 request.url.encodedPath.endsWith("/generate/async") -> """{"id":"abcd-1234"}"""
@@ -98,7 +114,7 @@ class HostedImageGenerationTest {
 
     @Test
     fun falRequiresKeyAndReturnsItsImageWithoutPretendingItSupportsEditing() = runTest {
-        val http = HttpClient(MockEngine { request ->
+        val http = trackedClient(MockEngine { request ->
             assertEquals("https://fal.run/fal-ai/flux/schnell", request.url.toString())
             assertEquals("Key test", request.headers[HttpHeaders.Authorization])
             respond("""{"images":[{"url":"https://example.org/image.png"}]}""",
@@ -113,7 +129,7 @@ class HostedImageGenerationTest {
 
     @Test
     fun unsafeOrInvalidProviderResultsDoNotBecomeArtifacts() = runTest {
-        val http = HttpClient(MockEngine {
+        val http = trackedClient(MockEngine {
             respond("""{"images":[{"url":"file:///private/credentials"}]}""",
                 HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
         })

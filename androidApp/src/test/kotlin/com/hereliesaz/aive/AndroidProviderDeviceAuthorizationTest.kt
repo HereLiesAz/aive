@@ -7,17 +7,33 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AndroidProviderDeviceAuthorizationTest {
+    // An engine left open outlives the test and can report its failure to whichever test runs next
+    // (kotlinx.coroutines.test.UncaughtExceptionsBeforeTest), so every client a test made is closed.
+    private val opened = mutableListOf<HttpClient>()
+
+    private fun trackedClient(
+        engine: io.ktor.client.engine.HttpClientEngine,
+        config: io.ktor.client.HttpClientConfig<*>.() -> Unit = {},
+    ): HttpClient = HttpClient(engine, config).also { opened += it }
+
+    @After
+    fun closeOpenedClients() {
+        opened.forEach { it.close() }
+        opened.clear()
+    }
+
     @Test
     fun huggingFaceRequestsPublicClientCodeAndUsesItToExchangeOnlyAfterConsent() = runBlocking {
         val urls = mutableListOf<String>()
         var checks = 0
-        val client = HttpClient(MockEngine { request ->
+        val client = trackedClient(MockEngine { request ->
             urls += request.url.toString()
             val response = when (request.url.encodedPath) {
                 "/oauth/device" -> """{"device_code":"private-device","user_code":"ABCD-1234","verification_uri":"https://huggingface.co/activate"}"""
@@ -49,7 +65,7 @@ class AndroidProviderDeviceAuthorizationTest {
 
     @Test
     fun pollinationsRequiresAppRegistrationAndRejectsNonUserKeys() = runBlocking {
-        val client = HttpClient(MockEngine { request ->
+        val client = trackedClient(MockEngine { request ->
             val content = when (request.url.encodedPath) {
                 "/api/device/code" -> """{"device_code":"d-1","user_code":"WXYZ-9876","verification_uri_complete":"https://enter.pollinations.ai/device?user_code=WXYZ-9876"}"""
                 "/api/device/token" -> """{"access_token":"pk_not-a-user-key"}"""
@@ -71,7 +87,7 @@ class AndroidProviderDeviceAuthorizationTest {
 
     @Test
     fun unregisteredProviderCannotSendAnyAuthorizationRequest() = runBlocking {
-        val client = HttpClient(MockEngine { error("Must never send a request") })
+        val client = trackedClient(MockEngine { error("Must never send a request") })
         val auth = AndroidProviderDeviceAuthorization(client, emptyMap())
         try {
             auth.begin("huggingface")

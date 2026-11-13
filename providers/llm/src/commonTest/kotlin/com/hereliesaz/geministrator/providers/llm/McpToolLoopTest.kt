@@ -36,6 +36,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -80,6 +81,21 @@ private class ScriptedToolModel(private val alwaysCall: Boolean = false) : ToolC
 }
 
 class McpToolLoopTest {
+    // An engine left open outlives the test and can report its failure to whichever test runs next
+    // (kotlinx.coroutines.test.UncaughtExceptionsBeforeTest), so every client a test made is closed.
+    private val opened = mutableListOf<HttpClient>()
+
+    private fun trackedClient(
+        engine: io.ktor.client.engine.HttpClientEngine,
+        config: io.ktor.client.HttpClientConfig<*>.() -> Unit = {},
+    ): HttpClient = HttpClient(engine, config).also { opened += it }
+
+    @AfterTest
+    fun closeOpenedClients() {
+        opened.forEach { it.close() }
+        opened.clear()
+    }
+
     private val request = AgentTaskRequest(
         taskRunId = TaskRunId("task-weather"),
         objective = "Report the weather in Lyon",
@@ -235,7 +251,7 @@ class McpToolLoopTest {
                 }
                 respond(reply, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
             }
-            val api = AnthropicMessagesApi(LlmApiKeyProvider { "key" }, model = "claude-test", client = HttpClient(engine))
+            val api = AnthropicMessagesApi(LlmApiKeyProvider { "key" }, model = "claude-test", client = trackedClient(engine))
             val outcome = McpToolLoop().run(api, "What is the weather?", FakeToolbox())
 
             assertEquals("It is sunny.", outcome.result.text)
