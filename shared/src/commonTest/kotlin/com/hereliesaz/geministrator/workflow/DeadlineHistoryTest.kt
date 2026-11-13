@@ -42,6 +42,43 @@ class DeadlineHistoryTest {
     }
 
     @Test
+    fun theMostSpecificListWithEnoughEvidenceAnswers() {
+        val history = DeadlineHistory(MapSettings())
+        // Five slow runs of one task on a slow Source, five quick runs of another task on a fast one.
+        repeat(5) { history.record(WorkKind.HostedModel, 9 * minute, source = "keyless-slow", task = "survey") }
+        repeat(5) { history.record(WorkKind.HostedModel, 1 * minute, source = "keyed-fast", task = "lesson") }
+        assertEquals(List(5) { 9 * minute }, history.samples(WorkKind.HostedModel, "keyless-slow", "survey"))
+        assertEquals(List(5) { 1 * minute }, history.samples(WorkKind.HostedModel, "keyed-fast", "lesson"))
+        // A task never seen on a Source known to be slow is judged by that Source.
+        assertEquals(List(5) { 9 * minute }, history.samples(WorkKind.HostedModel, "keyless-slow", "never-seen"))
+        // A Source never seen, with a task that was, is judged by that task.
+        assertEquals(List(5) { 9 * minute }, history.samples(WorkKind.HostedModel, "new-source", "survey"))
+        // Neither known: the kind's own list, which holds both groups.
+        assertEquals(10, history.samples(WorkKind.HostedModel, "new-source", "never-seen").size)
+    }
+
+    @Test
+    fun aListWithTooFewSamplesDefersToABroaderOne() {
+        val history = DeadlineHistory(MapSettings())
+        repeat(DeadlineHistory.ENOUGH) { history.record(WorkKind.CliAgent, 4 * minute, source = "cli-a", task = "build") }
+        history.record(WorkKind.CliAgent, 30 * minute, source = "cli-a", task = "rare")
+        // The rare task has one sample on this Source; the Source as a whole has enough, so it answers.
+        val answer = history.samples(WorkKind.CliAgent, "cli-a", "rare")
+        assertEquals(DeadlineHistory.ENOUGH + 1, answer.size)
+        assertTrue(30 * minute in answer)
+    }
+
+    @Test
+    fun longIdsFoldToShortStableKeys() {
+        val long = "a".repeat(300)
+        val keys = DeadlineHistory.specificKeys(WorkKind.HostedModel, long, long)
+        assertTrue(keys.all { it.length < 80 }, keys.toString())
+        assertEquals(keys, DeadlineHistory.specificKeys(WorkKind.HostedModel, long, long))
+        assertEquals(3, keys.size)
+        assertEquals(emptyList(), DeadlineHistory.specificKeys(WorkKind.HostedModel, null, " "))
+    }
+
+    @Test
     fun aHistoryThatKeepsNothingKeepsNothing() {
         DeadlineHistory.None.record(WorkKind.HostedModel, minute)
         assertTrue(DeadlineHistory.None.samples(WorkKind.HostedModel).isEmpty())
