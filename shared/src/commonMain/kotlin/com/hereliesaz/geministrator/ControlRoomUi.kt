@@ -478,6 +478,8 @@ fun ControlRoom(
         },
         onCloseCreature = { selectedTaskId?.let(onTaskSelected) },
         onCloseKeeperPart = if (compact && keeperOpen.value) ({ keeperOpen.value = false }) else null,
+        // The repository is linked and changed in Connections.
+        onOpenRepository = openConnections,
     )
 
     // The creature's panel: in a sheet on a phone, docked beside the page on wide screens.
@@ -784,12 +786,13 @@ private fun shellCrumbs(
     onOpenHive: () -> Unit,
     onCloseCreature: () -> Unit,
     onCloseKeeperPart: (() -> Unit)?,
+    onOpenRepository: (() -> Unit)? = null,
 ): List<ShellCrumb> = buildList {
     add(ShellCrumb(stringResource(Res.string.crumb_hive), "crumb-hive", onOpenDistrict))
     when {
         destination == ControlRoomDestination.Overview -> {
             if (inDistrict) return@buildList
-            repositoryName?.takeIf(String::isNotBlank)?.let { add(ShellCrumb(it, "crumb-repository", null)) }
+            repositoryName?.takeIf(String::isNotBlank)?.let { add(ShellCrumb(it, "crumb-repository", onOpenRepository)) }
             hiveName?.takeIf(String::isNotBlank)?.let { add(ShellCrumb(it, "crumb-a-hive", onOpenHive)) }
             if (creatureName == null) timelineName?.let { add(ShellCrumb(it, "crumb-timeline", null)) }
             creatureName?.let { add(ShellCrumb(it, "crumb-creature", onCloseCreature)) }

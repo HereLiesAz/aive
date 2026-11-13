@@ -638,13 +638,15 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_draft_adopted">Using %1$s: %2$d creatures. Undo takes them out again.</string>
     <string name="hive_draft_retry">Try again</string>
     <string name="hive_draft_problem_no_prompt">Say what the swarm is for first.</string>
-    <string name="hive_draft_problem_no_roles">No creatures are switched on to draft with. Switch some on in the Roster.</string>
+    <string name="hive_draft_problem_no_roles">No creatures are switched on to draft with.</string>
+    <string name="hive_draft_fix_roster">Switch creatures on in the Roster</string>
+    <string name="hive_draft_fix_sources">Link a source in Connections</string>
     <string name="hive_draft_problem_empty">The keeper came back with nothing. Try again, or say a little more.</string>
     <string name="hive_draft_problem_too_many">The keeper proposed more than %1$d creatures. Try a smaller job, or draft it in parts.</string>
     <string name="hive_draft_problem_unknown_role">The keeper chose a creature this swarm does not have. Try again.</string>
     <string name="hive_draft_problem_cycle">The keeper had creatures waiting on each other in a loop. Try again.</string>
     <string name="hive_draft_problem_unreadable">The keeper’s answer could not be read. Try again.</string>
-    <string name="hive_draft_unavailable">No queen is linked to draft with. Link a source in the Keeper’s room.</string>
+    <string name="hive_draft_unavailable">No queen is linked to draft with.</string>
     <string name="hive_not_yet_run">Not yet run</string>
     <string name="hive_objective">Objective for the next run</string>
     <string name="hive_repository">Repository: owner/repo or URL</string>
