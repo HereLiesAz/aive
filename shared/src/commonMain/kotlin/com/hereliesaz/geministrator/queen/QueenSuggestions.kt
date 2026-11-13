@@ -47,10 +47,27 @@ enum class QueenAction {
 
     /** Rest the swarm (the keeper's own pause): what is running finishes, nothing new starts. */
     Rest,
+
+    // A change to the swarm's shape. Never applied to a running swarm and never loosening an approval: the keeper can only
+    // keep it for next time, where it is an ordinary note in the Improvement flow.
+    /** A check between two steps, after work failed late and was costly. */
+    AddCheck,
+
+    /** A step that keeps failing or timing out is too big: split it. */
+    SplitStep,
+
+    /** Steps blocked for the same reason: the order may be wrong. */
+    ReorderSteps,
+
+    /** A step that can change something and kept failing: put an approval in front of it (only ever adds one). */
+    AddApproval,
     ;
 
     /** Whether the queen applies it herself on the keeper's tap; the others only lead somewhere. */
     val appliesHere: Boolean get() = this == RewordStep || this == RedoFromStep || this == Rest
+
+    /** Whether the keeper's tap only keeps it for next time (a shape change, never applied live). */
+    val keepsForNextTime: Boolean get() = this == AddCheck || this == SplitStep || this == ReorderSteps || this == AddApproval
 
     companion object {
         fun parse(raw: String?): QueenAction? = entries.firstOrNull { it.name == raw }
@@ -121,6 +138,8 @@ internal fun queenCandidates(
     run: WorkflowRun,
     signals: List<QueenSignal>,
     caps: SpendCaps,
+    /** For the shape changes: a step that can change something is told apart by its role. */
+    roles: Collection<RoleDefinition> = emptyList(),
 ): List<QueenCandidate> {
     if (!run.live()) return emptyList()
     val nanny = hasNanny(definition, run)
@@ -157,12 +176,47 @@ internal fun queenCandidates(
             outsideFor(definition, run, signal.taskId),
         )
     }
+    found += shapeCandidates(definition, run, signals, roles)
     costPace(definition, run, caps)?.let { found += it }
     // The Nanny's findings are one more input to her own judgement; she keeps her own candidate when both name the same step and action.
     nannyCandidates(definition, run).forEach { n -> if (found.none { it.action == n.action && it.subject == n.subject }) found += n }
     if (nanny && nannyPhase(definition, run) == NannyPhase.AwaitingReview && run.keeperPause == null) {
         found += QueenCandidate(QueenAction.Rest, QUEEN_RUN_SUBJECT, QueenVoice.SuggestRestNanny, emptyList(), outside = false)
     }
+    return found
+}
+
+/** Failures that make a shape change worth keeping, and the share of finished steps that makes a failure costly. */
+private const val SHAPE_FAILURES = 3
+
+/**
+ * Shape changes she can keep for next time, from the signals alone: no model. None of them removes or relaxes an approval.
+ * AddCheck: a step failed [SHAPE_FAILURES] times after work before it finished. SplitStep: a step timed out twice or
+ * failed [SHAPE_FAILURES] times. AddApproval: a step that can change something, with no approval, failed twice.
+ * ReorderSteps: the same block holds two or more steps.
+ */
+internal fun shapeCandidates(
+    definition: WorkflowDefinition,
+    run: WorkflowRun,
+    signals: List<QueenSignal>,
+    roles: Collection<RoleDefinition> = emptyList(),
+): List<QueenCandidate> {
+    val found = mutableListOf<QueenCandidate>()
+    fun add(action: QueenAction, voice: QueenVoice, taskId: String) {
+        val name = definition.tasks.firstOrNull { it.id.value == taskId }?.name.orEmpty()
+        found += QueenCandidate(action, taskId, voice, listOf(stepNumber(definition, taskId).toString(), queenSlot(name)), outsideFor(definition, run, taskId))
+    }
+    for (signal in signals.filterIsInstance<QueenSignal.RepeatedFailure>()) {
+        val task = definition.tasks.firstOrNull { it.id.value == signal.taskId } ?: continue
+        val finishedBefore = definition.tasks.any { dep -> dep.id in task.dependsOn && run.taskRuns[dep.id]?.status == TaskRunStatus.Completed }
+        if (signal.failedAttempts >= SHAPE_FAILURES && finishedBefore) add(QueenAction.AddCheck, QueenVoice.SuggestAddCheck, task.id.value)
+        val timedOut = (run.taskRuns[task.id]?.timedOutAttempts ?: 0) >= 2
+        if (signal.failedAttempts >= SHAPE_FAILURES || timedOut) add(QueenAction.SplitStep, QueenVoice.SuggestSplitStep, task.id.value)
+        if (signal.failedAttempts >= 2 && mutatesWithoutApproval(definition, task, roles)) {
+            add(QueenAction.AddApproval, QueenVoice.SuggestAddApproval, task.id.value)
+        }
+    }
+    signals.filterIsInstance<QueenSignal.RepeatedBlock>().firstOrNull()?.let { add(QueenAction.ReorderSteps, QueenVoice.SuggestReorderSteps, it.taskId) }
     return found
 }
 
@@ -273,6 +327,7 @@ internal fun queenAcceptRefused(
 ): Boolean {
     if (!run.live()) return true
     val action = QueenAction.parse(proposal.action) ?: return true
+    if (action.keepsForNextTime) return false
     if (!action.appliesHere) return true
     val task = definition.tasks.firstOrNull { it.id.value == proposal.target }
     val stale = candidates != null && action != QueenAction.RewordStep &&
@@ -287,6 +342,23 @@ internal fun queenAcceptRefused(
         else -> true
     }
 }
+
+/**
+ * The ordinary note a kept suggestion becomes in the Improvement flow (never applied; the keeper changes the swarm by hand,
+ * or the next plan reads it). The id is derived from the queen's row, so keeping it twice makes one note.
+ */
+internal fun keptForNextTime(proposal: ImprovementProposal, now: Long): ImprovementProposal =
+    proposal.copy(
+        id = "kept:" + proposal.id,
+        kind = ImprovementKind.Other,
+        newText = "",
+        status = ProposalStatus.Proposed,
+        createdAtEpochMillis = now,
+        decidedAtEpochMillis = null,
+        note = null,
+        source = ImprovementSource.QueenKept,
+        evidence = queenText("Kept for next time: " + (proposal.action ?: "") + " on " + proposal.target, 300),
+    )
 
 /**
  * A step that can change something outside its own output (a repository, a script, a service) and does not sit
@@ -312,7 +384,9 @@ fun queenSuggestionNotes(proposals: List<ImprovementProposal>, run: WorkflowRun)
         val voice = QueenVoice.entries.firstOrNull { it.name == proposal.voice } ?: return@mapNotNull null
         val subject = proposal.target
         val link = when (action) {
-            QueenAction.RewordStep, QueenAction.RedoFromStep -> QueenLink.Creature(subject, CreatureTab.Work)
+            QueenAction.RewordStep, QueenAction.RedoFromStep, QueenAction.AddCheck, QueenAction.SplitStep,
+            QueenAction.ReorderSteps, QueenAction.AddApproval,
+            -> QueenLink.Creature(subject, CreatureTab.Work)
             QueenAction.SwapSource, QueenAction.RaiseBudget -> QueenLink.Creature(subject, CreatureTab.Mind)
             QueenAction.RaiseAllowance -> QueenLink.Limits
             QueenAction.Rest -> null

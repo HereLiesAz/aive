@@ -995,7 +995,7 @@ class ApplicationRuntime private constructor(
         queenProposalsReadAt = now
         try {
             val candidates = queenCandidates(
-                definition, run, queenSignals(definition, run, roles, queenStalled[run.id.value]), queenCaps(),
+                definition, run, queenSignals(definition, run, roles, queenStalled[run.id.value]), queenCaps(), roles,
             )
             val rows = ledger.state().proposals.filter { it.source == ImprovementSource.Queen }
             // Rows left over from another run are settled; a row for this run is settled once it no longer stands.
@@ -1163,7 +1163,7 @@ class ApplicationRuntime private constructor(
         } ?: return@withLock QueenAccept.NothingChanged
         val (definition, run) = seen
         if (run.id.value != proposal.cycleRunId ||
-            queenAcceptRefused(proposal, definition, run, roles, queenCandidates(definition, run, queenSignals(definition, run, roles, queenStalled[run.id.value]), queenCaps()))
+            queenAcceptRefused(proposal, definition, run, roles, queenCandidates(definition, run, queenSignals(definition, run, roles, queenStalled[run.id.value]), queenCaps(), roles))
         ) return@withLock QueenAccept.NothingChanged
         // Claim the row first (a compare-and-set), so only one tap runs the side effect; give it back if that does not take.
         val now = nowEpochMillis()
@@ -1189,6 +1189,12 @@ class ApplicationRuntime private constructor(
                 }
                 QueenAction.Rest -> {
                     setKeeperPause(true)
+                    true
+                }
+                // A shape change is only kept for next time: an ordinary note in the Improvement flow, never applied to this swarm.
+                QueenAction.AddCheck, QueenAction.SplitStep, QueenAction.ReorderSteps, QueenAction.AddApproval -> {
+                    val kept = com.hereliesaz.geministrator.queen.keptForNextTime(proposal, now)
+                    ledger.merge { state -> state.copy(proposals = state.proposals + if (state.proposals.any { it.id == kept.id }) emptyList() else listOf(kept)) }
                     true
                 }
                 else -> false
