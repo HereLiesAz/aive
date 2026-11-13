@@ -42,7 +42,7 @@ class SuiteCountsInDocsTest {
     @Test
     fun keepersRoomSaysHowManyHivesAndHowManySchedulesTheSuiteAdds() {
         val text = doc("Keepers-Room.md")
-        assertEquals(wordFor(hives), said(text, "Add the coding suite\\*\\* puts ($alternation) coding hives"))
+        assertEquals(wordFor(hives), said(text, "Add the coding suite\\*\\* puts ($alternation) coding swarms"))
         assertEquals(wordFor(scheduled), said(text, "for the ($alternation) that only read and report"))
     }
 
