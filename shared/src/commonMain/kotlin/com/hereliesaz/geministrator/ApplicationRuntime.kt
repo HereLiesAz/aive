@@ -219,6 +219,8 @@ class ApplicationRuntime private constructor(
 
     internal fun keeperHourlyCapUsd(): Double? = queenCaps().hourlySpendCapUsd
 
+    internal suspend fun activeRunId(): String? = runtimeMutex.withLock { current?.state?.run?.id?.value }
+
     internal suspend fun trainingModels(): DisputeModels? = resolveDisputeModels()
 
     internal suspend fun republishState() {

@@ -154,3 +154,12 @@ fun interface RoleLessonBank {
 internal fun ApplicationRuntime.attachRoleLessonBank(layer: com.hereliesaz.geministrator.memory.MemoryLayerController?) {
     roleLessonBank = layer?.let { l -> RoleLessonBank { id, parent, lessons -> l.bankRoleLessons(id.value, parent.value, lessons) } }
 }
+
+/**
+ * The keeper starts a training swarm for the role [parentRoleId] and the few words [domain] (from the library's entry for a role).
+ * It is launched as an ordinary run from the active run's project. False when there is no active run or it cannot start.
+ */
+internal suspend fun ApplicationRuntime.startTrainingFromActive(parentRoleId: String, domain: String): Boolean {
+    val source = activeRunId() ?: return false
+    return launchTrainingSwarm(source, domain, parentRoleId, keeperSpendCapUsd = keeperHourlyCapUsd()) != null
+}

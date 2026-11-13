@@ -795,6 +795,7 @@ fun App(
             host.swarmDrafter = orchestrationRuntime?.let { planner ->
                 { prompt: String -> runtime?.draftSwarm(prompt, planner, planReviewer) ?: SwarmDraftResult.Unavailable }
             }
+            host.specialistTrainer = { roleId: String, domain: String -> runtime?.startTrainingFromActive(roleId, domain) ?: false }
         }
 
         // Scheduled hives (docs/Scheduled-Workflows.md): while the app is open, a due schedule starts its
