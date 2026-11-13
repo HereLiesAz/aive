@@ -1,10 +1,29 @@
 package com.hereliesaz.geministrator.distributed
 
+import com.hereliesaz.geministrator.domain.ScriptLanguage
+import com.hereliesaz.geministrator.domain.ScriptRunner
+import com.hereliesaz.geministrator.domain.TaskExecutor
 import kotlin.test.Test
+import kotlin.test.assertNotNull
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class DistributedComputeWorkerTest {
+    @Test
+    fun remoteLeasesRefuseGitHubActionsExecutors() {
+        assertNotNull(remoteLeaseExecutorRefusal(TaskExecutor.GitHubAction(workflow = "ci.yml")))
+        assertNotNull(
+            remoteLeaseExecutorRefusal(
+                TaskExecutor.Script(ScriptLanguage.Python, "print(1)", ScriptRunner.GitHubActions("ci.yml")),
+            ),
+        )
+        assertNull(
+            remoteLeaseExecutorRefusal(
+                TaskExecutor.Script(ScriptLanguage.Python, "print(1)", ScriptRunner.LocalSandbox),
+            ),
+        )
+    }
+
     @Test
     fun disconnectedRelayInvalidatesClaimedWork() {
         assertEquals(

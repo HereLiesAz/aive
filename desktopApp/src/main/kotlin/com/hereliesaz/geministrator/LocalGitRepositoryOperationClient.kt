@@ -97,9 +97,10 @@ internal class LocalGitRepositoryOperationClient(
             metadata = buildMap {
                 put("repositorySource", RepositorySource.Local.name)
                 put("operation", operation)
-                put("command", command?.joinToString(" ").orEmpty())
+                // Absolute local paths stay on this device: only file names are reported.
+                put("command", command?.joinToString(" ") { arg -> if (java.io.File(arg).isAbsolute) java.io.File(arg).name else arg }.orEmpty())
                 put("exitCode", result.exitCode.toString())
-                worktree?.let { put("worktreePath", it.absolutePath) }
+                worktree?.let { put("worktreePath", it.name) }
                 snapshot.branch?.let { put("branch", it) }
                 snapshot.headCommit?.let { put("headCommit", it) }
                 snapshot.dirtyFileCount?.let { put("dirtyFileCount", it.toString()) }

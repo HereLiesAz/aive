@@ -92,6 +92,14 @@ class RemoteRelayPairingTest {
     }
 
     @Test
+    fun aStoredPairingOnAnUnsafeRelayIsNotReadBack() {
+        val good = RemoteRelayPairing.generate("https://relay.example.com")
+        assertNotNull(RemoteRelayPairing.fromStorage(good.toStorage()))
+        val tampered = good.toStorage().replace("https://relay.example.com", "http://relay.example.net")
+        assertNull(RemoteRelayPairing.fromStorage(tampered))
+    }
+
+    @Test
     fun framesFollowTheDocumentedWireFormat() {
         val key = ByteArray(32) { it.toByte() }
         val cipher = RelayFrameCipher(key, "room-0123456789abcdef")

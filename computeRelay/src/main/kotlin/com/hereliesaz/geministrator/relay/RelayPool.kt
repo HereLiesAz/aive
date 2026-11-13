@@ -158,7 +158,7 @@ class RelayPool(
      * token. Enrolling the same key again is a no-op apart from the display name; a different key
      * for an enrolled node ID, or any key for a revoked one, is refused.
      */
-    suspend fun enrol(request: ComputeNodeEnrolmentRequest): EnrolledComputeNode {
+    suspend fun enrol(request: ComputeNodeEnrolmentRequest, ownerAuthority: Boolean = false): EnrolledComputeNode {
         val outbound = mutableListOf<Pair<RelayPeer, ComputeRelayServerMessage>>()
         val enrolled = mutex.withLock {
             if (request.protocolVersion != DISTRIBUTED_COMPUTE_PROTOCOL_VERSION) {
@@ -207,6 +207,13 @@ class RelayPool(
                         enrolledAtEpochMillis = now,
                     )
                 }
+                // Only the pool owner can bring a revoked node ID back, and only with a freshly signed request.
+                existing.revoked && ownerAuthority -> PersistedRelayNode(
+                    nodeId = request.nodeId,
+                    displayName = request.displayName,
+                    publicKey = request.publicKey,
+                    enrolledAtEpochMillis = now,
+                )
                 existing.revoked -> throw NodeEnrolmentException(
                     ComputeNodeAuth.ERROR_NODE_REVOKED,
                     "Node ID ${request.nodeId} was revoked in this pool; choose a new device ID",
@@ -272,17 +279,19 @@ class RelayPool(
 
     /**
      * [byNodeId] revokes [targetNodeId]: its key stops opening sessions, its node ID cannot enrol
-     * again, its live session is closed, leases it published are cancelled and leases it holds are
-     * requeued. Revocation is kept with the pool's enrolled nodes.
+     * again (unless the pool owner re-enrols it), its live session is closed, leases it published
+     * are cancelled and leases it holds are requeued. Revocation is kept with the pool's enrolled
+     * nodes. A node may revoke only itself; revoking another node needs [ownerAuthority], which the
+     * relay grants only for the pool owner's token.
      */
-    suspend fun revoke(byNodeId: String, targetNodeId: String) {
+    suspend fun revoke(byNodeId: String, targetNodeId: String, ownerAuthority: Boolean = false) {
         val outbound = mutableListOf<Pair<RelayPeer, ComputeRelayServerMessage>>()
         val reoffer = mutableListOf<String>()
         var revokedPeer: RelayPeer? = null
         mutex.withLock {
             val by = enrolments[byNodeId]
             check(by != null && !by.revoked) { "Only an enrolled node can revoke another" }
-            require(targetNodeId != byNodeId) { "A node cannot revoke itself" }
+            check(targetNodeId == byNodeId || ownerAuthority) { "Revoking another node needs the pool owner's token" }
             val target = enrolments[targetNodeId]
                 ?: throw IllegalArgumentException("No node $targetNodeId is enrolled in this pool")
             if (target.revoked) return
@@ -795,7 +804,7 @@ class RelayPool(
         const val MAX_UNFINISHED_LEASES_PER_ORIGIN: Int = 64
 
         /** Leases, unfinished and retained terminal ones, one pool may hold. */
-        const val MAX_LEASES_PER_POOL: Int = 512
+        const val MAX_LEASES_PER_POOL: Int = 128
 
         /** An unfinished lease is cancelled and dropped this long after the relay accepted it. */
         const val MAX_UNFINISHED_LEASE_AGE_MILLIS: Long = 24L * 60L * 60L * 1_000L

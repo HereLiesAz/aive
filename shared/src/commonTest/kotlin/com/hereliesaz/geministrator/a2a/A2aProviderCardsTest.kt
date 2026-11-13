@@ -154,4 +154,10 @@ class A2aProviderCardsTest {
         }
         assertTrue("provider:openai" in text)
     }
+
+    @Test
+    fun oneLineDropsBidirectionalAndOtherFormatControls() {
+        assertEquals("abc", a2aOneLine("a\u202Eb\u200Bc\u2066", 20))
+        assertEquals("a b", a2aOneLine("a\n\tb", 20))
+    }
 }

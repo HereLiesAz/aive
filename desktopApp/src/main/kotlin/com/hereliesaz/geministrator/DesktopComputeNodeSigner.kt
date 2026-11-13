@@ -10,6 +10,10 @@ import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 
+/** The system store could not be read right now; the node identity was left untouched. */
+internal class IdentityUnreadableException :
+    IllegalStateException("The system store could not be read, so this device's compute identity was left unchanged. Unlock it and try again.")
+
 /**
  * This desktop's compute node identity: a P-256 key pair (JCA). The private key is kept in the OS
  * credential store through [DesktopDistributedComputeCredentialStore.forNodeIdentity], with the same
@@ -50,16 +54,24 @@ internal class DesktopComputeNodeSigner(private val keyPair: KeyPair) : ComputeN
             )
         }.getOrNull()
 
-        /** The stored identity, or a new one handed to [write] when there is none (or it is unreadable). */
+        /**
+         * The stored identity, or a new one handed to [write] when there is none (or the stored
+         * value is not a key pair). An unreadable store (locked, timed out) never creates or
+         * overwrites an identity: it throws [IdentityUnreadableException] so the caller retries later.
+         */
         fun loadOrCreate(
-            read: () -> String?,
+            read: () -> StoredSecret,
             write: (String) -> Unit,
         ): DesktopComputeNodeSigner {
-            read()?.let(::decode)?.let { return it }
+            when (val stored = read()) {
+                is StoredSecret.Found -> decode(stored.value)?.let { return it }
+                StoredSecret.Unreadable -> throw IdentityUnreadableException()
+                StoredSecret.Absent -> Unit
+            }
             return generate().also { write(it.encoded()) }
         }
 
         fun loadOrCreate(store: DesktopDistributedComputeCredentialStore): DesktopComputeNodeSigner =
-            loadOrCreate(read = store::readToken, write = store::writeToken)
+            loadOrCreate(read = store::readSecret, write = store::writeToken)
     }
 }

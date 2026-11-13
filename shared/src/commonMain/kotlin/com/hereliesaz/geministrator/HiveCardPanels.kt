@@ -51,6 +51,7 @@ import com.hereliesaz.geministrator.resources.hive_card_needs_provider
 import com.hereliesaz.geministrator.resources.hive_card_needs_role
 import com.hereliesaz.geministrator.resources.hive_card_objectives_off
 import com.hereliesaz.geministrator.resources.hive_card_objectives_on
+import com.hereliesaz.geministrator.resources.hive_card_objective
 import com.hereliesaz.geministrator.resources.hive_card_pinned
 import com.hereliesaz.geministrator.resources.hive_card_read
 import com.hereliesaz.geministrator.resources.hive_card_ready
@@ -242,6 +243,13 @@ private fun HiveCardSummaryLines(summary: HiveCardSummary) {
             LinkText(
                 stringResource(Res.string.hive_card_drifter, url),
                 onClick = openConnections?.let { open -> { open(url) } },
+            )
+        }
+        summary.objectives.take(MAX_SUMMARY_LINES).forEach { objective ->
+            Text(
+                stringResource(Res.string.hive_card_objective, objective.creatureName, objective.text),
+                style = AzphaltType.body,
+                color = azphaltOnSurface(),
             )
         }
         summary.needsRoles.take(MAX_SUMMARY_LINES).forEach {

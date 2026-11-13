@@ -31,11 +31,22 @@
 
     async function loadKey() {
         const db = await openDb();
-        const existing = await request(db.transaction(STORE, "readonly").objectStore(STORE).get(KEY_ID));
-        if (existing) return existing;
-        const created = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
-        await request(db.transaction(STORE, "readwrite").objectStore(STORE).put(created, KEY_ID));
-        return created;
+        const candidate = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+        // Read and write happen in one transaction, so two tabs starting together cannot each keep a
+        // different key: whichever transaction runs second finds the first one's key and uses it.
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE, "readwrite");
+            const store = tx.objectStore(STORE);
+            const existing = store.get(KEY_ID);
+            let chosen = candidate;
+            existing.onsuccess = () => {
+                if (existing.result) chosen = existing.result;
+                else store.put(candidate, KEY_ID);
+            };
+            tx.oncomplete = () => resolve(chosen);
+            tx.onerror = () => reject(tx.error);
+            tx.onabort = () => reject(tx.error);
+        });
     }
 
     function key() {

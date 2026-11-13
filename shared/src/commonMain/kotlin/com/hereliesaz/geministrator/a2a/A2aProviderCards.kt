@@ -102,7 +102,8 @@ object A2aProviderCards {
 }
 
 /**
- * Remote or user text as one short line for a card: control characters become spaces, runs of
+ * Remote or user text as one short line for a card: control characters become spaces, Unicode
+ * format characters (bidirectional controls, zero-width joiners and the like) are dropped, runs of
  * whitespace collapse, and the result is cut to [max] characters without splitting a surrogate pair.
  */
 fun a2aOneLine(text: String?, max: Int): String {
@@ -110,6 +111,7 @@ fun a2aOneLine(text: String?, max: Int): String {
     val out = StringBuilder()
     var pendingSpace = false
     for (c in text) {
+        if (c.category == CharCategory.FORMAT) continue
         if (c.isWhitespace() || c.isISOControl()) {
             pendingSpace = out.isNotEmpty()
             continue

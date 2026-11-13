@@ -17,6 +17,7 @@ internal object GithubReleaseFeed {
     private const val RELEASES_URL =
         "https://api.github.com/repos/HereLiesAz/aive/releases?per_page=5"
     const val RELEASES_PAGE_URL = "https://github.com/HereLiesAz/aive/releases"
+    private const val MAX_FEED_BYTES = 2 * 1024 * 1024
     private const val GITHUB_PAGE_PREFIX = "https://github.com/"
     private val apkName = Regex("^TheAive-(.+)-android\\.apk$")
 
@@ -32,7 +33,7 @@ internal object GithubReleaseFeed {
             if (connection.responseCode !in 200..299) {
                 error("GitHub release check failed with HTTP ${connection.responseCode}")
             }
-            parseLatest(connection.inputStream.bufferedReader().use { it.readText() })
+            parseLatest(connection.inputStream.use { readBoundedText(it, MAX_FEED_BYTES) })
         } finally {
             connection.disconnect()
         }
@@ -61,4 +62,17 @@ internal object GithubReleaseFeed {
             .reduceOrNull { best, candidate ->
                 if (isNewerVersion(candidate.version, best.version)) candidate else best
             }
+}
+
+/** The stream as UTF-8 text, failing as soon as more than [maxBytes] bytes arrive. */
+internal fun readBoundedText(stream: java.io.InputStream, maxBytes: Int): String {
+    val out = java.io.ByteArrayOutputStream()
+    val buffer = ByteArray(8192)
+    while (true) {
+        val count = stream.read(buffer)
+        if (count < 0) break
+        if (out.size() + count > maxBytes) error("The release feed is larger than $maxBytes bytes")
+        out.write(buffer, 0, count)
+    }
+    return out.toString(Charsets.UTF_8.name())
 }

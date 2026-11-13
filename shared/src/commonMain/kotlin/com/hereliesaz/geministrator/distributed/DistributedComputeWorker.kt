@@ -163,6 +163,9 @@ class SystemExecutorDistributedWorkloadRunner(
             )
             if (decision.isDenied) return decision.reason
         }
+        // Dispatching workflows runs code with the keeper's repository token, and the approval in
+        // the envelope cannot be verified here, so remote leases of these executors are refused.
+        remoteLeaseExecutorRefusal(delegate)?.let { return it }
         if (delegate.usesRepositoryCredentials()) {
             val repository = envelope.project.repository ?: return "the project has no linked repository"
             if (trustedRepositories().none { it.sameRepositoryAs(repository) }) {
@@ -192,6 +195,16 @@ class SystemExecutorDistributedWorkloadRunner(
         progressMessage = execution.progressMessage ?: progressMessage,
     )
 }
+
+/** Executors that spend the keeper's repository token on workflow dispatch never run for a remote lease. */
+internal fun remoteLeaseExecutorRefusal(delegate: TaskExecutor): String? =
+    if (delegate is TaskExecutor.GitHubAction ||
+        (delegate is TaskExecutor.Script && delegate.runner is ScriptRunner.GitHubActions)
+    ) {
+        "GitHub Actions work needs the keeper's approval on the origin device"
+    } else {
+        null
+    }
 
 /**
  * Returns why a claimed worker must stop executing, or null while it still owns a live lease.
