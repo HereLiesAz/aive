@@ -141,6 +141,13 @@ interface ManagedSessionGateway {
     suspend fun usageReport(handle: ManagedSessionHandle): ManagedSessionUsage? = null
 
     /**
+     * How many new reports (progress, thinking, messages, artifacts) the session has made so far, or null when
+     * this gateway cannot tell. The queen watches whether it changes, so she never reads a creature that has
+     * said nothing at all as silent: only one that spoke and then stopped.
+     */
+    suspend fun progressCount(handle: ManagedSessionHandle): Long? = null
+
+    /**
      * The question the session's agent is waiting on the keeper for (docs/Agent-UI.md), or null when
      * this gateway does not know (the task keeps what it already holds).
      */

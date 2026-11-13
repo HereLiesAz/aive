@@ -77,7 +77,7 @@ private fun WorkflowEvent.taskOrNull(): TaskDefinitionId? = when (this) {
 }
 
 internal fun WorkflowEvent.logText(): String = when (this) {
-    is WorkflowCreated -> "Workflow created" + (objective?.let { ": $it" } ?: "")
+    is WorkflowCreated -> "Run created" + (objective?.let { ": $it" } ?: "")
     is TaskBecameReady -> "Ready"
     is ExecutorAssigned -> "Executor assigned: ${executor::class.simpleName ?: "executor"}"
     is AgentAssigned -> "Agent assigned: role ${roleId.value}"
@@ -95,9 +95,9 @@ internal fun WorkflowEvent.logText(): String = when (this) {
     is TaskCompleted -> "Completed"
     is TaskFailed -> "Failed: $reason"
     is HumanDecisionRequired -> "Needs a person: $reason"
-    is WorkflowCompleted -> "Workflow completed"
-    is WorkflowFailed -> "Workflow failed: $reason"
-    is WorkflowCancelled -> "Workflow cancelled"
+    is WorkflowCompleted -> "Run completed"
+    is WorkflowFailed -> "Run failed: $reason"
+    is WorkflowCancelled -> "Run cancelled"
     is TaskCancelled -> "Cancelled"
     is ExternalRunCancelFailed -> "Could not cancel external run $externalRunId: $reason"
     is TaskRerunRequested -> "Rerun requested from ${fromWorkflowRunId.value}" +

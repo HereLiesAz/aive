@@ -46,8 +46,9 @@ internal object MemoryContrast {
         wordNet: WordNetLexicon? = MemoryLanguageResources.loadedOrNull()?.wordNet,
     ): Contrast? {
         val lexicon = wordNet?.let(::MemoryContrastLexicon)
-        val a = tokens(left)
-        val b = tokens(right)
+        // The alignment is quadratic in the token counts, so very long texts are compared on their start.
+        val a = tokens(left).take(MAX_ALIGNED_TOKENS)
+        val b = tokens(right).take(MAX_ALIGNED_TOKENS)
         if (a.isEmpty() || b.isEmpty()) return null
         val lcs = align(a.map { it.norm }, b.map { it.norm })
         val sharedContent = lcs.count { (i, _) -> a[i].content }
@@ -176,6 +177,8 @@ internal object MemoryContrast {
         }
         return pairs
     }
+
+    internal const val MAX_ALIGNED_TOKENS = 512
 
     private val TOKEN = Regex("\"[^\"]{1,80}\"|`[^`]{1,80}`|[A-Za-z0-9_][A-Za-z0-9_./+#'-]*[A-Za-z0-9_+#]|[A-Za-z0-9]|[.!?;]")
 

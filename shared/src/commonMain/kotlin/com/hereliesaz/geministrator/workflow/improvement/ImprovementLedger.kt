@@ -40,6 +40,9 @@ enum class ImprovementSource {
 
     /** The habits layer: an operation the swarm did often enough to be a habit. */
     Habit,
+
+    /** The queen's mid-run suggestions (per run, decided in Messages; see queen/QueenSuggestions.kt). */
+    Queen,
 }
 
 /**
@@ -70,6 +73,16 @@ data class ImprovementProposal(
     val sourceRef: String? = null,
     /** The evidence the mechanism gave, bounded and quoted. */
     val evidence: String = "",
+    // The queen's own fields (source Queen only). All default, so a ledger written before they existed still reads.
+    // For a queen row [cycleRunId] is the run it was made for and [sourceRef] the swarm's id.
+    /** The queen's action, by name ([com.hereliesaz.geministrator.queen.QueenAction]). */
+    val action: String? = null,
+    /** The sentence she says, by name ([com.hereliesaz.geministrator.queen.QueenVoice]); [summary] is the English fallback. */
+    val voice: String? = null,
+    /** The slots of that sentence: counts and bounded names. */
+    val args: List<String> = emptyList(),
+    /** Whether it rests on content from outside the keeper's own; then it is labelled and asks before it applies. */
+    val outside: Boolean = false,
 )
 
 /** What one finished cycle left: how many proposals, and whether it examined the loop (the clause). */
@@ -237,22 +250,43 @@ object LoopObligation {
 object ProposalRetention {
     const val MAX = 500
 
+    /** The queen's rows are per run and short-lived: at most this many are kept, the oldest dropped first. */
+    const val MAX_QUEEN = 100
+
     private val dropOrder = listOf(ProposalStatus.Dismissed, ProposalStatus.Superseded, ProposalStatus.Reverted, ProposalStatus.Proposed)
 
-    fun bound(proposals: List<ImprovementProposal>, max: Int = MAX): List<ImprovementProposal> {
-        var excess = proposals.size - max
-        if (excess <= 0) return proposals
-        val drop = hashSetOf<Int>()
-        for (status in dropOrder) {
-            for ((index, proposal) in proposals.withIndex()) {
-                if (excess <= 0) break
-                if (proposal.status == status) {
-                    drop += index
-                    excess -= 1
-                }
+    /** [proposals] with the queen's oldest rows dropped beyond [MAX_QUEEN]; every other source is left alone. */
+    internal fun boundQueen(proposals: List<ImprovementProposal>): List<ImprovementProposal> {
+        var surplus = proposals.count { it.source == ImprovementSource.Queen } - MAX_QUEEN
+        if (surplus <= 0) return proposals
+        val kept = mutableListOf<ImprovementProposal>()
+        for (proposal in proposals) {
+            if (proposal.source == ImprovementSource.Queen && surplus > 0) {
+                surplus -= 1
+            } else {
+                kept += proposal
             }
         }
-        return proposals.filterIndexed { index, _ -> index !in drop }
+        return kept
+    }
+
+    /**
+     * The queen's rows keep their own budget ([MAX_QUEEN], oldest first) and never count against [max]; the eviction
+     * pass over [max] looks only at the other sources, so adding a queen row can never drop another source's proposal.
+     */
+    fun bound(all: List<ImprovementProposal>, max: Int = MAX): List<ImprovementProposal> {
+        val proposals = boundQueen(all)
+        val others = proposals.filter { it.source != ImprovementSource.Queen }
+        var excess = others.size - max
+        if (excess <= 0) return proposals
+        val drop = hashSetOf<ImprovementProposal>()
+        for (status in dropOrder) {
+            for (proposal in others) {
+                if (excess <= 0) break
+                if (proposal.status == status && drop.add(proposal)) excess -= 1
+            }
+        }
+        return proposals.filter { it !in drop }
     }
 }
 

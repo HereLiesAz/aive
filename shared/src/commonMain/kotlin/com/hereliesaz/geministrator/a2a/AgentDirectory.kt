@@ -30,7 +30,51 @@ internal data class AgentDirectoryEntry(
     /** Unverified publisher name claim from SearchA2A, never a provider permission. */
     val ansName: String? = null,
     val ansHost: String? = null,
+    /** What the operator says it thinks with (SearchA2A `backing.declared_provider`); null while the directory has no such field. Unverified. */
+    val declaredSource: String? = null,
+    /** Where the operator says it runs (SearchA2A `backing.hosting`); null while the directory has no such field. Unverified. */
+    val declaredHosting: String? = null,
 )
+
+/**
+ * The facts one directory row may state about an orphan, and nothing more (vocabulary-and-first-run, Part 5):
+ * the endpoint host from the address, a Source and Host only when the directory declares them, and no vendor guessed
+ * from a hostname. Pure; the screen chooses the words.
+ */
+internal data class OrphanRowFacts(
+    /** The endpoint's hostname, lower-cased, without a port. */
+    val host: String,
+    /** What it thinks with, as declared by its operator; null reads 'Source: not stated'. */
+    val declaredSource: String?,
+    /** Where it runs, as declared by its operator; null while only [host] is known. */
+    val declaredHosting: String?,
+    /** It runs on someone else's server (its Host), not on this computer. */
+    val livesElsewhere: Boolean,
+    /** The registry reports it tried one test task: a note, never a trust signal. */
+    val registryTriedATest: Boolean,
+) {
+    /** The Host line's value: the declared hosting when the directory supplies it, else the hostname. */
+    val hostLine: String get() = declaredHosting ?: host
+}
+
+internal fun orphanRowFacts(entry: AgentDirectoryEntry): OrphanRowFacts {
+    val authority = entry.cardUrl.substringAfter("://").substringBefore('/').substringBefore('?').substringBefore('#')
+        .substringAfterLast('@').lowercase()
+    val host = if (authority.startsWith("[")) {
+        authority.substringBefore(']') + "]"
+    } else {
+        authority.substringBefore(':')
+    }.ifBlank { entry.cardUrl.trim() }
+    val onThisComputer = host == "localhost" || host == "[::1]" || host.endsWith(".localhost") ||
+        host.startsWith("127.") || host == "0.0.0.0"
+    return OrphanRowFacts(
+        host = host,
+        declaredSource = entry.declaredSource?.takeIf(String::isNotBlank),
+        declaredHosting = entry.declaredHosting?.takeIf(String::isNotBlank),
+        livesElsewhere = !onThisComputer,
+        registryTriedATest = entry.registryReportsTaskTested,
+    )
+}
 
 internal data class AgentDirectoryResults(
     val entries: List<AgentDirectoryEntry>,
@@ -150,6 +194,8 @@ internal class SearchA2aDirectorySource(
             val match = if (ranked) record["match_score"].valueText()?.toDoubleOrNull()
                 ?.takeIf { it.isFinite() && it in 0.0..1.0 } else null
             val ansClaim = directoryAnsClaim(record)
+            // Not in the directory today (checked 2026-11-13); read when searcha2a adds them, labelled declared.
+            val backing = record["backing"] as? JsonObject
             AgentDirectoryEntry(
                 cardUrl = cardUrl,
                 name = A2aDrifters.cleanCardText(record["name"].valueText().orEmpty(), 60)
@@ -160,6 +206,10 @@ internal class SearchA2aDirectorySource(
                 matchScore = match,
                 ansName = ansClaim?.first,
                 ansHost = ansClaim?.second,
+                declaredSource = backing?.get("declared_provider").valueText()
+                    ?.let { A2aDrifters.cleanCardText(it, 40) }?.takeIf(String::isNotBlank),
+                declaredHosting = backing?.get("hosting").valueText()
+                    ?.let { A2aDrifters.cleanCardText(it, 40) }?.takeIf(String::isNotBlank),
             )
         }
 

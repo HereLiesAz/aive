@@ -23,6 +23,8 @@ import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.URLProtocol
+import io.ktor.http.Url
 import io.ktor.http.contentType
 import io.ktor.http.encodeURLPathPart
 import kotlinx.serialization.SerialName
@@ -77,6 +79,24 @@ interface GitHubActionsClient {
      * not an error. The default does nothing, for clients with no cancel endpoint.
      */
     suspend fun cancel(repository: RepositoryRef, runId: String) = Unit
+}
+
+/**
+ * Returns [location] when it is an https URL on a GitHub-owned artifact download host with no
+ * userinfo or custom port, else null.
+ */
+internal fun githubArtifactDownloadTarget(location: String?): String? {
+    val raw = location?.trim().orEmpty()
+    if (raw.isEmpty()) return null
+    val url = runCatching { Url(raw) }.getOrNull() ?: return null
+    if (url.protocol != URLProtocol.HTTPS) return null
+    if (url.user != null || url.password != null) return null
+    if (url.port != URLProtocol.HTTPS.defaultPort) return null
+    val host = url.host.lowercase()
+    val allowed = host == "actions.githubusercontent.com" ||
+        host.endsWith(".actions.githubusercontent.com") ||
+        host.endsWith(".blob.core.windows.net")
+    return if (allowed) raw else null
 }
 
 class GitHubRestActionsClient(
@@ -199,6 +219,17 @@ class GitHubRestActionsClient(
         ) {
             githubHeaders(token)
         }
+        if (response.status.value == HTTP_FOUND) {
+            // The zip endpoint answers with one redirect to a short-lived download URL. It is
+            // followed only to a GitHub-owned https host, without the token, and no further.
+            val target = githubArtifactDownloadTarget(response.headers[HttpHeaders.Location])
+                ?: error("Unable to download GitHub Actions artifact $artifactId: unexpected download location")
+            val download = httpClient.get(target)
+            if (download.status.value !in 200..299) {
+                error("Unable to download GitHub Actions artifact $artifactId: HTTP ${download.status.value}")
+            }
+            return download.body()
+        }
         if (response.status.value !in 200..299) {
             error("Unable to download GitHub Actions artifact $artifactId: HTTP ${response.status.value}")
         }
@@ -306,6 +337,7 @@ class GitHubRestActionsClient(
     private companion object {
         const val API_VERSION = "2026-03-10"
         const val HTTP_CONFLICT = 409
+        const val HTTP_FOUND = 302
     }
 }
 

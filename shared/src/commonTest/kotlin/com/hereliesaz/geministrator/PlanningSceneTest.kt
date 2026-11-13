@@ -163,7 +163,7 @@ class PlanningSceneTest {
             assertEquals("One", seen[1].firstStepName)
             assertEquals("Two", seen[3].firstStepName, "The reworked plan's first step")
             assertEquals(PlanningVerdict.Approved, seen[4].verdict)
-            assertEquals(BuiltInRoles.AdversarialReviewer.id, seen[1].reviewer.id)
+            assertEquals(BuiltInRoles.Reviewer.id, seen[1].reviewer.id)
         } finally {
             scope.cancel()
         }

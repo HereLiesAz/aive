@@ -154,6 +154,26 @@ class SqlWorkflowPersistenceTest {
     }
 
     @Test
+    fun writingOverAnUnreadRowQuarantinesItsUnreadablePayloadFirst() = runBlocking {
+        val file = tempDatabase()
+        val first = desktopSqlWorkflowPersistence(file)
+        val damaged = run("damaged", updatedAt = 2L)
+        first.projects.put(project)
+        first.runs.put(damaged)
+        java.sql.DriverManager.getConnection("jdbc:sqlite:${file.absolutePath}").use { connection ->
+            connection.prepareStatement("UPDATE run SET payload = '{\"truncated' WHERE id = 'damaged'").executeUpdate()
+        }
+
+        val restored = desktopSqlWorkflowPersistence(file)
+        // Nothing has read the row; the write must not be its first and last contact.
+        restored.runs.put(damaged)
+
+        assertEquals(listOf("WorkflowRun"), restored.quarantinedRecords.map { it.kind })
+        assertTrue(restored.quarantinedRecords.single().key.substringAfterLast(':').length == 16)
+        assertEquals(damaged, restored.runs.get(damaged.id))
+    }
+
+    @Test
     fun eventsComeBackInOccurrenceOrderPerRun() = runBlocking {
         val persistence = desktopSqlWorkflowPersistence(null)
         val runId = WorkflowRunId("run")

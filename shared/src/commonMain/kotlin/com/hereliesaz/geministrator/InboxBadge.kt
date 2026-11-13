@@ -66,17 +66,25 @@ private val inboxReadRevision = mutableIntStateOf(0)
 internal fun inboxItemKeys(run: WorkflowRun): List<String> {
     val pause = run.globalPause
     if (pause != null) {
-        return listOf(inboxKey("pause", run.id.value, pause.reportArtifactId.value))
+        return listOf(pauseInboxKey(run, pause))
     }
     val spendStop = run.spendPause
     if (spendStop != null) {
-        return listOf(inboxKey("spend-stop", run.id.value, spendStop.pausedAtEpochMillis.toString()))
+        return listOf(spendStopInboxKey(run, spendStop))
     }
     return run.taskRuns.values
         .filter(::creatureNeedsYou)
         .sortedBy { it.taskDefinitionId.value }
         .map { inboxKey(run, it) }
 }
+
+/** The Messages key of the run's Nanny freeze. One definition, shared by the badge and the Messages rows. */
+internal fun pauseInboxKey(run: WorkflowRun, pause: com.hereliesaz.geministrator.domain.WorkflowGlobalPause): String =
+    inboxKey("pause", run.id.value, pause.reportArtifactId.value)
+
+/** The Messages key of the run's spend cap stop. One definition, shared by the badge and the Messages rows. */
+internal fun spendStopInboxKey(run: WorkflowRun, stop: com.hereliesaz.geministrator.domain.WorkflowSpendPause): String =
+    inboxKey("spend-stop", run.id.value, stop.pausedAtEpochMillis.toString())
 
 /** The Inbox items one creature, [taskId], stands for: its wait on the keeper, if it is waiting. */
 internal fun inboxItemKeys(run: WorkflowRun, taskId: String): List<String> =
@@ -108,7 +116,18 @@ private fun inboxKey(run: WorkflowRun, taskRun: com.hereliesaz.geministrator.dom
 
 /** The Inbox items for whatever the application is showing; none unless a run is live. */
 internal fun inboxItemKeys(state: ApplicationRuntimeState): List<String> =
-    (state as? ApplicationRuntimeState.Live)?.presentation?.run?.let(::inboxItemKeys).orEmpty()
+    (state as? ApplicationRuntimeState.Live)?.presentation?.let { inboxItemKeys(it.run) + queenSuggestionKeys(it) }.orEmpty()
+
+/**
+ * The Messages keys of the queen's open suggestions: each one waits on the keeper's decision, so it counts toward the
+ * badge like a wait does (at most one at Quiet, two at Helpful). None while the swarm is frozen or stopped: those
+ * pages speak alone ([inboxItemKeys]).
+ */
+internal fun queenSuggestionKeys(presentation: LiveWorkflowPresentation): List<String> {
+    val run = presentation.run
+    if (run.globalPause != null || run.spendPause != null) return emptyList()
+    return presentation.queen.filter { it.suggestion != null }.map { "queen|" + it.id }
+}
 
 private fun inboxKey(vararg parts: String): String =
     parts.joinToString("|") { it.replace(INBOX_READ_SEPARATOR, ' ') }

@@ -104,7 +104,12 @@ suspend fun ApplicationRuntime.pauseForHallMonitorReview(
 
 suspend fun ApplicationRuntime.loadHallMonitorPauseReviewState(): HallMonitorPauseReviewState? {
     val live = state.value as? ApplicationRuntimeState.Live ?: return null
-    val pause = live.presentation.run.globalPause ?: return null
+    return loadHallMonitorPauseReviewState(live.presentation.run)
+}
+
+/** The freeze review of [run]: its report, the reviews so far, solutions and practice runs; null when it is not frozen. */
+suspend fun ApplicationRuntime.loadHallMonitorPauseReviewState(run: com.hereliesaz.geministrator.domain.WorkflowRun): HallMonitorPauseReviewState? {
+    val pause = run.globalPause ?: return null
     val report = persistence.artifacts.get(pause.reportArtifactId)
     val antagonist = persistence.artifacts.get(pause.antagonistReviewArtifactId)
     val orchestratorGate = persistence.approvalGates.get(pause.orchestratorGateId) ?: return null

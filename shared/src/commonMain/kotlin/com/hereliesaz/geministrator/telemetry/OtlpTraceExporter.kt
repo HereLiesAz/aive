@@ -57,6 +57,9 @@ class OtlpTraceExporter(
     private val httpClient: HttpClient = httpClient.config { followRedirects = false }
     private val queue = Channel<OtelSpan>(maxQueuedSpans, BufferOverflow.DROP_OLDEST)
 
+    /** Told how each drained batch ended, so a caller can record delivery only once it happened. */
+    var onBatchFinished: (suspend (List<OtelSpan>, OtlpExportOutcome) -> Unit)? = null
+
     fun enqueue(spans: List<OtelSpan>) {
         spans.forEach { queue.trySend(it) }
     }
@@ -68,7 +71,8 @@ class OtlpTraceExporter(
             while (batch.size < maxBatchSpans) {
                 batch += queue.tryReceive().getOrNull() ?: break
             }
-            export(batch)
+            val outcome = export(batch)
+            onBatchFinished?.invoke(batch, outcome)
         }
     }
 

@@ -18,7 +18,7 @@ import com.hereliesaz.geministrator.workflow.writableSurface
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsText
+import com.hereliesaz.geministrator.net.boundedBodyText
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -234,13 +234,13 @@ internal class AndroidRoleSurfaceIntegration(
                 require(source.url.startsWith("https://", ignoreCase = true)) {
                     "Spreadsheet network sources must use HTTPS"
                 }
-                httpClient.get(source.url).bodyAsText()
+                httpClient.get(source.url).boundedBodyText()
             }
             is SpreadsheetSource.GoogleSheet -> {
                 require(source.spreadsheetId.isNotBlank()) { "Google Sheet ID is required" }
                 httpClient.get(
                     "https://docs.google.com/spreadsheets/d/${source.spreadsheetId}/export?format=csv&gid=${source.gid.ifBlank { "0" }}",
-                ).bodyAsText()
+                ).boundedBodyText()
             }
         }
 

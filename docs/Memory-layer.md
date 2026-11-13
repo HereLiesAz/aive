@@ -278,7 +278,7 @@ A launch naming a run that is not stored is refused. `ProviderTaskRequestFactory
 run's first session starts; a second parent makes the run a merge and its contrasts are marked then.
 In the app, the launch form's **Lineage** choice sets them: **New** (none), **Continue a run** (pick
 one earlier run) or **Combine runs** (pick two or more, in the order picked; the first is primary).
-The run list shows each run's workflow, date, status and project (`loadLaunchableRuns`,
+The run list shows each run's swarm, date, status and project (`loadLaunchableRuns`,
 `LaunchLineageState`). A finished run's hive also offers **Feed it more**, which asks what next and
 launches a continuation in the same project (`ContinueRunPanel`).
 
@@ -570,9 +570,9 @@ The **Memory** destination (every platform) is the whole layer in one place, dri
 - **Queue:** waiting and parked counts; retry or discard parked entries.
 - **Tuning:** attempts before parking, packet size, similarity needed to condense, batch size.
 - **On-device models:** install or remove each clerk's model where the platform has them (Android).
-- **Workflow memory bank:** pick the workflow whose bank the screen shows. Counts, forget one episode
-  (and what came only from it), export/import JSON and clear act on that workflow's own records only;
-  its ancestors' and other workflows' banks are untouched, and an import holding another workflow's
+- **Swarm memory bank:** pick the swarm whose bank the screen shows. Counts, forget one episode
+  (and what came only from it), export/import JSON and clear act on that swarm's own records only;
+  its ancestors' and other swarms' banks are untouched, and an import holding another swarm's
   episode is refused. Memory can be switched off or its consolidation paused.
 - **Raw history:** how much raw session context is held, and the retention setting (keep all, cap by
   size, cap by age).
@@ -583,7 +583,7 @@ The **Memory** destination (every platform) is the whole layer in one place, dri
   summary (or that it is still pending), and its explicit history (`MemoryLayerController.history`:
   what it replaced and was condensed from). Each stored episode can open its whole summary tree,
   indented by level.
-- **Projects:** every project with workflow banks, its expansions, a control to expand it to include
+- **Projects:** every project with swarm banks, its expansions, a control to expand it to include
   another project (`MemoryLayerController.expandProject`, a reason is required; add-only), and its own
   raw retention (`rawRetentionByProject`: global, keep all, cap by size, cap by age).
 

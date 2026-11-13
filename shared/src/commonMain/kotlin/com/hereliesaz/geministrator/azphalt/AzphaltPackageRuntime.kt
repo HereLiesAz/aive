@@ -99,8 +99,8 @@ class KmpZipAzphaltArchiveReader(
     companion object {
         const val DEFAULT_MAX_ARCHIVE_BYTES: Int = 64 * 1024 * 1024
         const val DEFAULT_MAX_ENTRIES: Int = 512
-        const val DEFAULT_MAX_ENTRY_BYTES: Long = 32L * 1024 * 1024
-        const val DEFAULT_MAX_TOTAL_INFLATED_BYTES: Long = 128L * 1024 * 1024
+        const val DEFAULT_MAX_ENTRY_BYTES: Long = 16L * 1024 * 1024
+        const val DEFAULT_MAX_TOTAL_INFLATED_BYTES: Long = 48L * 1024 * 1024
         const val DEFAULT_MAX_PATH_LENGTH: Int = 1024
     }
 }

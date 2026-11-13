@@ -45,6 +45,7 @@ import com.hereliesaz.geministrator.resources.schedule_last_never
 import com.hereliesaz.geministrator.resources.schedule_next
 import com.hereliesaz.geministrator.resources.schedule_next_off
 import com.hereliesaz.geministrator.resources.schedule_none
+import com.hereliesaz.geministrator.resources.schedule_open_hive
 import com.hereliesaz.geministrator.resources.schedule_note
 import com.hereliesaz.geministrator.resources.schedule_off
 import com.hereliesaz.geministrator.resources.schedule_on
@@ -234,9 +235,12 @@ internal fun SchedulesPart(compact: Boolean) {
         if (items.isEmpty()) {
             Text(stringResource(Res.string.schedule_none), style = AzphaltType.body, color = azphaltOnSurface())
         }
+        val openHive = LocalPlaceLinks.current.openHive
         items.forEach { schedule ->
             ScheduleCard(
                 schedule,
+                // What it runs is the hive it belongs to: the card opens it.
+                onOpenHive = openHive?.let { open -> { open(schedule.workflowId) } },
                 onEdit = { change -> edit(schedule.id, change) },
                 onToggle = { toggle(schedule) },
                 onRemove = { scope.launch { runCatching { store.remove(schedule.id) }.onFailure { message = it.message }; reload += 1 } },
@@ -248,6 +252,7 @@ internal fun SchedulesPart(compact: Boolean) {
 @Composable
 private fun ScheduleCard(
     schedule: WorkflowSchedule,
+    onOpenHive: (() -> Unit)?,
     onEdit: ((WorkflowSchedule) -> WorkflowSchedule?) -> Unit,
     onToggle: () -> Unit,
     onRemove: () -> Unit,
@@ -277,6 +282,7 @@ private fun ScheduleCard(
         endCap = stringResource(if (schedule.enabled) Res.string.schedule_on else Res.string.schedule_off),
         well = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (onOpenHive != null) LinkText(stringResource(Res.string.schedule_open_hive), onClick = onOpenHive)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     AzphaltPill(
                         // The state it is in, filled while on; tapping flips it.

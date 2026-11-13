@@ -25,6 +25,17 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 
+/** The lease id a relay message reports on, or null for messages that are not about one of our leases. */
+internal fun leaseMessageId(message: ComputeRelayServerMessage): String? = when (message) {
+    is ComputeRelayServerMessage.LeaseAccepted -> message.leaseId
+    is ComputeRelayServerMessage.LeaseClaimed -> message.leaseId
+    is ComputeRelayServerMessage.LeaseRequeued -> message.leaseId
+    is ComputeRelayServerMessage.LeaseProgress -> message.leaseId
+    is ComputeRelayServerMessage.LeaseCompleted -> message.leaseId
+    is ComputeRelayServerMessage.LeaseCancelled -> message.leaseId
+    else -> null
+}
+
 /**
  * One node's session with a compute relay.
  *
@@ -164,10 +175,13 @@ class RelayDistributedComputeClient(
         send(ComputeRelayClientMessage.ListEnrolledNodes)
     }
 
-    /** Revokes another node of the pool. The relay refuses a node revoking itself. */
-    suspend fun revokeNode(nodeId: String) {
+    /**
+     * Revokes another node of the pool. The relay accepts this only with the pool owner's token;
+     * without it a node can revoke only itself.
+     */
+    suspend fun revokeNode(nodeId: String, ownerToken: String? = null) {
         require(nodeId != node.nodeId) { "A node cannot revoke itself" }
-        send(ComputeRelayClientMessage.RevokeNode(nodeId))
+        send(ComputeRelayClientMessage.RevokeNode(nodeId, ownerToken))
     }
 
     /** Enrols this node's key unless the ledger says it already is. Uses the pool token. */
@@ -229,6 +243,9 @@ class RelayDistributedComputeClient(
     }
 
     private suspend fun handle(message: ComputeRelayServerMessage) {
+        // Lease messages are accepted only for leases this client published; a relay cannot
+        // introduce results for ids it was never given.
+        leaseMessageId(message)?.let { if (it !in _leaseStates.value) return }
         when (message) {
             is ComputeRelayServerMessage.Registered -> {
                 require(message.protocolVersion == DISTRIBUTED_COMPUTE_PROTOCOL_VERSION) {

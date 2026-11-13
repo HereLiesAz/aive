@@ -71,6 +71,7 @@ import kotlinx.coroutines.withContext
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.app_approval_failed
 import com.hereliesaz.geministrator.resources.app_unreachable
+import com.hereliesaz.geministrator.resources.queen_suggest_nothing_changed
 import com.hereliesaz.geministrator.resources.app_clear_failed
 import com.hereliesaz.geministrator.resources.app_escalation_decision_failed
 import com.hereliesaz.geministrator.resources.app_import_failed
@@ -168,11 +169,19 @@ fun App(
     codeExecution: com.hereliesaz.geministrator.mcp.CodeExecutionToolSource? = null,
     /** Where MCP servers' requests for input are shown; null where no keeper can be asked. */
     mcpElicitation: com.hereliesaz.geministrator.mcp.PromptingMcpElicitationGate? = null,
+    /** Whether the keeper turned the app's own control interface on; the queen reads its capability names only then. */
+    researchBridgeEnabled: () -> Boolean = { false },
 ) {
     val scope = rememberCoroutineScope()
     val workflowPersistence = remember(persistence) { persistence ?: com.hereliesaz.geministrator.persistence.WorkflowPersistenceFactory.durable }
     // The keeper's spend caps (Keeper's room, This device), read by the runtime every cycle.
     val spendCapStore = remember { SpendCapStore(com.russhwolf.settings.Settings()) }
+    val queenLevelStore = remember { QueenLevelStore(com.russhwolf.settings.Settings()) }
+    // The one improvement ledger: the queen's suggestions are rows of it, decided in Messages.
+    val improvementStore = remember { SettingsImprovementStore() }
+    val deadlineHistory = remember {
+        com.hereliesaz.geministrator.workflow.DeadlineHistory(com.russhwolf.settings.Settings())
+    }
     // A reviewed plan waiting for the keeper, kept across a restart; outside workflow persistence and every export.
     val planStore = remember { com.hereliesaz.geministrator.orchestration.ReviewedPlanStore(com.russhwolf.settings.Settings()) }
     // The keeper's approval habits, on this device only (workflow/ProgressiveDelegation.kt).
@@ -215,6 +224,9 @@ fun App(
                     listOf(com.hereliesaz.geministrator.retrieval.ArtifactChunkSource) + contextChunkSources,
                 ),
                 spendCaps = { spendCapStore.caps },
+                queenLevel = { queenLevelStore.level },
+                queenLedger = improvementStore,
+                deadlineHistory = deadlineHistory,
                 traceExport = com.hereliesaz.geministrator.telemetry.WorkflowTraceExport.durable,
                 delegations = delegations,
                 // The runtime's cycle and its saves are not UI work.
@@ -322,6 +334,62 @@ fun App(
         }
     }
 
+    // The queen's research before planning: what is already connected here, then at most one question the keeper may decline.
+    val researchBridgeOn = researchBridgeEnabled()
+    val researchServers = mcpHost?.servers?.collectAsState()?.value.orEmpty()
+    val researchSettings = remember { com.hereliesaz.geministrator.research.ResearchSettings() }
+    val researchOn by researchSettings.enabled.collectAsState()
+    // The repository the keeper is launching against, read by the docs lead when research runs.
+    val researchRepository = remember { arrayOfNulls<RepositoryRef>(1) }
+    val researchDocNames = remember(contextChunkSources) {
+        com.hereliesaz.geministrator.research.ChunkSourceDocNames(contextChunkSources) { researchRepository[0] }
+    }
+    val researchStep = remember(mcpHost, mcpConsent, researchBridgeOn, researchServers.isNotEmpty(), researchOn, researchDocNames) {
+        if (!researchOn) return@remember null
+        com.hereliesaz.geministrator.research.ResearchStep(
+            local = buildList {
+                if (contextChunkSources.isNotEmpty()) {
+                    add(com.hereliesaz.geministrator.research.ResearchSource.Repository to com.hereliesaz.geministrator.research.RepositoryDocsResearch(researchDocNames::names))
+                }
+                if (mcpHost != null && researchServers.isNotEmpty()) {
+                    add(com.hereliesaz.geministrator.research.ResearchSource.ConnectedServer to com.hereliesaz.geministrator.research.ConnectedServersResearch(mcpHost))
+                }
+                if (researchBridgeOn) {
+                    add(
+                        com.hereliesaz.geministrator.research.ResearchSource.AppBridge to com.hereliesaz.geministrator.research.AppBridgeResearch(
+                            { true },
+                            listOf("status", "hives", "roles", "providers", "runs", "settings"),
+                        ),
+                    )
+                }
+            },
+            candidates = if (mcpConsent == null) {
+                emptyList()
+            } else {
+                listOf(
+                    com.hereliesaz.geministrator.research.ResearchCandidate(
+                        source = com.hereliesaz.geministrator.research.ResearchSource.SearchA2A,
+                        serverId = "research-searcha2a",
+                        serverName = "SearchA2A directory",
+                        serverLocation = com.hereliesaz.geministrator.research.SearchA2aMcpLookup.ENDPOINT,
+                        toolName = "search_agents",
+                        lookup = com.hereliesaz.geministrator.research.SearchA2aMcpLookup({
+                            com.hereliesaz.geministrator.mcp.McpStreamableHttpTransport(
+                                com.hereliesaz.geministrator.a2a.sharedExternalDiscoveryClient,
+                                com.hereliesaz.geministrator.research.SearchA2aMcpLookup.ENDPOINT,
+                            )
+                        }),
+                    ),
+                )
+            },
+            consent = mcpConsent ?: com.hereliesaz.geministrator.mcp.McpConsentGate.DenyUnasked,
+        )
+    }
+    val researchContext = com.hereliesaz.geministrator.research.ResearchContext(
+        connectedServers = researchServers.size,
+        bridgeEnabled = researchBridgeOn,
+    )
+
     // The keeper's answer to a reviewed plan: shown over the planning field, held until they press Start or Do not start.
     val askKeeper: suspend (com.hereliesaz.geministrator.orchestration.PlanDecision) -> Boolean = { decision ->
         val answer = CompletableDeferred<Boolean>()
@@ -391,6 +459,7 @@ fun App(
         objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
         onFinished: (Throwable?) -> Unit = {},
     ) = runLaunch(onFinished) { activeRuntime ->
+        researchRepository[0] = repository
         if (orchestrationRuntime != null) {
             activeRuntime.launchOrchestratedWorkflow(
                 projectName = projectName,
@@ -403,6 +472,8 @@ fun App(
                 confirmPlan = askKeeper,
                 planStore = planStore,
                 objectiveProvenance = objectiveProvenance,
+                research = researchStep,
+                researchContext = researchContext,
             )
         } else {
             launchSteps.push("Starting the starter workflow…")
@@ -527,7 +598,20 @@ fun App(
             ?: startupControlRoomDestination(hasConfiguredProvider = providers.any { it !is OnDeviceTextAgentProvider })
         var selectedTaskIdValue by rememberDurableStringState("navigation.selected-task-id")
         val selectedTaskId = selectedTaskIdValue.takeIf(String::isNotBlank)
-        var navigationHistory by remember { mutableStateOf(emptyList<ControlRoomDestination>()) }
+        var navigationHistory by remember { mutableStateOf(emptyList<NavEntry>()) }
+        // Where the keeper is now, with the creature and tab open there: what Back returns to (B1).
+        fun hereEntry() = NavEntry(
+            destination = destination,
+            taskId = selectedTaskId.orEmpty(),
+            tab = if (selectedTaskId != null) DurableUiState.store.getString("creature.panel.tab").orEmpty() else "",
+        )
+        // The one way to go to a place: it records where the keeper was, creature and tab included.
+        fun navigate(target: ControlRoomDestination) {
+            if (target == destination) return
+            navigationHistory = historyAfterNavigate(navigationHistory, hereEntry(), target)
+            destinationName = target.name
+            if (target != ControlRoomDestination.Overview) selectedTaskIdValue = ""
+        }
         val taskInspectorVisible = selectedTaskId != null &&
             destination == ControlRoomDestination.Overview
 
@@ -539,8 +623,14 @@ fun App(
             when {
                 taskInspectorVisible -> selectedTaskIdValue = ""
                 navigationHistory.isNotEmpty() -> {
-                    destinationName = navigationHistory.last().name
+                    val back = navigationHistory.last()
+                    destinationName = back.destination.name
                     navigationHistory = navigationHistory.dropLast(1)
+                    if (back.taskId.isNotEmpty()) {
+                        CreatureTabRestore.taskId = back.taskId
+                        CreatureTabRestore.tab = back.tab
+                        selectedTaskIdValue = back.taskId
+                    }
                 }
                 destination != ControlRoomDestination.Overview -> {
                     destinationName = ControlRoomDestination.Overview.name
@@ -553,9 +643,7 @@ fun App(
                 azphaltPackageImportRequest != null &&
                 destination != ControlRoomDestination.AddOns
             ) {
-                navigationHistory = navigationHistory + destination
-                destinationName = ControlRoomDestination.AddOns.name
-                selectedTaskIdValue = ""
+                navigate(ControlRoomDestination.AddOns)
             }
         }
 
@@ -647,7 +735,6 @@ fun App(
         // hive as drawn, with no planner to ask and nothing approved for anyone. It waits for the active
         // run to finish, says what it decided in the app log, and a hive with an approval waits for the keeper.
         val scheduleStore = remember { SettingsWorkflowScheduleStore() }
-        val improvementStore = remember { SettingsImprovementStore() }
         // A finished self-improvement cycle is read into the keeper's Improvement list, once
         // (docs/architecture/SELF_IMPROVEMENT.md). Reading changes nothing: a proposal is adopted only by the keeper.
         val finishedCycle = (runtimeState as? ApplicationRuntimeState.Live)?.presentation?.run
@@ -727,6 +814,7 @@ fun App(
             LocalEntire provides entire,
             LocalMcpHost provides mcpHost,
             LocalCodeExecution provides codeExecution,
+            LocalResearchSettings provides researchSettings,
             LocalCreatureRig provides { label ->
                 if (label in programmaticRoles) CreatureRigMapping.PROGRAMMATIC_RIG else stableHost.rigFor(rolesByName[label])
             },
@@ -739,23 +827,7 @@ fun App(
                     ControlRoom(
                         destination = destination,
                         destinations = destinations,
-                        onDestinationSelected = { target ->
-                            if (target != destination) {
-                                // The hive is home: reaching it clears the way back. Returning to a place
-                                // already on the way back pops to it, so Back never ping-pongs and the
-                                // history never grows past the places actually open.
-                                val earlier = navigationHistory.indexOf(target)
-                                navigationHistory = when {
-                                    target == ControlRoomDestination.Overview -> emptyList()
-                                    earlier >= 0 -> navigationHistory.take(earlier)
-                                    else -> navigationHistory + destination
-                                }
-                                destinationName = target.name
-                                if (target != ControlRoomDestination.Overview) {
-                                    selectedTaskIdValue = ""
-                                }
-                            }
-                        },
+                        onDestinationSelected = { target -> navigate(target) },
                         selectedTaskId = selectedTaskId,
                         onTaskSelected = { taskId ->
                             selectedTaskIdValue = if (selectedTaskId == taskId) "" else taskId
@@ -845,6 +917,54 @@ fun App(
                                                 "Escalation rejected in application"
                                             },
                                         )
+                                    }
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    actionFailure = actionFailureOf(getString(Res.string.app_escalation_decision_failed), failure)
+                                }
+                            }
+                        },
+                        onNannyReview = { step, approved ->
+                            scope.launch {
+                                try {
+                                    val activeRuntime = runtime ?: error("Runtime is unavailable")
+                                    activeRuntime.applyHallMonitorReviewStep(step, approved)
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    actionFailure = actionFailureOf(getString(Res.string.app_escalation_decision_failed), failure)
+                                }
+                            }
+                        },
+                        onNannyTestSolution = { findingId, solutionIndex ->
+                            scope.launch {
+                                try {
+                                    val activeRuntime = runtime ?: error("Runtime is unavailable")
+                                    val planner = orchestrationRuntime
+                                        ?: error(
+                                            "Nanny solution testing requires the orchestration model runtime on this platform. " +
+                                                "The paused workflow and recommendation were not changed.",
+                                        )
+                                    activeRuntime.testHallMonitorSolution(findingId, solutionIndex, planner)
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    actionFailure = actionFailureOf(getString(Res.string.app_escalation_decision_failed), failure)
+                                }
+                            }
+                        },
+                        onQueenSuggestion = { proposalId, accept ->
+                            scope.launch {
+                                try {
+                                    val activeRuntime = runtime ?: error("Runtime is unavailable")
+                                    if (accept) {
+                                        // A suggestion that no longer stands, or was already decided, changes nothing and says so.
+                                        if (activeRuntime.acceptQueenSuggestion(proposalId) != ApplicationRuntime.QueenAccept.Applied) {
+                                            actionFailure = ActionFailure(getString(Res.string.queen_suggest_nothing_changed), "")
+                                        }
+                                    } else {
+                                        activeRuntime.dismissQueenSuggestion(proposalId)
                                     }
                                 } catch (failure: CancellationException) {
                                     throw failure

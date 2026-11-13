@@ -155,6 +155,10 @@ class AgentProviderRegistry(
 
     fun provider(id: AgentProviderId): AgentProvider? = providersById[id]
 
+    /** The Sources the queen's planner and reviewer could be answered by: those [select] may choose on its own. */
+    fun linkedSourceIds(): List<String> =
+        providersById.values.filterNot { it.explicitOnly || it is OnDeviceTextAgentProvider }.map { it.id.value }
+
     /**
      * Whether a provider [select] may choose on its own supports every capability in [required]. The
      * on-device provider does not count: it takes only small tasks, so it staffs no role by itself.

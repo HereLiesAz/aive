@@ -47,6 +47,8 @@ import com.hereliesaz.geministrator.resources.hive_draft_planner
 import com.hereliesaz.geministrator.resources.hive_draft_done
 import com.hereliesaz.geministrator.resources.hive_draft_go
 import com.hereliesaz.geministrator.resources.hive_draft_hint
+import com.hereliesaz.geministrator.resources.hive_draft_fix_roster
+import com.hereliesaz.geministrator.resources.hive_draft_fix_sources
 import com.hereliesaz.geministrator.resources.hive_draft_keep
 import com.hereliesaz.geministrator.resources.hive_draft_kept
 import com.hereliesaz.geministrator.resources.hive_draft_problem_cycle
@@ -69,13 +71,16 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 
+/** The place that fixes a draft that could not start: the Roster for no creatures on, Connections for no source. */
+private enum class DraftFix { Roster, Sources }
+
 /** Where a draft stands; the screen shows one line for it and the actions that fit. */
 private sealed interface DraftPhase {
     data object Idle : DraftPhase
     data object Working : DraftPhase
     data class Done(val creatures: Int, val notes: List<String> = emptyList()) : DraftPhase
     data class Review(val ready: SwarmDraftResult.Ready) : DraftPhase
-    data class Failed(val message: String, val raw: String?) : DraftPhase
+    data class Failed(val message: String, val raw: String?, val fix: DraftFix? = null) : DraftPhase
     data object Kept : DraftPhase
 
     /** Saved hives that resemble the description, offered before the planner is asked. */
@@ -139,10 +144,13 @@ internal fun SwarmDraftBox(
                     // Nothing of the keeper's to lose: it lands at once. Otherwise they decide.
                     if (redraftReplaces(definition) == 0) apply(result) else phase = DraftPhase.Review(result)
                 }
-                is SwarmDraftResult.Problem -> phase = DraftPhase.Failed(problemMessage(result.problem), null)
+                is SwarmDraftResult.Problem -> phase = DraftPhase.Failed(
+                    problemMessage(result.problem), null,
+                    fix = DraftFix.Roster.takeIf { result.problem == SwarmDraftProblem.NoRoles },
+                )
                 is SwarmDraftResult.ProviderFailed ->
                     phase = DraftPhase.Failed(result.summary ?: friendlyErrorMessageOutsideComposition(result.raw), result.raw)
-                SwarmDraftResult.Unavailable -> phase = DraftPhase.Failed(getString(Res.string.hive_draft_unavailable), null)
+                SwarmDraftResult.Unavailable -> phase = DraftPhase.Failed(getString(Res.string.hive_draft_unavailable), null, DraftFix.Sources)
             }
         }
     }
@@ -251,6 +259,19 @@ internal fun SwarmDraftBox(
             }
             is DraftPhase.Failed -> {
                 Status(now.message)
+                // What is missing is switched on, or linked, in one place: the sentence opens it.
+                val links = LocalPlaceLinks.current
+                when (now.fix) {
+                    DraftFix.Roster -> LinkText(
+                        stringResource(Res.string.hive_draft_fix_roster),
+                        onClick = links.openPlace?.let { open -> { open(ControlRoomDestination.Company) } },
+                    )
+                    DraftFix.Sources -> LinkText(
+                        stringResource(Res.string.hive_draft_fix_sources),
+                        onClick = links.openConnections?.let { open -> { open(null) } },
+                    )
+                    null -> Unit
+                }
                 ErrorDetailsToggle(raw = now.raw, seed = "swarm-draft")
                 AzphaltThemedSurface(Azphalt.Ink) {
                     val retry = stringResource(Res.string.hive_draft_retry)

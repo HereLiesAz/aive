@@ -3,7 +3,9 @@ package com.hereliesaz.geministrator
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
@@ -105,10 +107,13 @@ class PanelScreenshotTest {
     )
 
     @Test
-    fun shootsTheWorkflowFlowchart() {
+    fun shootsTheFlowchartCards() {
+        // The back of each creature in Edit: the flowchart's card, one selected.
         val flow = WorkflowFlowchart.of(definition, run)
-        shoot("50-flowchart", 900, 1900) {
-            WorkflowFlowchartView(flow, selectedTaskId = "review", onTaskSelected = {}, emptyText = "none", modifier = Modifier.fillMaxSize())
+        shoot("50-flowchart-cards", 400, 900) {
+            androidx.compose.foundation.layout.Column(Modifier.padding(16.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                flow.nodes.forEach { node -> FlowCardFace(node, selected = node.id.value == "review", modifier = Modifier.width(176.dp).height(76.dp)) }
+            }
         }
     }
 

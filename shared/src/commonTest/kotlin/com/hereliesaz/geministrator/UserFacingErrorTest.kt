@@ -79,4 +79,15 @@ class UserFacingErrorTest {
         assertEquals(ErrorKind.RateLimited, classifyError("You exceeded your quota"))
         assertEquals(ErrorKind.ServerError, classifyError("The model is overloaded"))
     }
+
+    @Test
+    fun cliStoppedAfterMinutesReadsAsTimedOut() {
+        assertEquals(ErrorKind.TimedOut, classifyError("Claude Code timed out and was stopped after 30 minutes."))
+    }
+
+    @Test
+    fun a2aAndMoyaiDidNotFinishInTimeReadAsTimedOut() {
+        assertEquals(ErrorKind.TimedOut, classifyError("Remote agent timed out: it did not finish in time"))
+        assertEquals(ErrorKind.TimedOut, classifyError("Moyai session abc12345 timed out: it did not finish in time"))
+    }
 }

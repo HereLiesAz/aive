@@ -3,6 +3,13 @@ package com.hereliesaz.geministrator
 import java.io.File
 import java.util.prefs.Preferences
 
+/** What a read of a stored secret found. [Unreadable] means the store could not answer (locked, timed out). */
+internal sealed interface StoredSecret {
+    data class Found(val value: String) : StoredSecret
+    data object Absent : StoredSecret
+    data object Unreadable : StoredSecret
+}
+
 /**
  * One distributed-compute secret in the OS credential store. The default holds the relay (pool)
  * token; [forNodeIdentity] holds this device's compute node signing key.
@@ -12,29 +19,57 @@ internal class DesktopDistributedComputeCredentialStore(
     private val windowsFileName: String = WINDOWS_TOKEN_FILE_NAME,
     /** Only the pool token may also come from the environment. */
     private val readEnvironment: Boolean = true,
+    /** Whether the keeper has allowed the plaintext preferences file when no OS store works. Off by default. */
+    private val allowPlaintextFallback: () -> Boolean = { plaintextFallbackAllowed() },
 ) {
     private val fallback = Preferences.userRoot().node(PREFERENCES_NODE)
 
-    fun readToken(): String? =
-        (if (readEnvironment) environmentToken() else null)
-            ?: readFromKeychain(account, windowsTokenFile(windowsFileName))
-            ?: fallback.get(account, null)?.trim()?.takeIf(String::isNotEmpty)
+    /** The secret held only for this session when it could not be persisted. */
+    @Volatile
+    private var sessionSecret: String? = null
+
+    /** One plain line for the keeper when the last write could not be persisted, else null. */
+    @Volatile
+    var notice: String? = null
+        private set
+
+    fun readToken(): String? = (readSecret() as? StoredSecret.Found)?.value
+
+    /** Like [readToken], but tells an unreadable store apart from an empty one. */
+    fun readSecret(): StoredSecret {
+        (if (readEnvironment) environmentToken() else null)?.let { return StoredSecret.Found(it) }
+        sessionSecret?.let { return StoredSecret.Found(it) }
+        when (val stored = readFromKeychainState(account, windowsTokenFile(windowsFileName))) {
+            is StoredSecret.Found, StoredSecret.Unreadable -> return stored
+            StoredSecret.Absent -> Unit
+        }
+        return fallback.get(account, null)?.trim()?.takeIf(String::isNotEmpty)
+            ?.let { StoredSecret.Found(it) } ?: StoredSecret.Absent
+    }
 
     fun writeToken(token: String) {
         val clean = token.trim()
         require(clean.isNotEmpty()) { "Relay token is required" }
         val file = windowsTokenFile(windowsFileName)
         // Only drop the fallback copy once the OS store demonstrably returns the token.
-        if (!writeToKeychain(clean, account, file) || readFromKeychain(account, file) != clean) {
-            fallback.put(account, clean)
-            fallback.flush()
-        } else {
+        if (writeToKeychain(clean, account, file) && readFromKeychain(account, file) == clean) {
             fallback.remove(account)
             fallback.flush()
+            sessionSecret = null
+            notice = null
+        } else if (allowPlaintextFallback()) {
+            fallback.put(account, clean)
+            fallback.flush()
+            notice = null
+        } else {
+            sessionSecret = clean
+            notice = "No system store is available, so this secret is kept for this session only."
         }
     }
 
     fun clear() {
+        sessionSecret = null
+        notice = null
         deleteFromKeychain(account, windowsTokenFile(windowsFileName))
         fallback.remove(account)
         fallback.flush()
@@ -51,6 +86,47 @@ internal class DesktopDistributedComputeCredentialStore(
             windowsFileName = "distributed-compute-node-key.dpapi",
             readEnvironment = false,
         )
+
+        /** The keeper's explicit opt-in (environment variable) to the plaintext preferences fallback. */
+        fun plaintextFallbackAllowed(): Boolean =
+            System.getenv("AIVE_ALLOW_PLAINTEXT_SECRETS")?.trim() == "1"
+
+        /**
+         * Reads the OS store, telling "nothing stored" from "could not be read". Only a clean
+         * not-found answer is [StoredSecret.Absent]; a timeout or any other failure is [StoredSecret.Unreadable].
+         */
+        fun readFromKeychainState(account: String = ACCOUNT, tokenFile: File = windowsTokenFile()): StoredSecret = runCatching {
+            val builder: ProcessBuilder = when {
+                os.contains("mac") -> ProcessBuilder(
+                    listOf("security", "find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", account, "-w"),
+                )
+                os.contains("win") -> {
+                    if (!tokenFile.isFile) return@runCatching StoredSecret.Absent
+                    windowsPowerShell(WINDOWS_READ_SCRIPT, tokenFile)
+                }
+                os.contains("nux") || os.contains("nix") || os.contains("bsd") -> ProcessBuilder(
+                    listOf("secret-tool", "lookup", "service", KEYCHAIN_SERVICE, "account", account),
+                )
+                else -> return@runCatching StoredSecret.Absent
+            }
+            val execution = CredentialTool.execute(builder)
+            val result = execution.result
+            when {
+                execution.timedOut -> StoredSecret.Unreadable
+                // The tool could not start: there is no store to read.
+                result == null -> StoredSecret.Absent
+                result.ok -> result.output.trim().takeIf(String::isNotEmpty)
+                    ?.let { StoredSecret.Found(it) } ?: StoredSecret.Absent
+                notFoundExitCode(result.exitCode) -> StoredSecret.Absent
+                else -> StoredSecret.Unreadable
+            }
+        }.getOrElse { StoredSecret.Unreadable }
+
+        private fun notFoundExitCode(code: Int): Boolean = when {
+            os.contains("mac") -> code == 44
+            os.contains("win") -> false
+            else -> code == 1
+        }
 
         fun environmentToken(): String? =
             System.getenv("AIVE_RELAY_TOKEN")?.trim()?.takeIf(String::isNotEmpty)
