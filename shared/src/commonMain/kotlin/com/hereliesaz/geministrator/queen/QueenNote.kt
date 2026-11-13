@@ -43,6 +43,7 @@ enum class QueenVoice(val relay: QueenRelay?) {
     WatchBudget(QueenRelay.Watch),
     WatchFailedOver(QueenRelay.Watch),
     WatchSlow(QueenRelay.Watch),
+    WatchTimedOut(QueenRelay.Watch),
     AllowanceStopRun(QueenRelay.Allowance),
     AllowanceStopHour(QueenRelay.Allowance),
     AllowanceStopUnpriced(QueenRelay.Allowance),

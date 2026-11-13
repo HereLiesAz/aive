@@ -1968,6 +1968,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_title_finish">The swarm has stopped</string>
     <string name="queen_title_waits">What waits for you</string>
     <string name="queen_say_watch_slow">Step %1$s (%2$s) has worked longer than the %3$s minutes I allowed. I am still waiting. You can give it more time on its job.</string>
+    <string name="queen_say_watch_timed_out">I stopped step %1$s (%2$s) because it took longer than I allowed, %3$s time(s) so far. It tries again, on another Source when there is one.</string>
     <string name="creature_taking_longer">Taking longer than expected (allowed %1$s min)</string>
     <string name="inspector_time">TIME</string>
     <string name="queen_title_watch">The queen noticed something</string>

@@ -53,4 +53,16 @@ class QueenDeadlineTest {
         val retry = qTaskRun("a", TaskRunStatus.Running, attempt = 2).copy(clock = clock)
         assertNull(slowCreatureAllowedMinutes(qTask("a"), retry))
     }
+
+    @Test fun helpfulSaysWhenAStepWasStoppedForTakingTooLongAndQuietDoesNot() {
+        val run = qRun(qTaskRun("a", TaskRunStatus.Running, attempt = 2).copy(timedOutAttempts = 1), qTaskRun("b", TaskRunStatus.Running))
+        val note = queenUpdate(definition, run, roles, QueenLevel.Helpful).single { it.voice == QueenVoice.WatchTimedOut }
+        assertEquals(listOf("1", "Task a", "1"), note.args)
+        assertTrue(queenUpdate(definition, run, roles, QueenLevel.Quiet).none { it.voice == QueenVoice.WatchTimedOut })
+    }
+
+    @Test fun anEscalatedStepGetsNoSecondNote() {
+        val run = qRun(qTaskRun("a", TaskRunStatus.Escalated).copy(timedOutAttempts = 2), qTaskRun("b", TaskRunStatus.Running))
+        assertTrue(queenUpdate(definition, run, roles, QueenLevel.Helpful).none { it.voice == QueenVoice.WatchTimedOut })
+    }
 }

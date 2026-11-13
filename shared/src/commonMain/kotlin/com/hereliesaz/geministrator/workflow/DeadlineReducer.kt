@@ -14,7 +14,7 @@ import com.hereliesaz.geministrator.domain.WorkflowRun
  * Whether a creature past its hard point is stopped. A patch release can switch it off without a data change;
  * while off, the hard point only marks the soft notice.
  */
-const val HARD_DEADLINES_ENABLED: Boolean = false
+const val HARD_DEADLINES_ENABLED: Boolean = true
 
 sealed interface DeadlineVerdict {
     data object Ok : DeadlineVerdict
