@@ -990,6 +990,82 @@ class ApplicationRuntime private constructor(
     }
 
     /**
+     * Adds the staffed steps [extension] to the run on screen after the keeper approved the plan (docs/Keepers-Room.md), for a swarm
+     * that asked for it by having the plan-approval step ([com.hereliesaz.geministrator.orchestration.RunExtension.GATE_STEP_ID]).
+     * Only a running swarm, not paused, frozen or stopped. The extension meets the validation any plan meets: the pure rules
+     * of [com.hereliesaz.geministrator.orchestration.RunExtension.refusal] (every added step comes after the approval, none repeats an id),
+     * `validateAgainst` through the factory that builds the steps, the requirements checklist's rules (a step that can change something
+     * needs an approval before it), and the graph validator. A step already in the run is never changed. Returns null when the steps were
+     * added, or why they were not (nothing is applied then). Never reachable from a remote interface: only the app calls it.
+     */
+    suspend fun extendRun(extension: List<com.hereliesaz.geministrator.orchestration.OrchestrationPlanStep>): String? = runtimeMutex.withLock {
+        val snapshot = current ?: return@withLock "No active workflow is loaded."
+        val run = newestRun(snapshot.state.run)
+        if (run.status != WorkflowRunStatus.Running) return@withLock "Only a swarm that is running can take more steps."
+        if (run.globalPause != null || run.spendPause != null || run.keeperPause != null) return@withLock "The swarm is paused or stopped."
+        val definition = snapshot.definition
+        val currentSteps = com.hereliesaz.geministrator.orchestration.RunExtension.stepsOf(definition)
+            ?: return@withLock "A step of this swarm has no role, so it cannot be extended."
+        val gateApproved = run.taskRuns[TaskDefinitionId(com.hereliesaz.geministrator.orchestration.RunExtension.GATE_STEP_ID)]?.status == TaskRunStatus.Completed
+        com.hereliesaz.geministrator.orchestration.RunExtension.refusal(currentSteps, extension, gateApproved)?.let { return@withLock it }
+        val rolesNow = run.roleSnapshot.filter(RoleDefinition::enabled).ifEmpty { activeRoles(resolveRoleCollection(persistence.roles.all())) }
+        val inputs = com.hereliesaz.geministrator.orchestration.RequirementInputs(
+            objective = run.objective,
+            objectiveExternal = run.objectiveProvenance.isUntrusted(),
+            roles = rolesNow,
+            availableRoleIds = rolesNow.map { it.id.value }.toSet(),
+        )
+        com.hereliesaz.geministrator.orchestration.RunExtension.introducedProblem(inputs, currentSteps, extension)?.let { return@withLock it }
+        val packet = com.hereliesaz.geministrator.orchestration.OrchestrationPacket(
+            objective = run.objective,
+            currentState = "extend-run",
+            availableAgents = rolesNow.map { role ->
+                com.hereliesaz.geministrator.orchestration.OrchestrationRole(role.id.value, role.name, role.authorities.map { it.name }.sorted())
+            },
+            instruction = "Add the staffed steps to the run after the keeper approved the plan.",
+        )
+        val built = try {
+            com.hereliesaz.geministrator.workflow.OrchestratedWorkflowFactory.create(
+                id = definition.id,
+                objective = run.objective,
+                plan = com.hereliesaz.geministrator.orchestration.OrchestrationPlan(currentSteps + extension),
+                packet = packet,
+                roles = rolesNow,
+            )
+        } catch (failure: IllegalArgumentException) {
+            return@withLock failure.message ?: "The steps were not accepted."
+        }
+        val appended = com.hereliesaz.geministrator.orchestration.RunExtension.append(definition, built, extension.map { it.id }.toSet())
+        val ready = when (appended) {
+            is com.hereliesaz.geministrator.orchestration.RunExtension.Appended.Refused -> return@withLock appended.reason
+            is com.hereliesaz.geministrator.orchestration.RunExtension.Appended.Ready -> appended
+        }
+        val now = decisionTime(nowEpochMillis(), run)
+        val fresh = com.hereliesaz.geministrator.workflow.WorkflowRunFactory.create(
+            definition = ready.definition,
+            workflowRunId = run.id,
+            projectId = run.projectId,
+            objective = run.objective,
+            nowEpochMillis = now,
+            taskRunIdFactory = { id -> TaskRunId("${run.id.value}:${id.value}:extend") },
+            roles = rolesNow,
+            parentWorkflowRunIds = run.parentWorkflowRunIds,
+            objectiveProvenance = run.objectiveProvenance,
+        )
+        // Every step already in the run keeps its own state; only the added steps take a new one.
+        val taskRuns = fresh.taskRuns.mapValues { (id, added) -> run.taskRuns[id] ?: added }
+        val followed = com.hereliesaz.geministrator.workflow.WorkflowRunFactory.refreshReadiness(
+            definition = ready.definition,
+            run = run.copy(taskRuns = taskRuns, definitionSnapshot = ready.definition, updatedAtEpochMillis = now),
+            nowEpochMillis = now,
+        )
+        persistence.runs.put(followed)
+        replaceCurrent(snapshot.copy(definition = ready.definition, state = snapshot.state.copy(run = followed)))
+        publishCurrent()
+        null
+    }
+
+    /**
      * Rewinds the active run to [taskDefinitionId] in place: that creature and what follows it start
      * again while the rest of the swarm keeps running ([WorkflowRuntimeCoordinator.rewind]).
      */
