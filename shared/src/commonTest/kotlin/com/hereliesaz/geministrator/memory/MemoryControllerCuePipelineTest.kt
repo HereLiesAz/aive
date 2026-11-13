@@ -18,7 +18,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import com.hereliesaz.geministrator.orchestration.MemoryResolution as QueryResolution
 
@@ -80,9 +79,9 @@ class MemoryControllerCuePipelineTest {
             AgentEvent.Message(ProviderRunId("run-agent-1"), "Check #SettingsMemoryStore and how MemoryLog encodes the snapshot."),
         ) { sent += it; ProviderActionResult.Accepted }
 
-        assertTrue(sent.isNotEmpty(), "the tag the agent wrote is followed")
-        // A followed tag brings summaries (a hashtag line, then "- gist" lines); a bare cloud is one line.
-        assertTrue(sent.all { it.startsWith(MEMORY_MESSAGE_MARKER) && "\n- " in it }, "$sent")
+        // The tag the agent wrote is followed (a header naming it, then "- gist" lines) and that is all: no cloud beside it.
+        assertEquals(1, sent.size, "$sent")
+        assertTrue(sent.single().startsWith("$MEMORY_MESSAGE_MARKER #settingsmemorystore\n- "), sent.single())
         assertTrue(sent.any { "append-only log" in it }, "$sent")
         assertTrue(sent.none { "memory-node:" in it || "memory-history:" in it }, "gist rendering shows no ids: $sent")
         assertEquals(before, store.read(), "surfacing writes nothing to a stored memory")
@@ -100,7 +99,7 @@ class MemoryControllerCuePipelineTest {
 
         assertEquals(1, sent.size, "$sent")
         assertTrue(sent.single().startsWith("$MEMORY_MESSAGE_MARKER #"), sent.single())
-        assertFalse("\n" in sent.single(), "a cloud is one line of tags")
+        assertTrue(sent.single().lineSequence().drop(1).all { it.startsWith("- ") }, "a cloud is a line of tags, then at most phrase lines")
     }
 
     @Test
@@ -166,5 +165,35 @@ class MemoryControllerCuePipelineTest {
         val last = all.single { episode -> episode.chunks.any { "beta finding about backoff" in it.text } }
         assertTrue(last.chunks.none { "alpha finding about retries" in it.text }, "each part reaches memory once")
         assertTrue(last.chunks.any { "I could use /remindme here, maybe." in it.text }, "the sentence mentioning it is just banked")
+    }
+
+    @Test
+    fun keyPhrasesRideAfterTheTagsUnderTheCapAndAreNotRepeated() = runBlocking {
+        val tag = MemoryNode(MemoryNodeId("tag-keystore"), MemoryNodeKind.NounTag, "keystore", createdAtEpochMillis = 0)
+        val phrases = (1..4).map { MemoryNode(MemoryNodeId("phrase-$it"), MemoryNodeKind.Phrase, "keystore rotation rule number $it", createdAtEpochMillis = 0) }
+        val snapshot = MemorySnapshot(
+            nodes = listOf(tag) + phrases,
+            edges = phrases.map { MemoryEdge(MemoryEdgeId("e-${it.id.value}"), tag.id, it.id, MemoryRelationKind.Indexes, 1f, 0) },
+        )
+        val controller = MemoryLayerController(
+            banks = MemoryBanks.inMemory(mapOf("wf-ph" to InMemoryMemoryStore(snapshot))),
+            settingsStore = MemoryLayerSettingsStore(MapSettings()),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            nowEpochMillis = { 1_000L },
+        )
+        controller.setDefaultAttentionLevel(1f)
+        val h = handle("agent-6")
+        controller.observer.onSessionStarted(h, request("agent-6", "wf-ph"))
+
+        val first = controller.observer.annotateUserMessage(h, "Where is the keystore?")
+        val lines = first.removePrefix("Where is the keystore?\n\n").lines()
+        assertEquals("$MEMORY_MESSAGE_MARKER #keystore", lines.first(), first)
+        val shown = lines.drop(1)
+        assertTrue(shown.isNotEmpty() && shown.size <= 3, "at most three phrases: $first")
+        assertTrue(shown.all { it.startsWith("- keystore rotation rule number ") }, first)
+
+        // The same tag again inside the novelty window brings nothing, tags or phrases.
+        assertEquals("Where is the keystore?", controller.observer.annotateUserMessage(h, "Where is the keystore?"))
     }
 }

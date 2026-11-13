@@ -1332,7 +1332,41 @@ class MemoryLayerController(
             session.watcher.offered(cues.map { it.node.text })
             cues.forEach { session.dwell.hit(it.node.text) }
         }
-        return "$MEMORY_MESSAGE_MARKER " + cues.joinToString(" ") { MemoryCueWatcher.hashtag(it.node.text) }
+        val tags = "$MEMORY_MESSAGE_MARKER " + cues.joinToString(" ") { MemoryCueWatcher.hashtag(it.node.text) }
+        // Key phrases ride after the tags, as "- " lines like any other injection.
+        val phrases = runCatching { cuePhrases(workflow, cues, gate, agentId) }.getOrDefault(emptyList())
+        return if (phrases.isEmpty()) tags else tags + phrases.joinToString("") { "\n- $it" }
+    }
+
+    /**
+     * The key phrases condensed under the cloud's [cues], at most [MAX_CLOUD_PHRASES] (the top
+     * [MAX_CLOUD_PHRASE_TAGS] tags' best), each a short gist. They are the depth ladder's phrase level, so a
+     * phrase shown in the last novelty window is not shown again, here or when the agent follows the tag.
+     * Read only; nothing stored changes.
+     */
+    private suspend fun cuePhrases(
+        workflow: String,
+        cues: List<MemoryRecallHit>,
+        gate: AttentionGatedRecall,
+        agentId: String,
+    ): List<String> {
+        val tool = layerFor(workflow).tool
+        val hits = cues.take(MAX_CLOUD_PHRASE_TAGS).flatMap { cue ->
+            tool.grip(
+                MemoryTagQuery(
+                    tags = listOf(cue.node.text),
+                    resolution = MemoryResolution.Phrase,
+                    maxResults = MAX_CLOUD_PHRASES,
+                    scope = MemoryBankScope(taskRunId = agentId),
+                ),
+            ).hits
+        }
+        val best = withProvenance(workflow, hits)
+            .filter { it.node.kind == MemoryNodeKind.Phrase }
+            .distinctBy { it.node.id }
+            .sortedByDescending { it.score }
+            .take(MAX_CLOUD_PHRASES)
+        return gate.fresh(best, MemoryDepth.Phrases.ordinal).map { it.sourceLabel() + gistOf(it.node.text, CLOUD_PHRASE_CHARS) }
     }
 
     /**
@@ -1439,6 +1473,10 @@ class MemoryLayerController(
     private companion object {
         const val MAX_TRIGGERS_PER_THOUGHT = 3
         const val MAX_TRIGGER_SUMMARIES = 3
+        /** Key phrases that ride with a cloud: from how many of its tags, how many in all, and how long each. */
+        const val MAX_CLOUD_PHRASE_TAGS = 3
+        const val MAX_CLOUD_PHRASES = 3
+        const val CLOUD_PHRASE_CHARS = 100
         /** Finer summaries and sources: how many more may come back once the agent has lingered. */
         const val DEEPER_EXTRA_SUMMARIES = 2
         const val MAX_PENDING_RECALLS = 8
