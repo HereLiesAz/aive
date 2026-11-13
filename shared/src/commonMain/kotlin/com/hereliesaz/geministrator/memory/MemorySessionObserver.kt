@@ -45,6 +45,9 @@ interface MemorySessionObserver {
      * and is not banked again; any other message, whatever it starts with, is the agent's.
      */
     suspend fun noteIssued(message: String) = Unit
+
+    /** The keeper sent [text] into the running session; the whole session is experience, so it is banked. */
+    suspend fun onKeeperMessage(handle: ManagedSessionHandle, text: String) = Unit
 }
 
 /** First line of every message memory sends into a session, so it is never banked or re-read as the agent's own. */
@@ -181,8 +184,12 @@ class QueuedMemorySessionObserver(
                 "Agent failure",
                 event.reason.take(maxCapturedEventChars),
             )
-            // Reasoning is watched for recall triggers, not banked.
-            is AgentEvent.Thinking,
+            // The whole session is context: reasoning is banked as well as watched for recall triggers.
+            is AgentEvent.Thinking -> MemorySessionPart(
+                MemorySourceKind.AgentNote,
+                "Agent thinking",
+                event.content.take(maxCapturedEventChars),
+            )
             is AgentEvent.PlanApproved,
             is AgentEvent.Progress,
             is AgentEvent.Completed,
@@ -191,6 +198,13 @@ class QueuedMemorySessionObserver(
         } ?: return
 
         if (part.text.isBlank()) return
+        val capture = mutex.withLock { captures[handle]?.also { it.parts.add(part) } } ?: return
+        journalUnsent(handle, capture)
+    }
+
+    override suspend fun onKeeperMessage(handle: ManagedSessionHandle, text: String) {
+        if (text.isBlank()) return
+        val part = MemorySessionPart(MemorySourceKind.Message, "Keeper message", text.take(maxCapturedEventChars))
         val capture = mutex.withLock { captures[handle]?.also { it.parts.add(part) } } ?: return
         journalUnsent(handle, capture)
     }

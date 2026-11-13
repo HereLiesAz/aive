@@ -65,7 +65,7 @@ Built after the audit above (the audit table and plan below describe the state b
 | Queen's memory | Resolved by removal: `OrchestrationPacket.retrievedMemory` is gone (nothing filled it; filling it puts memory text into the prompt of the model that designs steps). |
 | Controller-level cue tests | Built: `MemoryControllerCuePipelineTest`. |
 
-Needs the owner's decision, not built: banking `Thinking` and keeper mid-session messages (privacy); a reader for resolutions (the owner said they are condensed like everything else); releasing a trained clerk.
+Decided by the owner: the whole session is banked, so `Thinking` and keeper mid-session messages are banked (built); `#tag` and explicit memory thoughts are shortcuts, not commands; specific values blend over time and with repetition like everything else. Not built: a reader for resolutions (condensed like everything else); a trained clerk.
 
 ## Minimal change plan (original; see Status above for what is done)
 
