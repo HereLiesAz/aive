@@ -134,5 +134,18 @@ class MemoryCueWatcherTest {
         )
         val blocks = controller.promptContextProvider.recallFor(request, MemoryQueryPlan(emptyList(), enoughEvidence = false)).blocks
         assertTrue(blocks.any { it.label == "Memory" && it.content.startsWith("$MEMORY_MESSAGE_MARKER #") }, "$blocks")
+
+        // A plan that says memory is not needed skips only the heavy grip, never the prompt's cue cloud.
+        val gatedOff = MemoryQueryPlan(
+            listOf(com.hereliesaz.geministrator.orchestration.MemoryQuerySpec("keystore", com.hereliesaz.geministrator.orchestration.MemoryResolution.Summary, "TEST")),
+            enoughEvidence = true,
+        )
+        val gatedRequest = AgentTaskRequest(
+            TaskRunId("agent-4"), "Check the keystore signing", "", emptyList(),
+            orchestrationContext = AgentOrchestrationContext(workflowRunId = WorkflowRunId("wf-keys")),
+        )
+        val gated = controller.promptContextProvider.recallFor(gatedRequest, gatedOff).blocks
+        assertTrue(gated.any { it.label == "Memory" && it.content.startsWith("$MEMORY_MESSAGE_MARKER #") }, "$gated")
+        assertTrue(gated.none { it.label == "Relevant memory" || it.label == "Memory timeline" }, "$gated")
     }
 }

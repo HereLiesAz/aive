@@ -335,11 +335,9 @@ class ProviderBackedManagedSessionGateway(
             }
         }
 
-        val recalled = if (recallMemory) {
-            guarded(com.hereliesaz.geministrator.memory.MemoryPromptRecall()) { memory.recallFor(this, queryPlan) }
-        } else {
-            com.hereliesaz.geministrator.memory.MemoryPromptRecall()
-        }
+        // Always asked: the plan only gates the heavy query grip (inside the provider); the cue cloud for
+        // the prompt comes from the agent's own words and is never skipped because a plan says no.
+        val recalled = guarded(com.hereliesaz.geministrator.memory.MemoryPromptRecall()) { memory.recallFor(this, queryPlan) }
         // A chunk already present in the prompt (an artifact the handoff carries, say) is not repeated.
         val present = (promptContext.stablePrefix + promptContext.dynamicContext).map(PromptContextBlock::content)
         val retrieved = contextRetriever?.let { retriever -> guarded(emptyList()) { retriever.retrieve(this) } }.orEmpty()

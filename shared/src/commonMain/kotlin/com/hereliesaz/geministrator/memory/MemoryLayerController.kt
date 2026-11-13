@@ -1191,7 +1191,9 @@ class MemoryLayerController(
         agentAttention.consumeTokens(
             AttentionGatedRecall.approximateTokens(request.objective + request.roleInstructions, APPROXIMATE_CHARS_PER_TOKEN),
         )
-        val (ranked, chronological) = gripPlan(request, queryPlan)
+        // The query plan gates only this heavy grip; the cue cloud below is drawn from the prompt's own words.
+        val planned = !queryPlan.enoughEvidence && queryPlan.queries.isNotEmpty()
+        val (ranked, chronological) = if (planned) gripPlan(request, queryPlan) else emptyList<MemoryRecallHit>() to emptySet<String>()
         // Cue-first: the Attention Deficit Dial decides whether deeper resolutions may surface.
         // The lineage first, whatever the gate's order; read-only hits after, labelled.
         val hits = agentAttention.select(ranked).sortedBy { it.provenance?.readOnlyFromWorkflow != null }
