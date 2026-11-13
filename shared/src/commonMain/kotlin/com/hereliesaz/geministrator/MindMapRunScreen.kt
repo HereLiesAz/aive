@@ -41,6 +41,7 @@ import com.hereliesaz.geministrator.domain.parseRepositoryRef
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.first_hive_default_name
 import com.hereliesaz.geministrator.resources.common_dismiss
 import com.hereliesaz.geministrator.resources.overview_has_no_persisted_workflow_run
 import com.hereliesaz.geministrator.resources.overview_a_workflow_gate_is_waiting_for
@@ -220,6 +221,7 @@ internal fun MindMapRunScreen(
     val missingNameMessage = stringResource(Res.string.overview_enter_name)
     val missingObjectiveMessage = stringResource(Res.string.overview_enter_objective)
     val invalidRepositoryMessage = stringResource(Res.string.overview_invalid_repository_location)
+    val firstHiveFallback = stringResource(Res.string.first_hive_default_name)
     var optionsOpen by rememberDurableBooleanState(
         key = "overview.$draftScope.options-open",
         initialValue = existingRepository != null,
@@ -671,7 +673,7 @@ internal fun MindMapRunScreen(
                         // A first hive needs no name to start: it takes one from what it was fed, once
                         // it has been fed (an empty tap must not name it "First hive" for good).
                         val name = projectName.trim().ifBlank {
-                            if (firstLaunch && objective.isNotBlank()) firstHiveName(objective) else ""
+                            if (firstLaunch && objective.isNotBlank()) firstHiveName(objective, firstHiveFallback) else ""
                         }
                         // Permanent diagnostic: distinguishes "tap never arrived" from "tap arrived
                         // but launch failed" in any future "nothing happens" report.
@@ -1058,5 +1060,5 @@ private fun TaskRunStatus.activityRank(): Int = when (this) {
 private const val MADE_PREVIEW_CHARS = 2_400
 
 /** A first hive's name, from the first words of what it was fed. */
-internal fun firstHiveName(objective: String): String =
-    objective.trim().split(Regex("\\s+")).take(4).joinToString(" ").take(40).trim().ifBlank { "First hive" }
+internal fun firstHiveName(objective: String, fallback: String = "First hive"): String =
+    objective.trim().split(Regex("\\s+")).take(4).joinToString(" ").take(40).trim().ifBlank { fallback }

@@ -15,6 +15,9 @@ import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.hall_monitor_resume_workflow
+import com.hereliesaz.geministrator.resources.hall_monitor_approve_recommendations
+import com.hereliesaz.geministrator.resources.hall_monitor_your_review
 import com.hereliesaz.geministrator.resources.common_approve
 import com.hereliesaz.geministrator.resources.common_inbox
 import com.hereliesaz.geministrator.resources.common_reject
@@ -129,24 +132,23 @@ internal fun HallMonitorPauseInboxScreen(
                     }
 
                     Text(
-                        "Your review. The Orchestrator reviews the report on its own; recommendations are never applied " +
-                            "automatically. Resume continues the frozen workflow once both reviews are decided.",
+                        stringResource(Res.string.hall_monitor_your_review),
                         style = AzphaltType.body,
                         color = azphaltOnSurface(),
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AzphaltPill(
-                            label = "APPROVE RECOMMENDATIONS",
+                            label = stringResource(Res.string.hall_monitor_approve_recommendations),
                             seed = "hall-monitor-review-approve",
                             onClick = { onReview(HallMonitorReviewStep.HumanReview, true) },
                         )
                         AzphaltPill(
-                            label = "REJECT",
+                            label = stringResource(Res.string.common_reject),
                             seed = "hall-monitor-review-reject",
                             onClick = { onReview(HallMonitorReviewStep.HumanReview, false) },
                         )
                         AzphaltPill(
-                            label = "RESUME WORKFLOW",
+                            label = stringResource(Res.string.hall_monitor_resume_workflow),
                             seed = "hall-monitor-review-resume",
                             onClick = { onReview(HallMonitorReviewStep.Resume, true) },
                         )

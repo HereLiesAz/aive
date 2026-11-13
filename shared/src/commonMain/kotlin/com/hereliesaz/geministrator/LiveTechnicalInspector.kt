@@ -90,6 +90,9 @@ import com.hereliesaz.geministrator.workflow.SessionActivityKind
 import com.hereliesaz.geministrator.workflow.attemptsOf
 import com.hereliesaz.geministrator.log.formatLogTime
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.inspector_payload_role_instructions
+import com.hereliesaz.geministrator.resources.inspector_payload_redacted
+import com.hereliesaz.geministrator.resources.inspector_payload_objective
 import com.hereliesaz.geministrator.resources.inspector_activity
 import com.hereliesaz.geministrator.resources.inspector_shared_creature
 import com.hereliesaz.geministrator.resources.inspector_shared_creature_here
@@ -658,12 +661,12 @@ internal fun TechnicalInspector(
                     val sentArtifacts = allContextArtifacts.filter { it.kind !in redaction.excludedArtifactKinds }
                     LiveInspectorLine(stringResource(Res.string.inspector_payload_context), buildString {
                         append(stringResource(Res.string.inspector_role, roleForPayload.name))
-                        append("\nObjective: ${if (redaction.redactObjective) "[redacted by policy]" else task.objective.take(120) + if (task.objective.length > 120) "…" else ""}")
+                        append(stringResource(Res.string.inspector_payload_objective, if (redaction.redactObjective) stringResource(Res.string.inspector_payload_redacted) else task.objective.take(120) + if (task.objective.length > 120) "…" else ""))
                         if (task.acceptanceCriteria.isNotEmpty()) {
                             append(pluralStringResource(Res.plurals.inspector_acceptance_criteria_count, task.acceptanceCriteria.size, task.acceptanceCriteria.size))
                         }
                         if (!redaction.redactRoleInstructions && roleForPayload.instructions.isNotBlank()) {
-                            append("\nRole instructions: ${roleForPayload.instructions.take(80)}${if (roleForPayload.instructions.length > 80) "…" else ""}")
+                            append(stringResource(Res.string.inspector_payload_role_instructions, roleForPayload.instructions.take(80) + if (roleForPayload.instructions.length > 80) "…" else ""))
                         } else if (redaction.redactRoleInstructions) {
                             append(stringResource(Res.string.inspector_role_instructions_redacted_by_policy))
                         }

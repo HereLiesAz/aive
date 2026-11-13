@@ -244,6 +244,16 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="compute_workflow">Workflow</string>
 
     <string name="hall_monitor_tasks_complete_artifacts">%1$s / %2$s tasks complete · %3$s artifacts</string>
+    <string name="hall_monitor_your_review">Your review. The Orchestrator reviews the report on its own; recommendations are never applied automatically. Resume continues the frozen workflow once both reviews are decided.</string>
+    <string name="hall_monitor_approve_recommendations">Approve recommendations</string>
+    <string name="hall_monitor_resume_workflow">Resume workflow</string>
+    <string name="inspector_payload_objective">\nObjective: %1$s</string>
+    <string name="inspector_payload_redacted">[redacted by policy]</string>
+    <string name="inspector_payload_role_instructions">\nRole instructions: %1$s</string>
+    <string name="runs_artifact_stored">stored</string>
+    <string name="runs_event_system">system</string>
+    <string name="runs_event_executor">executor</string>
+    <string name="improvement_evidence">Evidence: %1$s</string>
     <string name="hall_monitor_global_pause">GLOBAL PAUSE</string>
     <string name="hall_monitor_hall_monitor_review">Hall Monitor review</string>
     <string name="hall_monitor_isolated">Isolated</string>
@@ -1120,6 +1130,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="overview_no_project">No hive yet</string>
     <string name="overview_objective">Objective</string>
     <string name="first_hive">Your first hive</string>
+    <string name="first_hive_default_name">First hive</string>
     <string name="first_hive_hint">Feed it work and it plans the rest, hatching the creatures it needs. Its name, a repository and saved projects are under Options.</string>
     <string name="first_hive_objective">What should it work on?</string>
     <string name="first_hive_feed">Feed it</string>

@@ -76,6 +76,9 @@ import com.hereliesaz.geministrator.events.WorkflowCreated
 import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.events.WorkflowFailed
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.runs_event_executor
+import com.hereliesaz.geministrator.resources.runs_event_system
+import com.hereliesaz.geministrator.resources.runs_artifact_stored
 import com.hereliesaz.geministrator.resources.common_approve
 import com.hereliesaz.geministrator.resources.common_inbox
 import com.hereliesaz.geministrator.resources.common_reject
@@ -167,184 +170,6 @@ internal fun EmptyTechnicalInspector(message: String, modifier: Modifier = Modif
 }
 
 @Composable
-internal fun CompanyScreen(
-    runtimeState: ApplicationRuntimeState = ApplicationRuntimeState.Loading,
-    onSaveRole: (RoleDefinition) -> Unit = {},
-    modifier: Modifier = Modifier,
-) {
-    val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
-    var showRoleForm by remember { mutableStateOf(false) }
-    var roleIdDraft by remember { mutableStateOf("") }
-    var roleNameDraft by remember { mutableStateOf("") }
-    var roleDescDraft by remember { mutableStateOf("") }
-    var roleInstructionsDraft by remember { mutableStateOf("") }
-    Column(
-        modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text(stringResource(Res.string.swarm_title), style = AzphaltType.hero, color = azphaltOnSurface())
-        AzphaltPill(
-            label = if (showRoleForm) stringResource(Res.string.common_cancel) else stringResource(Res.string.swarm_add_role),
-            seed = "add-role-toggle",
-            onClick = {
-                showRoleForm = !showRoleForm
-                if (!showRoleForm) {
-                    roleIdDraft = ""
-                    roleNameDraft = ""
-                    roleDescDraft = ""
-                    roleInstructionsDraft = ""
-                }
-            },
-        )
-        if (showRoleForm) {
-            OutlinedTextField(
-                value = roleNameDraft,
-                onValueChange = { roleNameDraft = it },
-                label = { Text("Role name") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = roleIdDraft,
-                onValueChange = { roleIdDraft = it },
-                label = { Text("Role ID (slug)") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = roleDescDraft,
-                onValueChange = { roleDescDraft = it },
-                label = { Text("Description") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = roleInstructionsDraft,
-                onValueChange = { roleInstructionsDraft = it },
-                label = { Text("Standing instructions") },
-                minLines = 3,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            AzphaltPill(
-                label = "Save role",
-                seed = "save-role",
-                onClick = {
-                    val id = roleIdDraft.trim().ifBlank { roleNameDraft.trim().lowercase().replace(" ", "-") }
-                    if (id.isNotEmpty() && roleNameDraft.isNotBlank()) {
-                        onSaveRole(
-                            RoleDefinition(
-                                id = RoleDefinitionId(id),
-                                name = roleNameDraft.trim(),
-                                description = roleDescDraft.trim(),
-                                instructions = roleInstructionsDraft.trim(),
-                            )
-                        )
-                        showRoleForm = false
-                        roleIdDraft = ""
-                        roleNameDraft = ""
-                        roleDescDraft = ""
-                        roleInstructionsDraft = ""
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        if (liveWorkflow != null) {
-            val definition = liveWorkflow.definition
-            SectionLabel("Workflow Policies")
-            AzphaltRecord(
-                seed = "policy-integration",
-                eyebrow = "Integration",
-                title = "Integration policy",
-                body = when (definition.integrationPolicy) {
-                    IntegrationPolicy.Manual -> "Changes integrated manually"
-                    IntegrationPolicy.PullRequest -> "Changes delivered via pull request"
-                    IntegrationPolicy.AutoMergeAfterVerification -> "Auto-merge after verification passes"
-                },
-                endCap = definition.integrationPolicy.name,
-            )
-            AzphaltRecord(
-                seed = "policy-concurrency",
-                eyebrow = "Concurrency",
-                title = "Concurrency policy",
-                body = buildString {
-                    append("${definition.concurrencyPolicy.maxConcurrentTasks} tasks max")
-                    if (definition.concurrencyPolicy.perProviderLimits.isNotEmpty()) {
-                        append(" · Per-provider limits: ${definition.concurrencyPolicy.perProviderLimits.entries.joinToString { "${it.key.value}=${it.value}" }}")
-                    }
-                },
-                endCap = "${definition.concurrencyPolicy.maxConcurrentTasks} max",
-            )
-            AzphaltRecord(
-                seed = "policy-tests",
-                eyebrow = "Test design",
-                title = "Test design policy",
-                body = when (definition.testDesignPolicy) {
-                    TestDesignPolicy.None -> "No test design injection"
-                    TestDesignPolicy.BeforeImplementation -> "Pre-code verification injected before implementation"
-                    TestDesignPolicy.AfterImplementation -> "Post-code regression tests injected after implementation"
-                    TestDesignPolicy.BeforeAndAfterImplementation -> "Pre-code verification and post-code regression tests injected"
-                },
-                endCap = definition.testDesignPolicy.name,
-            )
-            AzphaltRecord(
-                seed = "policy-cache",
-                eyebrow = "Prompt reuse",
-                title = "Prompt reuse policy",
-                body = when (definition.promptReusePolicy) {
-                    PromptReusePolicy.ProviderDefault -> "Provider decides cache behavior"
-                    PromptReusePolicy.PreferCache -> "Cache reads preferred where supported"
-                    PromptReusePolicy.DisableCache -> "Prompt caching disabled"
-                },
-                endCap = definition.promptReusePolicy.name,
-            )
-            val activeRoleIds = liveWorkflow.run.taskRuns.values
-                .filter { it.status in setOf(TaskRunStatus.Running, TaskRunStatus.Planning, TaskRunStatus.AwaitingApproval, TaskRunStatus.Verifying) }
-                .mapNotNull { it.assignedRoleId }
-                .toSet()
-            val byDept = liveWorkflow.roles.groupBy { it.department() }
-            listOf("Executive", "Product", "Engineering", "Assurance", "Delivery", "Custom").forEach { dept ->
-                val roles = byDept[dept] ?: return@forEach
-                SectionLabel(dept)
-                roles.forEach { role ->
-                    AzphaltRecord(
-                        seed = role.id.value,
-                        eyebrow = dept,
-                        title = role.name,
-                        endCap = if (role.id in activeRoleIds) "Working" else "Available",
-                        body = role.description,
-                    )
-                }
-            }
-        } else {
-            listOf(
-                "Executive" to listOf("Orchestrator"),
-                "Product" to listOf("Product Manager", "Researcher", "UX Designer"),
-                "Engineering" to listOf("Architect", "EPA Representative", "Implementation Engineer"),
-                "Assurance" to listOf("Crash Test Dummy", "QA Engineer", "Adversarial Reviewer", "Code Reviewer", "Recovery Engineer"),
-                "Delivery" to listOf("Release Engineer"),
-            ).forEach { (department, roles) ->
-                SectionLabel(department)
-                roles.forEach { role ->
-                    AzphaltRecord(
-                        seed = role,
-                        eyebrow = department,
-                        title = role,
-                        endCap = if (role == "Implementation Engineer") "Working" else "Available",
-                        body = when (role) {
-                            "Crash Test Dummy" -> "Author tests · cannot verify or approve"
-                            "EPA Representative" -> "Select environment · cannot implement or verify"
-                            "Implementation Engineer" -> "Implement · cannot certify own work"
-                            else -> "Swarm role"
-                        },
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
 internal fun InboxScreen(
     runtimeState: ApplicationRuntimeState = ApplicationRuntimeState.Loading,
     onApproveTask: (String) -> Unit = {},
@@ -426,7 +251,7 @@ internal fun InboxScreen(
                                     taskRun.artifacts.forEach { artifact ->
                                         val ref = artifact.uri
                                             ?: artifact.textContent?.take(80)?.let { if (artifact.textContent.length > 80) "$it…" else it }
-                                            ?: "stored"
+                                            ?: stringResource(Res.string.runs_artifact_stored)
                                         AzphaltNote(
                                             seed = "inbox-artifact-${artifact.id.value}",
                                             label = "${artifact.kind.name} · ${artifact.label}",
@@ -450,26 +275,9 @@ internal fun InboxScreen(
                     )
                 }
             }
-        } else {
-            DecisionRecord("infra-release", stringResource(Res.string.runs_failure_escalation_2), stringResource(Res.string.runs_infra_release), stringResource(Res.string.runs_release_failed_after_3_attempts), true)
-            DecisionRecord("market-security", stringResource(Res.string.runs_security_risk), stringResource(Res.string.runs_marketplace_security), stringResource(Res.string.runs_expanded_oauth_scope_challenged), true)
-            DecisionRecord("foo-integration", stringResource(Res.string.runs_upcoming), stringResource(Res.string.runs_foo_authentication), stringResource(Res.string.runs_integration_approval_after_independent_review), false)
         }
     }
 }
-
-@Composable
-private fun DecisionRecord(seed: String, kind: String, title: String, body: String, actionable: Boolean) {
-    AzphaltRecord(seed, kind, title, body, if (actionable) "Needs you" else "Later", well = if (actionable) {
-        {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AzphaltPill("Approve", "$seed-approve", onClick = {})
-                AzphaltPill("Reject", "$seed-reject", onClick = {})
-            }
-        }
-    } else null)
-}
-
 
 internal fun workflowEventTaskId(event: WorkflowEvent): TaskDefinitionId? = when (event) {
     is TaskBecameReady -> event.taskDefinitionId
@@ -527,10 +335,11 @@ internal fun workflowEventLabel(event: WorkflowEvent): String = when (event) {
     }
 }
 
+@Composable
 internal fun workflowEventDetail(event: WorkflowEvent): String = when (event) {
     is WorkflowCreated -> event.objective?.take(80) ?: event.workflowRunId.value.takeLast(8)
     is ApprovalRequired -> event.reason.take(80)
-    is ApprovalDecisionReceived -> event.decidedByRoleId?.value ?: "system"
+    is ApprovalDecisionReceived -> event.decidedByRoleId?.value ?: stringResource(Res.string.runs_event_system)
     is ArtifactCreated -> event.artifact.id.value.takeLast(16)
     is VerificationFailed -> event.reason.take(80)
     is RetryScheduled -> event.reason.take(80)
@@ -540,171 +349,8 @@ internal fun workflowEventDetail(event: WorkflowEvent): String = when (event) {
     is HumanDecisionRequired -> event.reason.take(80)
     is ExternalRunCancelFailed -> event.reason.take(80)
     is PolicyDecisionRecorded -> event.reason.take(80)
-    is ExecutorAssigned -> event.executor::class.simpleName ?: "executor"
+    is ExecutorAssigned -> event.executor::class.simpleName ?: stringResource(Res.string.runs_event_executor)
     is AgentAssigned -> event.roleId.value
     is TaskRerunRequested -> event.editedObjective?.take(80) ?: event.fromWorkflowRunId.value.takeLast(8)
     else -> event.workflowRunId.value.takeLast(8)
-}
-
-@Composable
-private fun runStatusEndCap(status: WorkflowRunStatus): String = when (status) {
-    WorkflowRunStatus.Completed -> stringResource(Res.string.runs_done)
-    WorkflowRunStatus.Failed -> stringResource(Res.string.runs_failed)
-    WorkflowRunStatus.Cancelled -> stringResource(Res.string.runs_cancelled)
-    WorkflowRunStatus.Running -> stringResource(Res.string.runs_running)
-    WorkflowRunStatus.AwaitingHuman -> stringResource(Res.string.runs_waiting)
-    WorkflowRunStatus.Created -> stringResource(Res.string.runs_created)
-}
-
-@Composable
-internal fun WorkflowTemplateScreen(
-    runtimeState: ApplicationRuntimeState = ApplicationRuntimeState.Loading,
-    modifier: Modifier = Modifier,
-) {
-    val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
-    val entrance = remember { AzphaltEntrance.roll() }
-    var selectedTaskId by remember { mutableStateOf<String?>(null) }
-    Column(
-        modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text("WORKFLOWS", style = AzphaltType.hero, color = azphaltOnSurface())
-        if (liveWorkflow != null) {
-            val definition = liveWorkflow.definition
-            val concurrency = definition.concurrencyPolicy
-            SectionLabel("Active — ${definition.name}")
-            AzphaltRecord(
-                seed = "workflow-policies",
-                eyebrow = "Policies",
-                title = "Workflow configuration",
-                body = buildString {
-                    append("Integration: ${definition.integrationPolicy.name}")
-                    append(" · Concurrency: ${concurrency.maxConcurrentTasks} max")
-                    if (concurrency.perProviderLimits.isNotEmpty()) {
-                        append(" (")
-                        append(concurrency.perProviderLimits.entries.joinToString(", ") { (pid, n) -> "${pid.value}: $n" })
-                        append(")")
-                    }
-                    append(" · Tests: ${definition.testDesignPolicy.name}")
-                    append(" · Cache: ${definition.promptReusePolicy.name}")
-                },
-                endCap = "${definition.tasks.size} tasks",
-            )
-            SectionLabel("Task graph")
-            definition.tasks.forEachIndexed { index, task ->
-                val taskRun = liveWorkflow.run.taskRuns[task.id]
-                val executor = task.executor
-                val executorLabel = when {
-                    executor != null -> executor.displayName()
-                    task.roleId != null -> task.roleId.value
-                    else -> "Unassigned"
-                }
-                val policyDetail = buildString {
-                    when (val ap = task.approvalPolicy) {
-                        is ApprovalPolicy.None -> Unit
-                        is ApprovalPolicy.RoleApproval -> append("Approval: ${ap.authority.name}")
-                        is ApprovalPolicy.HumanApproval -> append("Approval: Human")
-                    }
-                    if (task.retryPolicy.maxAttempts > 1) {
-                        if (isNotEmpty()) append(" · ")
-                        append("Retry: ${task.retryPolicy.maxAttempts}x")
-                    }
-                    when (val ep = task.escalationPolicy) {
-                        is EscalationPolicy.FailWorkflow -> Unit
-                        is EscalationPolicy.RequireHumanDecision -> {
-                            if (isNotEmpty()) append(" · ")
-                            append("Escalation: Human")
-                        }
-                        is EscalationPolicy.Reassign -> {
-                            if (isNotEmpty()) append(" · ")
-                            append("Escalation: Reassign → ${ep.roleId.value}")
-                        }
-                    }
-                    if (task.dependsOn.isNotEmpty()) {
-                        if (isNotEmpty()) append(" · ")
-                        append("After: ${task.dependsOn.joinToString(", ") { it.value }}")
-                    }
-                }.ifBlank { task.objective.take(60) }
-                val isSelected = selectedTaskId == task.id.value
-                AzphaltRecord(
-                    seed = "task-dag-${task.id.value}",
-                    eyebrow = executorLabel,
-                    title = task.name,
-                    body = policyDetail,
-                    endCap = taskRun?.status?.name ?: "Pending",
-                    selected = isSelected,
-                    onClick = { selectedTaskId = if (isSelected) null else task.id.value },
-                    modifier = Modifier.azphaltEntrance(entrance, index, definition.tasks.size),
-                    well = if (isSelected) {
-                        {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                val executorDetail = when (val ex = task.effectiveExecutor()) {
-                                    is TaskExecutor.RoleAgent -> "Role: ${ex.roleId.value}"
-                                    is TaskExecutor.GitHubAction -> "Workflow: ${ex.workflow}${ex.ref?.let { " @ $it" } ?: ""}"
-                                    is TaskExecutor.Script -> "Script: ${ex.language.name} · " + when (val runner = ex.runner) {
-                                        is com.hereliesaz.geministrator.domain.ScriptRunner.LocalSandbox -> "local sandbox"
-                                        is com.hereliesaz.geministrator.domain.ScriptRunner.GitHubActions -> "GitHub Actions / ${runner.workflow}"
-                                    }
-                                    is TaskExecutor.TestRunner -> "Command: ${ex.command ?: "default"}"
-                                    is TaskExecutor.Deployment -> "Environment: ${ex.environment}"
-                                    is TaskExecutor.RepositoryOperation -> "Operation: ${ex.operation}"
-                                    is TaskExecutor.HumanApproval -> "Label: ${ex.label}"
-                                    is TaskExecutor.ExternalService -> "${ex.service}${ex.operation?.let { " · $it" } ?: ""}"
-                                    is TaskExecutor.NestedWorkflow -> "Workflow: ${ex.workflowDefinitionId.value}"
-                                    is TaskExecutor.Distributed -> "Remote: " + ex.delegate.displayName()
-                                }
-                                AzphaltNote("executor-type-${task.id.value}", "Executor type", executor?.displayName() ?: "Role agent")
-                                AzphaltNote("executor-detail-${task.id.value}", "Executor detail", executorDetail)
-                                when (val pc = task.providerConstraints) {
-                                    is ProviderConstraints.None -> Unit
-                                    is ProviderConstraints.RequireCapabilities -> AzphaltNote("constraints-${task.id.value}", "Provider constraints", pc.capabilities.joinToString(", ") { it.name })
-                                    is ProviderConstraints.RequireProvider -> AzphaltNote("constraints-${task.id.value}", "Pinned provider", pc.providerId.value)
-                                }
-                                if (task.acceptanceCriteria.isNotEmpty()) {
-                                    AzphaltNote("criteria-${task.id.value}", "Acceptance criteria", task.acceptanceCriteria.joinToString("\n") { "· ${it.description}" })
-                                }
-                            }
-                        }
-                    } else null,
-                )
-            }
-        } else {
-            listOf(
-                Triple("Standard Feature", "Product → Architecture → Tests → Implementation → QA → Review → Release", "Default"),
-                Triple("Bug Fix", "Diagnosis → Contract → Fix → Regression → QA → Review", "Template"),
-                Triple("Research Spike", "Product → Research → Architecture → Decision", "Template"),
-            ).forEachIndexed { index, item ->
-                AzphaltRecord(
-                    "workflow-$index",
-                    "Workflow",
-                    item.first,
-                    item.second,
-                    item.third,
-                    modifier = Modifier.azphaltEntrance(entrance, index, 3),
-                )
-            }
-        }
-    }
-}
-
-private data class ArtifactEntry(
-    val id: String,
-    val name: String,
-    val detail: String,
-    val children: List<ArtifactEntry> = emptyList(),
-)
-
-
-@Composable
-private fun SectionLabel(label: String) {
-    Text(label.uppercase(), style = AzphaltType.eyebrow, color = azphaltOnSurface())
-}
-
-private fun RoleDefinition.department(): String = when (id.value) {
-    "orchestrator" -> "Executive"
-    "product-manager", "researcher", "ux-designer" -> "Product"
-    "architect", "epa-representative", "implementation-engineer" -> "Engineering"
-    "crash-test-dummy", "qa-engineer", "adversarial-reviewer", "code-reviewer", "recovery-engineer" -> "Assurance"
-    "release-engineer" -> "Delivery"
-    else -> "Custom"
 }
