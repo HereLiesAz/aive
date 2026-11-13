@@ -5,6 +5,7 @@ import com.hereliesaz.geministrator.classifyError
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
+import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -220,6 +221,67 @@ class KeylessPacer(
     fun record(providerId: String) {
         if (limitOf(providerId) == null) return
         starts.getOrPut(providerId) { ArrayList() }.add(now())
+    }
+
+    /** How long until [providerId] may be given another request: 0 when it has room now, else until its oldest counted request leaves the window. */
+    fun waitMillis(providerId: String): Long {
+        val limit = limitOf(providerId) ?: return 0L
+        val recent = starts[providerId] ?: return 0L
+        val current = now()
+        recent.removeAll { it <= current - limit.windowMillis }
+        if (recent.size < limit.requests) return 0L
+        return recent[recent.size - limit.requests] + limit.windowMillis - current
+    }
+}
+
+/** What a request that must keep a Source's limit does next: go now, wait its turn, or give up because the turn is too far off. */
+sealed interface PaceTurn {
+    data object Go : PaceTurn
+
+    data class Wait(val millis: Long) : PaceTurn
+
+    data object TooLong : PaceTurn
+}
+
+/** The turn for a Source that needs [waitMillis] more, when no more than [remainingMillis] may still be waited. Pure. */
+fun paceTurn(waitMillis: Long, remainingMillis: Long): PaceTurn = when {
+    waitMillis <= 0L -> PaceTurn.Go
+    waitMillis > remainingMillis -> PaceTurn.TooLong
+    else -> PaceTurn.Wait(waitMillis)
+}
+
+/** The longest one queen call waits for a Source's turn: more than a minute, so a Source limited to 2 a minute always has a turn within it. */
+const val QUEEN_PACE_CALL_MILLIS = 90_000L
+
+/** The most a whole dispute waits for Sources' turns in all. Her wait, not the keeper's. */
+const val QUEEN_PACE_TOTAL_MILLIS = 10 * 60_000L
+
+/**
+ * One [KeylessPacer] shared by everyone who calls a Source (the registry's creatures and the queen's own calls), under one [lock]
+ * (the registry's), so their requests are counted together and a Source's limit is kept once, by the same rules.
+ */
+class KeylessPacing(private val pacer: KeylessPacer, private val lock: kotlinx.coroutines.sync.Mutex) {
+    /**
+     * Waits for [providerId]'s turn, then counts the request. Returns the milliseconds waited, or null, having counted nothing,
+     * when the turn is more than [maxWaitMillis] away in all. A Source with no stated limit goes at once. A cancelled wait propagates.
+     */
+    suspend fun await(providerId: String, maxWaitMillis: Long): Long? {
+        var waited = 0L
+        while (true) {
+            val turn = lock.withLock {
+                val decided = paceTurn(pacer.waitMillis(providerId), maxWaitMillis - waited)
+                if (decided is PaceTurn.Go) pacer.record(providerId)
+                decided
+            }
+            when (turn) {
+                PaceTurn.Go -> return waited
+                PaceTurn.TooLong -> return null
+                is PaceTurn.Wait -> {
+                    kotlinx.coroutines.delay(turn.millis)
+                    waited += turn.millis
+                }
+            }
+        }
     }
 }
 

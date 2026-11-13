@@ -59,15 +59,18 @@ class TextGenerationQueenModel(
     override suspend fun answer(prompt: String): String {
         val order = if (pinnedProviderId == null) candidates else candidates.filter { it.id == pinnedProviderId }
         if (order.isEmpty()) error("No linked LLM can answer for the queen")
+        // Inside a dispute the call keeps each Source's request limit (waiting its turn, counted as her wait) and tells the Story of a move.
+        val call = com.hereliesaz.geministrator.queen.currentQueenCallContext()
         var last: Throwable? = null
         for ((index, candidate) in order.withIndex()) {
             try {
+                if (call != null && !call.awaitTurn(candidate.id)) error("${candidate.name} has no turn within the queen's wait")
                 return candidate.api.generate(prompt).text
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Throwable) {
                 last = failure
-                // Pinned: the keeper's choice, it never moves. Automatic: the next Source in the routing order, said in the Story.
+                // Pinned: the keeper's choice, it never moves (it waits its turn, and fails when that is too far off). Automatic: the next Source in the routing order, said in the Story.
                 if (pinnedProviderId != null) throw failure
                 order.getOrNull(index + 1)?.let { next ->
                     reportLaunchProgress("${candidate.name} could not answer for the queen; asking ${next.name}…")
