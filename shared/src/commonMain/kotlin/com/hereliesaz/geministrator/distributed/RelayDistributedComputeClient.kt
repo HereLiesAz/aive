@@ -53,6 +53,8 @@ class RelayDistributedComputeClient(
     private val enrolmentLedger: ComputeNodeEnrolmentLedger = InMemoryComputeNodeEnrolmentLedger(),
     private val nowEpochMillis: () -> Long = ::currentEpochMillis,
     private val json: Json = defaultJson,
+    /** The pool owner's token when the keeper set one; sent only with enrolment. */
+    private val ownerToken: String? = null,
 ) {
     private val sessionMutex = Mutex()
     private var session: DefaultClientWebSocketSession? = null
@@ -92,6 +94,7 @@ class RelayDistributedComputeClient(
         signer = signer,
         nowEpochMillis = nowEpochMillis,
         json = json,
+        ownerToken = ownerToken,
     )
 
     fun start(scope: CoroutineScope) {

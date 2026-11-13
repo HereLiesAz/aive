@@ -42,6 +42,7 @@ internal class DesktopDistributedComputeSession(
         initialNode = node,
         signer = signer,
         enrolmentLedger = SettingsComputeNodeEnrolmentLedger(),
+        ownerToken = System.getenv("AIVE_RELAY_OWNER_TOKEN")?.takeIf(String::isNotBlank),
     )
 
     private val gateway = RelayDistributedComputeGateway(client, node.nodeId)
