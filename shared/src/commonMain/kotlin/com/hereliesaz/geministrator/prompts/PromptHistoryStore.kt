@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.hereliesaz.geministrator.DurableUiState
 import com.hereliesaz.geministrator.DurableUiStateStore
+import com.russhwolf.settings.Settings
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -67,12 +68,39 @@ internal class PromptHistoryStore(
         const val ENABLED_KEY: String = "prompts.v1.enabled"
 
         fun keyOf(kind: PromptKind): String = "prompts.v1.${kind.key}"
+
+        /** Moves remembered text kept with the other interface drafts into [target], once; [legacy] is emptied of it. */
+        internal fun moveLegacyInto(target: DurableUiStateStore, legacy: DurableUiStateStore) {
+            (listOf(ENABLED_KEY) + PromptKind.entries.map { keyOf(it) }).forEach { key ->
+                val old = legacy.getString(key) ?: return@forEach
+                if (target.getString(key) == null) target.putString(key, old)
+                legacy.remove(key)
+            }
+        }
     }
 }
 
 /** The app's one remembered-text store. */
 internal object PromptHistory {
-    val store: PromptHistoryStore by lazy { PromptHistoryStore() }
+    val store: PromptHistoryStore by lazy {
+        val own = RememberedTextSettings.separate
+        if (own == null) {
+            PromptHistoryStore()
+        } else {
+            val target = DurableUiStateStore(own)
+            PromptHistoryStore.moveLegacyInto(target, DurableUiState.store)
+            PromptHistoryStore(target)
+        }
+    }
+}
+
+/**
+ * A platform that can keep remembered text in a settings file of its own sets it here, before the first screen
+ * reads it. Android does, so that its backup rules can leave exactly this text out of backup and device transfer.
+ */
+object RememberedTextSettings {
+    @Volatile
+    var separate: Settings? = null
 }
 
 /** What a screen needs of one kind's history: the entries to suggest from and a way to remember a launch. */

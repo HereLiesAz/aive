@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.net.boundedBytes
 import com.hereliesaz.geministrator.net.boundedBodyText
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactKind
@@ -12,7 +13,6 @@ import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.displayName
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
@@ -228,12 +228,12 @@ class GitHubRestActionsClient(
             if (download.status.value !in 200..299) {
                 error("Unable to download GitHub Actions artifact $artifactId: HTTP ${download.status.value}")
             }
-            return download.body()
+            return download.boundedBytes(ARTIFACT_DOWNLOAD_MAX_BYTES)
         }
         if (response.status.value !in 200..299) {
             error("Unable to download GitHub Actions artifact $artifactId: HTTP ${response.status.value}")
         }
-        return response.body()
+        return response.boundedBytes(ARTIFACT_DOWNLOAD_MAX_BYTES)
     }
 
     override suspend fun cancel(repository: RepositoryRef, runId: String) {
@@ -572,3 +572,6 @@ private fun String.pathSegment(): String {
     require(isNotEmpty() && this != "." && this != "..") { "Invalid GitHub path segment: '$this'" }
     return encodeURLPathPart()
 }
+
+/** The most of a downloaded run artifact that is read; the archive reader's own inflate limit applies after. */
+private const val ARTIFACT_DOWNLOAD_MAX_BYTES: Int = 128 * 1024 * 1024

@@ -151,6 +151,7 @@ import com.hereliesaz.geministrator.resources.settings_compute_pool_id
 import com.hereliesaz.geministrator.resources.settings_connect_as_many_providers_as_you
 import com.hereliesaz.geministrator.resources.settings_connect_this_device_to_the_same
 import com.hereliesaz.geministrator.resources.settings_crash_reports
+import com.hereliesaz.geministrator.resources.settings_crash_reports_waiting
 import com.hereliesaz.geministrator.resources.settings_crash_reports_intro
 import com.hereliesaz.geministrator.resources.settings_credential_configured
 import com.hereliesaz.geministrator.resources.settings_data
@@ -769,6 +770,14 @@ internal fun ProviderSettingsScreen(
                 style = AzphaltType.body,
                 color = azphaltOnSurface(),
             )
+            val waitingReport = remember(setting.enabled) { setting.payloadPreview() }
+            if (waitingReport != null) {
+                Text(
+                    stringResource(Res.string.settings_crash_reports_waiting, waitingReport),
+                    style = AzphaltType.body,
+                    color = azphaltOnSurface(),
+                )
+            }
             AzphaltPill(
                 if (setting.enabled) stringResource(Res.string.settings_automatic_crash_reports_on) else stringResource(Res.string.settings_automatic_crash_reports_off),
                 "crash-reporting-toggle",

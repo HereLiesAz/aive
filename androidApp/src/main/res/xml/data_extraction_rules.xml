@@ -16,6 +16,7 @@
         <exclude domain="file" path="haive/memory" />
         <exclude domain="file" path="haive/orchestration-specialists" />
         <exclude domain="sharedpref" path="aive_azphalt_models.xml" />
+        <exclude domain="sharedpref" path="aive_remembered_text.xml" />
         <exclude domain="file" path="azphalt/models" />
     </cloud-backup>
     <device-transfer>
@@ -28,6 +29,7 @@
         <exclude domain="file" path="haive/memory" />
         <exclude domain="file" path="haive/orchestration-specialists" />
         <exclude domain="sharedpref" path="aive_azphalt_models.xml" />
+        <exclude domain="sharedpref" path="aive_remembered_text.xml" />
         <exclude domain="file" path="azphalt/models" />
     </device-transfer>
 </data-extraction-rules>

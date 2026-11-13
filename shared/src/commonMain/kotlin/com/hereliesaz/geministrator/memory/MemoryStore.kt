@@ -34,6 +34,14 @@ interface MemoryStore {
     suspend fun replaceIfRevision(expectedRevision: Long, snapshot: MemorySnapshot): Boolean
 }
 
+/**
+ * A store holding a connection (a database) that can be released when idle and reopened later from the same
+ * place. Only such a store may be closed by [MemoryBanks]; one that keeps its data in memory must not be.
+ */
+interface ClosableMemoryStore : MemoryStore {
+    fun close()
+}
+
 class InMemoryMemoryStore(
     initial: MemorySnapshot = MemorySnapshot(),
     /** A workflow's own records in a lineage bank: may reference its ancestors' records (see [LineageMemoryStore]). */

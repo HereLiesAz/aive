@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.providers.llm
 
+import com.hereliesaz.geministrator.net.boundedBytes
 import com.hereliesaz.geministrator.azphalt.AZPHALT_STORE_URL
 import com.hereliesaz.geministrator.azphalt.AzphaltRepositoryClient
 import com.hereliesaz.geministrator.azphalt.KmpZipAzphaltArchiveReader
@@ -12,7 +13,6 @@ import com.hereliesaz.geministrator.workflow.TaskExecutorContext
 import com.hereliesaz.geministrator.workflow.TaskExecutorExecution
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegration
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
@@ -281,7 +281,7 @@ class StoreNodeCharacterRigPipelineExecutorIntegration(
         require(response.status.value in 200..299) {
             "Unable to fetch canonical source crop for ${entry.displayName()}: HTTP ${response.status.value}"
         }
-        return response.body()
+        return response.boundedBytes()
     }
 
     private suspend fun packagePayload(op: StoreOperation): Map<String, ByteArray> {

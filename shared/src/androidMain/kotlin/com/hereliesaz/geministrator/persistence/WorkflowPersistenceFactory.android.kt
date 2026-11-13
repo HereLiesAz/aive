@@ -4,6 +4,8 @@ import android.content.Context
 import app.cash.sqldelight.async.coroutines.synchronous
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import com.hereliesaz.geministrator.persistence.db.WorkflowDatabase
+import com.hereliesaz.geministrator.prompts.RememberedTextSettings
+import com.russhwolf.settings.SharedPreferencesSettings
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 
@@ -17,6 +19,12 @@ object AndroidWorkflowPersistence {
 
     fun install(context: Context) {
         this.context = context.applicationContext
+        // Remembered text lives in its own preferences file so the backup rules can leave it out.
+        if (RememberedTextSettings.separate == null) {
+            RememberedTextSettings.separate = SharedPreferencesSettings(
+                this.context!!.getSharedPreferences(REMEMBERED_TEXT_PREFERENCES, Context.MODE_PRIVATE),
+            )
+        }
     }
 
     internal fun open(): DurableWorkflowPersistence {
@@ -35,6 +43,9 @@ object AndroidWorkflowPersistence {
     }
 
     const val DATABASE_NAME: String = "aive-workflows.db"
+
+    /** The preferences file (`aive_remembered_text.xml`) the backup rules exclude. */
+    const val REMEMBERED_TEXT_PREFERENCES: String = "aive_remembered_text"
 }
 
 /** Workflow state in the app's aive-workflows.db; the earlier SharedPreferences store moves in on first use. */

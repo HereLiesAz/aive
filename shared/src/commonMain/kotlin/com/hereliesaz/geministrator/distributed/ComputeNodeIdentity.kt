@@ -220,6 +220,8 @@ class ComputeNodeEnroller(
     private val signer: ComputeNodeSigner,
     private val nowEpochMillis: () -> Long,
     private val json: Json = RelayDistributedComputeClient.defaultJson,
+    /** The pool owner's token, when the keeper set one: sent with the enrolment so an owner can re-enrol a revoked node. */
+    private val ownerToken: String? = null,
 ) {
     suspend fun enrol(nodeId: String, displayName: String): ComputeNodeEnrolmentResponse {
         require(poolToken.isNotBlank()) { "The pool token is required to enrol this device" }
@@ -229,6 +231,7 @@ class ComputeNodeEnroller(
         val request = ComputeNodeAuth.enrolmentRequest(signer, poolId, nodeId, displayName, nowEpochMillis())
         val response = httpClient.post(ComputeNodeAuth.enrolmentUrl(relayBaseUrl, poolId)) {
             header(HttpHeaders.Authorization, "Bearer $poolToken")
+            ownerToken?.takeIf(String::isNotBlank)?.let { header(ComputeNodeAuth.HEADER_OWNER_TOKEN, it) }
             setBody(
                 TextContent(
                     json.encodeToString(ComputeNodeEnrolmentRequest.serializer(), request),

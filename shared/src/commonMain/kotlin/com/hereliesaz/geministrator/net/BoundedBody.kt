@@ -52,6 +52,12 @@ suspend fun HttpResponse.boundedText(maxBytes: Int): String {
     return bodyAsChannel().readAllBounded(maxBytes).decodeToString()
 }
 
+/** The body as raw bytes, never more than [maxBytes] read; throws [ResponseTooLargeException] past that. */
+suspend fun HttpResponse.boundedBytes(maxBytes: Int = DEFAULT_RESPONSE_MAX_BYTES): ByteArray {
+    contentLength()?.let { if (it > maxBytes) throw ResponseTooLargeException(maxBytes.toLong()) }
+    return bodyAsChannel().readAllBounded(maxBytes)
+}
+
 /** Like [boundedText] for an error body that is only quoted: what fits in [maxBytes] is kept, the rest is ignored. */
 suspend fun HttpResponse.boundedTextOrTruncated(maxBytes: Int): String {
     val channel = bodyAsChannel()

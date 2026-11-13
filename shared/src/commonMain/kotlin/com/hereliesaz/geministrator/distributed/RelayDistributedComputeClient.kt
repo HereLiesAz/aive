@@ -53,6 +53,8 @@ class RelayDistributedComputeClient(
     private val enrolmentLedger: ComputeNodeEnrolmentLedger = InMemoryComputeNodeEnrolmentLedger(),
     private val nowEpochMillis: () -> Long = ::currentEpochMillis,
     private val json: Json = defaultJson,
+    /** The pool owner's token when the keeper set one; sent only with enrolment. */
+    private val ownerToken: String? = null,
 ) {
     private val sessionMutex = Mutex()
     private var session: DefaultClientWebSocketSession? = null
@@ -92,6 +94,7 @@ class RelayDistributedComputeClient(
         signer = signer,
         nowEpochMillis = nowEpochMillis,
         json = json,
+        ownerToken = ownerToken,
     )
 
     fun start(scope: CoroutineScope) {
@@ -183,6 +186,22 @@ class RelayDistributedComputeClient(
         require(nodeId != node.nodeId) { "A node cannot revoke itself" }
         send(ComputeRelayClientMessage.RevokeNode(nodeId, ownerToken))
     }
+
+    /**
+     * A lease's progress and result are taken only from the worker that claimed it, where this client saw the
+     * claim. A lease whose claim this client never saw (it connected after the claim) has no worker to compare
+     * with and is taken as the relay reports it.
+     */
+    private fun fromClaimedWorker(leaseId: String, workerNodeId: String): Boolean {
+        val claimed = _leaseStates.value[leaseId]?.workerNodeId ?: return true
+        return claimed == workerNodeId
+    }
+
+    private fun workerMismatch(leaseId: String) = ComputeRelayServerMessage.Error(
+        code = "worker-mismatch",
+        message = "A lease report came from a node other than the one that claimed it and was ignored",
+        leaseId = leaseId,
+    )
 
     /** Enrols this node's key unless the ledger says it already is. Uses the pool token. */
     internal suspend fun ensureEnrolled() {
@@ -292,7 +311,9 @@ class RelayDistributedComputeClient(
                     ),
                 )
             }
-            is ComputeRelayServerMessage.LeaseProgress -> {
+            is ComputeRelayServerMessage.LeaseProgress -> if (!fromClaimedWorker(message.leaseId, message.workerNodeId)) {
+                _errors.emit(workerMismatch(message.leaseId))
+            } else {
                 val phase = when (message.progress.status) {
                     com.hereliesaz.geministrator.domain.TaskRunStatus.Verifying -> DistributedLeasePhase.Verifying
                     else -> DistributedLeasePhase.Running
@@ -309,7 +330,9 @@ class RelayDistributedComputeClient(
                     ),
                 )
             }
-            is ComputeRelayServerMessage.LeaseCompleted -> {
+            is ComputeRelayServerMessage.LeaseCompleted -> if (!fromClaimedWorker(message.leaseId, message.workerNodeId)) {
+                _errors.emit(workerMismatch(message.leaseId))
+            } else {
                 val phase = if (message.result.status == com.hereliesaz.geministrator.domain.TaskRunStatus.Completed) {
                     DistributedLeasePhase.Completed
                 } else {

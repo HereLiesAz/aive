@@ -15,7 +15,6 @@ import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.providers.ProviderArtifact
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.cookies.AcceptAllCookiesStorage
 import io.ktor.client.plugins.cookies.HttpCookies
@@ -372,11 +371,11 @@ private class MoyaiApi(
                     chatEnabled = true,
                 ),
             )
-        }.requireSuccess("start Moyai session").body()
+        }.requireSuccess("start Moyai session").boundedJson<MoyaiRun>()
     }
 
     suspend fun getRun(runId: String): MoyaiRun = withSession {
-        client.get("$baseUrl/api/runs/$runId").requireSuccess("read Moyai session").body()
+        client.get("$baseUrl/api/runs/$runId").requireSuccess("read Moyai session").boundedJson<MoyaiRun>()
     }
 
     suspend fun sendMessage(runId: String, message: String, clientId: String) = withSession {
@@ -414,7 +413,7 @@ private class MoyaiApi(
 
     private suspend fun ensureSession(): String = sessionMutex.withLock {
         csrf?.let { return@withLock it }
-        var session = client.get("$baseUrl/api/session").requireSuccess("read Moyai login session").body<MoyaiSession>()
+        var session = client.get("$baseUrl/api/session").requireSuccess("read Moyai login session").boundedJson<MoyaiSession>()
         if (!session.authenticated) {
             val password = workspacePassword?.trim().orEmpty()
             require(password.isNotEmpty()) {
@@ -425,7 +424,7 @@ private class MoyaiApi(
                 contentType(ContentType.Application.Json)
                 setBody(MoyaiLogin(password))
             }.requireSuccess("sign in to Moyai")
-            session = client.get("$baseUrl/api/session").requireSuccess("confirm Moyai login session").body()
+            session = client.get("$baseUrl/api/session").requireSuccess("confirm Moyai login session").boundedJson<MoyaiSession>()
         }
         require(session.authenticated && session.csrf.isNotBlank()) { "Moyai workspace did not establish an authenticated session" }
         csrf = session.csrf
@@ -447,6 +446,11 @@ private class MoyaiApi(
         error(message)
     }
 }
+
+private val moyaiJson = Json { ignoreUnknownKeys = true; explicitNulls = false }
+
+/** A Moyai JSON reply read up to the default byte cap, then decoded. */
+private suspend inline fun <reified T> HttpResponse.boundedJson(): T = moyaiJson.decodeFromString(boundedBodyText())
 
 private class MoyaiSessionExpired(message: String) : IllegalStateException(message)
 

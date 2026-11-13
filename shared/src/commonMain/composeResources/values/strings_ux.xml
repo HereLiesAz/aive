@@ -79,7 +79,6 @@
     <string name="inspector_hint_approve_plan">Approving lets the agent start making the changes in its plan. It may use your source quota and change the repository.</string>
     <string name="inspector_hint_approve_task">Approving lets this task go ahead. It may use your source quota or change files or services.</string>
     <string name="inspector_hint_approve_nested">Approving lets this step of the sub-swarm continue. It may use your source quota or change files.</string>
-    <string name="semantics_selected">Selected</string>
     <string name="semantics_capillary">%1$s, feeding %2$s</string>
     <string name="semantics_move_node_left">Move left</string>
     <string name="semantics_move_node_right">Move right</string>

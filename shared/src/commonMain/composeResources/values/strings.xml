@@ -37,26 +37,12 @@
     <string name="app_workflow_delegation_failed">Swarm delegation failed</string>
     <string name="app_workflow_launch_failed">Run launch failed</string>
 
-    <string name="artifacts_artifact_id">Artifact ID · %1$s</string>
-    <string name="artifacts_artifacts">ARTIFACTS</string>
-    <string name="artifacts_loading_runtime">Loading runtime…</string>
-    <string name="artifacts_no_artifacts_have_been_produced_by">No artifacts have been produced by this run.</string>
-    <string name="artifacts_no_artifacts_match">No artifacts match "%1$s".</string>
-    <string name="artifacts_no_live_run">No live run.</string>
-    <string name="artifacts_no_project_yet">No project yet.</string>
-    <string name="artifacts_no_workflow_run_yet">No run yet.</string>
-    <string name="artifacts_open">Open</string>
-    <string name="artifacts_persisted_workflow_artifact">Persisted run artifact</string>
-    <string name="artifacts_run_unavailable">Run unavailable: %1$s</string>
-    <string name="artifacts_runtime_disconnected">Runtime disconnected: %1$s</string>
-    <string name="artifacts_search_artifacts">Search artifacts</string>
 
     <string name="common_approve">Approve</string>
     <string name="common_cancel">Cancel</string>
     <string name="common_connect">Connect</string>
     <string name="common_connected">Connected</string>
     <string name="common_off">Off</string>
-    <string name="memory_swarm">Memory swarm</string>
     <string name="memory_swarm_lead">A swarm of its own, running beside every other: it banks what each run learns. Each stage works programmatically, or on a model you choose.</string>
     <string name="keeper_room">Keeper's room</string>
     <string name="keeper_feeds_the_hive">Feeds the hive</string>
@@ -367,7 +353,6 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="provenance_memory_recall">recalled from memory</string>
     <string name="provenance_unknown">unknown origin, treated as external</string>
     <string name="provenance_made_from_external">%1$s, made from external content</string>
-    <string name="inspector_inspector">INSPECTOR</string>
     <string name="inspector_local_sandbox">local sandbox</string>
     <string name="inspector_message">MESSAGE</string>
     <string name="inspector_message_agent">Message agent</string>
@@ -435,7 +420,6 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="district_state_gestating">swarming</string>
     <string name="district_state_hatched">emerged</string>
     <string name="district_state_withered">lost</string>
-    <string name="district_surface">Your hive</string>
     <string name="stable_choose">Your first creature</string>
     <string name="stable_choose_hint">Pick one. It is yours without limit. Every other breed you hatch or buy, one at a time.</string>
     <string name="stable_keep">Keep %1$s</string>
@@ -538,6 +522,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_draft_keep">Keep mine</string>
     <string name="hive_draft_kept">Kept your swarm as it is.</string>
     <string name="keeper_local_agents">Local agents</string>
+    <string name="local_agents_workspace_read_only">Workspace agent: read-only</string>
+    <string name="local_agents_workspace_writes">Workspace agent: can change files</string>
+    <string name="local_agents_workspace_note">The workspace agent reads a linked local repository and plans. Read-only stops it before it writes or commits anything. Tap to switch.</string>
     <string name="keeper_local_agents_lead">The vendors' own command-line tools, run on this computer under your own login.</string>
     <string name="local_agents_note">These run the command-line tools you already have installed and logged in to, so no key is needed for them. Each is off until you turn it on. One only ever runs after you approved a plan, in its own copy of the repository on a new branch, and it is not picked automatically: pin a role to it (Work, Source). It runs as you, on this computer, and the app cannot confine it beyond that.</string>
     <string name="local_agents_found">Found at %1$s %2$s</string>
@@ -729,8 +716,6 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="timeline_view_events">Events</string>
     <string name="timeline_view_memory">Memory</string>
     <string name="timeline_view_log">Log</string>
-    <string name="timeline_view_flowchart">Flowchart</string>
-    <string name="hive_view_creatures">Creatures</string>
     <string name="swarm_activity_show">Show activity</string>
     <string name="swarm_activity_hide">Hide activity</string>
     <string name="swarm_activity_none">This role has not done anything in any run yet.</string>
@@ -1097,7 +1082,6 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="memory_keep_all_raw_history">Keep all raw history</string>
     <string name="memory_keep_it">Keep it</string>
     <string name="memory_memories_condensed_together">Memories condensed together</string>
-    <string name="memory_memory">MEMORY</string>
     <string name="memory_memory_cleared">Memory cleared.</string>
     <string name="memory_memory_is_not_available_in_this">Memory is not available in this build.</string>
     <string name="memory_memory_off">Memory: off</string>
@@ -1271,12 +1255,10 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="overview_project_name">Project name</string>
     <string name="overview_provider_settings">Connections</string>
     <string name="overview_reading_persisted_workflow_state">Reading saved swarm state.</string>
-    <string name="overview_recover_clear_corrupted_data">Recover — clear corrupted data</string>
     <string name="overview_repository_search_unavailable">Search isn't available right now. Paste the repository's address instead.</string>
     <string name="overview_required">Required</string>
     <string name="overview_resume_failed">The swarm stopped</string>
     <string name="overview_retry_runtime">Try again</string>
-    <string name="overview_runtime">Runtime</string>
     <string name="overview_runtime_disconnected">The swarm can't reach its agents</string>
     <string name="overview_runtime_is_advancing_without_human_intervention">Runtime is advancing without human intervention.</string>
     <string name="overview_search_github_repositories_or_paste_url">Search GitHub repositories or paste URL</string>
@@ -1299,9 +1281,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="provider_credential_leave_blank_to_use_the_free">Leave blank to use the free tier</string>
     <string name="provider_credential_save">Save</string>
 
-    <string name="repositories_connect_the_repository_hosts_aive_may">Connect the repository hosts The Aive may operate while swarms run. Project repository links stay separate from AI-source credentials and role routing.</string>
     <string name="repositories_credential_configured">Credential configured</string>
-    <string name="repositories_desktop_repository_service">Desktop repository service</string>
     <string name="repositories_disconnect">Disconnect</string>
     <string name="repositories_get_access_token">Get access token</string>
     <string name="repositories_entire">Entire</string>
@@ -1309,7 +1289,6 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="repositories_entire_not_installed">The entire command isn't installed on this computer.</string>
     <string name="repositories_entire_checking">Looking for the entire command…</string>
     <string name="repositories_entire_signed_in_as">Signed in as %1$s</string>
-    <string name="repositories_entire_not_signed_in">Not signed in</string>
     <string name="repositories_entire_install">Install Entire</string>
     <string name="repositories_entire_log_in">Log in to Entire</string>
     <string name="repositories_entire_logging_in">Finish signing in in your browser…</string>
@@ -1321,15 +1300,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="repositories_entire_clone">Clone</string>
     <string name="repositories_entire_cloning">Cloning…</string>
     <string name="repositories_entire_cloned_to">Cloned to %1$s. Link it to a project from the Hive.</string>
-    <string name="repositories_entire_not_installed_cap">Not installed</string>
-    <string name="repositories_local_git">Local Git</string>
-    <string name="repositories_local_working_trees_are_linked_per">Local working trees are linked per project from the Hive. Desktop validates the selected folder as a Git repository and executes bounded Git operations directly against that working tree.</string>
-    <string name="repositories_no_credential_configured">No credential configured</string>
-    <string name="repositories_no_token">No token</string>
-    <string name="repositories_not_configured">Not configured</string>
     <string name="repositories_reconfigure">Reconfigure</string>
-    <string name="repositories_repository_service">Repository service</string>
-    <string name="repositories_repository_services">REPOSITORY SERVICES</string>
 
     <string name="repository_credential_connect">CONNECT</string>
     <string name="repository_credential_credential">CREDENTIAL</string>
@@ -1405,7 +1376,6 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="runs_retry_scheduled_attempt">Retry scheduled · attempt %1$s</string>
     <string name="runs_run">Run · %1$s</string>
     <string name="runs_running">Running</string>
-    <string name="runs_runs">RUNS</string>
     <string name="runs_security_risk">Security risk</string>
     <string name="runs_stop">Stop</string>
     <string name="runs_task_cancelled">Task cancelled</string>
@@ -1520,6 +1490,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_on_device_small_tasks_no_model">No local model is installed yet. Install a memory stage's local model from the Memory swarm; this takes effect once one is installed.</string>
     <string name="settings_on_device_small_tasks_off">Small tasks on this device: OFF</string>
     <string name="settings_on_device_small_tasks_on">Small tasks on this device: ON</string>
+    <string name="settings_crash_reports_waiting">Waiting to be sent, exactly as it will be sent: %1$s</string>
     <string name="settings_crash_reports_intro">Off unless you turn it on. When enabled, crashes and app-not-responding events are sent automatically to the </string>
     <string name="settings_online"> online</string>
     <string name="settings_online_2">Online</string>
@@ -1569,6 +1540,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_setup_imported">Setup file imported</string>
     <string name="settings_setup_imported_summary">Projects: %1$d · Swarms: %2$d · Roles: %3$d · Settings: %4$d · Source keys: %5$d · Repository accounts: %6$d</string>
     <string name="settings_setup_imported_compute">Compute pool token restored.</string>
+    <string name="settings_setup_held_relay">This file would move Remote access to %1$s. It was not applied.</string>
+    <string name="settings_setup_use_relay">Use the relay %1$s</string>
     <string name="settings_setup_imported_relay">Remote access pairing restored. Turn Remote access on to use it.</string>
     <string name="settings_provider">Source</string>
     <string name="settings_ready">Ready</string>
@@ -1691,7 +1664,6 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="store_approve_publisher_key_change_for_this">Allow this publisher's changed signature</string>
     <string name="store_azphalt">Add-on · %1$s</string>
     <string name="store_azphalt_package_import_is_unavailable_on">Importing add-on files isn't supported on this device.</string>
-    <string name="store_azphalt_store">AZPHALT STORE</string>
     <string name="store_azphalt_store_could_not_be_loaded">The Azphalt Store could not be loaded. Check your connection and try Refresh.</string>
     <string name="store_azphalt_store_search_failed">Search failed. Check your connection and try again.</string>
     <string name="store_change_key">Change key</string>
@@ -1904,7 +1876,6 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="swarm_surface_alias">Surface alias</string>
     <string name="swarm_surface_aliases_must_be_unique_and">Surface aliases must be unique and every attached surface needs a usable source/query/flowchart.</string>
     <string name="swarm_surfaces">\nSurfaces: </string>
-    <string name="swarm_swarm">SWARM</string>
     <string name="swarm_tabular_rows_available_to_scripts_as">Tabular rows available to scripts as aive.surfaces['%1$s'].</string>
     <string name="swarm_test_design">Test design</string>
     <string name="swarm_test_design_policy">Test design policy</string>
@@ -1927,8 +1898,6 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="swarm_filter_none">No role in the swarm fits this filter.</string>
 
     <string name="terrarium_could_not_stage_workflow_edit">Could not stage swarm edit.</string>
-    <string name="terrarium_draft_wiring_staged_now_depends">Draft wiring staged: %1$s now depends on %2$s.</string>
-    <string name="terrarium_reset_zoom">Reset zoom, now %1$s</string>
     <string name="focus_creature">Creature</string>
     <string name="focus_neighbours">Neighbours</string>
     <string name="focus_path_orchestrator">Path to the orchestrator</string>
@@ -2096,7 +2065,6 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="tour_paused_line">Tour paused</string>
     <string name="tour_step_count">Step %1$d of %2$d</string>
     <string name="tour_state_description">Tour step %1$d of %2$d</string>
-    <string name="tour_guide_label">Tour guide</string>
     <string name="tour_reply_yes">Yes, keep going</string>
     <string name="tour_reply_sort_of">Sort of, say it another way</string>
     <string name="tour_reply_lost">Lost me, go slower</string>

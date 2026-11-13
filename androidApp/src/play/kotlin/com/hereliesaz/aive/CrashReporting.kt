@@ -10,4 +10,5 @@ internal object CrashReporting {
     fun setEnabled(context: Context, enabled: Boolean) = Unit
     fun install(context: Context, onFirstReportSent: () -> Unit) = Unit
     fun markFirstReportNoticeShown(context: Context) = Unit
+    fun preview(context: Context): String? = null
 }

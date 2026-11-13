@@ -7,4 +7,6 @@ package com.hereliesaz.geministrator
 data class CrashReportingSetting(
     val enabled: Boolean,
     val onEnabledChange: (Boolean) -> Unit,
+    /** The report waiting to be sent, exactly as it will be sent, or null when none waits. Shown beside the toggle. */
+    val payloadPreview: () -> String? = { null },
 )
