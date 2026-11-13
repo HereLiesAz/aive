@@ -26,8 +26,8 @@ internal data class HallMonitorTrialLaunchRequest(
 )
 
 internal fun hallMonitorTrialLaunchObjective(findingId: String, solutionIndex: Int): String {
-    require(findingId.isNotBlank()) { "Hall Monitor finding id is required" }
-    require(solutionIndex >= 0) { "Hall Monitor solution index must not be negative" }
+    require(findingId.isNotBlank()) { "Nanny finding id is required" }
+    require(solutionIndex >= 0) { "Nanny solution index must not be negative" }
     return "$HALL_MONITOR_TRIAL_LAUNCH_PREFIX$solutionIndex$HALL_MONITOR_TRIAL_LAUNCH_SEPARATOR$findingId"
 }
 
@@ -35,8 +35,8 @@ internal fun parseHallMonitorTrialLaunchObjective(objective: String): HallMonito
     parseHallMonitorTrialRequest(objective, HALL_MONITOR_TRIAL_LAUNCH_PREFIX)
 
 internal fun hallMonitorTrialActionId(findingId: String, solutionIndex: Int): String {
-    require(findingId.isNotBlank()) { "Hall Monitor finding id is required" }
-    require(solutionIndex >= 0) { "Hall Monitor solution index must not be negative" }
+    require(findingId.isNotBlank()) { "Nanny finding id is required" }
+    require(solutionIndex >= 0) { "Nanny solution index must not be negative" }
     return "$HALL_MONITOR_TRIAL_ACTION_PREFIX$solutionIndex$HALL_MONITOR_TRIAL_LAUNCH_SEPARATOR$findingId"
 }
 
@@ -47,17 +47,17 @@ private fun parseHallMonitorTrialRequest(value: String, prefix: String): HallMon
     if (!value.startsWith(prefix)) return null
     val payload = value.removePrefix(prefix)
     val separator = payload.indexOf(HALL_MONITOR_TRIAL_LAUNCH_SEPARATOR)
-    require(separator > 0) { "Malformed Hall Monitor solution trial request" }
+    require(separator > 0) { "Malformed Nanny solution trial request" }
     val solutionIndex = payload.substring(0, separator).toIntOrNull()
-        ?: error("Malformed Hall Monitor solution index")
+        ?: error("Malformed Nanny solution index")
     val findingId = payload.substring(separator + HALL_MONITOR_TRIAL_LAUNCH_SEPARATOR.length)
-    require(findingId.isNotBlank()) { "Malformed Hall Monitor finding id" }
+    require(findingId.isNotBlank()) { "Malformed Nanny finding id" }
     return HallMonitorTrialLaunchRequest(findingId, solutionIndex)
 }
 
 /** Tolerates old fenced Hall Monitor output while new prompts require raw JSON. */
 internal fun decodeHallMonitorReportPayload(raw: String): HallMonitorReport {
-    require(raw.isNotBlank()) { "Hall Monitor report has no machine-readable payload" }
+    require(raw.isNotBlank()) { "Nanny report has no machine-readable payload" }
     val trimmed = raw.trim()
     val normalized = if (trimmed.startsWith("```")) {
         val firstNewline = trimmed.indexOf('\n')
@@ -83,7 +83,7 @@ internal fun decodeHallMonitorReportPayload(raw: String): HallMonitorReport {
             ?.let { return it }
     }
     error(
-        "Hall Monitor report is not machine-readable HallMonitorReport JSON. " +
+        "Nanny report is not machine-readable HallMonitorReport JSON. " +
             "Request a revised report before testing a proposed solution.",
     )
 }

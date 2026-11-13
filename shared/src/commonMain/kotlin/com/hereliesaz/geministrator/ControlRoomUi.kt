@@ -109,7 +109,7 @@ enum class ControlRoomDestination(val label: String) {
     Workflows("Workflows"),
     Company("Roster"),
     Stable("Stable"),
-    Inbox("Inbox"),
+    Inbox("Messages"),
     Compute("Compute"),
     Memory("Memory swarm"),
     AddOns("AZPHALT STORE"),

@@ -222,7 +222,7 @@ object A2aDrifters {
             id = roleIdFor(connection.providerId),
             name = nameOf(card, connection.cardUrl),
             description = buildString {
-                append("A drifter: a remote agent at ").append(host).append(", spoken to over A2A.")
+                append("An orphan: a remote agent at ").append(host).append(", spoken to over A2A.")
                 if (about.isNotEmpty()) append(" Its card says: \"").append(about.replace("\"", "'")).append("\"")
                 if (skills.isNotEmpty()) append(" Skills: ").append(skills.joinToString(", ")).append('.')
             },

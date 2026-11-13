@@ -118,8 +118,8 @@ class ProviderFailoverTest {
         val a = ProviderFailover.failureOf("gemini", "Gemini", "Gemini response was truncated at the token limit")
         val b = ProviderFailover.failureOf("openai", "OpenAI", "OpenAI response was truncated at the output-token limit")
         assertEquals(
-            "The plan was too long for the provider's output limit (tried Gemini, OpenAI). " +
-                "Try a shorter description, or a provider with a larger limit.",
+            "The plan was too long for the source's output limit (tried Gemini, OpenAI). " +
+                "Try a shorter description, or a source with a larger limit.",
             ProviderFailover.allFailedMessage(listOf(a, b)),
         )
         // Mixed failures keep the per-provider wording.

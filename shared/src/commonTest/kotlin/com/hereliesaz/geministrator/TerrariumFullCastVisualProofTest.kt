@@ -31,7 +31,7 @@ class TerrariumFullCastVisualProofTest {
                 "Recovery Engineer",
                 "Release Engineer",
                 "Antagonist",
-                "Hall Monitor",
+                "Nanny",
             ),
             projection.subjects.map { it.node.label }.toSet(),
         )

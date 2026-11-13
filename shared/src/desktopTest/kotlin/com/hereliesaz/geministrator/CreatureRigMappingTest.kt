@@ -50,6 +50,7 @@ class CreatureRigMappingTest {
         "recovery engineer" to "sustainability-advocate",
         "code reviewer" to "migration-engineer",
         "hall monitor" to "disassembled-glossy-slime",
+        "nanny" to "disassembled-glossy-slime",
         "architect" to "architect",
         "data miner" to "data-miner-sheet-3-variant",
         "knowledge keeper" to "knowledge-keeper-sheet-2-variant",

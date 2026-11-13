@@ -44,11 +44,11 @@ data class HallMonitorSolution(
     val validationTests: List<String>,
 ) {
     init {
-        require(title.isNotBlank()) { "Hall Monitor solution title must not be blank" }
-        require(target.isNotBlank()) { "Hall Monitor solution target must not be blank" }
-        require(rationale.isNotBlank()) { "Hall Monitor solution rationale must not be blank" }
-        require(tradeoffs.isNotEmpty()) { "Hall Monitor solution must state at least one tradeoff" }
-        require(validationTests.isNotEmpty()) { "Hall Monitor solution must define validation tests" }
+        require(title.isNotBlank()) { "Nanny solution title must not be blank" }
+        require(target.isNotBlank()) { "Nanny solution target must not be blank" }
+        require(rationale.isNotBlank()) { "Nanny solution rationale must not be blank" }
+        require(tradeoffs.isNotEmpty()) { "Nanny solution must state at least one tradeoff" }
+        require(validationTests.isNotEmpty()) { "Nanny solution must define validation tests" }
     }
 }
 
@@ -64,13 +64,13 @@ data class HallMonitorFinding(
     val solutions: List<HallMonitorSolution>,
 ) {
     init {
-        require(id.isNotBlank()) { "Hall Monitor finding id must not be blank" }
-        require(subject.isNotBlank()) { "Hall Monitor finding subject must not be blank" }
-        require(observation.isNotBlank()) { "Hall Monitor finding observation must not be blank" }
-        require(evidence.isNotEmpty()) { "Hall Monitor finding must include evidence" }
-        require(counterEvidence.isNotEmpty()) { "Hall Monitor finding must include counter-evidence" }
-        require(falsificationCriteria.isNotEmpty()) { "Hall Monitor finding must state falsification criteria" }
-        require(solutions.size >= 2) { "Hall Monitor finding must provide at least two materially distinct solutions" }
+        require(id.isNotBlank()) { "Nanny finding id must not be blank" }
+        require(subject.isNotBlank()) { "Nanny finding subject must not be blank" }
+        require(observation.isNotBlank()) { "Nanny finding observation must not be blank" }
+        require(evidence.isNotEmpty()) { "Nanny finding must include evidence" }
+        require(counterEvidence.isNotEmpty()) { "Nanny finding must include counter-evidence" }
+        require(falsificationCriteria.isNotEmpty()) { "Nanny finding must state falsification criteria" }
+        require(solutions.size >= 2) { "Nanny finding must provide at least two materially distinct solutions" }
     }
 }
 
@@ -85,12 +85,12 @@ data class HallMonitorTestDesign(
     val delegationRoleId: RoleDefinitionId? = null,
 ) {
     init {
-        require(name.isNotBlank()) { "Hall Monitor test name must not be blank" }
-        require(hypothesis.isNotBlank()) { "Hall Monitor test hypothesis must not be blank" }
-        require(fixture.isNotBlank()) { "Hall Monitor test fixture must not be blank" }
-        require(controls.isNotEmpty()) { "Hall Monitor test design must include controls" }
-        require(measurements.isNotEmpty()) { "Hall Monitor test design must include measurements" }
-        require(expectedFailureModes.isNotEmpty()) { "Hall Monitor test design must include expected failure modes" }
+        require(name.isNotBlank()) { "Nanny test name must not be blank" }
+        require(hypothesis.isNotBlank()) { "Nanny test hypothesis must not be blank" }
+        require(fixture.isNotBlank()) { "Nanny test fixture must not be blank" }
+        require(controls.isNotEmpty()) { "Nanny test design must include controls" }
+        require(measurements.isNotEmpty()) { "Nanny test design must include measurements" }
+        require(expectedFailureModes.isNotEmpty()) { "Nanny test design must include expected failure modes" }
     }
 }
 
@@ -106,13 +106,13 @@ data class HallMonitorReport(
     val summary: String,
 ) {
     init {
-        require(reportId.isNotBlank()) { "Hall Monitor report id must not be blank" }
-        require(title.isNotBlank()) { "Hall Monitor report title must not be blank" }
-        require(measuredToEpochMillis >= measuredFromEpochMillis) { "Hall Monitor report measurement window is invalid" }
-        require(findings.isNotEmpty()) { "Hall Monitor report must contain at least one finding" }
-        require(orchestrationTests.isNotEmpty()) { "Hall Monitor report must design orchestration-layer tests" }
-        require(memoryTests.isNotEmpty()) { "Hall Monitor report must design memory-layer tests" }
-        require(summary.isNotBlank()) { "Hall Monitor report summary must not be blank" }
+        require(reportId.isNotBlank()) { "Nanny report id must not be blank" }
+        require(title.isNotBlank()) { "Nanny report title must not be blank" }
+        require(measuredToEpochMillis >= measuredFromEpochMillis) { "Nanny report measurement window is invalid" }
+        require(findings.isNotEmpty()) { "Nanny report must contain at least one finding" }
+        require(orchestrationTests.isNotEmpty()) { "Nanny report must design orchestration-layer tests" }
+        require(memoryTests.isNotEmpty()) { "Nanny report must design memory-layer tests" }
+        require(summary.isNotBlank()) { "Nanny report summary must not be blank" }
     }
 }
 
@@ -132,7 +132,7 @@ data class HallMonitorAntagonistReview(
     val note: String,
 ) {
     init {
-        require(reportId.isNotBlank()) { "Hall Monitor review report id must not be blank" }
+        require(reportId.isNotBlank()) { "Nanny review report id must not be blank" }
         require(evidenceChecked.isNotEmpty()) { "Antagonist review must record evidence it checked" }
         require(note.isNotBlank()) { "Antagonist review note must not be blank" }
     }

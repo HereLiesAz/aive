@@ -427,7 +427,7 @@ class RuntimeControlHost(
     }
 
     override suspend fun draftHive(prompt: String): JsonObject {
-        val draft = drafter() ?: fail(ControlErrorCode.Unavailable, "No planner is linked; connect a provider in the app")
+        val draft = drafter() ?: fail(ControlErrorCode.Unavailable, "No queen is linked; connect a source in the app")
         if (prompt.isBlank()) fail(ControlErrorCode.InvalidArgument, "prompt is required")
         return when (val result = draft(prompt)) {
             is ControlDraftOutcome.Ready -> buildJsonObject {
@@ -460,7 +460,7 @@ class RuntimeControlHost(
         val r = rt()
         val role = roles(r).firstOrNull { it.id.value == roleId } ?: fail(ControlErrorCode.NotFound, "No role $roleId")
         if (providerId != null && AgentProviderId(providerId) !in r.providerRegistry.providerIds) {
-            fail(ControlErrorCode.NotFound, "No linked provider $providerId")
+            fail(ControlErrorCode.NotFound, "No linked source $providerId")
         }
         // The same save the Swarm screen's provider picker uses.
         val saved = role.copy(preferredProviderId = providerId?.let(::AgentProviderId))

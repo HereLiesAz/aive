@@ -40,7 +40,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import kotlin.test.Test
-import kotlin.test.assertTrue
 
 /** Screenshots of the panels added for the keeper's logs, activity, flowchart and data, for checking by eye. */
 class PanelScreenshotTest {
@@ -56,7 +55,7 @@ class PanelScreenshotTest {
             var image = scene.render(900_000_000L)
             for (ms in 1_000..2_000 step 100) image = scene.render(ms * 1_000_000L)
             val bytes = image.encodeToData()!!.bytes
-            assertTrue(bytes.size > 10_000, "$name looks blank")
+            ScreenshotChecks.check(name, bytes, width, height)
             File(out, "$name.png").writeBytes(bytes)
         }
     }

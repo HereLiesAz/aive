@@ -94,6 +94,16 @@ jobs:
           name: unit-test-reports
           path: '**/build/reports/tests/'
 
+      # The screenshot tests save every shot they assert on; keep them so a reviewer can look.
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ui-screenshots
+          path: shared/build/hive-screens/
+          if-no-files-found: ignore
+          retention-days: 14
+
       # Declares this as target-local CI to HereLiesAz/workflows; never fails the run.
       - name: Report CI
         if: always()

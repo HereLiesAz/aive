@@ -47,13 +47,13 @@ class HallMonitorSolutionTrialService(
         nowEpochMillis: Long,
     ): HallMonitorSolutionTrial {
         val pause = requireNotNull(sourceRun.globalPause) {
-            "Workflow ${sourceRun.id.value} is not globally paused for Hall Monitor review"
+            "Workflow ${sourceRun.id.value} is not globally paused for Nanny review"
         }
         require(pause.kind == WorkflowGlobalPauseKind.HallMonitorReview) {
-            "Workflow ${sourceRun.id.value} is paused for ${pause.kind}, not Hall Monitor review"
+            "Workflow ${sourceRun.id.value} is paused for ${pause.kind}, not Nanny review"
         }
-        require(findingId.isNotBlank()) { "Hall Monitor finding id is required" }
-        require(solutionIndex >= 0) { "Hall Monitor solution index must not be negative" }
+        require(findingId.isNotBlank()) { "Nanny finding id is required" }
+        require(solutionIndex >= 0) { "Nanny solution index must not be negative" }
 
         val alreadyRunning = pause.solutionTrials.firstOrNull { trial ->
             trial.findingId == findingId &&
@@ -61,18 +61,18 @@ class HallMonitorSolutionTrialService(
                 persistence.runs.get(trial.workflowRunId)?.status?.isTerminal() == false
         }
         require(alreadyRunning == null) {
-            "Hall Monitor solution '$findingId/$solutionIndex' already has an active trial ${alreadyRunning?.workflowRunId?.value}"
+            "Nanny solution '$findingId/$solutionIndex' already has an active trial ${alreadyRunning?.workflowRunId?.value}"
         }
 
         val reportArtifact = requireNotNull(persistence.artifacts.get(pause.reportArtifactId)) {
-            "Paused Hall Monitor report ${pause.reportArtifactId.value} is missing"
+            "Paused Nanny report ${pause.reportArtifactId.value} is missing"
         }
         val report = decodeHallMonitorReportPayload(reportArtifact.textContent.orEmpty())
         val finding = requireNotNull(report.findings.firstOrNull { it.id == findingId }) {
-            "Hall Monitor report ${report.reportId} has no finding '$findingId'"
+            "Nanny report ${report.reportId} has no finding '$findingId'"
         }
         val solution = requireNotNull(finding.solutions.getOrNull(solutionIndex)) {
-            "Hall Monitor finding '$findingId' has no solution at index $solutionIndex"
+            "Nanny finding '$findingId' has no solution at index $solutionIndex"
         }
 
         val project = requireNotNull(persistence.projects.get(sourceRun.projectId)) {
@@ -83,7 +83,7 @@ class HallMonitorSolutionTrialService(
         }
         val launchRoles = activeRoles(resolveRoleCollection(persistence.roles.all()))
             .filterNot { it.id == HallMonitorRole.id }
-        require(launchRoles.isNotEmpty()) { "No active roles are available to run a Hall Monitor solution trial" }
+        require(launchRoles.isNotEmpty()) { "No active roles are available to run a Nanny solution trial" }
         val launchRoleIds = launchRoles.mapTo(linkedSetOf()) { it.id }
         val comparisonRole = launchRoles.firstOrNull {
             it.id == BuiltInRoles.QaEngineer.id && RoleAuthority.Verify in it.authorities
@@ -92,7 +92,7 @@ class HallMonitorSolutionTrialService(
         } ?: launchRoles.firstOrNull {
             RoleAuthority.ReviewCode in it.authorities
         } ?: error(
-            "Hall Monitor solution testing requires an active independent verification or review role",
+            "Nanny solution testing requires an active independent verification or review role",
         )
 
         val roleTaskIds = sourceDefinition.tasks.mapNotNullTo(linkedSetOf()) { task ->
@@ -116,7 +116,7 @@ class HallMonitorSolutionTrialService(
         val trialId = "hall-monitor-solution-trial:${sourceRun.id.value}:$nowEpochMillis"
         val trialDefinitionId = WorkflowDefinitionId("hall-monitor-trial-$nowEpochMillis")
         val trialRunId = WorkflowRunId("hall-monitor-trial-run-$nowEpochMillis")
-        val experimentObjective = "Test Hall Monitor solution '${solution.title}' against the paused workflow objective: ${sourceRun.objective}"
+        val experimentObjective = "Test Nanny solution '${solution.title}' against the paused workflow objective: ${sourceRun.objective}"
         val packet = OrchestrationPacket(
             objective = experimentObjective,
             currentState = "hall-monitor-solution-test",
@@ -129,7 +129,7 @@ class HallMonitorSolutionTrialService(
                 )
             },
             artifacts = listOf(
-                "Hall Monitor report: ${report.summary}",
+                "Nanny report: ${report.summary}",
                 "Finding ${finding.id}: ${finding.observation}",
                 "Evidence: ${finding.evidence.joinToString { it.claim }}",
                 "Counter-evidence: ${finding.counterEvidence.joinToString { it.claim }}",
@@ -143,7 +143,7 @@ class HallMonitorSolutionTrialService(
             },
             currentPlan = currentPlan,
             instruction = """
-                Build an isolated counterfactual experiment for exactly the selected Hall Monitor solution.
+                Build an isolated counterfactual experiment for exactly the selected Nanny solution.
                 The source workflow is globally paused and MUST remain untouched.
 
                 Use the current plan as the baseline. Preserve a control/baseline path whenever technically
@@ -170,7 +170,7 @@ class HallMonitorSolutionTrialService(
         val plannedTaskIds = planned.tasks.mapTo(linkedSetOf()) { it.id }
         val dependedOn = planned.tasks.flatMapTo(linkedSetOf()) { it.dependsOn }
         val exitTaskIds = plannedTaskIds - dependedOn
-        require(exitTaskIds.isNotEmpty()) { "Hall Monitor solution trial planner produced no terminal experiment task" }
+        require(exitTaskIds.isNotEmpty()) { "Nanny solution trial planner produced no terminal experiment task" }
         val comparisonTaskId = uniqueComparisonTaskId(plannedTaskIds)
         val comparisonCriteria = buildList {
             solution.validationTests.forEach { add(AcceptanceCriterion(it)) }
@@ -185,7 +185,7 @@ class HallMonitorSolutionTrialService(
         }
         val comparisonTask = TaskDefinition(
             id = comparisonTaskId,
-            name = "Compare Hall Monitor trial results",
+            name = "Compare Nanny trial results",
             objective = buildString {
                 append("Independently evaluate the isolated trial for '")
                 append(solution.title)
@@ -199,7 +199,7 @@ class HallMonitorSolutionTrialService(
         )
         val trialDefinition = planned.copy(
             name = "TEST · ${solution.title}".take(80),
-            description = "Isolated Hall Monitor counterfactual for ${sourceRun.id.value}; finding ${finding.id}, solution $solutionIndex.",
+            description = "Isolated Nanny counterfactual for ${sourceRun.id.value}; finding ${finding.id}, solution $solutionIndex.",
             tasks = planned.tasks + comparisonTask,
             integrationPolicy = IntegrationPolicy.Manual,
             // The selected solution carries its own validation contract; avoid injecting unrelated

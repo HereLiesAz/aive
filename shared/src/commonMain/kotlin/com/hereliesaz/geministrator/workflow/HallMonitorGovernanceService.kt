@@ -102,32 +102,32 @@ class HallMonitorGovernanceService(
         require(!run.status.isTerminal()) { "Terminal workflow ${run.id.value} cannot be paused" }
 
         val report = requireNotNull(persistence.artifacts.get(reportArtifactId)) {
-            "Hall Monitor report artifact ${reportArtifactId.value} does not exist"
+            "Nanny report artifact ${reportArtifactId.value} does not exist"
         }
         require(report.kind == ArtifactKind.HallMonitorReport) {
-            "Artifact ${reportArtifactId.value} is not a Hall Monitor report"
+            "Artifact ${reportArtifactId.value} is not a Nanny report"
         }
         val reportTaskRun = requireNotNull(run.taskRuns.values.firstOrNull { it.id == report.taskRunId }) {
-            "Hall Monitor report does not belong to a task in workflow ${run.id.value}"
+            "Nanny report does not belong to a task in workflow ${run.id.value}"
         }
         require(reportTaskRun.assignedRoleId == HallMonitorRole.id) {
-            "Hall Monitor report must be produced by the Hall Monitor role"
+            "Nanny report must be produced by the Nanny role"
         }
         require(reportTaskRun.status == TaskRunStatus.Completed) {
-            "Hall Monitor report task must be completed before review"
+            "Nanny report task must be completed before review"
         }
 
         val review = requireNotNull(persistence.artifacts.get(antagonistReviewArtifactId)) {
             "Antagonist review artifact ${antagonistReviewArtifactId.value} does not exist"
         }
         require(review.kind == ArtifactKind.HallMonitorReview || review.kind == ArtifactKind.Review) {
-            "Artifact ${antagonistReviewArtifactId.value} is not a Hall Monitor review"
+            "Artifact ${antagonistReviewArtifactId.value} is not a Nanny review"
         }
         val reviewTaskRun = requireNotNull(run.taskRuns.values.firstOrNull { it.id == review.taskRunId }) {
             "Antagonist review does not belong to a task in workflow ${run.id.value}"
         }
         require(reviewTaskRun.assignedRoleId == BuiltInRoles.Antagonist.id) {
-            "Hall Monitor report must be reviewed by the Antagonist"
+            "Nanny report must be reviewed by the Antagonist"
         }
         require(reviewTaskRun.status == TaskRunStatus.Completed) {
             "Antagonist review task must be completed before a global pause"
@@ -139,7 +139,7 @@ class HallMonitorGovernanceService(
             "Antagonist review targets report '$reviewedReportId', not '$reportId'"
         }
         require(review.metadata[HALL_MONITOR_REVIEW_VERDICT_METADATA].equals(HALL_MONITOR_REVIEW_PASS, ignoreCase = true)) {
-            "Hall Monitor report must PASS the Antagonist before a global pause can open"
+            "Nanny report must PASS the Antagonist before a global pause can open"
         }
 
         val cancelledTaskIds = mutableSetOf<com.hereliesaz.geministrator.domain.TaskDefinitionId>()
@@ -174,7 +174,7 @@ class HallMonitorGovernanceService(
 
         val orchestratorGateId = ApprovalGateId("hall-monitor:orchestrator:${run.id.value}:$reportId")
         val humanGateId = ApprovalGateId("hall-monitor:human:${run.id.value}:$reportId")
-        val reason = "Hall Monitor report '$reportId' passed Antagonist review and requires Orchestrator and user review."
+        val reason = "Nanny report '$reportId' passed Antagonist review and requires Orchestrator and user review."
 
         val snapshots = run.taskRuns.values
             .filterNot { it.status.isTerminal() }
@@ -192,7 +192,7 @@ class HallMonitorGovernanceService(
             if (taskRun.status.isTerminal()) taskRun else taskRun.copy(
                 status = TaskRunStatus.Blocked,
                 blockingReason = BlockingReason(HALL_MONITOR_GLOBAL_PAUSE_CODE, reason),
-                progressMessage = "Globally paused for Hall Monitor review",
+                progressMessage = "Globally paused for Nanny review",
             )
         }
         val pausedRun = run.copy(
@@ -218,7 +218,7 @@ class HallMonitorGovernanceService(
     suspend fun ensureReviewGates(run: WorkflowRun, nowEpochMillis: Long): ReviewGates {
         val pause = requireNotNull(run.globalPause) { "Workflow ${run.id.value} is not globally paused" }
         require(pause.kind == WorkflowGlobalPauseKind.HallMonitorReview) {
-            "Workflow ${run.id.value} is paused for ${pause.kind}, not Hall Monitor review"
+            "Workflow ${run.id.value} is paused for ${pause.kind}, not Nanny review"
         }
         val orchestrator = gateCoordinator.open(
             id = pause.orchestratorGateId,
@@ -253,7 +253,7 @@ class HallMonitorGovernanceService(
         if (gates.orchestrator.status in setOf(ApprovalGateStatus.Approved, ApprovalGateStatus.Rejected)) return run
 
         val report = requireNotNull(persistence.artifacts.get(pause.reportArtifactId)) {
-            "Paused Hall Monitor report ${pause.reportArtifactId.value} is missing"
+            "Paused Nanny report ${pause.reportArtifactId.value} is missing"
         }
         val antagonistReview = requireNotNull(persistence.artifacts.get(pause.antagonistReviewArtifactId)) {
             "Paused Antagonist review ${pause.antagonistReviewArtifactId.value} is missing"
@@ -263,7 +263,7 @@ class HallMonitorGovernanceService(
         val reviewRequest = AgentTaskRequest(
             taskRunId = taskRunId,
             objective = """
-                Review the attached Hall Monitor report after its Antagonist pass. Judge whether
+                Review the attached Nanny report after its Antagonist pass. Judge whether
                 the evidence and counter-evidence justify escalating its recommendations for user
                 consideration. Do not implement any recommendation. Your FIRST nonblank line must
                 be exactly `VERDICT: APPROVE` or `VERDICT: REJECT`. Then provide concise reasons,
@@ -285,7 +285,7 @@ class HallMonitorGovernanceService(
                     PromptContextBlock("Role", role.instructions),
                 ),
                 dynamicContext = listOf(
-                    PromptContextBlock("Hall Monitor report", report.textContent.orEmpty()),
+                    PromptContextBlock("Nanny report", report.textContent.orEmpty()),
                     PromptContextBlock("Antagonist review", antagonistReview.textContent.orEmpty()),
                 ),
                 cacheNamespace = "${run.id.value}:hall-monitor-orchestrator-review",
@@ -383,7 +383,7 @@ class HallMonitorGovernanceService(
     ): ApprovalGate {
         val pause = requireNotNull(run.globalPause) { "Workflow ${run.id.value} is not globally paused" }
         require(decidedByRoleId == BuiltInRoles.Orchestrator.id) {
-            "Hall Monitor Orchestrator review must be decided by the Orchestrator role"
+            "Nanny Orchestrator review must be decided by the Orchestrator role"
         }
         ensureReviewGates(run, nowEpochMillis)
         return gateCoordinator.decide(
@@ -435,7 +435,7 @@ class HallMonitorGovernanceService(
                     externalRunId = null,
                     blockingReason = null,
                     progress = null,
-                    progressMessage = "Resuming after Hall Monitor global pause",
+                    progressMessage = "Resuming after Nanny global pause",
                 )
             } else {
                 taskRun.copy(

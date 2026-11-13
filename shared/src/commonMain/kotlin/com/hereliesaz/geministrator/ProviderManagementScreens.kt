@@ -682,7 +682,7 @@ internal fun ProviderSettingsScreen(
         if (healthChecking) {
             LaunchedEffect(Unit) {
                 try {
-                    healthResults = settingsActionOrNull("Provider health check") { onCheckProviderHealth() }
+                    healthResults = settingsActionOrNull("Source health check") { onCheckProviderHealth() }
                 } finally {
                     healthChecking = false
                 }

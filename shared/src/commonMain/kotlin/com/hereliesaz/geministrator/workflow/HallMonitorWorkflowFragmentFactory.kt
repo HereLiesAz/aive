@@ -22,7 +22,7 @@ object HallMonitorWorkflowFragmentFactory {
 
         val report = TaskDefinition(
             id = reportId,
-            name = "Hall Monitor efficiency review",
+            name = "Nanny efficiency review",
             objective = """
                 Audit individual model/provider behavior and the orchestration as a whole for efficiency,
                 plateauing, unnecessary spend/context, repeated corrections, routing problems, role overlap,
@@ -43,15 +43,15 @@ object HallMonitorWorkflowFragmentFactory {
 
         val antagonistReview = TaskDefinition(
             id = antagonistReviewId,
-            name = "Antagonist review of Hall Monitor report",
+            name = "Antagonist review of Nanny report",
             objective = """
-                Audit the Hall Monitor report cold. Verify cited evidence, counter-evidence, measurements,
+                Audit the Nanny report cold. Verify cited evidence, counter-evidence, measurements,
                 falsification criteria, proposed alternatives, each solution's executable validation tests,
                 and both test-design sections. Produce a HallMonitorReview artifact. Copy
                 '$HALL_MONITOR_REPORT_ID_METADATA' from the report and set
                 '$HALL_MONITOR_REVIEW_VERDICT_METADATA' to exactly 'pass', 'revise', or 'reject'. Use 'pass'
                 only if the report is sufficiently supported to justify pausing the whole workflow for
-                Orchestrator and user review. Do not soften unsupported Hall Monitor claims.
+                Orchestrator and user review. Do not soften unsupported Nanny claims.
             """.trimIndent(),
             roleId = BuiltInRoles.Antagonist.id,
             dependsOn = setOf(reportId),
@@ -61,7 +61,7 @@ object HallMonitorWorkflowFragmentFactory {
 
         return WorkflowFragment(
             id = WorkflowFragmentId("$idPrefix-governance"),
-            name = "Hall Monitor governance",
+            name = "Nanny governance",
             tasks = listOf(report, antagonistReview),
             entryPoints = setOf(reportId),
             exitPoints = setOf(antagonistReviewId),

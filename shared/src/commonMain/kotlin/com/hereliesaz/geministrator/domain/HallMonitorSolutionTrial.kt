@@ -23,11 +23,11 @@ data class HallMonitorSolutionTrial(
     val createdAtEpochMillis: Long,
 ) {
     init {
-        require(id.isNotBlank()) { "Hall Monitor solution trial id must not be blank" }
-        require(findingId.isNotBlank()) { "Hall Monitor solution trial finding id must not be blank" }
-        require(solutionIndex >= 0) { "Hall Monitor solution index must not be negative" }
-        require(solutionTitle.isNotBlank()) { "Hall Monitor solution title must not be blank" }
-        require(target.isNotBlank()) { "Hall Monitor solution target must not be blank" }
-        require(validationTests.isNotEmpty()) { "Hall Monitor solution trial requires validation tests" }
+        require(id.isNotBlank()) { "Nanny solution trial id must not be blank" }
+        require(findingId.isNotBlank()) { "Nanny solution trial finding id must not be blank" }
+        require(solutionIndex >= 0) { "Nanny solution index must not be negative" }
+        require(solutionTitle.isNotBlank()) { "Nanny solution title must not be blank" }
+        require(target.isNotBlank()) { "Nanny solution target must not be blank" }
+        require(validationTests.isNotEmpty()) { "Nanny solution trial requires validation tests" }
     }
 }

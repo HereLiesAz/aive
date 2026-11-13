@@ -39,7 +39,7 @@ class ProposalMirrorsTest {
         assertEquals("rip-1", qa.sourceRef)
         assertEquals("- Quote the failing command.", qa.newText)
         assertTrue(!qa.meta)
-        assertTrue(first.proposals.single { it.target == "hall-monitor" }.meta, "the Hall Monitor's own instructions are the loop's")
+        assertTrue(first.proposals.single { it.target == "hall-monitor" }.meta, "the Nanny's own instructions are the loop's")
     }
 
     @Test

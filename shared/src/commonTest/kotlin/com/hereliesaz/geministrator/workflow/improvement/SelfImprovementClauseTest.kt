@@ -39,7 +39,7 @@ class SelfImprovementClauseTest {
         val entry = CodingWorkflowSuite.all().single { it.definition.id.value == SelfImprovementLoop.HIVE_ID }
         assertEquals(loop, entry.definition)
         assertNotNull(entry.schedule).also { assertTrue(it.withEvidence, "its objective is fed the swarm's evidence") }
-        assertTrue(loop.tasks.any { it.roleId == HallMonitorRole.id }, "the Hall Monitor is the observer")
+        assertTrue(loop.tasks.any { it.roleId == HallMonitorRole.id }, "the Nanny is the observer")
     }
 
     @Test
@@ -209,7 +209,7 @@ class SelfImprovementClauseTest {
 
         // The step declares another role, but dispatch runs the Hall Monitor.
         val monitorRuns = with(examine.copy(executor = TaskExecutor.RoleAgent(HallMonitorRole.id)))
-        assertTrue(LoopIntegrity.violations(monitorRuns).any { "independently of the Hall Monitor" in it })
+        assertTrue(LoopIntegrity.violations(monitorRuns).any { "independently of the Nanny" in it })
 
         // The challenger runs as the same role as the examiner although the declared ids differ.
         val sameRole = with(challenge.copy(executor = TaskExecutor.RoleAgent(examine.roleId!!)))
@@ -220,7 +220,7 @@ class SelfImprovementClauseTest {
         if (ancestorId != null) {
             val ancestor = loop.tasks.single { it.id == ancestorId }
             val sneaky = with(ancestor.copy(executor = TaskExecutor.RoleAgent(HallMonitorRole.id)))
-            assertTrue(LoopIntegrity.violations(sneaky).any { "independently of the Hall Monitor" in it })
+            assertTrue(LoopIntegrity.violations(sneaky).any { "independently of the Nanny" in it })
         }
     }
 }

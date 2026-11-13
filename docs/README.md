@@ -91,6 +91,8 @@ Memory is organised per workflow run: every run has its own memory bank, continu
 
 [`LOCALIZATION.md`](LOCALIZATION.md) explains how user-facing strings are stored as resources, the key naming convention, how to add a language, and what is intentionally not localized.
 
+[`Vocabulary.md`](Vocabulary.md) maps the words the app shows (Story, Source, Messages, Nanny, Orphan) to the terms the code and the technical docs use (timeline, provider, inbox, Hall Monitor, drifter).
+
 [`VERSIONING.md`](VERSIONING.md) defines the four-part build identity, immutable exact-build tags, patch-grouped GitHub Releases, centralized release/version policy, desktop package-version mapping, and Google Play versionCode rules.
 
 ### Policy decisions

@@ -161,7 +161,7 @@ object ProviderCatalog {
             displayName = "OpenRouter",
             apiKeyUrl = "https://openrouter.ai/settings/keys",
             credentialLabel = "OpenRouter API key",
-            description = "One account for hundreds of models from many providers. Needs an API key.",
+            description = "One account for hundreds of models from many sources. Needs an API key.",
         ),
         ProviderCatalogEntry(
             id = TOGETHER_ID,
@@ -233,7 +233,7 @@ object ProviderCatalog {
             apiKeyUrl = "https://app.kilo.ai/profile",
             credentialLabel = "Kilo API key (optional)",
             description = "Free models. No key needed. Limited to 200 requests an hour per IP address. Free routing may use " +
-                "providers that log prompts, so keep confidential data out.",
+                "sources that log prompts, so keep confidential data out.",
             keyOptional = true,
         ),
         ProviderCatalogEntry(

@@ -904,7 +904,7 @@ private fun StoreLlmRecord(
                         ).joinToString(" at ").ifBlank { it.protocols.joinToString() }
                         Text(
                             if ("moyai-session" in it.protocols) {
-                                "$target. Aive connects to the remote Moyai workspace as an agent provider."
+                                "$target. Aive connects to the remote Moyai workspace as an agent source."
                             } else {
                                 "$target. Aive calls this endpoint directly."
                             },

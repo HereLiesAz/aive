@@ -6,6 +6,8 @@ This policy describes the current source-available builds of **The Aive**, appli
 
 The Aive is a workflow orchestration application. It can store workflow information locally and, when you choose to use an external executor or provider, send the information needed to perform that work to the service you selected.
 
+This policy uses "provider" for the outside service that runs a model or an agent. The app's screens call an AI provider a **source** ([Vocabulary](Vocabulary.md)); where the policy says provider, it means that service.
+
 Android ships in two flavors. The **GitHub release** flavor (APKs published on GitHub Releases) adds optional crash reporting, an optional installed-Gemini bridge, and update checks against GitHub Releases. The **Google Play** flavor contains none of these. Desktop and web builds contain none of them either.
 
 ## Summary

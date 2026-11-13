@@ -116,9 +116,9 @@ Each is a default chosen to keep moving. **Wrong if** says what would show it is
 
 - **Frames are filed by what they are drawn from, not by run.** Wrong if you start a new run with an identical storyboard and style and expect new pictures: you get the old ones back, free. Change a prompt, name the shots in `regenerate-shots`, or delete the film's folder.
 - **Editing one shot's prompt redraws every frame**, because the film's name includes every prompt. Wrong if you edit storyboards a shot at a time and want the other frames kept.
-- **The frame review is a text step.** It is given each shot's prompt and the frame's file location, not its pixels. Wrong if you expect it to find a six-fingered hand: only a provider that opens image files can. Your approval of the film is where eyes land; there, send shots back with `regenerate-shots` in the frames step's objective.
+- **The frame review is a text step.** It is given each shot's prompt and the frame's file location, not its pixels. Wrong if you expect it to find a six-fingered hand: only a source that opens image files can. Your approval of the film is where eyes land; there, send shots back with `regenerate-shots` in the frames step's objective.
 - **The gate is the assemble step, not the review step.** The review is not made to require a Verification artifact, because a failed review could not then record which shots to redraw. Wrong if you want the review step itself to show as failed.
-- **The budget counts every attempt, per workflow run, in memory.** Wrong if a failed call is free with your provider (it overcounts), or you want a daily or per-film cap, or a setting in the app instead of an environment variable.
+- **The budget counts every attempt, per workflow run, in memory.** Wrong if a failed call is free with your source (it overcounts), or you want a daily or per-film cap, or a setting in the app instead of an environment variable.
 - **40 images is lower than the 60 shots allowed.** A film of 41 to 60 shots needs the budget raised first. Wrong if you mean to make long films: raise the default.
 - **Frames are 3:2 and cropped to 16:9.** About a sixth of each picture's height is trimmed. Wrong if you want portrait or a different shape: change `FILM_FRAME_SIZE` and `FfmpegFilmPlan.DEFAULT_*`.
 - **Look: 8 % zoom, half-second crossfade, 25 fps, crf 20, 1280 x 720, silent.** Wrong if you want cuts, no motion, higher resolution or sound. Narration is kept in the storyboard but never drawn, spoken or sent to ffmpeg.
@@ -126,5 +126,5 @@ Each is a default chosen to keep moving. **Wrong if** says what would show it is
 - **The two film steps are registered for this computer only,** beside the test runner and not with the node-character pipeline, because they read and write local files and run ffmpeg. Wrong if you want a pool node to draw the frames: the files would have to travel with it.
 - **Films and frames are not cleaned up.** `~/.aive/film` grows by a few megabytes per frame. Wrong if disk space matters: delete old folders by hand.
 - **No creative roles.** The hive reuses Product Manager, UX Designer and Adversarial Reviewer. Wrong if you want a storyboard artist or an art director: add the roles to your copy of the hive.
-- **OpenAI only.** The frames step uses the image tool the node-character pipeline already uses. Wrong if you want another image provider: implement `FilmImageApi`.
+- **OpenAI only.** The frames step uses the image tool the node-character pipeline already uses. Wrong if you want another image source: implement `FilmImageApi`.
 - **Its own install button.** It is not in the coding suite, since it needs a desktop and spends money. Wrong if you would rather have it appear with the other suites.

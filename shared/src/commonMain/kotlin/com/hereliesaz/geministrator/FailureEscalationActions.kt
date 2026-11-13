@@ -76,7 +76,7 @@ suspend fun ApplicationRuntime.decideFailureEscalation(
     }
     parseHallMonitorTrialActionId(taskDefinitionId.value)?.let {
         error(
-            "Hall Monitor solution testing requires the orchestration model runtime on this platform. " +
+            "Nanny solution testing requires the orchestration model runtime on this platform. " +
                 "The paused workflow and recommendation were not changed.",
         )
     }
