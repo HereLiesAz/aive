@@ -1406,7 +1406,7 @@ class ApplicationRuntime private constructor(
                                 upstreamArtifacts = task.dependsOn.size,
                             ),
                             source = com.hereliesaz.geministrator.workflow.SourceTrait(keyless = provider?.keyless == true),
-                            history = deadlineHistory.samples(kind),
+                            history = deadlineHistory.samples(kind, taskRun.assignedProviderId?.value, task.id.value),
                         )
                     },
                     deadlineSample = { task, taskRun, activeMillis ->
@@ -1414,7 +1414,7 @@ class ApplicationRuntime private constructor(
                         val kind = com.hereliesaz.geministrator.workflow.DeadlinePolicy
                             .kindOf(taskRun.executor ?: task.executor, provider?.workKind)
                         if (com.hereliesaz.geministrator.workflow.DeadlinePolicy.isTimed(kind)) {
-                            deadlineHistory.record(kind, activeMillis)
+                            deadlineHistory.record(kind, activeMillis, taskRun.assignedProviderId?.value, task.id.value)
                         }
                     },
                 )
