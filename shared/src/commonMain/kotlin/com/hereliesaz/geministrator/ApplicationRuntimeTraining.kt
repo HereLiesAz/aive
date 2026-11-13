@@ -87,6 +87,8 @@ internal suspend fun ApplicationRuntime.launchTrainingSwarm(
             parentWorkflowRunIds = listOfNotNull(source.id),
         )
         loadLatest()
+        // The round is driven from here: the ruling, the challenge, the next round or the offer (ApplicationRuntimeTrainingDriver.kt).
+        startTrainingDriver(runId.value)
         runId.value
     } catch (cancelled: kotlinx.coroutines.CancellationException) {
         throw cancelled
@@ -113,6 +115,8 @@ internal suspend fun ApplicationRuntime.adoptTrainedSpecialist(
     domain: String,
     bankLessons: (suspend (RoleDefinitionId, List<String>) -> Boolean)? = null,
 ): AdoptionResult? {
+    // Only a run whose Nanny ruling passed and was offered to the keeper can ever be adopted (a non-pass cancels the offer as well).
+    if (trainingRunId !in trainingOffered) return null
     val run = persistence.runs.get(WorkflowRunId(trainingRunId)) ?: return null
     val lessons = trainingStepText(run, TRAINING_LESSONS_ID)?.let(::parseLessons).orEmpty()
     val adoption = trainingAdoption(parentRoleId, domain, lessons) ?: return null

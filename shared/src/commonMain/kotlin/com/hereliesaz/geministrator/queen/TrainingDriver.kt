@@ -74,3 +74,51 @@ suspend fun exchangeOnRuling(
  */
 fun nextForExchange(exchange: RulingExchange, round: Int, limits: TrainingLimits, findings: List<String>): TrainingNext =
     trainingNext(round, limits, exchange.ruling, exchange.outcome, findings)
+
+// ---------------------------------------------------------------------------------------------------------------------
+// What the driver says and carries once a round is decided.
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** Her note when the keeper approved and she adopted the specialist for [domain]. */
+internal fun trainingAdoptedNote(runId: String, domain: String): QueenNote =
+    QueenNote(queenNoteId(runId, "training", QueenVoice.TrainingAdopted.name), QueenVoice.TrainingAdopted, listOf(queenSlot(domain)), link = QueenLink.Roster)
+
+private const val TRAINING_CARRY_TEXT_MAX = 200
+private const val TRAINING_CARRY_MAX = 4
+
+/**
+ * What a training round found, as rows of the one improvement ledger (source Nanny: she works for the next swarm), the place the
+ * next swarm's planning reads: the ruling's reason and the reviewer's findings. The Nanny's own report findings are carried
+ * by [nannyCarryForward]. Each row is carried once (the same run and finding give the same id). Pure. For a round that has ended.
+ */
+fun trainingCarryForward(
+    runId: String,
+    definitionId: String,
+    domain: String,
+    rulingReason: String?,
+    findings: List<String>,
+    existing: List<com.hereliesaz.geministrator.workflow.improvement.ImprovementProposal>,
+    now: Long,
+): List<com.hereliesaz.geministrator.workflow.improvement.ImprovementProposal> {
+    val lines = (listOfNotNull(rulingReason?.takeIf { it.isNotBlank() }?.let { "Ruling: $it" }) + findings.filter { it.isNotBlank() })
+        .take(TRAINING_CARRY_MAX)
+    return lines.mapIndexedNotNull { index, line ->
+        val id = "nanny:training:$runId:$index"
+        if (existing.any { it.id == id }) return@mapIndexedNotNull null
+        com.hereliesaz.geministrator.workflow.improvement.ImprovementProposal(
+            id = id,
+            cycleRunId = runId,
+            kind = com.hereliesaz.geministrator.workflow.improvement.ImprovementKind.Other,
+            target = queenText(domain, 60),
+            summary = queenText("Training: $line", TRAINING_CARRY_TEXT_MAX),
+            newText = "",
+            expectedEffect = "",
+            undo = "",
+            meta = false,
+            createdAtEpochMillis = now,
+            source = com.hereliesaz.geministrator.workflow.improvement.ImprovementSource.Nanny,
+            sourceRef = definitionId,
+            evidence = queenText("Found while training a specialist for the domain above; carried to the next swarm.", TRAINING_CARRY_TEXT_MAX),
+        )
+    }
+}
