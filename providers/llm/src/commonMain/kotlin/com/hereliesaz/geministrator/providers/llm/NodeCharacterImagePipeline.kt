@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.providers.llm
 
+import com.hereliesaz.geministrator.net.boundedBodyText
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ArtifactRef
@@ -649,7 +650,7 @@ class OpenAiNodeCharacterImageApi(
         if (response.status.value !in 200..299) {
             // A 4xx refusal was not billed; a 5xx (or anything else) may have been.
             if (response.status.value !in 400..499) meter?.recordUnpriced()
-            val body = response.bodyAsText().redactSecrets().take(1_200)
+            val body = response.boundedBodyText().redactSecrets().take(1_200)
             error(
                 "OpenAI node-character request failed: HTTP ${response.status.value}" +
                     body.takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty(),

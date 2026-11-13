@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.providers.llm
 
+import com.hereliesaz.geministrator.net.boundedBodyText
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ArtifactKind
@@ -894,7 +895,7 @@ private fun RepositoryRef.gitLabApiBase(): String {
 }
 
 private suspend fun HttpResponse.requireSuccessBody(operation: String): String {
-    val body = bodyAsText()
+    val body = boundedBodyText()
     if (status.value !in 200..299) {
         error(
             "Unable to $operation: HTTP ${status.value}" +

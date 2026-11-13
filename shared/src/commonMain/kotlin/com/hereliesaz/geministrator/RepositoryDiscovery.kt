@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.net.boundedBodyText
 import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.workflow.RepositoryServiceTokenProvider
 import io.ktor.client.HttpClient
@@ -54,7 +55,7 @@ class RemoteRepositoryDiscoveryClient(
         val login = cachedGithubLogin ?: run {
             val response = httpClient.get("$githubBaseUrl/user") { githubHeaders(token) }
             response.requireSuccess("read GitHub account")
-            json.decodeFromString<GitHubUser>(response.bodyAsText()).login.also { cachedGithubLogin = it }
+            json.decodeFromString<GitHubUser>(response.boundedBodyText()).login.also { cachedGithubLogin = it }
         }
         val ownedResponse = httpClient.get("$githubBaseUrl/user/repos") {
             githubHeaders(token)
@@ -67,7 +68,7 @@ class RemoteRepositoryDiscoveryClient(
             }
         }
         ownedResponse.requireSuccess("list GitHub repositories")
-        val owned = json.decodeFromString<List<GitHubRepository>>(ownedResponse.bodyAsText())
+        val owned = json.decodeFromString<List<GitHubRepository>>(ownedResponse.boundedBodyText())
 
         val trimmed = query.trim()
         val searched = if (trimmed.isEmpty()) {
@@ -83,7 +84,7 @@ class RemoteRepositoryDiscoveryClient(
                 }
             }
             response.requireSuccess("search GitHub repositories")
-            json.decodeFromString<GitHubRepositorySearchResponse>(response.bodyAsText()).items
+            json.decodeFromString<GitHubRepositorySearchResponse>(response.boundedBodyText()).items
         }
 
         val ownIds = owned.mapTo(mutableSetOf()) { it.id }
@@ -124,7 +125,7 @@ class RemoteRepositoryDiscoveryClient(
             }
         }
         ownedResponse.requireSuccess("list GitLab repositories")
-        val owned = json.decodeFromString<List<GitLabProject>>(ownedResponse.bodyAsText())
+        val owned = json.decodeFromString<List<GitLabProject>>(ownedResponse.boundedBodyText())
 
         val trimmed = query.trim()
         val searched = if (trimmed.isEmpty()) {
@@ -141,7 +142,7 @@ class RemoteRepositoryDiscoveryClient(
                 }
             }
             response.requireSuccess("search GitLab repositories")
-            json.decodeFromString<List<GitLabProject>>(response.bodyAsText())
+            json.decodeFromString<List<GitLabProject>>(response.boundedBodyText())
         }
 
         val ownIds = owned.mapTo(mutableSetOf()) { it.id }
@@ -181,7 +182,7 @@ class RemoteRepositoryDiscoveryClient(
 
     private suspend fun HttpResponse.requireSuccess(operation: String) {
         if (status.value in 200..299) return
-        val detail = bodyAsText().take(300)
+        val detail = boundedBodyText().take(300)
         error("Unable to $operation: HTTP ${status.value}${detail.takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty()}")
     }
 }

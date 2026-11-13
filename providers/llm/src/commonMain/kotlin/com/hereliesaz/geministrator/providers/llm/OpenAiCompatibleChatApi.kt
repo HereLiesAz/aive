@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.providers.llm
 
+import com.hereliesaz.geministrator.net.boundedBodyText
 import com.hereliesaz.geministrator.net.HttpStatusFailure
 import com.hereliesaz.geministrator.net.parseRetryAfterMillis
 import com.hereliesaz.geministrator.net.CleartextPolicy
@@ -114,7 +115,7 @@ class OpenAiCompatibleChatApi(
         }
 
         if (response.status.value !in 200..299) {
-            val responseBody = response.bodyAsText().redactSecrets().take(800)
+            val responseBody = response.boundedBodyText().redactSecrets().take(800)
             throw HttpStatusFailure(
                 status = response.status.value,
                 message = "Unable to generate compatible chat response: HTTP ${response.status.value}" +

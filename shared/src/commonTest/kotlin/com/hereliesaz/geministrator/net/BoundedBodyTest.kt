@@ -65,4 +65,16 @@ class BoundedBodyTest {
         val back = buildList { while (true) add(reader.readLine() ?: break) }
         assertEquals(lines, back)
     }
+
+    @Test
+    fun aLineCapStopsALongLineWithoutLimitingALongLivedStream() = runTest {
+        val many = "data: ok\n".repeat(10_000)
+        val reader = BoundedLineReader(ByteReadChannel(many.encodeToByteArray()), Long.MAX_VALUE, maxLineBytes = 64)
+        repeat(10_000) { assertEquals("data: ok", reader.readLine()) }
+        assertNull(reader.readLine())
+        val endless = BoundedLineReader(ByteReadChannel(("x".repeat(500_000) + "\n").encodeToByteArray()), Long.MAX_VALUE, maxLineBytes = 1_000)
+        assertFailsWith<ResponseTooLargeException> { endless.readLine() }
+        val unterminated = BoundedLineReader(ByteReadChannel("x".repeat(5_000).encodeToByteArray()), Long.MAX_VALUE, maxLineBytes = 1_000)
+        assertFailsWith<ResponseTooLargeException> { unterminated.readLine() }
+    }
 }

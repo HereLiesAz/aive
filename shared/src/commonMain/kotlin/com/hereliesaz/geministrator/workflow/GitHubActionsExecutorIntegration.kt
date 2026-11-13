@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.net.boundedBodyText
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ArtifactRef
@@ -227,7 +228,7 @@ class GitHubRestActionsClient(
     }
 
     private suspend fun HttpResponse.requireSuccessBody(operation: String): String {
-        val body = bodyAsText()
+        val body = boundedBodyText()
         if (status.value !in 200..299) {
             error(
                 "Unable to $operation: HTTP ${status.value}${body.take(500).takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty()}",

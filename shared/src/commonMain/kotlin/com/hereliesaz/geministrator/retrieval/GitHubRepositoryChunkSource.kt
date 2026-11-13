@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.retrieval
 
+import com.hereliesaz.geministrator.net.boundedBodyText
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
@@ -102,7 +103,7 @@ class GitHubRepositoryChunkSource(
     }
 
     private suspend fun HttpResponse.requireSuccessBody(operation: String): String {
-        val body = bodyAsText()
+        val body = boundedBodyText()
         if (status.value !in 200..299) error("Unable to $operation: HTTP ${status.value}")
         return body
     }

@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.net.boundedBodyText
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import io.ktor.client.HttpClient
 import io.ktor.client.request.HttpRequestBuilder
@@ -185,7 +186,7 @@ class GitHubRestOpenCodeRunnerClient(
     }
 
     private suspend fun HttpResponse.requireSuccessBody(operation: String): String {
-        val body = bodyAsText()
+        val body = boundedBodyText()
         if (status.value !in 200..299) {
             error(
                 "Unable to $operation: HTTP ${status.value}" +
