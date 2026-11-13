@@ -1212,7 +1212,7 @@ class ApplicationRuntime private constructor(
         queenProposalsReadAt = now
         try {
             val signals = queenSignals(definition, run, roles, queenStalled[run.id.value])
-            val candidates = queenCandidates(definition, run, signals, queenCaps(), roles) +
+            val candidates = queenCandidates(definition, run, signals, queenCaps(), roles, trainingUsage()) +
                 com.hereliesaz.geministrator.queen.wordingCandidates(definition, run, queenWordings[run.id.value].orEmpty())
             launchWordingCheckpoint(definition, run, signals)
             val rows = ledger.state().proposals.filter { it.source == ImprovementSource.Queen }
@@ -1236,6 +1236,21 @@ class ApplicationRuntime private constructor(
             // Her suggestions are a courtesy; the swarm goes on without them.
         }
     }
+
+    /**
+     * Finished uses of each role in earlier runs, by project (the domain), for her training suggestion. Training runs are left out
+     * (the swarm's own creatures are not a domain), and only the newest runs of each project are read.
+     */
+    private suspend fun trainingUsage(): List<com.hereliesaz.geministrator.queen.RoleUse> =
+        persistence.projects.all().flatMap { project ->
+            persistence.runs.byProject(project.id).sortedByDescending { it.updatedAtEpochMillis }.take(100)
+                .filter { r -> r.definitionSnapshot?.let { d -> com.hereliesaz.geministrator.queen.trainingRunInfo(d) } == null }
+                .flatMap { r ->
+                    r.taskRuns.values.filter { it.status == TaskRunStatus.Completed }.mapNotNull { t ->
+                        t.assignedRoleId?.let { com.hereliesaz.geministrator.queen.RoleUse(it.value, r.id.value, project.id.value) }
+                    }
+                }
+        }
 
     /** Minutes each run has stood still (see [com.hereliesaz.geministrator.queen.stalledMinutes]), by run id; read when she speaks. */
     private val queenStalled = LinkedHashMap<String, Int>()
@@ -1469,7 +1484,7 @@ class ApplicationRuntime private constructor(
         } ?: return@withLock QueenAccept.NothingChanged
         val (definition, run) = seen
         if (run.id.value != proposal.cycleRunId ||
-            queenAcceptRefused(proposal, definition, run, roles, queenCandidates(definition, run, queenSignals(definition, run, roles, queenStalled[run.id.value]), queenCaps(), roles))
+            queenAcceptRefused(proposal, definition, run, roles, queenCandidates(definition, run, queenSignals(definition, run, roles, queenStalled[run.id.value]), queenCaps(), roles, trainingUsage()))
         ) return@withLock QueenAccept.NothingChanged
         // Claim the row first (a compare-and-set), so only one tap runs the side effect; give it back if that does not take.
         val now = nowEpochMillis()

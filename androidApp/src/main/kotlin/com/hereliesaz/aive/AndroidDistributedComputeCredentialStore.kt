@@ -84,6 +84,15 @@ internal class AndroidDistributedComputeCredentialStore(
             preferencesName = REMOTE_RELAY_PREFERENCES_NAME,
         )
 
+        /** The pool owner's token (revoke another device, re-enrol a revoked one), in its own Keystore-encrypted file. */
+        fun forRelayOwner(context: Context) = AndroidDistributedComputeCredentialStore(
+            context,
+            keyAlias = "aive.relay-owner.token",
+            preferencesName = RELAY_OWNER_PREFERENCES_NAME,
+        )
+
+        const val RELAY_OWNER_PREFERENCES_NAME = "aive.relay-owner.credentials"
+
         /** Excluded from backup like the other credential files. */
         const val REMOTE_RELAY_PREFERENCES_NAME = "aive.remote-relay.credentials"
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"

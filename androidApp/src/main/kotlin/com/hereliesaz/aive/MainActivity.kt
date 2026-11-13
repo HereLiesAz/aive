@@ -202,6 +202,7 @@ class MainActivity : ComponentActivity() {
         val initialRepositoryCredentials = repositoryCredentialStore.readAll()
         val computeConfigurationStore = SettingsDistributedComputeConfigurationStore()
         val computeCredentialStore = AndroidDistributedComputeCredentialStore(this)
+        val relayOwnerStore = AndroidDistributedComputeCredentialStore.forRelayOwner(this)
         var initialComputeConfiguration = computeConfigurationStore.read()
         if (initialComputeConfiguration.nodeId.isBlank() || initialComputeConfiguration.displayName.isBlank()) {
             initialComputeConfiguration = initialComputeConfiguration.copy(
@@ -251,6 +252,7 @@ class MainActivity : ComponentActivity() {
                 var configuringRepositoryServiceId by remember { mutableStateOf<String?>(null) }
                 var computeConfiguration by remember { mutableStateOf(initialComputeConfiguration) }
                 var computeToken by remember { mutableStateOf(initialComputeToken) }
+                var relayOwnerToken by remember { mutableStateOf(relayOwnerStore.readToken()) }
                 var crashReportingEnabled by remember { mutableStateOf(CrashReporting.isEnabled(this@MainActivity)) }
                 var remoteAccess by remember { mutableStateOf(remoteAccessController.store.snapshot()) }
                 var remoteRelayUrl by remember { mutableStateOf(remoteAccessController.store.relayUrl) }
@@ -399,7 +401,7 @@ class MainActivity : ComponentActivity() {
                             )
                     } ?: imageIntegrations
                 }
-                val computeSession = remember(computeConfiguration, computeToken, baseExecutorIntegrations) {
+                val computeSession = remember(computeConfiguration, computeToken, relayOwnerToken, baseExecutorIntegrations) {
                     val token = computeToken
                     // The node's signing key lives in the Android Keystore; without it there is no session.
                     val signer = if (DISTRIBUTED_COMPUTE_AVAILABLE && computeConfiguration.configured && token != null) {
@@ -415,6 +417,7 @@ class MainActivity : ComponentActivity() {
                             baseIntegrations = baseExecutorIntegrations,
                             supportedExecutorKinds = androidDistributedExecutorKinds(repositoryCredentials),
                             signer = signer,
+                            ownerToken = relayOwnerToken,
                         )
                     } else {
                         null
@@ -635,11 +638,17 @@ class MainActivity : ComponentActivity() {
                             lastError = computeError,
                             enrolledNodes = computeEnrolledNodes,
                             revoked = computeRevoked,
+                            ownerTokenSettable = true,
+                            ownerTokenConfigured = relayOwnerToken != null,
+                            onSaveOwnerToken = { owner ->
+                                relayOwnerStore.writeToken(owner)
+                                relayOwnerToken = relayOwnerStore.readToken()
+                            },
                         ),
                         onRevokeComputeNode = { nodeId ->
                             computeSession?.let { session ->
                                 uiScope.launch {
-                                    runCatching { session.client.revokeNode(nodeId) }
+                                    runCatching { session.client.revokeNode(nodeId, relayOwnerToken) }
                                         .onFailure { computeError = it.message }
                                 }
                             }

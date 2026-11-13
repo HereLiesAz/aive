@@ -220,7 +220,7 @@ class QueenSuggestionsTest {
     fun shapeChangesAreNeverOnTheMenu() {
         // The live menu is these; the four shape changes are only ever kept for next time, and none removes or loosens an approval, skips a step or moves work to a writing Source.
         assertEquals(
-            setOf("RewordStep", "RedoFromStep", "SwapSource", "RaiseBudget", "RaiseAllowance", "Rest"),
+            setOf("RewordStep", "RedoFromStep", "SwapSource", "RaiseBudget", "RaiseAllowance", "Rest", "TrainSpecialist"),
             QueenAction.entries.filterNot { it.keepsForNextTime }.map { it.name }.toSet(),
         )
         assertEquals(

@@ -40,6 +40,8 @@ internal class AndroidDistributedComputeSession(
     private val supportedExecutorKinds: Set<String>,
     /** This device's Keystore-held identity; the pool token only enrols it. */
     signer: ComputeNodeSigner,
+    /** The pool owner's token, when the keeper set one: lets this device re-enrol itself after a revoke. */
+    ownerToken: String? = null,
 ) {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -66,6 +68,7 @@ internal class AndroidDistributedComputeSession(
         initialNode = currentNode,
         signer = signer,
         enrolmentLedger = SettingsComputeNodeEnrolmentLedger(),
+        ownerToken = ownerToken,
     )
 
     private val gateway = RelayDistributedComputeGateway(client, currentNode.nodeId)

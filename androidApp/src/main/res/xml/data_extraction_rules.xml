@@ -11,6 +11,7 @@
         <exclude domain="sharedpref" path="haive.repository.credentials.xml" />
         <exclude domain="sharedpref" path="haive.distributed-compute.credentials.xml" />
         <exclude domain="sharedpref" path="aive.remote-relay.credentials.xml" />
+        <exclude domain="sharedpref" path="aive.relay-owner.credentials.xml" />
         <exclude domain="sharedpref" path="aive.mcp.credentials.xml" />
         <exclude domain="sharedpref" path="aive.remote-relay.settings.xml" />
         <exclude domain="file" path="haive/memory" />
@@ -24,6 +25,7 @@
         <exclude domain="sharedpref" path="haive.repository.credentials.xml" />
         <exclude domain="sharedpref" path="haive.distributed-compute.credentials.xml" />
         <exclude domain="sharedpref" path="aive.remote-relay.credentials.xml" />
+        <exclude domain="sharedpref" path="aive.relay-owner.credentials.xml" />
         <exclude domain="sharedpref" path="aive.mcp.credentials.xml" />
         <exclude domain="sharedpref" path="aive.remote-relay.settings.xml" />
         <exclude domain="file" path="haive/memory" />
