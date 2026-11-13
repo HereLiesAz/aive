@@ -303,6 +303,9 @@ class AgentDirectoryTest {
 
     @Test
     fun registrySkillMatchStillShowsAlreadyConnectedWhenLocalNameDoesNotMatch() = runTest {
+        // The built-in World Bank suggestion's description mentions GDP and would be a second,
+        // legitimate local hit for this query; dismiss the catalog so only this entry is judged.
+        A2aDrifterSeeds.SEEDS.forEach { A2aDrifterSeeds.dismiss(it.cardUrl) }
         val url = "https://economic.example.org/.well-known/agent-card.json"
         val connected = A2aAgentConnections.add(url)
         val directory = AgentDirectory(
