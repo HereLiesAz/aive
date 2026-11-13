@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.azphalt
 
+import com.hereliesaz.geministrator.runCatchingCancellable
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -114,7 +115,7 @@ class AzphaltStoreService(
             page = page,
         )
         // Only language models Aive can call directly (§ Direct use); sandbox-only ones are left out.
-        val llms = runCatching { repository.search(query = query, kinds = setOf("llm"), page = page) }
+        val llms = runCatchingCancellable { repository.search(query = query, kinds = setOf("llm"), page = page) }
             .getOrNull()?.packages.orEmpty()
         val packages = (orchestration.packages + models.packages + llms)
             .filter { it.kind == "workflow" || it.kind == "role" || it.isModelAssetPackage() || it.isDirectLlmPackage() }
@@ -229,7 +230,7 @@ class AzphaltStoreService(
     }
 
     suspend fun prepareLocalModelInstall(bytes: ByteArray): AzphaltPreparedModelInstall {
-        val signingKeys = runCatching { repositoryIndex().signingKeys }.getOrDefault(emptyList())
+        val signingKeys = runCatchingCancellable { repositoryIndex().signingKeys }.getOrDefault(emptyList())
         val verified = verifier.verify(bytes, signingKeys)
         val manifest = verified.packageContents.manifest
         require(manifest.kind == "asset") { "Imported package ${manifest.id} is not a model asset package" }
@@ -240,7 +241,7 @@ class AzphaltStoreService(
         )
         requireTargetsAive(manifest.id, manifest.targetApps)
 
-        val revocationResult = runCatching { revocations() }
+        val revocationResult = runCatchingCancellable { revocations() }
         revocationResult.getOrNull()?.let { known ->
             requireNotRevoked(manifest.id, manifest.version, known)
         }
@@ -496,11 +497,11 @@ class AzphaltStoreService(
      * import remains cryptographically verified but is presented as untrusted for explicit approval.
      */
     suspend fun prepareLocalInstall(bytes: ByteArray): AzphaltPreparedInstall {
-        val signingKeys = runCatching { repositoryIndex().signingKeys }.getOrDefault(emptyList())
+        val signingKeys = runCatchingCancellable { repositoryIndex().signingKeys }.getOrDefault(emptyList())
         val verified = verifier.verify(bytes, signingKeys)
         val manifest = verified.packageContents.manifest
         requireNotDowngrade(manifest.id, installStore.get(manifest.id)?.version, manifest.version)
-        val revocationResult = runCatching { revocations() }
+        val revocationResult = runCatchingCancellable { revocations() }
         revocationResult.getOrNull()?.let { known ->
             requireNotRevoked(manifest.id, manifest.version, known)
         }
@@ -602,7 +603,7 @@ class AzphaltStoreService(
                 )
             }
 
-            val detail = runCatching { repository.detail(dependency.id) }.getOrElse { failure ->
+            val detail = runCatchingCancellable { repository.detail(dependency.id) }.getOrElse { failure ->
                 return@map AzphaltResolvedDependency(
                     dependency = dependency,
                     status = if (dependency.required) AzphaltDependencyStatus.Unavailable else AzphaltDependencyStatus.OptionalNotInstalled,

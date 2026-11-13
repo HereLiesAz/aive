@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.memory
 
+import com.hereliesaz.geministrator.runCatchingCancellable
 import com.hereliesaz.geministrator.net.backoffMillis
 import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.memory.procedural.ProcedureTraceReader
@@ -254,7 +255,7 @@ class MemoryLayerController(
         var sent = 0
         for ((key, envelope) in held.pending()) {
             val workflow = envelope.workflowRunId ?: memoryWorkflowOf(null, envelope.taskRunId, envelope.sourceSessionId)
-            val recovered = runCatching {
+            val recovered = runCatchingCancellable {
                 registerWorkflow(workflow, envelope.projectId)
                 layerFor(workflow).queue.enqueueSession(envelope)
             }.isSuccess
@@ -389,7 +390,7 @@ class MemoryLayerController(
         scope.launch {
             drain()
             // The user's raw-retention setting, if any (the default keeps everything).
-            runCatching { applyRawRetention() }
+            runCatchingCancellable { applyRawRetention() }
         }
     }
 
@@ -723,7 +724,7 @@ class MemoryLayerController(
             val tokenCount = AttentionGatedRecall.approximateTokens(text, APPROXIMATE_CHARS_PER_TOKEN)
             attention.forAgent(agentId).consumeTokens(tokenCount)
             cueMutex.withLock { cueSessions[agentId]?.dwell?.consumeTokens(tokenCount) }
-            val cloud = runCatching { cueCloud(agentId, text) }.getOrNull() ?: return text
+            val cloud = runCatchingCancellable { cueCloud(agentId, text) }.getOrNull() ?: return text
             return "$text\n\n$cloud"
         }
 
@@ -1020,12 +1021,12 @@ class MemoryLayerController(
             recallForPrompt(request, queryPlan)
 
         override suspend fun queryHints(request: AgentTaskRequest): MemoryQueryHints =
-            if (!active) MemoryQueryHints() else runCatching { queryHintsFor(request) }.getOrDefault(MemoryQueryHints())
+            if (!active) MemoryQueryHints() else runCatchingCancellable { queryHintsFor(request) }.getOrDefault(MemoryQueryHints())
 
         override suspend fun feedbackTerms(
             request: AgentTaskRequest,
             queryPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan,
-        ): Map<String, Int> = if (!active) emptyMap() else runCatching { feedbackTermsFor(request, queryPlan) }.getOrDefault(emptyMap())
+        ): Map<String, Int> = if (!active) emptyMap() else runCatchingCancellable { feedbackTermsFor(request, queryPlan) }.getOrDefault(emptyMap())
     }
 
     /** One grip per planned query; each hit keeps its best score and whether a chronological query found it. */
@@ -1139,7 +1140,7 @@ class MemoryLayerController(
         if (objective.isBlank()) return MemoryQueryHints()
         val code = extractCodeSemanticHints(objective)
         // Never wait on loading the language data at task start; the clerks load it in the background.
-        val analysis = MemoryLanguageResources.loadedOrNull()?.let { resources -> runCatching { MemoryTextAnalyzer(resources).analyze(objective) }.getOrNull() }
+        val analysis = MemoryLanguageResources.loadedOrNull()?.let { resources -> runCatchingCancellable { MemoryTextAnalyzer(resources).analyze(objective) }.getOrNull() }
         val entities = analysis?.entities().orEmpty()
             .filter { it.impliedBy == null && !it.negated }
             .map { it.text }
@@ -1216,16 +1217,16 @@ class MemoryLayerController(
             if (firstPrompt) add(PromptContextBlock("Memory protocol", MEMORY_PROTOCOL))
             // A specialist role's lessons are not listed here: they arrive through the cue path (cloud, phrases,
             // summaries by depth) when the work touches them. A first-prompt pointer says so.
-            if (firstPrompt && runCatching { roleLessons(request.orchestrationContext.roleId?.value.orEmpty()) }.getOrNull()?.isNotEmpty() == true) {
+            if (firstPrompt && runCatchingCancellable { roleLessons(request.orchestrationContext.roleId?.value.orEmpty()) }.getOrNull()?.isNotEmpty() == true) {
                 add(PromptContextBlock("Role lessons", ROLE_LESSONS_POINTER))
             }
             // The user's prompt draws its own cue cloud, like any thought.
-            runCatching { cueCloud(request.taskRunId.value, request.objective, request, alongside = true) }.getOrNull()?.let { add(PromptContextBlock("Memory", it)) }
+            runCatchingCancellable { cueCloud(request.taskRunId.value, request.objective, request, alongside = true) }.getOrNull()?.let { add(PromptContextBlock("Memory", it)) }
             if (pending.isNotEmpty()) {
                 add(PromptContextBlock("Recalled on request", untrustedRecall(pending.joinToString("\n\n") { it.removePrefix(MEMORY_MESSAGE_MARKER).trim() }.take(MAX_RECALL_CHARS))))
             }
             // Habits already formed from earlier runs that this task names: counts and facts, offer only.
-            runCatching { habitOfferText(memoryWorkflowOf(request), request.objective) }.getOrNull()
+            runCatchingCancellable { habitOfferText(memoryWorkflowOf(request), request.objective) }.getOrNull()
                 ?.let { add(PromptContextBlock("Habits", it)) }
             if (relevant.isNotEmpty()) {
                 add(
@@ -1280,8 +1281,8 @@ class MemoryLayerController(
         val triggers = cueMutex.withLock { session.watcher }.read(text, isCommon)
 
         suspend fun deliver(message: String) {
-            runCatching { layer.sessionObserver.noteIssued(message) }
-            val accepted = runCatching { reply(message) }.getOrNull() is com.hereliesaz.geministrator.providers.ProviderActionResult.Accepted
+            runCatchingCancellable { layer.sessionObserver.noteIssued(message) }
+            val accepted = runCatchingCancellable { reply(message) }.getOrNull() is com.hereliesaz.geministrator.providers.ProviderActionResult.Accepted
             if (!accepted) cueMutex.withLock {
                 session.pending += message
                 while (session.pending.size > MAX_PENDING_RECALLS) session.pending.removeAt(0)
@@ -1356,7 +1357,7 @@ class MemoryLayerController(
         }
         val tags = "$MEMORY_MESSAGE_MARKER " + cues.joinToString(" ") { MemoryCueWatcher.hashtag(it.node.text) }
         // Key phrases ride after the tags, as "- " lines like any other injection.
-        val phrases = runCatching { cuePhrases(listOfNotNull(workflow, roleBank), cues, gate, agentId) }.getOrDefault(emptyList())
+        val phrases = runCatchingCancellable { cuePhrases(listOfNotNull(workflow, roleBank), cues, gate, agentId) }.getOrDefault(emptyList())
         return if (phrases.isEmpty()) tags else tags + phrases.joinToString("") { "\n- $it" }
     }
 
@@ -1480,7 +1481,7 @@ class MemoryLayerController(
         MemoryRuntimeBridge.promptContextProvider = promptContextProvider
         MemoryRuntimeBridge.procedureTraceSink = procedureTraceSink
         MemoryRuntimeBridge.procedureTraceReader = procedureTraceReader
-        scope.launch { runCatching { recoverCapturedSessions() } }
+        scope.launch { runCatchingCancellable { recoverCapturedSessions() } }
         drainSoon()
     }
 
@@ -1497,7 +1498,7 @@ class MemoryLayerController(
         val backup = legacyBackup
         mutableLegacyBackupOffered.value = backup != null &&
             banks.migrationState.migrationReport() != null &&
-            runCatching { backup.present() }.getOrDefault(false)
+            runCatchingCancellable { backup.present() }.getOrDefault(false)
     }
 
     private companion object {

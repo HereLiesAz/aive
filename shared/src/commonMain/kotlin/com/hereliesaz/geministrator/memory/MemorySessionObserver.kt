@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.memory
 
+import com.hereliesaz.geministrator.runCatchingCancellable
 import com.hereliesaz.geministrator.control.ControlRedaction
 import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.providers.ProviderActionResult
@@ -246,7 +247,7 @@ class QueuedMemorySessionObserver(
         queue.enqueueSession(envelopeOf(handle, capture, fresh + listOfNotNull(terminal), sequence))
         // Only once it is in the queue does the journal let go of it: a failure above keeps it for the restart.
         capture.journaledAt = null
-        runCatching { journal?.record(handle.providerRunId.value, null) }
+        runCatchingCancellable { journal?.record(handle.providerRunId.value, null) }
     }
 
     private fun envelopeOf(
@@ -293,7 +294,7 @@ class QueuedMemorySessionObserver(
             capture.parts.subList(capture.sentParts, capture.parts.size).toList() to capture.sends
         }
         if (fresh.isEmpty()) return
-        runCatching { target.record(handle.providerRunId.value, envelopeOf(handle, capture, fresh, sequence)) }
+        runCatchingCancellable { target.record(handle.providerRunId.value, envelopeOf(handle, capture, fresh, sequence)) }
     }
 }
 

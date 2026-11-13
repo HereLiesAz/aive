@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.orchestration
 
+import com.hereliesaz.geministrator.runCatchingCancellable
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
@@ -312,15 +313,15 @@ class GuardedModelBackedOrchestrationUtilities(
         fallbackValue: O,
         crossinline validate: (O) -> Boolean,
     ): O {
-        val raw = runCatching {
+        val raw = runCatchingCancellable {
             runtime.infer(role, json.encodeToString(input))
         }.getOrNull()?.trim().orEmpty()
         if (raw.isEmpty()) return fallbackValue
 
-        val candidate = runCatching {
+        val candidate = runCatchingCancellable {
             json.decodeFromString<O>(raw)
         }.getOrNull() ?: return fallbackValue
-        return if (runCatching { validate(candidate) }.getOrDefault(false)) candidate else fallbackValue
+        return if (runCatchingCancellable { validate(candidate) }.getOrDefault(false)) candidate else fallbackValue
     }
 
     private fun escalationIsAtLeastAsConservative(

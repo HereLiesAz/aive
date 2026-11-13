@@ -1,5 +1,7 @@
 package com.hereliesaz.geministrator.orchestration
 
+import com.hereliesaz.geministrator.runCatchingCancellable
+
 /**
  * The judgement calls inside the orchestration utilities, asked as typed questions.
  *
@@ -110,11 +112,11 @@ class DecisionInformedOrchestrationUtilities(
 
     /** The confident answer to each question, by option name; unconfident or failed answers are left out. */
     private fun confident(text: String, questions: List<OrchestrationQuestion>): Map<OrchestrationQuestion, String> {
-        val answers = runCatching { model.answer(text, questions) }.getOrNull() ?: return emptyMap()
+        val answers = runCatchingCancellable { model.answer(text, questions) }.getOrNull() ?: return emptyMap()
         return questions.mapNotNull { question ->
             val probabilities = answers[question]?.takeIf { it.size == question.options.size } ?: return@mapNotNull null
             val best = probabilities.indices.maxByOrNull { probabilities[it] } ?: return@mapNotNull null
-            val threshold = maxOf(minConfidence, runCatching { model.minConfidence(question) }.getOrNull() ?: minConfidence)
+            val threshold = maxOf(minConfidence, runCatchingCancellable { model.minConfidence(question) }.getOrNull() ?: minConfidence)
             if (probabilities[best] >= threshold) question to question.options[best] else null
         }.toMap()
     }

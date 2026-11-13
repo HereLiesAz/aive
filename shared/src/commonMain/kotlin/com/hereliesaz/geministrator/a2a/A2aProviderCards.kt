@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.a2a
 
+import com.hereliesaz.geministrator.runCatchingCancellable
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.workflow.AgentProviderRegistry
@@ -139,7 +140,7 @@ suspend fun AgentProviderRegistry.a2aProviderInfos(): List<A2aProviderInfo> =
     providerIds.sortedBy { it.value }.mapNotNull { id ->
         val provider = provider(id) ?: return@mapNotNull null
         val capabilities = withTimeoutOrNull(CAPABILITIES_TIMEOUT_MILLIS) {
-            runCatching { provider.capabilities().supported }.getOrNull()
+            runCatchingCancellable { provider.capabilities().supported }.getOrNull()
         } ?: return@mapNotNull null
         A2aProviderInfo(id = id.value, displayName = displayName(id), capabilities = capabilities)
     }

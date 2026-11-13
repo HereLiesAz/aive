@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.distributed
 
+import com.hereliesaz.geministrator.runCatchingCancellable
 import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.ScriptRunner
@@ -342,7 +343,7 @@ class DistributedComputeWorker(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Throwable) {
-            runCatching {
+            runCatchingCancellable {
                 client.complete(
                     envelope.leaseId,
                     DistributedExecutionResult(
