@@ -2,6 +2,7 @@ name: Android CI
 
 # Runs unit tests on every push/PR and builds the Android debug app.
 # Release publication belongs exclusively to Build and Deploy.
+# Dependency-graph submission lives only in dependency-submission.yml (path-filtered, single-flight).
 # Target-local CI under HereLiesAz/workflows policy: each job ends with the central
 # ci-report action, which registers this workflow `local`, `ci: true`.
 
@@ -92,59 +93,6 @@ jobs:
         with:
           name: unit-test-reports
           path: '**/build/reports/tests/'
-
-      # Declares this as target-local CI to HereLiesAz/workflows; never fails the run.
-      - name: Report CI
-        if: always()
-        uses: HereLiesAz/workflows/.github/actions/ci-report@main
-
-  dependency-submission:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: unit-tests
-    permissions:
-      contents: write
-      id-token: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Check out h2g2
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: HereLiesAz/conveyance-h2g2
-          ref: 8ff45ea2fbf91f8b2fb22a542a87efdf9b856f0c # pinned: README "Bumping the vendor pins"
-          path: vendor/conveyance-h2g2
-
-      - name: Check out Conveyance
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: HereLiesAz/Conveyance
-          ref: 9d9a694c64d0bdfd1d6e9f38a1ad972bb5618ac4 # pinned: README "Bumping the vendor pins"
-          path: vendor/conveyance-h2g2/vendor/Conveyance
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
-        with:
-          cache-read-only: false
-          dependency-graph: disabled
-
-      - name: Replace legacy dependency snapshot with filtered runtime graph
-        uses: gradle/actions/dependency-submission@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
-        with:
-          dependency-graph: generate-and-submit
-          dependency-graph-include-projects: ':androidApp|:desktopApp|:webApp|:shared|:providers:llm'
-          dependency-graph-include-configurations: '.*[Rr]untime.*'
-          dependency-graph-continue-on-failure: false
-          additional-arguments: '-Phaive.useLocalH2g2=false'
-          cache-disabled: true
 
       # Declares this as target-local CI to HereLiesAz/workflows; never fails the run.
       - name: Report CI
