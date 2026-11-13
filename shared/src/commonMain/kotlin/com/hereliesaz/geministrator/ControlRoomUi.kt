@@ -45,6 +45,10 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.produceState
 import com.hereliesaz.geministrator.log.AppLog
+import com.hereliesaz.geministrator.tour.TourOverlayHost
+import com.hereliesaz.geministrator.tour.TourTargetId
+import com.hereliesaz.geministrator.tour.tourEscapeKey
+import com.hereliesaz.geministrator.tour.tourTarget
 import com.hereliesaz.geministrator.log.sessionScope
 import com.hereliesaz.geministrator.workflow.SessionActivityFeeds
 import com.hereliesaz.geministrator.workflow.ProgressiveDelegationStore
@@ -555,6 +559,7 @@ fun ControlRoom(
         modifier = Modifier
             .fillMaxSize()
             .background(ground.page)
+            .tourEscapeKey()
             .padding(contentPadding),
     ) {
         val railLabelled = maxWidth >= ShellRailLabelledFrom
@@ -705,6 +710,9 @@ fun ControlRoom(
         // The once-per-streak offer to stop asking for a non-mutating gate (workflow/ProgressiveDelegation.kt).
         delegations?.let { DelegationOfferDialog(it) }
 
+        // The tutorial layer: draws nothing unless a tour is running (tour/TourOverlay.kt).
+        TourOverlayHost()
+
         // Live keeps the creature's modal sheet; Edit's own sheet is the flipped card's (CardFlipSheetHost above).
         if (inspectorVisible && compact && creatureSheetAllowed(editing = flipHost.editing, flipped = false)) {
             selectedTaskId?.let { taskId ->
@@ -836,8 +844,8 @@ private fun ShellHeader(
                 )
             }
             if (!compact) Breadcrumb(crumbs, Modifier.weight(1f)) else Spacer(Modifier.weight(1f))
-            InboxBadge(unread = unreadInbox, onClick = onOpenInbox)
-            KeeperButton(selected = keeperOpen, onClick = onOpenKeeper)
+            InboxBadge(unread = unreadInbox, onClick = onOpenInbox, modifier = Modifier.tourTarget(TourTargetId.MESSAGES_BUTTON))
+            KeeperButton(selected = keeperOpen, onClick = onOpenKeeper, modifier = Modifier.tourTarget(TourTargetId.KEEPERS_ROOM_GEAR))
         }
         if (compact) Breadcrumb(crumbs, Modifier.fillMaxWidth())
     }

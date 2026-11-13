@@ -2026,4 +2026,21 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_level_quiet_line">What needs you, why a swarm stopped, what the nanny or I noticed, and one note when it finishes.</string>
     <string name="queen_level_helpful">Helpful</string>
     <string name="queen_level_helpful_line">Also one line that keeps up with how far the swarm has got, and a line on what waits for you.</string>
+    <!-- The tutorial overlay's own controls and status lines. Chrome only: lessons are never written here. -->
+    <string name="tour_know_this">I know this</string>
+    <string name="tour_got_it">Got it</string>
+    <string name="tour_back">Back</string>
+    <string name="tour_more">More</string>
+    <string name="tour_less">Less</string>
+    <string name="tour_pause">Pause</string>
+    <string name="tour_resume">Resume</string>
+    <string name="tour_stop">Stop the tour</string>
+    <string name="tour_paused_line">Tour paused</string>
+    <string name="tour_step_count">Step %1$d of %2$d</string>
+    <string name="tour_state_description">Tour step %1$d of %2$d</string>
+    <string name="tour_guide_label">Tour guide</string>
+    <string name="tour_reply_yes">Yes, keep going</string>
+    <string name="tour_reply_sort_of">Sort of, say it another way</string>
+    <string name="tour_reply_lost">Lost me, go slower</string>
+    <string name="tour_reply_show">Show me on the real thing</string>
 </resources>
