@@ -168,6 +168,9 @@ open class TextLlmProvider(
         return ProviderActionResult.Accepted
     }
 
+    // The generation runs inside observe(): collecting it again would bill it again.
+    override val observeDrivesBilledWork: Boolean = true
+
     override fun observe(runId: ProviderRunId): Flow<AgentEvent> = flow {
         val session = mutex.withLock { sessions[runId] }
             ?: error("$displayName session ${runId.value} is not available in this process")

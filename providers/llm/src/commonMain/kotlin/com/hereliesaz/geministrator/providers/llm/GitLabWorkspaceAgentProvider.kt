@@ -202,6 +202,9 @@ class GitLabWorkspaceAgentProvider(
         return ProviderActionResult.Accepted
     }
 
+    // The generation runs inside observe(): collecting it again would bill it again.
+    override val observeDrivesBilledWork: Boolean = true
+
     override fun observe(runId: ProviderRunId): Flow<AgentEvent> = flow {
         val session = session(runId)
         try {

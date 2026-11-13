@@ -241,6 +241,27 @@ class ProviderBackedManagedSessionGatewayTest {
     }
 
     @Test
+    fun anObserverThatDrivesBilledWorkIsNeverCollectedASecondTime() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val provider = BilledObserverProvider()
+        val handle = ManagedSessionHandle(TaskRunId("billed-task"), provider.id, ProviderRunId("billed-run"))
+        try {
+            val gateway = ProviderBackedManagedSessionGateway(
+                AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings()),
+                scope,
+            )
+            gateway.reconnect(handle, ManagedSessionStatus.Running)
+            withTimeout(3_000L) {
+                while (gateway.status(handle) != ManagedSessionStatus.Failed) delay(20L)
+            }
+            delay(1_500L)
+            assertEquals(1, provider.observeCount, "a second collect would run, and bill, the generation again")
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
     fun observerReplayDoesNotDuplicateArtifactsAcrossReconnectAttempts() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val provider = ReplayingArtifactProvider()
@@ -365,6 +386,24 @@ private class RecordingReconnectProvider : AgentProvider {
     }
 
     override fun observe(runId: ProviderRunId): Flow<AgentEvent> = emptyFlow()
+    override suspend fun sendMessage(runId: ProviderRunId, message: String) = ProviderActionResult.Accepted
+    override suspend fun approvePlan(runId: ProviderRunId) = ProviderActionResult.Accepted
+    override suspend fun cancel(runId: ProviderRunId) = ProviderActionResult.Accepted
+}
+
+/** A provider whose observe() is the paid generation itself, and which faults once the work has been billed. */
+private class BilledObserverProvider : AgentProvider {
+    override val id = AgentProviderId("billed-observer")
+    private val observeCounter = MutableStateFlow(0)
+    val observeCount: Int
+        get() = observeCounter.value
+    override val observeDrivesBilledWork: Boolean = true
+    override suspend fun capabilities() = AgentCapabilities(supported = setOf(AgentCapability.RepositoryRead))
+    override suspend fun start(request: AgentTaskRequest) = AgentRunHandle(ProviderRunId("billed-run"))
+    override fun observe(runId: ProviderRunId): Flow<AgentEvent> = flow {
+        observeCounter.value += 1
+        throw IllegalStateException("the result could not be recorded")
+    }
     override suspend fun sendMessage(runId: ProviderRunId, message: String) = ProviderActionResult.Accepted
     override suspend fun approvePlan(runId: ProviderRunId) = ProviderActionResult.Accepted
     override suspend fun cancel(runId: ProviderRunId) = ProviderActionResult.Accepted

@@ -573,11 +573,16 @@ class ProviderBackedManagedSessionGateway(
                 try {
                     provider.observe(handle.providerRunId).collect { event -> applyEvent(handle, event) }
                     consecutiveFailures = 0
+                    if (provider.observeDrivesBilledWork && !handle.isTerminal()) {
+                        // The generation ran and ended without a result event; collecting again would pay for it again.
+                        throw IllegalStateException("The provider's work ended without a result")
+                    }
                     if (!handle.isTerminal()) delay(OBSERVER_RETRY_MILLIS)
                 } catch (failure: CancellationException) {
                     throw failure
                 } catch (failure: Exception) {
-                    consecutiveFailures++
+                    // A billed observer is not retried: its next collect would run the paid work again.
+                    consecutiveFailures = if (provider.observeDrivesBilledWork) MAX_OBSERVER_FAILURES else consecutiveFailures + 1
                     if (consecutiveFailures >= MAX_OBSERVER_FAILURES) {
                         val failed = mutex.withLock {
                             val current = snapshots[handle] ?: return@withLock false
