@@ -71,6 +71,7 @@ import kotlinx.coroutines.withContext
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.app_approval_failed
 import com.hereliesaz.geministrator.resources.app_unreachable
+import com.hereliesaz.geministrator.resources.queen_suggest_nothing_changed
 import com.hereliesaz.geministrator.resources.app_clear_failed
 import com.hereliesaz.geministrator.resources.app_escalation_decision_failed
 import com.hereliesaz.geministrator.resources.app_import_failed
@@ -176,6 +177,8 @@ fun App(
     // The keeper's spend caps (Keeper's room, This device), read by the runtime every cycle.
     val spendCapStore = remember { SpendCapStore(com.russhwolf.settings.Settings()) }
     val queenLevelStore = remember { QueenLevelStore(com.russhwolf.settings.Settings()) }
+    // The one improvement ledger: the queen's suggestions are rows of it, decided in Messages.
+    val improvementStore = remember { SettingsImprovementStore() }
     val deadlineHistory = remember {
         com.hereliesaz.geministrator.workflow.DeadlineHistory(com.russhwolf.settings.Settings())
     }
@@ -222,6 +225,7 @@ fun App(
                 ),
                 spendCaps = { spendCapStore.caps },
                 queenLevel = { queenLevelStore.level },
+                queenLedger = improvementStore,
                 deadlineHistory = deadlineHistory,
                 traceExport = com.hereliesaz.geministrator.telemetry.WorkflowTraceExport.durable,
                 delegations = delegations,
@@ -731,7 +735,6 @@ fun App(
         // hive as drawn, with no planner to ask and nothing approved for anyone. It waits for the active
         // run to finish, says what it decided in the app log, and a hive with an approval waits for the keeper.
         val scheduleStore = remember { SettingsWorkflowScheduleStore() }
-        val improvementStore = remember { SettingsImprovementStore() }
         // A finished self-improvement cycle is read into the keeper's Improvement list, once
         // (docs/architecture/SELF_IMPROVEMENT.md). Reading changes nothing: a proposal is adopted only by the keeper.
         val finishedCycle = (runtimeState as? ApplicationRuntimeState.Live)?.presentation?.run
@@ -944,6 +947,25 @@ fun App(
                                                 "The paused workflow and recommendation were not changed.",
                                         )
                                     activeRuntime.testHallMonitorSolution(findingId, solutionIndex, planner)
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    actionFailure = actionFailureOf(getString(Res.string.app_escalation_decision_failed), failure)
+                                }
+                            }
+                        },
+                        onQueenSuggestion = { proposalId, accept ->
+                            scope.launch {
+                                try {
+                                    val activeRuntime = runtime ?: error("Runtime is unavailable")
+                                    if (accept) {
+                                        // A suggestion that no longer stands, or was already decided, changes nothing and says so.
+                                        if (activeRuntime.acceptQueenSuggestion(proposalId) != ApplicationRuntime.QueenAccept.Applied) {
+                                            actionFailure = ActionFailure(getString(Res.string.queen_suggest_nothing_changed), "")
+                                        }
+                                    } else {
+                                        activeRuntime.dismissQueenSuggestion(proposalId)
+                                    }
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {

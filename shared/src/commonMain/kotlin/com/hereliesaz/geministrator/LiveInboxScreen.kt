@@ -138,6 +138,8 @@ internal fun LiveInboxScreen(
     onNannyReview: (HallMonitorReviewStep, Boolean) -> Unit = { _, _ -> },
     /** Starts an isolated practice run of one of the Nanny's solutions: finding id, solution index. */
     onNannyTestSolution: (String, Int) -> Unit = { _, _ -> },
+    /** The keeper accepts (true) or dismisses (false) one of the queen's suggestions, by its ledger id. */
+    onQueenSuggestion: (String, Boolean) -> Unit = { _, _ -> },
     onOpenStory: (() -> Unit)? = null,
     onOpenRun: (String) -> Unit = {},
     /** Opens Connections: where a Source the queen found missing is connected. */
@@ -157,6 +159,7 @@ internal fun LiveInboxScreen(
                 openCreature = onOpenCreature,
                 nannyReview = onNannyReview,
                 nannyTestSolution = onNannyTestSolution,
+                decideSuggestion = onQueenSuggestion,
                 openStory = onOpenStory,
                 openRun = onOpenRun,
                 openConnections = onOpenConnections,
@@ -201,6 +204,8 @@ internal class MessageActions(
     val openCreature: (taskId: String, tab: CreatureTab) -> Unit = { _, _ -> },
     val nannyReview: (HallMonitorReviewStep, Boolean) -> Unit = { _, _ -> },
     val nannyTestSolution: (String, Int) -> Unit = { _, _ -> },
+    /** The keeper accepts (true) or dismisses (false) one of the queen's suggestions, by its ledger id. */
+    val decideSuggestion: (String, Boolean) -> Unit = { _, _ -> },
     /** Opens the Story (the run's timeline). */
     val openStory: (() -> Unit)? = null,
     /** Opens another run, such as a practice run. */
@@ -296,7 +301,7 @@ internal fun MessagesPage(
                     action = {
                         // Every item the run lists, whether or not it is on screen, is marked seen.
                         InkPagePill(stringResource(Res.string.inbox_mark_all_read)) {
-                            readLog.markRead(inboxItemKeys(presentation.run))
+                            readLog.markRead(inboxItemKeys(presentation.run) + queenSuggestionKeys(presentation))
                         }
                     },
                 )

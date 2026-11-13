@@ -156,8 +156,10 @@ internal fun ImprovementPart(
             )
         }
         message?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface(), modifier = Modifier.azphaltLiveRegion()) }
-        if (state.proposals.isEmpty()) Text(stringResource(Res.string.improvement_none), style = AzphaltType.body, color = azphaltOnSurface())
-        state.proposals.sortedByDescending { it.createdAtEpochMillis }.forEach { proposal ->
+        // The queen's suggestions are per run and decided in Messages, not here.
+        val listed = state.proposals.filter { it.source != ImprovementSource.Queen }
+        if (listed.isEmpty()) Text(stringResource(Res.string.improvement_none), style = AzphaltType.body, color = azphaltOnSurface())
+        listed.sortedByDescending { it.createdAtEpochMillis }.forEach { proposal ->
             ProposalCard(
                 proposal = proposal,
                 hives = authored,
@@ -280,6 +282,7 @@ private fun ProposalCard(
             ImprovementSource.Loop -> Res.string.improvement_source_loop
             ImprovementSource.RoleHistory -> Res.string.improvement_source_role
             ImprovementSource.Habit -> Res.string.improvement_source_habit
+            ImprovementSource.Queen -> Res.string.improvement_source_queen
         },
     )
     // A hive-step proposal replaces a step's whole objective: show what it replaces, and what it would break in the loop.

@@ -25,7 +25,7 @@ private const val MAX_PRACTICE_NOTES = 3
 /** Where the Nanny's report has got, read from the run alone. */
 enum class NannyPhase { None, Checking, AwaitingReview, SentBack, Rejected, Frozen }
 
-private fun hasNanny(definition: WorkflowDefinition, run: WorkflowRun): Boolean =
+internal fun hasNanny(definition: WorkflowDefinition, run: WorkflowRun): Boolean =
     definition.tasks.any { it.roleId == HallMonitorRole.id } || run.taskRuns.values.any { it.assignedRoleId == HallMonitorRole.id }
 
 private fun latestReport(run: WorkflowRun): ArtifactRef? = run.taskRuns.values

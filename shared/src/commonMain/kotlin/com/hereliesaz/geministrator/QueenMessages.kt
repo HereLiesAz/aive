@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.HallMonitorAction
@@ -71,6 +73,13 @@ private fun voiceResource(voice: QueenVoice): StringResource = when (voice) {
         QueenVoice.DisputeTesting -> Res.string.queen_say_dispute_testing
         QueenVoice.DisputeStillUnsure -> Res.string.queen_say_dispute_still_unsure
         QueenVoice.DisputeCannotInvestigate -> Res.string.queen_say_dispute_cannot_investigate
+        // Mid-run suggestions.
+        QueenVoice.SuggestRedoStep -> Res.string.queen_say_suggest_redo_step
+        QueenVoice.SuggestSwapSource -> Res.string.queen_say_suggest_swap_source
+        QueenVoice.SuggestRaiseBudget -> Res.string.queen_say_suggest_raise_budget
+        QueenVoice.SuggestRaiseAllowance -> Res.string.queen_say_suggest_raise_allowance
+        QueenVoice.SuggestRestNanny -> Res.string.queen_say_suggest_rest_nanny
+        QueenVoice.SuggestRewordStep -> Res.string.queen_say_suggest_reword_step
 }
 
 @Composable
@@ -109,7 +118,7 @@ internal fun queenSentence(note: QueenNote): String {
 /** The heading of a row of the queen's own. */
 @Composable
 internal fun queenTitle(note: QueenNote): String = stringResource(
-    when (note.voice) {
+    if (note.suggestion != null) Res.string.queen_title_suggestion else when (note.voice) {
         QueenVoice.StatusWorking, QueenVoice.StatusWorkingClear, QueenVoice.StatusIdle, QueenVoice.StatusIdleClear -> Res.string.queen_title_status
         QueenVoice.FinishedAll, QueenVoice.FinishedAllCost, QueenVoice.FinishedFailed,
         QueenVoice.FinishedFailedNoStep, QueenVoice.FinishedStopped -> Res.string.queen_title_finish
@@ -147,6 +156,21 @@ internal fun QueenSays(
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // The suggestion waiting for the keeper's yes to a step that redoes work (or rests on outside content).
+    val confirming = remember { mutableStateOf<QueenNote?>(null) }
+    confirming.value?.let { note ->
+        AzphaltAlertDialog(
+            title = stringResource(Res.string.queen_suggest_confirm_title),
+            text = stringResource(Res.string.queen_suggest_confirm_body),
+            confirmLabel = stringResource(Res.string.queen_suggest_accept),
+            onConfirm = {
+                confirming.value = null
+                note.suggestion?.let { actions.decideSuggestion(it.proposalId, true) }
+            },
+            onDismissRequest = { confirming.value = null },
+            dismissLabel = stringResource(Res.string.confirm_cancel),
+        )
+    }
     if (notes.isEmpty()) return
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         notes.forEach { note ->
@@ -161,6 +185,7 @@ internal fun QueenSays(
                             QueenQuoteLabel.QueenApproach -> Res.string.queen_quote_queen_approach
                             QueenQuoteLabel.Objection -> Res.string.queen_quote_objection
                             QueenQuoteLabel.StillMissing -> Res.string.queen_quote_still_missing
+                            QueenQuoteLabel.QueenWording -> Res.string.queen_quote_queen_wording
                         },
                     ),
                     style = AzphaltType.eyebrow,
@@ -182,6 +207,23 @@ internal fun QueenSays(
             }
             if (showLink && label != null && go != null) {
                 AzphaltPill(label, "queen-link-${note.id}", onClick = go)
+            }
+            val suggestion = note.suggestion
+            if (suggestion != null) {
+                if (note.outside) {
+                    Text(stringResource(Res.string.queen_suggest_outside), style = AzphaltType.eyebrow, color = azphaltMutedOnSurface())
+                }
+                // A suggestion she applies herself has a button for it; one that only leads somewhere has its link.
+                if (suggestion.action.appliesHere) {
+                    AzphaltPill(
+                        stringResource(Res.string.queen_suggest_accept), "queen-accept-${note.id}",
+                        onClick = { if (suggestion.confirm) confirming.value = note else actions.decideSuggestion(suggestion.proposalId, true) },
+                    )
+                }
+                AzphaltPill(
+                    stringResource(Res.string.queen_suggest_dismiss), "queen-dismiss-${note.id}",
+                    onClick = { actions.decideSuggestion(suggestion.proposalId, false) },
+                )
             }
         }
         Spacer(Modifier.height(4.dp))
