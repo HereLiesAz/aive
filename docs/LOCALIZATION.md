@@ -36,7 +36,7 @@ Rules:
 - Catalog display names that are data (`ProviderCatalog`, `RepositoryServiceCatalog`, Azphalt package metadata), the theme ground names (`Mustard`, `Navy`, ...; also used as a persisted key), and the app name `The Aive` in the desktop window title.
 - Enum labels (`ControlRoomDestination`, store/library filters, `LaunchLineageMode`), mascot activity labels (covered by exact-text unit tests), and status messages set from plain click handlers (e.g. "Loaded …", validation messages in MindMap/RunLineage launch forms). These still need a follow-up to move to resources.
 - Workflow engine text shown in the UI but produced outside the UI layer (task/artifact labels, run step messages in `workflow/` and `ApplicationRuntime*`).
-- Unused legacy screens in `ControlRoomScreens.kt` / `ProviderManagementScreens.kt` (`CompanyScreen`, `WorkflowTemplateScreen`, `ArtifactFileManagerScreen`, `CompanyProviderScreen`).
+- Unused legacy screens in `ControlRoomScreens.kt` / `ProviderManagementScreens.kt` (`CompanyScreen`, `WorkflowTemplateScreen`, `ArtifactFileManagerScreen`; `CompanyProviderScreen` is deleted).
 
 ## Locale-sensitive formatting
 
