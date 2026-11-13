@@ -48,6 +48,12 @@ import com.hereliesaz.geministrator.resources.schedule_none
 import com.hereliesaz.geministrator.resources.schedule_note
 import com.hereliesaz.geministrator.resources.schedule_off
 import com.hereliesaz.geministrator.resources.schedule_on
+import com.hereliesaz.geministrator.resources.confirm_discard_schedules_action
+import com.hereliesaz.geministrator.resources.confirm_discard_schedules_body
+import com.hereliesaz.geministrator.resources.confirm_discard_schedules_title
+import com.hereliesaz.geministrator.resources.confirm_remove_schedule_action
+import com.hereliesaz.geministrator.resources.confirm_remove_schedule_body
+import com.hereliesaz.geministrator.resources.confirm_remove_schedule_title
 import com.hereliesaz.geministrator.resources.schedule_remove
 import com.hereliesaz.geministrator.resources.schedule_dst_eu
 import com.hereliesaz.geministrator.resources.schedule_dst_none
@@ -126,6 +132,7 @@ internal fun SchedulesPart(compact: Boolean) {
     var reload by remember { mutableStateOf(0) }
     var message by remember { mutableStateOf<String?>(null) }
     var unreadable by remember { mutableStateOf(false) }
+    var confirmingDiscard by remember { mutableStateOf(false) }
     suspend fun refresh() {
         items = store.all()
         unreadable = store.unreadable()
@@ -177,8 +184,17 @@ internal fun SchedulesPart(compact: Boolean) {
                 label = stringResource(Res.string.schedule_unreadable_discard),
                 seed = "schedule-discard-unreadable",
                 tone = PillTone.Danger,
-                onClick = { scope.launch { store.discardUnreadable(); reload += 1 } },
+                onClick = { confirmingDiscard = true },
             )
+            if (confirmingDiscard) {
+                AzphaltConfirm(
+                    title = stringResource(Res.string.confirm_discard_schedules_title),
+                    text = stringResource(Res.string.confirm_discard_schedules_body),
+                    confirmLabel = stringResource(Res.string.confirm_discard_schedules_action),
+                    onConfirm = { confirmingDiscard = false; scope.launch { store.discardUnreadable(); reload += 1 } },
+                    onDismiss = { confirmingDiscard = false },
+                )
+            }
         }
         if (host != null && !unreadable) {
             AzphaltPill(
@@ -252,6 +268,7 @@ private fun ScheduleCard(
     val onNamed = stringResource(Res.string.schedule_pill_named, onLabel, schedule.name)
     val runNowNamed = stringResource(Res.string.schedule_pill_named, runNowLabel, schedule.name)
     val removeNamed = stringResource(Res.string.schedule_pill_named, removeLabel, schedule.name)
+    var confirmingRemove by remember(schedule.id) { mutableStateOf(false) }
     AzphaltRecord(
         seed = "schedule-${schedule.id}",
         eyebrow = cadenceText(schedule.cadence, schedule.utcOffsetMinutes),
@@ -281,8 +298,17 @@ private fun ScheduleCard(
                         description = removeNamed,
                         seed = "schedule-remove-${schedule.id}",
                         tone = PillTone.Danger,
-                        onClick = onRemove,
+                        onClick = { confirmingRemove = true },
                     )
+                    if (confirmingRemove) {
+                        AzphaltConfirm(
+                            title = stringResource(Res.string.confirm_remove_schedule_title, schedule.name),
+                            text = stringResource(Res.string.confirm_remove_schedule_body),
+                            confirmLabel = stringResource(Res.string.confirm_remove_schedule_action),
+                            onConfirm = { confirmingRemove = false; onRemove() },
+                            onDismiss = { confirmingRemove = false },
+                        )
+                    }
                 }
                 if (schedule.cadence.kind != ScheduleCadence.Kind.EveryHours) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

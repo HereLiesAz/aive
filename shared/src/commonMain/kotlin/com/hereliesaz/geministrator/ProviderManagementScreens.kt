@@ -80,6 +80,12 @@ import com.hereliesaz.geministrator.resources.settings_a2a_lan_waiting
 import com.hereliesaz.geministrator.resources.settings_a2a_lan_warning
 import com.hereliesaz.geministrator.resources.settings_a2a_server
 import com.hereliesaz.geministrator.resources.settings_a2a_server_card_url
+import com.hereliesaz.geministrator.resources.confirm_compute_disconnect_action
+import com.hereliesaz.geministrator.resources.confirm_compute_disconnect_body
+import com.hereliesaz.geministrator.resources.confirm_compute_disconnect_title
+import com.hereliesaz.geministrator.resources.confirm_new_token_action
+import com.hereliesaz.geministrator.resources.confirm_new_token_body
+import com.hereliesaz.geministrator.resources.confirm_new_token_title
 import com.hereliesaz.geministrator.resources.settings_a2a_server_copy_token
 import com.hereliesaz.geministrator.resources.settings_a2a_server_description
 import com.hereliesaz.geministrator.resources.settings_a2a_server_failed
@@ -1039,6 +1045,7 @@ internal fun ProviderSettingsScreen(
 
         a2aServerSetting?.let { setting ->
             ProviderSectionLabel(stringResource(Res.string.settings_a2a_server))
+            var confirmingNewToken by remember { mutableStateOf(false) }
             Text(
                 stringResource(Res.string.settings_a2a_server_description),
                 style = AzphaltType.body,
@@ -1087,8 +1094,17 @@ internal fun ProviderSettingsScreen(
                     AzphaltPill(
                         stringResource(Res.string.settings_a2a_server_reset_token),
                         "a2a-server-reset-token",
-                        onClick = setting.onResetToken,
+                        onClick = { confirmingNewToken = true },
                     )
+                    if (confirmingNewToken) {
+                        AzphaltConfirm(
+                            title = stringResource(Res.string.confirm_new_token_title),
+                            text = stringResource(Res.string.confirm_new_token_body),
+                            confirmLabel = stringResource(Res.string.confirm_new_token_action),
+                            onConfirm = { confirmingNewToken = false; setting.onResetToken() },
+                            onDismiss = { confirmingNewToken = false },
+                        )
+                    }
                 }
                 if (setting.tokenIsTemporary) {
                     Text(
@@ -1368,12 +1384,22 @@ internal fun ProviderSettingsScreen(
                 },
             )
             if (distributedComputeState.ready) {
+                var confirmingComputeDisconnect by remember { mutableStateOf(false) }
                 AzphaltPill(
                     stringResource(Res.string.settings_disconnect),
                     "distributed-disconnect",
-                    onClick = onDisconnectDistributedCompute,
+                    onClick = { confirmingComputeDisconnect = true },
                     tone = PillTone.Danger,
                 )
+                if (confirmingComputeDisconnect) {
+                    AzphaltConfirm(
+                        title = stringResource(Res.string.confirm_compute_disconnect_title),
+                        text = stringResource(Res.string.confirm_compute_disconnect_body),
+                        confirmLabel = stringResource(Res.string.confirm_compute_disconnect_action),
+                        onConfirm = { confirmingComputeDisconnect = false; onDisconnectDistributedCompute() },
+                        onDismiss = { confirmingComputeDisconnect = false },
+                    )
+                }
             }
         }
         if (distributedComputeState.onlineNodes.isNotEmpty()) {

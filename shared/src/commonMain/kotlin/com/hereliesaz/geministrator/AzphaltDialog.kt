@@ -10,6 +10,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.confirm_cancel
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * The one alert dialog style for The Aive: Ink container, text in the exact opposite of Ink, a
@@ -56,4 +59,26 @@ fun AzphaltAlertDialog(
             },
         )
     }
+}
+
+/**
+ * A plain sentence on what will happen and a verb button for it, with Cancel: the one confirm every
+ * hard-to-undo action asks (Disconnect, Forget, Remove...).
+ */
+@Composable
+internal fun AzphaltConfirm(
+    title: String,
+    text: String,
+    confirmLabel: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AzphaltAlertDialog(
+        title = title,
+        text = text,
+        confirmLabel = confirmLabel,
+        onConfirm = onConfirm,
+        onDismissRequest = onDismiss,
+        dismissLabel = stringResource(Res.string.confirm_cancel),
+    )
 }

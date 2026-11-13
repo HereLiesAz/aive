@@ -92,4 +92,22 @@
     <string name="job_approval_off_title">Stop asking you first?</string>
     <string name="job_approval_off_body">This step will run without waiting for your OK. Nothing it does will be held for you to approve.</string>
     <string name="job_approval_off_action">Turn off</string>
+    <string name="confirm_compute_disconnect_title">Disconnect from Compute?</string>
+    <string name="confirm_compute_disconnect_body">This device stops sharing work with your other devices until you connect it again.</string>
+    <string name="confirm_compute_disconnect_action">Disconnect</string>
+    <string name="confirm_new_token_title">Make a new token?</string>
+    <string name="confirm_new_token_body">Anything using the current token stops working until you give it the new one.</string>
+    <string name="confirm_new_token_action">Make new token</string>
+    <string name="confirm_forget_memory_title">Forget this memory?</string>
+    <string name="confirm_forget_memory_body">This memory is deleted from this device. It cannot be undone.</string>
+    <string name="confirm_forget_memory_action">Forget it</string>
+    <string name="confirm_replace_memory_title">Replace your memory?</string>
+    <string name="confirm_replace_memory_body">Everything remembered on this device is replaced by what you pasted. It cannot be undone.</string>
+    <string name="confirm_replace_memory_action">Replace it</string>
+    <string name="confirm_remove_schedule_title">Remove %1$s?</string>
+    <string name="confirm_remove_schedule_body">This schedule is deleted and will not start again.</string>
+    <string name="confirm_remove_schedule_action">Remove it</string>
+    <string name="confirm_discard_schedules_title">Discard the unreadable list?</string>
+    <string name="confirm_discard_schedules_body">The saved schedules that could not be read are deleted for good, and you start with an empty list.</string>
+    <string name="confirm_discard_schedules_action">Discard it</string>
 </resources>

@@ -100,6 +100,12 @@ import com.hereliesaz.geministrator.resources.memory_episode
 import com.hereliesaz.geministrator.resources.memory_every_finished_session_is_banked_here
 import com.hereliesaz.geministrator.resources.memory_export_memory_to_json
 import com.hereliesaz.geministrator.resources.memory_exported_memory_chars
+import com.hereliesaz.geministrator.resources.confirm_forget_memory_action
+import com.hereliesaz.geministrator.resources.confirm_forget_memory_body
+import com.hereliesaz.geministrator.resources.confirm_forget_memory_title
+import com.hereliesaz.geministrator.resources.confirm_replace_memory_action
+import com.hereliesaz.geministrator.resources.confirm_replace_memory_body
+import com.hereliesaz.geministrator.resources.confirm_replace_memory_title
 import com.hereliesaz.geministrator.resources.memory_forget
 import com.hereliesaz.geministrator.resources.memory_forget_everything
 import com.hereliesaz.geministrator.resources.memory_graph
@@ -625,6 +631,7 @@ private fun DataSection(controller: MemoryLayerController) {
     var exported by remember { mutableStateOf<String?>(null) }
     var importDraft by remember { mutableStateOf<String?>(null) }
     var clearConfirm by remember { mutableStateOf(false) }
+    var confirmingReplace by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var openTree by remember { mutableStateOf<com.hereliesaz.geministrator.memory.MemoryEpisodeId?>(null) }
 
@@ -650,9 +657,17 @@ private fun DataSection(controller: MemoryLayerController) {
                             selected = episode.id == openTree,
                             onClick = { openTree = if (episode.id == openTree) null else episode.id },
                         )
-                        AzphaltPill(stringResource(Res.string.memory_forget), "memory-forget-${episode.id.value}", onClick = {
-                            scope.launch { controller.forgetEpisode(episode.id) }
-                        })
+                        var forgetting by remember(episode.id) { mutableStateOf(false) }
+                        AzphaltPill(stringResource(Res.string.memory_forget), "memory-forget-${episode.id.value}", onClick = { forgetting = true })
+                        if (forgetting) {
+                            AzphaltConfirm(
+                                title = stringResource(Res.string.confirm_forget_memory_title),
+                                text = stringResource(Res.string.confirm_forget_memory_body),
+                                confirmLabel = stringResource(Res.string.confirm_forget_memory_action),
+                                onConfirm = { forgetting = false; scope.launch { controller.forgetEpisode(episode.id) } },
+                                onDismiss = { forgetting = false },
+                            )
+                        }
                     }
                     if (episode.id == openTree) {
                         val rows = MemoryInspection.outline(snapshot, episode.id)
@@ -697,13 +712,23 @@ private fun DataSection(controller: MemoryLayerController) {
             modifier = Modifier.fillMaxWidth().height(120.dp),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AzphaltPill(stringResource(Res.string.memory_replace_memory), "memory-import-confirm", onClick = {
-                scope.launch {
-                    message = runCatching { controller.importJson(draft) }
-                        .fold({ getString(Res.string.memory_imported) }, { "Not imported: ${it.message ?: "unreadable JSON"}" })
-                    importDraft = null
-                }
-            })
+            AzphaltPill(stringResource(Res.string.memory_replace_memory), "memory-import-confirm", onClick = { confirmingReplace = true })
+            if (confirmingReplace) {
+                AzphaltConfirm(
+                    title = stringResource(Res.string.confirm_replace_memory_title),
+                    text = stringResource(Res.string.confirm_replace_memory_body),
+                    confirmLabel = stringResource(Res.string.confirm_replace_memory_action),
+                    onConfirm = {
+                        confirmingReplace = false
+                        scope.launch {
+                            message = runCatching { controller.importJson(draft) }
+                                .fold({ getString(Res.string.memory_imported) }, { "Not imported: ${it.message ?: "unreadable JSON"}" })
+                            importDraft = null
+                        }
+                    },
+                    onDismiss = { confirmingReplace = false },
+                )
+            }
             AzphaltPill(stringResource(Res.string.common_cancel), "memory-import-cancel", onClick = { importDraft = null })
         }
     }
