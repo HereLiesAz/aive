@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.memory
 
+import com.hereliesaz.geministrator.runCatchingCancellable
 import com.hereliesaz.geministrator.vector.FlatVectorIndex
 import com.hereliesaz.geministrator.vector.HnswVectorIndex
 import com.hereliesaz.geministrator.vector.TextEmbedder
@@ -248,10 +249,10 @@ class GraphMemoryTool(
         if (missing.isNotEmpty()) {
             summarizer.metrics.pairSummaryViolations += missing.size
             val now = nowEpochMillis()
-            runCatching { generated += MemoryPairSummaries.ensure(store, missing, now, summarizer) }
+            runCatchingCancellable { generated += MemoryPairSummaries.ensure(store, missing, now, summarizer) }
             missing.filter { it.id !in generated }.forEach { edge ->
                 // Not writable here (e.g. a read-only bank): still shown, computed for this recall.
-                runCatching { generated[edge.id] = MemoryPairSummaries.summaryFor(index.snapshot, edge, now, summarizer) }
+                runCatchingCancellable { generated[edge.id] = MemoryPairSummaries.summaryFor(index.snapshot, edge, now, summarizer) }
             }
         }
         return hits.map { hit ->

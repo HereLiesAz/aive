@@ -50,9 +50,11 @@ data class McpServerConfig(
 
 /** The configured servers, as JSON in the platform's general settings (no secrets). */
 class McpServerStore(
-    private val settings: Settings = com.hereliesaz.geministrator.persistence.PrivateSettings.forKeys(DEFAULT_STORAGE_KEY),
+    settings: Settings? = null,
     private val storageKey: String = DEFAULT_STORAGE_KEY,
 ) {
+    /** Resolved at first use, not at construction, so the private file is chosen whatever order the platform starts in. */
+    private val backing: Settings by lazy { settings ?: com.hereliesaz.geministrator.persistence.PrivateSettings.forKeys(DEFAULT_STORAGE_KEY) }
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
@@ -60,13 +62,13 @@ class McpServerStore(
     private val serializer = ListSerializer(McpServerConfig.serializer())
 
     fun read(): List<McpServerConfig> {
-        return (settings.readQuarantining(storageKey) { json.decodeFromString(serializer, it) } ?: emptyList())
+        return (backing.readQuarantining(storageKey) { json.decodeFromString(serializer, it) } ?: emptyList())
             .filter { runCatching { it.validate() }.isSuccess }
     }
 
     fun write(servers: List<McpServerConfig>) {
-        settings.refuseIfUnreadable(storageKey) { json.decodeFromString(serializer, it) }
-        settings.putString(storageKey, json.encodeToString(serializer, servers))
+        backing.refuseIfUnreadable(storageKey) { json.decodeFromString(serializer, it) }
+        backing.putString(storageKey, json.encodeToString(serializer, servers))
     }
 
     companion object {

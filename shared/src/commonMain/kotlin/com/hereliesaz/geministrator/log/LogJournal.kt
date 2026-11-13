@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.log
 
+import com.hereliesaz.geministrator.runCatchingCancellable
 import com.hereliesaz.geministrator.control.ControlRedaction
 import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.hereliesaz.geministrator.withPlatformLock
@@ -70,7 +71,7 @@ class LogJournal(
     private fun restore(): List<LogLine> {
         val store = settings ?: return emptyList()
         if (storageKey.isEmpty()) return emptyList()
-        return runCatching { decodeLogLines(store.getStringOrNull(storageKey).orEmpty()) }
+        return runCatchingCancellable { decodeLogLines(store.getStringOrNull(storageKey).orEmpty()) }
             .getOrDefault(emptyList())
             .takeLast(maxLines)
     }
@@ -79,7 +80,7 @@ class LogJournal(
         val store = settings ?: return
         if (storageKey.isEmpty()) return
         // The latest lines are read inside the lock, so a slower earlier writer can never overwrite a newer one.
-        runCatching { withPlatformLock(store) { store.putString(storageKey, encodeLogLines(state.value)) } }
+        runCatchingCancellable { withPlatformLock(store) { store.putString(storageKey, encodeLogLines(state.value)) } }
     }
 
     companion object {

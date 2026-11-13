@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.distributed
 
+import com.hereliesaz.geministrator.runCatchingCancellable
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
 import io.ktor.client.plugins.websocket.webSocketSession
@@ -248,7 +249,7 @@ class RelayDistributedComputeClient(
         val heartbeat = scope.launch {
             while (isActive) {
                 delay(15_000)
-                runCatching { send(ComputeRelayClientMessage.NodeHeartbeat) }
+                runCatchingCancellable { send(ComputeRelayClientMessage.NodeHeartbeat) }
             }
         }
         try {

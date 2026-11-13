@@ -911,7 +911,7 @@ class ApplicationRuntime private constructor(
             run.roleSnapshot.firstOrNull { it.id == id } ?: roles.firstOrNull { it.id == id }
         }
         val executor = taskRun.executor
-            ?: runCatching { task.effectiveExecutor(role) }.getOrNull()
+            ?: runCatchingCancellable { task.effectiveExecutor(role) }.getOrNull()
             ?: return null
         val providerId = taskRun.assignedProviderId
         val capabilities = providerId?.let { id ->
@@ -1739,7 +1739,7 @@ class ApplicationRuntime private constructor(
         val results = mutableMapOf<String, Result<AgentCapabilities>>()
         for (providerId in providerRegistry.providerIds) {
             val provider = providerRegistry.provider(providerId) ?: continue
-            results[providerId.value] = runCatching { provider.capabilities() }
+            results[providerId.value] = runCatchingCancellable { provider.capabilities() }
         }
         return results
     }

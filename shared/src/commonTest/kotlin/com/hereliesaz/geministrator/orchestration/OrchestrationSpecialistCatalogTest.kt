@@ -11,7 +11,13 @@ import kotlin.test.assertTrue
 class OrchestrationSpecialistCatalogTest {
     @Test
     fun releasedCatalogParses() {
-        OrchestrationSpecialistCatalog.released()
+        val library = OrchestrationSpecialistCatalog.released()
+        // Whatever the release lists is held whole: one specialist per entry, and every artifact names a real asset and a hex digest.
+        assertEquals(Regex("\"specialistId\"").findAll(OrchestrationSpecialistCatalog.RELEASED).count(), library.allSpecialists().size)
+        library.allArtifacts().forEach { artifact ->
+            assertTrue(Regex("[0-9a-f]{64}").matches(artifact.sha256), "${artifact.logicalArtifactId}: ${artifact.sha256}")
+            assertTrue(artifact.assetName.isNotBlank(), artifact.logicalArtifactId)
+        }
     }
 
     /** Same shape the Kaggle notebook writes, including fields the app ignores. */

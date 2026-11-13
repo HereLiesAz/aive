@@ -18,7 +18,11 @@ class MemoryContrastRegisterTest {
     fun veryLongTextsAreComparedOnTheirStartAndReturn() {
         val long = "I chose Postgres for the database. " + "filler word ".repeat(20_000)
         val other = "I chose MySQL for the database. " + "other word ".repeat(20_000)
-        MemoryContrast.between(long, other)
+        val contrast = assertNotNull(MemoryContrast.between(long, other), "the starts differ in one filler, so it is a contrast")
+        assertTrue(contrast.frameKey.startsWith("i chose _ for the database"), contrast.frameKey)
+        assertTrue(contrast.leftFiller.startsWith("postgresql"), contrast.leftFiller)
+        assertTrue(contrast.rightFiller.startsWith("mysql"), contrast.rightFiller)
+        assertNull(MemoryContrast.between(long, long), "the same long text is no contrast")
     }
 
     @Test
@@ -79,21 +83,24 @@ class MemoryContrastRegisterTest {
         val generalized = snapshot.nodes.single { it.id.value.startsWith("g-") }
         assertTrue("c-2|${generalized.id.value}" in divergences, "$divergences")
 
-        val register = snapshot.variantRegister().single()
-        assertEquals("I chose _ for the database", register.frame)
-        val byFiller = register.variants.associateBy { it.filler }
-        assertEquals(setOf("Postgres", "MySQL"), byFiller.keys)
+        val frame = snapshot.nodes.single { it.kind == MemoryNodeKind.Frame }
+        assertEquals("I chose _ for the database", frame.text)
+        val variantNodes = snapshot.edges.filter { it.relation == MemoryRelationKind.VariantOf && it.to == frame.id }
+            .map { edge -> snapshot.nodes.single { it.id == edge.from } }
+        assertEquals(setOf("Postgres", "MySQL"), variantNodes.map { it.text }.toSet())
+        fun attestations(filler: String) = snapshot.edges.filter { edge ->
+            edge.relation == MemoryRelationKind.Attests && edge.to == variantNodes.single { it.text == filler }.id
+        }
         assertEquals(
             setOf(MemoryNodeId("c-1"), MemoryNodeId("c-3"), generalized.id),
-            byFiller.getValue("Postgres").attestations.map { it.memoryId }.toSet(),
+            attestations("Postgres").map { it.from }.toSet(),
         )
-        assertEquals(2, byFiller.getValue("Postgres").occurrences)
-        val mysql = byFiller.getValue("MySQL").attestations.single()
-        assertEquals(2L, mysql.recordedAtEpochMillis)
-        assertEquals("I chose", mysql.subject)
-        assertEquals("session-e-c-2", mysql.context["sessions"])
-        assertEquals("project", mysql.context["projectId"])
-        assertEquals(listOf("e-c-2"), mysql.sourceEpisodeIds)
+        val mysql = attestations("MySQL").single()
+        assertEquals("2", mysql.metadata[MemoryVariantRegister.RECORDED_AT])
+        assertEquals("I chose", mysql.metadata[MemoryVariantRegister.SUBJECT])
+        assertEquals("session-e-c-2", mysql.metadata["sessions"])
+        assertEquals("project", mysql.metadata["projectId"])
+        assertEquals("e-c-2", mysql.metadata["sourceEpisodeIds"])
         // Nothing is ranked or hidden: no node in the register carries a verdict, and nothing is superseded.
         assertTrue(snapshot.edges.none { it.relation == MemoryRelationKind.Supersedes && it.to.value == "c-2" })
     }
@@ -106,8 +113,9 @@ class MemoryContrastRegisterTest {
         assertTrue(store.commit(snapshot.revision, first))
         val again = MemoryVariantRegister.mutationFor(store.read(), MemoryEpisodeId("e-c-2"), 11L)
         assertTrue(again.nodesToAdd.isEmpty() && again.edgesToAdd.isEmpty())
-        val attestation = store.read().variantRegister().single().variants.first().attestations.single()
-        assertEquals("2026-05-04", attestation.statedEventDate)
+        val after = store.read()
+        val attestation = after.edges.single { it.relation == MemoryRelationKind.Attests && it.metadata.containsKey(MemoryVariantRegister.EVENT_AT) && it.from.value == "c-1" }
+        assertEquals("2026-05-04", attestation.metadata[MemoryVariantRegister.EVENT_AT])
     }
 
     @Test
@@ -133,7 +141,7 @@ class MemoryContrastRegisterTest {
         assertEquals(listOf("c-2"), hit.conflicts.map { it.id.value })
 
         // Rendering never cuts a unit in two, whatever the budget.
-        val units = listOf("first${hit.divergenceLines()}", "second unit that does not fit")
+        val units = listOf("first ${hit.conflicts.joinToString { it.text }}", "second unit that does not fit")
         val rendered = units.joinWholeUnits(maxChars = units.first().length + 3)
         assertTrue("MySQL" in rendered && "second" !in rendered)
     }
@@ -163,7 +171,6 @@ class MemoryContrastRegisterTest {
         val hit = tool.grip(MemoryQuery("MySQL database", resolution = MemoryResolution.Context)).hits.single { it.node.id.value == "c-2" }
         assertEquals(listOf("c-1"), hit.conflicts.map { it.id.value })
         assertEquals(listOf(deliberation.id), hit.deliberations.map { it.id })
-        assertTrue("earlier deliberation" in hit.divergenceLines())
 
         assertFailsWith<IllegalArgumentException> {
             tool.deliberate(MemoryDeliberationRequest("s", "x", listOf(MemoryNodeId("missing")), deliberatedAtEpochMillis = 1L))
@@ -240,7 +247,7 @@ class MemoryContrastRegisterTest {
         val forgotten = store.read().without(MemoryEpisodeId("e-c-2"))
 
         assertTrue(forgotten.nodes.none { it.kind == MemoryNodeKind.Variant && it.text == "MySQL" })
-        assertEquals(listOf("Postgres"), forgotten.variantRegister().single().variants.map { it.filler })
+        assertEquals(listOf("Postgres"), forgotten.nodes.filter { it.kind == MemoryNodeKind.Variant }.map { it.text })
     }
 
     // ---- helpers -------------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.a2a
 
+import com.hereliesaz.geministrator.runCatchingCancellable
 import com.hereliesaz.geministrator.ExternalWorkflowLaunchRequest
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
@@ -167,9 +168,9 @@ class A2aServer(
     /** The Agent Card; [lanHost] is the network address the caller reached, null for this computer. */
     suspend fun card(lanHost: String? = null): A2aAgentCard {
         val base = lanHost?.let(lanBaseUrl) ?: baseUrl()
-        val roles = runCatching { host.roles() }.getOrDefault(emptyList()).filter { it.enabled }
+        val roles = runCatchingCancellable { host.roles() }.getOrDefault(emptyList()).filter { it.enabled }
         val providers = if (describeProviders()) {
-            runCatching { host.providers() }.getOrDefault(emptyList())
+            runCatchingCancellable { host.providers() }.getOrDefault(emptyList())
         } else {
             null
         }
@@ -337,7 +338,7 @@ class A2aServer(
         if (objective.length > MAX_OBJECTIVE_CHARS) {
             throw A2aRpcException(A2aErrorCodes.INVALID_PARAMS, "The objective is longer than $MAX_OBJECTIVE_CHARS characters")
         }
-        val busy = runCatching { host.busy() }.getOrDefault(true)
+        val busy = runCatchingCancellable { host.busy() }.getOrDefault(true)
         return mutex.withLock {
             val record = Record(
                 taskId = idFactory(),
@@ -365,7 +366,7 @@ class A2aServer(
     private suspend fun getTask(params: JsonObject): A2aTask {
         val taskId = params.string("id") ?: throw A2aRpcException(A2aErrorCodes.INVALID_PARAMS, "params.id is required")
         val runId = mutex.withLock { records[taskId] ?: throw taskNotFound(taskId) }.runId
-        val run = runId?.let { runCatching { host.run(it) }.getOrNull() }
+        val run = runId?.let { runCatchingCancellable { host.run(it) }.getOrNull() }
         return mutex.withLock {
             val record = records[taskId] ?: throw taskNotFound(taskId)
             run?.let { (workflowRun, _) ->
@@ -395,7 +396,7 @@ class A2aServer(
             record.runId to queued
         }
         if (!queued) {
-            val cancelled = runId != null && runCatching { host.cancel(runId) }.getOrDefault(false)
+            val cancelled = runId != null && runCatchingCancellable { host.cancel(runId) }.getOrDefault(false)
             if (!cancelled) {
                 throw A2aRpcException(A2aErrorCodes.TASK_NOT_CANCELABLE, "Task $taskId is not the active run, or its launch is under way")
             }
