@@ -137,7 +137,7 @@ class ProviderFailoverTest {
         assertTrue("OpenAI is out of credit" in all && "Add credit" in all, all)
         assertTrue("Claude rejected its key" in all && "Reconnect" in all, all)
         val pinned = ProviderFailover.pinnedMessage(credit)
-        assertTrue("did not switch" in pinned && "choose another provider" in pinned, pinned)
+        assertTrue("did not switch" in pinned && "choose another source" in pinned, pinned)
     }
 
     // --- gateway with fake providers ------------------------------------------------------

@@ -50,7 +50,6 @@ class CreatureRigMappingTest {
         "recovery engineer" to "sustainability-advocate",
         "code reviewer" to "migration-engineer",
         "hall monitor" to "disassembled-glossy-slime",
-        "nanny" to "disassembled-glossy-slime",
         "architect" to "architect",
         "data miner" to "data-miner-sheet-3-variant",
         "knowledge keeper" to "knowledge-keeper-sheet-2-variant",
@@ -106,6 +105,8 @@ class CreatureRigMappingTest {
             assertEquals(slug, CreatureRigMapping.slugFor(label), "label '$label'")
         }
         assertEquals(expectedRigForRole.size, CreatureRigMapping.bySlugKind.size, "every mapped role is in the expected table")
+        // The Hall Monitor is the Nanny now; a role saved under either name wears the same creature.
+        assertEquals("disassembled-glossy-slime", CreatureRigMapping.slugFor("Nanny"))
         assertEquals("simulator", CreatureRigMapping.slugFor("Simulator"))
         assertEquals("ux-designer", CreatureRigMapping.slugFor("UX Designer"))
         assertEquals("data-miner-sheet-3-variant", CreatureRigMapping.slugFor("Data Miner"))
