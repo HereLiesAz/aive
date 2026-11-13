@@ -66,6 +66,18 @@
     <string name="keeper_connections_lead">What your creatures run on, and where their work lands.</string>
     <string name="keeper_compute">Compute</string>
     <string name="keeper_compute_lead">Other machines that can take the swarm's work, and which work goes where.</string>
+    <string name="keeper_group_sources">Sources and tools</string>
+    <string name="keeper_group_sources_lead">What your creatures think with, the tools they may use, and where their work lands.</string>
+    <string name="keeper_group_allowance">Allowance</string>
+    <string name="keeper_group_allowance_lead">The most real money a run, or an hour, may spend. When it is reached every creature rests until you raise it.</string>
+    <string name="keeper_group_hosts">Hosts</string>
+    <string name="keeper_group_hosts_lead">Where your creatures run: this device, your other machines, and models that run here.</string>
+    <string name="keeper_group_data">Data and privacy</string>
+    <string name="keeper_group_data_lead">Save, load, move or delete what The Aive keeps, and what it may report.</string>
+    <string name="keeper_group_routines">Routines and trust</string>
+    <string name="keeper_group_routines_lead">Swarms that start by themselves, what your creatures may do without asking you, and what they suggest.</string>
+    <string name="keeper_group_look">Look</string>
+    <string name="keeper_group_look_lead">The colour behind your creatures.</string>
     <string name="keeper_projects">Projects and data</string>
     <string name="keeper_projects_lead">Save, load, move or delete what The Aive keeps.</string>
     <string name="keeper_device">This device</string>
@@ -78,7 +90,7 @@
     <string name="keeper_limits_lead">Caps that stop the hive when its known spend reaches them.</string>
     <string name="keeper_device_lead_wide">Models that run here, and reaching this device from another.</string>
     <string name="keeper_page_title">Make it yours</string>
-    <string name="keeper_page_line">Connections, limits, this device and how it all looks.</string>
+    <string name="keeper_page_line">Sources, allowance, hosts, your data, routines and how it all looks.</string>
     <string name="keeper_ground_selected">Selected</string>
     <string name="keeper_delegations">Delegations</string>
     <string name="keeper_delegations_lead">Gates you let a creature pass without asking you. Only gates that can't write, deploy or reach outside The Aive are ever offered.</string>

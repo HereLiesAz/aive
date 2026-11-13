@@ -63,6 +63,18 @@ import com.hereliesaz.geministrator.resources.keeper_limits_lead
 import com.hereliesaz.geministrator.resources.keeper_page_line
 import com.hereliesaz.geministrator.resources.keeper_page_title
 import com.hereliesaz.geministrator.resources.keeper_feeds_the_hive
+import com.hereliesaz.geministrator.resources.keeper_group_sources
+import com.hereliesaz.geministrator.resources.keeper_group_sources_lead
+import com.hereliesaz.geministrator.resources.keeper_group_allowance
+import com.hereliesaz.geministrator.resources.keeper_group_allowance_lead
+import com.hereliesaz.geministrator.resources.keeper_group_hosts
+import com.hereliesaz.geministrator.resources.keeper_group_hosts_lead
+import com.hereliesaz.geministrator.resources.keeper_group_data
+import com.hereliesaz.geministrator.resources.keeper_group_data_lead
+import com.hereliesaz.geministrator.resources.keeper_group_routines
+import com.hereliesaz.geministrator.resources.keeper_group_routines_lead
+import com.hereliesaz.geministrator.resources.keeper_group_look
+import com.hereliesaz.geministrator.resources.keeper_group_look_lead
 import com.hereliesaz.geministrator.resources.keeper_on_count
 import com.hereliesaz.geministrator.resources.keeper_projects
 import com.hereliesaz.geministrator.resources.keeper_projects_lead
@@ -73,6 +85,27 @@ import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
 /**
+ * The six parts the Keeper's room lists, each with one sentence (docs/Keepers-Room.md). Every earlier part is
+ * still drawn, now inside one of these ([KeeperSection.group]); no part is new.
+ */
+internal enum class KeeperGroup(val title: StringResource, val lead: StringResource, val feedsTheHive: Boolean) {
+    Sources(Res.string.keeper_group_sources, Res.string.keeper_group_sources_lead, true),
+    Allowance(Res.string.keeper_group_allowance, Res.string.keeper_group_allowance_lead, false),
+    Hosts(Res.string.keeper_group_hosts, Res.string.keeper_group_hosts_lead, true),
+    Data(Res.string.keeper_group_data, Res.string.keeper_group_data_lead, false),
+    Routines(Res.string.keeper_group_routines, Res.string.keeper_group_routines_lead, false),
+    Look(Res.string.keeper_group_look, Res.string.keeper_group_look_lead, false),
+    ;
+
+    /** The parts of [KeeperSection] drawn in this one, among those on offer. */
+    fun membersIn(sections: List<KeeperSection>): List<KeeperSection> = sections.filter { it.group == this }
+}
+
+/** The parts (groups) to list for the sections on offer, in the room's order, none empty. */
+internal fun keeperGroupsFor(sections: List<KeeperSection>): List<KeeperGroup> =
+    KeeperGroup.entries.filter { group -> sections.any { it.group == group } }
+
+/**
  * The parts of the Keeper's room (docs/Keepers-Room.md): everything that sets up the hive, in one
  * place. [feedsTheHive] parts are what the swarm runs on; the rest are the keeper's own.
  */
@@ -80,19 +113,21 @@ internal enum class KeeperSection(
     val title: StringResource,
     val lead: StringResource,
     val feedsTheHive: Boolean,
+    /** The one of the room's six parts this one is shown in (the parts are regroupings, nothing new). */
+    val group: KeeperGroup,
 ) {
-    Connections(Res.string.keeper_connections, Res.string.keeper_connections_lead, true),
-    Compute(Res.string.keeper_compute, Res.string.keeper_compute_lead, true),
-    Projects(Res.string.keeper_projects, Res.string.keeper_projects_lead, false),
-    Delegations(Res.string.keeper_delegations, Res.string.keeper_delegations_lead, false),
-    Schedules(Res.string.keeper_schedules, Res.string.keeper_schedules_lead, false),
-    LocalAgents(Res.string.keeper_local_agents, Res.string.keeper_local_agents_lead, false),
-    Improvement(Res.string.keeper_improvement, Res.string.keeper_improvement_lead, false),
-    /** Wide only: the spend caps, which a phone keeps in [Device]. */
-    Limits(Res.string.keeper_limits, Res.string.keeper_limits_lead, false),
-    Device(Res.string.keeper_device, Res.string.keeper_device_lead, false),
-    Appearance(Res.string.keeper_appearance, Res.string.keeper_appearance_lead, false),
-    About(Res.string.keeper_about, Res.string.keeper_about_lead, false),
+    Connections(Res.string.keeper_connections, Res.string.keeper_connections_lead, true, KeeperGroup.Sources),
+    Compute(Res.string.keeper_compute, Res.string.keeper_compute_lead, true, KeeperGroup.Hosts),
+    Projects(Res.string.keeper_projects, Res.string.keeper_projects_lead, false, KeeperGroup.Data),
+    Delegations(Res.string.keeper_delegations, Res.string.keeper_delegations_lead, false, KeeperGroup.Routines),
+    Schedules(Res.string.keeper_schedules, Res.string.keeper_schedules_lead, false, KeeperGroup.Routines),
+    LocalAgents(Res.string.keeper_local_agents, Res.string.keeper_local_agents_lead, false, KeeperGroup.Sources),
+    Improvement(Res.string.keeper_improvement, Res.string.keeper_improvement_lead, false, KeeperGroup.Routines),
+    /** The spend caps, on every width. */
+    Limits(Res.string.keeper_limits, Res.string.keeper_limits_lead, false, KeeperGroup.Allowance),
+    Device(Res.string.keeper_device, Res.string.keeper_device_lead, false, KeeperGroup.Hosts),
+    Appearance(Res.string.keeper_appearance, Res.string.keeper_appearance_lead, false, KeeperGroup.Look),
+    About(Res.string.keeper_about, Res.string.keeper_about_lead, false, KeeperGroup.Data),
     ;
 
     companion object {
@@ -120,7 +155,7 @@ internal fun KeeperRoom(
     opening: KeeperSection?,
     compact: Boolean,
     statusOf: @Composable (KeeperSection) -> String?,
-    content: @Composable (KeeperSection, Modifier) -> Unit,
+    content: @Composable (List<KeeperSection>, Modifier) -> Unit,
     modifier: Modifier = Modifier,
     // The open part and, on a phone, whether it is open over the list; the shell holds these so its
     // breadcrumb can name the part (docs/Keepers-Room.md).
@@ -129,32 +164,33 @@ internal fun KeeperRoom(
 ) {
     var selectedName by selectedName
     var open by open
-    val sections = if (compact) sections.filter { it != KeeperSection.Limits } else sections
     LaunchedEffect(opening) {
         if (opening != null) {
             selectedName = opening.name
             open = true
         }
     }
-    val selected = sections.firstOrNull { it.name == selectedName }
-        ?: sections.firstOrNull { compact && selectedName == KeeperSection.Limits.name && it == KeeperSection.Device }
-        ?: sections.first()
+    val selected = sections.firstOrNull { it.name == selectedName } ?: sections.first()
+    val groups = keeperGroupsFor(sections)
+    val members = selected.group.membersIn(sections)
+    // A group opens on its first part; the room remembers that part.
+    val selectGroup: (KeeperGroup) -> Unit = { group -> selectedName = group.membersIn(sections).first().name }
 
     if (compact) {
         PlatformBackHandler(enabled = open) { open = false }
         if (open) {
             // The breadcrumb's "Keeper's room" step, or Back, returns to the list.
             Column(modifier.fillMaxSize()) {
-                KeeperSectionHeading(selected, compact = true)
-                content(selected, Modifier.weight(1f).fillMaxWidth())
+                KeeperSectionHeading(selected.group, compact = true)
+                content(members, Modifier.weight(1f).fillMaxWidth())
             }
         } else {
             Column(
                 modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                KeeperSectionList(sections, selected = null, statusOf = statusOf) {
-                    selectedName = it.name
+                KeeperSectionList(groups, sections, selected = null, statusOf = statusOf) {
+                    selectGroup(it)
                     open = true
                 }
             }
@@ -171,15 +207,15 @@ internal fun KeeperRoom(
                 val ink = Azphalt.Ink
                 Box(Modifier.width(200.dp).clip(RoundedCornerShape(17.dp)).background(ink)) {
                     AzphaltSurface(ink) {
-                        KeeperNav(sections, selected, statusOf) { selectedName = it.name }
+                        KeeperNav(groups, sections, selected.group, statusOf) { selectGroup(it) }
                     }
                 }
                 Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(19.dp)).background(ink)) {
                     AzphaltThemedSurface(ink) {
                         Column(Modifier.fillMaxSize()) {
-                            KeeperCardHeading(selected)
+                            KeeperCardHeading(selected.group)
                             // The part pads itself 12dp in; the card's edge is 27dp in, as its heading.
-                            content(selected, Modifier.weight(1f).fillMaxWidth().padding(start = 15.dp, end = 3.dp))
+                            content(members, Modifier.weight(1f).fillMaxWidth().padding(start = 15.dp, end = 3.dp))
                         }
                     }
                 }
@@ -191,13 +227,14 @@ internal fun KeeperRoom(
 /** The wide room's list of parts: one Ink column, the open part filled in the strong colour. */
 @Composable
 private fun KeeperNav(
+    groups: List<KeeperGroup>,
     sections: List<KeeperSection>,
-    selected: KeeperSection,
+    selected: KeeperGroup,
     statusOf: @Composable (KeeperSection) -> String?,
-    onSelect: (KeeperSection) -> Unit,
+    onSelect: (KeeperGroup) -> Unit,
 ) {
     Column(Modifier.verticalScroll(rememberScrollState()).padding(8.dp).selectableGroup()) {
-        sections.forEach { section ->
+        groups.forEach { section ->
             val isSelected = section == selected
             val fill = if (isSelected) azphaltStrong() else androidx.compose.ui.graphics.Color.Transparent
             val text = if (isSelected) fill.onOpposite() else azphaltMutedOnSurface()
@@ -217,7 +254,7 @@ private fun KeeperNav(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(stringResource(section.title).uppercase(), style = AzphaltType.endCap, color = text, modifier = Modifier.weight(1f))
-                statusOf(section)?.let { Text(it.uppercase(), style = AzphaltType.endCap, color = text) }
+                groupStatus(section, sections, statusOf)?.let { Text(it.uppercase(), style = AzphaltType.endCap, color = text) }
             }
         }
     }
@@ -225,7 +262,7 @@ private fun KeeperNav(
 
 /** The open part's heading on its card: its group as the eyebrow, its name, its one-line lead. */
 @Composable
-private fun KeeperCardHeading(section: KeeperSection) {
+private fun KeeperCardHeading(section: KeeperGroup) {
     Column(
         Modifier.fillMaxWidth().padding(start = 27.dp, top = 27.dp, end = 27.dp).semantics(mergeDescendants = true) { heading() },
     ) {
@@ -238,7 +275,7 @@ private fun KeeperCardHeading(section: KeeperSection) {
         Text(stringResource(section.title), style = AzphaltType.section, color = azphaltOnSurface())
         Spacer(Modifier.height(5.dp))
         Text(
-            stringResource(if (section == KeeperSection.Device) Res.string.keeper_device_lead_wide else section.lead),
+            stringResource(section.lead),
             style = AzphaltType.body,
             color = azphaltMutedOnSurface(),
         )
@@ -247,7 +284,7 @@ private fun KeeperCardHeading(section: KeeperSection) {
 }
 
 @Composable
-private fun KeeperSectionHeading(section: KeeperSection, compact: Boolean) {
+private fun KeeperSectionHeading(section: KeeperGroup, compact: Boolean) {
     Column(
         Modifier.fillMaxWidth().padding(start = if (compact) 16.dp else 12.dp, end = 16.dp, top = if (compact) 8.dp else 22.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -260,14 +297,15 @@ private fun KeeperSectionHeading(section: KeeperSection, compact: Boolean) {
 
 @Composable
 private fun KeeperSectionList(
+    groups: List<KeeperGroup>,
     sections: List<KeeperSection>,
-    selected: KeeperSection?,
+    selected: KeeperGroup?,
     statusOf: @Composable (KeeperSection) -> String?,
-    onSelect: (KeeperSection) -> Unit,
+    onSelect: (KeeperGroup) -> Unit,
 ) {
     Column(Modifier.fillMaxWidth().selectableGroup(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         listOf(true, false).forEach { feeds ->
-            val group = sections.filter { it.feedsTheHive == feeds }
+            val group = groups.filter { it.feedsTheHive == feeds }
             if (group.isEmpty()) return@forEach
             Text(
                 stringResource(if (feeds) Res.string.keeper_feeds_the_hive else Res.string.keeper_the_keeper).uppercase(),
@@ -293,12 +331,30 @@ private fun KeeperSectionList(
                         .padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(stringResource(section.title), style = AzphaltType.lead, color = text, modifier = Modifier.weight(1f))
-                    statusOf(section)?.let { Text(it.uppercase(), style = AzphaltType.endCap, color = text) }
+                    Column(Modifier.weight(1f).padding(vertical = 6.dp)) {
+                        Text(stringResource(section.title), style = AzphaltType.lead, color = text)
+                        // One sentence under each part, so the list says what is in it.
+                        Text(stringResource(section.lead), style = AzphaltType.body, color = text)
+                    }
+                    groupStatus(section, sections, statusOf)?.let { Text(it.uppercase(), style = AzphaltType.endCap, color = text) }
                 }
             }
         }
     }
+}
+
+/** A part's count: the first of its members that has one. */
+@Composable
+private fun groupStatus(
+    group: KeeperGroup,
+    sections: List<KeeperSection>,
+    statusOf: @Composable (KeeperSection) -> String?,
+): String? {
+    for (member in group.membersIn(sections)) {
+        val status = statusOf(member)
+        if (status != null) return status
+    }
+    return null
 }
 
 /** How many things a part has switched on, for the section list ("3 on", "off"). */
