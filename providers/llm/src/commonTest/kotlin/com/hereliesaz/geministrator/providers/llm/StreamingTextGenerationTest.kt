@@ -332,6 +332,21 @@ class StreamingTextGenerationTest {
     }
 
     @Test
+    fun aCancelledSessionNobodyIsWatchingIsNotKeptForever() = runTest {
+        val api = object : TextGenerationApi {
+            override suspend fun generate(prompt: String) = TextGenerationResult("unused")
+        }
+        val provider = TextLlmProvider(AgentProviderId("text"), "Text", api)
+        val handle = provider.start(
+            AgentTaskRequest(taskRunId = TaskRunId("t"), objective = "Fix sync", roleInstructions = "Engineer", acceptanceCriteria = emptyList(), requirePlanApproval = true),
+        )
+        assertIs<ProviderActionResult.Accepted>(provider.approvePlan(handle.providerRunId), "a live session takes an approval")
+        provider.cancel(handle.providerRunId)
+        val rejected = assertIs<ProviderActionResult.Rejected>(provider.approvePlan(handle.providerRunId))
+        assertTrue("not available" in rejected.reason, "the cancelled session is gone, not parked in the map: ${rejected.reason}")
+    }
+
+    @Test
     fun aTextProviderEmitsThinkingAndTakesMemoryMidStream() = runTest {
         val prompts = mutableListOf<String>()
         lateinit var provider: TextLlmProvider

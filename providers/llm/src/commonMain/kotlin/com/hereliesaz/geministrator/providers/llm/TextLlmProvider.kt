@@ -60,6 +60,8 @@ open class TextLlmProvider(
         val generation: InterruptibleGeneration,
         /** MCP tool calls the run made: their results are external-provenance content. */
         var toolOutcomes: List<McpToolOutcome> = emptyList(),
+        /** True while an [observe] collector holds the session: it ends the session itself when it finishes. */
+        var observing: Boolean = false,
     )
 
     private val mutex = Mutex()
@@ -174,10 +176,21 @@ open class TextLlmProvider(
     override fun observe(runId: ProviderRunId): Flow<AgentEvent> = flow {
         val session = mutex.withLock { sessions[runId] }
             ?: error("$displayName session ${runId.value} is not available in this process")
+        session.observing = true
+        try {
+            observeSession(runId, session)
+        } finally {
+            session.observing = false
+            // A collector stopped from outside (the app closing, the task cancelled) leaves a cancelled session behind.
+            if (session.phase.value == TextLlmSessionPhase.Cancelled) mutex.withLock { sessions.remove(runId) }
+        }
+    }
+
+    private suspend fun FlowCollector<AgentEvent>.observeSession(runId: ProviderRunId, session: Session) {
 
         if (session.request.requirePlanApproval) {
             if (!session.planGenerated.value) {
-                val preview = generateOrFail(runId, session) ?: return@flow
+                val preview = generateOrFail(runId, session) ?: return
                 session.planResult = preview
                 session.planGenerated.value = true
                 emit(AgentEvent.PlanGenerated(runId = runId, summary = preview.text.take(MAX_PLAN_PREVIEW_CHARS)))
@@ -188,24 +201,24 @@ open class TextLlmProvider(
                 session.planResult?.let { emitUsage(runId, it) }
                 emit(AgentEvent.Failed(runId, "$displayName session cancelled"))
                 mutex.withLock { sessions.remove(runId) }
-                return@flow
+                return
             }
             emit(AgentEvent.PlanApproved(runId))
             // In-process sessions deliver the generation the user approved. A session
             // reconstructed by reconnect() after a restart only has the durable plan
             // flag, not the generation itself, so it executes exactly once here.
-            val result = session.planResult ?: generateOrFail(runId, session) ?: return@flow
-            if (cancelledDuringGeneration(runId, session, result)) return@flow
+            val result = session.planResult ?: generateOrFail(runId, session) ?: return
+            if (cancelledDuringGeneration(runId, session, result)) return
             emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text, session.toolOutcomes)))
             emitUsage(runId, result)
         } else {
             if (session.phase.value == TextLlmSessionPhase.Cancelled) {
                 emit(AgentEvent.Failed(runId, "$displayName session cancelled"))
                 mutex.withLock { sessions.remove(runId) }
-                return@flow
+                return
             }
-            val result = generateOrFail(runId, session) ?: return@flow
-            if (cancelledDuringGeneration(runId, session, result)) return@flow
+            val result = generateOrFail(runId, session) ?: return
+            if (cancelledDuringGeneration(runId, session, result)) return
             emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text, session.toolOutcomes)))
             emitUsage(runId, result)
         }
@@ -363,6 +376,8 @@ open class TextLlmProvider(
         session.phase.value = TextLlmSessionPhase.Cancelled
         // A generation already streaming stops at its next piece instead of running to its end, billed.
         session.generation.cancel()
+        // Nobody is collecting it, so nobody will end it: a session cancelled before (or between) observers is dropped here.
+        if (!session.observing) mutex.withLock { sessions.remove(runId) }
         return ProviderActionResult.Accepted
     }
 

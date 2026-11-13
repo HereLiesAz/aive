@@ -74,6 +74,19 @@ class CliAgentProviderTest {
         }
     }
 
+    @Test
+    fun providersRebuiltOverTheSameTempFolderShareOneNoHooksDirectory() {
+        val tmp = createTempDirectory("cli-nohooks").toFile()
+        try {
+            val first = provider(FakeCli(), tmp = tmp)
+            val second = provider(FakeCli(), tmp = tmp)
+            assertEquals(first.noHooks, second.noHooks)
+            assertEquals(1, tmp.listFiles { f -> f.name.startsWith("aive-cli-nohooks-") }.orEmpty().size)
+        } finally {
+            tmp.deleteRecursively()
+        }
+    }
+
     private fun provider(
         cli: FakeCli, settings: CliAgentSettings = settings(), env: Map<String, String> = emptyMap(), tmp: File,
         forSpec: com.hereliesaz.geministrator.providers.cli.CliAgentSpec = spec,
