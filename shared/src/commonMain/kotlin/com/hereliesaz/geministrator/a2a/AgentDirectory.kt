@@ -9,6 +9,7 @@ import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -237,7 +238,7 @@ internal class SearchA2aDirectorySource(
     }
 
     private fun kotlinx.serialization.json.JsonElement?.valueText(): String? =
-        (this as? JsonPrimitive)?.content
+        (this as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content
 
     /** A name given as a plain string or as an object holding it under [key]. */
     private fun kotlinx.serialization.json.JsonElement?.nameText(key: String): String? =

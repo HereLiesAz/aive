@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.retrieval
 
 import java.io.File
+import java.nio.file.Files
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.eclipse.jgit.lib.Constants
@@ -44,14 +45,24 @@ object JGitRepositoryReader : LocalRepositoryReader {
     override suspend fun diskFiles(root: String): List<LocalRepositoryFile> = withContext(Dispatchers.IO) {
         val base = File(root)
         base.walkTopDown()
-            .onEnter { dir -> dir == base || dir.name !in setOf(".git", ".gradle", ".idea", "build", "node_modules") }
-            .filter(File::isFile)
+            .onEnter { dir ->
+                dir == base || (dir.name !in setOf(".git", ".gradle", ".idea", "build", "node_modules") &&
+                    !Files.isSymbolicLink(dir.toPath()))
+            }
+            // A repository with no commit is read from disk: never follow a link out of the root.
+            .filter { it.isFile && !Files.isSymbolicLink(it.toPath()) }
             .map { LocalRepositoryFile(it.relativeTo(base).invariantSeparatorsPath, it.length()) }
             .toList()
     }
 
     override suspend fun readDisk(root: String, path: String): String? = withContext(Dispatchers.IO) {
-        runCatching { File(root, path).readText() }.getOrNull()
+        runCatching {
+            val base = File(root).toPath().toRealPath()
+            val target = File(root, path).toPath()
+            val real = target.toRealPath()
+            // Refuse the file itself or any directory above it being a link that leaves the root.
+            if (Files.isSymbolicLink(target) || !real.startsWith(base)) null else real.toFile().readText()
+        }.getOrNull()
     }
 
     private suspend fun <T> withRepository(root: String, block: (Repository) -> T?): T? = withContext(Dispatchers.IO) {

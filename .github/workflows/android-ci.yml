@@ -1,7 +1,8 @@
 name: Android CI
 
 # Runs unit tests on every push/PR and builds the Android debug app.
-# Release publication belongs exclusively to Build and Deploy.
+# Signed Android releases (Play and GitHub) are built and published only by the central
+# HereLiesAz/workflows runs; Build and Deploy publishes the desktop installers. This workflow publishes nothing.
 # Dependency-graph submission lives only in dependency-submission.yml (path-filtered, single-flight).
 # Target-local CI under HereLiesAz/workflows policy: each job ends with the central
 # ci-report action, which registers this workflow `local`, `ci: true`.
@@ -78,6 +79,12 @@ jobs:
           node --check tools/puppet-rig/app.js
           node --check tools/puppet-rig/rig-core.js
           node tools/puppet-rig/test/rig-core.mjs
+
+      - name: Azphalt package tests
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+          npm test
 
       - name: Clear compose-resource build cache entries
         run: rm -rf ~/.gradle/caches/build-cache/ || true

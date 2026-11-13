@@ -1,6 +1,9 @@
 import unittest
 
-import benchmark
+try:
+    import benchmark
+except ModuleNotFoundError as missing:  # numpy / onnxruntime / transformers are heavy, optional deps
+    raise unittest.SkipTest(f"bitnet benchmark dependencies not installed: {missing.name}")
 
 
 class BenchmarkScoringTest(unittest.TestCase):

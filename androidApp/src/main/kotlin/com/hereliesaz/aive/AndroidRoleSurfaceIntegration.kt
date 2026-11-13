@@ -373,6 +373,9 @@ internal class AndroidRoleSurfaceIntegration(
             val name = safeFileName(source.name).let {
                 if (it.endsWith(".db", true) || it.endsWith(".sqlite", true)) it else "$it.db"
             }
+            require(!isReservedAppDatabaseName(name)) {
+                "Database '$name' belongs to the app's own stores and cannot be used by a role surface"
+            }
             if (writable) {
                 appContext.openOrCreateDatabase(name, Context.MODE_PRIVATE, null)
             } else {
@@ -435,4 +438,15 @@ internal class AndroidRoleSurfaceIntegration(
         const val MAX_SQL_MUTATION_CHARS = 100_000
         const val STALE_SQL_COPY_MILLIS = 10L * 60L * 1000L
     }
+}
+
+/**
+ * The app's own databases (workflows, memory banks, procedures) all start with `aive-`; the legacy
+ * `haive` prefix and Android/Room bookkeeping files are reserved too. A role surface may only open
+ * databases it owns, never the stores that hold approvals, run state and roles.
+ */
+internal fun isReservedAppDatabaseName(name: String): Boolean {
+    val lower = name.trim().lowercase()
+    return lower.startsWith("aive") || lower.startsWith("haive") ||
+        lower.startsWith("androidx") || lower.startsWith("room_") || lower.startsWith("google_app_measurement")
 }

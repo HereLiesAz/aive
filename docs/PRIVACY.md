@@ -1,6 +1,6 @@
 # Privacy Policy for The Aive
 
-**Effective date: November 2, 2026**
+**Effective date: November 13, 2026**
 
 This policy describes the current source-available builds of **The Aive**, application ID `com.hereliesaz.aive`.
 
@@ -15,7 +15,7 @@ Android ships in two flavors. The **GitHub release** flavor (APKs published on G
 - The current source does **not** include advertising SDKs.
 - The current source does **not** include third-party analytics, behavioral tracking, Crashlytics, Sentry, Mixpanel, Amplitude, or similar telemetry SDKs.
 - The GitHub release flavor for Android has opt-in crash/ANR reporting: it is **off unless you turn it on** in Settings. It is first-party code that posts to a first-party relay, not a telemetry SDK. See [Crash and ANR reports](#crash-and-anr-reports-github-release-flavor-only).
-- Android has an opt-in **Remote access** feature, **off by default**, that lets your own IDEaz on another device reach The Aive through a relay. The relay sees only encrypted data, a room name and your IP address. See [Remote access](#remote-access-android).
+- Android has a **Remote access** feature that is currently not available (switched off in the code; nothing is created or connected). If released it would be opt-in and **off by default**, and would let your own IDEaz on another device reach The Aive through a relay. The relay sees only encrypted data, a room name and your IP address. See [Remote access](#remote-access-android).
 - Every build has an opt-in **Trace export** to an OpenTelemetry collector that you name, **off by default**. It sends run structure, timing, token counts and cost; prompts and outputs only if you turn on a second toggle. See [Trace export](#trace-export-opentelemetry).
 - The Aive does **not** sell personal information.
 - Workflow state is stored locally by the application unless it must be sent to an external service to perform work you requested.
@@ -63,7 +63,7 @@ The Android app sets `allowBackup="true"`. If Android device backup is on, the s
 
 The Aive works with external services only when you connect them and assign work to them.
 
-- **Hosted LLM providers.** OpenAI, Anthropic (Claude), Google Gemini, xAI (Grok), DeepSeek, Groq, Cerebras, Mistral, Hugging Face Inference, OpenRouter, Together AI, Fireworks AI, Perplexity, Cohere, NVIDIA NIM, SambaNova, Ollama Cloud (some of its models need credits on your Ollama account from 2026-11-09), Z.ai, and Cloudflare Workers AI. Each receives prompts through its own API using the key you supply. If you connect OpenAI, node-character image generation also sends its image prompts to OpenAI's Images API.
+- **Hosted LLM providers.** OpenAI, Anthropic (Claude), Google Gemini, xAI (Grok), DeepSeek, Groq, Cerebras, Mistral, Hugging Face Inference, OpenRouter, Together AI, Fireworks AI, Perplexity, Cohere, NVIDIA NIM, SambaNova, Ollama Cloud (some of its models need credits on your Ollama account from 2026-11-09), Z.ai, Pollinations, and Cloudflare Workers AI. Each receives prompts through its own API using the key you supply. If you connect OpenAI, node-character image generation also sends its image prompts to OpenAI's Images API.
 - **Plan review.** When you launch a swarm with a linked planner, or draft one from a description, the plan the planner wrote is sent, with your objective and the names of the roles it uses, to a reviewer before anything runs (up to three times: the plan, the reviewer's objections, a reworked plan). The reviewer is a provider you have linked, the one its role is pinned to if it is pinned, otherwise the first of your linked providers that answers (a linked keyless gateway last, with the same logging as above). It is never sent to an unlinked gateway. What the reviewer says is shown to you as plain text and is not kept after you decide.
 - **Keyless free tiers.** Kilo Gateway, LLM7, and OVHcloud AI Endpoints need no key, and they are linked by default: the first time the app starts (and for a keyless source added in a later release) each one is turned on, once, with no tap. Prompts and repository text sent to one of them leave your device unauthenticated, go to a third party that may log them, and are limited by your IP address (Kilo 200 requests an hour, OVHcloud 2 a minute). They are used only when no source you added is available, never in place of a source a creature is set to, and never for a creature set to another source. **Connections** has one switch that turns every keyless source off, and each source can be disconnected on its own; a source you disconnect is not turned back on. The AI Horde image generator, also keyless, is turned on the same way and sends image prompts to volunteer workers.
 - **Companion apps on Android (IDEaz).** Apps signed with The Aive's own key can ask it to run a prompt or start a workflow ([Remote API](Remote-API.md)). A prompt goes to the provider that app names, or else to the provider you linked for planning; The Aive never sends one to an unlinked keyless gateway on its own. Other apps cannot use this. With [Remote access](#remote-access-android) on, your own IDEaz on another device can do the same through an encrypted relay.
@@ -151,7 +151,9 @@ If you switch on procedural trace capture (`proceduralTraceCaptureEnabled`, the 
 
 ## Remote access (Android)
 
-Remote access lets IDEaz on another device of yours run prompts on your linked AI providers and start workflows on this device. It exists in both Android flavors and is **off by default**: nothing runs, connects or is created until you turn on **Settings → Remote Access**.
+**Remote access is not available in this version.** It is switched off in the code (`RemoteAccessController.AVAILABLE = false`): the setting is hidden, no pairing or relay connection is ever created, and the foreground-service and notification permissions are not declared. The section below describes what it will do if it is released; none of it happens today.
+
+Remote access would let IDEaz on another device of yours run prompts on your linked AI providers and start workflows on this device. It would exist in both Android flavors and be **off by default**: nothing would run, connect or be created until you turned on **Settings → Remote Access**.
 
 - **What turning it on does.** The Aive creates a random pairing (a room name, two relay tokens and an encryption key) and runs a foreground service, shown by a persistent notification, that keeps a connection to a relay open. The relay defaults to `https://aive-relay.hereliesaz.workers.dev`, operated by the project maintainer on Cloudflare; you can enter your own relay before turning it on.
 - **What the relay sees.** Every message between The Aive and IDEaz is encrypted on your devices with a key that never leaves the pairing code, so the relay and Cloudflare see only ciphertext, its size and timing, the room name, and the IP addresses of the two devices. They cannot read your prompts, the replies or your workflows. The relay stores only hashes of the two tokens, and deletes a room 30 days after The Aive last connected to it.

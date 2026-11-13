@@ -116,6 +116,30 @@ class AgentDirectoryTest {
     }
 
     @Test
+    fun jsonNullFieldsAreAbsentNotTheTextNull() = runTest {
+        val body = """
+            {"schema":1,"source":"searcha2a","match_mode":"semantic","results":[
+              {"kind":"a2a-agent","installable":false,"verification":"card_read_only",
+               "name":null,"source_url":"https://nul.example.org/card","skills":[{"name":"x"}],
+               "backing":{"declared_provider":null,"hosting":null},
+               "access":{"keyless":null}}
+            ]}
+        """.trimIndent()
+        val client = HttpClient(MockEngine {
+            respond(body, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+        })
+        try {
+            val row = SearchA2aDirectorySource(client).search("anything").single()
+            assertNull(row.declaredSource)
+            assertNull(row.declaredHosting)
+            assertNull(row.keyless)
+            assertEquals("nul.example.org", row.name)
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
     fun backingObjectsAndKeylessFromTheWorkerShapeAreRead() = runTest {
         val body = """
             {"schema":1,"source":"searcha2a","match_mode":"semantic","results":[

@@ -252,8 +252,12 @@ Yarn can try to download a local library from the npm registry. Rebuild the pinn
 publications before using this option locally; their native version alone does not identify
 the source revision.
 
-Android signing is used when signing secrets are available. Play publishing is a separate delivery
-step and uses the repository Play service-account secret when enabled.
+This repository holds no signing material and publishes no signed Android artifact. Signed Play and
+GitHub Android releases (including the Android `versionCode`, passed as `-Papp.versionCode`, and the
+16 KB native-alignment check on the signed bundle) are built and published by the central
+`HereLiesAz/workflows` runs (`android-play-release.yml`, `android-github-release.yml`). Here,
+`multiplatform.yml` builds unsigned debug and R8-minified variants, checks the native libraries'
+16 KB alignment, and publishes only the desktop installers.
 
 The checked-in release line remains four-part (`MAJOR.MINOR.PATCH.BUILD`). Exact builds keep
 immutable four-part Git tags, while GitHub Release objects are grouped by patch: all `0.9.6.x`
