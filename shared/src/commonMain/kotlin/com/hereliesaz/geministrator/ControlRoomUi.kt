@@ -45,6 +45,8 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.produceState
 import com.hereliesaz.geministrator.log.AppLog
+import com.hereliesaz.geministrator.tour.TourTargetId
+import com.hereliesaz.geministrator.tour.tourTarget
 import com.hereliesaz.geministrator.log.sessionScope
 import com.hereliesaz.geministrator.workflow.SessionActivityFeeds
 import com.hereliesaz.geministrator.workflow.ProgressiveDelegationStore
@@ -836,8 +838,8 @@ private fun ShellHeader(
                 )
             }
             if (!compact) Breadcrumb(crumbs, Modifier.weight(1f)) else Spacer(Modifier.weight(1f))
-            InboxBadge(unread = unreadInbox, onClick = onOpenInbox)
-            KeeperButton(selected = keeperOpen, onClick = onOpenKeeper)
+            InboxBadge(unread = unreadInbox, onClick = onOpenInbox, modifier = Modifier.tourTarget(TourTargetId.MESSAGES_BUTTON))
+            KeeperButton(selected = keeperOpen, onClick = onOpenKeeper, modifier = Modifier.tourTarget(TourTargetId.KEEPERS_ROOM_GEAR))
         }
         if (compact) Breadcrumb(crumbs, Modifier.fillMaxWidth())
     }
