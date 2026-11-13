@@ -675,7 +675,7 @@ class AzphaltStoreService(
     }
 
     private fun requireSha256(value: String?, label: String) {
-        require(value?.lowercase()?.matches(Regex("sha256-[0-9a-f]{64}")) == true) {
+        require(azphaltSha256Hex(value) != null) {
             "Remote model $label requires a sha256-<hex> checksum"
         }
     }
