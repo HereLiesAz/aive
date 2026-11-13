@@ -99,6 +99,46 @@ class MemoryCueWatcherTest {
     }
 
     @Test
+    fun lingeringOnATagGoesDeeperAndNeverChangesAStoredMemory() = runBlocking {
+        val store = InMemoryMemoryStore()
+        MemoryConsolidationQueue(store).enqueueSession(
+            MemorySessionEnvelope(
+                "s1",
+                workflowRunId = "session:agent-1",
+                userPrompt = "Move the memory store off JSON settings.",
+                parts = listOf(
+                    MemorySessionPart(
+                        MemorySourceKind.AgentNote,
+                        "Agent",
+                        "We decided to replace SettingsMemoryStore with an append-only log in MemoryLog.kt because every commit re-encoded the snapshot.",
+                    ),
+                ),
+                closedAtEpochMillis = 1L,
+            ),
+        )
+        val controller = MemoryLayerController(
+            banks = MemoryBanks.inMemory(mapOf("session:agent-1" to store)),
+            settingsStore = MemoryLayerSettingsStore(MapSettings()),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            nowEpochMillis = { 1_000L },
+        )
+        controller.drain()
+        val before = store.read()
+        val handle = ManagedSessionHandle(TaskRunId("agent-1"), AgentProviderId("p"), ProviderRunId("r"))
+        val sent = mutableListOf<String>()
+        // Four follows of the same tag: gist, key phrases, finer summaries, then what they were condensed from.
+        repeat(4) {
+            controller.observer.onSessionEvent(handle, AgentEvent.Thinking(ProviderRunId("r"), "Back to #SettingsMemoryStore and its storage.")) {
+                sent += it
+                ProviderActionResult.Accepted
+            }
+        }
+        assertTrue(sent.first().startsWith(MEMORY_MESSAGE_MARKER) && "append-only log" in sent.first(), sent.first())
+        assertEquals(before, store.read(), "surfacing writes nothing to a stored memory")
+    }
+
+    @Test
     fun userPromptsDrawACueCloudToo() = runBlocking {
         val store = InMemoryMemoryStore()
         MemoryConsolidationQueue(store).enqueueSession(
