@@ -16,10 +16,10 @@ on:
       - main
   workflow_dispatch:
 
+# Least privilege: each job below declares what it needs. id-token is only for the central
+# ci-report action (and Pages deploy); pages: write is only for deploy-pages.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   # Main/release runs must never be cancelled after an immutable tag has been created.
@@ -32,6 +32,9 @@ jobs:
     name: Resolve four-part version
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -50,6 +53,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Check out repository
@@ -383,6 +389,9 @@ jobs:
     needs: version
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 75
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -638,6 +647,10 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
