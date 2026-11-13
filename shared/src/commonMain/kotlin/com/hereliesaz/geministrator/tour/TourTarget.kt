@@ -97,9 +97,9 @@ sealed interface TourEvent {
 }
 
 /**
- * Where tagged controls report their window bounds and taps. Nothing is recorded unless [tracking] is on (the overlay
- * layer switches it on only while a tour is active), so the tags cost one flag check when no tour runs.
- * It never reads a control's content and never acts for the keeper.
+ * Where tagged controls report their window bounds and taps. Bounds are always kept (cheap); taps and "opened" are
+ * reported only while [tracking] is on (a tour is active). It never reads a control's content and never acts for the
+ * keeper.
  */
 object TourTargetRegistry {
     private val bounds = mutableStateMapOf<TourTargetId, Rect>()
@@ -112,7 +112,6 @@ object TourTargetRegistry {
         get() = trackingState.value
         internal set(value) {
             trackingState.value = value
-            if (!value) bounds.clear()
         }
 
     /** Where the control is now, or null while it is not on screen. */
@@ -141,7 +140,7 @@ object TourTargetRegistry {
 /**
  * Tags a real control with its stable tutorial id. Invisible: it draws nothing, changes no layout, consumes no pointer
  * event and no focus, and adds no semantics. It only reports the control's bounds, that it entered the tree, and that
- * a press-and-release happened on it, while a tour is active.
+ * a press-and-release happened on it (the last two only while a tour is active).
  */
 fun Modifier.tourTarget(id: TourTargetId): Modifier = composed {
     DisposableEffect(id) {
@@ -150,7 +149,9 @@ fun Modifier.tourTarget(id: TourTargetId): Modifier = composed {
     }
     Modifier
         .onGloballyPositioned { coordinates ->
-            if (TourTargetRegistry.tracking) TourTargetRegistry.register(id, coordinates.boundsInWindow())
+            // Always recorded (one equality check and, only when it moved, one map write), so a tour that starts
+            // while the control is already on screen can find it without a new layout pass.
+            TourTargetRegistry.register(id, coordinates.boundsInWindow())
         }
         .pointerInput(id) {
             awaitEachGesture {
