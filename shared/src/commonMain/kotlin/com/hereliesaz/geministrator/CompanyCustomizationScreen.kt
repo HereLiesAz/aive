@@ -1647,7 +1647,7 @@ private fun RoleDefinition.companyDepartment(): String = when (id.value) {
     "orchestrator" -> stringResource(Res.string.swarm_executive)
     "product-manager", "researcher", "ux-designer" -> stringResource(Res.string.swarm_product)
     "architect", "epa-representative", "implementation-engineer" -> stringResource(Res.string.swarm_engineering)
-    "crash-test-dummy", "qa-engineer", "adversarial-reviewer", "code-reviewer", "recovery-engineer" -> stringResource(Res.string.swarm_assurance)
+    "crash-test-dummy", "qa-engineer", "adversarial-reviewer", "reviewer", "plan-reviewer", "code-reviewer", "recovery-engineer" -> stringResource(Res.string.swarm_assurance)
     "release-engineer" -> stringResource(Res.string.swarm_delivery)
     else -> stringResource(Res.string.swarm_custom)
 }

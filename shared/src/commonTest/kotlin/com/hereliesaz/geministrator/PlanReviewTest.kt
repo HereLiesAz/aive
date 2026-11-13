@@ -176,16 +176,26 @@ class PlanReviewTest {
     }
 
     @Test
-    fun theAdversarialReviewerReviewsAndOtherwiseAnyRoleThatMayRejectAndApprovePlans() {
+    fun theGenericReviewerReviewsThenTheAdversarialOneThenAnyRoleThatMayRejectAndApprovePlans() {
         val roles = BuiltInRoles.all
-        assertEquals(BuiltInRoles.AdversarialReviewer.id, planReviewerRole(roles)?.id)
+        assertEquals(BuiltInRoles.Reviewer.id, planReviewerRole(roles)?.id)
 
-        val without = roles.map { if (it.id == BuiltInRoles.AdversarialReviewer.id) it.copy(enabled = false) else it }
-        val fallback = planReviewerRole(without)
-        assertTrue(fallback != null && fallback.id != BuiltInRoles.AdversarialReviewer.id && fallback.id != BuiltInRoles.Orchestrator.id)
+        val noGeneric = roles.map { if (it.id == BuiltInRoles.Reviewer.id) it.copy(enabled = false) else it }
+        assertEquals(BuiltInRoles.AdversarialReviewer.id, planReviewerRole(noGeneric)?.id)
+
+        val neither = noGeneric.map { if (it.id == BuiltInRoles.AdversarialReviewer.id) it.copy(enabled = false) else it }
+        val fallback = planReviewerRole(neither)
+        assertTrue(fallback != null && fallback.id != BuiltInRoles.Orchestrator.id && fallback.id != BuiltInRoles.Planner.id)
         assertTrue(RoleAuthority.RejectPlan in fallback!!.authorities && RoleAuthority.ApprovePlan in fallback.authorities)
 
         assertNull(planReviewerRole(roles.map { it.copy(enabled = false) }))
+    }
+
+    @Test
+    fun anOldPlanReviewerIdOpensAsTheGenericReviewer() {
+        val old = BuiltInRoles.Reviewer.copy(id = com.hereliesaz.geministrator.domain.RoleDefinitionId("plan-reviewer"))
+        val roles = BuiltInRoles.all.filter { it.id != BuiltInRoles.Reviewer.id } + old
+        assertEquals("plan-reviewer", planReviewerRole(roles)?.id?.value)
     }
 
     @Test
