@@ -965,6 +965,7 @@ class WorkflowEngine(
         }
 
         nextRun = stopRolesOverBudget(nextRun, handles, nowEpochMillis)
+        nextRun = stopStepsOverAllowance(definition, nextRun, handles, nowEpochMillis)
         // A task that failed in this pass has not met its failure policy yet (the caller applies it
         // next): what is conditioned on its failure waits for that decision.
         val failedThisPass = nextRun.taskRuns
@@ -1296,47 +1297,7 @@ class WorkflowEngine(
             if (taskRun.status !in BUDGET_STOPPABLE) continue
             val roleId = taskRun.assignedRoleId ?: continue
             if (!roleBudgetSpent(nextRun, roleId)) continue
-            // The task is parked either way so nothing more is sent, but a session the provider would not
-            // stop keeps billing: that is recorded, not lost.
-            var stoppedUsage: ManagedSessionUsage? = null
-            withContext(NonCancellable) {
-                val refusal = sessionGateway.cancelFailure(handle)
-                if (refusal != null) {
-                    runCatching {
-                        eventSink.append(
-                            ExternalRunCancelFailed(
-                                workflowRunId = run.id,
-                                taskDefinitionId = taskId,
-                                externalRunId = handle.providerRunId.value,
-                                reason = refusal,
-                                occurredAtEpochMillis = nowEpochMillis,
-                            ),
-                        )
-                    }
-                } else {
-                    // What it spent between the last poll and the stop is still spent: it counts toward the budget.
-                    stoppedUsage = runCatching { sessionGateway.usageReport(handle)?.sanitized() }.getOrNull()
-                    stoppedUsage?.let { usage ->
-                        runCatching {
-                            eventSink.append(
-                                ProviderUsageRecorded(
-                                    workflowRunId = run.id,
-                                    taskDefinitionId = taskId,
-                                    providerId = handle.providerId,
-                                    providerRunId = handle.providerRunId,
-                                    inputTokens = usage.inputTokens,
-                                    outputTokens = usage.outputTokens,
-                                    costUsd = usage.costUsd,
-                                    cacheHitFraction = usage.cacheHitFraction,
-                                    latencyMillis = usage.latencyMillis,
-                                    costUnknown = usage.costUnknown,
-                                    occurredAtEpochMillis = nowEpochMillis,
-                                ),
-                            )
-                        }
-                    }
-                }
-            }
+            val stoppedUsage = stopSession(run, taskId, handle, nowEpochMillis)
             TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Blocked)
             nextRun = nextRun.copy(
                 taskRuns = nextRun.taskRuns + (
@@ -1352,6 +1313,94 @@ class WorkflowEngine(
                         progress = null,
                         progressMessage = null,
                         providerPlan = null,
+                    )
+                ),
+                updatedAtEpochMillis = nowEpochMillis,
+            )
+        }
+        return nextRun
+    }
+
+    /**
+     * Cancels [handle]'s provider session and returns what it spent between the last poll and the stop, which still counts.
+     * A session the provider would not stop keeps billing: that is recorded, not lost.
+     */
+    private suspend fun stopSession(
+        run: WorkflowRun,
+        taskId: TaskDefinitionId,
+        handle: ManagedSessionHandle,
+        nowEpochMillis: Long,
+    ): ManagedSessionUsage? {
+        // The task is parked either way so nothing more is sent, but a session the provider would not
+        // stop keeps billing: that is recorded, not lost.
+        var stoppedUsage: ManagedSessionUsage? = null
+        withContext(NonCancellable) {
+            val refusal = sessionGateway.cancelFailure(handle)
+            if (refusal != null) {
+                runCatching {
+                    eventSink.append(
+                        ExternalRunCancelFailed(
+                            workflowRunId = run.id,
+                            taskDefinitionId = taskId,
+                            externalRunId = handle.providerRunId.value,
+                            reason = refusal,
+                            occurredAtEpochMillis = nowEpochMillis,
+                        ),
+                    )
+                }
+            } else {
+                // What it spent between the last poll and the stop is still spent: it counts toward the budget.
+                stoppedUsage = runCatching { sessionGateway.usageReport(handle)?.sanitized() }.getOrNull()
+                stoppedUsage?.let { usage ->
+                    runCatching {
+                        eventSink.append(
+                            ProviderUsageRecorded(
+                                workflowRunId = run.id,
+                                taskDefinitionId = taskId,
+                                providerId = handle.providerId,
+                                providerRunId = handle.providerRunId,
+                                inputTokens = usage.inputTokens,
+                                outputTokens = usage.outputTokens,
+                                costUsd = usage.costUsd,
+                                cacheHitFraction = usage.cacheHitFraction,
+                                latencyMillis = usage.latencyMillis,
+                                costUnknown = usage.costUnknown,
+                                occurredAtEpochMillis = nowEpochMillis,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+        return stoppedUsage
+    }
+
+    /**
+     * Token allowance breaker for a step made from a template: the provider session of a step that has used its whole
+     * allowance is cancelled and the step fails with [STEP_ALLOWANCE_EXCEEDED]. The caller does not retry it; the queen says so in Messages.
+     */
+    private suspend fun stopStepsOverAllowance(
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        handles: Map<TaskDefinitionId, ManagedSessionHandle>,
+        nowEpochMillis: Long,
+    ): WorkflowRun {
+        var nextRun = run
+        for ((taskId, handle) in handles) {
+            val taskRun = nextRun.taskRuns[taskId] ?: continue
+            if (taskRun.status !in BUDGET_STOPPABLE) continue
+            val task = definition.tasks.firstOrNull { it.id == taskId } ?: continue
+            if (!stepAllowanceSpent(task, taskRun)) continue
+            val stoppedUsage = stopSession(run, taskId, handle, nowEpochMillis)
+            val counted = taskRun.copy(usage = stoppedUsage?.let { taskRun.usage.plus(it) } ?: taskRun.usage)
+            TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Failed)
+            nextRun = nextRun.copy(
+                taskRuns = nextRun.taskRuns + (
+                    taskId to counted.copy(
+                        status = TaskRunStatus.Failed,
+                        blockingReason = stepAllowanceReason(task, counted),
+                        progress = null,
+                        progressMessage = null,
                     )
                 ),
                 updatedAtEpochMillis = nowEpochMillis,

@@ -113,6 +113,8 @@ private fun voiceResource(voice: QueenVoice): StringResource = when (voice) {
         QueenVoice.StepSkipped -> Res.string.queen_say_step_skipped
         // The Nanny's finding about a template, passed on mid-run.
         QueenVoice.SuggestNannyTemplate -> Res.string.queen_say_suggest_nanny_template
+        // A step stopped at its token allowance.
+        QueenVoice.StepAllowanceStopped -> Res.string.queen_say_step_allowance_stopped
 }
 
 @Composable

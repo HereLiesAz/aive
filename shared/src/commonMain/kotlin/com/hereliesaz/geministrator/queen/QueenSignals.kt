@@ -8,8 +8,11 @@ import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.isTerminal
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
+import com.hereliesaz.geministrator.workflow.STEP_ALLOWANCE_EXCEEDED
 import com.hereliesaz.geministrator.workflow.isHeldForRoleBudget
 import com.hereliesaz.geministrator.workflow.roleTokensSpent
+import com.hereliesaz.geministrator.workflow.stepTokenAllowance
+import com.hereliesaz.geministrator.workflow.stepTokensUsed
 
 /** Something the queen can count in the run, with no model: the basis of her "I noticed". */
 sealed interface QueenSignal {
@@ -120,6 +123,24 @@ fun queenSignals(
     }
     return signals
 }
+
+/**
+ * One note per step that was stopped because it used its whole token allowance (a step made from a template): what it used,
+ * what it was allowed, and that it was not tried again. Said at every level, since it explains why a step did not finish.
+ */
+internal fun stepAllowanceNotes(definition: WorkflowDefinition, run: WorkflowRun): List<QueenNote> =
+    definition.tasks.mapNotNull { task ->
+        val taskRun = run.taskRuns[task.id] ?: return@mapNotNull null
+        if (taskRun.blockingReason?.code != STEP_ALLOWANCE_EXCEEDED) return@mapNotNull null
+        if (taskRun.status != TaskRunStatus.Failed && taskRun.status != TaskRunStatus.Escalated) return@mapNotNull null
+        val allowance = stepTokenAllowance(task) ?: return@mapNotNull null
+        QueenNote(
+            queenNoteId(run.id.value, "watch", "stepallowance", task.id.value, taskRun.attempt.toString()),
+            QueenVoice.StepAllowanceStopped,
+            listOf((definition.tasks.indexOf(task) + 1).toString(), queenSlot(task.name), stepTokensUsed(taskRun).toString(), allowance.toString()),
+            QueenLink.Creature(task.id.value, CreatureTab.Work),
+        )
+    }
 
 /**
  * One note per creature that has passed the time the queen allowed and is still working (Helpful only): she is
