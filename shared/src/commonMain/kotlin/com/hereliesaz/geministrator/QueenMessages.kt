@@ -100,6 +100,9 @@ private fun voiceResource(voice: QueenVoice): StringResource = when (voice) {
         QueenVoice.MissingReviewerNoRoom -> Res.string.queen_say_missing_reviewer_no_room
         QueenVoice.MissingReviewerNoSecondSource -> Res.string.queen_say_missing_reviewer_no_second_source
         QueenVoice.FinishedNotReached -> Res.string.queen_say_finished_not_reached
+        // Blockers: what the hive still needs made or obtained.
+        QueenVoice.MissingBlocker -> Res.string.queen_say_missing_blocker
+        QueenVoice.FinishedBlockersOpen -> Res.string.queen_say_finished_blockers_open
 }
 
 @Composable
@@ -141,7 +144,7 @@ internal fun queenTitle(note: QueenNote): String = stringResource(
     if (note.suggestion != null) Res.string.queen_title_suggestion else when (note.voice) {
         QueenVoice.StatusWorking, QueenVoice.StatusWorkingClear, QueenVoice.StatusIdle, QueenVoice.StatusIdleClear -> Res.string.queen_title_status
         QueenVoice.FinishedAll, QueenVoice.FinishedAllCost, QueenVoice.FinishedFailed,
-        QueenVoice.FinishedFailedNoStep, QueenVoice.FinishedStopped, QueenVoice.FinishedNotReached -> Res.string.queen_title_finish
+        QueenVoice.FinishedFailedNoStep, QueenVoice.FinishedStopped, QueenVoice.FinishedNotReached, QueenVoice.FinishedBlockersOpen -> Res.string.queen_title_finish
         QueenVoice.TrainingOffer, QueenVoice.TrainingStopped, QueenVoice.TrainingNeedsYou, QueenVoice.TrainingAdopted -> Res.string.queen_title_training
         else -> when (note.relay) {
             QueenRelay.Waits -> Res.string.queen_title_waits

@@ -39,25 +39,58 @@ The Nanny can propose a change to a step template or to a role's own definition.
 - **What a change may never touch.** Effects, the approval floor, privacy limits, the output kind and schema, input ports, the role it uses, and for a role its identity, capabilities, authorities and way of running. Tools may only be narrowed; limits may only be tightened. This is checked on the data when you adopt, and again whenever the catalog resolves a version.
 - **Wording may become more specific.** A revision may add what the Nanny has learned works. The first-run tutorial keeps using the built-in roles unless you adopted a revision.
 
+## Starting points: presets and the artifact set
+
+The quickstart intents, artifact types, actions and capabilities of the Artifact tool (36 steps) are **starting points**, not a checklist. A hive needs what it needs; these are the shapes of what a creature can be asked to make, so the queen, the planner and you can begin from a step that already has a checked output instead of a blank task. They are in the catalog as templates and **presets**. A preset is a template of its own id made from a built-in by changing data only (wording, the compiled check on the output, the output kind, the input ports, the reach of the tool); it has no executor of its own, runs through the same contract machinery, and the Nanny improves it as its own lineage (`template/StepPresets.kt`). The ledger of where each of the 36 stands is data too (`template/ArtifactStepCoverage.kt`) and a test accounts for every one.
+
+Two templates joined the six: **Draw a diagram** (a Mermaid flowchart, checked by the same reader the Flowchart view uses) and **Prepare files for a repository** (files written on a new dedicated branch; the result must name a branch that is not a shared one and list the files; it changes a branch, so it asks first and tries once, and the existing gated repository steps commit and push; no hosted page). The presets:
+
+| Preset | From | What it is for | Output check |
+|---|---|---|---|
+| `deck-outline` | write a document | an outline of a slide deck, one heading per slide (no slide renderer) | Markdown, two headings at least |
+| `docs-draft` | write a document | a draft ready to paste into a document tool | Markdown, two headings at least |
+| `design-tokens` | write a document | design tokens of a design system | one JSON object |
+| `design-page`, `explainer-page`, `data-page` | make a page | a mock-up, an explainer, a page of given data with its sources | one page, nothing loaded from outside |
+| `sheet-table` | turn text into a table | rows for a spreadsheet | comma-separated, every column named |
+| `read-one-item`, `list-connected-source`, `query-connected-rows` | read from a connected tool | one item, a list, records (the last two hand back a table) | text, or a table |
+| `read-repository-files` | read from a connected tool | read the linked repository's files, nothing written | text |
+| `change-connected-rows` | change something in a connected tool | change records in a database or sheet tool | `TARGET:` and `CHANGED:` |
+| `remove-in-connected-source` | change something in a connected tool | remove one thing with a tool that asks on every call | `TARGET:` and `CHANGED:` |
+| `update-repository-files`, `add-assets-to-repository`, `prepare-download-files` | prepare files for a repository | change files on an existing branch, add assets, files to download | `BRANCH:` and `FILES:` |
+
+A preset that changes something keeps its approval floor and its single attempt, and the queen never makes one by herself. The presets are not in Add creature (they would crowd it); they are what a blocker names.
+
+## Blockers
+
+A **blocker** is anything that must be created or obtained for a particular hive to be complete: a document, a page, a table, files on a branch, a read or a change of a connected tool, a thing only you can supply. It is typed data on the run: an id, one plain sentence, optionally a starting template from the closed catalog (a template or preset above, validated; "none" otherwise), optionally the step that makes it, and a state: open, in progress, done or dropped (`queen/Blockers.kt`).
+
+- **Who adds one.** The planner, in its plan (`blockers`, each as a line, optionally ` => template-id` and ` @ step-id`; unknown templates and steps are dropped, at most eight, the queen's pick never a step that changes something). The queen, in the middle of a run. You, in the existing hive form. The Nanny's findings, for the next hive. Recording one calls no model.
+- **Where you see it.** In Messages as what is missing (the existing "Something is missing" row, with the blocker's own words on a quoted line and a link to its step, else the Story), and in the finish note when the swarm finished with one still open.
+- **What it holds.** The hive is not called reached while a blocker is open or in progress (`hiveReached`); a finished swarm with every sign met but a blocker open is said to be finished, not reached. A blocker with a step follows that step (done when it is done, in progress while it works, open again when it fails); you can mark one done or dropped.
+- **Giving it a step.** `Blockers.assignStep` makes a step from the starting template (the template's own contract, the version the catalog has now, its first required input set to the sentence) and checks the swarm with the existing validation; an effectful template is yours to start and still needs its approval before it validates.
+- **Carry-forward.** `Blockers.carryForward` turns what a finished hive left unmet into open blockers for the next one.
+
+Built: the data, the planner's and the queen's and your way of adding one (as functions), the state following the run, the check on the hive, the sentences in Messages and the finish note, the memory of a run's blockers. Not yet wired: the plan's blockers are remembered per run in memory only (they are lost with the app); nothing yet calls `assignStep` or `carryForward` from a live run, the queen does not yet add one mid-run by herself, your add and mark controls are not in the hive form, and the Nanny's findings do not yet become blockers. A saved swarm for a goal is not provided: a goal's blockers come from its plan.
+
 ## Steps that cannot run in Aive
 
-Thirteen steps of the artifact set are not built, because they need a claude.ai-hosted artifact, or a capability of a hosted page, or a device feature Aive has no code for:
+These are simply not available as starting points. None of them is a blocker or something you must waive. Thirteen things of the artifact set need a claude.ai-hosted artifact, a capability of a hosted page, or a device feature Aive has no code for (twelve whole steps, and the hosted halves of publish and upload-assets, which are built in their repository form above):
 
-1. actions/quickstart, the router of that tool (the catalog and the queen's pick are the equivalent)
-2. actions/publish, as a hosted page with a private address and versions (the nearest is files on a repository branch, then the existing gated repository steps)
-3. actions/open
-4. actions/pin-unpin
-5. actions/upload-assets
-6. actions/artifact-comments
-7. capabilities/assets
-8. capabilities/artifact, also called self
-9. capabilities/comments
-10. capabilities/room
-11. capabilities/user
-12. capabilities/dictation (no speech-recognition code)
-13. capabilities/tts (no speech code)
+1. actions/quickstart: the router of that tool; the catalog and the queen's pick are the equivalent.
+2. actions/publish as a hosted page with a private address and versions; the repository form is `prepare-files-for-repository`.
+3. actions/open: it only shows a hosted artifact; the Story already shows what a step made.
+4. actions/pin-unpin: the claude.ai sidebar.
+5. actions/upload-assets as a hosted asset store; the repository form is `add-assets-to-repository`.
+6. actions/artifact-comments: claude.ai comment threads (a change step with a Slack or GitHub tool can post a comment elsewhere).
+7. capabilities/assets: a hosted asset store.
+8. capabilities/artifact, and its deprecated alias capabilities/self: a hosted page republishing itself.
+9. capabilities/comments: a hosted comment store.
+10. capabilities/room: live presence on a hosted page.
+11. capabilities/user: the identity of the viewer of a hosted page.
+12. capabilities/dictation: no speech-recognition code.
+13. capabilities/tts: no speech code.
 
-Built on the six steps above, in some honest form, are the rest of the intents, types, reads and the connected-tool capability. Not yet built: a diagram step, a list step, a remove preset and the database presets.
+Options if you want one of the hosted ones: connect a tool that offers it (for example the Artifact tool exposed as an MCP server you connect), after which the read and change steps can use it; or do without. Nothing is faked.
 
 ## Not done in this slice
 

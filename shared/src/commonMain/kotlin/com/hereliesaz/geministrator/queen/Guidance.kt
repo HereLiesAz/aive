@@ -84,11 +84,18 @@ fun checkHive(definition: WorkflowDefinition, run: WorkflowRun, signs: List<Hive
 }
 
 /**
- * The hive is reached (pure, observable): the run completed and every sign shows. A run that finishes with a sign unmet is
+ * The hive is reached (pure, observable): the run completed, every sign shows and no blocker is open. A run that finishes with a sign unmet is
  * finished but not reached, and she says so (see [finishNote]).
  */
-fun hiveReached(definition: WorkflowDefinition, run: WorkflowRun, signs: List<HiveSign> = emptyList()): Boolean =
-    run.status == WorkflowRunStatus.Completed && checkHive(definition, run, signs).all { it.met }
+fun hiveReached(
+    definition: WorkflowDefinition,
+    run: WorkflowRun,
+    signs: List<HiveSign> = emptyList(),
+    /** What the hive still needs created or obtained: while any is open or in progress, the hive is not reached (see [Blockers]). */
+    blockers: List<Blocker> = emptyList(),
+): Boolean =
+    run.status == WorkflowRunStatus.Completed && checkHive(definition, run, signs).all { it.met } &&
+        Blockers.unmet(Blockers.resolved(blockers, definition, run)).isEmpty()
 
 /** The step to look at first when a sign is unmet: the sign's own step, or for nothing-failed the first step that failed. */
 internal fun firstUnmetStep(definition: WorkflowDefinition, run: WorkflowRun, checks: List<HiveCheck>): TaskDefinition? {

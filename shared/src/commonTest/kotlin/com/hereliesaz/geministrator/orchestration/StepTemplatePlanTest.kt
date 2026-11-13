@@ -28,7 +28,7 @@ class StepTemplatePlanTest {
     fun theCatalogOffersNothingThatChangesAnything() {
         val ids = BuiltInTemplates.forPlanner().map { it.id }
         assertTrue("change-connected-source" !in ids)
-        assertEquals(5, ids.size)
+        assertEquals(6, ids.size)
     }
 
     @Test

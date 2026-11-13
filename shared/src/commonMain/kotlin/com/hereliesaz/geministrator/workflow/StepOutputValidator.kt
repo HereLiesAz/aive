@@ -4,6 +4,8 @@ import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.OutputSpec
 import com.hereliesaz.geministrator.domain.TaskContract
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 
 /*
  * The deterministic check on a step's output (docs/Step-Templates.md). An agent's output is model text and
@@ -24,6 +26,9 @@ object StepOutputValidators {
     const val VERDICT = "verdict"
     const val FOUND_TEXT = "found-text"
     const val CHANGE_RESULT = "change-result"
+    const val MERMAID_FLOWCHART = "mermaid-flowchart"
+    const val JSON_OBJECT = "json-object"
+    const val FILES_CHANGE = "files-change"
 
     const val MAX_DOCUMENT_CHARS: Int = 60_000
     const val MAX_PAGE_CHARS: Int = 500_000
@@ -41,6 +46,9 @@ object StepOutputValidators {
         VERDICT to ("verdict" to 1),
         FOUND_TEXT to ("found" to 1),
         CHANGE_RESULT to ("change" to 1),
+        MERMAID_FLOWCHART to ("diagram" to 1),
+        JSON_OBJECT to ("json" to 1),
+        FILES_CHANGE to ("files" to 1),
     )
 
     val ids: Set<String> get() = levels.keys
@@ -72,6 +80,9 @@ object StepOutputValidators {
             VERDICT -> if (ArtifactVerdicts.of(artifact) == null) "The output must begin with a VERDICT line." else null
             FOUND_TEXT -> if (text.length > MAX_FOUND_CHARS) "The output is longer than $MAX_FOUND_CHARS characters." else null
             CHANGE_RESULT -> changeResult(text)
+            MERMAID_FLOWCHART -> mermaid(text)
+            JSON_OBJECT -> jsonObject(text)
+            FILES_CHANGE -> filesChange(text)
             else -> "Unknown output check '$id'."
         }
     }
@@ -110,6 +121,56 @@ object StepOutputValidators {
         if (parsed.rows.isEmpty()) return "The table has no rows."
         if (parsed.rows.size > MAX_TABLE_ROWS) return "The table has more than $MAX_TABLE_ROWS rows."
         if (filled && parsed.columns.any(String::isBlank)) return "Every column needs a header."
+        return null
+    }
+
+    /** [text] without one surrounding code fence (a model often wraps a diagram or JSON in one). */
+    private fun unfence(text: String): String {
+        val trimmed = text.trim()
+        if (!trimmed.startsWith("```")) return trimmed
+        val inner = trimmed.substringAfter('\n', "").trimEnd()
+        return inner.removeSuffix("```").trim()
+    }
+
+    private val flowchartHeader = Regex("""^(?:flowchart|graph)\s+[A-Za-z]{2}$""", RegexOption.IGNORE_CASE)
+
+    /** A Mermaid flowchart the common reader ([MermaidFlowchartParser]) understands, with nothing it has to skip. */
+    private fun mermaid(text: String): String? {
+        if (text.length > MAX_DOCUMENT_CHARS) return "The diagram is longer than $MAX_DOCUMENT_CHARS characters."
+        val body = unfence(text)
+        val first = body.lineSequence().map { it.substringBefore("%%").trim() }.firstOrNull { it.isNotEmpty() }
+            ?: return "The diagram is empty."
+        if (!flowchartHeader.matches(first)) return "The diagram must begin with a flowchart line and a direction, such as `flowchart TD`."
+        val graph = try {
+            MermaidFlowchartParser.parse(body)
+        } catch (_: Exception) {
+            return "The diagram is not a flowchart the app can read."
+        }
+        return if (graph.warnings.isNotEmpty()) "The diagram has a statement the flowchart reader does not understand." else null
+    }
+
+    private fun jsonObject(text: String): String? {
+        if (text.length > MAX_DOCUMENT_CHARS) return "The output is longer than $MAX_DOCUMENT_CHARS characters."
+        val element = try {
+            Json.parseToJsonElement(unfence(text))
+        } catch (_: Exception) {
+            return "The output is not valid JSON."
+        }
+        val obj = element as? JsonObject ?: return "The output must be one JSON object."
+        return if (obj.isEmpty()) "The JSON object is empty." else null
+    }
+
+    private val branchLine = Regex("""(?im)^\W*branch\W*[:=]\s*(\S+)""")
+    private val filesLine = Regex("""(?im)^\W*files?\W*[:=]\s*\S""")
+    private val sharedBranches = setOf("main", "master", "develop", "trunk", "head", "release")
+
+    /** Files written on a dedicated branch: a BRANCH line that is not a shared branch, and a FILES line. */
+    private fun filesChange(text: String): String? {
+        if (text.length > MAX_FOUND_CHARS) return "The output is longer than $MAX_FOUND_CHARS characters."
+        val named = branchLine.find(text)?.groupValues?.get(1)?.trim('`', '"', '\'', '.', ',')
+            ?: return "The result must name the branch (a BRANCH line)."
+        if (named.lowercase().removePrefix("origin/") in sharedBranches) return "The files must be on a dedicated branch, not '$named'."
+        if (!filesLine.containsMatchIn(text)) return "The result must list the files written (a FILES line)."
         return null
     }
 

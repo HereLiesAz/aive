@@ -2083,6 +2083,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_say_missing_reviewer_over_cap">I did not ask my reviewer to read the plan: another request would take this hour past half of your hourly cap. I checked only what I can check myself. Change the caps if you want it asked.</string>
     <string name="queen_say_missing_reviewer_no_room">I did not ask my reviewer to read the plan: the Source has no room for another request right now. I checked only what I can check myself. Connect another Source to give it room.</string>
     <string name="queen_say_missing_reviewer_no_second_source">I did not ask my reviewer to read the plan: I have one Source and it has no room right now. I checked only what I can check myself. A second Source would let my reviewer read it. Connect one.</string>
+    <string name="queen_say_missing_blocker">The hive is not complete: this still has to be made or obtained.</string>
+    <string name="queen_say_finished_blockers_open">The swarm finished, but I cannot call the hive reached: %1$s of the things it needs have not been made or obtained yet.</string>
     <string name="queen_say_finished_not_reached">The swarm finished, but I cannot call the hive reached: %1$s of %2$s signs are not met. Step %3$s (%4$s) is where to look.</string>
 
     <!-- Step templates: a step is a task for a creature with a contract around it (docs/Step-Templates.md). -->
@@ -2092,6 +2094,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="step_template_text_to_table">Turn text into a table</string>
     <string name="step_template_check_work">Check the work</string>
     <string name="step_template_read_connected">Read from a connected tool</string>
+    <string name="step_template_make_diagram">Draw a diagram</string>
+    <string name="step_template_prepare_files">Prepare files for a repository</string>
     <string name="step_template_change_connected">Change something in a connected tool</string>
     <string name="step_port_brief">Brief</string>
     <string name="step_port_sources">Sources</string>

@@ -48,9 +48,11 @@ fun queenUpdate(
     stalledForMinutes: Int? = null,
     /** What the planner named as the signs that the hive is reached (see [HiveSigns]); empty means the default signs. */
     hiveSigns: List<HiveSign> = emptyList(),
+    /** What the hive still needs created or obtained (see [Blockers]); said as what is missing, and it holds the hive from being reached. */
+    blockers: List<Blocker> = emptyList(),
 ): List<QueenNote> {
-    if (run.status.finished()) return listOf(finishNote(definition, run, hiveSigns))
-    val lead = missingNotes(run.id.value, missing, level) + disputes
+    if (run.status.finished()) return listOf(finishNote(definition, run, hiveSigns, blockers))
+    val lead = missingNotes(run.id.value, missing, level) + blockerNotes(run.id.value, definition, run, blockers) + disputes
     val stop = run.spendPause
     if (stop != null) return lead + allowanceNotes(run)
     if (run.globalPause != null) return lead + nannyRelay(definition, run, review)
@@ -73,7 +75,12 @@ fun queenUpdate(
 }
 
 /** The finish note: all done (with its cost only when every cost is known), could not finish, or stopped. */
-internal fun finishNote(definition: WorkflowDefinition, run: WorkflowRun, hiveSigns: List<HiveSign> = emptyList()): QueenNote {
+internal fun finishNote(
+    definition: WorkflowDefinition,
+    run: WorkflowRun,
+    hiveSigns: List<HiveSign> = emptyList(),
+    blockers: List<Blocker> = emptyList(),
+): QueenNote {
     val id = run.id.value
     val done = run.taskRuns.values.count { it.status == TaskRunStatus.Completed }
     return when (run.status) {
@@ -89,6 +96,15 @@ internal fun finishNote(definition: WorkflowDefinition, run: WorkflowRun, hiveSi
                     QueenVoice.FinishedNotReached,
                     listOf(unmet.toString(), checks.size.toString(), step(definition, look.id.value).toString(), queenSlot(look.name)),
                     QueenLink.Creature(look.id.value, CreatureTab.Work),
+                )
+            } else if (Blockers.unmet(Blockers.resolved(blockers, definition, run)).isNotEmpty()) {
+                // Every sign shows, but something the hive needs is still missing: finished is not reached.
+                val open = Blockers.unmet(Blockers.resolved(blockers, definition, run))
+                QueenNote(
+                    queenNoteId(id, "finish", "blockers", open.joinToString(",") { it.id }),
+                    QueenVoice.FinishedBlockersOpen,
+                    listOf(open.size.toString()),
+                    QueenLink.Story,
                 )
             } else if (cost > 0.0 && !run.hasUnpricedUsage()) {
                 QueenNote(queenNoteId(id, "finish", "cost"), QueenVoice.FinishedAllCost, listOf(formatUsd(cost)), QueenLink.Story)

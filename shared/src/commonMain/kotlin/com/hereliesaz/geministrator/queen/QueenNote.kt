@@ -105,6 +105,10 @@ enum class QueenVoice(val relay: QueenRelay?) {
     MissingReviewerNoRoom(QueenRelay.Missing),
     MissingReviewerNoSecondSource(QueenRelay.Missing),
     FinishedNotReached(null),
+
+    // --- Blockers: what a hive still needs created or obtained (queen/Blockers.kt). Kept apart, after every other voice. ---
+    MissingBlocker(QueenRelay.Missing),
+    FinishedBlockersOpen(null),
 }
 
 /** Where a note leads: an existing place, never a new one. */
