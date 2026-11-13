@@ -36,12 +36,15 @@ fun queenUpdate(
     roles: Collection<RoleDefinition>,
     level: QueenLevel,
     review: HallMonitorPauseReviewState? = null,
+    /** What she consulted before planning this run, if anything. */
+    research: com.hereliesaz.geministrator.research.ResearchRecord? = null,
 ): List<QueenNote> {
     if (run.status.finished()) return listOf(finishNote(definition, run))
     val stop = run.spendPause
     if (stop != null) return allowanceNotes(run)
     if (run.globalPause != null) return nannyRelay(definition, run, review)
     val notes = mutableListOf<QueenNote>()
+    researchNote(run, research, level)?.let { notes += it }
     notes += waitSentences(definition, run, roles)
     notes += nannyRelay(definition, run, review)
     if (nannyPhase(definition, run) == NannyPhase.None && definition.tasks.none { it.roleId == com.hereliesaz.geministrator.domain.HallMonitorRole.id }) {
@@ -178,4 +181,20 @@ internal fun allowanceNotes(run: WorkflowRun): List<QueenNote> {
             attachedTo = key,
         ),
     )
+}
+
+/**
+ * One plain line on what she consulted before planning. Quiet shows it only when something relevant was skipped;
+ * Helpful always shows it. It carries counts only, never text from a lookup.
+ */
+internal fun researchNote(run: WorkflowRun, research: com.hereliesaz.geministrator.research.ResearchRecord?, level: QueenLevel): QueenNote? {
+    if (research == null || research.isEmpty) return null
+    val skipped = research.skipped.count { it.reason != com.hereliesaz.geministrator.research.ResearchSkipReason.NoQuery }
+    if (skipped == 0 && level != QueenLevel.Helpful) return null
+    val looked = research.consulted.size.toString()
+    return if (skipped > 0) {
+        QueenNote(queenNoteId(run.id.value, "research", "skipped"), QueenVoice.ResearchSkipped, listOf(looked, skipped.toString()), QueenLink.Story)
+    } else {
+        QueenNote(queenNoteId(run.id.value, "research", "consulted"), QueenVoice.ResearchConsulted, listOf(looked, research.leads.toString()), QueenLink.Story)
+    }
 }

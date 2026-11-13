@@ -60,6 +60,8 @@ enum class QueenVoice(val relay: QueenRelay?) {
     PracticeRunning(QueenRelay.Nanny),
     PracticeDone(QueenRelay.Nanny),
     PracticeEnded(QueenRelay.Nanny),
+    ResearchConsulted(null),
+    ResearchSkipped(null),
 }
 
 /** Where a note leads: an existing place, never a new one. */

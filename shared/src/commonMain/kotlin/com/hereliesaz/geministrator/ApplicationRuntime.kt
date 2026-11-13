@@ -152,6 +152,14 @@ class ApplicationRuntime private constructor(
     /** The freeze review the queen last read; refreshed by the cycle while frozen, so publishing stays pure. */
     private var queenReview: QueenReview? = null
 
+    /** What the queen consulted before planning each run launched here (memory only; the Story keeps the line). */
+    private val researchRecords = LinkedHashMap<String, com.hereliesaz.geministrator.research.ResearchRecord>()
+
+    internal fun rememberResearch(runId: String, record: com.hereliesaz.geministrator.research.ResearchRecord) {
+        researchRecords[runId] = record
+        while (researchRecords.size > 32) researchRecords.remove(researchRecords.keys.first())
+    }
+
     private data class Current(
         val project: Project,
         val definition: WorkflowDefinition,
@@ -919,7 +927,7 @@ class ApplicationRuntime private constructor(
     private fun queenNotesFor(definition: WorkflowDefinition, run: WorkflowRun): List<com.hereliesaz.geministrator.queen.QueenNote> =
         try {
             val review = queenReview?.takeIf { it.runId == run.id.value }?.state
-            com.hereliesaz.geministrator.queen.queenUpdate(definition, run, roles, queenLevel(), review)
+            com.hereliesaz.geministrator.queen.queenUpdate(definition, run, roles, queenLevel(), review, researchRecords[run.id.value])
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (_: Exception) {
