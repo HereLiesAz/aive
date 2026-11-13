@@ -31,16 +31,18 @@ data class TraceExportSettings(
  * the endpoint and headers are never written into an exported `.aivesetup` file.
  */
 class TraceExportSettingsStore(
-    private val settings: Settings = com.hereliesaz.geministrator.persistence.PrivateSettings.forKeys(DEFAULT_KEY, DEFAULT_EXPORTED_KEY),
+    settings: Settings? = null,
     private val key: String = DEFAULT_KEY,
     private val exportedKey: String = DEFAULT_EXPORTED_KEY,
 ) {
-    fun load(): TraceExportSettings = settings.getStringOrNull(key)
+    /** Resolved at first use, not at construction, so the private file is chosen whatever order the platform starts in. */
+    private val backing: Settings by lazy { settings ?: com.hereliesaz.geministrator.persistence.PrivateSettings.forKeys(DEFAULT_KEY, DEFAULT_EXPORTED_KEY) }
+    fun load(): TraceExportSettings = backing.getStringOrNull(key)
         ?.let { encoded -> runCatching { json.decodeFromString(TraceExportSettings.serializer(), encoded) }.getOrNull() }
         ?: TraceExportSettings()
 
     fun save(value: TraceExportSettings) {
-        settings.putString(key, json.encodeToString(TraceExportSettings.serializer(), value))
+        backing.putString(key, json.encodeToString(TraceExportSettings.serializer(), value))
     }
 
     /** Runs already handed to the exporter, newest last, bounded to [MAX_REMEMBERED_RUNS]. */
@@ -48,11 +50,11 @@ class TraceExportSettingsStore(
 
     fun markExported(runId: String) {
         val runs = exportedRuns().filterNot { it == runId } + runId
-        settings.putString(exportedKey, runs.takeLast(MAX_REMEMBERED_RUNS).joinToString("\n"))
+        backing.putString(exportedKey, runs.takeLast(MAX_REMEMBERED_RUNS).joinToString("\n"))
     }
 
     private fun exportedRuns(): List<String> =
-        settings.getStringOrNull(exportedKey)?.split('\n')?.filter(String::isNotBlank).orEmpty()
+        backing.getStringOrNull(exportedKey)?.split('\n')?.filter(String::isNotBlank).orEmpty()
 
     companion object {
         const val DEFAULT_KEY: String = "aive.telemetry.otlp.v1"
