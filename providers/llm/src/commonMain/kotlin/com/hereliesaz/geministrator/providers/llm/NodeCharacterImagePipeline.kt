@@ -44,13 +44,17 @@ class NodeCharacterImagePipelineExecutorIntegration(
     private val assetStore: NodeCharacterAssetStore = SettingsNodeCharacterAssetStore(),
     private val api: OpenAiNodeCharacterImageApi = OpenAiNodeCharacterImageApi(apiKeyProvider),
     private val maxVisualAttempts: Int = 3,
+    /** The most paid calls (image and vision, every attempt) one dispatch may make; the pipeline's worst case is 12. */
+    private val maxCallsPerDispatch: Int = NODE_CHARACTER_CALL_BUDGET_DEFAULT,
 ) : TaskExecutorIntegration {
     init {
         require(maxVisualAttempts >= 1) { "maxVisualAttempts must be at least one" }
+        require(maxCallsPerDispatch >= 1) { "maxCallsPerDispatch must be at least one" }
     }
 
     override val orchestrationToolId: String = NODE_CHARACTER_IMAGE_PIPELINE_SERVICE
-    override val retryDispatchFailures: Boolean = true
+    // Every call is paid and a failure may follow billed calls: the workflow's retry would pay for all of them again.
+    override val retryDispatchFailures: Boolean = false
 
     override fun supports(executor: TaskExecutor): Boolean =
         executor is TaskExecutor.ExternalService &&
@@ -58,10 +62,11 @@ class NodeCharacterImagePipelineExecutorIntegration(
 
     override suspend fun dispatch(context: TaskExecutorContext): TaskExecutorExecution {
         val executor = context.executor as TaskExecutor.ExternalService
+        val meter = ImageSpendMeter(maxCallsPerDispatch)
         return try {
             val operation = parseOperation(executor.operation)
             when (operation.verb) {
-                "generate" -> generate(context, operation)
+                "generate" -> generate(context, operation, meter)
                 "register" -> register(context, operation)
                 else -> TaskExecutorExecution(
                     status = TaskRunStatus.Failed,
@@ -69,12 +74,14 @@ class NodeCharacterImagePipelineExecutorIntegration(
                 )
             }
         } catch (cancelled: CancellationException) {
+            // A cancelled run still paid for the calls it made; the workflow keeps the task's usage it was last told.
             throw cancelled
         } catch (failure: Throwable) {
             TaskExecutorExecution(
                 status = TaskRunStatus.Failed,
                 progressMessage = failure.message?.takeIf(String::isNotBlank)
                     ?: "Node-character image pipeline failed",
+                usage = meter.usage(),
             )
         }
     }
@@ -88,6 +95,7 @@ class NodeCharacterImagePipelineExecutorIntegration(
     private suspend fun generate(
         context: TaskExecutorContext,
         operation: PipelineOperation,
+        meter: ImageSpendMeter,
     ): TaskExecutorExecution {
         val role = context.run.roleSnapshot.firstOrNull { it.id.value == operation.roleId }
         val roleLabel = role?.name ?: operation.roleId
@@ -110,10 +118,12 @@ class NodeCharacterImagePipelineExecutorIntegration(
             prompt = sourcePrompt,
             inputImages = emptyList(),
             action = "generate",
+            meter = meter,
         )
         var sourceInspection = api.inspect(
             prompt = sourceInspectionPrompt(roleLabel, sourcePrompt),
             images = listOf(source.dataUri()),
+            meter = meter,
         )
 
         var sourceAttempt = 1
@@ -127,10 +137,12 @@ class NodeCharacterImagePipelineExecutorIntegration(
                 ),
                 inputImages = listOf(source.dataUri()),
                 action = "edit",
+                meter = meter,
             )
             sourceInspection = api.inspect(
                 prompt = sourceInspectionPrompt(roleLabel, sourcePrompt),
                 images = listOf(source.dataUri()),
+                meter = meter,
             )
         }
         require(sourceInspection.pass) {
@@ -143,10 +155,12 @@ class NodeCharacterImagePipelineExecutorIntegration(
             prompt = rigPrompt,
             inputImages = listOf(source.dataUri()),
             action = "auto",
+            meter = meter,
         )
         var rigInspection = api.inspect(
             prompt = rigInspectionPrompt(roleLabel, evidence),
             images = listOf(source.dataUri(), rig.dataUri()),
+            meter = meter,
         )
 
         var rigAttempt = 1
@@ -160,10 +174,12 @@ class NodeCharacterImagePipelineExecutorIntegration(
                 ),
                 inputImages = listOf(source.dataUri(), rig.dataUri()),
                 action = "edit",
+                meter = meter,
             )
             rigInspection = api.inspect(
                 prompt = rigInspectionPrompt(roleLabel, evidence),
                 images = listOf(source.dataUri(), rig.dataUri()),
+                meter = meter,
             )
         }
         require(rigInspection.pass) {
@@ -244,6 +260,7 @@ class NodeCharacterImagePipelineExecutorIntegration(
             artifacts = listOf(sourceArtifact, rigArtifact, promptArtifact, verificationArtifact),
             progress = 1f,
             progressMessage = "Generated and visually verified $roleLabel",
+            usage = meter.usage(),
         )
     }
 
@@ -505,6 +522,7 @@ class OpenAiNodeCharacterImageApi(
         action: String,
         size: String = "1024x1536",
         background: String = "transparent",
+        meter: ImageSpendMeter? = null,
     ): GeneratedNodeImage {
         val request = ResponsesRequest(
             model = responseModel,
@@ -538,7 +556,7 @@ class OpenAiNodeCharacterImageApi(
             ),
             toolChoice = ImageToolChoice(type = "image_generation"),
         )
-        val response = post(request)
+        val response = post(request, meter, imageCall = true)
         val image = response.output.firstOrNull {
             it.type == "image_generation_call" && !it.result.isNullOrBlank()
         } ?: error("OpenAI response did not contain an image_generation_call result")
@@ -551,6 +569,7 @@ class OpenAiNodeCharacterImageApi(
     suspend fun inspect(
         prompt: String,
         images: List<String>,
+        meter: ImageSpendMeter? = null,
     ): NodeCharacterVisualInspection {
         val request = ResponsesRequest(
             model = responseModel,
@@ -572,7 +591,7 @@ class OpenAiNodeCharacterImageApi(
                 ),
             ),
         )
-        val response = post(request)
+        val response = post(request, meter, imageCall = false)
         val text = response.output
             .asSequence()
             .filter { it.type == "message" }
@@ -594,22 +613,50 @@ class OpenAiNodeCharacterImageApi(
         }
     }
 
-    private suspend fun post(request: ResponsesRequest): ResponsesResponse {
+    private suspend fun post(request: ResponsesRequest, meter: ImageSpendMeter?, imageCall: Boolean): ResponsesResponse {
         val key = apiKeyProvider.getApiKey().trim()
         require(key.isNotEmpty()) { "OpenAI API key is not configured for node-character generation" }
-        val response = client.post("$baseUrl/responses") {
-            header(HttpHeaders.Authorization, "Bearer $key")
-            contentType(ContentType.Application.Json)
-            setBody(request)
+        // The call is counted before it is made: a call that fails on the way may still have been billed.
+        meter?.reserveCall()
+        val response = try {
+            client.post("$baseUrl/responses") {
+                header(HttpHeaders.Authorization, "Bearer $key")
+                contentType(ContentType.Application.Json)
+                setBody(request)
+            }
+        } catch (failure: CancellationException) {
+            meter?.recordUnpriced()
+            throw failure
+        } catch (failure: Throwable) {
+            // No answer came back: the provider may still have billed it.
+            meter?.recordUnpriced()
+            throw failure
         }
         if (response.status.value !in 200..299) {
+            // A 4xx refusal was not billed; a 5xx (or anything else) may have been.
+            if (response.status.value !in 400..499) meter?.recordUnpriced()
             val body = response.bodyAsText().redactSecrets().take(1_200)
             error(
                 "OpenAI node-character request failed: HTTP ${response.status.value}" +
                     body.takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty(),
             )
         }
-        return response.body()
+        val parsed: ResponsesResponse = try {
+            response.body()
+        } catch (failure: Throwable) {
+            meter?.recordUnpriced()
+            throw failure
+        }
+        meter?.record(
+            priceProviderId = "openai",
+            model = responseModel,
+            inputTokens = parsed.usage?.inputTokens,
+            outputTokens = parsed.usage?.outputTokens,
+            cachedInputTokens = parsed.usage?.inputTokensDetails?.cachedTokens,
+            // The image tool bills at the image model's rate, which the price table does not list.
+            imagePriced = imageCall,
+        )
+        return parsed
     }
 }
 
@@ -674,6 +721,19 @@ private data class ImageToolChoice(
 @Serializable
 private data class ResponsesResponse(
     val output: List<ResponsesOutputItem> = emptyList(),
+    val usage: ResponsesUsage? = null,
+)
+
+@Serializable
+private data class ResponsesUsage(
+    @SerialName("input_tokens") val inputTokens: Long? = null,
+    @SerialName("output_tokens") val outputTokens: Long? = null,
+    @SerialName("input_tokens_details") val inputTokensDetails: ResponsesInputDetails? = null,
+)
+
+@Serializable
+private data class ResponsesInputDetails(
+    @SerialName("cached_tokens") val cachedTokens: Long? = null,
 )
 
 @Serializable
@@ -689,3 +749,61 @@ private data class ResponsesOutputContent(
     val type: String? = null,
     val text: String? = null,
 )
+
+/** Paid calls one node-character dispatch may make: three source attempts and three rig attempts, each generated and inspected. */
+const val NODE_CHARACTER_CALL_BUDGET_DEFAULT: Int = 12
+
+/**
+ * What one dispatch has asked of the image API: a hard cap on calls and the spend they are known to have made. The spend
+ * fails closed: a call whose cost cannot be priced (an image call, whose model is not on the price list; a call that
+ * failed without an answer) marks the usage as unknown, never free, so a dollar cap stops the run.
+ */
+class ImageSpendMeter(private val maxCalls: Int) {
+    var calls: Int = 0
+        private set
+    private var inputTokens = 0L
+    private var outputTokens = 0L
+    private var costUsd = 0.0
+    private var costUnknown = false
+
+    fun reserveCall() {
+        check(calls < maxCalls) { "The node-character call budget ($maxCalls calls) is used up; nothing more is asked of the image model." }
+        calls += 1
+    }
+
+    /** A call that may have been billed but reported no usage. */
+    fun recordUnpriced() {
+        costUnknown = true
+    }
+
+    fun record(
+        priceProviderId: String,
+        model: String,
+        inputTokens: Long?,
+        outputTokens: Long?,
+        cachedInputTokens: Long?,
+        imagePriced: Boolean,
+    ) {
+        this.inputTokens += inputTokens ?: 0L
+        this.outputTokens += outputTokens ?: 0L
+        val price = com.hereliesaz.geministrator.providers.ModelPriceTable.Default.priceFor(priceProviderId, model)
+        if (price == null || inputTokens == null || outputTokens == null) {
+            costUnknown = true
+        } else {
+            costUsd += price.costUsd(inputTokens, outputTokens, cachedInputTokens ?: 0L)
+        }
+        if (imagePriced) costUnknown = true
+    }
+
+    fun usage(): com.hereliesaz.geministrator.domain.TaskUsage? =
+        if (calls == 0) {
+            null
+        } else {
+            com.hereliesaz.geministrator.domain.TaskUsage(
+                inputTokens = inputTokens,
+                outputTokens = outputTokens,
+                costUsd = costUsd,
+                costUnknown = costUnknown,
+            )
+        }
+}
