@@ -776,7 +776,7 @@ class WorkflowEngine(
             updatedAtEpochMillis = nowEpochMillis,
         )
         nextRun = refreshReadiness(definition, nextRun, nowEpochMillis)
-        val status = deriveWorkflowStatus(definition, nextRun)
+        val status = deriveWorkflowStatus(nextRun)
         if (status == WorkflowRunStatus.Completed) {
             eventSink.append(WorkflowCompleted(nextRun.id, nowEpochMillis))
         }
@@ -971,7 +971,7 @@ class WorkflowEngine(
             .filter { (id, taskRun) -> taskRun.status == TaskRunStatus.Failed && run.taskRuns[id]?.status != TaskRunStatus.Failed }
             .keys
         nextRun = refreshReadiness(definition, nextRun, nowEpochMillis, failedThisPass)
-        val workflowStatus = deriveWorkflowStatus(definition, nextRun)
+        val workflowStatus = deriveWorkflowStatus(nextRun)
         if (workflowStatus == WorkflowRunStatus.Completed && run.status != WorkflowRunStatus.Completed) {
             eventSink.append(WorkflowCompleted(nextRun.id, nowEpochMillis))
         }
@@ -1370,16 +1370,15 @@ class WorkflowEngine(
         )
     }
 
-    private fun deriveWorkflowStatus(definition: WorkflowDefinition, run: WorkflowRun): WorkflowRunStatus {
+    private fun deriveWorkflowStatus(run: WorkflowRun): WorkflowRunStatus {
         if (run.status.isTerminal()) return run.status
-        val optionalIds = definition.tasks.filter { it.optional }.mapTo(mutableSetOf()) { it.id }
-        // A skipped optional creature is neither a failure nor unfinished work: it counts as set aside.
+        // An optional creature set aside for good (handleFailure marked it) is neither a failure nor unfinished work;
+        // one that has only just failed, with its retry decision still to come, is still a failure.
         val statuses = run.taskRuns.values.map {
-            if (it.status == TaskRunStatus.Failed && it.taskDefinitionId in optionalIds) TaskRunStatus.Cancelled else it.status
+            if (it.status == TaskRunStatus.Failed && it.blockingReason?.code == OPTIONAL_STEP_SKIPPED) TaskRunStatus.Cancelled else it.status
         }
-        val skippedOnly = run.taskRuns.values.all { it.status == TaskRunStatus.Failed && it.taskDefinitionId in optionalIds }
         return when {
-            statuses.isNotEmpty() && statuses.all { it == TaskRunStatus.Cancelled } && !skippedOnly -> WorkflowRunStatus.Cancelled
+            statuses.isNotEmpty() && statuses.all { it == TaskRunStatus.Cancelled } -> WorkflowRunStatus.Cancelled
             statuses.isNotEmpty() && statuses.all { it == TaskRunStatus.Completed || it == TaskRunStatus.Cancelled } -> WorkflowRunStatus.Completed
             statuses.any { it == TaskRunStatus.AwaitingApproval || it == TaskRunStatus.Escalated } -> WorkflowRunStatus.AwaitingHuman
             statuses.any { it == TaskRunStatus.Failed } -> WorkflowRunStatus.Failed
