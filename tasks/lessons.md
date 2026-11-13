@@ -123,3 +123,8 @@ Android CI failed on every push because (1) an Android string had an unescaped a
 
 - Owner correction: I told builders the queen makes no "is it working" judgement when a Nanny exists and only settles disputes. Wrong. They are two different functions: the queen makes her own judgement of whether a swarm is working (failing steps, a Source that gave out, budget), with or without a Nanny; the Nanny makes sure it works as well as possible (efficacy and efficiency). Neither replaces the other.
 - Rule: when the owner assigns a duty to one role, do not infer that a neighbouring role loses its own. Ask what each is for before removing behaviour from either.
+
+## A rule scoped to one workflow is not a rule for everything
+
+- Owner correction: 'roles stay generic' meant only at the very beginning, for the first-run introductory tutorial workflow. I generalised it into a standing rule (reviewer/planner always generic, Nanny revisions rejected for domain wording) and told builders so. Roles, templates and the rest evolve over generations (memetic changes fast, genetic changes slow, both intentional).
+- Rule: when the owner scopes an instruction ('especially in the tutorial', 'for now', 'in the very beginning'), keep the scope in the code comments, docs and agent briefs. Do not widen it, and ask when a scope word is missing.
