@@ -1563,6 +1563,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_card_create">Create this swarm</string>
     <string name="hive_card_ready">%1$s: %2$d creatures, %3$d strands.</string>
     <string name="hive_card_pinned">%1$s runs on %2$s.</string>
+    <string name="hive_card_objective">%1$s will be told: %2$s</string>
     <string name="hive_card_needs_provider">Needs %1$s, which is not connected here. Its creatures use auto for now. Tap to connect it.</string>
     <string name="hive_card_drifter">This swarm uses an orphan: %1$s. Tap to connect it.</string>
     <string name="hive_card_needs_role">Needs the role %1$s, which this swarm does not have. That creature was left out.</string>

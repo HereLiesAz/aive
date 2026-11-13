@@ -41,6 +41,7 @@ object A2aHiveCard {
     const val MAX_CREATURES = 12
     const val MAX_NAME_CHARS = 80
     const val MAX_OBJECTIVE_CHARS = 200
+    const val SUMMARY_OBJECTIVE_CHARS = 160
     const val MAX_ID_CHARS = 64
     const val MAX_URL_CHARS = 300
     private const val MAX_DEPTH = 16
@@ -304,6 +305,11 @@ object A2aHiveCard {
                 strandsKept = strandsKept,
                 strandsDropped = strandsDropped,
                 drifterCards = drifterCards.toList(),
+                objectives = parsed
+                    .filter { it.id in kept }
+                    .mapNotNull { creature ->
+                        creature.objective?.let { HiveCardObjective(creature.name, a2aOneLine(it, SUMMARY_OBJECTIVE_CHARS)) }
+                    },
             ),
         )
     }
@@ -435,7 +441,11 @@ data class HiveCardSummary(
     val strandsKept: Int,
     val strandsDropped: Int,
     val drifterCards: List<String>,
+    /** Objectives the card itself supplied for the creatures kept, each cut short, so the keeper reads what they will be told to do. */
+    val objectives: List<HiveCardObjective> = emptyList(),
 )
+
+data class HiveCardObjective(val creatureName: String, val text: String)
 
 sealed interface HiveCardProblem {
     data object Empty : HiveCardProblem
