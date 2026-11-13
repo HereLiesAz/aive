@@ -18,7 +18,7 @@ enum class QueenLevel {
 }
 
 /** Where a relayed note comes from. */
-enum class QueenRelay { Nanny, Allowance, Waits, Watch }
+enum class QueenRelay { Nanny, Allowance, Waits, Watch, Missing, Dispute }
 
 /**
  * Every sentence the queen can say: a closed set, each a string resource with bounded slots
@@ -62,6 +62,17 @@ enum class QueenVoice(val relay: QueenRelay?) {
     PracticeEnded(QueenRelay.Nanny),
     ResearchConsulted(null),
     ResearchSkipped(null),
+    MissingNoSource(QueenRelay.Missing),
+    MissingNoPlanner(QueenRelay.Missing),
+    MissingNoReviewer(QueenRelay.Missing),
+    MissingPairBroken(QueenRelay.Missing),
+    MissingSameSource(QueenRelay.Missing),
+    DisputeNeedsYou(QueenRelay.Dispute),
+    DisputeNeedsYouQueenAway(QueenRelay.Dispute),
+    DisputeResearching(QueenRelay.Dispute),
+    DisputeTesting(QueenRelay.Dispute),
+    DisputeStillUnsure(QueenRelay.Dispute),
+    DisputeCannotInvestigate(QueenRelay.Dispute),
 }
 
 /** Where a note leads: an existing place, never a new one. */
@@ -80,10 +91,16 @@ sealed interface QueenLink {
 
     /** Another run, such as a practice run. */
     data class Run(val runId: String) : QueenLink
+
+    /** Connections in the Keeper's room: where a Source is connected. */
+    data object Connections : QueenLink
+
+    /** The Roster: where a role is switched on or edited. */
+    data object Roster : QueenLink
 }
 
 /** What a quoted line is, so the keeper can see whose words they are. */
-enum class QueenQuoteLabel { NannyFinding, QueenReason, PracticeSolution }
+enum class QueenQuoteLabel { NannyFinding, QueenReason, PracticeSolution, QueenApproach, Objection, StillMissing }
 
 /** Text taken from the run, shown on its own labeled line: escaped, capped, never part of a sentence. */
 data class QueenQuote(val label: QueenQuoteLabel, val text: String)

@@ -38,12 +38,18 @@ fun queenUpdate(
     review: HallMonitorPauseReviewState? = null,
     /** What she consulted before planning this run, if anything. */
     research: com.hereliesaz.geministrator.research.ResearchRecord? = null,
+    /** What she found missing when this run was launched (see [missingForPlanning]); said once, with where to fix it. */
+    missing: List<Missing> = emptyList(),
+    /** What she says about disputes she could not settle herself (see [disputeNotes]); always said. */
+    disputes: List<QueenNote> = emptyList(),
 ): List<QueenNote> {
     if (run.status.finished()) return listOf(finishNote(definition, run))
+    val lead = missingNotes(run.id.value, missing, level) + disputes
     val stop = run.spendPause
-    if (stop != null) return allowanceNotes(run)
-    if (run.globalPause != null) return nannyRelay(definition, run, review)
+    if (stop != null) return lead + allowanceNotes(run)
+    if (run.globalPause != null) return lead + nannyRelay(definition, run, review)
     val notes = mutableListOf<QueenNote>()
+    notes += lead
     researchNote(run, research, level)?.let { notes += it }
     notes += waitSentences(definition, run, roles)
     notes += nannyRelay(definition, run, review)

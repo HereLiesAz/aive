@@ -60,6 +60,17 @@ private fun voiceResource(voice: QueenVoice): StringResource = when (voice) {
         QueenVoice.PracticeEnded -> Res.string.queen_say_practice_ended
         QueenVoice.ResearchConsulted -> Res.string.queen_say_research_consulted
         QueenVoice.ResearchSkipped -> Res.string.queen_say_research_skipped
+        QueenVoice.MissingNoSource -> Res.string.queen_say_missing_no_source
+        QueenVoice.MissingNoPlanner -> Res.string.queen_say_missing_no_planner
+        QueenVoice.MissingNoReviewer -> Res.string.queen_say_missing_no_reviewer
+        QueenVoice.MissingPairBroken -> Res.string.queen_say_missing_pair_broken
+        QueenVoice.MissingSameSource -> Res.string.queen_say_missing_same_source
+        QueenVoice.DisputeNeedsYou -> Res.string.queen_say_dispute_needs_you
+        QueenVoice.DisputeNeedsYouQueenAway -> Res.string.queen_say_dispute_needs_you_queen_away
+        QueenVoice.DisputeResearching -> Res.string.queen_say_dispute_researching
+        QueenVoice.DisputeTesting -> Res.string.queen_say_dispute_testing
+        QueenVoice.DisputeStillUnsure -> Res.string.queen_say_dispute_still_unsure
+        QueenVoice.DisputeCannotInvestigate -> Res.string.queen_say_dispute_cannot_investigate
 }
 
 @Composable
@@ -106,6 +117,8 @@ internal fun queenTitle(note: QueenNote): String = stringResource(
             QueenRelay.Waits -> Res.string.queen_title_waits
             QueenRelay.Watch -> Res.string.queen_title_watch
             QueenRelay.Allowance -> Res.string.queen_title_allowance
+            QueenRelay.Missing -> Res.string.queen_title_missing
+            QueenRelay.Dispute -> Res.string.queen_title_dispute
             else -> Res.string.queen_title_nanny
         }
     },
@@ -118,6 +131,8 @@ private fun linkLabel(link: QueenLink): String? = when (link) {
     QueenLink.Story -> stringResource(Res.string.queen_link_story)
     is QueenLink.Message -> stringResource(Res.string.queen_link_message)
     is QueenLink.Run -> stringResource(Res.string.queen_link_run)
+    QueenLink.Connections -> stringResource(Res.string.queen_link_connections)
+    QueenLink.Roster -> stringResource(Res.string.queen_link_roster)
 }
 
 /**
@@ -143,6 +158,9 @@ internal fun QueenSays(
                             QueenQuoteLabel.NannyFinding -> Res.string.queen_quote_nanny_finding
                             QueenQuoteLabel.QueenReason -> Res.string.queen_quote_queen_reason
                             QueenQuoteLabel.PracticeSolution -> Res.string.queen_quote_practice_solution
+                            QueenQuoteLabel.QueenApproach -> Res.string.queen_quote_queen_approach
+                            QueenQuoteLabel.Objection -> Res.string.queen_quote_objection
+                            QueenQuoteLabel.StillMissing -> Res.string.queen_quote_still_missing
                         },
                     ),
                     style = AzphaltType.eyebrow,
@@ -158,6 +176,8 @@ internal fun QueenSays(
                 QueenLink.Story -> actions.openStory
                 is QueenLink.Message -> ({ onSelect(link.key) })
                 is QueenLink.Run -> ({ actions.openRun(link.runId) })
+                QueenLink.Connections -> actions.openConnections
+                QueenLink.Roster -> actions.openRoster
                 null -> null
             }
             if (showLink && label != null && go != null) {
