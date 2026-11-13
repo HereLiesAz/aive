@@ -551,7 +551,7 @@ internal fun HiveFeedBar(
                 }
             }
             message?.let {
-                Text(it, style = AzphaltType.body.copy(fontSize = 13.sp), color = azphaltOnSurface(), modifier = Modifier.azphaltLiveRegion())
+                PackedFailureText(it, seed = "feed-error", style = AzphaltType.body.copy(fontSize = 13.sp), modifier = Modifier.azphaltLiveRegion())
                 onOpenConnections?.let { open ->
                     AzphaltPill(label = stringResource(Res.string.launch_error_check_connections), seed = "feed-error-connections", onClick = open)
                 }

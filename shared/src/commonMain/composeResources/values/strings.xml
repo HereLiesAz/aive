@@ -98,7 +98,7 @@
     <string name="keeper_add_provider">Add a provider</string>
     <string name="keeper_add_a2a_agent">Connect remote agent</string>
     <string name="keeper_add_a2a_agent_hint">Independent A2A service · not an Azphalt package</string>
-    <string name="keeper_a2a_agent_explain">A remote A2A agent runs on another service, not in Aive or the Azphalt Store. Connecting one verifies its Agent Card, then adds it as a provider. Assign it to a role in Swarm to send tasks there. Work and approved context sent to it leave this device; its replies are treated as external content.</string>
+    <string name="keeper_a2a_agent_explain">A remote A2A agent runs on another service, not in Aive or the Azphalt Store. Connecting one verifies its Agent Card, then adds it as a provider. Assign it to a role in the Roster to send tasks there. Work and approved context sent to it leave this device; its replies are treated as external content.</string>
     <string name="keeper_a2a_agent_card_url">Agent Card URL</string>
     <string name="keeper_a2a_agent_add">Connect agent</string>
     <string name="keeper_a2a_agent_remove">Remove</string>
@@ -207,7 +207,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="compute_compute">COMPUTE</string>
     <string name="compute_compute_pool">Compute pool</string>
     <string name="compute_compute_pool_not_configured">Compute pool not configured</string>
-    <string name="compute_configure_the_relay_and_this_device">Configure the relay and this device in Settings before delegating remote work.</string>
+    <string name="compute_configure_the_relay_and_this_device">Configure the relay and this device under Compute in the Keeper's room before delegating remote work.</string>
     <string name="compute_configured_offline">Configured · offline</string>
     <string name="compute_connected_device"> connected device</string>
     <string name="compute_connected_hardware_advertises_capacity_accelerators_models">Connected hardware advertises capacity, accelerators, models, and supported executor kinds.</string>
@@ -289,6 +289,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inbox_kind_question">Question</string>
     <string name="inbox_kind_budget">Budget spent</string>
     <string name="inbox_artifact_waiting">Artifact waiting</string>
+    <string name="inbox_action_answer">Answer it</string>
     <string name="inbox_question_where">Its agent asked you a question. Answer it on this creature’s Needs, in the hive.</string>
     <string name="inbox_budget_where">Raise it on this creature’s Mind, in the hive.</string>
 
@@ -339,6 +340,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inspector_open_trace">Open its trace</string>
     <string name="inspector_payload_context">PAYLOAD CONTEXT</string>
     <string name="inspector_plan">PLAN</string>
+    <string name="inspector_plan_show_full">Show full plan</string>
+    <string name="inspector_plan_show_less">Show less</string>
     <string name="inspector_plan_place">%1$s of %2$s</string>
     <string name="inspector_proceed">Proceed</string>
     <string name="inspector_progress">PROGRESS</string>
@@ -685,6 +688,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="flowchart_detail_gate_turned_back">A review turned this work back.</string>
     <string name="flowchart_detail_waiting_on">Waiting for %1$s to finish.</string>
     <string name="flowchart_detail_keeper_paused">You paused the hive.</string>
+    <string name="flowchart_detail_provider_failed_plain">%1$s could not do this step.</string>
     <string name="flowchart_detail_failed">It failed.</string>
     <string name="flowchart_detail_failed_with">It failed: %1$s</string>
     <string name="flowchart_detail_blocked">It is on hold.</string>
@@ -1232,10 +1236,10 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="repositories_entire_reference_hint">/gh/owner/repo or /et/project/repo</string>
     <string name="repositories_entire_clone">Clone</string>
     <string name="repositories_entire_cloning">Cloning…</string>
-    <string name="repositories_entire_cloned_to">Cloned to %1$s. Link it to a project from the Overview screen.</string>
+    <string name="repositories_entire_cloned_to">Cloned to %1$s. Link it to a project from the Hive.</string>
     <string name="repositories_entire_not_installed_cap">Not installed</string>
     <string name="repositories_local_git">Local Git</string>
-    <string name="repositories_local_working_trees_are_linked_per">Local working trees are linked per project from the Overview screen. Desktop validates the selected folder as a Git repository and executes bounded Git operations directly against that working tree.</string>
+    <string name="repositories_local_working_trees_are_linked_per">Local working trees are linked per project from the Hive. Desktop validates the selected folder as a Git repository and executes bounded Git operations directly against that working tree.</string>
     <string name="repositories_no_credential_configured">No credential configured</string>
     <string name="repositories_no_token">No token</string>
     <string name="repositories_not_configured">Not configured</string>
@@ -1304,8 +1308,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="runs_marketplace_security">Marketplace · Security</string>
     <string name="runs_needs_you">Needs you</string>
     <string name="runs_no_pending_decisions">No pending decisions.</string>
-    <string name="runs_no_projects_yet">No projects yet. Open Overview and start a run to create one.</string>
-    <string name="runs_no_runs">No runs yet. Open Overview, enter an objective and start a run.</string>
+    <string name="runs_no_projects_yet">No projects yet. Open the Hive and start a run to create one.</string>
+    <string name="runs_no_runs">No runs yet. Open the Hive, enter an objective and start a run.</string>
     <string name="runs_plan_approval">Plan Approval</string>
     <string name="runs_policy_allowed">Policy allowed</string>
     <string name="runs_policy_denied">Policy denied</string>
@@ -1408,7 +1412,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="spend_stop_title_run">This run reached its cost cap</string>
     <string name="spend_stop_title_hourly">The hive reached its hourly spend cap</string>
     <string name="spend_stop_spent">%1$s of %2$s in known cost. Every creature is parked and no session is running.</string>
-    <string name="spend_stop_how_to_lift">Raise or clear the cap in the Keeper's room, under This device, then lift the stop. If the cap is still reached, the hive stops again.</string>
+    <string name="spend_stop_how_to_lift">Raise or clear the cap in the Keeper's room, under %1$s, then lift the stop. If the cap is still reached, the hive stops again.</string>
     <string name="spend_stop_stopped">STOPPED</string>
     <string name="spend_stop_change_caps">Change the spend caps</string>
     <string name="spend_stop_lift">Lift the stop</string>

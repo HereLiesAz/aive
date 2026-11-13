@@ -631,7 +631,7 @@ internal fun MindMapRunScreen(
                 if (gate == FeedGate.Provider || gate is FeedGate.Repository) {
                     // Something to think with, in one tap: the free gateways right here, the rest
                     // (your own key) in the Keeper's room.
-                    val free = ProviderCatalog.builtInEntries.filter { it.keyOptional }.take(3)
+                    val free = ProviderCatalog.firstRunFreeEntries()
                     free.forEachIndexed { index, entry ->
                         AzphaltPill(
                             tone = if (index == 0 && gate == FeedGate.Provider) PillTone.Primary else PillTone.Quiet,
@@ -727,12 +727,7 @@ internal fun MindMapRunScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 (launchFieldsError ?: launchError)?.let { message ->
-                    Text(
-                        message,
-                        style = AzphaltType.body,
-                        color = azphaltOnSurface(),
-                        modifier = Modifier.azphaltLiveRegion(),
-                    )
+                    PackedFailureText(message, seed = "launch-error", modifier = Modifier.azphaltLiveRegion())
                     // A launch that failed is usually about what is connected: take the keeper there.
                     if (launchError != null) {
                         AzphaltPill(
@@ -931,15 +926,18 @@ internal fun MindMapRunScreen(
             .sortedByDescending { (_, taskRun) -> taskRun.status.activityRank() }
             .take(8)
         recentTasks.forEachIndexed { index, (task, taskRun) ->
+            // A step that failed or is held says why in a plain sentence; the provider's own text is in its creature's panel.
+            val troubled = taskRun.status.isTroubled()
             val detail = buildString {
                 append(taskRun.status.label())
                 taskRun.progressMessage?.takeIf(String::isNotBlank)?.let {
                     append(" · ")
-                    append(it)
+                    append(if (troubled) plainFailureLine(it) else it)
                 }
                 taskRun.blockingReason?.message?.takeIf(String::isNotBlank)?.let {
                     append(" · ")
-                    append(it)
+                    // A hold's reason is the runtime's own wording; only an error from a provider is re-said.
+                    append(if (troubled && classifyError(it) != ErrorKind.Other) friendlyErrorMessage(it) else it)
                 }
             }
             AzphaltNote(
@@ -980,7 +978,7 @@ private fun hiveStatusLine(live: LiveWorkflowPresentation, activeTaskId: String?
     val feeds by activity.feeds.collectAsState()
     val doing = activeRun.providerRunId
         ?.let { feeds[SessionActivityKey(activeRun.id, it)]?.lastOrNull()?.doingNowText() }
-        ?: activeRun.progressMessage?.takeIf(String::isNotBlank)
+        ?: activeRun.progressMessage?.takeIf(String::isNotBlank)?.let { if (activeRun.status.isTroubled()) plainFailureLine(it) else it }
         ?: activeRun.status.label()
     val waitingOnIt = remember(live.definition, run, live.roles) {
         creaturesWaitingOn(activeRun.taskDefinitionId, live.definition, run, live.roles)
@@ -1062,3 +1060,7 @@ private const val MADE_PREVIEW_CHARS = 2_400
 /** A first hive's name, from the first words of what it was fed. */
 internal fun firstHiveName(objective: String, fallback: String = "First hive"): String =
     objective.trim().split(Regex("\\s+")).take(4).joinToString(" ").take(40).trim().ifBlank { fallback }
+
+/** A step whose own message may be a failure's raw text rather than what it is doing. */
+internal fun TaskRunStatus.isTroubled(): Boolean = this == TaskRunStatus.Failed || this == TaskRunStatus.Escalated ||
+    this == TaskRunStatus.Blocked || this == TaskRunStatus.Retrying

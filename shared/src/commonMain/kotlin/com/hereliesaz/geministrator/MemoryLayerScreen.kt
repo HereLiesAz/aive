@@ -100,6 +100,12 @@ import com.hereliesaz.geministrator.resources.memory_episode
 import com.hereliesaz.geministrator.resources.memory_every_finished_session_is_banked_here
 import com.hereliesaz.geministrator.resources.memory_export_memory_to_json
 import com.hereliesaz.geministrator.resources.memory_exported_memory_chars
+import com.hereliesaz.geministrator.resources.confirm_forget_memory_action
+import com.hereliesaz.geministrator.resources.confirm_forget_memory_body
+import com.hereliesaz.geministrator.resources.confirm_forget_memory_title
+import com.hereliesaz.geministrator.resources.confirm_replace_memory_action
+import com.hereliesaz.geministrator.resources.confirm_replace_memory_body
+import com.hereliesaz.geministrator.resources.confirm_replace_memory_title
 import com.hereliesaz.geministrator.resources.memory_forget
 import com.hereliesaz.geministrator.resources.memory_forget_everything
 import com.hereliesaz.geministrator.resources.memory_graph
@@ -166,6 +172,22 @@ import com.hereliesaz.geministrator.resources.memory_why_include_another_project
 import com.hereliesaz.geministrator.resources.memory_workflow_memory_bank
 import com.hereliesaz.geministrator.resources.memory_workflows_to_it_expansions_are_permanent
 import org.jetbrains.compose.resources.getString
+import com.hereliesaz.geministrator.resources.memory_check_values
+import com.hereliesaz.geministrator.resources.memory_default_provider
+import com.hereliesaz.geministrator.resources.memory_give_reason
+import com.hereliesaz.geministrator.resources.memory_legacy_backup_delete
+import com.hereliesaz.geministrator.resources.memory_legacy_backup_note
+import com.hereliesaz.geministrator.resources.memory_legacy_deleted
+import com.hereliesaz.geministrator.resources.memory_legacy_not_deleted
+import com.hereliesaz.geministrator.resources.memory_not_applied
+import com.hereliesaz.geministrator.resources.memory_not_deleted
+import com.hereliesaz.geministrator.resources.memory_not_expanded
+import com.hereliesaz.geministrator.resources.memory_not_imported
+import com.hereliesaz.geministrator.resources.memory_retention_50m
+import com.hereliesaz.geministrator.resources.memory_retention_90d
+import com.hereliesaz.geministrator.resources.memory_retention_keep_all
+import com.hereliesaz.geministrator.resources.memory_unknown_error
+import com.hereliesaz.geministrator.resources.memory_unreadable_json
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -423,7 +445,7 @@ private fun StageEngineEditor(
         body = buildString {
             append(stringResource(Res.string.memory_runs_on, resolved.shortLabel))
             if (engine.kind == MemoryEngineKind.HostedModel && resolved == MemoryEngineKind.HostedModel) {
-                append(" · ${engine.providerId ?: "default provider"}")
+                append(" · ${engine.providerId ?: stringResource(Res.string.memory_default_provider)}")
                 engine.model?.let { append(" · $it") }
             }
             fallback?.let { append(stringResource(Res.string.memory_running_programmatically_instead, it)) }
@@ -534,6 +556,9 @@ private fun TuningSection(settings: MemoryLayerSettings, onApply: (com.hereliesa
     var similarity by remember(policy) { mutableStateOf(policy.minimumSimilarityWeight.toString()) }
     var batch by remember(policy) { mutableStateOf(policy.condensationBatchSize.toString()) }
     var error by remember { mutableStateOf<String?>(null) }
+    // Read here: the click below runs outside composition.
+    val notApplied = stringResource(Res.string.memory_not_applied, PLACEHOLDER)
+    val checkValues = stringResource(Res.string.memory_check_values)
 
     MemorySectionLabel(stringResource(Res.string.memory_tuning))
     @Composable
@@ -563,7 +588,7 @@ private fun TuningSection(settings: MemoryLayerSettings, onApply: (com.hereliesa
                     condensationBatchSize = batch.trim().toInt(),
                 )
             }
-            error = next.exceptionOrNull()?.let { "Not applied: ${it.message ?: "check the values"}" }
+            error = next.exceptionOrNull()?.let { notApplied.replace(PLACEHOLDER, it.message ?: checkValues) }
             next.getOrNull()?.let(onApply)
         })
         AzphaltPill(stringResource(Res.string.memory_defaults), "memory-tuning-defaults", onClick = {
@@ -625,6 +650,7 @@ private fun DataSection(controller: MemoryLayerController) {
     var exported by remember { mutableStateOf<String?>(null) }
     var importDraft by remember { mutableStateOf<String?>(null) }
     var clearConfirm by remember { mutableStateOf(false) }
+    var confirmingReplace by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var openTree by remember { mutableStateOf<com.hereliesaz.geministrator.memory.MemoryEpisodeId?>(null) }
 
@@ -650,9 +676,17 @@ private fun DataSection(controller: MemoryLayerController) {
                             selected = episode.id == openTree,
                             onClick = { openTree = if (episode.id == openTree) null else episode.id },
                         )
-                        AzphaltPill(stringResource(Res.string.memory_forget), "memory-forget-${episode.id.value}", onClick = {
-                            scope.launch { controller.forgetEpisode(episode.id) }
-                        })
+                        var forgetting by remember(episode.id) { mutableStateOf(false) }
+                        AzphaltPill(stringResource(Res.string.memory_forget), "memory-forget-${episode.id.value}", onClick = { forgetting = true })
+                        if (forgetting) {
+                            AzphaltConfirm(
+                                title = stringResource(Res.string.confirm_forget_memory_title),
+                                text = stringResource(Res.string.confirm_forget_memory_body),
+                                confirmLabel = stringResource(Res.string.confirm_forget_memory_action),
+                                onConfirm = { forgetting = false; scope.launch { controller.forgetEpisode(episode.id) } },
+                                onDismiss = { forgetting = false },
+                            )
+                        }
                     }
                     if (episode.id == openTree) {
                         val rows = MemoryInspection.outline(snapshot, episode.id)
@@ -697,13 +731,26 @@ private fun DataSection(controller: MemoryLayerController) {
             modifier = Modifier.fillMaxWidth().height(120.dp),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AzphaltPill(stringResource(Res.string.memory_replace_memory), "memory-import-confirm", onClick = {
-                scope.launch {
-                    message = runCatching { controller.importJson(draft) }
-                        .fold({ getString(Res.string.memory_imported) }, { "Not imported: ${it.message ?: "unreadable JSON"}" })
-                    importDraft = null
-                }
-            })
+            AzphaltPill(stringResource(Res.string.memory_replace_memory), "memory-import-confirm", onClick = { confirmingReplace = true })
+            if (confirmingReplace) {
+                AzphaltConfirm(
+                    title = stringResource(Res.string.confirm_replace_memory_title),
+                    text = stringResource(Res.string.confirm_replace_memory_body),
+                    confirmLabel = stringResource(Res.string.confirm_replace_memory_action),
+                    onConfirm = {
+                        confirmingReplace = false
+                        scope.launch {
+                            message = runCatching { controller.importJson(draft) }
+                                .fold(
+                                    { getString(Res.string.memory_imported) },
+                                    { getString(Res.string.memory_not_imported, it.message ?: getString(Res.string.memory_unreadable_json)) },
+                                )
+                            importDraft = null
+                        }
+                    },
+                    onDismiss = { confirmingReplace = false },
+                )
+            }
             AzphaltPill(stringResource(Res.string.common_cancel), "memory-import-cancel", onClick = { importDraft = null })
         }
     }
@@ -711,16 +758,17 @@ private fun DataSection(controller: MemoryLayerController) {
     val legacyOffered by controller.legacyBackupOffered.collectAsState()
     if (legacyOffered) {
         Text(
-            "The memory kept before per-workflow banks is still on this device as a backup. It holds every workflow's " +
-                "history in one place that Forget, retention and Forget everything do not reach. Records listed in the " +
-                "migration report as drawn from several workflows exist only there.",
+            stringResource(Res.string.memory_legacy_backup_note),
             style = AzphaltType.body,
             color = azphaltOnSurface(),
         )
-        AzphaltPill("Delete the old memory backup", "memory-legacy-delete", onClick = {
+        AzphaltPill(stringResource(Res.string.memory_legacy_backup_delete), "memory-legacy-delete", onClick = {
             scope.launch {
                 message = runCatching { controller.deleteLegacyBackup() }
-                    .fold({ if (it) "The old memory backup was deleted." else "The old memory backup was not deleted." }, { "Not deleted: ${it.message ?: "unknown error"}" })
+                    .fold(
+                        { getString(if (it) Res.string.memory_legacy_deleted else Res.string.memory_legacy_not_deleted) },
+                        { getString(Res.string.memory_not_deleted, it.message ?: getString(Res.string.memory_unknown_error)) },
+                    )
             }
         }, tone = PillTone.Danger, modifier = Modifier.fillMaxWidth())
     }
@@ -847,6 +895,7 @@ private fun ProjectsSection(controller: MemoryLayerController, settings: MemoryL
     )
     projects.forEach { project ->
         var reason by remember(project) { mutableStateOf("") }
+        val giveReason = stringResource(Res.string.memory_give_reason)
         var message by remember(project) { mutableStateOf<String?>(null) }
         val includes = log.expansions.filter { it.projectId == project }
         AzphaltRecord(
@@ -866,8 +915,8 @@ private fun ProjectsSection(controller: MemoryLayerController, settings: MemoryL
                         AzphaltPill(stringResource(Res.string.memory_raw_global), "memory-project-retention-$project-global", selected = current == null, onClick = {
                             scope.launch { controller.setProjectRawRetention(project, null) }
                         })
-                        RETENTION_CHOICES.forEach { (label, retention) ->
-                            AzphaltPill(stringResource(Res.string.memory_raw, label), "memory-project-retention-$project-${retention.mode.name}", selected = current == retention, onClick = {
+                        RETENTION_CHOICES.forEach { (labelRes, retention) ->
+                            AzphaltPill(stringResource(Res.string.memory_raw, stringResource(labelRes)), "memory-project-retention-$project-${retention.mode.name}", selected = current == retention, onClick = {
                                 scope.launch { controller.setProjectRawRetention(project, retention) }
                             })
                         }
@@ -885,11 +934,11 @@ private fun ProjectsSection(controller: MemoryLayerController, settings: MemoryL
                             others.forEach { other ->
                                 AzphaltPill(stringResource(Res.string.memory_include, other), "memory-project-expand-$project-$other", onClick = {
                                     if (reason.isBlank()) {
-                                        message = "Give a reason first."
+                                        message = giveReason
                                     } else {
                                         scope.launch {
                                             message = runCatching { controller.expandProject(project, other, by = "user", reason = reason.trim()) }
-                                                .fold({ getString(Res.string.memory_now_includes, other) }, { "Not expanded: ${it.message}" })
+                                                .fold({ getString(Res.string.memory_now_includes, other) }, { getString(Res.string.memory_not_expanded, it.message.orEmpty()) })
                                             reason = ""
                                         }
                                     }
@@ -914,12 +963,14 @@ private fun MemorySectionLabel(label: String) {
     Text(label.uppercase(), style = AzphaltType.eyebrow, color = azphaltOnSurface())
 }
 
+/** Stands in for a message that is only known when the click runs. */
+private const val PLACEHOLDER = "\u0000"
 private const val RECENT_EPISODES = 8
 private const val OUTLINE_ROW_CHARS = 160
 private const val INSPECTED_CHARS = 240
 
 private val RETENTION_CHOICES = listOf(
-    "keep all" to MemoryRawRetention.KeepAll,
-    "50 M characters" to MemoryRawRetention(MemoryRawRetention.Mode.CapBySize, maxCharacters = 50_000_000L),
-    "90 days" to MemoryRawRetention(MemoryRawRetention.Mode.CapByAge, maxAgeMillis = 90L * 86_400_000L),
+    Res.string.memory_retention_keep_all to MemoryRawRetention.KeepAll,
+    Res.string.memory_retention_50m to MemoryRawRetention(MemoryRawRetention.Mode.CapBySize, maxCharacters = 50_000_000L),
+    Res.string.memory_retention_90d to MemoryRawRetention(MemoryRawRetention.Mode.CapByAge, maxAgeMillis = 90L * 86_400_000L),
 )

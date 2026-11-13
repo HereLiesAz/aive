@@ -80,6 +80,12 @@ import com.hereliesaz.geministrator.resources.settings_a2a_lan_waiting
 import com.hereliesaz.geministrator.resources.settings_a2a_lan_warning
 import com.hereliesaz.geministrator.resources.settings_a2a_server
 import com.hereliesaz.geministrator.resources.settings_a2a_server_card_url
+import com.hereliesaz.geministrator.resources.confirm_compute_disconnect_action
+import com.hereliesaz.geministrator.resources.confirm_compute_disconnect_body
+import com.hereliesaz.geministrator.resources.confirm_compute_disconnect_title
+import com.hereliesaz.geministrator.resources.confirm_new_token_action
+import com.hereliesaz.geministrator.resources.confirm_new_token_body
+import com.hereliesaz.geministrator.resources.confirm_new_token_title
 import com.hereliesaz.geministrator.resources.settings_a2a_server_copy_token
 import com.hereliesaz.geministrator.resources.settings_a2a_server_description
 import com.hereliesaz.geministrator.resources.settings_a2a_server_failed
@@ -247,219 +253,6 @@ import com.hereliesaz.geministrator.resources.settings_unreleased_roles_keep_the
 import com.hereliesaz.geministrator.resources.settings_whenever_the_local_planner_is_not
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
-
-@Composable
-internal fun CompanyProviderScreen(
-    runtimeState: ApplicationRuntimeState = ApplicationRuntimeState.Loading,
-    connectedProviderIds: Set<String> = emptySet(),
-    onSaveRole: (RoleDefinition) -> Unit = {},
-    modifier: Modifier = Modifier,
-) {
-    val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
-    val roles: Collection<RoleDefinition> = liveWorkflow?.roles
-        ?: (runtimeState as? ApplicationRuntimeState.NoRun)?.roles
-        ?: (runtimeState as? ApplicationRuntimeState.NoProject)?.roles
-        ?: emptyList()
-    var showRoleForm by remember { mutableStateOf(false) }
-    var roleIdDraft by remember { mutableStateOf("") }
-    var roleNameDraft by remember { mutableStateOf("") }
-    var roleDescDraft by remember { mutableStateOf("") }
-    var roleInstructionsDraft by remember { mutableStateOf("") }
-    var roleProviderDraft by remember { mutableStateOf<String?>(null) }
-
-    Column(
-        modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(26.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text("SWARM", style = AzphaltType.hero, color = azphaltOnSurface())
-        Text(
-            "Assign each swarm role to the provider you want. AUTO lets Aive choose a compatible connected provider; explicit assignments let you spread an orchestration across provider quotas.",
-            style = AzphaltType.body,
-            color = azphaltOnSurface(),
-        )
-
-        AzphaltPill(
-            label = if (showRoleForm) "Cancel" else "Add role",
-            seed = "add-role-toggle",
-            onClick = {
-                showRoleForm = !showRoleForm
-                if (!showRoleForm) {
-                    roleIdDraft = ""
-                    roleNameDraft = ""
-                    roleDescDraft = ""
-                    roleInstructionsDraft = ""
-                    roleProviderDraft = null
-                }
-            },
-        )
-
-        if (showRoleForm) {
-            OutlinedTextField(
-                value = roleNameDraft,
-                onValueChange = { roleNameDraft = it },
-                label = { Text("Role name") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = roleIdDraft,
-                onValueChange = { roleIdDraft = it },
-                label = { Text("Role ID (slug)") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = roleDescDraft,
-                onValueChange = { roleDescDraft = it },
-                label = { Text("Description") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = roleInstructionsDraft,
-                onValueChange = { roleInstructionsDraft = it },
-                label = { Text("Standing instructions") },
-                minLines = 3,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            ProviderChoiceRow(
-                selectedProviderId = roleProviderDraft,
-                connectedProviderIds = connectedProviderIds,
-                onSelected = { roleProviderDraft = it },
-            )
-            AzphaltPill(
-                label = "Save role",
-                seed = "save-role",
-                onClick = {
-                    val id = roleIdDraft.trim().ifBlank { roleNameDraft.trim().lowercase().replace(" ", "-") }
-                    if (id.isNotEmpty() && roleNameDraft.isNotBlank()) {
-                        onSaveRole(
-                            RoleDefinition(
-                                id = RoleDefinitionId(id),
-                                name = roleNameDraft.trim(),
-                                description = roleDescDraft.trim(),
-                                instructions = roleInstructionsDraft.trim(),
-                                preferredProviderId = roleProviderDraft?.let(::AgentProviderId),
-                            ),
-                        )
-                        showRoleForm = false
-                        roleIdDraft = ""
-                        roleNameDraft = ""
-                        roleDescDraft = ""
-                        roleInstructionsDraft = ""
-                        roleProviderDraft = null
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-
-        val byDepartment = roles.groupBy { it.providerDepartment() }
-        listOf("Executive", "Product", "Engineering", "Assurance", "Delivery", "Custom").forEach { department ->
-            val deptRoles = byDepartment[department] ?: return@forEach
-            ProviderSectionLabel(department)
-            val activeRoleIds = liveWorkflow?.run?.taskRuns?.values
-                ?.filter {
-                    it.status in setOf(
-                        TaskRunStatus.Running,
-                        TaskRunStatus.Planning,
-                        TaskRunStatus.AwaitingApproval,
-                        TaskRunStatus.Verifying,
-                    )
-                }
-                ?.mapNotNull { it.assignedRoleId }
-                ?.toSet()
-                .orEmpty()
-            deptRoles.forEach { role ->
-                val assigned = role.preferredProviderId?.value
-                val providerLabel = assigned?.let { ProviderCatalog.entry(it)?.displayName ?: it } ?: "Auto"
-                AzphaltRecord(
-                    seed = "provider-role-${role.id.value}",
-                    eyebrow = department,
-                    title = role.name,
-                    body = "${role.description}\nProvider: $providerLabel",
-                    endCap = if (role.id in activeRoleIds) "Working" else "Available",
-                    well = {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("PROVIDER ROUTING", style = AzphaltType.eyebrow, color = azphaltOnSurface())
-                            ProviderChoiceRow(
-                                selectedProviderId = assigned,
-                                connectedProviderIds = connectedProviderIds,
-                                onSelected = { selected ->
-                                    onSaveRole(
-                                        role.copy(
-                                            preferredProviderId = selected?.let(::AgentProviderId),
-                                        ),
-                                    )
-                                },
-                            )
-                            if (connectedProviderIds.isEmpty()) {
-                                Text(
-                                    "Connect provider API keys in Settings before assigning roles.",
-                                    style = AzphaltType.body,
-                                    color = azphaltOnSurface(),
-                                )
-                            }
-                        }
-                    },
-                )
-            }
-        }
-
-        if (liveWorkflow != null) {
-            val definition = liveWorkflow.definition
-            ProviderSectionLabel("Workflow Policies")
-            AzphaltRecord(
-                seed = "policy-integration",
-                eyebrow = "Integration",
-                title = "Integration policy",
-                body = when (definition.integrationPolicy) {
-                    IntegrationPolicy.Manual -> "Changes integrated manually"
-                    IntegrationPolicy.PullRequest -> "Changes delivered via pull request"
-                    IntegrationPolicy.AutoMergeAfterVerification -> "Auto-merge after verification passes"
-                },
-                endCap = definition.integrationPolicy.name,
-            )
-            AzphaltRecord(
-                seed = "policy-concurrency",
-                eyebrow = "Concurrency",
-                title = "Concurrency policy",
-                body = buildString {
-                    append("${definition.concurrencyPolicy.maxConcurrentTasks} tasks max")
-                    if (definition.concurrencyPolicy.perProviderLimits.isNotEmpty()) {
-                        append(" · Per-provider limits: ")
-                        append(definition.concurrencyPolicy.perProviderLimits.entries.joinToString { "${it.key.value}=${it.value}" })
-                    }
-                },
-                endCap = "${definition.concurrencyPolicy.maxConcurrentTasks} max",
-            )
-            AzphaltRecord(
-                seed = "policy-tests",
-                eyebrow = "Test design",
-                title = "Test design policy",
-                body = when (definition.testDesignPolicy) {
-                    TestDesignPolicy.None -> "No test design injection"
-                    TestDesignPolicy.BeforeImplementation -> "Pre-code verification injected before implementation"
-                    TestDesignPolicy.AfterImplementation -> "Post-code regression tests injected after implementation"
-                    TestDesignPolicy.BeforeAndAfterImplementation -> "Pre-code verification and post-code regression tests injected"
-                },
-                endCap = definition.testDesignPolicy.name,
-            )
-            AzphaltRecord(
-                seed = "policy-cache",
-                eyebrow = "Prompt reuse",
-                title = "Prompt reuse policy",
-                body = when (definition.promptReusePolicy) {
-                    PromptReusePolicy.ProviderDefault -> "Provider decides cache behavior"
-                    PromptReusePolicy.PreferCache -> "Cache reads preferred where supported"
-                    PromptReusePolicy.DisableCache -> "Prompt caching disabled"
-                },
-                endCap = definition.promptReusePolicy.name,
-            )
-
-        }
-    }
-}
 
 @Composable
 internal fun ProviderSettingsScreen(
@@ -1039,6 +832,7 @@ internal fun ProviderSettingsScreen(
 
         a2aServerSetting?.let { setting ->
             ProviderSectionLabel(stringResource(Res.string.settings_a2a_server))
+            var confirmingNewToken by remember { mutableStateOf(false) }
             Text(
                 stringResource(Res.string.settings_a2a_server_description),
                 style = AzphaltType.body,
@@ -1087,8 +881,17 @@ internal fun ProviderSettingsScreen(
                     AzphaltPill(
                         stringResource(Res.string.settings_a2a_server_reset_token),
                         "a2a-server-reset-token",
-                        onClick = setting.onResetToken,
+                        onClick = { confirmingNewToken = true },
                     )
+                    if (confirmingNewToken) {
+                        AzphaltConfirm(
+                            title = stringResource(Res.string.confirm_new_token_title),
+                            text = stringResource(Res.string.confirm_new_token_body),
+                            confirmLabel = stringResource(Res.string.confirm_new_token_action),
+                            onConfirm = { confirmingNewToken = false; setting.onResetToken() },
+                            onDismiss = { confirmingNewToken = false },
+                        )
+                    }
                 }
                 if (setting.tokenIsTemporary) {
                     Text(
@@ -1368,12 +1171,22 @@ internal fun ProviderSettingsScreen(
                 },
             )
             if (distributedComputeState.ready) {
+                var confirmingComputeDisconnect by remember { mutableStateOf(false) }
                 AzphaltPill(
                     stringResource(Res.string.settings_disconnect),
                     "distributed-disconnect",
-                    onClick = onDisconnectDistributedCompute,
+                    onClick = { confirmingComputeDisconnect = true },
                     tone = PillTone.Danger,
                 )
+                if (confirmingComputeDisconnect) {
+                    AzphaltConfirm(
+                        title = stringResource(Res.string.confirm_compute_disconnect_title),
+                        text = stringResource(Res.string.confirm_compute_disconnect_body),
+                        confirmLabel = stringResource(Res.string.confirm_compute_disconnect_action),
+                        onConfirm = { confirmingComputeDisconnect = false; onDisconnectDistributedCompute() },
+                        onDismiss = { confirmingComputeDisconnect = false },
+                    )
+                }
             }
         }
         if (distributedComputeState.onlineNodes.isNotEmpty()) {

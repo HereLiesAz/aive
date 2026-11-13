@@ -66,6 +66,7 @@ import com.hereliesaz.geministrator.resources.confirm_reject_plan_title
 import com.hereliesaz.geministrator.resources.confirm_stop_action
 import com.hereliesaz.geministrator.resources.confirm_stop_body
 import com.hereliesaz.geministrator.resources.confirm_stop_title
+import com.hereliesaz.geministrator.resources.inbox_action_answer
 import com.hereliesaz.geministrator.resources.inbox_artifact_waiting
 import com.hereliesaz.geministrator.resources.inbox_budget_where
 import com.hereliesaz.geministrator.resources.inbox_kind_budget
@@ -92,6 +93,7 @@ import com.hereliesaz.geministrator.resources.inspector_budget_spent
 import com.hereliesaz.geministrator.resources.inspector_hint_approve_nested
 import com.hereliesaz.geministrator.resources.inspector_hint_approve_plan
 import com.hereliesaz.geministrator.resources.inspector_hint_approve_task
+import com.hereliesaz.geministrator.resources.inspector_raise_budget
 import com.hereliesaz.geministrator.resources.inspector_reject_plan
 import com.hereliesaz.geministrator.resources.inspector_retry_task
 import com.hereliesaz.geministrator.resources.inspector_stop_workflow
@@ -111,6 +113,9 @@ internal fun LiveInboxScreen(
     modifier: Modifier = Modifier,
     onLiftSpendStop: () -> Unit = {},
     onOpenLimits: (() -> Unit)? = null,
+    /** Opens a creature's panel on a tab: where a question or a spent budget is resolved. */
+    onOpenCreature: (taskId: String, tab: CreatureTab) -> Unit = { _, _ -> },
+    compact: Boolean = false,
 ) {
     if (runtimeState is ApplicationRuntimeState.Live) {
         val presentation = runtimeState.presentation
@@ -120,6 +125,7 @@ internal fun LiveInboxScreen(
                 onLiftSpendStop = onLiftSpendStop,
                 modifier = modifier,
                 onOpenLimits = onOpenLimits,
+                compact = compact,
             )
 
             presentation.run.globalPause != null -> HallMonitorPauseInboxScreen(
@@ -148,6 +154,7 @@ internal fun LiveInboxScreen(
                         onApproveTask = onApproveTask,
                         onRejectPlan = onRejectPlan,
                         onResolveEscalation = onResolveEscalation,
+                        onOpenCreature = onOpenCreature,
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {
@@ -156,6 +163,7 @@ internal fun LiveInboxScreen(
                         onApproveTask = onApproveTask,
                         onRejectPlan = onRejectPlan,
                         onResolveEscalation = onResolveEscalation,
+                        onOpenCreature = onOpenCreature,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -176,8 +184,8 @@ internal fun LiveInboxScreen(
                 ApplicationRuntimeState.Loading -> stringResource(Res.string.inbox_loading_runtime)
                 is ApplicationRuntimeState.NoProject -> stringResource(Res.string.inbox_no_project_yet_there_are_no)
                 is ApplicationRuntimeState.NoRun -> stringResource(Res.string.inbox_no_active_run_there_are_no)
-                is ApplicationRuntimeState.Disconnected -> stringResource(Res.string.inbox_runtime_disconnected, runtimeState.message)
-                is ApplicationRuntimeState.ResumeFailed -> stringResource(Res.string.inbox_run_unavailable, runtimeState.message)
+                is ApplicationRuntimeState.Disconnected -> stringResource(Res.string.inbox_runtime_disconnected, friendlyErrorMessage(runtimeState.message))
+                is ApplicationRuntimeState.ResumeFailed -> stringResource(Res.string.inbox_run_unavailable, friendlyErrorMessage(runtimeState.message))
                 is ApplicationRuntimeState.Live -> stringResource(Res.string.inbox_no_pending_decisions)
             },
             style = AzphaltType.body,
@@ -185,6 +193,10 @@ internal fun LiveInboxScreen(
         )
     }
 }
+
+/** Why an escalated step stopped, in one plain line (no internal code); null when the run recorded no reason. */
+@Composable
+internal fun escalationReason(message: String?): String? = message?.trim()?.takeIf(String::isNotEmpty)?.let { plainFailureLine(it) }
 
 /** What one Inbox entry waits on the keeper for; [inboxEntries] decides it as the badge's key does. */
 internal enum class InboxEntryKind { PlanApproval, TaskApproval, NestedApproval, Escalation, Question, BudgetSpent }
@@ -228,6 +240,16 @@ internal fun inboxEntries(presentation: LiveWorkflowPresentation): List<InboxEnt
             maxAttempts = task.retryPolicy.maxAttempts,
         )
     }
+}
+
+/**
+ * Where a wait that has no button of its own is resolved: the creature's Needs for a question its agent asked,
+ * its Mind for a spent budget. Null for the waits decided in the Inbox itself.
+ */
+internal fun inboxEntryLinkTab(kind: InboxEntryKind): CreatureTab? = when (kind) {
+    InboxEntryKind.Question -> CreatureTab.Needs
+    InboxEntryKind.BudgetSpent -> CreatureTab.Mind
+    else -> null
 }
 
 /** The entry to show: the one remembered as selected while it still waits, else the first. */
@@ -287,6 +309,7 @@ internal fun WideInboxPage(
     onRejectPlan: (String) -> Unit,
     onResolveEscalation: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onOpenCreature: (taskId: String, tab: CreatureTab) -> Unit = { _, _ -> },
     readLog: InboxReadLog = remember { InboxReadLog(Settings()) },
 ) {
     val entries = remember(presentation) { inboxEntries(presentation) }
@@ -334,6 +357,7 @@ internal fun WideInboxPage(
                 onRejectPlan = { confirming = it to false },
                 onRetry = { onResolveEscalation(it, true) },
                 onStop = { confirming = it to true },
+                onOpenCreature = onOpenCreature,
                 modifier = Modifier.weight(1.2f).widthIn(min = 430.dp).fillMaxHeight(),
             )
         }
@@ -430,7 +454,7 @@ private fun inboxKindTone(entry: InboxEntry): Color = when (entry.kind) {
 }
 
 @Composable
-private fun inboxKindLabel(kind: InboxEntryKind): String = stringResource(
+internal fun inboxKindLabel(kind: InboxEntryKind): String = stringResource(
     when (kind) {
         InboxEntryKind.PlanApproval -> Res.string.inbox_kind_plan
         InboxEntryKind.TaskApproval -> Res.string.inbox_kind_task
@@ -475,6 +499,7 @@ private fun InboxDetail(
     onRejectPlan: (String) -> Unit,
     onRetry: (String) -> Unit,
     onStop: (String) -> Unit,
+    onOpenCreature: (taskId: String, tab: CreatureTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val ink = Azphalt.Ink
@@ -524,6 +549,9 @@ private fun InboxDetail(
                     color = azphaltMutedOnSurface(),
                     modifier = Modifier.widthIn(max = 530.dp),
                 )
+                if (entry.kind == InboxEntryKind.Escalation && !isPlainReason(taskRun.blockingReason?.message)) {
+                    ErrorDetailsToggle(raw = taskRun.blockingReason?.message, seed = "inbox-${entry.taskId}", modifier = Modifier.widthIn(max = 530.dp))
+                }
                 Spacer(Modifier.height(20.dp))
                 // The evidence it waits with, as the run holds it: never invented.
                 taskRun.artifacts.forEach { artifact ->
@@ -545,7 +573,7 @@ private fun InboxDetail(
                 }
                 }
                 Spacer(Modifier.height(11.dp))
-                InboxDetailActions(entry, onApprove, onRejectPlan, onRetry, onStop)
+                InboxDetailActions(entry, onApprove, onRejectPlan, onRetry, onStop, onOpenCreature)
             }
         }
     }
@@ -565,7 +593,7 @@ private fun inboxDetailCopy(
     }
     InboxEntryKind.NestedApproval -> stringResource(Res.string.inspector_hint_approve_nested)
     InboxEntryKind.Escalation -> buildString {
-        append(taskRun.blockingReason?.let { "${it.code} · ${it.message}" } ?: stringResource(Res.string.runs_task_failed))
+        append(escalationReason(taskRun.blockingReason?.message) ?: stringResource(Res.string.runs_task_failed))
         append("\n")
         append(stringResource(Res.string.runs_attempt_of, taskRun.attempt, entry.maxAttempts).trim())
     }
@@ -584,6 +612,7 @@ private fun InboxDetailActions(
     onRejectPlan: (String) -> Unit,
     onRetry: (String) -> Unit,
     onStop: (String) -> Unit,
+    onOpenCreature: (taskId: String, tab: CreatureTab) -> Unit,
 ) {
     val id = entry.taskId
     val actions: List<Triple<String, Boolean, () -> Unit>> = when (entry.kind) {
@@ -597,7 +626,9 @@ private fun InboxDetailActions(
             Triple(stringResource(Res.string.inspector_retry_task), true) { onRetry(id) },
             Triple(stringResource(Res.string.inspector_stop_workflow), false) { onStop(id) },
         )
-        InboxEntryKind.Question, InboxEntryKind.BudgetSpent -> emptyList()
+        // Answered or raised on the creature itself: the button takes the keeper there.
+        InboxEntryKind.Question -> listOf(Triple(stringResource(Res.string.inbox_action_answer), true) { onOpenCreature(id, CreatureTab.Needs) })
+        InboxEntryKind.BudgetSpent -> listOf(Triple(stringResource(Res.string.inspector_raise_budget), true) { onOpenCreature(id, CreatureTab.Mind) })
     }
     if (actions.isEmpty()) return
     Row(Modifier.widthIn(max = 440.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {

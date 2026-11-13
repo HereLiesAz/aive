@@ -38,6 +38,19 @@ import com.hereliesaz.geministrator.resources.provider_credential_get
 import com.hereliesaz.geministrator.resources.provider_credential_key_optional
 import com.hereliesaz.geministrator.resources.provider_credential_leave_blank_to_use_the_free
 import com.hereliesaz.geministrator.resources.provider_credential_save
+import com.hereliesaz.geministrator.resources.cred_authorization_failed
+import com.hereliesaz.geministrator.resources.cred_authorization_pending
+import com.hereliesaz.geministrator.resources.cred_authorize_openrouter
+import com.hereliesaz.geministrator.resources.cred_checking
+import com.hereliesaz.geministrator.resources.cred_connect_account
+import com.hereliesaz.geministrator.resources.cred_connecting
+import com.hereliesaz.geministrator.resources.cred_could_not_start_sign_in
+import com.hereliesaz.geministrator.resources.cred_enter_code
+import com.hereliesaz.geministrator.resources.cred_i_have_authorized
+import com.hereliesaz.geministrator.resources.cred_one_time_code
+import com.hereliesaz.geministrator.resources.cred_open_authorization_page
+import com.hereliesaz.geministrator.resources.cred_sign_in_openrouter
+import com.hereliesaz.geministrator.resources.cred_sign_in_with
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -65,6 +78,10 @@ fun ProviderCredentialSetup(
     var errorMessage by remember(providerId) { mutableStateOf<String?>(null) }
     var keylessConfirm by remember(providerId) { mutableStateOf(false) }
     val requiredMessage = stringResource(Res.string.credential_field_required, entry.credentialLabel)
+    // Read here: the sign-in callbacks below run outside composition.
+    val couldNotStartSignIn = stringResource(Res.string.cred_could_not_start_sign_in)
+    val authorizationPending = stringResource(Res.string.cred_authorization_pending)
+    val authorizationFailed = stringResource(Res.string.cred_authorization_failed)
 
     LoadAzphaltFonts()
     MaterialTheme(colorScheme = GeministratorColors) {
@@ -108,7 +125,7 @@ fun ProviderCredentialSetup(
 
                 if (onStartDeviceSignIn != null && onCheckDeviceSignIn != null) {
                     AzphaltPill(
-                        label = "Sign in with ${entry.displayName}",
+                        label = stringResource(Res.string.cred_sign_in_with, entry.displayName),
                         seed = "device-login-${entry.id}",
                         onClick = {
                             if (!deviceBusy) {
@@ -124,7 +141,7 @@ fun ProviderCredentialSetup(
                                     } catch (cancelled: kotlin.coroutines.cancellation.CancellationException) {
                                         throw cancelled
                                     } catch (failure: Exception) {
-                                        deviceHint = failure.message ?: "Could not start account sign-in"
+                                        deviceHint = failure.message ?: couldNotStartSignIn
                                     } finally {
                                         deviceBusy = false
                                     }
@@ -134,17 +151,17 @@ fun ProviderCredentialSetup(
                     )
                     if (deviceVerificationUrl != null) {
                         Text(
-                            "Enter code ${deviceUserCode.orEmpty()} on the provider's authorization page. The provider controls login and any Google sign-in. Charges may apply.",
+                            stringResource(Res.string.cred_enter_code, deviceUserCode.orEmpty()),
                             style = AzphaltType.body,
                             color = azphaltOnSurface(),
                         )
                         AzphaltPill(
-                            label = "Open authorization page",
+                            label = stringResource(Res.string.cred_open_authorization_page),
                             seed = "device-open-${entry.id}",
                             onClick = { deviceVerificationUrl?.let(uriHandler::openUri) },
                         )
                         AzphaltPill(
-                            label = if (deviceBusy) "Checking…" else "I've authorized",
+                            label = stringResource(if (deviceBusy) Res.string.cred_checking else Res.string.cred_i_have_authorized),
                             seed = "device-check-${entry.id}",
                             onClick = {
                                 if (!deviceBusy) {
@@ -153,14 +170,14 @@ fun ProviderCredentialSetup(
                                         try {
                                             val credential = onCheckDeviceSignIn()
                                             if (credential == null) {
-                                                deviceHint = "Authorization is still pending. Complete it in your browser."
+                                                deviceHint = authorizationPending
                                             } else {
                                                 onSave(credential)
                                             }
                                         } catch (cancelled: kotlin.coroutines.cancellation.CancellationException) {
                                             throw cancelled
                                         } catch (failure: Exception) {
-                                            deviceHint = failure.message ?: "Account authorization failed"
+                                            deviceHint = failure.message ?: authorizationFailed
                                         } finally {
                                             deviceBusy = false
                                         }
@@ -175,7 +192,7 @@ fun ProviderCredentialSetup(
                 }
                 if (onStartAccountSignIn != null && onCompleteAccountSignIn != null) {
                     AzphaltPill(
-                        label = "Sign in with OpenRouter",
+                        label = stringResource(Res.string.cred_sign_in_openrouter),
                         seed = "account-sign-in-${entry.id}",
                         onClick = {
                             authorizationCode = ""
@@ -186,7 +203,7 @@ fun ProviderCredentialSetup(
                     )
                     if (accountSignInInProgress) {
                         Text(
-                            "Authorize Aive in your browser, then copy the one-time code shown by OpenRouter. Your OpenRouter account may use Google sign-in. Model usage is billed to that account.",
+                            stringResource(Res.string.cred_authorize_openrouter),
                             style = AzphaltType.body,
                             color = azphaltOnSurface(),
                         )
@@ -196,11 +213,11 @@ fun ProviderCredentialSetup(
                                 authorizationCode = it
                                 errorMessage = null
                             },
-                            label = "One-time authorization code",
+                            label = stringResource(Res.string.cred_one_time_code),
                             errorMessage = errorMessage,
                         )
                         AzphaltPill(
-                            label = if (exchangingCode) "Connecting…" else "Connect account",
+                            label = stringResource(if (exchangingCode) Res.string.cred_connecting else Res.string.cred_connect_account),
                             seed = "account-exchange-${entry.id}",
                             onClick = {
                                 if (!exchangingCode && authorizationCode.isNotBlank()) {
@@ -212,7 +229,7 @@ fun ProviderCredentialSetup(
                                         } catch (cancelled: kotlin.coroutines.cancellation.CancellationException) {
                                             throw cancelled
                                         } catch (failure: Exception) {
-                                            errorMessage = failure.message ?: "Account authorization failed"
+                                            errorMessage = failure.message ?: authorizationFailed
                                         } finally {
                                             exchangingCode = false
                                         }

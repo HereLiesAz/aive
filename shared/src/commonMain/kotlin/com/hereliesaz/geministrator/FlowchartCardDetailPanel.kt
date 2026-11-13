@@ -39,6 +39,7 @@ import com.hereliesaz.geministrator.resources.flowchart_detail_keeper_paused
 import com.hereliesaz.geministrator.resources.flowchart_detail_no_provider
 import com.hereliesaz.geministrator.resources.flowchart_detail_not_started
 import com.hereliesaz.geministrator.resources.flowchart_detail_provider_failed
+import com.hereliesaz.geministrator.resources.flowchart_detail_provider_failed_plain
 import com.hereliesaz.geministrator.resources.flowchart_detail_question
 import com.hereliesaz.geministrator.resources.flowchart_detail_skipped
 import com.hereliesaz.geministrator.resources.flowchart_detail_spend_stopped
@@ -65,6 +66,9 @@ internal class FlowchartLinks(
     /** Leaves Flowchart for Live and opens the creature's panel on [CreatureTab]. */
     val openCreature: (taskId: String, tab: CreatureTab) -> Unit,
 )
+
+/** The sentences whose [FlowchartCardDetail.detail] is text a provider or the runtime wrote. */
+private val RAW_TEXT_SENTENCES = setOf(FlowchartSentenceKind.ProviderFailed, FlowchartSentenceKind.Failed)
 
 internal val LocalFlowchartLinks = staticCompositionLocalOf<FlowchartLinks?> { null }
 
@@ -112,6 +116,10 @@ internal fun FlowchartCardDetailPanel(
                 color = Azphalt.Ink.mutedOnOpposite(),
             )
             Text(sentence, style = AzphaltType.body, color = Azphalt.Ink.onOpposite())
+            // What a provider or the runtime said, word for word, stays one tap away.
+            if (detail.sentence in RAW_TEXT_SENTENCES && !isPlainReason(detail.detail)) {
+                ErrorDetailsToggle(raw = detail.detail, seed = "flowchart-$taskId")
+            }
             if (onClick != null) {
                 AzphaltPill(
                     label = flowchartActionLabel(detail.action),
@@ -137,18 +145,26 @@ private fun flowchartSentenceText(detail: FlowchartCardDetail): String = when (d
     FlowchartSentenceKind.ComputeUnavailable -> stringResource(Res.string.flowchart_detail_compute_unavailable)
     FlowchartSentenceKind.IntegrationUnavailable -> stringResource(Res.string.flowchart_detail_integration_unavailable)
     FlowchartSentenceKind.HallMonitorPaused -> stringResource(Res.string.flowchart_detail_hall_monitor)
-    FlowchartSentenceKind.ProviderFailed ->
+    FlowchartSentenceKind.ProviderFailed -> if (isPlainReason(detail.detail)) {
         stringResource(Res.string.flowchart_detail_provider_failed, detail.subject.orEmpty(), detail.detail.orEmpty())
+    } else {
+        stringResource(Res.string.flowchart_detail_provider_failed_plain, detail.subject.orEmpty()) + " " + friendlyErrorMessage(detail.detail)
+    }
     FlowchartSentenceKind.NoProvider -> stringResource(Res.string.flowchart_detail_no_provider)
     FlowchartSentenceKind.GateTurnedBack -> stringResource(Res.string.flowchart_detail_gate_turned_back)
     FlowchartSentenceKind.WaitingOnStep -> stringResource(Res.string.flowchart_detail_waiting_on, detail.subject.orEmpty())
     FlowchartSentenceKind.KeeperPaused -> stringResource(Res.string.flowchart_detail_keeper_paused)
-    FlowchartSentenceKind.Failed -> detail.detail
-        ?.let { stringResource(Res.string.flowchart_detail_failed_with, it) }
-        ?: stringResource(Res.string.flowchart_detail_failed)
-    FlowchartSentenceKind.Blocked -> detail.detail
-        ?.let { stringResource(Res.string.flowchart_detail_blocked_with, it) }
-        ?: stringResource(Res.string.flowchart_detail_blocked)
+    FlowchartSentenceKind.Failed -> when {
+        detail.detail == null -> stringResource(Res.string.flowchart_detail_failed)
+        isPlainReason(detail.detail) -> stringResource(Res.string.flowchart_detail_failed_with, detail.detail)
+        else -> stringResource(Res.string.flowchart_detail_failed) + " " + friendlyErrorMessage(detail.detail)
+    }
+    // A hold's reason is the runtime's own wording; only an error from a provider is re-said.
+    FlowchartSentenceKind.Blocked -> when {
+        detail.detail == null -> stringResource(Res.string.flowchart_detail_blocked)
+        classifyError(detail.detail) == ErrorKind.Other -> stringResource(Res.string.flowchart_detail_blocked_with, detail.detail)
+        else -> stringResource(Res.string.flowchart_detail_blocked) + " " + friendlyErrorMessage(detail.detail)
+    }
     FlowchartSentenceKind.NotStarted -> stringResource(Res.string.flowchart_detail_not_started)
     FlowchartSentenceKind.Done -> stringResource(Res.string.flowchart_detail_done)
     FlowchartSentenceKind.Skipped -> stringResource(Res.string.flowchart_detail_skipped)

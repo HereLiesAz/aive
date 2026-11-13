@@ -153,6 +153,11 @@ import com.hereliesaz.geministrator.resources.confirm_stop_action
 import com.hereliesaz.geministrator.resources.confirm_reject_plan_title
 import com.hereliesaz.geministrator.resources.confirm_reject_plan_body
 import com.hereliesaz.geministrator.resources.confirm_reject_plan_action
+import com.hereliesaz.geministrator.resources.inbox_action_answer
+import com.hereliesaz.geministrator.resources.inbox_budget_where
+import com.hereliesaz.geministrator.resources.inbox_question_where
+import com.hereliesaz.geministrator.resources.inspector_hint_approve_nested
+import com.hereliesaz.geministrator.resources.inspector_raise_budget
 import org.jetbrains.compose.resources.stringResource
 
 /** The inspector with nothing live to show: says so instead of showing sample data. */
@@ -175,6 +180,8 @@ internal fun InboxScreen(
     onApproveTask: (String) -> Unit = {},
     onRejectPlan: (String) -> Unit = {},
     onResolveEscalation: (String, Boolean) -> Unit = { _, _ -> },
+    /** Opens a creature's panel on a tab: where a question or a spent budget is resolved. */
+    onOpenCreature: (taskId: String, tab: CreatureTab) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
@@ -199,43 +206,51 @@ internal fun InboxScreen(
             )
         }
         if (liveWorkflow != null) {
-            val pending = liveWorkflow.run.taskRuns.values.filter {
-                it.status == TaskRunStatus.AwaitingApproval || it.status == TaskRunStatus.Escalated
-            }
-            if (pending.isEmpty()) {
+            // Every kind of wait the badge counts, in the badge's own order (inboxEntries), not only two of them.
+            val entries = remember(liveWorkflow) { inboxEntries(liveWorkflow) }
+            if (entries.isEmpty()) {
                 Text(stringResource(Res.string.runs_no_pending_decisions), style = AzphaltType.body, color = azphaltOnSurface())
             } else {
-                pending.forEach { taskRun ->
-                    val task = liveWorkflow.definition.tasks.firstOrNull { it.id == taskRun.taskDefinitionId }
-                    val taskId = taskRun.taskDefinitionId.value
-                    val isPlanApproval = taskRun.status == TaskRunStatus.AwaitingApproval
+                entries.forEach { entry ->
+                    val task = liveWorkflow.definition.tasks.firstOrNull { it.id.value == entry.taskId }
+                    val taskRun = liveWorkflow.run.taskRuns.values.first { it.taskDefinitionId.value == entry.taskId }
+                    val taskId = entry.taskId
+                    val kind = entry.kind
+                    val isPlanApproval = kind == InboxEntryKind.PlanApproval
                     val scope = buildString {
-                        if (isPlanApproval) {
-                            append(stringResource(Res.string.runs_approve_to_begin_execution))
-                            task?.approvalPolicy?.let {
-                                if (it is ApprovalPolicy.RoleApproval) append(stringResource(Res.string.runs_authority, it.authority.name))
-                            }
-                        } else {
-                            val maxAttempts = task?.retryPolicy?.maxAttempts ?: 2
-                            append(stringResource(Res.string.runs_attempt_of, taskRun.attempt, maxAttempts))
-                            task?.escalationPolicy?.let { ep ->
-                                when (ep) {
-                                    is EscalationPolicy.FailWorkflow -> append(stringResource(Res.string.runs_reject_stops_the_workflow))
-                                    is EscalationPolicy.RequireHumanDecision -> append(stringResource(Res.string.runs_human_decision_required))
-                                    is EscalationPolicy.Reassign -> append(stringResource(Res.string.runs_reject_reassigns_to, ep.roleId.value))
+                        when (kind) {
+                            InboxEntryKind.PlanApproval, InboxEntryKind.TaskApproval -> {
+                                append(stringResource(Res.string.runs_approve_to_begin_execution))
+                                task?.approvalPolicy?.let {
+                                    if (it is ApprovalPolicy.RoleApproval) append(stringResource(Res.string.runs_authority, it.authority.name))
                                 }
                             }
+                            InboxEntryKind.Escalation -> {
+                                append(stringResource(Res.string.runs_attempt_of, taskRun.attempt, entry.maxAttempts))
+                                task?.escalationPolicy?.let { ep ->
+                                    when (ep) {
+                                        is EscalationPolicy.FailWorkflow -> append(stringResource(Res.string.runs_reject_stops_the_workflow))
+                                        is EscalationPolicy.RequireHumanDecision -> append(stringResource(Res.string.runs_human_decision_required))
+                                        is EscalationPolicy.Reassign -> append(stringResource(Res.string.runs_reject_reassigns_to, ep.roleId.value))
+                                    }
+                                }
+                            }
+                            else -> Unit
                         }
                     }
                     AzphaltRecord(
                         seed = taskId,
-                        eyebrow = if (isPlanApproval) stringResource(Res.string.runs_plan_approval) else stringResource(Res.string.runs_failure_escalation),
+                        eyebrow = inboxKindLabel(kind),
                         title = task?.name ?: taskId,
                         body = buildString {
-                            val primary = if (isPlanApproval) {
-                                taskRun.progressMessage?.takeIf(String::isNotBlank) ?: task?.objective ?: ""
-                            } else {
-                                taskRun.blockingReason?.let { "${it.code} · ${it.message}" } ?: stringResource(Res.string.runs_task_failed)
+                            val primary = when (kind) {
+                                InboxEntryKind.PlanApproval, InboxEntryKind.TaskApproval ->
+                                    taskRun.progressMessage?.takeIf(String::isNotBlank) ?: task?.objective ?: ""
+                                InboxEntryKind.Escalation ->
+                                    escalationReason(taskRun.blockingReason?.message) ?: stringResource(Res.string.runs_task_failed)
+                                InboxEntryKind.NestedApproval -> stringResource(Res.string.inspector_hint_approve_nested)
+                                InboxEntryKind.Question -> stringResource(Res.string.inbox_question_where)
+                                InboxEntryKind.BudgetSpent -> stringResource(Res.string.inbox_budget_where)
                             }
                             append(primary)
                             if (scope.isNotBlank()) {
@@ -246,6 +261,9 @@ internal fun InboxScreen(
                         endCap = stringResource(Res.string.runs_needs_you),
                         well = {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (kind == InboxEntryKind.Escalation && !isPlainReason(taskRun.blockingReason?.message)) {
+                                    ErrorDetailsToggle(raw = taskRun.blockingReason?.message, seed = "inbox-$taskId")
+                                }
                                 if (taskRun.artifacts.isNotEmpty()) {
                                     Text(stringResource(Res.string.runs_evidence), style = AzphaltType.eyebrow, color = azphaltOnSurface())
                                     taskRun.artifacts.forEach { artifact ->
@@ -260,14 +278,25 @@ internal fun InboxScreen(
                                     }
                                 }
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    if (isPlanApproval) {
-                                        AzphaltPill(stringResource(Res.string.common_approve), "$taskId-approve", onClick = { onApproveTask(taskId) })
-                                        if (taskRun.assignedProviderId != null) {
+                                    when (kind) {
+                                        InboxEntryKind.PlanApproval -> {
+                                            AzphaltPill(stringResource(Res.string.common_approve), "$taskId-approve", onClick = { onApproveTask(taskId) })
                                             AzphaltPill(stringResource(Res.string.common_reject), "$taskId-reject", onClick = { confirming = taskId to false })
                                         }
-                                    } else {
-                                        AzphaltPill(stringResource(Res.string.common_retry), "$taskId-retry", onClick = { onResolveEscalation(taskId, true) })
-                                        AzphaltPill(stringResource(Res.string.runs_stop), "$taskId-stop", onClick = { confirming = taskId to true })
+                                        InboxEntryKind.TaskApproval, InboxEntryKind.NestedApproval ->
+                                            AzphaltPill(stringResource(Res.string.common_approve), "$taskId-approve", onClick = { onApproveTask(taskId) })
+                                        InboxEntryKind.Escalation -> {
+                                            AzphaltPill(stringResource(Res.string.common_retry), "$taskId-retry", onClick = { onResolveEscalation(taskId, true) })
+                                            AzphaltPill(stringResource(Res.string.runs_stop), "$taskId-stop", onClick = { confirming = taskId to true })
+                                        }
+                                        InboxEntryKind.Question -> AzphaltPill(
+                                            stringResource(Res.string.inbox_action_answer), "$taskId-answer",
+                                            onClick = { onOpenCreature(taskId, CreatureTab.Needs) },
+                                        )
+                                        InboxEntryKind.BudgetSpent -> AzphaltPill(
+                                            stringResource(Res.string.inspector_raise_budget), "$taskId-budget",
+                                            onClick = { onOpenCreature(taskId, CreatureTab.Mind) },
+                                        )
                                     }
                                 }
                             }

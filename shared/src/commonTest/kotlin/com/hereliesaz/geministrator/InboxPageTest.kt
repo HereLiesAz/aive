@@ -115,4 +115,13 @@ class InboxPageTest {
         assertEquals(0, unreadInboxCount(keys, badge.read))
         assertTrue(keys.all { it in InboxReadLog(settings).read })
     }
+
+    @Test
+    fun aQuestionAndASpentBudgetLeadToTheCreatureWhereTheyAreResolved() {
+        assertEquals(CreatureTab.Needs, inboxEntryLinkTab(InboxEntryKind.Question))
+        assertEquals(CreatureTab.Mind, inboxEntryLinkTab(InboxEntryKind.BudgetSpent))
+        // The rest are decided in place, with their own buttons.
+        listOf(InboxEntryKind.PlanApproval, InboxEntryKind.TaskApproval, InboxEntryKind.NestedApproval, InboxEntryKind.Escalation)
+            .forEach { assertNull(inboxEntryLinkTab(it)) }
+    }
 }
