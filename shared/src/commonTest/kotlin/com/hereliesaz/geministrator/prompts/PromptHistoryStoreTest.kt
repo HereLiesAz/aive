@@ -65,4 +65,14 @@ class PromptHistoryStoreTest {
         s.record(PromptKind.Objective, "fix the build")
         assertTrue(settings.keys.filter { "prompts.v1" in it }.all { it.startsWith(DurableUiStateStore.ROOT_KEY + ".") })
     }
+
+    @Test
+    fun legacyTextMovesToItsOwnSettingsOnce() {
+        val legacy = DurableUiStateStore(MapSettings().also { PromptHistoryStore(DurableUiStateStore(it), clock = { 1L }).record(PromptKind.Objective, "fix the build") })
+        val ownSettings = MapSettings()
+        val own = DurableUiStateStore(ownSettings)
+        PromptHistoryStore.moveLegacyInto(own, legacy)
+        assertEquals(listOf("fix the build"), PromptHistoryStore(own).entries(PromptKind.Objective).map { it.text })
+        assertEquals(null, legacy.getString(PromptHistoryStore.keyOf(PromptKind.Objective)))
+    }
 }
