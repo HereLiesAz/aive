@@ -58,7 +58,14 @@ Built after the audit above (the audit table and plan below describe the state b
 | A (retire `/deliberate`) | Built for agents: parser deleted, protocol sentence and `⚖` template removed. The resolution reader (A3 to A5) is **not built**; `MemoryTool.deliberate` and the absorber remain as an unused typed seam because tests and the tool API still use them. |
 | B depth ladder | Built: `MemoryDwell` (session only), depth levels cloud and gist, key phrases, finer summaries, condensed sources; novelty keyed by memory and depth (`AttentionGatedRecall.select(depth)`, `fresh`); `recordCoRecall` and `recordAccess` removed (their edges are no longer written; `MemoryCoRecall` is kept for its own test). |
 | C gist | Built for injected recall (`MemoryGist.kt`). Stored condensation still restates values (open owner question). `divergenceLines` is no longer used by an injection. |
-| D1 prompt cloud outside the plan gate | Built (gateway always asks; the grip inside `recallForPrompt` is gated). D2 to D4 not built. |
+| D1 prompt cloud outside the plan gate | Built (gateway always asks; the grip inside `recallForPrompt` is gated). |
+| D2 key phrases with the cloud | Built: `cuePhrases`, up to three `- ` lines after the tags, novelty keyed at the phrase depth. |
+| D4 role lessons by association | Built: the cloud, phrases and followed-tag summaries read the role's lesson bank under the same caps; the verbatim block is a first-prompt pointer. D3 (`#tag` and the recall phrase as ordinary echoes, no dial bypass) is **not built**. |
+| `/remindme` completeness | Built: the user prompt is sent once (first envelope only); unsent parts are journaled in the settings store and sent at the next start (`MemoryCaptureJournal`, `recoverCapturedSessions`); a cancelled session already banks its tail through the Failed end-of-session send (there is no Cancelled status). The protocol already teaches the command. |
+| Queen's memory | Resolved by removal: `OrchestrationPacket.retrievedMemory` is gone (nothing filled it; filling it puts memory text into the prompt of the model that designs steps). |
+| Controller-level cue tests | Built: `MemoryControllerCuePipelineTest`. |
+
+Needs the owner's decision, not built: banking `Thinking` and keeper mid-session messages (privacy); a reader for resolutions (the owner said they are condensed like everything else); releasing a trained clerk.
 
 ## Minimal change plan (original; see Status above for what is done)
 
