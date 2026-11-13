@@ -233,7 +233,7 @@ internal fun HiveDeleteRequest(
 internal fun deletedHiveStandIn(run: WorkflowRun): WorkflowDefinition = WorkflowDefinition(
     id = run.workflowDefinitionId,
     name = DELETED_HIVE_NAME,
-    description = "This hive was deleted. Its runs stay in history and can be viewed, not resumed.",
+    description = "This swarm was deleted. Its runs stay in history and can be viewed, not resumed.",
     tasks = run.taskRuns.values.map { taskRun ->
         com.hereliesaz.geministrator.domain.TaskDefinition(
             id = taskRun.taskDefinitionId,
@@ -245,4 +245,4 @@ internal fun deletedHiveStandIn(run: WorkflowRun): WorkflowDefinition = Workflow
     },
 )
 
-internal const val DELETED_HIVE_NAME = "Deleted hive"
+internal const val DELETED_HIVE_NAME = "Deleted swarm"
