@@ -76,7 +76,7 @@ class WorkflowEngineOutputCheckTest {
         val gateway = ScriptedGateway(done = setOf("Do write"), text = "nothing useful")
         val events = InMemoryWorkflowEventSink()
         val engine = WorkflowEngine(gateway, BuiltInRoles.all, events, outputValidators = mustSayOk)
-        val started = engine.dispatchReadyTasks(project, def, newRun(def), 10L)
+        val started = engine.dispatchReadyTasks(project, def, newRun(def), nowEpochMillis = 10L)
 
         val reconciled = engine.reconcile(def, started.run, started.handles, 20L, ids)
 
@@ -103,7 +103,7 @@ class WorkflowEngineOutputCheckTest {
         val def = definition(two)
         val gateway = ScriptedGateway(done = setOf("Do write"), text = "nothing useful")
         val engine = WorkflowEngine(gateway, BuiltInRoles.all, InMemoryWorkflowEventSink(), outputValidators = mustSayOk)
-        val started = engine.dispatchReadyTasks(project, def, newRun(def), 10L)
+        val started = engine.dispatchReadyTasks(project, def, newRun(def), nowEpochMillis = 10L)
         val reconciled = engine.reconcile(def, started.run, started.handles, 20L, ids)
         val message = reconciled.taskRuns.getValue(TaskDefinitionId("write")).blockingReason!!.message
 
@@ -119,7 +119,7 @@ class WorkflowEngineOutputCheckTest {
         val def = definition(task("write", VerificationPolicy.Deterministic("must-say-ok")))
         val gateway = ScriptedGateway(done = setOf("Do write"), text = "all OK here")
         val engine = WorkflowEngine(gateway, BuiltInRoles.all, InMemoryWorkflowEventSink(), outputValidators = mustSayOk)
-        val started = engine.dispatchReadyTasks(project, def, newRun(def), 10L)
+        val started = engine.dispatchReadyTasks(project, def, newRun(def), nowEpochMillis = 10L)
 
         val reconciled = engine.reconcile(def, started.run, started.handles, 20L, ids)
 
@@ -132,7 +132,7 @@ class WorkflowEngineOutputCheckTest {
         val def = definition(task("write", VerificationPolicy.Deterministic("not-registered")))
         val gateway = ScriptedGateway(done = setOf("Do write"), text = "all OK here")
         val engine = WorkflowEngine(gateway, BuiltInRoles.all, InMemoryWorkflowEventSink())
-        val started = engine.dispatchReadyTasks(project, def, newRun(def), 10L)
+        val started = engine.dispatchReadyTasks(project, def, newRun(def), nowEpochMillis = 10L)
 
         val reconciled = engine.reconcile(def, started.run, started.handles, 20L, ids)
 
@@ -144,7 +144,7 @@ class WorkflowEngineOutputCheckTest {
         val def = definition(task("main"), task("extra", optional = true))
         val gateway = ScriptedGateway(done = setOf("Do main"), text = "x")
         val engine = WorkflowEngine(gateway, BuiltInRoles.all, InMemoryWorkflowEventSink())
-        val started = engine.dispatchReadyTasks(project, def, newRun(def), 10L)
+        val started = engine.dispatchReadyTasks(project, def, newRun(def), nowEpochMillis = 10L)
         val extraId = TaskDefinitionId("extra")
         val failedRun = started.run.copy(
             taskRuns = started.run.taskRuns + (extraId to started.run.taskRuns.getValue(extraId).copy(status = TaskRunStatus.Failed)),
@@ -162,7 +162,7 @@ class WorkflowEngineOutputCheckTest {
     fun aRequiredCreatureThatFailsStillEndsTheRun() = runBlocking {
         val def = definition(task("main"))
         val engine = WorkflowEngine(ScriptedGateway(done = emptySet(), text = "x"), BuiltInRoles.all, InMemoryWorkflowEventSink())
-        val started = engine.dispatchReadyTasks(project, def, newRun(def), 10L)
+        val started = engine.dispatchReadyTasks(project, def, newRun(def), nowEpochMillis = 10L)
         val id = TaskDefinitionId("main")
         val failedRun = started.run.copy(
             taskRuns = started.run.taskRuns + (id to started.run.taskRuns.getValue(id).copy(status = TaskRunStatus.Failed)),
