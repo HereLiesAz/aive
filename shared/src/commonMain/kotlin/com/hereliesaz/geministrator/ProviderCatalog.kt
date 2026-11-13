@@ -53,6 +53,22 @@ object ProviderCatalog {
     /** Stored for a [ProviderCatalogEntry.keyOptional] provider linked without a key. */
     const val ANONYMOUS_CREDENTIAL = "anonymous"
 
+    /** Built-in providers that make pictures, not text: never the first thing a new keeper is given to think with. */
+    private val IMAGE_ONLY_IDS = setOf(AI_HORDE_ID, FAL_ID)
+
+    /** Most generous free limits first (Kilo: 200 requests an hour; LLM7: tight; OVHcloud: 2 a minute). */
+    private val FREE_RELIABILITY_ORDER = listOf(KILO_ID, LLM7_ID, OVHCLOUD_ID)
+
+    /**
+     * The free gateways a first hive offers in one tap: keyless, able to write text, best limits first,
+     * at most three. (The Keeper's room lists the rest.)
+     */
+    fun firstRunFreeEntries(): List<ProviderCatalogEntry> =
+        builtInEntries
+            .filter { it.keyOptional && it.id !in IMAGE_ONLY_IDS }
+            .sortedBy { entry -> FREE_RELIABILITY_ORDER.indexOf(entry.id).let { if (it < 0) Int.MAX_VALUE else it } }
+            .take(3)
+
     /** The providers built into Aive. */
     val builtInEntries: List<ProviderCatalogEntry> = listOf(
         ProviderCatalogEntry(

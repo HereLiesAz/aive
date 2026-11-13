@@ -631,7 +631,7 @@ internal fun MindMapRunScreen(
                 if (gate == FeedGate.Provider || gate is FeedGate.Repository) {
                     // Something to think with, in one tap: the free gateways right here, the rest
                     // (your own key) in the Keeper's room.
-                    val free = ProviderCatalog.builtInEntries.filter { it.keyOptional }.take(3)
+                    val free = ProviderCatalog.firstRunFreeEntries()
                     free.forEachIndexed { index, entry ->
                         AzphaltPill(
                             tone = if (index == 0 && gate == FeedGate.Provider) PillTone.Primary else PillTone.Quiet,
