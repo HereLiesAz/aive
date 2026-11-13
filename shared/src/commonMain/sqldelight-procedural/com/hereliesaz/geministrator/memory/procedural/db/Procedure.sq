@@ -59,6 +59,9 @@ DELETE FROM procedure_evidence;
 deleteTraces:
 DELETE FROM procedure_trace;
 
+deleteTrace:
+DELETE FROM procedure_trace WHERE receipt_key = ?;
+
 allArtifacts:
 SELECT body FROM procedure_artifact ORDER BY rowid;
 
