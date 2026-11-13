@@ -3,6 +3,17 @@ package com.hereliesaz.geministrator
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.BottomSheetScaffold
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.rememberBottomSheetScaffoldState
+import androidx.compose.material3.rememberStandardBottomSheetState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -96,4 +107,55 @@ internal fun FlowCardFace(node: FlowNode, selected: Boolean, modifier: Modifier 
         }
         state?.let { Text(it.uppercase(), style = AzphaltType.endCap.copy(fontSize = 10.sp), color = text, maxLines = 1) }
     }
+}
+
+/** How much of the flipped card's sheet shows before it is dragged up: its handle and the card's detail. */
+internal val CardFlipPeekHeight: Dp = 224.dp
+
+/**
+ * On a phone, the shell's body with Edit's sheet over it. The sheet is not modal: it shows itself at its peek
+ * (partially expanded, not full height) when [showSheet], leaves the creatures under it tappable (so the card
+ * can be tapped, or swiped, to flip back), and drags up to the creature's whole sheet. It reports how far it
+ * stands to [host] ([CardFlipEvent.SheetExpanded] and [CardFlipEvent.SheetPeeked]) so a swipe on the card only
+ * flips back while the sheet is at its peek, and expands when [host] says so (a card's button opening a tab).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun CardFlipSheetHost(
+    host: CardFlipHost,
+    enabled: Boolean,
+    showSheet: Boolean,
+    sheet: @Composable ColumnScope.() -> Unit,
+    content: @Composable () -> Unit,
+) {
+    if (!enabled) {
+        content()
+        return
+    }
+    val sheetState = rememberStandardBottomSheetState(initialValue = SheetValue.PartiallyExpanded, skipHiddenState = true)
+    val scaffoldState = rememberBottomSheetScaffoldState(sheetState)
+    LaunchedEffect(sheetState) {
+        snapshotFlow { sheetState.currentValue }.collect { value ->
+            host.send(if (value == SheetValue.Expanded) CardFlipEvent.SheetExpanded else CardFlipEvent.SheetPeeked)
+        }
+    }
+    val expanded = host.state.expanded
+    LaunchedEffect(showSheet, expanded) {
+        if (!showSheet) {
+            if (sheetState.currentValue == SheetValue.Expanded) sheetState.partialExpand()
+        } else if (expanded && sheetState.currentValue != SheetValue.Expanded) {
+            sheetState.expand()
+        }
+    }
+    BottomSheetScaffold(
+        sheetContent = { if (showSheet) sheet() },
+        scaffoldState = scaffoldState,
+        sheetPeekHeight = if (showSheet) CardFlipPeekHeight else 0.dp,
+        sheetSwipeEnabled = showSheet,
+        sheetContainerColor = Azphalt.Ink,
+        sheetContentColor = Azphalt.Ink.onOpposite(),
+        sheetDragHandle = { if (showSheet) BottomSheetDefaults.DragHandle(color = Azphalt.Ink.mutedOnOpposite()) },
+        containerColor = Color.Transparent,
+        contentColor = LocalContentColor.current,
+    ) { _ -> content() }
 }

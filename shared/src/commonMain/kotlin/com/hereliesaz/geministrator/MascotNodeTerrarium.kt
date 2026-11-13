@@ -620,6 +620,7 @@ private fun MascotNodeTerrarium(
                 label = "card-flip",
             )
             val flipSend = flip?.send
+            val cardState = card?.status?.label()
             val cardWidth = creatureSize.coerceIn(120.dp, 176.dp)
 
             Box(
@@ -639,7 +640,7 @@ private fun MascotNodeTerrarium(
                     .semantics(mergeDescendants = true) {
                         contentDescription = if (flipped && card != null) {
                             // The back: the card's own words, its step, who does it and how it stands.
-                            flowCardDescription(card, card.status?.label())
+                            flowCardDescription(card, cardState)
                         } else {
                             buildString {
                                 append(node.label)
