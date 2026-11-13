@@ -1631,6 +1631,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_remote_access_reset">Reset pairing</string>
     <string name="settings_relay_pool_device_identity_and_token">Relay, pool, device identity, and token are required</string>
     <string name="settings_relay_token">Relay token</string>
+    <string name="settings_relay_owner_token">Owner token (optional: revokes other devices and re-enrols a revoked one)</string>
+    <string name="settings_relay_owner_token_leave_blank_to_keep">Owner token (leave blank to keep)</string>
     <string name="settings_relay_token_leave_blank_to_keep">Relay token (leave blank to keep existing)</string>
     <string name="settings_relay_url_wss">Relay URL (wss://...)</string>
     <string name="settings_retry_install">Retry install (%1$s)</string>

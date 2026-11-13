@@ -340,6 +340,7 @@ internal fun ProviderSettingsScreen(
     // Unsaved secret text is deliberately not copied into general Settings. Once Save is pressed,
     // the token is synchronously committed to platform-secure credential storage.
     var tokenDraft by remember(distributedComputeState.tokenConfigured) { mutableStateOf("") }
+    var ownerTokenDraft by remember(distributedComputeState.ownerTokenConfigured) { mutableStateOf("") }
     var maxParallelDraft by rememberDurableStringState(
         "settings.compute.max-parallel",
         computeConfiguration.maxParallelLeases.toString(),
@@ -1179,6 +1180,23 @@ internal fun ProviderSettingsScreen(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+        if (distributedComputeState.ownerTokenSettable) {
+            OutlinedTextField(
+                value = ownerTokenDraft,
+                onValueChange = { ownerTokenDraft = it },
+                label = {
+                    Text(
+                        if (distributedComputeState.ownerTokenConfigured) {
+                            stringResource(Res.string.settings_relay_owner_token_leave_blank_to_keep)
+                        } else {
+                            stringResource(Res.string.settings_relay_owner_token)
+                        },
+                    )
+                },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         OutlinedTextField(
             value = maxParallelDraft,
             onValueChange = { value -> maxParallelDraft = value.filter(Char::isDigit).take(2) },
@@ -1226,6 +1244,8 @@ internal fun ProviderSettingsScreen(
                         tokenDraft.trim().takeIf(String::isNotEmpty),
                     )
                     tokenDraft = ""
+                    ownerTokenDraft.trim().takeIf(String::isNotEmpty)?.let(distributedComputeState.onSaveOwnerToken)
+                    ownerTokenDraft = ""
                 },
             )
             if (distributedComputeState.ready) {

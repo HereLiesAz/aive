@@ -73,6 +73,11 @@ data class DistributedComputeUiState(
     val enrolledNodes: List<EnrolledComputeNode> = emptyList(),
     /** This device's own identity was revoked by another pool member. */
     val revoked: Boolean = false,
+    /** Whether this host keeps the pool owner's token in the app (Android); the others read it from the environment. Shows the owner-token field in the relay row. */
+    val ownerTokenSettable: Boolean = false,
+    val ownerTokenConfigured: Boolean = false,
+    /** Stores the owner's token (the one that revokes other devices and re-enrols a revoked one). */
+    val onSaveOwnerToken: (String) -> Unit = {},
 ) {
     val ready: Boolean
         get() = configuration.configured && tokenConfigured
