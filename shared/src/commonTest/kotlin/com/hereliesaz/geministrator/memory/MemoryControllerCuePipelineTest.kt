@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator.memory
 
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ProviderRunId
+import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.TaskRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.orchestration.MemoryQueryPlan
@@ -195,5 +196,46 @@ class MemoryControllerCuePipelineTest {
 
         // The same tag again inside the novelty window brings nothing, tags or phrases.
         assertEquals("Where is the keystore?", controller.observer.annotateUserMessage(h, "Where is the keystore?"))
+    }
+
+    @Test
+    fun aRolesLessonsArriveByAssociationAndNotAsAVerbatimBlock() = runBlocking {
+        val lesson = "Check the filing year first (source: IRS, fetched 2026-01-02)"
+        val tag = MemoryNode(MemoryNodeId("tag-filing"), MemoryNodeKind.NounTag, "filing", createdAtEpochMillis = 0)
+        val phrase = MemoryNode(MemoryNodeId("phrase-filing"), MemoryNodeKind.Phrase, "check the filing year first", createdAtEpochMillis = 0)
+        val episode = MemoryEpisode(
+            id = MemoryEpisodeId("e1"), sourceSessionId = "s", userPrompt = lesson, createdAtEpochMillis = 1,
+            chunks = listOf(MemorySourceChunk(MemoryChunkId("e1:c"), MemoryEpisodeId("e1"), 0, MemorySourceKind.AgentNote, ROLE_LESSON_LABEL, lesson)),
+        )
+        val roleBank = MemorySnapshot(
+            episodes = listOf(episode),
+            nodes = listOf(tag, phrase),
+            edges = listOf(MemoryEdge(MemoryEdgeId("e-phrase"), tag.id, phrase.id, MemoryRelationKind.Indexes, 1f, 0)),
+        )
+        val controller = MemoryLayerController(
+            banks = MemoryBanks.inMemory(mapOf("wf-role" to InMemoryMemoryStore(), "role:reviewer-tax" to InMemoryMemoryStore(roleBank))),
+            settingsStore = MemoryLayerSettingsStore(MapSettings()),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            nowEpochMillis = { 1_000L },
+        )
+        controller.setDefaultAttentionLevel(1f)
+        val request = AgentTaskRequest(
+            TaskRunId("agent-7"), "Review the filing", "", emptyList(),
+            orchestrationContext = AgentOrchestrationContext(workflowRunId = WorkflowRunId("wf-role"), roleId = RoleDefinitionId("reviewer-tax")),
+        )
+        val blocks = controller.promptContextProvider.recallFor(request, MemoryQueryPlan(emptyList(), enoughEvidence = false)).blocks
+
+        // The lesson itself is not in a block of its own; a pointer says it will arrive.
+        val pointer = blocks.single { it.label == "Role lessons" }
+        assertTrue("Check the filing year" !in pointer.content, pointer.content)
+        // It arrives with the prompt's cue cloud: the role's tag, then its key phrase.
+        val cloud = blocks.single { it.label == "Memory" }.content.lines()
+        assertEquals("$MEMORY_MESSAGE_MARKER #filing", cloud.first(), "$blocks")
+        assertEquals(listOf("- check the filing year first"), cloud.drop(1), "$blocks")
+
+        // Later prompts do not repeat the pointer.
+        val later = controller.promptContextProvider.recallFor(request, MemoryQueryPlan(emptyList(), enoughEvidence = false)).blocks
+        assertTrue(later.none { it.label == "Role lessons" }, "$later")
     }
 }
