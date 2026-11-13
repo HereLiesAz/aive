@@ -16,6 +16,7 @@ import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.scar_hatched
+import com.hereliesaz.geministrator.resources.scar_stopped
 import com.hereliesaz.geministrator.resources.scar_withered
 import org.jetbrains.compose.resources.stringResource
 
@@ -39,7 +40,13 @@ internal fun RunScars(
     Row(modifier = modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         scars.forEach { scar ->
             AzphaltPill(
-                label = stringResource(if (scar.status == WorkflowRunStatus.Completed) Res.string.scar_hatched else Res.string.scar_withered),
+                label = stringResource(
+                    when (scar.status) {
+                        WorkflowRunStatus.Completed -> Res.string.scar_hatched
+                        WorkflowRunStatus.Cancelled -> Res.string.scar_stopped
+                        else -> Res.string.scar_withered
+                    },
+                ),
                 seed = "scar-${scar.id.value}",
                 endCap = scar.objective.take(24),
                 onClick = { onReplay(scar.id.value) },

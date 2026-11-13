@@ -66,8 +66,8 @@ import org.jetbrains.compose.resources.stringResource
 private val DistrictCore = Color(0xFF2A231E)
 private val DistrictEdge = Color(0xFF141110)
 private val Withered = Color(0xFF4A4139)
-// The palette only (docs/BRANDING.md): a hatched hive's ring is Yellow; a withered one dims.
-private val Hatched = Azphalt.Yellow
+// The palette only (docs/BRANDING.md): a running hive's ring is Yellow, a finished one green (the same green as a finished creature); a withered one dims.
+private val Hatched = ClaspGreen
 
 /**
  * The district (docs/Swarm-OS.md): every workflow you keep, as a neighbourhood of one dark tissue.
@@ -243,7 +243,11 @@ private fun NeighbourhoodCell(neighbourhood: Neighbourhood, onClick: () -> Unit,
                     val t = neighbourhood.growth.coerceIn(0f, 1f)
                     val rx = (7f + 12f * t).dp.toPx()
                     val ry = (9f + 15f * t).dp.toPx()
-                    val shell = if (neighbourhood.state == NeighbourhoodState.Withered) Withered else Azphalt.Yellow
+                    val shell = when (neighbourhood.state) {
+                        NeighbourhoodState.Withered -> Withered
+                        NeighbourhoodState.Hatched -> Hatched
+                        else -> Azphalt.Yellow
+                    }
                     drawOval(shell, topLeft = Offset(c.x - rx, c.y + r * 0.55f - ry), size = Size(rx * 2f, ry * 2f))
                 }
             }
