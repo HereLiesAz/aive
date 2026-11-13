@@ -903,6 +903,14 @@ private fun MascotNodeTerrarium(
                             .widthIn(max = creatureSize)
                             .clip(RoundedCornerShape(999.dp))
                             .background(if (pinned) Azphalt.Yellow else Azphalt.Ink.copy(alpha = 0.82f))
+                            .then(
+                                // Its Source is chosen on its role: the badge opens that role in the Roster.
+                                badge.roleId?.let { id ->
+                                    LocalPlaceLinks.current.openRole?.let { open ->
+                                        Modifier.clickable(role = Role.Button) { open(id) }
+                                    }
+                                } ?: Modifier,
+                            )
                             .padding(horizontal = 6.dp, vertical = 2.dp),
                     )
                 }

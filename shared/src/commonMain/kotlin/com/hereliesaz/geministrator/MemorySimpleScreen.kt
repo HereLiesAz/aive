@@ -116,7 +116,7 @@ internal fun MemoryViewToggle(view: MemoryView, onView: (MemoryView) -> Unit, mo
  * work, what waits, Consolidate now) and two notes. Every figure is real; see [memorySimpleField].
  */
 @Composable
-internal fun MemorySimpleView(controller: MemoryLayerController) {
+internal fun MemorySimpleView(controller: MemoryLayerController, onOpenTechnical: (() -> Unit)? = null) {
     val snapshot by controller.snapshot.collectAsState()
     val activity by controller.activity.collectAsState()
     val settings by controller.settings.collectAsState()
@@ -152,6 +152,7 @@ internal fun MemorySimpleView(controller: MemoryLayerController) {
                         proposals = proposals.pendingCount,
                         state = consolidateNowState(settings, activity),
                         onConsolidate = { controller.consolidateNow() },
+                        onOpenTechnical = onOpenTechnical,
                     )
                 }
             }
@@ -309,6 +310,7 @@ private fun MemoryFieldFigures(
     proposals: Int,
     state: ConsolidateNowState,
     onConsolidate: () -> Unit,
+    onOpenTechnical: (() -> Unit)? = null,
 ) {
     val figures: List<Pair<String, String>> = listOf(
         stringResource(Res.string.memory_simple_last_label) to last,
@@ -326,8 +328,8 @@ private fun MemoryFieldFigures(
                     modifier = if (narrow) Modifier.fillMaxWidth() else Modifier,
                 )
                 ConsolidateNowState.Working -> FieldNote(stringResource(Res.string.memory_consolidate_now_working))
-                ConsolidateNowState.Paused -> FieldNote(stringResource(Res.string.memory_simple_paused))
-                ConsolidateNowState.Off -> FieldNote(stringResource(Res.string.memory_simple_off))
+                ConsolidateNowState.Paused -> FieldNote(stringResource(Res.string.memory_simple_paused), onOpenTechnical)
+                ConsolidateNowState.Off -> FieldNote(stringResource(Res.string.memory_simple_off), onOpenTechnical)
             }
         }
     }
@@ -359,8 +361,9 @@ private fun FieldFigure(label: String, value: String, modifier: Modifier) {
 }
 
 @Composable
-private fun FieldNote(text: String) {
-    Text(text, style = AzphaltType.body, color = Azphalt.Ink.onOpposite(), modifier = Modifier.azphaltLiveRegion())
+private fun FieldNote(text: String, onClick: (() -> Unit)? = null) {
+    // "Resume it under Technical" is a link to the Technical view, where consolidation is switched back on.
+    LinkText(text, onClick, modifier = Modifier.azphaltLiveRegion(), color = Azphalt.Ink.onOpposite())
 }
 
 /** One of the two notes under the field: outlined on the page ground. */

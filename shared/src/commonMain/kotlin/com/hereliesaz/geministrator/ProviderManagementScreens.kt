@@ -364,6 +364,9 @@ internal fun ProviderSettingsScreen(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(keeperContentPadding(compact)),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+      if (sections.any { it.group == KeeperGroup.Hosts }) {
+        OtherDevicesCard(distributedComputeState, remoteAccessSetting, LocalPlaceLinks.current.openKeeperPart)
+      }
       if (KeeperSection.Connections in sections) {
         ProviderSectionLabel(stringResource(Res.string.settings_ai_providers))
         // Keyless sources start on; this one switch turns them all off (or back on). A single source is

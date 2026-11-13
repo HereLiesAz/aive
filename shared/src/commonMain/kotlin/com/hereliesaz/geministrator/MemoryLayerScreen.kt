@@ -233,7 +233,7 @@ internal fun MemoryLayerScreen(
             return@Column
         }
         when (view) {
-            MemoryView.Simple -> MemorySimpleView(controller)
+            MemoryView.Simple -> MemorySimpleView(controller, onOpenTechnical = { storedView = MemoryView.Technical.name })
             MemoryView.Technical -> MemoryLayerControls(controller, connectedProviderIds)
         }
     }

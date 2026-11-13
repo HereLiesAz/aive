@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -286,10 +287,23 @@ internal fun HivePageTitle(
     runNumber: Int?,
     activity: HiveActivity,
     modifier: Modifier = Modifier,
+    /** The state and project line opens the Keeper's room on Projects, where the project is changed; null leaves it plain. */
+    onEyebrowClick: (() -> Unit)? = null,
 ) {
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(eyebrow.uppercase(), style = AzphaltType.eyebrow, color = azphaltOnSurface(), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                eyebrow.uppercase(),
+                style = AzphaltType.eyebrow,
+                color = azphaltOnSurface(),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = if (onEyebrowClick != null) {
+                    Modifier.defaultMinSize(minHeight = AzphaltMinTouchTarget).clickable(role = Role.Button, onClick = onEyebrowClick)
+                } else {
+                    Modifier
+                },
+            )
             Text(
                 title,
                 style = AzphaltType.hero.copy(fontSize = 40.sp, lineHeight = 44.sp, letterSpacing = (-0.045f).sp * 40),

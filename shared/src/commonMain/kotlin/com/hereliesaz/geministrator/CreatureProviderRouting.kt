@@ -61,7 +61,12 @@ internal fun pinnedProviderName(providerId: String, role: RoleDefinition?): Stri
 }
 
 /** What a creature's badge says: its routing and, when pinned, the name the pin goes by. */
-internal data class CreatureProviderBadge(val routing: CreatureProviderRouting, val pinnedName: String?)
+internal data class CreatureProviderBadge(
+    val routing: CreatureProviderRouting,
+    val pinnedName: String?,
+    /** The role that picks its Source: the badge opens it in the Roster. */
+    val roleId: String? = null,
+)
 
 /** The badges of the agent creatures in [tasks], by task id; a creature that is not an agent has none. */
 internal fun creatureProviderBadges(
@@ -72,7 +77,7 @@ internal fun creatureProviderBadges(
         val role = roleFor(task)
         val routing = creatureProviderRouting(role, task) ?: return@forEach
         val name = (routing as? CreatureProviderRouting.Pinned)?.let { pinnedProviderName(it.providerId, role) }
-        put(task.id.value, CreatureProviderBadge(routing, name))
+        put(task.id.value, CreatureProviderBadge(routing, name, role?.id?.value))
     }
 }
 
