@@ -527,6 +527,7 @@ class OpenAiNodeCharacterImageApi(
             ),
             tools = listOf(
                 ImageGenerationTool(
+                    type = "image_generation",
                     model = imageModel,
                     size = size,
                     quality = "high",
@@ -654,7 +655,9 @@ private data class ResponsesInputContent(
 
 @Serializable
 private data class ImageGenerationTool(
-    val type: String = "image_generation",
+    // No default: the client's Json does not encode defaults, so a defaulted `type` was silently
+    // omitted and OpenAI answered 400 "Missing required parameter: 'tools[0].type'".
+    val type: String,
     val model: String,
     val size: String,
     val quality: String,
