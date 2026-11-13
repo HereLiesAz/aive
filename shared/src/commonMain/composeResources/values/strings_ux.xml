@@ -150,4 +150,5 @@
     <string name="prompt_remember_off">Remembering text: off</string>
     <string name="prompt_remember_clear">Clear remembered text</string>
     <string name="prompt_remember_cleared">Remembered text cleared.</string>
+    <string name="prompt_role_lesson">Add lesson: %1$s</string>
 </resources>

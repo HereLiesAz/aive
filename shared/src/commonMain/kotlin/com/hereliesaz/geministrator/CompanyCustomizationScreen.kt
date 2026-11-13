@@ -1,5 +1,12 @@
 package com.hereliesaz.geministrator
 
+import androidx.compose.runtime.collectAsState
+import com.hereliesaz.geministrator.memory.procedural.RoleInstructionProposer
+import com.hereliesaz.geministrator.prompts.PromptChoice
+import com.hereliesaz.geministrator.prompts.PromptKind
+import com.hereliesaz.geministrator.prompts.PromptSuggestBox
+import com.hereliesaz.geministrator.prompts.rememberPromptHistory
+import com.hereliesaz.geministrator.resources.prompt_role_lesson
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -243,6 +250,7 @@ internal fun CustomCompanyProviderScreen(
     var roleNameDraft by rememberDurableStringState(draftKey(COMPANY_ROLE_NAME_KEY))
     var roleDescDraft by rememberDurableStringState(draftKey(COMPANY_ROLE_DESCRIPTION_KEY))
     var roleInstructionsDraft by rememberDurableStringState(draftKey(COMPANY_ROLE_INSTRUCTIONS_KEY))
+    val roleInstructionHistory = rememberPromptHistory(PromptKind.RoleInstructions)
     var roleTokenBudgetDraft by rememberDurableStringState(draftKey(COMPANY_ROLE_TOKEN_BUDGET_KEY))
     var roleProviderDraftValue by rememberDurableStringState(draftKey(COMPANY_ROLE_PROVIDER_KEY))
     val roleProviderDraft = roleProviderDraftValue.takeIf(String::isNotBlank)
@@ -474,14 +482,37 @@ internal fun CustomCompanyProviderScreen(
                 minLines = 2,
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
-                colors = azphaltTextFieldColors(),
+            // Instructions used before are offered, and for a role with lessons waiting in its Mind, one choice
+            // that adds them to the draft. Choosing only fills this field: nothing is saved or approved by it.
+            val lessonState by RoleInstructionProposalsHost.ledger.state.collectAsState()
+            val lessonChoices = editingRoleId?.let { editing ->
+                lessonState.pendingFor(RoleDefinitionId(editing)).mapNotNull { proposal ->
+                    val lines = RoleInstructionProposer.fitting(roleInstructionsDraft, proposal.changes.map { it.line })
+                    lines.firstOrNull()?.let { first ->
+                        PromptChoice(
+                            label = stringResource(Res.string.prompt_role_lesson, first),
+                            text = RoleInstructionProposer.applyLines(roleInstructionsDraft, lines),
+                        )
+                    }
+                }
+            }.orEmpty()
+            PromptSuggestBox(
+                kind = PromptKind.RoleInstructions,
                 value = roleInstructionsDraft,
                 onValueChange = { roleInstructionsDraft = it },
-                label = { Text(stringResource(Res.string.swarm_standing_instructions)) },
-                minLines = 5,
                 modifier = Modifier.fillMaxWidth(),
-            )
+                choices = lessonChoices,
+                resetKey = editingRoleId,
+            ) { field ->
+                OutlinedTextField(
+                    colors = azphaltTextFieldColors(),
+                    value = field.value,
+                    onValueChange = field.onValueChange,
+                    label = { Text(stringResource(Res.string.swarm_standing_instructions)) },
+                    minLines = 5,
+                    modifier = Modifier.fillMaxWidth().then(field.modifier),
+                )
+            }
             OutlinedTextField(
                 colors = azphaltTextFieldColors(),
                 value = roleTokenBudgetDraft,
@@ -823,6 +854,7 @@ internal fun CustomCompanyProviderScreen(
                                 it.id == role.id && it.id.value != editingRoleId
                             }
                             if (conflictingIndex < 0) {
+                                roleInstructionHistory.record(role.instructions)
                                 draftRoles = if (editingIndex >= 0) {
                                     draftRoles.toMutableList().also { it[editingIndex] = role }
                                 } else {
