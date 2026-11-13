@@ -13,9 +13,13 @@ The Aive has two places: **the hive**, where all work happens (`Swarm-OS.md`), a
 | | **This device** | spend caps (on a phone only), remote access, the A2A server (desktop), the local planner, local orchestration specialists, small tasks on this device | Settings › Remote Access, Local Planner, Local Orchestration |
 | | **Delegations** | gates a creature passes without asking, each with Revoke; how many approvals in a row earn an offer | (new) |
 | | **Appearance** | the ground, chosen from six swatches; Reduce motion; Always show creature labels | Settings › Appearance |
-| | **About and privacy** | crash reports, trace export (OpenTelemetry), diagnostics | Settings › Crash Reports, Diagnostics |
+| | **About and privacy** | crash reports, trace export (OpenTelemetry), remembered text (one switch, Clear remembered text), diagnostics | Settings › Crash Reports, Diagnostics |
 
 Compute shows only where the build offers distributed compute.
+
+## Remembered text
+
+Text fields start with something useful instead of empty. The first launch's goal starts with the last goal you fed, or with a starting goal for the linked repository (a fixed template, no model is asked); its repository starts with the last one you used for that kind of source. The launch bar, the feed bar, a continuation, the swarm prompt, the hive name and a role's standing instructions offer what you typed there before, in the same dropdown the repository search uses. A finished swarm's feed bar starts with its own goal; a running one starts empty. A step that failed, escalated or is blocked starts its message to the agent with "Retry with: <why it stopped>", and a rerun offers that line in its objective menu. A suggestion is selected, so typing replaces it, and one you did not edit is never saved as a draft. **About and privacy** has the switch (on by default; turning it off deletes what was remembered) and **Clear remembered text**. Up to 12 entries per kind stay on this device and are never sent or exported; key-like text is never kept, and key, token, pairing-code, header, passphrase, memory import/export and script fields are never filled in. See [PRIVACY.md](PRIVACY.md).
 
 ## Delegations
 

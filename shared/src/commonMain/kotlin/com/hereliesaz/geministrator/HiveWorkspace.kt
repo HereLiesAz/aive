@@ -1,5 +1,9 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.prompts.PromptKind
+import com.hereliesaz.geministrator.prompts.PromptSuggestBox
+import com.hereliesaz.geministrator.prompts.PromptSuggestions
+import com.hereliesaz.geministrator.prompts.rememberPromptHistory
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -494,11 +498,13 @@ internal fun HiveFeedBar(
     var objective by remember(run.id) { mutableStateOf("") }
     val fieldName = stringResource(Res.string.hive_feed_title)
     val now = feedLaunchesNow(run.status)
+    val objectiveHistory = rememberPromptHistory(PromptKind.Objective)
     val queued = HiveFeedQueue.current?.takeIf { it.runId == run.id.value }
     val submit = {
         val clean = objective.trim()
         if (clean.isNotEmpty()) {
             if (now) onLaunch(clean) else HiveFeedQueue.queue(run.id, clean)
+            objectiveHistory.record(clean)
             objective = ""
         }
     }
@@ -516,18 +522,30 @@ internal fun HiveFeedBar(
                     Text(stringResource(Res.string.hive_feed_eyebrow), style = AzphaltType.eyebrow, color = azphaltStrong())
                     Text(stringResource(Res.string.hive_feed_title), style = AzphaltType.body.copy(fontSize = 14.sp), color = azphaltOnSurface())
                 }
-                OutlinedTextField(
+                // A finished swarm starts with what it was fed, selected, to run again with a tweak; a running
+                // one starts empty (the Go key would queue an unedited copy) and only offers earlier goals.
+                PromptSuggestBox(
+                    kind = PromptKind.Objective,
                     value = objective,
                     onValueChange = { objective = it },
-                    placeholder = { Text(stringResource(Res.string.hive_feed_placeholder), style = AzphaltType.body.copy(fontSize = 14.sp)) },
-                    singleLine = true,
-                    shape = RoundedCornerShape(28.dp),
-                    colors = azphaltTextFieldColors(),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
-                    keyboardActions = KeyboardActions(onGo = { submit() }),
-                    // The field is named for screen readers by what it is for, not only its placeholder.
-                    modifier = Modifier.weight(1f).semantics { contentDescription = fieldName },
-                )
+                    modifier = Modifier.weight(1f),
+                    seed = PromptSuggestions.feedObjective(run.objective, runFinished = now),
+                    onSeeded = { objective = it },
+                    resetKey = run.id,
+                ) { field ->
+                    OutlinedTextField(
+                        value = field.value,
+                        onValueChange = field.onValueChange,
+                        placeholder = { Text(stringResource(Res.string.hive_feed_placeholder), style = AzphaltType.body.copy(fontSize = 14.sp)) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(28.dp),
+                        colors = azphaltTextFieldColors(),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
+                        keyboardActions = KeyboardActions(onGo = { submit() }),
+                        // The field is named for screen readers by what it is for, not only its placeholder.
+                        modifier = Modifier.fillMaxWidth().then(field.modifier).semantics { contentDescription = fieldName },
+                    )
+                }
                 FeedButton(
                     label = stringResource(if (now) Res.string.hive_feed_launch else Res.string.hive_feed_queue),
                     onClick = submit,

@@ -754,6 +754,7 @@ internal fun ProviderSettingsScreen(
             )
         }
         TraceExportSettingsSection()
+        PromptHistorySettingsSection()
 
       }
 

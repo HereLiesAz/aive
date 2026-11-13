@@ -123,6 +123,11 @@ import com.hereliesaz.geministrator.resources.inspector_inline_evidence
 import com.hereliesaz.geministrator.resources.inspector_local_sandbox
 import com.hereliesaz.geministrator.resources.inspector_message
 import com.hereliesaz.geministrator.resources.inspector_message_agent
+import com.hereliesaz.geministrator.resources.prompt_retry_with
+import com.hereliesaz.geministrator.prompts.PromptKind
+import com.hereliesaz.geministrator.prompts.PromptSuggestBox
+import com.hereliesaz.geministrator.prompts.PromptSuggestions
+import com.hereliesaz.geministrator.prompts.rememberPromptHistory
 import com.hereliesaz.geministrator.resources.inspector_no_run_is_loaded
 import com.hereliesaz.geministrator.resources.inspector_now
 import com.hereliesaz.geministrator.resources.inspector_payload_context
@@ -224,9 +229,13 @@ internal fun TechnicalInspector(
     }
 
     val scope = rememberCoroutineScope()
-    var messageDraft by rememberDurableStringState(
+    var messageDraftSaved by rememberDurableStringState(
         key = "inspector.${liveWorkflow.run.id.value}.$selectedTaskId.message",
     )
+    // A suggested reply is held apart from the saved draft, so one the keeper never edited is not saved.
+    var seededMessage by remember(liveWorkflow.run.id, selectedTaskId) { mutableStateOf("") }
+    val messageDraft = messageDraftSaved.ifBlank { seededMessage }
+    val messageHistory = rememberPromptHistory(PromptKind.AgentMessage)
     var messageStatus by remember(selectedTaskId) { mutableStateOf<String?>(null) }
     var messageSending by remember(selectedTaskId) { mutableStateOf(false) }
     // Reject plan and Stop workflow cannot be undone, so each asks first: true = stop.
@@ -466,18 +475,38 @@ internal fun TechnicalInspector(
                 }
                 // Talking to its agent is part of its work, not something it needs from you.
                 if (taskRun.assignedProviderId != null && taskRun.providerRunId != null) {
-                    OutlinedTextField(
+                    // A step that stopped starts with "Retry with: <why it stopped>", selected, so typing replaces it.
+                    // A step that is waiting for an answer gets no suggestion.
+                    val stopped = taskRun.status == TaskRunStatus.Failed || taskRun.status == TaskRunStatus.Escalated ||
+                        taskRun.status == TaskRunStatus.Blocked
+                    val retryReason = if (stopped && taskRun.keeperQuestion == null) {
+                        PromptSuggestions.retryReason(taskRun.blockingReason?.message)
+                    } else {
+                        null
+                    }
+                    PromptSuggestBox(
+                        kind = PromptKind.AgentMessage,
                         value = messageDraft,
                         onValueChange = {
-                            messageDraft = it
+                            messageDraftSaved = it
+                            seededMessage = ""
                             messageStatus = null
                         },
-                        label = { Text(stringResource(Res.string.inspector_message_agent)) },
-                        minLines = 2,
-                        enabled = !messageSending,
-                        colors = azphaltTextFieldColors(),
                         modifier = Modifier.fillMaxWidth(),
-                    )
+                        seed = retryReason?.let { stringResource(Res.string.prompt_retry_with, it) },
+                        onSeeded = { seededMessage = it },
+                        resetKey = "${liveWorkflow.run.id.value}/$selectedTaskId",
+                    ) { field ->
+                        OutlinedTextField(
+                            value = field.value,
+                            onValueChange = field.onValueChange,
+                            label = { Text(stringResource(Res.string.inspector_message_agent)) },
+                            minLines = 2,
+                            enabled = !messageSending,
+                            colors = azphaltTextFieldColors(),
+                            modifier = Modifier.fillMaxWidth().then(field.modifier),
+                        )
+                    }
                     AzphaltPill(
                         label = if (messageSending) stringResource(Res.string.inspector_sending) else stringResource(Res.string.inspector_send_message),
                         seed = "message-$selectedTaskId",
@@ -490,7 +519,9 @@ internal fun TechnicalInspector(
                                     val failure = onMessageAgent(selectedTaskId, message)
                                     messageSending = false
                                     if (failure == null) {
-                                        messageDraft = ""
+                                        messageHistory.record(message)
+                                        messageDraftSaved = ""
+                                        seededMessage = ""
                                         messageStatus = getString(Res.string.inspector_sent)
                                     } else {
                                         messageStatus = failure
@@ -655,6 +686,8 @@ internal fun TechnicalInspector(
                         objective = task.objective,
                         output = output,
                         onRerun = { request -> onRerunFromTask(runId, request) },
+                        failure = taskRun.blockingReason?.message
+                            ?.takeIf { taskRun.status == TaskRunStatus.Failed || taskRun.status == TaskRunStatus.Escalated },
                     )
                 }
                 val roleForPayload = role

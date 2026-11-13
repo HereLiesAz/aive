@@ -1,5 +1,10 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.prompts.PromptFieldState
+import com.hereliesaz.geministrator.prompts.PromptKind
+import com.hereliesaz.geministrator.prompts.PromptSuggestBox
+import com.hereliesaz.geministrator.prompts.PromptSuggestions
+import com.hereliesaz.geministrator.prompts.rememberPromptHistory
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -103,6 +108,7 @@ internal fun SwarmDraftBox(
     var open by remember(key) { mutableStateOf(!redraft) }
     var prompt by remember(key) { mutableStateOf("") }
     var phase by remember(key) { mutableStateOf<DraftPhase>(DraftPhase.Idle) }
+    val promptHistory = rememberPromptHistory(PromptKind.SwarmDraft)
     val defaultName = stringResource(Res.string.hive_new_name)
     val host = LocalWorkflowLibraryHost.current
 
@@ -128,9 +134,11 @@ internal fun SwarmDraftBox(
                 swarmDraftFailure(failure)
             }
             when (result) {
-                is SwarmDraftResult.Ready ->
+                is SwarmDraftResult.Ready -> {
+                    promptHistory.record(asked)
                     // Nothing of the keeper's to lose: it lands at once. Otherwise they decide.
                     if (redraftReplaces(definition) == 0) apply(result) else phase = DraftPhase.Review(result)
+                }
                 is SwarmDraftResult.Problem -> phase = DraftPhase.Failed(problemMessage(result.problem), null)
                 is SwarmDraftResult.ProviderFailed ->
                     phase = DraftPhase.Failed(result.summary ?: friendlyErrorMessageOutsideComposition(result.raw), result.raw)
@@ -181,12 +189,24 @@ internal fun SwarmDraftBox(
                 DraftCapsuleButton(label, description, Azphalt.Ink, onClick = { open = true })
             }
         } else {
-            DraftField(
-                prompt = prompt,
-                onPrompt = { prompt = it },
-                busy = phase == DraftPhase.Working,
-                onDraft = ::draft,
-            )
+            // Starts with the last prompt typed here, selected so typing replaces it.
+            PromptSuggestBox(
+                kind = PromptKind.SwarmDraft,
+                value = prompt,
+                onValueChange = { prompt = it.take(SWARM_DRAFT_MAX_PROMPT_CHARS) },
+                modifier = Modifier.fillMaxWidth(),
+                seed = PromptSuggestions.swarmDraft(promptHistory.entries, starter = null)
+                    ?.take(SWARM_DRAFT_MAX_PROMPT_CHARS),
+                onSeeded = { prompt = it },
+                resetKey = key,
+            ) { field ->
+                DraftField(
+                    prompt = prompt,
+                    field = field,
+                    busy = phase == DraftPhase.Working,
+                    onDraft = ::draft,
+                )
+            }
         }
         when (val now = phase) {
             DraftPhase.Idle -> Unit
@@ -258,7 +278,7 @@ private fun Status(text: String) {
 
 /** The prompt in an Ink well with Draft at its end; Draft is quiet until there is something to draft from. */
 @Composable
-private fun DraftField(prompt: String, onPrompt: (String) -> Unit, busy: Boolean, onDraft: () -> Unit) {
+private fun DraftField(prompt: String, field: PromptFieldState, busy: Boolean, onDraft: () -> Unit) {
     val hint = stringResource(Res.string.hive_draft_hint)
     val label = stringResource(Res.string.hive_draft_go)
     AzphaltThemedSurface(Azphalt.Ink) {
@@ -274,14 +294,14 @@ private fun DraftField(prompt: String, onPrompt: (String) -> Unit, busy: Boolean
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             BasicTextField(
-                value = prompt,
-                onValueChange = { onPrompt(it.take(SWARM_DRAFT_MAX_PROMPT_CHARS)) },
+                value = field.value,
+                onValueChange = { field.onValueChange(it.copy(text = it.text.take(SWARM_DRAFT_MAX_PROMPT_CHARS))) },
                 maxLines = 4,
                 enabled = !busy,
                 textStyle = AzphaltType.body.copy(color = content),
                 cursorBrush = SolidColor(content),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
-                modifier = Modifier.weight(1f).semantics { contentDescription = hint },
+                modifier = Modifier.weight(1f).then(field.modifier).semantics { contentDescription = hint },
                 decorationBox = { field ->
                     Box(contentAlignment = Alignment.CenterStart) {
                         if (prompt.isEmpty()) {
