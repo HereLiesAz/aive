@@ -300,9 +300,7 @@ class MemoryLineageBanksTest {
         val w = World()
         contrastingPair(w)
         val hit = w.memory.recallFor("wf", "Postgres").single { it.node.id.value == "c1" }
-        val lines = hit.divergenceLines()
-        assertTrue("↔ diverges" in lines, lines)
-        assertFalse("deliberate" in lines, lines)
+        assertEquals(listOf("c2"), hit.conflicts.map { it.id.value })
 
         val handle = ManagedSessionHandle(TaskRunId("agent-d"), AgentProviderId("p"), ProviderRunId("r"))
         w.memory.observer.onSessionStarted(
@@ -365,19 +363,6 @@ class MemoryLineageBanksTest {
         assertEquals("wf", current.node.metadata[PRODUCED_BY_WORKFLOW])
         // History: the chosen and the not-chosen memories and the deliberation, all kept.
         assertEquals(setOf("c1", "c2", deliberation.id.value), view.read().historyOf(current.node.id).map { it.id.value }.toSet())
-
-        // Rendering of the contradiction history decays with access.
-        assertTrue("previously contested" in current.divergenceLines())
-        suspend fun recall(times: Int) = repeat(times) {
-            val snapshot = view.read()
-            val n = snapshot.edges.count { it.relation == MemoryRelationKind.Recalled }
-            view.commit(snapshot.revision, MemoryStoreMutation(edgesToAdd = listOf(MemoryEdge(MemoryEdgeId("recalled:${current.node.id.value}:${n + 1}"), deliberation.id, current.node.id, MemoryRelationKind.Recalled, createdAtEpochMillis = 5L))))
-        }
-        recall(RESOLVED_NOTE_RECALLS)
-        val linkOnly = w.memory.recallFor("wf", "database").single().divergenceLines()
-        assertTrue("previously contested" !in linkOnly && "memory-history:" in linkOnly, linkOnly)
-        recall(RESOLVED_LINK_RECALLS - RESOLVED_NOTE_RECALLS)
-        assertEquals("", w.memory.recallFor("wf", "database").single().divergenceLines())
 
         // New contrasting evidence reopens it as a live divergence.
         w.write("wf", "c3" to "I chose SQLite for the database.", at = 6L)

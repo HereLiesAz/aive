@@ -733,9 +733,6 @@ internal fun lexiconOperationFor(part: String): String? {
     return VERIFICATION_LEXICON.firstOrNull { (_, stems) -> stems.any(words::contains) }?.first
 }
 
-/** First matching operation; kept for single-operation callers. */
-internal fun verificationOperationFor(criterion: String): String = verificationOperationsFor(criterion).first()
-
 private fun verificationStem(word: String): String = when {
     word.endsWith("ing") && word.length > 5 -> word.dropLast(3)
     word.endsWith("ed") && word.length > 4 -> word.dropLast(2)

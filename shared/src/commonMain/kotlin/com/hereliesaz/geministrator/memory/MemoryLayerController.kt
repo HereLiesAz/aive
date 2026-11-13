@@ -1644,45 +1644,6 @@ internal fun MemorySnapshot.without(episodeId: MemoryEpisodeId): MemorySnapshot 
 }
 
 /**
- * A hit's divergent partners and deliberations, as indented lines under it. Partners are stated side
- * by side; nothing says which is right.
- */
-internal fun MemoryRecallHit.divergenceLines(): String = buildString {
-    conflicts.forEach { partner ->
-        append("\n  ↔ diverges (same subject, different content; both remembered): ").append(partner.text)
-    }
-    deliberations.forEach { append("\n  ✎ earlier deliberation: ").append(it.text) }
-    // The summary of each link delivered with the hit, and the hit's summary-tree levels.
-    pairSummaries.forEach { pair ->
-        append("\n  ⇄ ").append(pair.relation.name).append(" link, together: ").append(pair.summary.text.replace('\n', ' '))
-    }
-    if (outline.isNotEmpty()) {
-        append("\n  ⌂ outline: ").append(outline.joinToString(" › ") { it.text.replace('\n', ' ').take(OUTLINE_LEVEL_CHARS) })
-    }
-    // A resolved contrast is one memory; its history fades with each recall (always reachable via history()).
-    resolution?.let { history ->
-        when {
-            history.accessCount < RESOLVED_NOTE_RECALLS -> {
-                append("\n  ✓ resolved, previously contested; not chosen: ")
-                append(history.notChosen.joinToString(" | ") { it.text.take(160) })
-                append(" (history: memory-history:").append(node.id.value).append(')')
-            }
-            history.accessCount < RESOLVED_LINK_RECALLS -> append("\n  (history: memory-history:").append(node.id.value).append(')')
-            else -> Unit
-        }
-    }
-}
-
-/** Characters of each summary-tree level shown under a hit (the full node is reachable by id). */
-internal const val OUTLINE_LEVEL_CHARS = 160
-
-/** Recalls of a resolved memory that still show the brief "previously contested" note. */
-internal const val RESOLVED_NOTE_RECALLS = 2
-
-/** Recalls of a resolved memory after which not even the history link is rendered. */
-internal const val RESOLVED_LINK_RECALLS = 5
-
-/**
  * Joins recall units whole, in order, while they fit [maxChars]: a unit (a hit with its divergent
  * partners) is never cut in two. The first unit is always kept whole.
  */
