@@ -12,12 +12,26 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
+import org.junit.Assume.assumeTrue
 
 class FfmpegFilmPlanTest {
     private val plain = listOf(FilmClip("/data/film/f1/s1.png", 4), FilmClip("/data/film/f1/s2.png", 6), FilmClip("/data/film/f1/s3.png", 3))
 
     private fun build(clips: List<FilmClip> = plain, width: Int = 1280, height: Int = 720, silent: Boolean = true) =
         FfmpegFilmPlan.build("/usr/bin/ffmpeg", clips, "/out/film.mp4", width, height, silent)
+
+    /**
+     * The real-binary test is SKIPPED (never green) on a machine without ffmpeg, so a missing
+     * tool cannot pass as coverage. CI installs ffmpeg, so there a missing binary fails the run.
+     */
+    private fun requireOrSkip(name: String): File {
+        val found = CliLocator.locateBinary(listOf(name))
+        if (found == null) {
+            check(System.getenv("CI") != "true") { "$name is not installed on this CI runner; the workflow must install ffmpeg" }
+            assumeTrue("$name is not installed; skipping the real-binary check", false)
+        }
+        return found!!
+    }
 
     private fun values(command: List<String>, flag: String) =
         command.indices.filter { command[it] == flag }.map { command[it + 1] }
@@ -129,7 +143,7 @@ class FfmpegFilmPlanTest {
     /** Runs the real ffmpeg when this computer has it; the flags are written from its documentation and this is how they are held to it. */
     @Test
     fun theCommandMakesAFilmOfTheRightLengthAndFormatWithARealFfmpeg(): Unit = runBlocking {
-        val ffmpeg = CliLocator.locateBinary(listOf("ffmpeg")) ?: return@runBlocking
+        val ffmpeg = requireOrSkip("ffmpeg")
         val folder = Files.createTempDirectory("aive-film-real-").toFile()
         try {
             val colours = listOf(Color.RED, Color.GREEN, Color.BLUE)
@@ -148,7 +162,7 @@ class FfmpegFilmPlanTest {
             assertTrue(output.length() > 0)
             assertTrue(lines.any { FilmAssembleExecutorIntegration.progressMillis(it) != null }, "the progress lines are readable")
 
-            val ffprobe = CliLocator.locateBinary(listOf("ffprobe")) ?: return@runBlocking
+            val ffprobe = requireOrSkip("ffprobe")
             val probe = mutableListOf<String>()
             ProcessCliRunner.run(
                 listOf(ffprobe.absolutePath, "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,pix_fmt,width,height:format=duration", "-of", "default=nw=1", output.absolutePath),
