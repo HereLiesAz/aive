@@ -5,6 +5,7 @@ import app.cash.sqldelight.async.coroutines.synchronous
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import com.hereliesaz.geministrator.persistence.db.WorkflowDatabase
 import java.io.File
+import kotlinx.coroutines.Dispatchers
 
 /**
  * Supplies the application context the Android workflow database needs. Call [install] before
@@ -28,6 +29,8 @@ object AndroidWorkflowPersistence {
                 // App-private; the user's own data, kept until they clear app data or uninstall.
                 File(appContext.filesDir, "workflows-settings-backup-${System.currentTimeMillis()}.json").writeText(exported)
             },
+            // The driver is synchronous: keep its disk work off the main thread.
+            dispatcher = Dispatchers.IO,
         )
     }
 

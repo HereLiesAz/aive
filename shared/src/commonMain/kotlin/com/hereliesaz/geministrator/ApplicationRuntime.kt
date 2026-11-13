@@ -1276,9 +1276,15 @@ class ApplicationRuntime private constructor(
             traceExport: com.hereliesaz.geministrator.telemetry.WorkflowTraceExport? = null,
             /** The keeper's approval habits (workflow/ProgressiveDelegation.kt); null leaves every gate asking. */
             delegations: ProgressiveDelegationStore? = null,
+            /**
+             * Where the runtime's own work (the cycle that polls sessions and persists runs) runs. The app passes
+             * `Dispatchers.Default` so it is not on the UI thread; null keeps [scope]'s dispatcher, which is what a
+             * test's scheduler needs to stay deterministic.
+             */
+            runtimeDispatcher: kotlinx.coroutines.CoroutineDispatcher? = null,
         ): ApplicationRuntime {
             val runtimeJob = SupervisorJob(scope.coroutineContext[Job])
-            val runtimeScope = CoroutineScope(scope.coroutineContext + runtimeJob)
+            val runtimeScope = runtimeScopeOf(scope, runtimeJob, runtimeDispatcher)
             // Refinement-ladder training data: attached here, recording only once capture is switched on.
             com.hereliesaz.geministrator.workflow.refinement.LadderDatasetBridge.attach(persistence.inferenceSettings)
             val registry = providerRegistry ?: AgentProviderRegistry(
@@ -1373,6 +1379,14 @@ class ApplicationRuntime private constructor(
     }
 }
 
+
+/** [scope]'s context under [job], on [dispatcher] when one is given. */
+internal fun runtimeScopeOf(
+    scope: CoroutineScope,
+    job: Job,
+    dispatcher: kotlinx.coroutines.CoroutineDispatcher?,
+): CoroutineScope =
+    CoroutineScope(scope.coroutineContext + job + (dispatcher ?: kotlin.coroutines.EmptyCoroutineContext))
 
 /**
  * Correct only the persisted Node Creature Rig Pipeline back-edge. Provenance review must
