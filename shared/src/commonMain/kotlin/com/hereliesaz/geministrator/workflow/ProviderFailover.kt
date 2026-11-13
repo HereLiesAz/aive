@@ -88,7 +88,7 @@ object ProviderFailover {
 
     /** What the keeper can do about [kind]. */
     fun fixFor(kind: ErrorKind): String = when (kind) {
-        ErrorKind.OutOfCredit -> "Add credit in its billing settings."
+        ErrorKind.OutOfCredit -> "Add credits in its billing settings."
         ErrorKind.KeyRejected -> "Reconnect it in Settings with a valid key."
         ErrorKind.RateLimited -> "Wait a minute."
         ErrorKind.Offline -> "Check your internet connection."

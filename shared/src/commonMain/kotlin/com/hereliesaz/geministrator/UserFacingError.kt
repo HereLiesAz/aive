@@ -57,7 +57,7 @@ fun classifyError(raw: String?): ErrorKind {
         paymentRequiredCode.containsMatchIn(text) ||
             "payment required" in text || "payment_required" in text || "insufficient_quota" in text ||
             "insufficient balance" in text || "insufficient credit" in text || "credit balance" in text ||
-            "out of credit" in text || "billing" in text -> ErrorKind.OutOfCredit
+            "out of credit" in text || "requires credits" in text || "add credits" in text || "need credits" in text || "billing" in text -> ErrorKind.OutOfCredit
 
         rateLimitCode.containsMatchIn(text) ||
             "rate limit" in text || "rate-limit" in text || "ratelimit" in text ||

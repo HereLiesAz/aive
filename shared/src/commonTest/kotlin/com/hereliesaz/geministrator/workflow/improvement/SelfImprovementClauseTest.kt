@@ -169,16 +169,16 @@ class SelfImprovementClauseTest {
         assertTrue(LoopIntegrity.violations(withTask("examine-loop") { it.copy(condition = TaskCondition.OnFailure(TaskDefinitionId("observe"))) }).any { "skipped" in it })
         assertTrue(LoopIntegrity.violations(withTask("challenge-loop") { it.copy(holdOutput = true) }).any { "withhold" in it })
         // The Hall Monitor grading its own overlay, or the examination waiting on its report.
-        assertTrue(LoopIntegrity.violations(withTask("examine-loop") { it.copy(roleId = HallMonitorRole.id) }).any { "independently" in it })
+        assertTrue(LoopIntegrity.violations(withTask("examine-loop") { it.copy(roleId = HallMonitorRole.id, executor = TaskExecutor.RoleAgent(HallMonitorRole.id)) }).any { "independently" in it })
         assertTrue(LoopIntegrity.violations(withTask("examine-loop") { it.copy(dependsOn = setOf(TaskDefinitionId("observe"))) }).any { "independently" in it })
         // The challenge by the same role that made the examination.
-        assertTrue(LoopIntegrity.violations(withTask("challenge-loop") { it.copy(roleId = BuiltInRoles.Architect.id) }).any { "different role" in it })
+        assertTrue(LoopIntegrity.violations(withTask("challenge-loop") { it.copy(roleId = BuiltInRoles.Architect.id, executor = TaskExecutor.RoleAgent(BuiltInRoles.Architect.id)) }).any { "different role" in it })
         // Proposals that do not follow from the challenge, a last step that is not last, an objective that is only whitespace.
         assertTrue(LoopIntegrity.violations(withTask("propose") { it.copy(dependsOn = setOf(TaskDefinitionId("challenge-report"))) }).any { "challenge of the examination" in it })
         assertTrue(LoopIntegrity.violations(withTask("refine") { it.copy(dependsOn = emptySet()) }).any { "every other step" in it })
         assertTrue(LoopIntegrity.violations(withTask("examine-loop") { it.copy(objective = "   ") }).any { "examine itself" in it })
         // The word "loop" in a step that does nothing of the kind no longer passes: what counts is the step, not its text.
-        assertTrue(LoopIntegrity.violations(withTask("examine-loop") { it.copy(objective = "loop loop loop", roleId = HallMonitorRole.id) }).isNotEmpty())
+        assertTrue(LoopIntegrity.violations(withTask("examine-loop") { it.copy(objective = "loop loop loop", roleId = HallMonitorRole.id, executor = TaskExecutor.RoleAgent(HallMonitorRole.id)) }).isNotEmpty())
     }
 
     @Test
@@ -199,5 +199,28 @@ class SelfImprovementClauseTest {
         val why = LoopIntegrity.startRefusal(broken, haiveBuiltInRoles)
         assertNotNull(why)
         assertTrue("was not started" in why && "'propose'" in why, why)
+    }
+
+    @Test
+    fun f6b_independenceIsJudgedOnTheRoleDispatchUsesNotTheDeclaredRoleId() {
+        val examine = loop.tasks.single { it.id.value == "examine-loop" }
+        val challenge = loop.tasks.single { it.id.value == "challenge-loop" }
+        fun with(vararg changed: TaskDefinition) = loop.copy(tasks = loop.tasks.map { t -> changed.firstOrNull { it.id == t.id } ?: t })
+
+        // The step declares another role, but dispatch runs the Hall Monitor.
+        val monitorRuns = with(examine.copy(executor = TaskExecutor.RoleAgent(HallMonitorRole.id)))
+        assertTrue(LoopIntegrity.violations(monitorRuns).any { "independently of the Hall Monitor" in it })
+
+        // The challenger runs as the same role as the examiner although the declared ids differ.
+        val sameRole = with(challenge.copy(executor = TaskExecutor.RoleAgent(examine.roleId!!)))
+        assertTrue(LoopIntegrity.violations(sameRole).any { "different role" in it })
+
+        // An ancestor that declares another role but runs as the Hall Monitor.
+        val ancestorId = examine.dependsOn.firstOrNull()
+        if (ancestorId != null) {
+            val ancestor = loop.tasks.single { it.id == ancestorId }
+            val sneaky = with(ancestor.copy(executor = TaskExecutor.RoleAgent(HallMonitorRole.id)))
+            assertTrue(LoopIntegrity.violations(sneaky).any { "independently of the Hall Monitor" in it })
+        }
     }
 }

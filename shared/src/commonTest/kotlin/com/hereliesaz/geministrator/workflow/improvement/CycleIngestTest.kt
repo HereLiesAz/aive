@@ -69,4 +69,19 @@ class CycleIngestTest {
         assertEquals("c16", added.first().id.value)
         assertEquals("c25", added.last().id.value)
     }
+
+    @Test
+    fun f6b_aCycleOlderThanTheRetainedRecordsIsStillRememberedAsReadSoBackfillDoesNotResurrectItsProposals() = runTest {
+        val store = SettingsImprovementStore(InMemorySettings())
+        val history = (1..205).map { cycle("c$it", it * 1_000L, line) }
+        history.forEach { CycleIngest.ingest(store, it) }
+        val first = store.state().proposals.first()
+        store.decide(first.id) { it.copy(status = ProposalStatus.Dismissed) }
+        assertEquals(200, store.state().cycles.size, "the cycle records stay bounded")
+
+        assertEquals(emptyList(), CycleIngest.backfill(store, history), "cycles whose records were trimmed are still known to have been read")
+        assertEquals(false, CycleIngest.ingest(store, history[0]))
+        assertEquals(ProposalStatus.Dismissed, store.state().proposals.first { it.id == first.id }.status)
+        assertEquals(205, store.state().proposals.size)
+    }
 }
