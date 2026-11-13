@@ -31,7 +31,7 @@ data class TraceExportSettings(
  * the endpoint and headers are never written into an exported `.aivesetup` file.
  */
 class TraceExportSettingsStore(
-    private val settings: Settings = Settings(),
+    private val settings: Settings = com.hereliesaz.geministrator.persistence.PrivateSettings.forKeys(DEFAULT_KEY, DEFAULT_EXPORTED_KEY),
     private val key: String = DEFAULT_KEY,
     private val exportedKey: String = DEFAULT_EXPORTED_KEY,
 ) {

@@ -12,5 +12,6 @@
     <exclude domain="file" path="haive/orchestration-specialists" />
     <exclude domain="sharedpref" path="aive_azphalt_models.xml" />
     <exclude domain="sharedpref" path="aive_remembered_text.xml" />
+    <exclude domain="sharedpref" path="aive_private_settings.xml" />
     <exclude domain="file" path="azphalt/models" />
 </full-backup-content>

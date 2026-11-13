@@ -20,6 +20,12 @@ object AndroidWorkflowPersistence {
     fun install(context: Context) {
         this.context = context.applicationContext
         // Remembered text lives in its own preferences file so the backup rules can leave it out.
+        // The MCP server list and the trace exporter's OTLP headers likewise, so backup can leave them out.
+        if (PrivateSettings.separate == null) {
+            PrivateSettings.separate = SharedPreferencesSettings(
+                this.context!!.getSharedPreferences(PRIVATE_PREFERENCES, Context.MODE_PRIVATE),
+            )
+        }
         if (RememberedTextSettings.separate == null) {
             RememberedTextSettings.separate = SharedPreferencesSettings(
                 this.context!!.getSharedPreferences(REMEMBERED_TEXT_PREFERENCES, Context.MODE_PRIVATE),
@@ -46,6 +52,7 @@ object AndroidWorkflowPersistence {
 
     /** The preferences file (`aive_remembered_text.xml`) the backup rules exclude. */
     const val REMEMBERED_TEXT_PREFERENCES: String = "aive_remembered_text"
+    const val PRIVATE_PREFERENCES: String = "aive_private_settings"
 }
 
 /** Workflow state in the app's aive-workflows.db; the earlier SharedPreferences store moves in on first use. */
