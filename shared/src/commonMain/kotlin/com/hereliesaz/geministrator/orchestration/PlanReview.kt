@@ -77,6 +77,11 @@ suspend fun reviewUntilApproved(
     maxRounds: Int = MAX_PLAN_REVIEW_ROUNDS,
     /** Told where the loop is as it goes, so the field can show it: the phase, the plan in hand, the round under way. */
     onStage: suspend (PlanningPhase, OrchestrationPlan, Int) -> Unit = { _, _, _ -> },
+    /**
+     * What code alone can check of a plan (see [Requirements.checkPure]). A plan with an Unmet result is turned back at
+     * no cost: no review call is made, and the model's yes can never overrule it.
+     */
+    pureCheck: ((OrchestrationPlan) -> List<RequirementResult>)? = null,
 ): PlanReviewOutcome {
     require(maxRounds > 0) { "maxRounds must be positive" }
     var plan = firstPlan
@@ -84,7 +89,10 @@ suspend fun reviewUntilApproved(
     for (round in 1..maxRounds) {
         reportLaunchProgress("$reviewerName is reviewing the plan (round $round of $maxRounds)…")
         onStage(PlanningPhase.Reviewing, plan, round)
-        val verdict = try {
+        val unmetByCode = pureCheck?.invoke(plan)?.filter { it.verdict == RequirementVerdict.Unmet }.orEmpty()
+        val verdict = if (unmetByCode.isNotEmpty()) {
+            PlanVerdict.Reject(unmetByCode.joinToString("\n") { "${it.id}: ${it.evidence}" }.take(MAX_VERDICT_CHARS))
+        } else try {
             reviewer.review(PlanReviewRequest(packet, plan, reviewerName, instructions, pinnedProviderId))
         } catch (cancelled: CancellationException) {
             throw cancelled

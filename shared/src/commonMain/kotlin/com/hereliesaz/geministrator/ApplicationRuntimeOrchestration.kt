@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.domain.ContextProvenance
+import com.hereliesaz.geministrator.domain.isUntrusted
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.RepositoryRef
@@ -322,6 +323,13 @@ private suspend fun ApplicationRuntime.planAndDecide(
     val firstPlan = orchestrationRuntime.plan(inputs.packet)
     if (review == null) return firstPlan
     val (reviewer, role) = review
+    val requirementInputs = com.hereliesaz.geministrator.orchestration.RequirementInputs(
+        objective = inputs.objective,
+        objectiveExternal = inputs.objectiveProvenance.isUntrusted(),
+        roles = inputs.launchRoles,
+        availableRoleIds = inputs.plannerRoles.map { it.id.value }.toSet(),
+    )
+    val checklist = com.hereliesaz.geministrator.orchestration.Requirements.extract(requirementInputs)
     val outcome = reviewUntilApproved(
         packet = inputs.packet,
         firstPlan = firstPlan,
@@ -331,6 +339,7 @@ private suspend fun ApplicationRuntime.planAndDecide(
         instructions = role.instructions,
         pinnedProviderId = role.preferredProviderId?.value,
         onStage = { phase, current, round -> reportPlanningStage(planningStage(inputs, phase, current, round, role)) },
+        pureCheck = { candidate -> com.hereliesaz.geministrator.orchestration.Requirements.checkPure(requirementInputs, candidate, checklist) },
     )
     val plan = outcome.plan
     reportPlanningStage(planningStage(inputs, PlanningPhase.AwaitingKeeper, plan, outcome.rounds.size, role, outcome.verdict()))
