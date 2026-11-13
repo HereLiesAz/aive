@@ -100,6 +100,7 @@ object ComputeNodeAuth {
     const val HEADER_TIMESTAMP: String = "X-Aive-Node-Timestamp"
     const val HEADER_NONCE: String = "X-Aive-Node-Nonce"
     const val HEADER_SIGNATURE: String = "X-Aive-Node-Signature"
+    const val HEADER_OWNER_TOKEN: String = "X-Aive-Owner-Token"
 
     /** A signed request is accepted this long before or after the relay's clock. */
     const val MAX_CLOCK_SKEW_MILLIS: Long = 5L * 60L * 1_000L

@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskRunStatus
+import com.hereliesaz.geministrator.domain.isTerminal
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
 
@@ -19,7 +20,8 @@ internal sealed interface LiveEditMerge {
 
 /**
  * Offers a saved hive to its live run (docs/Keepers-Room.md, Pause, change, resume). Only a creature the
- * run has not started takes anything, and only its job and acceptance criteria: its place in the graph,
+ * run has not started takes anything, and only its job, acceptance criteria and time allowed (a creature
+ * already working takes its time allowed alone, so a keeper can give a slow one more time): its place in the graph,
  * its condition, its role and executor, its approval, retry and escalation policies and its placement
  * stay as the run has them and change from the next run. The merged hive is checked as a graph before it
  * is offered back, so an edit can never leave the run with creatures that wait on each other.
@@ -37,8 +39,14 @@ internal object LiveDefinitionEdit {
         var taken = 0
         val tasks = current.tasks.map { old ->
             val new = edited.tasks.firstOrNull { it.id == old.id }
-            if (new != null && run.taskRuns[old.id]?.status in OPEN) {
+            val status = run.taskRuns[old.id]?.status
+            if (new != null && status in OPEN) {
                 val merged = take(old, new)
+                if (merged != old) taken += 1
+                merged
+            } else if (new != null && status != null && !status.isTerminal()) {
+                // A creature already working: only its time allowed, which is read each cycle, not at start.
+                val merged = deadlineOnly(old, new)
                 if (merged != old) taken += 1
                 merged
             } else {
@@ -59,5 +67,7 @@ internal object LiveDefinitionEdit {
     }
 
     private fun jobAndCriteria(old: TaskDefinition, new: TaskDefinition): TaskDefinition =
-        old.copy(objective = new.objective, acceptanceCriteria = new.acceptanceCriteria)
+        old.copy(objective = new.objective, acceptanceCriteria = new.acceptanceCriteria, timeLimit = new.timeLimit)
+
+    private fun deadlineOnly(old: TaskDefinition, new: TaskDefinition): TaskDefinition = old.copy(timeLimit = new.timeLimit)
 }

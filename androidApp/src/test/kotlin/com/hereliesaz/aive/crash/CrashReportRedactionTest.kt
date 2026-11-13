@@ -21,6 +21,17 @@ class CrashReportRedactionTest {
     }
 
     @Test
+    fun pathsLongNumbersAndLongMessagesAreReduced() {
+        val trace = "java.io.FileNotFoundException: /home/alice/notes/plan.txt id 1234567890123 hash 0123456789abcdef0123 " + "x".repeat(500)
+        val redacted = redactCrashTrace(trace)
+        assertFalse("alice" in redacted)
+        assertFalse("1234567890123" in redacted)
+        assertFalse("0123456789abcdef0123" in redacted)
+        assertTrue(redacted.length <= 300)
+        assertFalse("alice" in redactCrashTrace("C:\\Users\\alice\\x.txt"))
+    }
+
+    @Test
     fun anOrdinaryStackFrameIsUnchanged() {
         val frame = "at com.hereliesaz.aive.MainActivity.onCreate(MainActivity.kt:154)"
         assertEquals(frame, redactCrashTrace(frame))

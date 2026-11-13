@@ -1145,6 +1145,28 @@ class WorkflowEngine(
         }
     }
 
+    /**
+     * A creature that took longer than allowed twice is not tried a third time whatever its escalation policy says:
+     * it goes to the keeper as an escalation (the normal Escalation row, with Retry task and Stop workflow), because
+     * ending a swarm for a slow step would lose the work already done.
+     */
+    suspend fun escalateTimedOut(
+        run: WorkflowRun,
+        taskDefinitionId: TaskDefinitionId,
+        reason: String,
+        nowEpochMillis: Long,
+    ): WorkflowRun {
+        val taskRun = requireNotNull(run.taskRuns[taskDefinitionId]) { "Task run ${taskDefinitionId.value} is missing" }
+        TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Escalated)
+        eventSink.append(HumanDecisionRequired(run.id, taskDefinitionId, reason, nowEpochMillis))
+        eventSink.append(TaskEscalated(run.id, taskDefinitionId, reason, occurredAtEpochMillis = nowEpochMillis))
+        return run.copy(
+            status = WorkflowRunStatus.AwaitingHuman,
+            taskRuns = run.taskRuns + (taskDefinitionId to taskRun.copy(status = TaskRunStatus.Escalated)),
+            updatedAtEpochMillis = nowEpochMillis,
+        )
+    }
+
     fun approvePlanGate(run: WorkflowRun, taskDefinitionId: TaskDefinitionId, nowEpochMillis: Long): WorkflowRun {
         require(!run.status.isTerminal()) { "Workflow ${run.id.value} is already ${run.status}" }
         val taskRun = requireNotNull(run.taskRuns[taskDefinitionId]) { "Task run ${taskDefinitionId.value} is missing" }
@@ -1183,6 +1205,8 @@ class WorkflowEngine(
                     progress = null,
                     progressMessage = null,
                     providerPlan = null,
+                    // The keeper chose to try again: the count of slow attempts starts over.
+                    timedOutAttempts = 0,
                 )),
                 updatedAtEpochMillis = nowEpochMillis,
             )

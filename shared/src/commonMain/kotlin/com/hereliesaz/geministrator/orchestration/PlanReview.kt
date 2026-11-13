@@ -168,15 +168,18 @@ fun planReviewPrompt(request: PlanReviewRequest): String = buildString {
 }
 
 /**
- * The role that reviews plans: the Adversarial Reviewer when it is enabled, else the first enabled role that
- * may reject and approve plans (and is not the orchestrator that proposed them). Null when there is none.
+ * The role that reviews plans: the generic Reviewer when it is enabled (a saved role under an old alias id,
+ * "plan-reviewer", counts as it), else the Adversarial Reviewer, else the first enabled role that may reject
+ * and approve plans (and is not the orchestrator or the planner). Null when there is none.
  */
 fun planReviewerRole(roles: List<RoleDefinition>): RoleDefinition? {
     val enabled = roles.filter { it.enabled }
+    val genericIds = setOf(BuiltInRoles.Reviewer.id.value) + BuiltInRoles.ReviewerAliases
+    enabled.firstOrNull { it.id.value in genericIds }?.let { return it }
     enabled.firstOrNull { it.id == BuiltInRoles.AdversarialReviewer.id }?.let { return it }
     return enabled.firstOrNull { role ->
         RoleAuthority.RejectPlan in role.authorities && RoleAuthority.ApprovePlan in role.authorities &&
-            role.id != BuiltInRoles.Orchestrator.id
+            role.id != BuiltInRoles.Orchestrator.id && role.id != BuiltInRoles.Planner.id
     }
 }
 

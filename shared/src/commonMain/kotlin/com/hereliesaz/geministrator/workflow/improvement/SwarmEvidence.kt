@@ -152,7 +152,7 @@ object SwarmEvidence {
             appendLine("Adopted since the last cycle, and what happened after (a role's fail rate over the window before the adoption and over the time since):")
             val lastCycle = state.cycles.maxOfOrNull { it.atEpochMillis } ?: 0L
             // Adopted since the last cycle, so a cycle does not report again what an earlier one already saw.
-            val adopted = state.proposals.filter { it.status == ProposalStatus.Adopted && (it.decidedAtEpochMillis ?: 0L) > lastCycle }
+            val adopted = state.proposals.filter { it.source != ImprovementSource.Queen && it.status == ProposalStatus.Adopted && (it.decidedAtEpochMillis ?: 0L) > lastCycle }
             if (adopted.isEmpty()) appendLine("- Nothing adopted since the last cycle.")
             adopted.take(MAX_ROWS).forEach { p ->
                 val at = p.decidedAtEpochMillis ?: 0L
@@ -169,12 +169,14 @@ object SwarmEvidence {
             }
             // The other mechanisms' proposals are in the same ledger: what each has noticed, and what the keeper made of it.
             appendLine("Proposals by the mechanism that noticed them (the loop reads the others' as evidence, so it does not repeat them):")
-            ImprovementSource.entries.forEach { source ->
+            // The queen's rows are per run and decided in Messages; they are not the loop's evidence.
+            ImprovementSource.entries.filter { it != ImprovementSource.Queen }.forEach { source ->
                 val mine = state.proposals.filter { it.source == source }
                 val label = when (source) {
                     ImprovementSource.Loop -> "the loop"
                     ImprovementSource.RoleHistory -> "run-history heuristics (role instructions)"
                     ImprovementSource.Habit -> "habits"
+                    ImprovementSource.Queen -> "the queen"
                 }
                 val judged = mine.filter { it.status == ProposalStatus.Dismissed }.takeLast(3).joinToString("; ") { agentText(it.summary, 70) }
                 appendLine(
@@ -183,8 +185,8 @@ object SwarmEvidence {
                         (if (judged.isNotEmpty()) "; recently dismissed: $judged" else ""),
                 )
             }
-            val pending = state.proposals.count { it.status == ProposalStatus.Proposed }
-            val dismissed = state.proposals.filter { it.status == ProposalStatus.Dismissed }.takeLast(5)
+            val pending = state.proposals.count { it.source != ImprovementSource.Queen && it.status == ProposalStatus.Proposed }
+            val dismissed = state.proposals.filter { it.source != ImprovementSource.Queen && it.status == ProposalStatus.Dismissed }.takeLast(5)
             appendLine("Proposals still waiting on the keeper: $pending. Recently dismissed (the keeper judged these not worth it): " +
                 if (dismissed.isEmpty()) "none." else dismissed.joinToString("; ") { agentText(it.summary, 80) })
         }

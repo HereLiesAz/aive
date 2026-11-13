@@ -20,4 +20,13 @@ class RelayHubSweepTest {
         val replacement = hub.pool("p")
         assert(replacement !== pool)
     }
+
+    @Test
+    fun lookingUpAPoolNeverCreatesOneAndCreationIsBounded() {
+        val hub = ComputeRelayHub()
+        kotlin.test.assertNull(hub.existingPool("p"))
+        repeat(256) { hub.pool("p$it") }
+        kotlin.test.assertFailsWith<IllegalStateException> { hub.pool("one-too-many") }
+        assertSame(hub.pool("p1"), hub.existingPool("p1"))
+    }
 }

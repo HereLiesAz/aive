@@ -10,6 +10,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Turns finished runs into OTLP traces (docs/architecture/OBSERVABILITY.md). It watches the
@@ -25,6 +27,24 @@ class WorkflowTraceExport(
 ) {
     private val exporter: OtlpTraceExporter by lazy { exporterFactory(store::load) }
     private var worker: Job? = null
+    private val guard = Mutex()
+    private val inFlight = mutableSetOf<String>()
+    private val runByTrace = mutableMapOf<String, String>()
+
+    /**
+     * Marks the runs in a delivered batch as exported. A batch the collector refused for good
+     * is not retried either; one that gave up or never started frees its runs to be sent again.
+     */
+    internal suspend fun batchFinished(spans: List<OtelSpan>, outcome: OtlpExportOutcome) {
+        guard.withLock {
+            spans.map(OtelSpan::traceId).distinct().forEach { traceId ->
+                val runId = runByTrace[traceId] ?: return@forEach
+                if (outcome == OtlpExportOutcome.Sent || outcome == OtlpExportOutcome.Rejected) store.markExported(runId)
+                inFlight -= runId
+                runByTrace.remove(traceId)
+            }
+        }
+    }
 
     /** Watches [runs] in [scope] until it is cancelled. Each run is exported at most once. */
     fun attach(
@@ -50,6 +70,7 @@ class WorkflowTraceExport(
         events: WorkflowEventRepository,
     ): Boolean {
         val spans = spansIfDue(run, events) ?: return false
+        exporter.onBatchFinished = ::batchFinished
         if (worker?.isActive != true) worker = scope.launch { exporter.run() }
         exporter.enqueue(spans)
         return true
@@ -64,7 +85,11 @@ class WorkflowTraceExport(
         if (run.updatedAtEpochMillis < enabledAt) return null
         val runId = run.id.value
         if (store.isExported(runId)) return null
-        store.markExported(runId)
+        // Recorded as exported only once a batch carrying it was delivered (see batchFinished).
+        val claimed = guard.withLock {
+            if (runId in inFlight) false else { inFlight += runId; runByTrace[traceIdFor(runId)] = runId; true }
+        }
+        if (!claimed) return null
         return WorkflowTraceBuilder.build(events.forRun(run.id), settings.contentPolicy)
             .takeIf { it.isNotEmpty() }
     }

@@ -21,8 +21,9 @@ class PlaceNamesInStringsTest {
     }
 
     @Test
-    fun theSpendCapsAreUnderLimitsOnAWideWindowAndThisDeviceOnAPhone() {
+    fun theSpendCapsAreInTheAllowancePartOnEveryWidth() {
         assertEquals(KeeperSection.Limits, spendLimitsSection(compact = false))
-        assertEquals(KeeperSection.Device, spendLimitsSection(compact = true))
+        assertEquals(KeeperSection.Limits, spendLimitsSection(compact = true))
+        assertEquals(KeeperGroup.Allowance, spendLimitsSection(compact = true).group)
     }
 }

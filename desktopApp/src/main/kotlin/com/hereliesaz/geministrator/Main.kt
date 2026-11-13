@@ -110,10 +110,16 @@ fun main() {
     }
     val initialComputeToken = computeCredentialStore.readToken()
     // The compute node's signing key, read from (or created in) the OS credential store once.
-    val computeNodeSigner = lazy {
-        runCatching {
-            DesktopComputeNodeSigner.loadOrCreate(DesktopDistributedComputeCredentialStore.forNodeIdentity())
-        }.getOrNull()
+    val nodeIdentityStore = DesktopDistributedComputeCredentialStore.forNodeIdentity()
+    var computeNodeSignerCache: DesktopComputeNodeSigner? = null
+    var computeNodeSignerProblem: String? = null
+    // Only a success is kept: an unreadable store is retried the next time the session is rebuilt.
+    val computeNodeSigner = {
+        computeNodeSignerCache ?: runCatching { DesktopComputeNodeSigner.loadOrCreate(nodeIdentityStore) }
+            .onFailure { computeNodeSignerProblem = it.message }
+            .onSuccess { computeNodeSignerProblem = nodeIdentityStore.notice }
+            .getOrNull()
+            ?.also { computeNodeSignerCache = it }
     }
     val httpClient = HttpClient(CIO)
     // MCP servers the keeper connects (docs/architecture/MCP_HOST.md); local ones run as processes.
@@ -248,7 +254,7 @@ fun main() {
                 val computeSession = remember(computeConfiguration, computeToken, baseExecutorIntegrations) {
                     val token = computeToken
                     val signer = if (computeConfiguration.configured && token != null) {
-                        computeNodeSigner.value
+                        computeNodeSigner()
                     } else {
                         null
                     }
@@ -266,7 +272,9 @@ fun main() {
                 }
                 var computeConnected by remember(computeSession) { mutableStateOf(false) }
                 var computeOnlineNodes by remember(computeSession) { mutableStateOf(emptyList<ComputeNodeDescriptor>()) }
-                var computeError by remember(computeSession) { mutableStateOf<String?>(null) }
+                var computeError by remember(computeSession) {
+                    mutableStateOf<String?>(computeNodeSignerProblem ?: computeCredentialStore.notice)
+                }
                 var computeEnrolledNodes by remember(computeSession) {
                     mutableStateOf(emptyList<com.hereliesaz.geministrator.distributed.EnrolledComputeNode>())
                 }
@@ -536,6 +544,7 @@ fun main() {
                         mcpConsent = mcpConsent,
                         codeExecution = codeExecution,
                         mcpElicitation = mcpElicitation,
+                        researchBridgeEnabled = { controlApi.enabled },
                         providers = providers,
                         executorIntegrations = executorIntegrations,
                         orchestrationUtilities = orchestrationUtilities,
@@ -575,7 +584,7 @@ fun main() {
                         onRevokeComputeNode = { nodeId ->
                             computeSession?.let { session ->
                                 uiScope.launch {
-                                    runCatching { session.client.revokeNode(nodeId) }
+                                    runCatching { session.client.revokeNode(nodeId, System.getenv("AIVE_RELAY_OWNER_TOKEN")?.takeIf(String::isNotBlank)) }
                                         .onFailure { computeError = it.message }
                                 }
                             }
@@ -586,6 +595,7 @@ fun main() {
                             if (token != null) {
                                 computeCredentialStore.writeToken(token)
                                 computeToken = computeCredentialStore.readToken()
+                                computeError = computeCredentialStore.notice
                             }
                         },
                         onDisconnectDistributedCompute = {

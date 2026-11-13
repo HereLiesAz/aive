@@ -119,6 +119,19 @@ class SetupFileTransfer(
             }
         }
 
+        // The remote pairing names a relay the phone will dial: it is shown like any other changed
+        // destination, and a relay that is not https is reported as not applied.
+        secrets.remoteRelayPairing?.let { stored ->
+            val relay = runCatching {
+                (json.parseToJsonElement(stored).jsonObject["relay"] as? kotlinx.serialization.json.JsonPrimitive)?.content
+            }.getOrNull()
+            if (relay == null || !relay.trim().lowercase().startsWith("https://")) {
+                skipped += "Remote access: the pairing's relay must be https://"
+            } else {
+                destinationChanges += "Remote access relay: $relay"
+            }
+        }
+
         // Roles and definitions before projects, so a project never points at a missing workflow.
         workflow.roles.forEach { persistence.roles.put(it) }
         workflow.definitions.forEach { persistence.definitions.put(it) }

@@ -78,6 +78,7 @@ class A2aAgentProvider(
     private val maxObserveMillis: Long = A2A_DEFAULT_MAX_OBSERVE_MILLIS,
     private val idFactory: () -> String = ::randomA2aId,
 ) : AgentProvider {
+    override val workKind: com.hereliesaz.geministrator.workflow.WorkKind get() = com.hereliesaz.geministrator.workflow.WorkKind.ExternalAgent
     private val api = A2aClientApi(cardUrl, bearerToken, client, idFactory)
     private val sessionsMutex = Mutex()
     private val sessions = mutableMapOf<ProviderRunId, Session>()
@@ -179,7 +180,7 @@ class A2aAgentProvider(
         emit(AgentEvent.Progress(runId, "Connected to $displayName task ${runId.value.take(8)}"))
         while (true) {
             if (startedAt.elapsedNow().inWholeMilliseconds > maxObserveMillis) {
-                emit(AgentEvent.Failed(runId, "$displayName did not finish in time"))
+                emit(AgentEvent.Failed(runId, "$displayName timed out: it did not finish in time"))
                 sessionsMutex.withLock { sessions.remove(runId) }
                 return@flow
             }

@@ -403,12 +403,12 @@ class HiveScreenshotTest {
                     opening = section,
                     compact = compact,
                     statusOf = { if (it == KeeperSection.Connections) keeperCount(providers.size + 1) else null },
-                    content = { part, partModifier ->
+                    content = { parts, partModifier ->
                         ProviderSettingsScreen(
                             connectedProviderIds = providers,
-                            section = part,
+                            sections = parts,
                             compact = compact,
-                            trailing = {
+                            trailing = { part ->
                                 if (part == KeeperSection.Connections) {
                                     RepositoryConnections(setOf(RepositoryServiceCatalog.GITHUB_ID), {}, {}, compact)
                                 }
@@ -989,7 +989,7 @@ class HiveScreenshotTest {
     }
 
     @Test
-    fun shootsTheFlowchart() {
+    fun shootsEditWithAFlippedCard() {
         runBlocking { CreatureRigMapping.allSlugs.forEach { CreatureRigCache.get(it) } }
         val flow = definition.copy(
             tasks = listOf(
@@ -1000,13 +1000,12 @@ class HiveScreenshotTest {
                 task("review", "Review", qa, "notify"),
             ),
         )
-        DurableUiState.store.putBoolean("hive.view.flow", true)
-        try {
-            shoot("24-flowchart", 900, 1800) {
-                GeministratorWorkflowTerrarium(flow, liveRun.copy(workflowDefinitionId = flow.id), roles, selectedTaskId = null, onTaskSelected = {}, onStageDefinition = { it })
+        // Edit, the "build" creature turned over to its card (the sheet itself is the shell's).
+        val host = CardFlipHost().apply { state = CardFlip(flippedId = "build") }
+        shoot("24-edit-flipped-card", 900, 1800) {
+            androidx.compose.runtime.CompositionLocalProvider(LocalCardFlip provides host) {
+                GeministratorWorkflowTerrarium(flow, liveRun.copy(workflowDefinitionId = flow.id), roles, selectedTaskId = "build", onTaskSelected = {}, onStageDefinition = { it }, startInBuild = true)
             }
-        } finally {
-            DurableUiState.store.putBoolean("hive.view.flow", false)
         }
     }
 

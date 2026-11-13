@@ -101,5 +101,6 @@ suspend fun ApplicationRuntime.launchSavedWorkflow(
         parentWorkflowRunIds = parents,
         objectiveProvenance = objectiveProvenance,
     )
+    rememberMissing("run-$stamp", staffingMissing(com.hereliesaz.geministrator.queen.staffQueen(launchRoles), providerRegistry.linkedSourceIds()))
     loadLatest()
 }

@@ -93,6 +93,7 @@ class ProviderBackedManagedSessionGateway(
     private val mutex = Mutex()
     private val snapshots = mutableMapOf<ManagedSessionHandle, SessionSnapshot>()
     private val observedEventKeys = mutableMapOf<ManagedSessionHandle, MutableSet<String>>()
+    private val progressCounts = mutableMapOf<ManagedSessionHandle, Long>()
 
     /** Each session's observer, kept so a cancel stops the generation it is watching ([cancel]) and a release frees it. */
     private val observerJobs = mutableMapOf<ManagedSessionHandle, Job>()
@@ -538,6 +539,7 @@ class ProviderBackedManagedSessionGateway(
         val observer = mutex.withLock {
             snapshots.remove(handle)
             observedEventKeys.remove(handle)
+            progressCounts.remove(handle)
             observerJobs.remove(handle)
         }
         observer?.cancel()
@@ -716,13 +718,18 @@ class ProviderBackedManagedSessionGateway(
         return typeName?.let { "$fallbackMessage ($it)" } ?: fallbackMessage
     }
 
+    override suspend fun progressCount(handle: ManagedSessionHandle): Long? =
+        mutex.withLock { progressCounts[handle] }
+
     private suspend fun applyEvent(
         handle: ManagedSessionHandle,
         event: AgentEvent,
     ) {
         val eventKey = event.memoryReplayKey()
         val unseen = mutex.withLock {
-            observedEventKeys.getOrPut(handle) { linkedSetOf() }.add(eventKey)
+            observedEventKeys.getOrPut(handle) { linkedSetOf() }.add(eventKey).also { fresh ->
+                if (fresh) progressCounts[handle] = (progressCounts[handle] ?: 0L) + 1L
+            }
         }
         if (!unseen) return
 

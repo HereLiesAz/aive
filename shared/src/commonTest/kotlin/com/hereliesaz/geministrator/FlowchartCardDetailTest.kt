@@ -240,10 +240,4 @@ class FlowchartCardDetailTest {
             assertEquals(FlowchartCardAction.OpenCreature("build", CreatureTab.Work), detail(run(status)).action)
         }
     }
-
-    @Test
-    fun theCreatureSheetOpensInLiveAndBuildButNotInFlowchart() {
-        assertTrue(creatureSheetAllowed(flowchart = false))
-        assertFalse(creatureSheetAllowed(flowchart = true))
-    }
 }

@@ -224,6 +224,12 @@ interface AgentProvider {
     val keyless: Boolean get() = false
 
     /**
+     * What kind of work this provider does, which sets the queen's reasonable wait for it
+     * ([com.hereliesaz.geministrator.workflow.DeadlinePolicy]); null when it is an ordinary hosted model.
+     */
+    val workKind: com.hereliesaz.geministrator.workflow.WorkKind? get() = null
+
+    /**
      * True when [observe] is itself the paid work (a text provider's generation runs inside the flow). Collecting it a
      * second time would run, and bill, the work again, so the gateway never retries or re-collects such an observer: a
      * fault ends the session as failed. False (the default) for a provider whose observe only watches work that is
