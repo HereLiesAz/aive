@@ -80,6 +80,8 @@ private fun voiceResource(voice: QueenVoice): StringResource = when (voice) {
         QueenVoice.SuggestRaiseAllowance -> Res.string.queen_say_suggest_raise_allowance
         QueenVoice.SuggestRestNanny -> Res.string.queen_say_suggest_rest_nanny
         QueenVoice.SuggestRewordStep -> Res.string.queen_say_suggest_reword_step
+        // The Nanny's findings handed to the queen.
+        QueenVoice.SuggestNannyFinding -> Res.string.queen_say_suggest_nanny_finding
 }
 
 @Composable

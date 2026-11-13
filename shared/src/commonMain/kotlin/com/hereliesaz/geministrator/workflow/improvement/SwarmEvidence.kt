@@ -177,6 +177,7 @@ object SwarmEvidence {
                     ImprovementSource.RoleHistory -> "run-history heuristics (role instructions)"
                     ImprovementSource.Habit -> "habits"
                     ImprovementSource.Queen -> "the queen"
+                    ImprovementSource.Nanny -> "the Nanny (findings from earlier runs, for this hive or swarm to plan with)"
                 }
                 val judged = mine.filter { it.status == ProposalStatus.Dismissed }.takeLast(3).joinToString("; ") { agentText(it.summary, 70) }
                 appendLine(
