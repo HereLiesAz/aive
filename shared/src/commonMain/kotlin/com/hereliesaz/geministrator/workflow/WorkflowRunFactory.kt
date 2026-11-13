@@ -28,6 +28,7 @@ import com.hereliesaz.geministrator.policy.PolicyRequest
 import com.hereliesaz.geministrator.policy.PolicyResource
 import com.hereliesaz.geministrator.policy.PolicySubject
 import com.hereliesaz.geministrator.policy.isAllowed
+import com.hereliesaz.geministrator.policy.isDenied
 
 object WorkflowRunFactory {
     const val EXECUTOR_INTEGRATION_UNAVAILABLE = "EXECUTOR_INTEGRATION_UNAVAILABLE"
@@ -179,7 +180,7 @@ object WorkflowRunFactory {
             // approval ancestor, but a skipped or cancelled approval also settles as "terminal", so
             // the policy decision point checks that one was actually granted before releasing it.
             val repositoryOperation = task.executor.withoutPlacement() as? TaskExecutor.RepositoryOperation
-            val mutationDenial = if (conditionMet && repositoryOperation != null && repositoryOperation.isMutation()) {
+            val repositoryDenial = if (conditionMet && repositoryOperation != null && repositoryOperation.isMutation()) {
                 val request = PolicyRequest(
                     subject = PolicySubject.System,
                     action = PolicyAction.RunRepositoryOperation(repositoryOperation.operation),
@@ -200,6 +201,31 @@ object WorkflowRunFactory {
             } else {
                 null
             }
+            // A step that declares an effect runs only with a person's approval: its plan gate, or an
+            // approval step before it that was actually granted (invariant 4a).
+            val stepDenial = if (conditionMet && task.isEffectfulStep()) {
+                val granted = hasGrantedApprovalAncestor(taskId, definitionsById, run)
+                val request = PolicyRequest(
+                    subject = PolicySubject.System,
+                    action = PolicyAction.CallTool(
+                        tool = task.contract?.allowedTools?.firstOrNull() ?: task.name,
+                        mutating = true,
+                        stepEffect = true,
+                    ),
+                    resource = PolicyResource.task(taskId, run.repositorySnapshot),
+                    context = PolicyContext(
+                        workflowRunId = run.id,
+                        taskDefinitionId = taskId,
+                        approval = stepApprovalEvidence(task, hasApprovalAncestor = granted, granted = granted),
+                    ),
+                )
+                InProcessPolicyDecisionPoint.decide(request)
+                    .takeIf { it is PolicyDecision.RequireApproval || it.isDenied }
+                    ?.also { onPolicyDecision?.invoke(request, it) }
+            } else {
+                null
+            }
+            val mutationDenial = repositoryDenial ?: stepDenial
             when {
                 mutationDenial != null -> taskRun.copy(
                     status = TaskRunStatus.Cancelled,

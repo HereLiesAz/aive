@@ -138,8 +138,15 @@ sealed interface PolicyAction {
         override val name: String = "role.reason_only"
     }
 
-    /** Hook: an agent calls a tool (for example an MCP tool). No caller routes here yet. */
-    data class CallTool(val tool: String, val mutating: Boolean = true) : PolicyAction {
+    /**
+     * An agent calls a tool (for example an MCP tool). [stepEffect] is true when the call is made by a step whose
+     * contract declares an effect: such a call needs evidence of a person's approval (declared when validating, granted at run time) (STEP_EFFECT_WITHOUT_APPROVAL).
+     */
+    data class CallTool(
+        val tool: String,
+        val mutating: Boolean = true,
+        val stepEffect: Boolean = false,
+    ) : PolicyAction {
         override val name: String = "tool.call"
     }
 
@@ -262,6 +269,7 @@ object PolicyCodes {
     const val REQUIRES_REPOSITORY_WRITE = "REQUIRES_REPOSITORY_WRITE"
     const val UNTRUSTED_CONTEXT = "UNTRUSTED_CONTEXT"
     const val SUBJECT_MISMATCH = "SUBJECT_MISMATCH"
+    const val STEP_EFFECT_WITHOUT_APPROVAL = "STEP_EFFECT_WITHOUT_APPROVAL"
 }
 
 /** Decides one [PolicyRequest]. Pure and synchronous; recording is the caller's job. */
@@ -412,9 +420,16 @@ object InProcessPolicyDecisionPoint : PolicyDecisionPoint {
         }
     }
 
-    // Hook rules: nothing calls these yet. They only ever add a gate, never remove one.
+    // Hook rules: they only ever add a gate, never remove one.
     private fun callTool(action: PolicyAction.CallTool, context: PolicyContext): PolicyDecision =
-        if (action.mutating && context.provenance != PolicyProvenance.Local) {
+        if (action.stepEffect && action.mutating && context.approval == ApprovalEvidence.None) {
+            // Invariant 4a: a step that declares an effect acts only once a person approved it.
+            PolicyDecision.RequireApproval(
+                code = PolicyCodes.STEP_EFFECT_WITHOUT_APPROVAL,
+                reason = "Tool '${action.tool}' changes something and no person has approved this step",
+                requiresHuman = true,
+            )
+        } else if (action.mutating && context.provenance != PolicyProvenance.Local) {
             PolicyDecision.RequireApproval(
                 code = PolicyCodes.UNTRUSTED_CONTEXT,
                 reason = "Tool '${action.tool}' would act on untrusted context",

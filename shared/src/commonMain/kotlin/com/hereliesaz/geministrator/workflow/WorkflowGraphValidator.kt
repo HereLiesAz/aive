@@ -26,6 +26,7 @@ sealed interface WorkflowValidationError {
     ) : WorkflowValidationError
     data class MissingExecutor(val taskId: TaskDefinitionId) : WorkflowValidationError
     data class MissingRepositoryMutationApproval(val taskId: TaskDefinitionId) : WorkflowValidationError
+    data class MissingStepApproval(val taskId: TaskDefinitionId) : WorkflowValidationError
     data class SelfDependency(val taskId: TaskDefinitionId) : WorkflowValidationError
     data class Cycle(val taskIds: Set<TaskDefinitionId>) : WorkflowValidationError
 }
@@ -41,6 +42,8 @@ fun WorkflowValidationError.humanReadable(): String = when (this) {
         "Task '${taskId.value}' has no executor or role assigned. Every task must specify who does the work."
     is WorkflowValidationError.MissingRepositoryMutationApproval ->
         "Repository mutation task '${taskId.value}' must depend on an unconditional human-approval task."
+    is WorkflowValidationError.MissingStepApproval ->
+        "Step '${taskId.value}' changes something outside its own output, so it needs your approval: turn its approval on, or put an approval step before it."
     is WorkflowValidationError.SelfDependency ->
         "Task '${taskId.value}' lists itself as a dependency. A task cannot depend on itself."
     is WorkflowValidationError.Cycle ->
@@ -98,6 +101,18 @@ object WorkflowGraphValidator {
             }
             if (conditionTarget != null && conditionTarget !in knownIds) {
                 errors += WorkflowValidationError.MissingConditionTarget(task.id, conditionTarget)
+            }
+
+            // A step that declares an effect is made only with an approval (invariant 4a).
+            if (task.isEffectfulStep()) {
+                val decision = decideStepEffect(
+                    task.id,
+                    task,
+                    stepApprovalEvidence(task, hasApprovalAncestor = hasHumanApprovalAncestor(task.id), granted = false),
+                )
+                if (decision.isDenied || decision is com.hereliesaz.geministrator.policy.PolicyDecision.RequireApproval) {
+                    errors += WorkflowValidationError.MissingStepApproval(task.id)
+                }
             }
 
             // A repository operation placed on another device is still a repository operation.
