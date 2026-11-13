@@ -235,7 +235,7 @@ internal fun InboxScreen(
                             val primary = if (isPlanApproval) {
                                 taskRun.progressMessage?.takeIf(String::isNotBlank) ?: task?.objective ?: ""
                             } else {
-                                taskRun.blockingReason?.let { "${it.code} · ${it.message}" } ?: stringResource(Res.string.runs_task_failed)
+                                escalationReason(taskRun.blockingReason?.message) ?: stringResource(Res.string.runs_task_failed)
                             }
                             append(primary)
                             if (scope.isNotBlank()) {
@@ -246,6 +246,9 @@ internal fun InboxScreen(
                         endCap = stringResource(Res.string.runs_needs_you),
                         well = {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (!isPlanApproval && !isPlainReason(taskRun.blockingReason?.message)) {
+                                    ErrorDetailsToggle(raw = taskRun.blockingReason?.message, seed = "inbox-$taskId")
+                                }
                                 if (taskRun.artifacts.isNotEmpty()) {
                                     Text(stringResource(Res.string.runs_evidence), style = AzphaltType.eyebrow, color = azphaltOnSurface())
                                     taskRun.artifacts.forEach { artifact ->

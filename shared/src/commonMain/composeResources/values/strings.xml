@@ -685,6 +685,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="flowchart_detail_gate_turned_back">A review turned this work back.</string>
     <string name="flowchart_detail_waiting_on">Waiting for %1$s to finish.</string>
     <string name="flowchart_detail_keeper_paused">You paused the hive.</string>
+    <string name="flowchart_detail_provider_failed_plain">%1$s could not do this step.</string>
     <string name="flowchart_detail_failed">It failed.</string>
     <string name="flowchart_detail_failed_with">It failed: %1$s</string>
     <string name="flowchart_detail_blocked">It is on hold.</string>

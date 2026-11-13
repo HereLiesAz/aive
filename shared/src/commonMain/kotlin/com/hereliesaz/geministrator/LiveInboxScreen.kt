@@ -176,8 +176,8 @@ internal fun LiveInboxScreen(
                 ApplicationRuntimeState.Loading -> stringResource(Res.string.inbox_loading_runtime)
                 is ApplicationRuntimeState.NoProject -> stringResource(Res.string.inbox_no_project_yet_there_are_no)
                 is ApplicationRuntimeState.NoRun -> stringResource(Res.string.inbox_no_active_run_there_are_no)
-                is ApplicationRuntimeState.Disconnected -> stringResource(Res.string.inbox_runtime_disconnected, runtimeState.message)
-                is ApplicationRuntimeState.ResumeFailed -> stringResource(Res.string.inbox_run_unavailable, runtimeState.message)
+                is ApplicationRuntimeState.Disconnected -> stringResource(Res.string.inbox_runtime_disconnected, friendlyErrorMessage(runtimeState.message))
+                is ApplicationRuntimeState.ResumeFailed -> stringResource(Res.string.inbox_run_unavailable, friendlyErrorMessage(runtimeState.message))
                 is ApplicationRuntimeState.Live -> stringResource(Res.string.inbox_no_pending_decisions)
             },
             style = AzphaltType.body,
@@ -185,6 +185,10 @@ internal fun LiveInboxScreen(
         )
     }
 }
+
+/** Why an escalated step stopped, in one plain line (no internal code); null when the run recorded no reason. */
+@Composable
+internal fun escalationReason(message: String?): String? = message?.trim()?.takeIf(String::isNotEmpty)?.let { plainFailureLine(it) }
 
 /** What one Inbox entry waits on the keeper for; [inboxEntries] decides it as the badge's key does. */
 internal enum class InboxEntryKind { PlanApproval, TaskApproval, NestedApproval, Escalation, Question, BudgetSpent }
@@ -524,6 +528,9 @@ private fun InboxDetail(
                     color = azphaltMutedOnSurface(),
                     modifier = Modifier.widthIn(max = 530.dp),
                 )
+                if (entry.kind == InboxEntryKind.Escalation && !isPlainReason(taskRun.blockingReason?.message)) {
+                    ErrorDetailsToggle(raw = taskRun.blockingReason?.message, seed = "inbox-${entry.taskId}", modifier = Modifier.widthIn(max = 530.dp))
+                }
                 Spacer(Modifier.height(20.dp))
                 // The evidence it waits with, as the run holds it: never invented.
                 taskRun.artifacts.forEach { artifact ->
@@ -565,7 +572,7 @@ private fun inboxDetailCopy(
     }
     InboxEntryKind.NestedApproval -> stringResource(Res.string.inspector_hint_approve_nested)
     InboxEntryKind.Escalation -> buildString {
-        append(taskRun.blockingReason?.let { "${it.code} · ${it.message}" } ?: stringResource(Res.string.runs_task_failed))
+        append(escalationReason(taskRun.blockingReason?.message) ?: stringResource(Res.string.runs_task_failed))
         append("\n")
         append(stringResource(Res.string.runs_attempt_of, taskRun.attempt, entry.maxAttempts).trim())
     }

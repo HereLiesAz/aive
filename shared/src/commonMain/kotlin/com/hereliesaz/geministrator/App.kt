@@ -360,7 +360,13 @@ fun App(
                 // OutOfMemoryError are Errors and previously escaped this handler,
                 // leaving the launch button silently doing nothing.
                 appLog("AiveLaunch", "Launch failed: ${failure::class.simpleName}: ${failure.message}")
-                launchError = failure.message?.takeIf(String::isNotBlank) ?: getString(Res.string.app_workflow_launch_failed)
+                val raw = failure.message?.takeIf(String::isNotBlank)
+                launchError = if (raw == null) {
+                    getString(Res.string.app_workflow_launch_failed)
+                } else {
+                    // Said plainly; the raw text rides behind it for Technical details (packFailureText).
+                    packFailureText(plainFailureLineOutsideComposition(raw), raw.takeUnless(::isPlainReason))
+                }
                 onFinished(failure)
             } finally {
                 launching = false

@@ -75,7 +75,8 @@ private val ACTIVE = setOf(
 
 private val HTTP_CLIENT_ERROR = Regex("""(?i)(http|status)[^0-9]{0,4}4\d\d""")
 
-private const val DETAIL_LIMIT = 140
+/** The raw text a card keeps, shown only behind Technical details. */
+private const val DETAIL_LIMIT = 300
 
 /**
  * Reads a flowchart card's state into one sentence and the one button that leads to where it is
