@@ -3,6 +3,7 @@ package com.hereliesaz.geministrator.queen
 import com.hereliesaz.geministrator.workflow.KeylessPacing
 import com.hereliesaz.geministrator.workflow.QUEEN_PACE_CALL_MILLIS
 import com.hereliesaz.geministrator.workflow.QUEEN_PACE_TOTAL_MILLIS
+import kotlinx.coroutines.withContext
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
@@ -48,3 +49,14 @@ fun pacingBudget(totalMillis: Long, waitedMillis: Long, callMillis: Long): Long 
 
 /** The enclosing dispute's call context, if any. */
 suspend fun currentQueenCallContext(): QueenCallContext? = coroutineContext[QueenCallContext]
+
+/**
+ * [base] whose every answer runs in its own fresh [QueenCallContext] on [pacing], so a long run of calls (a tutorial's plan and
+ * lessons) keeps each Source's request limit with a full wait budget per call instead of one shared dispute total.
+ */
+fun pacedPerCall(base: QueenModel, pacing: KeylessPacing?): QueenModel = object : QueenModel {
+    override val uses: List<ModelUse> get() = base.uses
+
+    override suspend fun answer(prompt: String): String =
+        withContext(QueenCallContext(pacing)) { base.answer(prompt) }
+}

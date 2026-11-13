@@ -2,6 +2,9 @@ package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.ProviderCatalog
 import com.hereliesaz.geministrator.queen.QueenCallContext
+import com.hereliesaz.geministrator.queen.QueenModel
+import com.hereliesaz.geministrator.queen.currentQueenCallContext
+import com.hereliesaz.geministrator.queen.pacedPerCall
 import com.hereliesaz.geministrator.queen.QueenLink
 import com.hereliesaz.geministrator.queen.QueenVoice
 import com.hereliesaz.geministrator.queen.pacingBudget
@@ -82,6 +85,20 @@ class SourcePacingTest {
         // The next turn is 60 s off, more than the 40 s of the total left: she does not wait for it.
         assertTrue(context.awaitTurn("ovh"))
         assertFalse(context.awaitTurn("ovh"))
+    }
+
+    @Test
+    fun everyAnswerOfAPacedModelRunsInItsOwnFreshContext() = runTest {
+        val seen = mutableListOf<QueenCallContext?>()
+        val base = QueenModel { seen += currentQueenCallContext(); "ok" }
+        val pacer = KeylessPacer(now = { testScheduler.currentTime }, limitOf = { twoAMinute })
+        val model = pacedPerCall(base, KeylessPacing(pacer, Mutex()))
+        model.answer("a")
+        model.answer("b")
+        assertEquals(2, seen.size)
+        assertTrue(seen.all { it != null && it.paces })
+        assertTrue(seen[0] !== seen[1])
+        assertNull(currentQueenCallContext())
     }
 
     @Test
