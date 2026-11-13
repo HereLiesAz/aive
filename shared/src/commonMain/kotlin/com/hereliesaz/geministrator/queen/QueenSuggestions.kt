@@ -64,10 +64,15 @@ enum class QueenAction {
 
     /** A generic role has been used repeatedly in one domain: the keeper starts training a specialist from the Roster. Only leads there. */
     TrainSpecialist,
+    /**
+     * The Nanny's mid-run finding about a step or role template, passed on now instead of at the end of the swarm. On the
+     * keeper's tap the queen puts the change in the Improvement list, where the keeper adopts it; nothing running is changed.
+     */
+    TemplateChange,
     ;
 
     /** Whether the queen applies it herself on the keeper's tap; the others only lead somewhere. */
-    val appliesHere: Boolean get() = this == RewordStep || this == RedoFromStep || this == Rest
+    val appliesHere: Boolean get() = this == RewordStep || this == RedoFromStep || this == Rest || this == TemplateChange
 
     /** Whether the keeper's tap only keeps it for next time (a shape change, never applied live). */
     val keepsForNextTime: Boolean get() = this == AddCheck || this == SplitStep || this == ReorderSteps || this == AddApproval
@@ -186,6 +191,8 @@ internal fun queenCandidates(
     costPace(definition, run, caps)?.let { found += it }
     // The Nanny's findings are one more input to her own judgement; she keeps her own candidate when both name the same step and action.
     nannyCandidates(definition, run).forEach { n -> if (found.none { it.action == n.action && it.subject == n.subject }) found += n }
+    // A finding about a template is hers to decide: offered now only when it would be accepted as it stands.
+    nannyTemplateCandidates(definition, run, roles).forEach { n -> if (found.none { it.action == n.action && it.subject == n.subject }) found += n }
     if (nanny && nannyPhase(definition, run) == NannyPhase.AwaitingReview && run.keeperPause == null) {
         found += QueenCandidate(QueenAction.Rest, QUEEN_RUN_SUBJECT, QueenVoice.SuggestRestNanny, emptyList(), outside = false)
     }
@@ -347,6 +354,7 @@ internal fun queenAcceptRefused(
                 run.taskRuns[task.id]?.status !in OPEN_STATUSES || mutatesWithoutApproval(definition, task, roles)
         QueenAction.RedoFromStep -> task == null || run.taskRuns[task.id] == null
         QueenAction.Rest -> run.keeperPause != null
+        QueenAction.TemplateChange -> false
         else -> true
     }
 }
@@ -399,6 +407,7 @@ fun queenSuggestionNotes(proposals: List<ImprovementProposal>, run: WorkflowRun)
             QueenAction.RaiseAllowance -> QueenLink.Limits
             QueenAction.TrainSpecialist -> QueenLink.Roster
             QueenAction.Rest -> null
+            QueenAction.Rest, QueenAction.TemplateChange -> null
         }
         QueenNote(
             id = proposal.id,

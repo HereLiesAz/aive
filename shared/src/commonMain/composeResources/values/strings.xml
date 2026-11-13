@@ -2090,6 +2090,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_say_missing_reviewer_no_room">I did not ask my reviewer to read the plan: the Source has no room for another request right now. I checked only what I can check myself. Connect another Source to give it room.</string>
     <string name="queen_say_missing_reviewer_no_second_source">I did not ask my reviewer to read the plan: I have one Source and it has no room right now. I checked only what I can check myself. A second Source would let my reviewer read it. Connect one.</string>
     <string name="queen_say_missing_blocker">The hive is not complete: this still has to be made or obtained.</string>
+    <string name="queen_say_suggest_nanny_template">The Nanny found a better wording for the %1$s template, from %2$s steps of evidence. She works for the next swarm, and I decided to pass it on now. If you go ahead I put it in the Improvement list in the Keeper\'s room, where you adopt it or not. Nothing that is running changes.</string>
     <string name="queen_say_finished_blockers_open">The swarm finished, but I cannot call the hive reached: %1$s of the things it needs have not been made or obtained yet.</string>
     <string name="teaching_failed_no_worker">I cannot teach yet: the Worker creature is switched off. Switch it on in the Roster, then start again.</string>
     <string name="teaching_failed_no_source">I could not reach a Source to plan the lessons. Open Connections to connect or fix one, then start again.</string>

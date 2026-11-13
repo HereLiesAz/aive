@@ -1559,6 +1559,16 @@ class ApplicationRuntime private constructor(
                     setKeeperPause(true)
                     true
                 }
+                // The Nanny's finding about a template: put in the Improvement list now, where the keeper adopts it. Nothing running changes.
+                QueenAction.TemplateChange -> {
+                    val made = com.hereliesaz.geministrator.queen.nannyTemplateProposal(definition, run, proposal.target, now)
+                    if (made == null) {
+                        false
+                    } else {
+                        ledger.merge { state -> state.copy(proposals = state.proposals + if (state.proposals.any { it.id == made.id }) emptyList() else listOf(made)) }
+                        true
+                    }
+                }
                 // A shape change is only kept for next time: an ordinary note in the Improvement flow, never applied to this swarm.
                 QueenAction.AddCheck, QueenAction.SplitStep, QueenAction.ReorderSteps, QueenAction.AddApproval -> {
                     val kept = com.hereliesaz.geministrator.queen.keptForNextTime(proposal, now)

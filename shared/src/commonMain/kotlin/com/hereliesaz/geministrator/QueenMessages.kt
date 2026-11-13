@@ -111,6 +111,8 @@ private fun voiceResource(voice: QueenVoice): StringResource = when (voice) {
         // A lesson that could not be written, and an optional step set aside.
         QueenVoice.TutorialLessonFailed -> Res.string.queen_say_tutorial_lesson_failed
         QueenVoice.StepSkipped -> Res.string.queen_say_step_skipped
+        // The Nanny's finding about a template, passed on mid-run.
+        QueenVoice.SuggestNannyTemplate -> Res.string.queen_say_suggest_nanny_template
 }
 
 @Composable
