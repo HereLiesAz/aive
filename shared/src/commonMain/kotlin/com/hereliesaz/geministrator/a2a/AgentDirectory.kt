@@ -34,6 +34,8 @@ internal data class AgentDirectoryEntry(
     val declaredSource: String? = null,
     /** Where the operator says it runs (SearchA2A `backing.hosting`); null while the directory has no such field. Unverified. */
     val declaredHosting: String? = null,
+    /** SearchA2A `access.keyless`: "declared", "no" or "unknown" (never observed); null when the row carries none. */
+    val keyless: String? = null,
 )
 
 /**
@@ -52,6 +54,8 @@ internal data class OrphanRowFacts(
     val livesElsewhere: Boolean,
     /** The registry reports it tried one test task: a note, never a trust signal. */
     val registryTriedATest: Boolean,
+    /** True when the card declares it needs no key, false when the directory says it does, null when unknown. */
+    val keylessDeclared: Boolean? = null,
 ) {
     /** The Host line's value: the declared hosting when the directory supplies it, else the hostname. */
     val hostLine: String get() = declaredHosting ?: host
@@ -73,6 +77,11 @@ internal fun orphanRowFacts(entry: AgentDirectoryEntry): OrphanRowFacts {
         declaredHosting = entry.declaredHosting?.takeIf(String::isNotBlank),
         livesElsewhere = !onThisComputer,
         registryTriedATest = entry.registryReportsTaskTested,
+        keylessDeclared = when (entry.keyless) {
+            "declared" -> true
+            "no" -> false
+            else -> null
+        },
     )
 }
 
@@ -194,7 +203,8 @@ internal class SearchA2aDirectorySource(
             val match = if (ranked) record["match_score"].valueText()?.toDoubleOrNull()
                 ?.takeIf { it.isFinite() && it in 0.0..1.0 } else null
             val ansClaim = directoryAnsClaim(record)
-            // Not in the directory today (checked 2026-11-13); read when searcha2a adds them, labelled declared.
+            // The Worker emits objects (backing.declared_provider.organization, backing.hosting.platform) and
+            // access.keyless as a word; a plain string is tolerated too. All of it is declared, never verified.
             val backing = record["backing"] as? JsonObject
             AgentDirectoryEntry(
                 cardUrl = cardUrl,
@@ -206,10 +216,12 @@ internal class SearchA2aDirectorySource(
                 matchScore = match,
                 ansName = ansClaim?.first,
                 ansHost = ansClaim?.second,
-                declaredSource = backing?.get("declared_provider").valueText()
+                declaredSource = backing?.get("declared_provider").nameText("organization")
                     ?.let { A2aDrifters.cleanCardText(it, 40) }?.takeIf(String::isNotBlank),
-                declaredHosting = backing?.get("hosting").valueText()
-                    ?.let { A2aDrifters.cleanCardText(it, 40) }?.takeIf(String::isNotBlank),
+                declaredHosting = backing?.get("hosting").nameText("platform")
+                    ?.let { A2aDrifters.cleanCardText(it, 40) }?.takeIf { it.isNotBlank() && it != "unknown" },
+                keyless = (record["access"] as? JsonObject)?.get("keyless").valueText()
+                    ?.takeIf { it == "declared" || it == "no" || it == "unknown" },
             )
         }
 
@@ -226,6 +238,10 @@ internal class SearchA2aDirectorySource(
 
     private fun kotlinx.serialization.json.JsonElement?.valueText(): String? =
         (this as? JsonPrimitive)?.content
+
+    /** A name given as a plain string or as an object holding it under [key]. */
+    private fun kotlinx.serialization.json.JsonElement?.nameText(key: String): String? =
+        (this as? JsonObject)?.get(key).valueText() ?: valueText()
 
     private companion object {
         const val INDEXED_SEARCH_URL = "https://searcha2a-api.hereliesaz.workers.dev/api/v1/directory"

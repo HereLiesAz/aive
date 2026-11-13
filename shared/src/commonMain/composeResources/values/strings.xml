@@ -131,6 +131,8 @@
     <string name="keeper_orphan_source_declared">Source: %1$s (declared)</string>
     <string name="keeper_orphan_source_not_stated">Source: not stated</string>
     <string name="keeper_orphan_host">Host: %1$s</string>
+    <string name="keeper_orphan_keyless_declared">Needs no key (declared, not tested)</string>
+    <string name="keeper_orphan_needs_key">Says it needs a key</string>
     <string name="keeper_orphan_name_claim">Says its name is %1$s (unverified)</string>
     <string name="keeper_a2a_agent_use_address">Look</string>
     <string name="keeper_a2a_agent_unreachable">The Agent Card could not be reached. Check the address and try again.</string>

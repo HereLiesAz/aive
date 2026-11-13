@@ -116,6 +116,38 @@ class AgentDirectoryTest {
     }
 
     @Test
+    fun backingObjectsAndKeylessFromTheWorkerShapeAreRead() = runTest {
+        val body = """
+            {"schema":1,"source":"searcha2a","match_mode":"semantic","results":[
+              {"kind":"a2a-agent","installable":false,"verification":"card_read_only",
+               "name":"Obj","source_url":"https://obj.example.org/card","skills":[{"name":"x"}],
+               "backing":{"declared_provider":{"organization":"Acme AI"},"hosting":{"platform":"Cloudflare","shared_platform":true}},
+               "access":{"auth_declared":"none","auth_types":[],"keyless":"declared","payment_required":"unknown"}},
+              {"kind":"a2a-agent","installable":false,"verification":"card_read_only",
+               "name":"Str","source_url":"https://str.example.org/card","skills":[{"name":"x"}],
+               "backing":{"declared_provider":"Plain Co","hosting":{"platform":"unknown"}},
+               "access":{"keyless":"no"}}
+            ]}
+        """.trimIndent()
+        val client = HttpClient(MockEngine {
+            respond(body, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+        })
+        try {
+            val rows = SearchA2aDirectorySource(client).search("anything")
+            val obj = rows.first { it.name == "Obj" }
+            assertEquals("Acme AI", obj.declaredSource)
+            assertEquals("Cloudflare", obj.declaredHosting)
+            assertEquals("declared", obj.keyless)
+            val str = rows.first { it.name == "Str" }
+            assertEquals("Plain Co", str.declaredSource)
+            assertNull(str.declaredHosting)
+            assertEquals("no", str.keyless)
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
     fun forgedOrInvalidAnsClaimsNeverBecomeTrustedDirectoryIdentities() = runTest {
         val invalid = """
             {"schema":1,"source":"searcha2a","match_mode":"keyword-fallback","results":[

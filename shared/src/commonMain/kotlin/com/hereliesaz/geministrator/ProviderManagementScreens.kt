@@ -60,6 +60,8 @@ import com.hereliesaz.geministrator.resources.keeper_agent_directory_query_examp
 import com.hereliesaz.geministrator.resources.keeper_orphan_card_only
 import com.hereliesaz.geministrator.resources.keeper_orphan_good_at
 import com.hereliesaz.geministrator.resources.keeper_orphan_host
+import com.hereliesaz.geministrator.resources.keeper_orphan_keyless_declared
+import com.hereliesaz.geministrator.resources.keeper_orphan_needs_key
 import com.hereliesaz.geministrator.resources.keeper_orphan_lives_elsewhere
 import com.hereliesaz.geministrator.resources.keeper_orphan_name_claim
 import com.hereliesaz.geministrator.resources.keeper_orphan_no_description
@@ -1628,6 +1630,14 @@ private fun orphanDetail(entry: AgentDirectoryEntry): String {
         )
         append('\n')
         append(stringResource(Res.string.keeper_orphan_host, facts.hostLine))
+        facts.keylessDeclared?.let {
+            append('\n')
+            append(
+                stringResource(
+                    if (it) Res.string.keeper_orphan_keyless_declared else Res.string.keeper_orphan_needs_key,
+                ),
+            )
+        }
         entry.ansName?.let {
             append('\n')
             append(stringResource(Res.string.keeper_orphan_name_claim, it))

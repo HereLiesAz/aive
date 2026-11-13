@@ -58,4 +58,12 @@ class OrphanRowFactsTest {
         assertTrue(orphanRowFacts(tested).registryTriedATest)
         assertFalse(orphanRowFacts(entry("https://x.example.org/card")).registryTriedATest)
     }
+
+    @Test
+    fun keylessIsReadFromTheDeclaredWordOnly() {
+        assertEquals(true, orphanRowFacts(entry("https://x.example.org/card").copy(keyless = "declared")).keylessDeclared)
+        assertEquals(false, orphanRowFacts(entry("https://x.example.org/card").copy(keyless = "no")).keylessDeclared)
+        assertNull(orphanRowFacts(entry("https://x.example.org/card").copy(keyless = "unknown")).keylessDeclared)
+        assertNull(orphanRowFacts(entry("https://x.example.org/card")).keylessDeclared)
+    }
 }
