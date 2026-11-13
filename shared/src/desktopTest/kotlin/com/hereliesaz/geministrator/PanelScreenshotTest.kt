@@ -145,13 +145,17 @@ class PanelScreenshotTest {
             roleOfTask = { roles[it] },
             roleOfSession = { key -> roles[run.taskRuns.values.first { r -> r.id == key.taskRunId }.taskDefinitionId] },
         )
+        // The keeper's pick lives in the machine's real preferences, shared with every other test in this JVM and
+        // every earlier run: put back what was there, not a guess at it.
+        val before = DurableUiState.store.getString("overview.timeline.log.source")
         DurableUiState.store.putString("overview.timeline.log.source", "Activity")
         try {
             shoot("51-activity-by-role", 780, 900) {
                 RunLogView(events = events, taskName = { names[it] ?: it.value }, sources = sources, modifier = Modifier.fillMaxSize())
             }
         } finally {
-            DurableUiState.store.putString("overview.timeline.log.source", "Run")
+            if (before == null) DurableUiState.store.remove("overview.timeline.log.source")
+            else DurableUiState.store.putString("overview.timeline.log.source", before)
         }
     }
 
