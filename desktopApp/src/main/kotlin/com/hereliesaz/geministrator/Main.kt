@@ -536,6 +536,7 @@ fun main() {
                         mcpConsent = mcpConsent,
                         codeExecution = codeExecution,
                         mcpElicitation = mcpElicitation,
+                        researchBridgeEnabled = { controlApi.enabled },
                         providers = providers,
                         executorIntegrations = executorIntegrations,
                         orchestrationUtilities = orchestrationUtilities,

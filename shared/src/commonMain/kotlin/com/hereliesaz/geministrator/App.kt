@@ -333,9 +333,20 @@ fun App(
     // The queen's research before planning: what is already connected here, then at most one question the keeper may decline.
     val researchBridgeOn = researchBridgeEnabled()
     val researchServers = mcpHost?.servers?.collectAsState()?.value.orEmpty()
-    val researchStep = remember(mcpHost, mcpConsent, researchBridgeOn, researchServers.isNotEmpty()) {
+    val researchSettings = remember { com.hereliesaz.geministrator.research.ResearchSettings() }
+    val researchOn by researchSettings.enabled.collectAsState()
+    // The repository the keeper is launching against, read by the docs lead when research runs.
+    val researchRepository = remember { arrayOfNulls<RepositoryRef>(1) }
+    val researchDocNames = remember(contextChunkSources) {
+        com.hereliesaz.geministrator.research.ChunkSourceDocNames(contextChunkSources) { researchRepository[0] }
+    }
+    val researchStep = remember(mcpHost, mcpConsent, researchBridgeOn, researchServers.isNotEmpty(), researchOn, researchDocNames) {
+        if (!researchOn) return@remember null
         com.hereliesaz.geministrator.research.ResearchStep(
             local = buildList {
+                if (contextChunkSources.isNotEmpty()) {
+                    add(com.hereliesaz.geministrator.research.ResearchSource.Repository to com.hereliesaz.geministrator.research.RepositoryDocsResearch(researchDocNames::names))
+                }
                 if (mcpHost != null && researchServers.isNotEmpty()) {
                     add(com.hereliesaz.geministrator.research.ResearchSource.ConnectedServer to com.hereliesaz.geministrator.research.ConnectedServersResearch(mcpHost))
                 }
@@ -444,6 +455,7 @@ fun App(
         objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
         onFinished: (Throwable?) -> Unit = {},
     ) = runLaunch(onFinished) { activeRuntime ->
+        researchRepository[0] = repository
         if (orchestrationRuntime != null) {
             activeRuntime.launchOrchestratedWorkflow(
                 projectName = projectName,
@@ -799,6 +811,7 @@ fun App(
             LocalEntire provides entire,
             LocalMcpHost provides mcpHost,
             LocalCodeExecution provides codeExecution,
+            LocalResearchSettings provides researchSettings,
             LocalCreatureRig provides { label ->
                 if (label in programmaticRoles) CreatureRigMapping.PROGRAMMATIC_RIG else stableHost.rigFor(rolesByName[label])
             },
