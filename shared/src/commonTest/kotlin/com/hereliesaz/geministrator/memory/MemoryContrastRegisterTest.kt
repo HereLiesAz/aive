@@ -15,6 +15,13 @@ class MemoryContrastRegisterTest {
     // ---- contrast detection -------------------------------------------------------------------
 
     @Test
+    fun veryLongTextsAreComparedOnTheirStartAndReturn() {
+        val long = "I chose Postgres for the database. " + "filler word ".repeat(20_000)
+        val other = "I chose MySQL for the database. " + "other word ".repeat(20_000)
+        MemoryContrast.between(long, other)
+    }
+
+    @Test
     fun sameFrameDifferentFillerIsAContrast() {
         val contrast = assertNotNull(MemoryContrast.between("I chose Postgres for the database.", "I chose MySQL for the database."))
         assertEquals("i chose _ for the database", contrast.frameKey)

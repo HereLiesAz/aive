@@ -53,6 +53,8 @@ import com.hereliesaz.geministrator.resources.mcp_consent_deny
 import com.hereliesaz.geministrator.resources.mcp_consent_title
 import com.hereliesaz.geministrator.resources.mcp_remove_body
 import com.hereliesaz.geministrator.resources.mcp_remove_title
+import com.hereliesaz.geministrator.resources.mcp_research
+import com.hereliesaz.geministrator.resources.mcp_research_detail
 import com.hereliesaz.geministrator.resources.mcp_script_sandbox
 import com.hereliesaz.geministrator.resources.mcp_script_sandbox_detail
 import com.hereliesaz.geministrator.resources.mcp_script_sandbox_off
@@ -86,6 +88,7 @@ internal val LocalMcpHost = compositionLocalOf<McpHost?> { null }
 
 /** The script sandbox over the MCP host, where the platform has one (desktop). */
 internal val LocalCodeExecution = compositionLocalOf<CodeExecutionToolSource?> { null }
+internal val LocalResearchSettings = compositionLocalOf<com.hereliesaz.geministrator.research.ResearchSettings?> { null }
 
 /**
  * Connections › MCP servers: one row per server, its consent setting, and adding one by address
@@ -156,6 +159,7 @@ internal fun McpServerConnections(host: McpHost, compact: Boolean) {
     }
 
     LocalCodeExecution.current?.takeIf(CodeExecutionToolSource::available)?.let { CodeExecutionRow(it, compact) }
+    LocalResearchSettings.current?.let { ResearchRow(it, compact) }
 
     AddConnectionRow(
         label = stringResource(Res.string.mcp_add_server),
@@ -316,6 +320,25 @@ private fun CodeExecutionRow(codeExecution: CodeExecutionToolSource, compact: Bo
             label = stringResource(if (enabled) Res.string.mcp_script_sandbox_turn_off else Res.string.mcp_script_sandbox_turn_on),
             seed = "mcp-script-sandbox",
             onClick = { codeExecution.settings.setEnabled(!enabled) },
+        )
+    }
+}
+
+/** The keeper's switch for the queen's research before planning; persisted, on by default. */
+@Composable
+private fun ResearchRow(research: com.hereliesaz.geministrator.research.ResearchSettings, compact: Boolean) {
+    val enabled by research.enabled.collectAsState()
+    ConnectionRow(
+        name = stringResource(Res.string.mcp_research),
+        detail = stringResource(Res.string.mcp_research_detail),
+        status = stringResource(if (enabled) Res.string.mcp_script_sandbox_on else Res.string.mcp_script_sandbox_off),
+        connected = enabled,
+        compact = compact,
+    ) {
+        AzphaltPill(
+            label = stringResource(if (enabled) Res.string.mcp_script_sandbox_turn_off else Res.string.mcp_script_sandbox_turn_on),
+            seed = "mcp-research",
+            onClick = { research.setEnabled(!enabled) },
         )
     }
 }

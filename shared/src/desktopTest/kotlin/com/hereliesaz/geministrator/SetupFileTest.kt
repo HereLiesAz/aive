@@ -195,6 +195,19 @@ class SetupFileTest {
         assertFalse("sk-test" in secrets.toString(), "SetupSecrets.toString must not reveal values")
     }
 
+    @Test
+    fun aPassphraseTypedDecomposedOpensAFileSealedComposedAndTheOtherWayRound() = runBlocking {
+        val composed = "café-passphrase"
+        val decomposed = "café-passphrase"
+        val source = SourceSetup.create()
+        val contents = SetupFileTransfer(source.persistence, source.settings).collect(crashReportingEnabled = true)
+        val sealedComposed = SetupFileCodec.encode(contents, FakeSecretStore(secrets).read(), composed, 1L)
+        val sealedDecomposed = SetupFileCodec.encode(contents, FakeSecretStore(secrets).read(), decomposed, 1L)
+
+        assertEquals(secrets, SetupFileCodec.decode(sealedComposed, decomposed).secrets)
+        assertEquals(secrets, SetupFileCodec.decode(sealedDecomposed, composed).secrets)
+    }
+
     private suspend fun exportFrom(source: SourceSetup): String = SetupFileCodec.encode(
         contents = SetupFileTransfer(source.persistence, source.settings).collect(crashReportingEnabled = true),
         secrets = FakeSecretStore(secrets).read(),

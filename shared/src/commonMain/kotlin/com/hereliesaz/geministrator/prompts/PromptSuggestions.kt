@@ -21,6 +21,10 @@ internal object PromptSuggestions {
     fun firstObjective(history: List<PromptEntry>, starter: String?): String? =
         lastObjective(history) ?: starter?.takeIf(String::isNotBlank)
 
+    /** The very first launch's seed: the last objective fed on this device, else the lesson goal [teachSeed]. */
+    fun firstLaunchObjective(history: List<PromptEntry>, teachSeed: String): String? =
+        lastObjective(history) ?: teachSeed.takeIf(String::isNotBlank)
+
     /** The feed bar's seed: what a swarm that has finished was fed, to run again with a tweak. Nothing while it runs. */
     fun feedObjective(runObjective: String?, runFinished: Boolean): String? =
         runObjective?.trim()?.takeIf { runFinished && it.isNotEmpty() }

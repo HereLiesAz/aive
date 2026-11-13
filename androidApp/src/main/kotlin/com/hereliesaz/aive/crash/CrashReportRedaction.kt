@@ -7,6 +7,11 @@ package com.hereliesaz.aive.crash
  */
 internal fun redactCrashTrace(trace: String): String =
     REDACTIONS.fold(trace) { text, (pattern, replacement) -> pattern.replace(text, replacement) }
+        .lineSequence()
+        .joinToString("\n") { it.take(MAX_LINE_CHARS) }
+
+/** An exception message line is cut to this many characters; stack frames are far shorter. */
+private const val MAX_LINE_CHARS = 300
 
 private const val REDACTED = "[redacted]"
 
@@ -19,6 +24,12 @@ private val REDACTIONS: List<Pair<Regex, String>> = listOf(
     // query strings can carry tokens or pairing material
     Regex("""(?i)(https?://[^\s?#"']+)\?[^\s"']+""") to "$1?$REDACTED",
     Regex("""[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}""") to "$REDACTED",
+    // Home and user directories name the person; only the part below them is kept.
+    Regex("""(?i)(?:/home|/Users)/[^/\s:"']+""") to "~",
+    Regex("""(?i)[A-Z]:\\Users\\[^\\\s:"']+""") to "~",
+    // Long digit and hex runs (ids, numbers, hashes) can identify a person or a record.
+    Regex("""\b[0-9]{9,}\b""") to REDACTED,
+    Regex("""\b[0-9a-fA-F]{16,}\b""") to REDACTED,
     // The Aive pairing code and relay tokens (aive1:<base64url>)
     Regex("""aive1:[A-Za-z0-9_-]{16,}""") to REDACTED,
 )

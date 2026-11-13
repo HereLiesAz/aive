@@ -53,6 +53,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.hereliesaz.geministrator.tour.TourTargetId
+import com.hereliesaz.geministrator.tour.tourTarget
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.crumb_here
 import com.hereliesaz.geministrator.resources.crumb_label
@@ -215,6 +217,7 @@ internal fun ShellRail(
                 count = 0,
                 small = true,
                 onClick = onOpenKeeper,
+                modifier = Modifier.tourTarget(TourTargetId.KEEPERS_ROOM_GEAR),
             )
         }
     }
@@ -256,6 +259,7 @@ private fun RailButton(
     count: Int,
     onClick: () -> Unit,
     small: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
     val fill = if (selected) azphaltStrong() else Color.Transparent
     val surface = azphaltSurface()
@@ -263,7 +267,7 @@ private fun RailButton(
     val badge = inboxBadgeLabel(count)
     val description = if (badge != null) stringResource(Res.string.rail_unread, label, badge) else label
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .semantics(mergeDescendants = true) {
                 role = Role.Tab
@@ -376,7 +380,7 @@ internal fun WideShellHeader(
                 Text(state, style = AzphaltType.eyebrow.copy(letterSpacing = 0.14.em), color = on)
             }
             Spacer(Modifier.width(9.dp))
-            InboxBadge(unread = unreadInbox, onClick = onOpenInbox)
+            InboxBadge(unread = unreadInbox, onClick = onOpenInbox, modifier = Modifier.tourTarget(TourTargetId.MESSAGES_BUTTON))
         }
         Box(Modifier.fillMaxWidth().height(2.dp).background(on.copy(alpha = 0.18f)))
     }

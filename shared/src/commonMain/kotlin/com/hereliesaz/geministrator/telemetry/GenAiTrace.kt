@@ -437,8 +437,11 @@ object WorkflowTraceBuilder {
             statusMessage = reason?.takeIf { content.includeContent }?.let { clip(it) }
         }
 
+        // Exported content passes the same scrub as the log before it leaves the device.
         private fun clip(text: String): String =
-            if (text.length <= content.maxContentChars) text else text.take(content.maxContentChars)
+            com.hereliesaz.geministrator.control.ControlRedaction.scrub(text).let {
+                if (it.length <= content.maxContentChars) it else it.take(content.maxContentChars)
+            }
     }
 }
 

@@ -8,9 +8,9 @@ Come to find out, both are now entire markets of their own, with very valuable c
 
 ## What it is
 
-The Aive is an AI swarm orchestration manager featuring living workflows: an H2G2-inspired UI with an approachable, user-friendly fishbowl game-like interface for monitoring and managing roles and progress whose nodes represent real work and whose state comes from the runtime.
+The Aive is an AI swarm orchestration manager featuring living swarms: an H2G2-inspired UI with an approachable, user-friendly fishbowl game-like interface for monitoring and managing roles and progress whose nodes represent real work and whose state comes from the runtime.
 
-Workflow nodes may be performed by AI sources such as specialized model agents, LLMs, coordinated sub-workflow roles, by people, or by systems like GitHub Actions, test runners, and deployment jobs. Progress belongs to the task run, not to a particular kind of worker.
+Swarm nodes may be performed by AI sources such as specialized model agents, LLMs, coordinated sub-swarm roles, by people, or by systems like GitHub Actions, test runners, and deployment jobs. Progress belongs to the task run, not to a particular kind of worker.
 
 ## Targets
 
@@ -33,7 +33,7 @@ Workflow nodes may be performed by AI sources such as specialized model agents, 
 - `tools/` — offline tooling: Azphalt package builder (`azp/`), BitNet benchmark, specialist optimization pipeline, Google Play asset generator
 - `vendor/` — not committed. `conveyance-h2g2` (the H2G2 style library) is built as a composite when present at `vendor/conveyance-h2g2`, with Conveyance at `vendor/conveyance-h2g2/vendor/Conveyance`. CI checks both out at pinned commit SHAs (`ref:` on each checkout in `.github/workflows/`); to build locally, clone them there at those SHAs (the JitPack fallback has no desktop variant). See "Bumping the vendor pins" below.
 - `docs/` — current product documentation and privacy policy
-- `docs/azphalt-packages/` — source for the Azphalt workflow/role packages packed by `tools/azp`
+- `docs/azphalt-packages/` — source for the Azphalt swarm/role packages packed by `tools/azp`
 - `docs/swarm-terrarium/` — terrarium node-creature design brief, character art and manifests
 - `memory_and_orchestration_layers.ipynb` — Colab/Kaggle notebook for training the memory-clerk specialist models
 - `branding/` — locked source brand and icon assets
@@ -71,7 +71,7 @@ Start with [`docs/README.md`](docs/README.md).
 - [Persistence](docs/architecture/PERSISTENCE.md)
 - [Distributed compute](docs/architecture/DISTRIBUTED_COMPUTE.md)
 - [Versioning and grouped releases](docs/VERSIONING.md)
-- [Workflow add-ons / Azphalt](docs/architecture/ADDONS.md)
+- [Swarm add-ons / Azphalt](docs/architecture/ADDONS.md)
 - [Live runtime acceptance](docs/architecture/LIVE_RUNTIME_ACCEPTANCE.md)
 - [Prompt caching](docs/architecture/PROMPT_CACHING.md)
 - [Remote API (Android)](docs/Remote-API.md)

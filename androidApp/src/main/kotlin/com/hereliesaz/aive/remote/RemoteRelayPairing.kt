@@ -78,7 +78,9 @@ internal class RemoteRelayPairing(
         fun fromStorage(stored: String): RemoteRelayPairing? = runCatching {
             val json = Json.parseToJsonElement(stored).jsonObject
             RemoteRelayPairing(
-                relay = json.text("relay"),
+                // A stored or imported relay is checked every time it is read, so none that fails
+                // the relay rule (https, bare origin) is ever dialled.
+                relay = normalizeRelayUrl(json.text("relay")),
                 room = json.text("room"),
                 hostToken = json.text("hostToken"),
                 clientToken = json.text("clientToken"),

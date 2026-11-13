@@ -22,6 +22,8 @@ data class LiveWorkflowPresentation(
     val definition: WorkflowDefinition,
     val run: WorkflowRun,
     val roles: Collection<RoleDefinition>,
+    /** What the queen says about this run in Messages: derived on every publish, never stored. */
+    val queen: List<com.hereliesaz.geministrator.queen.QueenNote> = emptyList(),
 )
 
 internal data class WorkflowMindMapProjection(

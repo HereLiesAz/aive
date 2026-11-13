@@ -219,9 +219,3 @@ private fun waitingOnSteps(
         subject = name,
     )
 }
-
-/**
- * Whether the creature's bottom sheet may open on a phone: in Live and Build, not in Flowchart, where a card's
- * own detail panel answers the tap. [flowchart] is the Flowchart view being on screen.
- */
-internal fun creatureSheetAllowed(flowchart: Boolean): Boolean = !flowchart

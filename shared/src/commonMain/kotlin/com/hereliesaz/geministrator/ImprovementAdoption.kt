@@ -117,7 +117,7 @@ internal class ImprovementAdoption(
             }
             is ImprovementApplier.Plan.HiveStepObjective -> {
                 val hive = hives.first { it.id.value == plan.hiveId }
-                val library = host ?: return@withLock AdoptionResult.Cannot("No hive library is available.")
+                val library = host ?: return@withLock AdoptionResult.Cannot("No swarm library is available.")
                 // The loop is held to its own rules: a change that would make it hold something up, change something or
                 // stop examining itself is refused, with the reasons, before anything is saved.
                 ImprovementApplier.loopViolations(hive, plan, roles).takeIf { it.isNotEmpty() }?.let { return@withLock AdoptionResult.BreaksLoop(it) }
