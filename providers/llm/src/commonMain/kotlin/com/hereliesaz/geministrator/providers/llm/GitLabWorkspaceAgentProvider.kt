@@ -97,6 +97,7 @@ class GitLabWorkspaceAgentProvider(
     private companion object {
         const val MAX_TREE_PATHS = 700
         const val MAX_TREE_PAGES = 7
+        const val PRIORITY_TREE_PAGES = 2
         const val TREE_PAGE_SIZE = 100
         const val MAX_SELECTED_FILES = 24
         const val MAX_FILE_CHARS = 40_000
@@ -540,12 +541,46 @@ class GitLabWorkspaceAgentProvider(
         token: String,
         branch: String,
     ): List<String> {
+        val alphabetical = loadTreePages(apiBase, projectPath, token, branch, path = null, recursive = true, maxPages = MAX_TREE_PAGES)
+        // The recursive listing is alphabetical and cut at the page limit, so a large repository loses whole
+        // directories. The top level and shared/ are read on their own and listed first.
+        val topLevel = optionalTreePages(apiBase, projectPath, token, branch, path = null, recursive = false, maxPages = 1)
+        val shared = optionalTreePages(apiBase, projectPath, token, branch, path = "shared", recursive = true, maxPages = PRIORITY_TREE_PAGES)
+        return mergeTreePriority(listOf(topLevel, shared), alphabetical, MAX_TREE_PATHS)
+    }
+
+    private suspend fun optionalTreePages(
+        apiBase: String,
+        projectPath: String,
+        token: String,
+        branch: String,
+        path: String?,
+        recursive: Boolean,
+        maxPages: Int,
+    ): List<String> = try {
+        loadTreePages(apiBase, projectPath, token, branch, path, recursive, maxPages)
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        emptyList()
+    }
+
+    private suspend fun loadTreePages(
+        apiBase: String,
+        projectPath: String,
+        token: String,
+        branch: String,
+        path: String?,
+        recursive: Boolean,
+        maxPages: Int,
+    ): List<String> {
         val files = mutableListOf<String>()
-        for (page in 1..MAX_TREE_PAGES) {
+        for (page in 1..maxPages) {
             val body = httpClient.get("$apiBase/projects/$projectPath/repository/tree") {
                 gitLabHeaders(token)
                 parameter("ref", branch)
-                parameter("recursive", true)
+                parameter("recursive", recursive)
+                if (path != null) parameter("path", path)
                 parameter("per_page", TREE_PAGE_SIZE)
                 parameter("page", page)
             }.requireSuccessBody("read GitLab repository tree")
@@ -969,3 +1004,15 @@ private data class GitLabWorkspaceDiffResponse(
     @SerialName("new_path") val newPath: String,
     val diff: String,
 )
+
+/** [priority] lists first, in order, then [rest]; each path once, at most [max]. */
+internal fun mergeTreePriority(priority: List<List<String>>, rest: List<String>, max: Int): List<String> {
+    val seen = LinkedHashSet<String>()
+    for (group in priority + listOf(rest)) {
+        for (path in group) {
+            if (seen.size >= max) return seen.toList()
+            seen.add(path)
+        }
+    }
+    return seen.toList()
+}

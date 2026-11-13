@@ -393,7 +393,7 @@ Every platform runs `NestedWorkflow` nodes through `WorkflowRunNestedWorkflowCli
 - The Play build hides distributed compute as a store-policy choice; it is not a mitigation and per-node identity does not change it.
 - Envelopes are not end-to-end encrypted in transit through the relay, so the relay operator sees them while processing. Optional process-restart persistence encrypts lease files at rest with AES-256-GCM and opaque pool filenames, but the relay process itself necessarily holds plaintext while routing work.
 - A pool member can forge a run that claims its approval gate completed. Without signed approvals the worker cannot verify that, so remote workers run only read-only repository operations (`status`, `fetch`); a mutation placed on another device fails there and has to run on the origin device.
-- Transport security depends on the relay URL. `wss://` is suggested but not enforced, and the bundled server has no TLS of its own.
+- Transport security depends on the relay URL. The client refuses a relay URL that is not `wss://` or `https://` (plain `ws://` and `http://` only to this device's loopback address), and enrolment sends the pool token only over those; the bundled server has no TLS of its own, so it needs a TLS-terminating proxy in front.
 
 ### Attached spreadsheet and SQL surfaces (role surfaces)
 

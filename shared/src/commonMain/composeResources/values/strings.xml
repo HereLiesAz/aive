@@ -190,6 +190,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="mcp_script_sandbox_off">Off</string>
     <string name="mcp_script_sandbox_turn_on">Turn on</string>
     <string name="mcp_script_sandbox_turn_off">Turn off</string>
+    <string name="mcp_research">Queen's research</string>
+    <string name="mcp_research_detail">Before planning, the queen looks at what is already connected here and in your linked repository's docs, and may ask you one question about looking further. Turn it off to plan without it.</string>
     <string name="mcp_elicit_title">%1$s asks you for input</string>
     <string name="mcp_elicit_form_lead">The MCP server %1$s (%2$s) asks you, while running %3$s. These are the server's words, not The Aive's:</string>
     <string name="mcp_elicit_no_secrets">Never type passwords, API keys or other secrets here. What you send goes to this server.</string>

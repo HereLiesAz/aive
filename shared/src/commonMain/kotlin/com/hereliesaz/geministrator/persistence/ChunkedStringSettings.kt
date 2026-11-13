@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.persistence
 
+import com.hereliesaz.geministrator.withPlatformLock
 import com.russhwolf.settings.Settings
 
 /**
@@ -25,7 +26,11 @@ internal class ChunkedStringSettings(
         require(chunkSize > 0) { "chunkSize must be positive" }
     }
 
-    override fun putString(key: String, value: String) {
+    // Writers and readers of one delegate take turns, so two writers cannot pick the same generation or delete
+    // each other's chunks, and a reader never sees a manifest whose chunks are being retired.
+    override fun putString(key: String, value: String) = withPlatformLock(delegate) { putLocked(key, value) }
+
+    private fun putLocked(key: String, value: String) {
         if (!chunks(key)) {
             delegate.putString(key, value)
             return
@@ -60,7 +65,9 @@ internal class ChunkedStringSettings(
     override fun getString(key: String, defaultValue: String): String =
         getStringOrNull(key) ?: defaultValue
 
-    override fun getStringOrNull(key: String): String? {
+    override fun getStringOrNull(key: String): String? = withPlatformLock(delegate) { readLocked(key) }
+
+    private fun readLocked(key: String): String? {
         if (!chunks(key)) return delegate.getStringOrNull(key)
 
         val manifest = readManifest(key) ?: return delegate.getStringOrNull(key)
@@ -75,7 +82,9 @@ internal class ChunkedStringSettings(
         }
     }
 
-    override fun remove(key: String) {
+    override fun remove(key: String) = withPlatformLock(delegate) { removeLocked(key) }
+
+    private fun removeLocked(key: String) {
         if (!chunks(key)) {
             delegate.remove(key)
             return

@@ -17,6 +17,8 @@ data class McpToolOffer(
     val serverId: String,
     val serverName: String,
     val toolName: String,
+    /** The tool says, or its name suggests, it destroys data: each call asks, even once the server is allowed for the run. */
+    val destructive: Boolean = false,
 )
 
 /**
@@ -164,6 +166,7 @@ class McpHost(
                     serverId = server.id,
                     serverName = server.name,
                     toolName = tool.name,
+                    destructive = mcpLooksDestructive(tool.name, tool.annotations),
                 )
             }
         }
@@ -228,14 +231,14 @@ class McpHost(
 
         private suspend fun allowed(server: McpServerConfig, offer: McpToolOffer, arguments: JsonObject): Boolean {
             if (server.alwaysAllowed) return true
-            if (mutex.withLock { runConsents[runKey]?.contains(server.id) == true }) return true
+            if (!offer.destructive && mutex.withLock { runConsents[runKey]?.contains(server.id) == true }) return true
             val decision = consent.decide(
                 McpConsentRequest(
                     serverId = server.id,
                     serverName = server.name,
                     serverLocation = server.location,
                     toolName = offer.toolName,
-                    argumentsPreview = arguments.toString().take(MAX_PREVIEW_CHARS),
+                    argumentsPreview = mcpArgumentsPreview(arguments, MAX_PREVIEW_CHARS),
                     runKey = runKey,
                 ),
             )
@@ -244,6 +247,8 @@ class McpHost(
                 McpConsentDecision.AllowAlways -> setAlwaysAllowed(server.id, true)
                 McpConsentDecision.AllowForRun -> Unit
             }
+            // A destructive-looking call is approved alone: nothing is remembered for the run.
+            if (offer.destructive) return true
             mutex.withLock {
                 runConsents.getOrPut(runKey) { mutableSetOf() } += server.id
                 while (runConsents.size > MAX_REMEMBERED_RUNS) runConsents.remove(runConsents.keys.first())
