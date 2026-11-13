@@ -51,6 +51,9 @@ data class OrchestrationPacket(
 interface OrchestrationAgentRuntime {
     suspend fun plan(packet: OrchestrationPacket): OrchestrationPlan
     suspend fun repair(packet: OrchestrationPacket): OrchestrationPlan
+
+    /** The Source that answered the last call, when this runtime knows it (the reviewer prefers another); null otherwise. */
+    val lastSourceId: String? get() = null
 }
 
 object NoOrchestrationAgentRuntime : OrchestrationAgentRuntime {

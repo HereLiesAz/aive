@@ -1,5 +1,8 @@
 package com.hereliesaz.geministrator.queen
 
+import com.hereliesaz.geministrator.domain.TaskRunStatus
+import com.hereliesaz.geministrator.domain.WorkflowRun
+import com.hereliesaz.geministrator.providers.ModelPriceTable
 import com.hereliesaz.geministrator.workflow.HourlySpend
 import com.hereliesaz.geministrator.workflow.SpendCaps
 
@@ -144,4 +147,42 @@ fun reviewerSourceOrder(plannerSource: String?, reviewerPin: String?, linked: Li
     if (reviewerPin != null) return listOf(reviewerPin)
     val others = linked.filter { it != plannerSource }
     return if (plannerSource != null && plannerSource in linked) others + plannerSource else others
+}
+
+// --- The real price of a call, and whether a creature waits for room. Kept apart, appended. ---
+
+/** One Source a call may be sent to: its id, its model, and whether its usage is billed per token (a keyless endpoint is not). */
+data class ModelUse(val sourceId: String, val modelId: String?, val billsPerToken: Boolean)
+
+/** The price status of the Sources a call may try, and the dearest estimate among them (null unless Priced). */
+data class PriceRead(val status: PriceStatus, val estimateUsd: Double?)
+
+/**
+ * What a call costs, read from the price table (pure; fail closed). Free only when no Source it may try bills per token;
+ * Unknown when there is none listed, or when any Source that bills has no price (never free); otherwise Priced, with the
+ * dearest estimate among the Sources for [inputTokens] in and [outputTokens] out, since the call may move to any of them.
+ */
+fun priceRead(uses: List<ModelUse>, table: ModelPriceTable, inputTokens: Long, outputTokens: Long): PriceRead {
+    if (uses.isEmpty()) return PriceRead(PriceStatus.Unknown, null)
+    var dearest = 0.0
+    var billed = false
+    for (use in uses) {
+        if (!use.billsPerToken) continue
+        val price = table.priceFor(use.sourceId, use.modelId) ?: return PriceRead(PriceStatus.Unknown, null)
+        billed = true
+        dearest = maxOf(dearest, price.costUsd(inputTokens, outputTokens))
+    }
+    return if (billed) PriceRead(PriceStatus.Priced, dearest) else PriceRead(PriceStatus.Free, 0.0)
+}
+
+/**
+ * Whether a creature of [run] is waiting for room on a Source: some step is ready (or being retried) to start, and either
+ * it has no Source yet or its Source is one of [noRoom], the keyless Sources at their stated request limit now.
+ */
+fun creatureWaitingForRoom(run: WorkflowRun, noRoom: Set<String>): Boolean {
+    if (noRoom.isEmpty()) return false
+    return run.taskRuns.values.any { task ->
+        val provider = task.assignedProviderId
+        (task.status == TaskRunStatus.Ready || task.status == TaskRunStatus.Retrying) && (provider == null || provider.value in noRoom)
+    }
 }

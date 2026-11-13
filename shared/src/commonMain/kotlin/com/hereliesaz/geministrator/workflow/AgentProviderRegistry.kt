@@ -158,6 +158,11 @@ class AgentProviderRegistry(
 
     fun provider(id: AgentProviderId): AgentProvider? = providersById[id]
 
+    /** The linked keyless Sources that have no room under their stated request limit now (the queen's calls yield to a creature waiting for one). */
+    suspend fun keylessWithoutRoom(): Set<String> = healthMutex.withLock {
+        providersById.values.filter { it.keyless && !keylessPacer.hasRoom(it.id.value) }.mapTo(mutableSetOf()) { it.id.value }
+    }
+
     /** The Sources the queen's planner and reviewer could be answered by: those [select] may choose on its own. */
     fun linkedSourceIds(): List<String> =
         providersById.values.filterNot { it.explicitOnly || it is OnDeviceTextAgentProvider }.map { it.id.value }

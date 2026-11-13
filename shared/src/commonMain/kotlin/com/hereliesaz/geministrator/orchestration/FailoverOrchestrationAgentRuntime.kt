@@ -25,6 +25,9 @@ class FailoverOrchestrationAgentRuntime(
     private val bench: ProviderBench = ProviderBench(),
 ) : OrchestrationAgentRuntime {
     private val lock = Mutex()
+    private var answeredBy: String? = null
+
+    override val lastSourceId: String? get() = answeredBy
 
     override suspend fun plan(packet: OrchestrationPacket): OrchestrationPlan = attempt { it.plan(packet) }
 
@@ -32,7 +35,8 @@ class FailoverOrchestrationAgentRuntime(
 
     private suspend fun attempt(call: suspend (OrchestrationAgentRuntime) -> OrchestrationPlan): OrchestrationPlan {
         if (candidates.size <= 1) {
-            return call((candidates.firstOrNull() ?: error("No planner available: link an LLM")).runtime)
+            val only = candidates.firstOrNull() ?: error("No planner available: link an LLM")
+            return call(only.runtime).also { answeredBy = only.providerId }
         }
         val tried = mutableSetOf<String>()
         val failures = mutableListOf<ProviderFailure>()
@@ -44,6 +48,7 @@ class FailoverOrchestrationAgentRuntime(
             try {
                 val plan = call(next.runtime)
                 lock.withLock { bench.clear(next.providerId) }
+                answeredBy = next.providerId
                 failures.lastOrNull()?.let { announce(it, next.displayName) }
                 return plan
             } catch (cancelled: CancellationException) {

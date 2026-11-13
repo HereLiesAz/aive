@@ -3,6 +3,7 @@ package com.hereliesaz.geministrator.orchestration
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.RoleAuthority
 import com.hereliesaz.geministrator.domain.RoleDefinition
+import kotlinx.serialization.Serializable
 
 /*
  * The requirements checklist: what the keeper wrote or set, as statements a plan can be checked against. Whatever code can
@@ -123,6 +124,7 @@ object Requirements {
 enum class PlanSuggestionKind { AddCheck, SplitStep, ReorderSteps, AddApproval, SwapSource, ConnectSource, RaiseAllowance, Narrow, Other }
 
 /** One idea beyond the requirements: plain text only, bounded. */
+@Serializable
 data class PlanSuggestion(val kind: PlanSuggestionKind, val text: String, val why: String, val stepId: String?)
 
 /** The reviewer's reply lines. Malformed lines are counted, never shifted. */

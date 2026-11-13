@@ -19,6 +19,9 @@ sealed interface DisputeOutcome {
 /** The queen's model: takes a prompt, returns text. It throws when it cannot be reached; callers then use the rules. */
 fun interface QueenModel {
     suspend fun answer(prompt: String): String
+
+    /** The Sources a call may go to, for the price check before it is made; empty when it does not say (a dollar cap then treats it as unpriced). */
+    val uses: List<ModelUse> get() = emptyList()
 }
 
 private const val MAX_REASON_CHARS = 400

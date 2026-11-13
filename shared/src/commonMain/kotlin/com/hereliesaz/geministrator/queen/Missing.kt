@@ -1,10 +1,15 @@
 package com.hereliesaz.geministrator.queen
 
 /** What the queen found missing. A closed set: the keeper's words for each live in string resources, never in run text. */
-enum class MissingKind { NoSource, NoPlanner, NoReviewer, PairBroken, SameSource }
+enum class MissingKind {
+    NoSource, NoPlanner, NoReviewer, PairBroken, SameSource,
+
+    // The reviewer was not asked (see missingForSkippedReviewer): its model has no price under a dollar cap, the hourly cap has no room, the Source has no room, or no second Source.
+    ReviewerSkippedNoPrice, ReviewerSkippedOverCap, ReviewerSkippedNoRoom, ReviewerSkippedNoSecondSource,
+}
 
 /** Where the keeper goes to get it: an existing place, never a new one. */
-enum class MissingFix { ConnectSource, EnableRole, EditRole }
+enum class MissingFix { ConnectSource, EnableRole, EditRole, RaiseCap }
 
 /** One missing thing. [detail] is a role name or a short rule, never model text. */
 data class Missing(val kind: MissingKind, val detail: String?, val fix: MissingFix)
@@ -39,14 +44,21 @@ internal fun missingNotes(runId: String, missing: List<Missing>, level: QueenLev
                 MissingKind.NoReviewer -> QueenVoice.MissingNoReviewer
                 MissingKind.PairBroken -> QueenVoice.MissingPairBroken
                 MissingKind.SameSource -> QueenVoice.MissingSameSource
+                MissingKind.ReviewerSkippedNoPrice -> QueenVoice.MissingReviewerNoPrice
+                MissingKind.ReviewerSkippedOverCap -> QueenVoice.MissingReviewerOverCap
+                MissingKind.ReviewerSkippedNoRoom -> QueenVoice.MissingReviewerNoRoom
+                MissingKind.ReviewerSkippedNoSecondSource -> QueenVoice.MissingReviewerNoSecondSource
             }
             val args = when (thing.kind) {
                 MissingKind.NoPlanner, MissingKind.NoReviewer, MissingKind.PairBroken -> listOf(queenSlot(thing.detail.orEmpty(), 80))
-                MissingKind.NoSource, MissingKind.SameSource -> emptyList()
+                MissingKind.NoSource, MissingKind.SameSource, MissingKind.ReviewerSkippedNoPrice, MissingKind.ReviewerSkippedOverCap,
+                MissingKind.ReviewerSkippedNoRoom, MissingKind.ReviewerSkippedNoSecondSource,
+                -> emptyList()
             }
             val link = when (thing.fix) {
                 MissingFix.ConnectSource -> QueenLink.Connections
                 MissingFix.EnableRole, MissingFix.EditRole -> QueenLink.Roster
+                MissingFix.RaiseCap -> QueenLink.Limits
             }
             QueenNote(queenNoteId(runId, "missing", thing.kind.name, thing.detail.orEmpty()), voice, args, link)
         }
