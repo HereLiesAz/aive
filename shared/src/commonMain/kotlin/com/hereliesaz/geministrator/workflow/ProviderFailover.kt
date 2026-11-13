@@ -50,7 +50,8 @@ object ProviderFailover {
         ErrorKind.ServerError,
         ErrorKind.OutputTooLong,
         -> true
-        ErrorKind.NoAgent, ErrorKind.Other -> false
+        // A malformed request fails the same way on every provider, exactly as Other did before it was told apart.
+        ErrorKind.NoAgent, ErrorKind.BadRequest, ErrorKind.Other -> false
     }
 
     fun shouldFailOver(raw: String?): Boolean = shouldFailOver(classifyError(raw))
@@ -65,7 +66,7 @@ object ProviderFailover {
         ErrorKind.ServerError -> 2 * MINUTE
         ErrorKind.RateLimited, ErrorKind.TimedOut, ErrorKind.Offline -> MINUTE
         // The provider is healthy; this prompt was just too big for its window. No benching.
-        ErrorKind.NoAgent, ErrorKind.OutputTooLong, ErrorKind.Other -> 0L
+        ErrorKind.NoAgent, ErrorKind.OutputTooLong, ErrorKind.BadRequest, ErrorKind.Other -> 0L
     }
 
     private const val MINUTE = 60_000L
@@ -83,6 +84,7 @@ object ProviderFailover {
         ErrorKind.ServerError -> "is having trouble"
         ErrorKind.NoAgent -> "cannot do this work"
         ErrorKind.OutputTooLong -> "ran out of room for its answer"
+        ErrorKind.BadRequest -> "did not accept the request"
         ErrorKind.Other -> "failed"
     }
 
@@ -94,7 +96,7 @@ object ProviderFailover {
         ErrorKind.Offline -> "Check your internet connection."
         ErrorKind.TimedOut, ErrorKind.ServerError -> "Try again in a moment."
         ErrorKind.OutputTooLong -> "Try a shorter description, or a provider with a larger limit."
-        ErrorKind.NoAgent, ErrorKind.Other -> "Check it in Settings."
+        ErrorKind.NoAgent, ErrorKind.BadRequest, ErrorKind.Other -> "Check it in Settings."
     }
 
     /** The plain note shown when work moved on: not an error. */

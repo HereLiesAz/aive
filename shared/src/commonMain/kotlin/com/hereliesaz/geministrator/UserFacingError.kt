@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.error_bad_request
 import com.hereliesaz.geministrator.resources.error_details_hide
 import com.hereliesaz.geministrator.resources.error_details_label
 import com.hereliesaz.geministrator.resources.error_details_show
@@ -28,11 +29,12 @@ import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 
 /** Coarse cause of a raw failure message, enough to tell the user what to do next. */
-enum class ErrorKind { KeyRejected, OutOfCredit, RateLimited, Offline, TimedOut, ServerError, NoAgent, OutputTooLong, Other }
+enum class ErrorKind { KeyRejected, OutOfCredit, RateLimited, Offline, TimedOut, ServerError, NoAgent, OutputTooLong, BadRequest, Other }
 
 private val unauthorizedCode = Regex("""(^|[^0-9])40[13]([^0-9]|$)""")
 private val paymentRequiredCode = Regex("""(^|[^0-9])402([^0-9]|$)""")
 private val rateLimitCode = Regex("""(^|[^0-9])429([^0-9]|$)""")
+private val badRequestCode = Regex("""(^|[^0-9])400([^0-9]|$)""")
 private val serverErrorCode = Regex("""(^|[^0-9])(500|502|503|504|529)([^0-9]|$)""")
 
 /** Pure classifier from a raw exception or HTTP error message to an [ErrorKind]. */
@@ -68,6 +70,10 @@ fun classifyError(raw: String?): ErrorKind {
             "internal server error" in text || "bad gateway" in text || "service unavailable" in text ||
             "overloaded" in text || "server error" in text -> ErrorKind.ServerError
 
+        // A request the provider refused as malformed: its wording says which field, the keeper cannot fix that.
+        badRequestCode.containsMatchIn(text) || "invalid_request" in text || "missing required parameter" in text ||
+            "bad request" in text -> ErrorKind.BadRequest
+
         "timeout" in text || "timed out" in text || "deadline exceeded" in text -> ErrorKind.TimedOut
 
         "unable to resolve host" in text || "unknownhost" in text || "unknown host" in text ||
@@ -88,6 +94,7 @@ internal fun ErrorKind.messageResource(): StringResource = when (this) {
     ErrorKind.ServerError -> Res.string.error_server_error
     ErrorKind.NoAgent -> Res.string.error_no_agent
     ErrorKind.OutputTooLong -> Res.string.error_output_too_long
+    ErrorKind.BadRequest -> Res.string.error_bad_request
     ErrorKind.Other -> Res.string.error_other
 }
 

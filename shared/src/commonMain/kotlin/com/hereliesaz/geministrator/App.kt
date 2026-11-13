@@ -2,6 +2,10 @@ package com.hereliesaz.geministrator
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -180,6 +184,9 @@ fun App(
     // Why the last launch did not start. It stays beside Feed it with what was typed, rather than
     // replacing the screen with a runtime failure (Conveyance: one element carries an act to its end).
     var launchError by remember { mutableStateOf<String?>(null) }
+    // A press (Approve, Stop, Pause...) that did not go through. It is said once, on the screen, and dismissed:
+    // it never replaces the hive's own state, which a failed button press says nothing about.
+    var actionFailure by remember { mutableStateOf<ActionFailure?>(null) }
     val providerReach by produceState(ProviderReach.Unknown, providers) { value = providerReach(providers) }
     val launchSteps = remember { LiveStepsFeedModel(maxRows = 5) }
     val launchStepRows by launchSteps.rows.collectAsState()
@@ -763,7 +770,7 @@ fun App(
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
-                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_approval_failed))
+                                    actionFailure = actionFailureOf(getString(Res.string.app_approval_failed), failure)
                                 }
                             }
                         },
@@ -774,7 +781,7 @@ fun App(
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
-                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_plan_rejection_failed))
+                                    actionFailure = actionFailureOf(getString(Res.string.app_plan_rejection_failed), failure)
                                 }
                             }
                         },
@@ -785,7 +792,7 @@ fun App(
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
-                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_lift_spend_stop_failed))
+                                    actionFailure = actionFailureOf(getString(Res.string.app_lift_spend_stop_failed), failure)
                                 }
                             }
                         },
@@ -796,7 +803,7 @@ fun App(
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
-                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_pause_run_failed))
+                                    actionFailure = actionFailureOf(getString(Res.string.app_pause_run_failed), failure)
                                 }
                             }
                         },
@@ -807,7 +814,7 @@ fun App(
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
-                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_stop_run_failed))
+                                    actionFailure = actionFailureOf(getString(Res.string.app_stop_run_failed), failure)
                                 }
                             }
                         },
@@ -834,7 +841,7 @@ fun App(
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
-                                    runtimeState = failure.toRuntimeFailureState(getString(Res.string.app_escalation_decision_failed))
+                                    actionFailure = actionFailureOf(getString(Res.string.app_escalation_decision_failed), failure)
                                 }
                             }
                         },
@@ -1119,6 +1126,15 @@ fun App(
                         onConnectFreeProvider = onConnectFreeProvider ?: onReconfigureProvider,
                         launchError = launchError,
                         onDismissLaunchError = { launchError = null },
+                    )
+                }
+                actionFailure?.let { failure ->
+                    FailureNotice(
+                        what = failure.what,
+                        raw = failure.raw,
+                        seed = "action",
+                        onDismiss = { actionFailure = null },
+                        modifier = Modifier.align(Alignment.TopCenter).padding(AzphaltSpacing.m).widthIn(max = 560.dp),
                     )
                 }
                 if (launching) {
