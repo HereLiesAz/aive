@@ -73,6 +73,7 @@ enum class QueenVoice(val relay: QueenRelay?) {
     DisputeTesting(QueenRelay.Dispute),
     DisputeStillUnsure(QueenRelay.Dispute),
     DisputeCannotInvestigate(QueenRelay.Dispute),
+    DisputeMovedSource(QueenRelay.Dispute),
 
     // --- Mid-run suggestions (queen/QueenSuggestions.kt). Kept together, after every other voice. ---
     SuggestRedoStep(QueenRelay.Watch),

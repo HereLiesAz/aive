@@ -73,6 +73,7 @@ private fun voiceResource(voice: QueenVoice): StringResource = when (voice) {
         QueenVoice.DisputeTesting -> Res.string.queen_say_dispute_testing
         QueenVoice.DisputeStillUnsure -> Res.string.queen_say_dispute_still_unsure
         QueenVoice.DisputeCannotInvestigate -> Res.string.queen_say_dispute_cannot_investigate
+        QueenVoice.DisputeMovedSource -> Res.string.queen_say_dispute_moved_source
         // Mid-run suggestions.
         QueenVoice.SuggestRedoStep -> Res.string.queen_say_suggest_redo_step
         QueenVoice.SuggestSwapSource -> Res.string.queen_say_suggest_swap_source

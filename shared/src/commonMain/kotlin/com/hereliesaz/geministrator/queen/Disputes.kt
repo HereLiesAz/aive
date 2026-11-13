@@ -298,8 +298,10 @@ internal fun approachOf(dispute: Dispute, outcome: DisputeOutcome): Approach? = 
 
 private suspend fun askWithin(model: QueenModel, prompt: String, timeoutMillis: Long, mayCall: () -> Boolean): String? {
     if (!mayCall()) return null
+    // Waiting for a Source's turn is her wait (bounded in QueenCallContext), not the answer's time: the answer keeps its own limit.
+    val turnWait = currentQueenCallContext()?.takeIf { it.paces }?.callBudgetMillis() ?: 0L
     return try {
-        kotlinx.coroutines.withTimeoutOrNull(timeoutMillis) { model.answer(prompt) }
+        kotlinx.coroutines.withTimeoutOrNull(timeoutMillis + turnWait) { model.answer(prompt) }
     } catch (cancelled: kotlinx.coroutines.CancellationException) {
         throw cancelled
     } catch (_: Throwable) {
@@ -441,3 +443,15 @@ internal fun disputeNotes(
         }
     }
 }
+
+/**
+ * The line in the Story that Automatic moved to another Source while settling a dispute on [runId]: which Source could not answer,
+ * which one she asked next, and why, with a way to the Story. Names and the reason are bounded text; the id is stable per move.
+ */
+internal fun sourceMovedNote(runId: String, from: String, to: String, why: String): QueenNote =
+    QueenNote(
+        id = queenNoteId(runId, "dispute", "moved", from, to),
+        voice = QueenVoice.DisputeMovedSource,
+        args = listOf(queenSlot(from), queenSlot(to), queenSlot(why)),
+        link = QueenLink.Story,
+    )

@@ -85,6 +85,9 @@ class AgentProviderRegistry(
 
     private val healthMutex = kotlinx.coroutines.sync.Mutex()
 
+    /** The pacer under the registry's own lock, for callers outside the registry (the queen's model calls) to keep the same Source limits. */
+    val sourcePacing: KeylessPacing = KeylessPacing(keylessPacer, healthMutex)
+
     /** How many Auto selections were spread so far; guarded by [healthMutex]. */
     private var autoRotation = 0
     private val health = HashMap<AgentProviderId, ProviderHealth>()
