@@ -48,7 +48,19 @@ Paths below are under `shared/src/commonMain/kotlin/com/hereliesaz/geministrator
 2. **No depth ladder.** Nothing makes injections go deeper as an agent dwells on a topic; novelty suppression does the opposite. And surfacing writes to stored memory (co-recall and access edges), which the model does not call for.
 3. **Recall renders as exact.** Verbatim text, scores and ids, and value-preserving condensation, where the model wants gist. Also: prompt-time recall is skipped when the query plan says no.
 
-## Minimal change plan (not done; no code changed)
+## Status: what is built
+
+Built after the audit above (the audit table and plan below describe the state before; nothing was compiled or run, CI verifies):
+
+| Item | State |
+|---|---|
+| A2 `/remindme` | Built: `MemoryRemindMeCommand`, `onRemindMe`, per-capture cursor, incremental end-of-session send, `MemorySessionEnvelope.sequence` for unique episode ids. Wired in the controller where the agent's messages are read. |
+| A (retire `/deliberate`) | Built for agents: parser deleted, protocol sentence and `⚖` template removed. The resolution reader (A3 to A5) is **not built**; `MemoryTool.deliberate` and the absorber remain as an unused typed seam because tests and the tool API still use them. |
+| B depth ladder | Built: `MemoryDwell` (session only), depth levels cloud and gist, key phrases, finer summaries, condensed sources; novelty keyed by memory and depth (`AttentionGatedRecall.select(depth)`, `fresh`); `recordCoRecall` and `recordAccess` removed (their edges are no longer written; `MemoryCoRecall` is kept for its own test). |
+| C gist | Built for injected recall (`MemoryGist.kt`). Stored condensation still restates values (open owner question). `divergenceLines` is no longer used by an injection. |
+| D1 prompt cloud outside the plan gate | Built (gateway always asks; the grip inside `recallForPrompt` is gated). D2 to D4 not built. |
+
+## Minimal change plan (original; see Status above for what is done)
 
 ### A. Replace `/deliberate` with absorbing a resolution from reasoning text
 
