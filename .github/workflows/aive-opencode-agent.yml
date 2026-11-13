@@ -22,6 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
+      AIVE_TASK: ${{ inputs.aive_task }}
+      GITHUB_TOKEN: ${{ github.token }}
       OPENCODE_VERSION: 1.18.32
     steps:
       # No stored credentials: the agent's shell must not be able to push. The runner pushes
@@ -49,11 +51,6 @@ jobs:
 
       - name: Run OpenCode
         shell: bash
-        # The write token exists only in this step: the npm install above runs third-party
-        # install scripts and must not see it.
-        env:
-          AIVE_TASK: ${{ inputs.aive_task }}
-          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           node <<'AIVE_NODE'
