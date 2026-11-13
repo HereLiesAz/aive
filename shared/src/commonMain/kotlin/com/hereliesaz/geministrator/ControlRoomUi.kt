@@ -332,10 +332,13 @@ fun ControlRoom(
                 latestDestinationSelected(ControlRoomDestination.Company)
             },
             openDelegations = {
-                keeperSectionName.value = KeeperSection.Delegations.name
-                keeperOpen.value = true
-                latestDestinationSelected(ControlRoomDestination.Settings)
+                openKeeperPartPlace(KeeperSection.Delegations, keeperSectionName, keeperOpen) { latestDestinationSelected(it) }
             },
+            openHive = { id -> openHivePlace(id, district, restingHive) { latestDestinationSelected(it) } },
+            openKeeperPart = { part ->
+                openKeeperPartPlace(part, keeperSectionName, keeperOpen) { latestDestinationSelected(it) }
+            },
+            openPlace = { place -> latestDestinationSelected(place) },
             openSwarmEditor = {
                 // The editor is on the hive: show it, the creature stays selected, its sheet set aside.
                 SwarmEditRequests.pending = true

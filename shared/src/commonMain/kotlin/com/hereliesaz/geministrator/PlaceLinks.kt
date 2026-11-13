@@ -67,6 +67,33 @@ internal fun openConnectionsPlace(
     onDestinationSelected(ControlRoomDestination.Settings)
 }
 
+/** The Keeper's room opened on one part (Schedules, Limits, Memory's neighbours...), not on whichever was left open. */
+internal fun openKeeperPartPlace(
+    section: KeeperSection,
+    keeperSectionName: MutableState<String>,
+    keeperOpen: MutableState<Boolean>,
+    onDestinationSelected: (ControlRoomDestination) -> Unit,
+) {
+    keeperSectionName.value = section.name
+    keeperOpen.value = true
+    onDestinationSelected(ControlRoomDestination.Settings)
+}
+
+/**
+ * The Hive place opened on one hive at rest (a schedule's hive, a role's hive): off the district, no resting hive
+ * but this one, back on the Hive destination.
+ */
+internal fun openHivePlace(
+    definitionId: String,
+    district: MutableState<Boolean>,
+    restingHive: MutableState<String>,
+    onDestinationSelected: (ControlRoomDestination) -> Unit,
+) {
+    district.value = false
+    restingHive.value = definitionId
+    onDestinationSelected(ControlRoomDestination.Overview)
+}
+
 /**
  * Links that any screen can follow without threading a callback through every parent (the nav map's "everything is a
  * link"). The ControlRoom provides them; a preview or test that provides none follows none, and its lines stay plain.
@@ -82,6 +109,12 @@ internal class PlaceLinks(
     val openDelegations: (() -> Unit)? = null,
     /** Opens the swarm editor (Edit view) of the hive on screen, the selected creature kept. */
     val openSwarmEditor: (() -> Unit)? = null,
+    /** Opens one hive on the Hive place, at rest unless it has a live run. */
+    val openHive: ((definitionId: String) -> Unit)? = null,
+    /** Opens the Keeper's room on one part. */
+    val openKeeperPart: ((KeeperSection) -> Unit)? = null,
+    /** Opens a whole place: the Roster, the Stable, the Store, Messages, the Swarm library. */
+    val openPlace: ((ControlRoomDestination) -> Unit)? = null,
 )
 
 internal val LocalPlaceLinks = staticCompositionLocalOf { PlaceLinks() }

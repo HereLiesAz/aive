@@ -51,4 +51,26 @@ class PlaceLinksTest {
         assertEquals(true, SwarmEditRequests.take())
         assertEquals(false, SwarmEditRequests.take())
     }
+
+    @Test
+    fun aKeeperPartLinkOpensThatPartInTheKeepersRoom() {
+        val section = mutableStateOf(KeeperSection.Connections.name)
+        val open = mutableStateOf(false)
+        val opened = mutableListOf<ControlRoomDestination>()
+        openKeeperPartPlace(KeeperSection.Schedules, section, open) { opened += it }
+        assertEquals(KeeperSection.Schedules.name, section.value)
+        assertEquals(true, open.value)
+        assertEquals(listOf(ControlRoomDestination.Settings), opened)
+    }
+
+    @Test
+    fun aHiveLinkOpensThatHiveAtRestOffTheDistrict() {
+        val district = mutableStateOf(true)
+        val resting = mutableStateOf("")
+        val opened = mutableListOf<ControlRoomDestination>()
+        openHivePlace("nightly-audit", district, resting) { opened += it }
+        assertEquals(false, district.value)
+        assertEquals("nightly-audit", resting.value)
+        assertEquals(listOf(ControlRoomDestination.Overview), opened)
+    }
 }

@@ -318,8 +318,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inbox_kind_budget">Budget spent</string>
     <string name="inbox_artifact_waiting">Artifact waiting</string>
     <string name="inbox_action_answer">Answer it</string>
-    <string name="inbox_question_where">Its agent asked you a question. Answer it on this creature’s Needs, in the hive.</string>
-    <string name="inbox_budget_where">Raise it on this creature’s Mind, in the hive.</string>
+    <string name="inbox_open_creature">Open this creature</string>
+    <string name="inbox_question_where">Its agent asked you a question. Answer it on this creature’s Needs.</string>
+    <string name="inbox_budget_where">Raise it on this creature’s role, in the Roster.</string>
 
     <string name="inspector_excluded_by_redaction_policy">, %1$s excluded by redaction policy</string>
     <string name="inspector_any_capable_provider">any capable source</string>
@@ -554,7 +555,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="schedule_add_film">Add the short-film swarm (desktop)</string>
     <string name="schedule_film_added">Added the short-film swarm to your swarms. It needs the desktop app, an OpenAI connection and ffmpeg, and it is never scheduled.</string>
     <string name="schedule_film_present">The short-film swarm is already on this device.</string>
-    <string name="schedule_none">No schedules yet. Add the coding suite for six that report while the app is open, or set one up from any swarm.</string>
+    <string name="schedule_open_hive">Open its hive</string>
+    <string name="schedule_none">No schedules yet. Add the coding suite for six that report while the app is open.</string>
     <string name="schedule_on">On</string>
     <string name="schedule_off">Off</string>
     <string name="schedule_run_now">Run now</string>

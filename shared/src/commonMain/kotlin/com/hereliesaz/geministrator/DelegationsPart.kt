@@ -66,6 +66,7 @@ internal fun DelegationsPart(store: ProgressiveDelegationStore, compact: Boolean
     val state by store.state.collectAsState()
     val delegations = state.delegations
     val openSource = LocalPlaceLinks.current.openSource
+    val openRole = LocalPlaceLinks.current.openRole
     if (delegations.isEmpty()) {
         Text(stringResource(Res.string.delegation_none, state.threshold), style = AzphaltType.body, color = azphaltOnSurface())
     }
@@ -80,6 +81,8 @@ internal fun DelegationsPart(store: ProgressiveDelegationStore, compact: Boolean
             status = null,
             connected = true,
             compact = compact,
+            // Its role opens its form in the Roster, where it is changed.
+            onNameClick = openRole?.let { open -> { open(record.key.roleId) } },
             // Its source is named in the detail: the line opens that source's own screen.
             onDetailClick = openSource?.let { open -> { open(record.key.providerId) } },
         ) {
