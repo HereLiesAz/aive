@@ -72,6 +72,7 @@ enum class QueenVoice(val relay: QueenRelay?) {
     DisputeResearching(QueenRelay.Dispute),
     DisputeTesting(QueenRelay.Dispute),
     DisputeStillUnsure(QueenRelay.Dispute),
+    DisputeCannotInvestigate(QueenRelay.Dispute),
 }
 
 /** Where a note leads: an existing place, never a new one. */

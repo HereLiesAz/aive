@@ -169,6 +169,16 @@ class ApplicationRuntime private constructor(
         while (queenMissing.size > 32) queenMissing.remove(queenMissing.keys.first())
     }
 
+    /** What she says about disputes she could not settle herself, per run (memory only; derived into Messages at each publish). */
+    private val queenDisputes = LinkedHashMap<String, List<com.hereliesaz.geministrator.queen.QueenNote>>()
+
+    internal fun rememberDisputeNotes(runId: String, notes: List<com.hereliesaz.geministrator.queen.QueenNote>) {
+        if (notes.isEmpty()) return
+        val known = queenDisputes[runId].orEmpty()
+        queenDisputes[runId] = (known + notes).distinctBy { it.id }.takeLast(8)
+        while (queenDisputes.size > 32) queenDisputes.remove(queenDisputes.keys.first())
+    }
+
     private data class Current(
         val project: Project,
         val definition: WorkflowDefinition,
@@ -936,7 +946,7 @@ class ApplicationRuntime private constructor(
     private fun queenNotesFor(definition: WorkflowDefinition, run: WorkflowRun): List<com.hereliesaz.geministrator.queen.QueenNote> =
         try {
             val review = queenReview?.takeIf { it.runId == run.id.value }?.state
-            com.hereliesaz.geministrator.queen.queenUpdate(definition, run, roles, queenLevel(), review, researchRecords[run.id.value], queenMissing[run.id.value].orEmpty())
+            com.hereliesaz.geministrator.queen.queenUpdate(definition, run, roles, queenLevel(), review, researchRecords[run.id.value], queenMissing[run.id.value].orEmpty(), queenDisputes[run.id.value].orEmpty())
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (_: Exception) {

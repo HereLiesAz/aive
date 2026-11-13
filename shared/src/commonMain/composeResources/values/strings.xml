@@ -2014,6 +2014,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_say_dispute_researching">Two creatures, %1$s and %2$s, disagree, and no fact I hold settles it. Both agreed that I look into it, so a small swarm is researching. You can open it and stop it.</string>
     <string name="queen_say_dispute_testing">Two creatures, %1$s and %2$s, disagree, and no fact I hold settles it. Both agreed that I try the options, so a small swarm is testing them. You can open it and stop it.</string>
     <string name="queen_say_dispute_still_unsure">Two creatures, %1$s and %2$s, disagree, and even after looking into it I am not sure. I have not acted. It is yours to decide.</string>
+    <string name="queen_say_dispute_cannot_investigate">Two creatures, %1$s and %2$s, disagree, and no fact I hold settles it. Both agreed that I look into it, but I cannot set that up from here yet. I have not acted. It is yours to decide.</string>
     <string name="queen_link_story">See what happened</string>
     <string name="queen_link_creature">Open that step</string>
     <string name="queen_link_message">Show me</string>

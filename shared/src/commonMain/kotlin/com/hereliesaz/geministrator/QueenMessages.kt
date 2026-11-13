@@ -70,6 +70,7 @@ private fun voiceResource(voice: QueenVoice): StringResource = when (voice) {
         QueenVoice.DisputeResearching -> Res.string.queen_say_dispute_researching
         QueenVoice.DisputeTesting -> Res.string.queen_say_dispute_testing
         QueenVoice.DisputeStillUnsure -> Res.string.queen_say_dispute_still_unsure
+        QueenVoice.DisputeCannotInvestigate -> Res.string.queen_say_dispute_cannot_investigate
 }
 
 @Composable
