@@ -20,7 +20,7 @@
 
     <!-- In-app update prompt (AndroidUpdateUi) -->
     <string name="update_github_title">The Aive %1$s is available</string>
-    <string name="update_github_body">This copy was installed outside Google Play, so the update comes from GitHub. Open the release page, download the APK, then tap it to install; Android may ask you to allow installs from your browser. Installing over this copy keeps your projects, settings, credentials, roles, and workflows.</string>
+    <string name="update_github_body">This copy was installed outside Google Play, so the update comes from GitHub. Open the release page, download the APK, then tap it to install; Android may ask you to allow installs from your browser. Installing over this copy keeps your projects, settings, credentials, roles, and swarms.</string>
     <string name="update_open_github">Open GitHub release</string>
     <string name="update_later">Later</string>
     <string name="update_play_title">An update for The Aive is available</string>

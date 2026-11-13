@@ -195,7 +195,7 @@ private suspend fun ApplicationRuntime.startPlannedWorkflow(inputs: PlanInputs, 
         updatedAtEpochMillis = now,
     )
     reportLaunchProgress("Planner returned ${plan.steps.size} step${if (plan.steps.size == 1) "" else "s"}")
-    reportLaunchProgress("Assembling workflow…")
+    reportLaunchProgress("Assembling the swarm…")
     val definition = if (inputs.design != null) {
         // The saved design stays as drawn: the run is of the planned hive, under a new id.
         plannedHiveDefinition(
@@ -293,7 +293,7 @@ private suspend fun ApplicationRuntime.planAndDecide(
     confirmPlan: (suspend (PlanDecision) -> Boolean)?,
     planStore: ReviewedPlanStore?,
 ): OrchestrationPlan? {
-    reportLaunchProgress("Asking the planner for a workflow (${inputs.plannerRoles.size} roles available)…")
+    reportLaunchProgress("Asking the planner for a swarm (${inputs.plannerRoles.size} roles available)…")
     // Only a launch that will be reviewed has a planning field: the planner's egg, the reviewer who hatches from it.
     review?.let { (_, role) -> reportPlanningStage(planningStage(inputs, PlanningPhase.Planning, null, 0, role)) }
     val firstPlan = orchestrationRuntime.plan(inputs.packet)
@@ -446,8 +446,8 @@ suspend fun ApplicationRuntime.resumePendingPlanLaunch(
     val inputs = try {
         val saved = pending.savedDefinitionId?.let { id ->
             // A hive in the library is read again, so an edit to it is seen; one a package brought is not saved, so the plan's own copy is used.
-            val definition = persistence.definitions.get(WorkflowDefinitionId(id)) ?: pending.design ?: error("The saved hive is gone")
-            definition to (savedHiveRoughDesign(definition) ?: error("The saved hive is no longer a rough design"))
+            val definition = persistence.definitions.get(WorkflowDefinitionId(id)) ?: pending.design ?: error("The saved swarm is gone")
+            definition to (savedHiveRoughDesign(definition) ?: error("The saved swarm is no longer a rough design"))
         }
         planInputs(
             projectName = pending.projectName,

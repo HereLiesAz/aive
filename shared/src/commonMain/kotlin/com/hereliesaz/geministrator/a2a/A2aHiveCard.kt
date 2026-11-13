@@ -88,7 +88,7 @@ object A2aHiveCard {
             )
         }
         val knownIds = creatures.mapTo(HashSet()) { it.id }
-        val name = a2aOneLine(definition.name, MAX_NAME_CHARS).ifBlank { "Hive" }
+        val name = a2aOneLine(definition.name, MAX_NAME_CHARS).ifBlank { "Swarm" }
         val params = buildJsonObject {
             put("format", FORMAT)
             put("version", VERSION)
@@ -403,7 +403,7 @@ data class HiveCardImportContext(
     val connectedProviderIds: Set<String>,
     val roles: Collection<RoleDefinition>,
     val existingHiveIds: Set<String>,
-    val defaultName: String = "Imported hive",
+    val defaultName: String = "Imported swarm",
 )
 
 sealed interface HiveCardExport {
