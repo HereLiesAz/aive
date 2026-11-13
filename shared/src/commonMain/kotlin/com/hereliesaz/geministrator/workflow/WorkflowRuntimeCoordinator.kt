@@ -92,6 +92,11 @@ class WorkflowRuntimeCoordinator(
      * default gives none, so a coordinator built without it times nothing.
      */
     private val deadlineAllowance: (TaskDefinition, TaskRun) -> Allowance = { _, _ -> Allowance.None },
+    /**
+     * Told how long an ended attempt actually worked (active milliseconds: a step that finished, or one stopped at
+     * its stop point), so the queen's Auto allowance can learn from it ([DeadlineHistory]). Does nothing by default.
+     */
+    private val deadlineSample: (TaskDefinition, TaskRun, Long) -> Unit = { _, _, _ -> },
     /** Whether a creature past its hard point is stopped ([HARD_DEADLINES_ENABLED]); tests set it. */
     private val enforceDeadlines: Boolean = HARD_DEADLINES_ENABLED,
 ) {
@@ -316,6 +321,7 @@ class WorkflowRuntimeCoordinator(
         if (hardStopped.isNotEmpty()) {
             nextRun = stopForDeadlines(project, definition, beforeDeadlines, nextRun, state.handles, hardStopped, nowEpochMillis)
         }
+        recordDeadlineSamples(definition, state.run, deadlines.run, hardStopped, nowEpochMillis)
         persistArtifacts(nextRun)
 
         val newlyFailedTaskIds = nextRun.taskRuns
@@ -820,6 +826,37 @@ class WorkflowRuntimeCoordinator(
             seen[taskId] = at
         }
         return seen
+    }
+
+    /**
+     * Tells [deadlineSample] how long each attempt that ended this cycle actually worked: a step that finished
+     * (the clock it had while working, read at [now]) and a step that was stopped at its stop point (the active
+     * time the stop recorded). Steps still working, and steps with no clock for their attempt, add nothing.
+     */
+    private fun recordDeadlineSamples(
+        definition: WorkflowDefinition,
+        before: WorkflowRun,
+        after: WorkflowRun,
+        hardStopped: Set<TaskDefinitionId>,
+        now: Long,
+    ) {
+        for ((id, taskRun) in after.taskRuns) {
+            val task = definition.tasks.firstOrNull { it.id == id } ?: continue
+            val millis = when {
+                id in hardStopped ->
+                    taskRun.clock?.takeIf { it.attempt == taskRun.attempt }?.activeMillisAtEnd
+                taskRun.status == TaskRunStatus.Completed -> {
+                    val prior = before.taskRuns[id]
+                    if (prior != null && prior.status != TaskRunStatus.Completed) {
+                        prior.clock?.takeIf { it.attempt == prior.attempt }?.let { ActiveClock.active(it, now) }
+                    } else {
+                        null
+                    }
+                }
+                else -> null
+            }
+            if (millis != null && millis > 0L) deadlineSample(task, taskRun, millis)
+        }
     }
 
     /**
