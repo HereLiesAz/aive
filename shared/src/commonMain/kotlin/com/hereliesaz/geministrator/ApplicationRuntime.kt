@@ -990,11 +990,12 @@ class ApplicationRuntime private constructor(
         val ledger = queenLedger ?: return
         val now = nowEpochMillis()
         carryNannyFindings(ledger, definition, run, now)
+        noteProgress(ledger, definition, run, now)
         if (now - queenProposalsReadAt < QUEEN_SUGGEST_REFRESH_MILLIS) return
         queenProposalsReadAt = now
         try {
             val candidates = queenCandidates(
-                definition, run, queenSignals(definition, run, roles), queenCaps(),
+                definition, run, queenSignals(definition, run, roles, queenStalled[run.id.value]), queenCaps(),
             )
             val rows = ledger.state().proposals.filter { it.source == ImprovementSource.Queen }
             // Rows left over from another run are settled; a row for this run is settled once it no longer stands.
@@ -1015,6 +1016,33 @@ class ApplicationRuntime private constructor(
             throw cancellation
         } catch (_: Exception) {
             // Her suggestions are a courtesy; the swarm goes on without them.
+        }
+    }
+
+    /** Minutes each run has stood still (see [com.hereliesaz.geministrator.queen.stalledMinutes]), by run id; read when she speaks. */
+    private val queenStalled = LinkedHashMap<String, Int>()
+
+    /** Notes the run's progress in the ledger (when she first saw it) and keeps how long it has stood still. A failure is swallowed. */
+    private suspend fun noteProgress(
+        ledger: com.hereliesaz.geministrator.workflow.improvement.ImprovementStore,
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        now: Long,
+    ) {
+        try {
+            var sightings = ledger.state().queenSightings
+            val updated = com.hereliesaz.geministrator.queen.observeProgress(sightings, definition, run, now)
+            if (updated != sightings) {
+                ledger.merge { state -> state.copy(queenSightings = com.hereliesaz.geministrator.queen.observeProgress(state.queenSightings, definition, run, now)) }
+                sightings = updated
+            }
+            val minutes = com.hereliesaz.geministrator.queen.stalledMinutes(definition, run, sightings, now)
+            if (minutes == null) queenStalled.remove(run.id.value) else queenStalled[run.id.value] = minutes
+            while (queenStalled.size > 32) queenStalled.remove(queenStalled.keys.first())
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            // Her sense of time is a courtesy; the swarm goes on.
         }
     }
 
@@ -1135,7 +1163,7 @@ class ApplicationRuntime private constructor(
         } ?: return@withLock QueenAccept.NothingChanged
         val (definition, run) = seen
         if (run.id.value != proposal.cycleRunId ||
-            queenAcceptRefused(proposal, definition, run, roles, queenCandidates(definition, run, queenSignals(definition, run, roles), queenCaps()))
+            queenAcceptRefused(proposal, definition, run, roles, queenCandidates(definition, run, queenSignals(definition, run, roles, queenStalled[run.id.value]), queenCaps()))
         ) return@withLock QueenAccept.NothingChanged
         // Claim the row first (a compare-and-set), so only one tap runs the side effect; give it back if that does not take.
         val now = nowEpochMillis()
@@ -1205,6 +1233,7 @@ class ApplicationRuntime private constructor(
                 definition, run, roles, queenLevel(), review, researchRecords[run.id.value],
                 missing = queenMissing[run.id.value].orEmpty(),
                 disputes = queenDisputes[run.id.value].orEmpty(),
+                stalledForMinutes = queenStalled[run.id.value],
                 suggestions = if (run.globalPause == null && run.spendPause == null) {
                     queenSuggestionNotes(queenProposals, run)
                 } else {

@@ -133,6 +133,8 @@ data class ImprovementState(
      * resurrecting dismissed ones and duplicating adopted ones). Itself capped at [MAX_INGESTED_IDS], oldest first.
      */
     val ingestedRunIds: List<String> = emptyList(),
+    /** When the queen first saw each run's current progress, so "nothing has moved" survives a restart. */
+    val queenSightings: List<com.hereliesaz.geministrator.queen.QueenSighting> = emptyList(),
 ) {
     /** True when the cycle of [runId] has been read, whether or not its record is still retained. */
     fun hasIngested(runId: String): Boolean = ingestedRunIds.contains(runId) || cycles.any { it.runId == runId }
@@ -329,6 +331,7 @@ class SettingsImprovementStore(
                 ProposalRetention.bound(now.proposals + proposals),
                 (now.cycles + cycle).takeLast(ImprovementState.MAX_CYCLES),
                 (now.ingestedRunIds + now.cycles.map { it.runId } + cycle.runId).distinct().takeLast(ImprovementState.MAX_INGESTED_IDS),
+                now.queenSightings,
             ),
         )
         true
@@ -370,6 +373,7 @@ class InMemoryImprovementStore : ImprovementStore {
             ProposalRetention.bound(state.proposals + proposals),
             (state.cycles + cycle).takeLast(ImprovementState.MAX_CYCLES),
             (state.ingestedRunIds + cycle.runId).distinct().takeLast(ImprovementState.MAX_INGESTED_IDS),
+            state.queenSightings,
         )
         return true
     }

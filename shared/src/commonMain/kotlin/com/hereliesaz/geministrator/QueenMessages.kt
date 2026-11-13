@@ -87,6 +87,8 @@ private fun voiceResource(voice: QueenVoice): StringResource = when (voice) {
         QueenVoice.TrainingOffer -> Res.string.queen_say_training_offer
         QueenVoice.TrainingStopped -> Res.string.queen_say_training_stopped
         QueenVoice.TrainingNeedsYou -> Res.string.queen_say_training_needs_you
+        QueenVoice.WatchStalled -> Res.string.queen_say_watch_stalled
+        QueenVoice.WatchRepeatedBlock -> Res.string.queen_say_watch_repeated_block
 }
 
 @Composable
