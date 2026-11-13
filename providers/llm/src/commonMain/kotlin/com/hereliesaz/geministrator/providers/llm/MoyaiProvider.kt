@@ -157,7 +157,7 @@ class MoyaiProvider(
         fun firstTimeSeen(text: String): Boolean = repliesInSnapshot.add(text)
         while (true) {
             if (startedAt.elapsedNow().inWholeMilliseconds > maxObserveMillis) {
-                emit(AgentEvent.Failed(runId, "Moyai session ${runId.value.take(8)} did not finish in time"))
+                emit(AgentEvent.Failed(runId, "Moyai session ${runId.value.take(8)} timed out: it did not finish in time"))
                 sessionsMutex.withLock { sessions.remove(runId) }
                 return@flow
             }

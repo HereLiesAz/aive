@@ -197,7 +197,7 @@ internal class CliAgentProvider(
             }
             when {
                 result.startFailure != null -> return@channelFlow fail("Could not start ${spec.displayName}: ${result.startFailure}")
-                result.timedOut -> return@channelFlow fail("${spec.displayName} was stopped after ${timeoutMillis / 60_000} minutes.")
+                result.timedOut -> return@channelFlow fail("${spec.displayName} timed out and was stopped after ${timeoutMillis / 60_000} minutes.")
             }
             val final = reader.finish(result.exitCode)
             if (result.exitCode != 0 || final.isError) {

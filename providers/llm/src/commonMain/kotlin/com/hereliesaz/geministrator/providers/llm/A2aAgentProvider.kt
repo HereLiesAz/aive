@@ -179,7 +179,7 @@ class A2aAgentProvider(
         emit(AgentEvent.Progress(runId, "Connected to $displayName task ${runId.value.take(8)}"))
         while (true) {
             if (startedAt.elapsedNow().inWholeMilliseconds > maxObserveMillis) {
-                emit(AgentEvent.Failed(runId, "$displayName did not finish in time"))
+                emit(AgentEvent.Failed(runId, "$displayName timed out: it did not finish in time"))
                 sessionsMutex.withLock { sessions.remove(runId) }
                 return@flow
             }
