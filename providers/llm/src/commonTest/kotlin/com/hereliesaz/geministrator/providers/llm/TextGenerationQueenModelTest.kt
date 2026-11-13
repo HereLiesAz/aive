@@ -73,11 +73,12 @@ class TextGenerationQueenModelTest {
     }
 
     @Test
-    fun automaticMovesOnWhenASourcesTurnIsTooFarOff() = runTest {
+    fun automaticMovesOnWhenASourcesTurnIsTooFarOffAndSaysSo() = runTest {
         val pacer = KeylessPacer(now = { testScheduler.currentTime }, limitOf = { if (it == "slow") oneAnHour else null })
         val slow = FakeApi { "slow" }
         val next = FakeApi { "next" }
-        val context = QueenCallContext(KeylessPacing(pacer, Mutex()))
+        val moves = mutableListOf<Triple<String, String, String>>()
+        val context = QueenCallContext(KeylessPacing(pacer, Mutex()), onMoved = { from, to, why -> moves += Triple(from, to, why) })
         val model = TextGenerationQueenModel(listOf(entry("slow", slow), entry("next", next)))
         withContext(context) {
             assertEquals("slow", model.answer("q"))
@@ -85,6 +86,9 @@ class TextGenerationQueenModelTest {
         }
         assertEquals(1, slow.prompts.size)
         assertEquals(1, next.prompts.size)
+        assertEquals(1, moves.size)
+        assertEquals("slow", moves[0].first)
+        assertEquals("next", moves[0].second)
     }
 
     @Test
@@ -92,13 +96,15 @@ class TextGenerationQueenModelTest {
         val pacer = KeylessPacer(now = { testScheduler.currentTime }, limitOf = { if (it == "slow") oneAnHour else null })
         val slow = FakeApi { "slow" }
         val other = FakeApi { "other" }
-        val context = QueenCallContext(KeylessPacing(pacer, Mutex()))
+        val moves = mutableListOf<String>()
+        val context = QueenCallContext(KeylessPacing(pacer, Mutex()), onMoved = { _, to, _ -> moves += to })
         val model = TextGenerationQueenModel(listOf(entry("other", other), entry("slow", slow)), pinnedProviderId = "slow")
         withContext(context) {
             assertEquals("slow", model.answer("q"))
             assertFailsWith<IllegalStateException> { model.answer("q") }
         }
         assertTrue(other.prompts.isEmpty())
+        assertTrue(moves.isEmpty())
     }
 
     @Test

@@ -2,7 +2,10 @@ package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.ProviderCatalog
 import com.hereliesaz.geministrator.queen.QueenCallContext
+import com.hereliesaz.geministrator.queen.QueenLink
+import com.hereliesaz.geministrator.queen.QueenVoice
 import com.hereliesaz.geministrator.queen.pacingBudget
+import com.hereliesaz.geministrator.queen.sourceMovedNote
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -86,5 +89,15 @@ class SourcePacingTest {
         assertEquals(90_000L, pacingBudget(600_000L, 0L, 90_000L))
         assertEquals(10_000L, pacingBudget(600_000L, 590_000L, 90_000L))
         assertEquals(0L, pacingBudget(600_000L, 700_000L, 90_000L))
+    }
+
+    @Test
+    fun aMoveToAnotherSourceIsAStoryNoteForThatRun() {
+        val note = sourceMovedNote("run-1", "Kilo", "LLM7", "HTTP 429")
+        assertEquals(QueenVoice.DisputeMovedSource, note.voice)
+        assertEquals(listOf("Kilo", "LLM7", "HTTP 429"), note.args)
+        assertEquals(QueenLink.Story, note.link)
+        assertEquals(note.id, sourceMovedNote("run-1", "Kilo", "LLM7", "other reason").id)
+        assertTrue(note.id != sourceMovedNote("run-2", "Kilo", "LLM7", "HTTP 429").id)
     }
 }

@@ -1057,9 +1057,14 @@ class ApplicationRuntime private constructor(
         val case = com.hereliesaz.geministrator.queen.nannyDispute(definition, run) ?: return
         if (!raisedDisputes.add(case.key)) return
         val runId = run.id.value
-        // Her calls keep the registry's per-Source pacing: a wait is hers, bounded, and never the keeper's.
+        // Her calls keep the registry's per-Source pacing (a wait is hers, bounded, and never the keeper's), and a move to another
+        // Source goes into the Story of this run.
         val callContext = com.hereliesaz.geministrator.queen.QueenCallContext(
             pacing = providerRegistry.sourcePacing,
+            onMoved = { from, to, why ->
+                rememberDisputeNotes(runId, listOf(com.hereliesaz.geministrator.queen.sourceMovedNote(runId, from, to, why)))
+                runtimeMutex.withLock { publishCurrent() }
+            },
         )
         runtimeScope.launch(callContext) {
             try {

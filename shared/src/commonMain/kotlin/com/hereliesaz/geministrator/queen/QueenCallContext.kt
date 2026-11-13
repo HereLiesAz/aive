@@ -16,6 +16,7 @@ class QueenCallContext(
     private val pacing: KeylessPacing?,
     private val totalWaitMillis: Long = QUEEN_PACE_TOTAL_MILLIS,
     private val callWaitMillis: Long = QUEEN_PACE_CALL_MILLIS,
+    private val onMoved: suspend (from: String, to: String, why: String) -> Unit = { _, _, _ -> },
 ) : AbstractCoroutineContextElement(Key) {
     private var waitedMillis = 0L
 
@@ -35,6 +36,8 @@ class QueenCallContext(
         waitedMillis += waited
         return true
     }
+
+    suspend fun moved(from: String, to: String, why: String) = onMoved(from, to, why)
 
     companion object Key : CoroutineContext.Key<QueenCallContext>
 }

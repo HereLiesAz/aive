@@ -443,3 +443,15 @@ internal fun disputeNotes(
         }
     }
 }
+
+/**
+ * The line in the Story that Automatic moved to another Source while settling a dispute on [runId]: which Source could not answer,
+ * which one she asked next, and why, with a way to the Story. Names and the reason are bounded text; the id is stable per move.
+ */
+internal fun sourceMovedNote(runId: String, from: String, to: String, why: String): QueenNote =
+    QueenNote(
+        id = queenNoteId(runId, "dispute", "moved", from, to),
+        voice = QueenVoice.DisputeMovedSource,
+        args = listOf(queenSlot(from), queenSlot(to), queenSlot(why)),
+        link = QueenLink.Story,
+    )

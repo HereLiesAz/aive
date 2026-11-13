@@ -74,6 +74,7 @@ class TextGenerationQueenModel(
                 if (pinnedProviderId != null) throw failure
                 order.getOrNull(index + 1)?.let { next ->
                     reportLaunchProgress("${candidate.name} could not answer for the queen; asking ${next.name}…")
+                    call?.moved(candidate.name, next.name, failure.message ?: failure::class.simpleName ?: "no answer")
                 }
             }
         }
