@@ -930,6 +930,7 @@ internal fun MindMapRunScreen(
         if (compact && run.status.isFinished()) {
             ContinueRunPanel(
                 runId = run.id,
+                parentObjective = run.objective,
                 onContinue = { continuation ->
                     onLaunchWorkflow(liveWorkflow.project.name, continuation, liveWorkflow.project.repository, listOf(run.id))
                 },

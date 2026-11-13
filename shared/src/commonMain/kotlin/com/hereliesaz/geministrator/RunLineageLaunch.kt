@@ -1,5 +1,11 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.prompts.PromptChoice
+import com.hereliesaz.geministrator.prompts.PromptKind
+import com.hereliesaz.geministrator.prompts.PromptSuggestBox
+import com.hereliesaz.geministrator.prompts.PromptSuggestions
+import com.hereliesaz.geministrator.prompts.rememberPromptHistory
+import com.hereliesaz.geministrator.resources.prompt_retry_with
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -200,9 +206,12 @@ internal fun ContinueRunPanel(
     runId: WorkflowRunId,
     onContinue: (objective: String) -> Unit,
     modifier: Modifier = Modifier,
+    /** What the run being continued was fed: the field starts with it, selected, to edit into the next goal. */
+    parentObjective: String? = null,
 ) {
     var open by remember(runId) { mutableStateOf(false) }
     var objective by remember(runId) { mutableStateOf("") }
+    val objectiveHistory = rememberPromptHistory(PromptKind.Objective)
     var error by remember(runId) { mutableStateOf<String?>(null) }
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         AzphaltPill(
@@ -218,13 +227,23 @@ internal fun ContinueRunPanel(
             style = AzphaltType.body,
             color = azphaltOnSurface(),
         )
-        OutlinedTextField(
+        PromptSuggestBox(
+            kind = PromptKind.Objective,
             value = objective,
             onValueChange = { objective = it; error = null },
-            label = { Text(stringResource(Res.string.lineage_next_objective)) },
-            minLines = 2,
             modifier = Modifier.fillMaxWidth(),
-        )
+            seed = PromptSuggestions.continueObjective(parentObjective),
+            onSeeded = { objective = it },
+            resetKey = runId,
+        ) { field ->
+            OutlinedTextField(
+                value = field.value,
+                onValueChange = field.onValueChange,
+                label = { Text(stringResource(Res.string.lineage_next_objective)) },
+                minLines = 2,
+                modifier = Modifier.fillMaxWidth().then(field.modifier),
+            )
+        }
         AzphaltPill(
             label = stringResource(Res.string.lineage_start_continuation),
             seed = "continue-run-start",
@@ -233,6 +252,7 @@ internal fun ContinueRunPanel(
                 if (objective.isBlank()) {
                     error = "Enter an objective to continue this run."
                 } else {
+                    objectiveHistory.record(objective)
                     onContinue(objective.trim())
                     open = false
                     objective = ""
@@ -258,6 +278,8 @@ internal fun RerunFromTaskPanel(
     output: String?,
     onRerun: suspend (TaskRerunRequest) -> String?,
     modifier: Modifier = Modifier,
+    /** Why the step stopped, if it did: offered as "Retry with: <reason>" in the objective field's menu. */
+    failure: String? = null,
 ) {
     val key = "${runId.value}/${taskId.value}"
     var open by remember(key) { mutableStateOf(false) }
@@ -332,15 +354,28 @@ internal fun RerunFromTaskPanel(
                 modifier = Modifier.fillMaxWidth(),
             )
         } else {
-            OutlinedTextField(
+            // The step's own objective is already in the field. A step that stopped offers one choice: its
+            // objective with "Retry with: <why it stopped>" added. Earlier hive goals are not offered here.
+            val retryLine = PromptSuggestions.retryReason(failure)?.let { stringResource(Res.string.prompt_retry_with, it) }
+            PromptSuggestBox(
+                kind = PromptKind.Objective,
                 value = objectiveDraft,
                 onValueChange = { objectiveDraft = it; error = null },
-                label = { Text(stringResource(Res.string.lineage_rerun_objective)) },
-                minLines = 2,
-                enabled = !working,
-                colors = azphaltTextFieldColors(),
                 modifier = Modifier.fillMaxWidth(),
-            )
+                choices = listOfNotNull(retryLine?.let { PromptChoice(it, objectiveDraft.trimEnd() + "\n\n" + it) }),
+                resetKey = key,
+                entryFilter = { false },
+            ) { field ->
+                OutlinedTextField(
+                    value = field.value,
+                    onValueChange = field.onValueChange,
+                    label = { Text(stringResource(Res.string.lineage_rerun_objective)) },
+                    minLines = 2,
+                    enabled = !working,
+                    colors = azphaltTextFieldColors(),
+                    modifier = Modifier.fillMaxWidth().then(field.modifier),
+                )
+            }
             AzphaltPill(
                 label = stringResource(Res.string.lineage_rerun_start),
                 seed = "rerun-start-$key",
