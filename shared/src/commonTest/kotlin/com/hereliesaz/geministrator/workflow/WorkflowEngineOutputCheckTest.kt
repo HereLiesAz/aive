@@ -159,7 +159,7 @@ class WorkflowEngineOutputCheckTest {
     }
 
     @Test
-    fun aRequiredCreatureThatFailsStillEndsTheRun() = runBlocking {
+    fun aRequiredCreatureThatFailsStillEndsTheRun() = runBlocking<Unit> {
         val def = definition(task("main"))
         val engine = WorkflowEngine(ScriptedGateway(done = emptySet(), text = "x"), BuiltInRoles.all, InMemoryWorkflowEventSink())
         val started = engine.dispatchReadyTasks(project, def, newRun(def), nowEpochMillis = 10L)

@@ -42,7 +42,11 @@ class NannyTemplateHandoffTest {
         evidence = listOf(HallMonitorEvidence("c", "src", "w", "p")),
         counterEvidence = listOf(HallMonitorEvidence("c", "src", "w", "p")),
         falsificationCriteria = listOf("f"),
-        solutions = listOf(HallMonitorSolution("Reword", action, wording, "r", listOf("tr"), listOf("v"))),
+        // A finding needs at least two solutions; the second (Retain) is never the one the queen acts on.
+        solutions = listOf(
+            HallMonitorSolution("Reword", action, wording, "r", listOf("tr"), listOf("v")),
+            HallMonitorSolution("Leave it", HallMonitorAction.Retain, "keep", "r", listOf("tr"), listOf("v")),
+        ),
     )
 
     private fun runOf(steps: Int, finding: HallMonitorFinding): com.hereliesaz.geministrator.domain.WorkflowRun {
