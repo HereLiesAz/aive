@@ -206,6 +206,8 @@ class WorkflowApprovalService(
                         blockingReason = null,
                         progress = null,
                         progressMessage = note ?: "Failure escalation approved; retry scheduled",
+                        // The keeper chose to try again: the count of slow attempts starts over.
+                        timedOutAttempts = 0,
                     )
                 ),
                 updatedAtEpochMillis = nowEpochMillis,

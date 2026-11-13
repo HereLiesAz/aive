@@ -160,6 +160,8 @@ import com.hereliesaz.geministrator.resources.inspector_send_message
 import com.hereliesaz.geministrator.resources.inspector_sending
 import com.hereliesaz.geministrator.resources.inspector_sent
 import com.hereliesaz.geministrator.resources.inspector_state
+import com.hereliesaz.geministrator.resources.inspector_time
+import com.hereliesaz.geministrator.resources.creature_taking_longer
 import com.hereliesaz.geministrator.resources.inspector_stop_workflow
 import com.hereliesaz.geministrator.resources.inspector_stored_evidence
 import com.hereliesaz.geministrator.resources.inspector_task_is_not_part_of
@@ -530,6 +532,9 @@ internal fun TechnicalInspector(
                     messageStatus?.let { LiveInspectorLine(stringResource(Res.string.inspector_message), it, live = true) }
                 }
                 LiveInspectorLine(stringResource(Res.string.inspector_state), taskRun.status.label())
+                com.hereliesaz.geministrator.workflow.slowCreatureAllowedMinutes(task, taskRun)?.let {
+                    LiveInspectorLine(stringResource(Res.string.inspector_time), stringResource(Res.string.creature_taking_longer, it.toString()), live = true)
+                }
                 // An executor that lives off this device or behind an integration links to where that is set up.
                 val executorLink = when (executor) {
                     is TaskExecutor.Distributed -> onOpenCompute

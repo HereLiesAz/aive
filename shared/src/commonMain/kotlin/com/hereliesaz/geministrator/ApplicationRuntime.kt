@@ -764,7 +764,8 @@ class ApplicationRuntime private constructor(
      * An edit saved to the hive on screen reaches its live run (docs/Keepers-Room.md, Pause, change,
      * resume). Only a creature the run has not started (waiting, ready or about to retry) takes the
      * edit, its job and criteria, now, because the engine reads a task's definition when it starts it;
-     * a creature that is running or done, a creature's role, executor, condition and policies, and the
+     * a creature that is running takes its time allowed alone (read each cycle, so a keeper can give a
+     * slow one more time); a creature that is done, a creature's role, executor, condition and policies, and the
      * hive's shape stay as the run has them and change from the next run, as the saved copy in the
      * library: the runtime never writes its own copy over a saved one ([WorkflowRuntimeCoordinator.persist]).
      * Nothing is cancelled and nothing restarts. Returns how many creatures took an edit.
@@ -1383,6 +1384,18 @@ class ApplicationRuntime private constructor(
                     orchestrationUtilities = orchestrationUtilities,
                     surfaceRuntime = roleSurfaceRuntime,
                     spendCaps = spendCaps,
+                    deadlineAllowance = { task, taskRun ->
+                        val provider = taskRun.assignedProviderId?.let(registry::provider)
+                        com.hereliesaz.geministrator.workflow.DeadlinePolicy.resolveAuto(
+                            kind = com.hereliesaz.geministrator.workflow.DeadlinePolicy
+                                .kindOf(taskRun.executor ?: task.executor, provider?.workKind),
+                            size = com.hereliesaz.geministrator.workflow.StepSize(
+                                contextTokens = task.objective.length / 4,
+                                upstreamArtifacts = task.dependsOn.size,
+                            ),
+                            source = com.hereliesaz.geministrator.workflow.SourceTrait(keyless = provider?.keyless == true),
+                        )
+                    },
                 )
                 val nestedWorkflows = WorkflowRunNestedWorkflowClient(
                     persistence = persistence,

@@ -59,6 +59,7 @@ class MoyaiProvider(
     /** A session still unfinished after this long is reported as failed instead of being polled forever. */
     private val maxObserveMillis: Long = 6L * 60L * 60L * 1_000L,
 ) : AgentProvider {
+    override val workKind: com.hereliesaz.geministrator.workflow.WorkKind get() = com.hereliesaz.geministrator.workflow.WorkKind.LongCreative
     private val api = MoyaiApi(baseUrl, workspacePassword, client)
     private val sessionsMutex = Mutex()
     private val sessions = mutableMapOf<ProviderRunId, AgentTaskRequest>()

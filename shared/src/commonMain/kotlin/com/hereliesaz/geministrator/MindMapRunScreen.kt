@@ -41,6 +41,7 @@ import com.hereliesaz.geministrator.domain.parseRepositoryRef
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.creature_taking_longer
 import com.hereliesaz.geministrator.resources.first_hive_default_name
 import com.hereliesaz.geministrator.resources.prompt_starter_goal
 import com.hereliesaz.geministrator.prompts.PromptEntry
@@ -1024,8 +1025,14 @@ internal fun MindMapRunScreen(
         recentTasks.forEachIndexed { index, (task, taskRun) ->
             // A step that failed or is held says why in a plain sentence; the provider's own text is in its creature's panel.
             val troubled = taskRun.status.isTroubled()
+            val slowText = com.hereliesaz.geministrator.workflow.slowCreatureAllowedMinutes(task, taskRun)
+                ?.let { stringResource(Res.string.creature_taking_longer, it.toString()) }
             val detail = buildString {
                 append(taskRun.status.label())
+                slowText?.let {
+                    append(" · ")
+                    append(it)
+                }
                 taskRun.progressMessage?.takeIf(String::isNotBlank)?.let {
                     append(" · ")
                     append(if (troubled) plainFailureLine(it) else it)

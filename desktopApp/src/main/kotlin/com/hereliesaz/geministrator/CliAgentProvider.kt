@@ -85,6 +85,7 @@ internal class CliAgentProvider(
     private val tempRoot: File = File(System.getProperty("java.io.tmpdir").orEmpty()),
 ) : AgentProvider {
     override val id: AgentProviderId = AgentProviderId(spec.id)
+    override val workKind: com.hereliesaz.geministrator.workflow.WorkKind get() = com.hereliesaz.geministrator.workflow.WorkKind.CliAgent
 
     /** Mutating work on the keeper's computer is never routed here automatically. */
     override val explicitOnly: Boolean get() = true

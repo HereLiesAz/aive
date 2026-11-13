@@ -796,6 +796,14 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="job_approval">Approval</string>
     <string name="job_approval_role">A role approves</string>
     <string name="job_retries_label">Retries</string>
+    <string name="job_time_label">Time allowed</string>
+    <string name="job_time_auto">The queen sets it</string>
+    <string name="job_time_minutes">%1$s minutes</string>
+    <string name="job_time_off">No limit</string>
+    <string name="job_time_person">A person decides this one</string>
+    <string name="job_time_nested">Its own steps keep time</string>
+    <string name="job_time_choice_auto">Auto</string>
+    <string name="job_time_choice_off">Off</string>
     <string name="job_retries_value">%1$s, then %2$s</string>
     <string name="job_then_stop">the hive stops</string>
     <string name="job_then_ask">it asks you</string>
@@ -1959,6 +1967,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_title_status">How the swarm is doing</string>
     <string name="queen_title_finish">The swarm has stopped</string>
     <string name="queen_title_waits">What waits for you</string>
+    <string name="queen_say_watch_slow">Step %1$s (%2$s) has worked longer than the %3$s minutes I allowed. I am still waiting. You can give it more time on its job.</string>
+    <string name="creature_taking_longer">Taking longer than expected (allowed %1$s min)</string>
+    <string name="inspector_time">TIME</string>
     <string name="queen_title_watch">The queen noticed something</string>
     <string name="queen_title_nanny">The nanny\'s report</string>
     <string name="queen_title_allowance">The allowance</string>

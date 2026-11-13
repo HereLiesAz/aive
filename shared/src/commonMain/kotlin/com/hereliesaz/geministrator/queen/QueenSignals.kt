@@ -63,6 +63,23 @@ fun queenSignals(definition: WorkflowDefinition, run: WorkflowRun, roles: Collec
 }
 
 /**
+ * One note per creature that has passed the time the queen allowed and is still working (Helpful only): she is
+ * still waiting, and the link opens the creature's Work tab, where the keeper can give it more time.
+ */
+internal fun slowNotes(definition: WorkflowDefinition, run: WorkflowRun): List<QueenNote> =
+    definition.tasks.mapNotNull { task ->
+        val taskRun = run.taskRuns[task.id] ?: return@mapNotNull null
+        val allowed = com.hereliesaz.geministrator.workflow.slowCreatureAllowedMinutes(task, taskRun) ?: return@mapNotNull null
+        val step = definition.tasks.indexOf(task) + 1
+        QueenNote(
+            queenNoteId(run.id.value, "watch", "slow", task.id.value, taskRun.attempt.toString(), allowed.toString()),
+            QueenVoice.WatchSlow,
+            listOf(step.toString(), queenSlot(task.name), allowed.toString()),
+            QueenLink.Creature(task.id.value, CreatureTab.Work),
+        )
+    }
+
+/**
  * The queen's own "I noticed": at most one note, the most serious signal first. Said only for a
  * swarm with no Nanny; with one, the Nanny's relay speaks and the queen does not claim her findings.
  */
