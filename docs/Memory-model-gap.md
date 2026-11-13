@@ -65,7 +65,7 @@ Built after the audit above (the audit table and plan below describe the state b
 | Queen's memory | Resolved by removal: `OrchestrationPacket.retrievedMemory` is gone (nothing filled it; filling it puts memory text into the prompt of the model that designs steps). |
 | Controller-level cue tests | Built: `MemoryControllerCuePipelineTest`. |
 
-Decided by the owner: the whole session is banked, so `Thinking` and keeper mid-session messages are banked (built); `#tag` and explicit memory thoughts are shortcuts, not commands; specific values blend over time and with repetition like everything else. Not built: a reader for resolutions (condensed like everything else); a trained clerk.
+Decided by the owner: the whole session is banked, so `Thinking` and keeper mid-session messages are banked (built); `#tag` and explicit memory thoughts are shortcuts, not commands; specific values blend over time and with repetition like everything else. Not built: a reader for resolutions (condensed like everything else). Trained memory models do exist: the epoch-8 specialists ship, and the association linker is the one still offered for install (Memory screen, on-device models). The epoch-8 generative models are withheld because they were broken, so a memory stage set to a local model runs programmatically until a working generative clerk is released.
 
 ## Minimal change plan (original; see Status above for what is done)
 
