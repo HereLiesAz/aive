@@ -52,7 +52,6 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.build_build
 import com.hereliesaz.geministrator.resources.build_live
-import com.hereliesaz.geministrator.resources.hive_view_flowchart
 import com.hereliesaz.geministrator.resources.hive_new_build_help
 import com.hereliesaz.geministrator.resources.hive_new_build_title
 import com.hereliesaz.geministrator.resources.hive_new_build_title_only
@@ -69,7 +68,7 @@ import org.jetbrains.compose.resources.stringResource
 
 /*
  * A new hive (mockup H6): it opens empty in Build. Its head names it and leads back to the district,
- * beside Live, Build and Flowchart as one control; under the field it is named, and creatures come up from the
+ * beside Live and Edit as one control; under the field it is named, and creatures come up from the
  * tray the way Build's Add creature brings them in.
  */
 
@@ -94,13 +93,11 @@ internal fun NewHiveCrumb(name: String, onSurface: () -> Unit, modifier: Modifie
     )
 }
 
-/** Live, Build and Flowchart share an Ink capsule; only one view is selected. */
+/** Live and Edit share an Ink capsule; only one view is selected. */
 @Composable
 internal fun TerrariumModeSegments(
     building: Boolean,
     onBuildingChange: (Boolean) -> Unit,
-    flowchart: Boolean,
-    onFlowchartSelected: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     AzphaltThemedSurface(Azphalt.Ink) {
@@ -113,9 +110,8 @@ internal fun TerrariumModeSegments(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             listOfNotNull(
-                runSegmentString(LocalRunSegment.current)?.let { Triple("live", it, !building && !flowchart) },
-                Triple("build", Res.string.build_build, building && !flowchart),
-                Triple("flowchart", Res.string.hive_view_flowchart, flowchart),
+                runSegmentString(LocalRunSegment.current)?.let { Triple("live", it, !building) },
+                Triple("build", Res.string.build_build, building),
             ).forEach { (mode, label, open) ->
                 val fill = if (open) azphaltStrong() else Azphalt.Ink
                 val text = stringResource(label)
@@ -131,8 +127,7 @@ internal fun TerrariumModeSegments(
                         .clip(RoundedCornerShape(999.dp))
                         .background(fill)
                         .clickable {
-                            if (mode == "flowchart") onFlowchartSelected()
-                            else onBuildingChange(mode == "build")
+                            onBuildingChange(mode == "build")
                         }
                         .padding(horizontal = 14.dp),
                     contentAlignment = Alignment.Center,

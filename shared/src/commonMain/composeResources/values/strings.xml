@@ -680,13 +680,11 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="timeline_view_log">Log</string>
     <string name="timeline_view_flowchart">Flowchart</string>
     <string name="hive_view_creatures">Creatures</string>
-    <string name="hive_view_flowchart">Flowchart</string>
     <string name="swarm_activity_show">Show activity</string>
     <string name="swarm_activity_hide">Hide activity</string>
     <string name="swarm_activity_none">This role has not done anything in any run yet.</string>
     <string name="swarm_activity_no_cost">none reported</string>
     <string name="swarm_activity_summary">Steps: %1$s, in %2$s run(s). Completed: %3$s. Failed or escalated: %4$s. Tokens reported: %5$s. Cost reported: %6$s. Newest first, from the runs kept on this device.</string>
-    <string name="flowchart_empty">This workflow has no steps yet.</string>
     <string name="flowchart_detail_working">Working: %1$s</string>
     <string name="flowchart_detail_waiting_approval">Waiting for your approval.</string>
     <string name="flowchart_detail_question">Its agent asked you a question and is waiting for your answer.</string>

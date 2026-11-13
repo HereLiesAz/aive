@@ -65,7 +65,6 @@ import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.build_build
 import com.hereliesaz.geministrator.resources.build_live
-import com.hereliesaz.geministrator.resources.hive_view_flowchart
 import com.hereliesaz.geministrator.resources.build_redo
 import com.hereliesaz.geministrator.resources.build_undo
 import com.hereliesaz.geministrator.resources.creature_panel_close
@@ -319,15 +318,13 @@ internal fun HivePageTitle(
 }
 
 /**
- * Across the top of the hive frame, on Ink: Live, Build or Flowchart, one line of what the swarm is doing,
+ * Across the top of the hive frame, on Ink: Live or Edit, one line of what the swarm is doing,
  * then undo and redo (in Build), centre, and zoom.
  */
 @Composable
 internal fun HiveControlsBar(
     building: Boolean,
     onBuildingChange: (Boolean) -> Unit,
-    flowchart: Boolean,
-    onFlowchartSelected: () -> Unit,
     status: String,
     onStatusClick: (() -> Unit)?,
     camera: TerrariumCamera,
@@ -352,10 +349,9 @@ internal fun HiveControlsBar(
                         .selectableGroup(),
                 ) {
                     runSegmentText(LocalRunSegment.current)?.let { label ->
-                        ModeSegment(label, selected = !building && !flowchart) { onBuildingChange(false) }
+                        ModeSegment(label, selected = !building) { onBuildingChange(false) }
                     }
-                    ModeSegment(stringResource(Res.string.build_build), selected = building && !flowchart) { onBuildingChange(true) }
-                    ModeSegment(stringResource(Res.string.hive_view_flowchart), selected = flowchart, onClick = onFlowchartSelected)
+                    ModeSegment(stringResource(Res.string.build_build), selected = building) { onBuildingChange(true) }
                 }
             }
             val statusLine: @Composable (Modifier) -> Unit = { statusModifier ->

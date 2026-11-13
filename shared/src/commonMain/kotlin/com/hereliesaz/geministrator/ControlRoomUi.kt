@@ -271,9 +271,6 @@ fun ControlRoom(
     val restingShown = restingHive.value.isNotBlank()
     // The hive's Timeline, held here so a creature's "Open its trace" can open it.
     val showTimeline = rememberDurableBooleanState("overview.timeline")
-    // Whether the hive is in Flowchart (not Live or Build): held here, shared with the terrarium, so the phone's
-    // creature sheet can stay out of it (a card's own detail panel answers the tap there).
-    val flowchartView = rememberDurableBooleanState("hive.view.flow")
     // A creature whose panel was set aside for its trace: still selected on the Timeline, its panel
     // closed. Selecting another creature (or none) forgets it; tapping it again reopens its panel.
     var panelSetAside by remember { mutableStateOf<String?>(null) }
@@ -388,10 +385,9 @@ fun ControlRoom(
         val run = liveWorkflow?.run ?: return@LaunchedEffect
         if (inspectorVisible && selectedTaskId != null) inboxReadLog.markRead(inboxItemKeys(run, selectedTaskId))
     }
-    // A creature's Needs, where a decision it waits on is made. Leaves Flowchart: its sheet is for Live and Build.
+    // A creature's Needs, where a decision it waits on is made.
     val openCreatureOn: (String, CreatureTab) -> Unit = { id, tab ->
         district.value = false
-        flowchartView.value = false
         if (selectedTaskId != id) onTaskSelected(id)
         // The panel belongs to the live hive: a resting hive left open would hide it.
         restingHive.value = ""
@@ -535,7 +531,6 @@ fun ControlRoom(
     }
     CompositionLocalProvider(
         LocalReleaseCreature provides releaseCreature,
-        LocalHiveFlowchartView provides flowchartView,
         LocalFlowchartLinks provides flowchartLinks,
         LocalPlaceLinks provides placeLinks,
         LocalCardFlip provides flipHost,

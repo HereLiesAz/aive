@@ -41,7 +41,6 @@ import com.hereliesaz.geministrator.resources.build_knot_on_any_outcome
 import com.hereliesaz.geministrator.resources.build_knot_on_failure
 import com.hereliesaz.geministrator.resources.build_knot_on_success
 import com.hereliesaz.geministrator.resources.build_live
-import com.hereliesaz.geministrator.resources.hive_view_flowchart
 import com.hereliesaz.geministrator.resources.build_pick_a_creature
 import com.hereliesaz.geministrator.resources.build_redo
 import com.hereliesaz.geministrator.resources.build_remove
@@ -51,19 +50,17 @@ import com.hereliesaz.geministrator.resources.build_rehearse
 import com.hereliesaz.geministrator.resources.build_undo
 import org.jetbrains.compose.resources.stringResource
 
-/** Live watches the run, Build edits wiring, and Flowchart reads the workflow top to bottom. */
+/** Live watches the run; Edit edits the wiring, and a tapped creature turns over to its step's card. */
 @Composable
 internal fun TerrariumModeToggle(
     building: Boolean,
     onBuildingChange: (Boolean) -> Unit,
-    flowchart: Boolean,
-    onFlowchartSelected: () -> Unit,
     modifier: Modifier = Modifier,
-    /** One Ink capsule holding all three modes, the open one filled (mockup H6's hive head). */
+    /** One Ink capsule holding both modes, the open one filled (mockup H6's hive head). */
     segmented: Boolean = false,
 ) {
     if (segmented) {
-        TerrariumModeSegments(building, onBuildingChange, flowchart, onFlowchartSelected, modifier)
+        TerrariumModeSegments(building, onBuildingChange, modifier)
         return
     }
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -71,7 +68,7 @@ internal fun TerrariumModeToggle(
             AzphaltPill(
                 label = label,
                 seed = "mode-live",
-                selected = !building && !flowchart,
+                selected = !building,
                 role = Role.RadioButton,
                 onClick = { onBuildingChange(false) },
             )
@@ -79,16 +76,9 @@ internal fun TerrariumModeToggle(
         AzphaltPill(
             label = stringResource(Res.string.build_build),
             seed = "mode-build",
-            selected = building && !flowchart,
+            selected = building,
             role = Role.RadioButton,
             onClick = { onBuildingChange(true) },
-        )
-        AzphaltPill(
-            label = stringResource(Res.string.hive_view_flowchart),
-            seed = "mode-flowchart",
-            selected = flowchart,
-            role = Role.RadioButton,
-            onClick = onFlowchartSelected,
         )
     }
 }

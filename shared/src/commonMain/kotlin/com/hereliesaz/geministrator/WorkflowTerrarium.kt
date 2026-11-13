@@ -31,7 +31,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.hive_view_label
-import com.hereliesaz.geministrator.resources.flowchart_empty
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.semantics.onLongClick
@@ -55,13 +54,6 @@ import org.jetbrains.compose.resources.stringResource
  * `onTaskSelected`, which treats a tap on the creature whose panel was closed as "open it again".
  */
 internal val LocalReleaseCreature = staticCompositionLocalOf<((String) -> Unit)?> { null }
-
-/**
- * The shell's own handle on whether the Flowchart view is showing (the durable "hive.view.flow" flag), so it
- * can tell Live and Build, where a creature's phone sheet opens, from Flowchart, where a card's detail panel
- * answers the tap. Null where nothing outside the terrarium needs to know: the view then keeps its own.
- */
-internal val LocalHiveFlowchartView = staticCompositionLocalOf<androidx.compose.runtime.MutableState<Boolean>?> { null }
 
 /**
  * Production workflow view: the DAG is a living node-creature map rather than a diagram.
@@ -157,7 +149,9 @@ internal fun GeministratorWorkflowTerrarium(
     // Who shares a creature: ordered tasks of one role. Build and the Swarm view keep one creature per task.
     val roaming = remember(stagedDefinition, run) { projectRoaming(stagedDefinition, run) }
     val swarmView = rememberDurableBooleanState("hive.view.swarm")
-    val flowView = LocalHiveFlowchartView.current ?: rememberDurableBooleanState("hive.view.flow")
+    // The retired Flowchart view (a stored "hive.view.flow") is Edit now: it lands there once, and is cleared.
+    val retiredFlowchart = remember { DurableUiState.store.getBoolean("hive.view.flow") == true }
+    LaunchedEffect(Unit) { if (retiredFlowchart) DurableUiState.store.remove("hive.view.flow") }
     var hiveMenu by remember { mutableStateOf(false) }
     var hiveDeleting by remember { mutableStateOf(false) }
     val animatedRelationships = remember(projection.relationships, run) {
@@ -204,12 +198,11 @@ internal fun GeministratorWorkflowTerrarium(
     }
 
     // Live watches the run; Build holds the field still and opens the wiring to edits.
-    var building by remember(definition.id) { mutableStateOf(startInBuild) }
+    var building by remember(definition.id) { mutableStateOf(migratedToEdit(retiredFlowchart && !readOnly, startInBuild)) }
     // A link elsewhere (a creature's job) asks for the editor: open it, the creature stays selected.
     LaunchedEffect(SwarmEditRequests.pending) {
         if (SwarmEditRequests.take() && !readOnly) {
             building = true
-            flowView.value = false
         }
     }
     // While grouping, taps gather creatures instead of selecting one.
@@ -362,9 +355,7 @@ internal fun GeministratorWorkflowTerrarium(
             if (heading == null) {
                 TerrariumModeToggle(
                     building = building,
-                    onBuildingChange = { building = it; flowView.value = false },
-                    flowchart = flowView.value && !building,
-                    onFlowchartSelected = { building = false; flowView.value = true },
+                    onBuildingChange = { building = it },
                 )
             } else {
                 Row(
@@ -375,9 +366,7 @@ internal fun GeministratorWorkflowTerrarium(
                     Box(Modifier.weight(1f, fill = false).padding(end = 8.dp)) { heading() }
                     TerrariumModeToggle(
                         building = building,
-                        onBuildingChange = { building = it; flowView.value = false },
-                        flowchart = flowView.value && !building,
-                        onFlowchartSelected = { building = false; flowView.value = true },
+                        onBuildingChange = { building = it },
                         segmented = true,
                     )
                 }
@@ -385,9 +374,7 @@ internal fun GeministratorWorkflowTerrarium(
         } else {
             HiveControlsBar(
                 building = building,
-                onBuildingChange = { building = it; flowView.value = false },
-                flowchart = flowView.value && !building,
-                onFlowchartSelected = { building = false; flowView.value = true },
+                onBuildingChange = { building = it },
                 status = frame.status,
                 onStatusClick = frame.onStatusClick,
                 camera = camera,
@@ -397,8 +384,8 @@ internal fun GeministratorWorkflowTerrarium(
                 onUndo = undo,
                 onRedo = redo,
             )
-            // Setup, the flowchart kept simple, or Swarm, the whole swarm at once. Build always shows all of it.
-            if (!building && !flowView.value) {
+            // Setup, the flowchart kept simple, or Swarm, the whole swarm at once. Edit always shows all of it.
+            if (!building) {
                 AzphaltThemedSurface(Azphalt.Ink) {
                     Row(Modifier.fillMaxWidth().background(Azphalt.Ink).padding(start = 8.dp, end = 8.dp, bottom = 10.dp)) {
                         SetupSwarmSwitch(
@@ -407,35 +394,6 @@ internal fun GeministratorWorkflowTerrarium(
                             label = stringResource(Res.string.hive_view_label),
                         )
                     }
-                }
-            }
-        }
-        // The single Flowchart mode shows the staged hive and run states without editing either.
-        val flowField: @Composable () -> Unit = {
-            Column(Modifier.fillMaxSize()) {
-                WorkflowFlowchartView(
-                    flow = remember(stagedDefinition, run, roles) {
-                        com.hereliesaz.geministrator.workflow.WorkflowFlowchart.of(
-                            stagedDefinition,
-                            run,
-                            roleName = { id -> roles.firstOrNull { it.id == id }?.name ?: id.value },
-                        )
-                    },
-                    selectedTaskId = selectedTaskId,
-                    onTaskSelected = onTaskSelected,
-                    emptyText = stringResource(Res.string.flowchart_empty),
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                )
-                // The tapped card says what is active or what holds it, and links to where that is unblocked.
-                selectedTaskId?.let { taskId ->
-                    FlowchartCardDetailPanel(
-                        taskId = taskId,
-                        definition = stagedDefinition,
-                        run = run,
-                        roles = roles,
-                        onShowStep = onTaskSelected,
-                        modifier = Modifier.padding(8.dp),
-                    )
                 }
             }
         }
@@ -513,7 +471,7 @@ internal fun GeministratorWorkflowTerrarium(
             }
         }
 
-        val baseField: @Composable () -> Unit = if (flowView.value && !building && !readOnly) flowField else field
+        val baseField: @Composable () -> Unit = field
         // A long press anywhere on the swarm opens its menu (Delete hive, which asks first). It only
         // watches: a drag, a pinch or a creature's own gesture cancels it, so none of them is disturbed.
         val shownField: @Composable () -> Unit = if (hiveDeletion == null || readOnly) {
