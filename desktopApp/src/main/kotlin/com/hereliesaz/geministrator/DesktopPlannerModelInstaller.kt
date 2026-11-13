@@ -41,6 +41,14 @@ internal object DesktopPlannerModel {
         get() = "%.1f GB".format(DOWNLOAD_BYTES / (1024.0 * 1024.0 * 1024.0))
 }
 
+private val SAFE_ASSET_NAME = Regex("[A-Za-z0-9][A-Za-z0-9._-]{0,199}")
+private const val TRUSTED_DOWNLOAD_PREFIX = "https://github.com/HereLiesAz/aive/releases/download/"
+
+/** Whether a release asset may be fetched: a plain file name, and a download URL inside this project's releases. */
+internal fun isTrustedPlannerAsset(name: String, downloadUrl: String): Boolean =
+    SAFE_ASSET_NAME.matches(name) && ".." !in name &&
+        downloadUrl.startsWith(TRUSTED_DOWNLOAD_PREFIX) && downloadUrl.none { it.isWhitespace() }
+
 internal data class InstalledPlannerModel(
     val root: File,
     val onnxModel: File,
@@ -144,9 +152,12 @@ internal class DesktopPlannerModelInstaller(
         val assets = root["assets"] as? JsonArray ?: error("Release metadata has no assets")
         return assets.mapNotNull { element ->
             val asset = element as? JsonObject ?: return@mapNotNull null
+            val name = asset["name"]?.jsonPrimitive?.content ?: return@mapNotNull null
+            val url = asset["browser_download_url"]?.jsonPrimitive?.content ?: return@mapNotNull null
+            if (!isTrustedPlannerAsset(name, url)) return@mapNotNull null
             ReleaseAsset(
-                name = asset["name"]?.jsonPrimitive?.content ?: return@mapNotNull null,
-                downloadUrl = asset["browser_download_url"]?.jsonPrimitive?.content ?: return@mapNotNull null,
+                name = name,
+                downloadUrl = url,
                 digest = asset["digest"]?.jsonPrimitive?.content,
                 size = asset["size"]?.jsonPrimitive?.content?.toLongOrNull(),
             )
