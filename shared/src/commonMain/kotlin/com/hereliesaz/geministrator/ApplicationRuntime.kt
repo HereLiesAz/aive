@@ -1087,6 +1087,7 @@ class ApplicationRuntime private constructor(
                 plan = com.hereliesaz.geministrator.orchestration.OrchestrationPlan(currentSteps + extension),
                 packet = packet,
                 roles = rolesNow,
+                templates = com.hereliesaz.geministrator.template.DeviceTemplates.catalog(),
             )
         } catch (failure: IllegalArgumentException) {
             return@withLock failure.message ?: "The steps were not accepted."

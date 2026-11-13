@@ -82,8 +82,10 @@ internal fun plannedHiveDefinition(
     packet: OrchestrationPacket,
     roles: Collection<RoleDefinition>,
     id: WorkflowDefinitionId,
+    /** Resolves the version a templated step is made at; the built-in version when null. */
+    templates: com.hereliesaz.geministrator.template.TemplateCatalog? = null,
 ): WorkflowDefinition {
-    val planned = OrchestratedWorkflowFactory.create(id, design.name, plan, packet, roles)
+    val planned = OrchestratedWorkflowFactory.create(id, design.name, plan, packet, roles, templates)
     // The Orchestrator has done its work: a step that reuses its id is a new step, not that task.
     val original = design.tasks.filter { it.agentRoleId() != BuiltInRoles.Orchestrator.id }.associateBy { it.id.value }
     val tasks = planned.tasks.map { task ->

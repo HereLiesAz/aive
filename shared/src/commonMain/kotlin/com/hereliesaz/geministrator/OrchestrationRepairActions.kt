@@ -107,6 +107,7 @@ suspend fun ApplicationRuntime.repairFailureEscalation(
         plan = repairPlan,
         packet = packet,
         roles = roles,
+        templates = com.hereliesaz.geministrator.template.DeviceTemplates.catalog(),
     )
     val preparedDefinition = WorkflowDefinitionPreparer(providerRegistry, roles)
         .prepare(repairedDefinition, presentation.project.repository)

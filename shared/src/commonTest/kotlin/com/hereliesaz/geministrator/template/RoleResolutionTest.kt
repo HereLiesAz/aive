@@ -23,7 +23,7 @@ class RoleResolutionTest {
 
     @AfterTest
     fun reset() {
-        LaunchRoles.store = null
+        DeviceTemplates.store = null
     }
 
     @Test
@@ -62,9 +62,9 @@ class RoleResolutionTest {
     fun launchRolesReadTheStoreAndNoRevisionsLeavesThemAsTheyAre() = runTest {
         val store = InMemoryTemplateStore()
         store.adopt(revision(planner, 2, "Plan in five steps."))
-        LaunchRoles.store = store
+        DeviceTemplates.store = store
         assertEquals("Plan in five steps.", LaunchRoles.resolve(listOf(planner)).single().instructions)
-        LaunchRoles.store = InMemoryTemplateStore()
+        DeviceTemplates.store = InMemoryTemplateStore()
         assertEquals(listOf(planner), LaunchRoles.resolve(listOf(planner)))
     }
 }

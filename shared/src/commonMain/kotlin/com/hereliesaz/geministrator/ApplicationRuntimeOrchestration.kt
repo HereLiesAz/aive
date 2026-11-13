@@ -244,6 +244,7 @@ private suspend fun ApplicationRuntime.startPlannedWorkflow(
             packet = inputs.packet,
             roles = inputs.launchRoles,
             id = WorkflowDefinitionId("${inputs.design.id.value}--planned-$stamp"),
+            templates = com.hereliesaz.geministrator.template.DeviceTemplates.catalog(),
         )
     } else {
         OrchestratedWorkflowFactory.create(
@@ -252,6 +253,7 @@ private suspend fun ApplicationRuntime.startPlannedWorkflow(
             plan = plan,
             packet = inputs.packet,
             roles = inputs.launchRoles,
+            templates = com.hereliesaz.geministrator.template.DeviceTemplates.catalog(),
         )
     }
     val launchService = WorkflowLaunchService(

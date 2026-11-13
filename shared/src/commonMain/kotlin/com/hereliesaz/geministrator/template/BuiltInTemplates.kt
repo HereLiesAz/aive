@@ -208,8 +208,10 @@ object BuiltInTemplates {
 
     /** Appended to the planner's instruction when templates are offered. */
     const val PLANNER_INSTRUCTION: String =
-        " A step may instead use one of availableTemplates: set templateId and give templateInputs a value for every required port " +
-            "(a literal, or @<step id>.<port> to take it from an earlier step that is also listed in dependsOn); roleId may then be left blank."
+        " Begin from a starting template for every step whose output a reviewer can review (a document, a page, a table, a diagram, a verdict): " +
+            "use one of availableTemplates, set templateId and give templateInputs a value for every required port " +
+            "(a literal, or @<step id>.<port> to take it from an earlier step that is also listed in dependsOn); roleId may then be left blank. " +
+            "Give a step a role of its own only when no template fits its output."
 
     /** Every built-in as a catalog base. */
     fun bases(roles: Collection<RoleDefinition> = haiveBuiltInRoles): List<TemplateBase> =
