@@ -60,7 +60,8 @@ jobs:
           dependency-graph-include-projects: ':androidApp|:desktopApp|:webApp|:shared|:providers:llm'
           dependency-graph-include-configurations: '.*[Rr]untime.*'
           dependency-graph-continue-on-failure: false
-          additional-arguments: '-Phaive.useLocalH2g2=false'
+          # No override: settings.gradle.kts includes the pinned vendor/conveyance-h2g2 checkout
+          # by default, so the graph describes the pinned commits, not a moving JitPack snapshot.
           cache-disabled: true
 
       # Declares this as target-local CI to HereLiesAz/workflows; never fails the run.

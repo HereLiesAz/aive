@@ -149,6 +149,11 @@ jobs:
           set -euo pipefail
           python3 -m unittest discover -s tools/orchestration_training -p 'test_*.py'
           python3 -m unittest discover -s tools/refinement_training -p 'test_*.py'
+          python3 -m unittest discover -s tools/specialist_optimization -p 'test_*.py'
+          python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+          # The BitNet benchmark needs numpy, onnxruntime and transformers; the test module skips
+          # itself cleanly when they are absent (they are not installed on this runner).
+          python3 -m unittest discover -s tools/bitnet_benchmark -p 'test_*.py'
           python3 tools/orchestration_training/make_notebook.py
           git diff --exit-code -- \
             aive_orchestration_specialists.ipynb \
@@ -192,6 +197,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Existence, plus Google Play's 16 KB page-size rule: every LOAD segment of the 64-bit
+          # libraries must be aligned to at least 0x4000. The central android-play-release run
+          # re-checks the signed bundle; this catches a regression before it gets that far.
+          bad=0
           for abi in arm64-v8a armeabi-v7a x86_64; do
             for lib in \
               "androidApp/build/generated/bitcos/jniLibs/${abi}/libhaive_bitcos.so" \
@@ -200,8 +209,17 @@ jobs:
                 echo "::error::Expected native runtime library was not found: $lib"
                 exit 1
               fi
+              if [ "$abi" != "armeabi-v7a" ]; then
+                for align in $(readelf -lW "$lib" | awk '/LOAD/ {print $NF}' | sort -u); do
+                  if [ $((align)) -lt 16384 ]; then
+                    echo "::error::$lib has a LOAD segment aligned to $align; 16 KB (0x4000) required"
+                    bad=1
+                  fi
+                done
+              fi
             done
           done
+          test "$bad" -eq 0
 
       - name: Publish Conveyance for isolated web builds
         run: |
@@ -466,12 +484,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download GitHub Android release
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
-        with:
-          name: aive-android-github-release
-          path: release-input/android
-
+      # The signed Android APK/AAB are built and published by the central HereLiesAz/workflows
+      # android-github-release / android-play-release runs (README.md), so this job publishes only
+      # the desktop installers this workflow actually uploads.
       - name: Download Linux installer
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
@@ -514,13 +529,11 @@ jobs:
           set -euo pipefail
           mkdir -p release-files
 
-          APK_SOURCE=$(find release-input/android -type f -name '*.apk' -print -quit)
           DEB_SOURCE=$(find release-input/linux -type f -name '*.deb' -print -quit)
           MSI_SOURCE=$(find release-input/windows -type f -name '*.msi' -print -quit)
           DMG_SOURCE=$(find release-input/macos -type f -name '*.dmg' -print -quit)
 
           for entry in \
-            "APK_SOURCE:$APK_SOURCE" \
             "DEB_SOURCE:$DEB_SOURCE" \
             "MSI_SOURCE:$MSI_SOURCE" \
             "DMG_SOURCE:$DMG_SOURCE"; do
@@ -533,7 +546,6 @@ jobs:
             fi
           done
 
-          cp "$APK_SOURCE" "release-files/TheAive-${VERSION_NAME}-android.apk"
           cp "$DEB_SOURCE" "release-files/TheAive-${VERSION_NAME}.deb"
           cp "$MSI_SOURCE" "release-files/TheAive-${VERSION_NAME}.msi"
           cp "$DMG_SOURCE" "release-files/TheAive-${VERSION_NAME}.dmg"
