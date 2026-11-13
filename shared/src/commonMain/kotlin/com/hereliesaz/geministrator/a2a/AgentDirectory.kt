@@ -81,8 +81,12 @@ internal object LocalAgentDirectorySource : AgentDirectorySource {
  * Search never contacts advertised Agent Cards or enrolls providers.
  */
 internal class SearchA2aDirectorySource(
-    private val http: HttpClient = sharedExternalDiscoveryClient,
+    httpOverride: HttpClient? = null,
 ) : AgentDirectorySource {
+    // Resolved on first search, not at construction: the Providers screen builds an AgentDirectory
+    // during composition, and creating the shared client there needs a platform engine that
+    // headless renders (screenshot tests) do not have, and that the keeper may never use.
+    private val http: HttpClient by lazy { httpOverride ?: sharedExternalDiscoveryClient }
     override val name: String = "SearchA2A"
 
     override suspend fun search(query: String): List<AgentDirectoryEntry> {
