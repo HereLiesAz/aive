@@ -65,23 +65,26 @@ class McpStdioTransport private constructor(
     }
 
     private suspend fun readLoop() {
+        var failure = McpProtocolException("The MCP server process stopped")
         try {
-            process.inputStream.bufferedReader(Charsets.UTF_8).useLines { lines ->
-                for (line in lines) {
-                    if (line.length > MAX_LINE_CHARS) continue
-                    val message = McpJsonRpc.parse(line) ?: continue
-                    val id = McpJsonRpc.idOf(message)
-                    when {
-                        McpJsonRpc.isRequest(message) -> answerServerRequest(message)
-                        id != null -> id.longOrNull?.let { pending[it]?.complete(message) }
-                        else -> Unit // notifications about in-flight requests are not used
-                    }
+            val reader = StdioLineReader(process.inputStream, MAX_LINE_BYTES)
+            while (true) {
+                val line = reader.readLine() ?: break
+                val message = McpJsonRpc.parse(line) ?: continue
+                val id = McpJsonRpc.idOf(message)
+                when {
+                    McpJsonRpc.isRequest(message) -> answerServerRequest(message)
+                    id != null -> id.longOrNull?.let { pending[it]?.complete(message) }
+                    else -> Unit // notifications about in-flight requests are not used
                 }
             }
+        } catch (_: StdioLineTooLongException) {
+            // The stream cannot be resynchronised after an oversized line: fail the waiting calls and stop the server.
+            failure = McpProtocolException("The MCP server sent a message that is too large; it was stopped")
+            runCatching { process.destroy() }
         } catch (_: Exception) {
             // The stream closed; pending callers are failed below.
         } finally {
-            val failure = McpProtocolException("The MCP server process stopped")
             pending.values.forEach { it.completeExceptionally(failure) }
         }
     }
@@ -116,7 +119,7 @@ class McpStdioTransport private constructor(
     }
 
     companion object {
-        private const val MAX_LINE_CHARS = 8_000_000
+        private const val MAX_LINE_BYTES = 8_000_000
 
         /** Starts [command] directly (no shell); throws when it cannot be started. */
         fun start(
