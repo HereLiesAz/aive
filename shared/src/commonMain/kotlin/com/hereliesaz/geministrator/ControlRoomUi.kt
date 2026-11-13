@@ -1397,6 +1397,7 @@ private fun MainDestination(
                     sections = KeeperSection.entries.filter {
                         (it != KeeperSection.Compute || computeAvailable) &&
                             (it != KeeperSection.Delegations || delegations != null) &&
+                            it != KeeperSection.Improvement &&
                             (it != KeeperSection.LocalAgents || com.hereliesaz.geministrator.providers.cli.LocalCliAgentHost.current != null)
                     },
                     opening = KeeperSection.of(place),
@@ -1460,9 +1461,10 @@ private fun MainDestination(
                                             embedded = true,
                                         )
                                         KeeperSection.Delegations -> delegations?.let { DelegationsPart(it, compact) }
-                                        KeeperSection.Schedules -> SchedulesPart(compact)
                                         KeeperSection.LocalAgents -> LocalAgentsPart()
-                                        KeeperSection.Improvement -> {
+                                        // The self-improvement cycle is one of the schedules' jobs, so its proposals sit under them.
+                                        KeeperSection.Schedules -> {
+                                            SchedulesPart(compact)
                                             val roleHost = LocalWorkflowLibraryHost.current
                                             ImprovementPart(
                                                 memoryLayer = memoryLayer,

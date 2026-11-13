@@ -545,7 +545,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="local_agents_project_on">Using repository settings</string>
     <string name="local_agents_project_off">Refusing repository settings</string>
     <string name="keeper_schedules">Schedules</string>
-    <string name="keeper_schedules_lead">Swarms that start by themselves while the app is open. Each is off until you turn it on.</string>
+    <string name="keeper_schedules_lead">Swarms that start by themselves while the app is open, and the changes the swarm suggests to itself. Each schedule is off until you turn it on.</string>
     <string name="schedule_add_suite">Add the coding suite</string>
     <string name="schedule_suite_added">Added %1$d swarms to your swarms. Your scheduled ones are listed here, off.</string>
     <string name="schedule_suite_present">The coding suite is already on this device.</string>
@@ -596,10 +596,10 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="keeper_improvement">Improvement</string>
     <string name="keeper_improvement_lead">What the swarm's self-improvement cycle proposes. Nothing changes until you adopt it.</string>
     <string name="improvement_lead_note">The self-improvement cycle reads the swarm's run history and examines itself too. It only proposes. A proposal changes a role, a swarm or a schedule when you adopt it here, with the exact text shown; Revert puts it back.</string>
-    <string name="improvement_standing_examined">The loop has examined itself recently.</string>
-    <string name="improvement_standing_never">No cycle has finished yet. Add the coding suite in Schedules, then run a cycle.</string>
-    <string name="improvement_standing_overdue">The loop has not examined itself for three weeks or more. Run a cycle.</string>
-    <string name="improvement_standing_skipped">The last cycle did not examine the loop itself. That is a defect in the loop: a proposal about it, or evidence it needs no change, is required each cycle.</string>
+    <string name="improvement_standing_examined">The swarm reviewed its own review process recently.</string>
+    <string name="improvement_standing_never">No review of the swarm has finished yet. Add the coding suite above, then run a review.</string>
+    <string name="improvement_standing_overdue">The swarm has not reviewed its own review process for three weeks or more. Run a review.</string>
+    <string name="improvement_standing_skipped">The last review did not look at the review process itself. Each review must suggest a change to it, or show it needs none.</string>
     <string name="improvement_no_loop">The self-improvement cycle is not on this device. Keeper's room › Schedules › Add the coding suite adds it.</string>
     <string name="improvement_run_cycle">Run a cycle now</string>
     <string name="improvement_run_cycle_note">The cycle starts once, within a minute, when no other run is active. This does not turn its schedule on.</string>
