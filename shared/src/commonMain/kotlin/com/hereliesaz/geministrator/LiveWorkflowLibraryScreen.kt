@@ -150,7 +150,11 @@ internal fun LiveWorkflowLibraryScreen(
     var composeQuery by rememberDurableStringState("workflows.compose-query")
     var saveId by rememberDurableStringState("workflows.save-id")
     var saveName by rememberDurableStringState("workflows.save-name")
-    var runObjective by rememberDurableStringState("workflows.run-objective")
+    var runObjectiveDraft by rememberDurableStringState("workflows.run-objective")
+    // What was fed last fills an empty field (selected, never written as the draft); a role's field is its domain, so none there.
+    var seededRunObjective by remember { mutableStateOf("") }
+    val runObjective = runObjectiveDraft.ifBlank { seededRunObjective }
+    val runObjectiveHistory = com.hereliesaz.geministrator.prompts.rememberPromptHistory(com.hereliesaz.geministrator.prompts.PromptKind.Objective)
     var refreshGeneration by remember { mutableStateOf(0) }
 
     // Selecting a library card works on that workflow: it becomes the editable draft.
@@ -415,13 +419,30 @@ internal fun LiveWorkflowLibraryScreen(
                                             style = AzphaltType.body,
                                             color = azphaltOnSurface(),
                                         )
-                                        OutlinedTextField(
+                                        com.hereliesaz.geministrator.prompts.PromptSuggestBox(
+                                            kind = com.hereliesaz.geministrator.prompts.PromptKind.Objective,
                                             value = runObjective,
-                                            onValueChange = { runObjective = it },
-                                            label = { Text(stringResource(Res.string.library_run_objective_inputs)) },
-                                            placeholder = { Text(stringResource(Res.string.library_optional_workflows_may_use_this_as)) },
+                                            onValueChange = {
+                                                runObjectiveDraft = it
+                                                seededRunObjective = ""
+                                            },
                                             modifier = Modifier.fillMaxWidth(),
-                                        )
+                                            seed = if (selectedEntry?.role == null) {
+                                                com.hereliesaz.geministrator.prompts.PromptSuggestions.lastObjective(runObjectiveHistory.entries)
+                                            } else {
+                                                null
+                                            },
+                                            onSeeded = { seededRunObjective = it },
+                                            resetKey = currentDraft.id.value,
+                                        ) { field ->
+                                            OutlinedTextField(
+                                                value = field.value,
+                                                onValueChange = field.onValueChange,
+                                                label = { Text(stringResource(Res.string.library_run_objective_inputs)) },
+                                                placeholder = { Text(stringResource(Res.string.library_optional_workflows_may_use_this_as)) },
+                                                modifier = Modifier.fillMaxWidth().then(field.modifier),
+                                            )
+                                        }
                                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                             if (host != null) {
                                                 AzphaltPill(
@@ -430,7 +451,10 @@ internal fun LiveWorkflowLibraryScreen(
                                                     onClick = {
                                                         scope.launch {
                                                             runCatching { host.run(currentDraft, runObjective) }
-                                                                .onSuccess { status = getString(Res.string.library_started, currentDraft.name) }
+                                                                .onSuccess {
+                                                                    runObjectiveHistory.record(runObjective)
+                                                                    status = getString(Res.string.library_started, currentDraft.name)
+                                                                }
                                                                 .onFailure { loadError = it.message ?: getString(Res.string.library_workflow_launch_failed) }
                                                         }
                                                     },
@@ -444,7 +468,7 @@ internal fun LiveWorkflowLibraryScreen(
                                                     seed = "workflow-train-specialist",
                                                     onClick = {
                                                         scope.launch {
-                                                            val started = runCatching { host.trainSpecialist(trainRole.id.value, runObjective) }.getOrDefault(false)
+                                                            val started = runCatching { host.trainSpecialist(trainRole.id.value, runObjectiveDraft) }.getOrDefault(false)
                                                             if (started) {
                                                                 status = getString(Res.string.library_train_started, trainRole.name)
                                                             } else {
