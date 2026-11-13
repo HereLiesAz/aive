@@ -85,6 +85,11 @@ enum class QueenVoice(val relay: QueenRelay?) {
 
     // --- The Nanny's findings handed to the queen (queen/NannyFindings.kt). Kept apart, after every other voice. ---
     SuggestNannyFinding(QueenRelay.Nanny),
+
+    // --- The training swarm (queen/TrainingLoop.kt). Kept apart, after every other voice. ---
+    TrainingOffer(QueenRelay.Watch),
+    TrainingStopped(QueenRelay.Watch),
+    TrainingNeedsYou(QueenRelay.Watch),
 }
 
 /** Where a note leads: an existing place, never a new one. */

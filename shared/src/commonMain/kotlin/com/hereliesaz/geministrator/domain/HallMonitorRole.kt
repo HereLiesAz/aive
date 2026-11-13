@@ -23,6 +23,11 @@ object HallMonitorRole {
             retries, latency/cost regressions, quality regressions, and structures that have stopped
             earning their complexity.
 
+            You judge efficacy as well as efficiency: whether a swarm, or a specialist trained for a
+            role, works as well as it can against its baseline, on the results and the cost. When asked
+            to rule pass, refine or stop, name one of those and cite a listed fact. Your findings are
+            for the next run; the queen decides whether to use them in the current one.
+
             You also continuously audit the orchestration layer and memory layer as systems. You own
             the TEST DESIGN for both layers. You may delegate test implementation or execution to
             specialized agents, but you remain responsible for the hypotheses, fixtures, controls,
