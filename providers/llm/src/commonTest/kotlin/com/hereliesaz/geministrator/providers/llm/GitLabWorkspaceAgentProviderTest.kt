@@ -25,6 +25,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -32,6 +33,21 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class GitLabWorkspaceAgentProviderTest {
+    // An engine left open outlives the test and can report its failure to whichever test runs next
+    // (kotlinx.coroutines.test.UncaughtExceptionsBeforeTest), so every client a test made is closed.
+    private val opened = mutableListOf<HttpClient>()
+
+    private fun trackedClient(
+        engine: io.ktor.client.engine.HttpClientEngine,
+        config: io.ktor.client.HttpClientConfig<*>.() -> Unit = {},
+    ): HttpClient = HttpClient(engine, config).also { opened += it }
+
+    @AfterTest
+    fun closeOpenedClients() {
+        opened.forEach { it.close() }
+        opened.clear()
+    }
+
     @Test
     fun commitsValidatedFileActionsToNestedGitLabRepository() = runTest {
         val requests = mutableListOf<HttpRequestData>()
@@ -74,7 +90,7 @@ class GitLabWorkspaceAgentProviderTest {
                 outputTokens = 5,
             ),
         )
-        val provider = provider(api, HttpClient(engine), "nested-gitlab")
+        val provider = provider(api, trackedClient(engine), "nested-gitlab")
 
         val handle = provider.start(request(TaskRunId("task-1")))
         val events = provider.observe(handle.providerRunId).toList()
@@ -126,7 +142,7 @@ class GitLabWorkspaceAgentProviderTest {
             )
         }
         val api = QueueTextApi(TextGenerationResult(text = "Update README.\nFILES:\nREADME.md", inputTokens = 1, outputTokens = 1))
-        val provider = provider(api, HttpClient(engine), "redirect-gitlab")
+        val provider = provider(api, trackedClient(engine), "redirect-gitlab")
 
         val handle = provider.start(request(TaskRunId("task-redirect")))
         provider.observe(handle.providerRunId).toList()
@@ -168,7 +184,7 @@ class GitLabWorkspaceAgentProviderTest {
                 text = """{"commitMessage":"Approved update","actions":[{"action":"update","filePath":"README.md","content":"approved\n"}]}""",
             ),
         )
-        val provider = provider(api, HttpClient(engine), "approval-gitlab")
+        val provider = provider(api, trackedClient(engine), "approval-gitlab")
         val handle = provider.start(request(TaskRunId("approval-task"), requirePlanApproval = true))
 
         val firstEvent = provider.observe(handle.providerRunId).first()
@@ -220,7 +236,7 @@ class GitLabWorkspaceAgentProviderTest {
                 text = """{"commitMessage":"Escape","actions":[{"action":"create","filePath":"../outside.txt","content":"nope"}]}""",
             ),
         )
-        val provider = provider(api, HttpClient(engine), "unsafe-gitlab")
+        val provider = provider(api, trackedClient(engine), "unsafe-gitlab")
 
         val handle = provider.start(request(TaskRunId("unsafe-task")))
         val events = provider.observe(handle.providerRunId).toList()
@@ -261,7 +277,7 @@ class GitLabWorkspaceAgentProviderTest {
                 return result
             }
         }
-        provider = provider(api, HttpClient(engine), "cancelled-gitlab")
+        provider = provider(api, trackedClient(engine), "cancelled-gitlab")
 
         runId = provider.start(request(TaskRunId("cancelled-task"))).providerRunId
         val events = provider.observe(runId!!).toList()

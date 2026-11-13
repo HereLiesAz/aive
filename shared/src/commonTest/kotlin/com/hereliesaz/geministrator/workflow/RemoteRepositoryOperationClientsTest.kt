@@ -18,11 +18,27 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class RemoteRepositoryOperationClientsTest {
+    // An engine left open outlives the test and can report its failure to whichever test runs next
+    // (kotlinx.coroutines.test.UncaughtExceptionsBeforeTest), so every client a test made is closed.
+    private val opened = mutableListOf<HttpClient>()
+
+    private fun trackedClient(
+        engine: io.ktor.client.engine.HttpClientEngine,
+        config: io.ktor.client.HttpClientConfig<*>.() -> Unit = {},
+    ): HttpClient = HttpClient(engine, config).also { opened += it }
+
+    @AfterTest
+    fun closeOpenedClients() {
+        opened.forEach { it.close() }
+        opened.clear()
+    }
+
     @Test
     fun gitLabStatusReadsProjectAndBranchWithPrivateToken() = runBlocking {
         val requests = mutableListOf<io.ktor.client.request.HttpRequestData>()
@@ -39,7 +55,7 @@ class RemoteRepositoryOperationClientsTest {
         }
         val client = GitLabRestRepositoryOperationClient(
             tokenProvider = RepositoryServiceTokenProvider { "gitlab-token" },
-            httpClient = HttpClient(engine),
+            httpClient = trackedClient(engine),
         )
 
         val run = client.start(gitLabProject(), "status")
@@ -65,7 +81,7 @@ class RemoteRepositoryOperationClientsTest {
         }
         val client = GitLabRestRepositoryOperationClient(
             tokenProvider = RepositoryServiceTokenProvider { "gitlab-token" },
-            httpClient = HttpClient(engine),
+            httpClient = trackedClient(engine),
         )
 
         val run = client.start(gitLabProject(), "create-branch:feature/repo-links")
@@ -92,7 +108,7 @@ class RemoteRepositoryOperationClientsTest {
         }
         val client = GitLabRestRepositoryOperationClient(
             tokenProvider = RepositoryServiceTokenProvider { "gitlab-token" },
-            httpClient = HttpClient(engine),
+            httpClient = trackedClient(engine),
         )
 
         val run = client.start(
@@ -122,7 +138,7 @@ class RemoteRepositoryOperationClientsTest {
         }
         val client = GitHubRestRepositoryOperationClient(
             tokenProvider = RepositoryServiceTokenProvider { "github-token" },
-            httpClient = HttpClient(engine),
+            httpClient = trackedClient(engine),
             baseUrl = "https://api.github.test",
         )
 
@@ -167,8 +183,8 @@ class RemoteRepositoryOperationClientsTest {
     fun repositoryClientsNeverFollowARedirectWithTheirToken() = runBlocking {
         val requests = mutableListOf<io.ktor.client.request.HttpRequestData>()
         // Whatever client is handed in, the redirect policy is the class's own.
-        val gitHub = GitHubRestRepositoryOperationClient(RepositoryServiceTokenProvider { "gh-token" }, HttpClient(redirectingEngine(requests)))
-        val gitLab = GitLabRestRepositoryOperationClient(RepositoryServiceTokenProvider { "gl-token" }, HttpClient(redirectingEngine(requests)))
+        val gitHub = GitHubRestRepositoryOperationClient(RepositoryServiceTokenProvider { "gh-token" }, trackedClient(redirectingEngine(requests)))
+        val gitLab = GitLabRestRepositoryOperationClient(RepositoryServiceTokenProvider { "gl-token" }, trackedClient(redirectingEngine(requests)))
 
         runCatching { gitHub.start(githubProject(), "status") }
         runCatching { gitLab.start(gitLabProject(), "status") }
@@ -180,7 +196,7 @@ class RemoteRepositoryOperationClientsTest {
     @Test
     fun actionsClientNeverFollowsARedirectWithItsToken() = runBlocking {
         val requests = mutableListOf<io.ktor.client.request.HttpRequestData>()
-        val client = GitHubRestActionsClient(GitHubTokenProvider { "gh-token" }, HttpClient(redirectingEngine(requests)))
+        val client = GitHubRestActionsClient(GitHubTokenProvider { "gh-token" }, trackedClient(redirectingEngine(requests)))
 
         runCatching { client.getRun(githubProject().repository!!, "42") }
 

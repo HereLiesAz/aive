@@ -25,6 +25,7 @@ import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -34,6 +35,21 @@ import kotlinx.coroutines.test.runTest
 
 @OptIn(ExperimentalEncodingApi::class)
 class ComputeNodeIdentityTest {
+    // An engine left open outlives the test and can report its failure to whichever test runs next
+    // (kotlinx.coroutines.test.UncaughtExceptionsBeforeTest), so every client a test made is closed.
+    private val opened = mutableListOf<HttpClient>()
+
+    private fun trackedClient(
+        engine: io.ktor.client.engine.HttpClientEngine,
+        config: io.ktor.client.HttpClientConfig<*>.() -> Unit = {},
+    ): HttpClient = HttpClient(engine, config).also { opened += it }
+
+    @AfterTest
+    fun closeOpenedClients() {
+        opened.forEach { it.close() }
+        opened.clear()
+    }
+
     @Test
     fun signedConnectHeadersCarryTheNodeTimestampNonceAndASignatureOfThoseFields() {
         val headers = ComputeNodeAuth.signedConnectHeaders(FakeSigner, "pool", "desk", 1_234L, "0123456789abcdef")
@@ -67,7 +83,7 @@ class ComputeNodeIdentityTest {
                 headers = headersOf(HttpHeaders.ContentType, "application/json"),
             )
         }
-        val enroller = ComputeNodeEnroller(HttpClient(engine), "wss://relay.example/", "pool", "pool-token", FakeSigner, { 99L })
+        val enroller = ComputeNodeEnroller(trackedClient(engine), "wss://relay.example/", "pool", "pool-token", FakeSigner, { 99L })
 
         val response = enroller.enrol("desk", "Desk")
 
@@ -94,7 +110,7 @@ class ComputeNodeIdentityTest {
             )
         }
         val ledger = InMemoryComputeNodeEnrolmentLedger()
-        val client = client(HttpClient(engine), ledger)
+        val client = client(trackedClient(engine), ledger)
 
         client.ensureEnrolled()
         client.ensureEnrolled()
@@ -116,7 +132,7 @@ class ComputeNodeIdentityTest {
             )
         }
         val ledger = InMemoryComputeNodeEnrolmentLedger()
-        val client = client(HttpClient(engine), ledger)
+        val client = client(trackedClient(engine), ledger)
 
         val refused = assertFailsWith<ComputeNodeEnrolmentException> { client.ensureEnrolled() }
 

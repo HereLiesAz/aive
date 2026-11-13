@@ -15,12 +15,28 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class GitHubRestActionsClientTest {
+    // An engine left open outlives the test and can report its failure to whichever test runs next
+    // (kotlinx.coroutines.test.UncaughtExceptionsBeforeTest), so every client a test made is closed.
+    private val opened = mutableListOf<HttpClient>()
+
+    private fun trackedClient(
+        engine: io.ktor.client.engine.HttpClientEngine,
+        config: io.ktor.client.HttpClientConfig<*>.() -> Unit = {},
+    ): HttpClient = HttpClient(engine, config).also { opened += it }
+
+    @AfterTest
+    fun closeOpenedClients() {
+        opened.forEach { it.close() }
+        opened.clear()
+    }
+
     @Test
     fun dispatchUsesReturnedWorkflowRunIdWithoutGuessingFromRunList() = runBlocking {
         val requests = mutableListOf<HttpRequestData>()
@@ -41,7 +57,7 @@ class GitHubRestActionsClientTest {
             }
         }
         val client = GitHubRestActionsClient(
-            httpClient = HttpClient(engine),
+            httpClient = trackedClient(engine),
             tokenProvider = GitHubTokenProvider { "token-123" },
             baseUrl = "https://api.github.test",
         )
@@ -88,7 +104,7 @@ class GitHubRestActionsClientTest {
             }
         }
         val client = GitHubRestActionsClient(
-            httpClient = HttpClient(engine),
+            httpClient = trackedClient(engine),
             tokenProvider = GitHubTokenProvider { "token-123" },
             baseUrl = "https://api.github.test",
         )
@@ -133,7 +149,7 @@ class GitHubRestActionsClientTest {
             }
         }
         val client = GitHubRestActionsClient(
-            httpClient = HttpClient(engine),
+            httpClient = trackedClient(engine),
             tokenProvider = GitHubTokenProvider { "token" },
             baseUrl = "https://api.github.test",
         )
@@ -165,7 +181,7 @@ class GitHubRestActionsClientTest {
             }
         }
         val client = GitHubRestActionsClient(
-            httpClient = HttpClient(engine),
+            httpClient = trackedClient(engine),
             tokenProvider = GitHubTokenProvider { "token" },
             baseUrl = "https://api.github.test",
         )
@@ -204,7 +220,7 @@ class GitHubRestActionsClientTest {
             }
         }
         val client = GitHubRestActionsClient(
-            httpClient = HttpClient(engine),
+            httpClient = trackedClient(engine),
             tokenProvider = GitHubTokenProvider { "token" },
             baseUrl = "https://api.github.test",
         )
@@ -237,7 +253,7 @@ class GitHubRestActionsClientTest {
             }
         }
         val client = GitHubRestActionsClient(
-            httpClient = HttpClient(engine),
+            httpClient = trackedClient(engine),
             tokenProvider = GitHubTokenProvider { "token" },
             baseUrl = "https://api.github.test",
         )
@@ -257,7 +273,7 @@ class GitHubRestActionsClientTest {
             respond(content = "{}", status = status, headers = headersOf(HttpHeaders.ContentType, "application/json"))
         }
         val client = GitHubRestActionsClient(
-            httpClient = HttpClient(engine),
+            httpClient = trackedClient(engine),
             tokenProvider = GitHubTokenProvider { "token-123" },
             baseUrl = "https://api.github.test",
         )

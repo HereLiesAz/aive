@@ -27,6 +27,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -34,6 +35,21 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PromptCachingTest {
+    // An engine left open outlives the test and can report its failure to whichever test runs next
+    // (kotlinx.coroutines.test.UncaughtExceptionsBeforeTest), so every client a test made is closed.
+    private val opened = mutableListOf<HttpClient>()
+
+    private fun trackedClient(
+        engine: io.ktor.client.engine.HttpClientEngine,
+        config: io.ktor.client.HttpClientConfig<*>.() -> Unit = {},
+    ): HttpClient = HttpClient(engine, config).also { opened += it }
+
+    @AfterTest
+    fun closeOpenedClients() {
+        opened.forEach { it.close() }
+        opened.clear()
+    }
+
     private val prompt = CacheablePrompt(
         stablePrefix = "ROLE INSTRUCTIONS\nArchitect\n\n",
         dynamicSuffix = "TASK\nDesign the sync worker",
@@ -274,7 +290,7 @@ class PromptCachingTest {
     private fun recordingClient(
         bodies: MutableList<String>,
         handler: suspend MockRequestHandleScope.(HttpRequestData) -> HttpResponseData,
-    ): HttpClient = HttpClient(
+    ): HttpClient = trackedClient(
         MockEngine { request: HttpRequestData ->
             when (val content = request.body) {
                 is OutgoingContent.ByteArrayContent -> bodies += content.bytes().decodeToString()

@@ -7,16 +7,32 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AndroidOpenRouterAccountAuthorizationTest {
+    // An engine left open outlives the test and can report its failure to whichever test runs next
+    // (kotlinx.coroutines.test.UncaughtExceptionsBeforeTest), so every client a test made is closed.
+    private val opened = mutableListOf<HttpClient>()
+
+    private fun trackedClient(
+        engine: io.ktor.client.engine.HttpClientEngine,
+        config: io.ktor.client.HttpClientConfig<*>.() -> Unit = {},
+    ): HttpClient = HttpClient(engine, config).also { opened += it }
+
+    @After
+    fun closeOpenedClients() {
+        opened.forEach { it.close() }
+        opened.clear()
+    }
+
     @Test
     fun signInUsesFreshPkceAndTheCodeIsOneShot() = runBlocking {
         var exchanges = 0
-        val client = HttpClient(MockEngine { request ->
+        val client = trackedClient(MockEngine { request ->
             exchanges += 1
             assertEquals("https://openrouter.ai/api/v1/auth/keys", request.url.toString())
             respond("""{"key":"sk-or-v1-test"}""", HttpStatusCode.OK,
@@ -44,7 +60,7 @@ class AndroidOpenRouterAccountAuthorizationTest {
     @Test
     fun failedExchangeCannotReplayTheSameVerifier() = runBlocking {
         var requests = 0
-        val client = HttpClient(MockEngine {
+        val client = trackedClient(MockEngine {
             requests += 1
             respond("{}", HttpStatusCode.Forbidden)
         })
