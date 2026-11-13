@@ -38,6 +38,7 @@ import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
 import io.ktor.client.HttpClient
 import kotlinx.browser.window
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.async
 import com.hereliesaz.geministrator.memory.HostedMemoryEngineProvider
@@ -98,8 +99,16 @@ fun main() {
         var repositoryCredentials by remember { mutableStateOf(emptyMap<String, String>()) }
         var credentialsLoaded by remember { mutableStateOf(false) }
         val scope = rememberCoroutineScope()
+        val freeProviderWrites = remember { kotlinx.coroutines.sync.Mutex() }
         // Credentials are encrypted at rest, so they load asynchronously before the app starts.
         LaunchedEffect(Unit) {
+            // Keyless sources start on, once each: a source the keeper disconnects later stays off.
+            KeylessDefaults.pending(readWebProviderCredentials().keys).let { plan ->
+                plan.connect.forEach { id ->
+                    runCatching { WebCredentialStore.write(providerStorageKey(id), ProviderCatalog.ANONYMOUS_CREDENTIAL) }
+                }
+                KeylessDefaults.commit(plan)
+            }
             credentials = readWebProviderCredentials()
             repositoryCredentials = readWebRepositoryCredentials()
             credentialsLoaded = true
@@ -197,9 +206,12 @@ fun main() {
                 },
                 onReconfigureProvider = { configuringProviderId = it },
                 onConnectFreeProvider = { freeProviderId ->
+                    // One at a time: the keyless switch connects several, and each re-reads what is stored.
                     scope.launch {
-                        WebCredentialStore.write(providerStorageKey(freeProviderId), ProviderCatalog.ANONYMOUS_CREDENTIAL)
-                        credentials = readWebProviderCredentials()
+                        freeProviderWrites.withLock {
+                            WebCredentialStore.write(providerStorageKey(freeProviderId), ProviderCatalog.ANONYMOUS_CREDENTIAL)
+                            credentials = readWebProviderCredentials()
+                        }
                     }
                 },
                 onDisconnectProvider = { disconnectedProviderId ->

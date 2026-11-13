@@ -59,6 +59,25 @@ object ProviderCatalog {
     /** Most generous free limits first (Kilo: 200 requests an hour; LLM7: tight; OVHcloud: 2 a minute). */
     private val FREE_RELIABILITY_ORDER = listOf(KILO_ID, LLM7_ID, OVHCLOUD_ID)
 
+    /** True for a built-in Source that makes pictures, not text. */
+    fun isImageOnly(id: String): Boolean = id in IMAGE_ONLY_IDS
+
+    /** Position of [id] among the free gateways, best limits first; the rest sort after. */
+    fun freeReliabilityRank(id: String): Int = FREE_RELIABILITY_ORDER.indexOf(id).let { if (it < 0) Int.MAX_VALUE else it }
+
+    /**
+     * The request limits the catalog text states for a keyless Source: at most [requests] in [windowMillis] per
+     * IP address. Sources whose text gives no number (LLM7: "tight") have none here, and are paced only by the
+     * rate-limit answers they send back.
+     */
+    data class KeylessRateLimit(val requests: Int, val windowMillis: Long)
+
+    fun keylessRateLimit(id: String): KeylessRateLimit? = when (id) {
+        KILO_ID -> KeylessRateLimit(requests = 200, windowMillis = 60 * 60_000L)
+        OVHCLOUD_ID -> KeylessRateLimit(requests = 2, windowMillis = 60_000L)
+        else -> null
+    }
+
     /**
      * The free gateways a first hive offers in one tap: keyless, able to write text, best limits first,
      * at most three. (The Keeper's room lists the rest.)
@@ -66,7 +85,7 @@ object ProviderCatalog {
     fun firstRunFreeEntries(): List<ProviderCatalogEntry> =
         builtInEntries
             .filter { it.keyOptional && it.id !in IMAGE_ONLY_IDS }
-            .sortedBy { entry -> FREE_RELIABILITY_ORDER.indexOf(entry.id).let { if (it < 0) Int.MAX_VALUE else it } }
+            .sortedBy { freeReliabilityRank(it.id) }
             .take(3)
 
     /** The providers built into Aive. */

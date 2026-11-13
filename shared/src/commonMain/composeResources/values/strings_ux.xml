@@ -63,7 +63,9 @@
     <string name="overview_enter_objective">Enter an objective to start a run.</string>
     <string name="overview_invalid_repository_location">Invalid repository location</string>
     <string name="firstrun_title">Try it free, no key</string>
-    <string name="firstrun_body">No account needed. Pick one of these to get started; you can add a stronger source later. Free gateways may log prompts and limit how many requests you can send, so keep confidential data out.</string>
+    <string name="firstrun_body">No account needed. Pick one of these to get started; you can add a stronger source later.</string>
+    <string name="keyless_sources_on">Keyless sources: on</string>
+    <string name="keyless_sources_off">Keyless sources: off</string>
     <string name="firstrun_connect">Connect %1$s</string>
     <string name="firstrun_connect_hint">Opens a screen where you confirm. No key is needed.</string>
     <string name="remote_access_enter_code">Enter this code in IDEaz on your other device: Settings → The Aive.</string>
@@ -75,7 +77,7 @@
     <string name="credential_keyless_warning_title">Connect without a key?</string>
     <string name="credential_keyless_warning_body">Free gateways without a key may log your prompts and limit requests per IP address. Keep confidential data out of workflows that use it.</string>
     <string name="credential_keyless_warning_confirm">Connect without a key</string>
-    <string name="credential_keyless_hint">Free gateways take your prompts without a key and may log them, so keep confidential work out.</string>
+    <string name="credential_keyless_hint">Prompts and repository text sent to a keyless source leave this device and may be logged. Free sources limit requests (Kilo 200 an hour, OVHcloud 2 a minute).</string>
     <string name="swarm_title">Swarm</string>
     <string name="creature_rig_gallery_title">Puppet-rig creatures</string>
     <string name="inspector_hint_approve_plan">Approving lets the agent start making the changes in its plan. It may use your source quota and change the repository.</string>
