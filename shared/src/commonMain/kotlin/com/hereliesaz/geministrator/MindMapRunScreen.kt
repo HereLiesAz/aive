@@ -939,8 +939,9 @@ internal fun MindMapRunScreen(
                 value = detail,
                 // A link: what it says is acted on in the creature's panel (its provider, its job).
                 onClick = { openCreature(task.id.value) },
+                // Not live regions: several of these update at once while a swarm works, and each
+                // announcement would interrupt the last. They read when focused.
                 modifier = Modifier
-                    .azphaltLiveRegion()
                     .azphaltEntrance(activityEntrance, index, recentTasks.size.coerceAtLeast(1)),
             )
         }

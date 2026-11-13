@@ -144,7 +144,12 @@ internal fun SchedulesPart(compact: Boolean) {
         runCatching { store.update(id, change) }.onFailure { message = it.message }
         reload += 1
     }
+    // Turning a schedule on awaits the host's vetting; a second tap meanwhile would vet and write twice.
+    var toggling by remember { mutableStateOf<String?>(null) }
     fun toggle(schedule: WorkflowSchedule) = scope.launch {
+        if (toggling == schedule.id) return@launch
+        toggling = schedule.id
+        try {
         if (schedule.enabled) {
             runCatching { store.update(schedule.id) { it.copy(enabled = false) } }.onFailure { message = it.message }
         } else {
@@ -157,6 +162,9 @@ internal fun SchedulesPart(compact: Boolean) {
                     store.update(schedule.id) { it.copy(enabled = true, definitionFingerprint = vetting?.fingerprint ?: it.definitionFingerprint) }
                 }.onFailure { message = it.message }
             }
+        }
+        } finally {
+            toggling = null
         }
         reload += 1
     }

@@ -88,9 +88,12 @@ internal fun azphaltSurface(): Color = LocalAzphaltSurface.current ?: Azphalt.cu
 @Composable
 internal fun azphaltOnSurface(): Color = azphaltSurface().onOpposite()
 
-/** Disabled or secondary content on [azphaltSurface]: softened, but never under 3:1. */
+/** Secondary text on [surface]: softened, but never under 4.5:1 (it is read, so the 3:1 large-text floor is not enough). */
+internal fun secondaryTextOn(surface: Color): Color = surface.mutedOnOpposite(AZPHALT_MIN_TEXT_CONTRAST)
+
+/** Secondary content on [azphaltSurface]: softened, but never under 4.5:1. Disabled controls keep the 3:1 floor. */
 @Composable
-internal fun azphaltMutedOnSurface(): Color = azphaltSurface().mutedOnOpposite()
+internal fun azphaltMutedOnSurface(): Color = secondaryTextOn(azphaltSurface())
 
 /**
  * Declares that everything inside is drawn on [background] (composited over the surface already

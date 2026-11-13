@@ -76,4 +76,11 @@ class AzphaltAccessibilityTest {
         assertTrue(effectiveReduceMotion(platformReduceMotion = true, keeperReduceMotion = false))
         assertTrue(effectiveReduceMotion(platformReduceMotion = true, keeperReduceMotion = true))
     }
+
+    @Test
+    fun aRecordReadsItsBodyAfterItsTitleKindAndCap() {
+        assertEquals("Ship it, Task, 2 left. Do the thing", recordDescription("Ship it", "Task", "2 left", "Do the thing"))
+        assertEquals("Ship it", recordDescription("Ship it", "", null, null))
+        assertEquals("Ship it, Task", recordDescription("Ship it", "Task", " ", ""))
+    }
 }

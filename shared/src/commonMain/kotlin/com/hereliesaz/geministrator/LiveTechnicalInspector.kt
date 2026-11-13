@@ -60,6 +60,7 @@ import com.hereliesaz.geministrator.resources.inspector_budget_spent
 import com.hereliesaz.geministrator.resources.inspector_raise_budget
 import com.hereliesaz.geministrator.agentui.awaitsKeeperAnswer
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.size
@@ -617,10 +618,24 @@ internal fun TechnicalInspector(
                     if (!liveWorkflow.run.status.isFinished()) {
                         var rewindMessage by remember(taskId) { mutableStateOf<String?>(null) }
                         val rewindScope = rememberCoroutineScope()
+                        // A second tap while the first is running would rewind it twice.
+                        var rewinding by remember(taskId) { mutableStateOf(false) }
                         AzphaltPill(
                             label = stringResource(Res.string.inspector_rewind),
                             seed = "inspector-rewind",
-                            onClick = { rewindScope.launch { rewindMessage = onRewindTask(taskId.value) } },
+                            enabled = !rewinding,
+                            onClick = {
+                                if (!rewinding) {
+                                    rewinding = true
+                                    rewindScope.launch {
+                                        try {
+                                            rewindMessage = onRewindTask(taskId.value)
+                                        } finally {
+                                            rewinding = false
+                                        }
+                                    }
+                                }
+                            },
                         )
                         Text(stringResource(Res.string.inspector_rewind_note), style = AzphaltType.body, color = azphaltOnSurface())
                         rewindMessage?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface()) }
@@ -810,10 +825,22 @@ private fun LiveInspectorLine(label: String, value: String, live: Boolean = fals
     Column(
         verticalArrangement = Arrangement.spacedBy(3.dp),
         modifier = (if (live) Modifier.semantics { liveRegion = LiveRegionMode.Polite } else Modifier)
-            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier),
+            .then(
+                if (onClick != null) {
+                    Modifier.defaultMinSize(minHeight = AzphaltMinTouchTarget).clickable(role = Role.Button, onClick = onClick)
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         Text(label, style = AzphaltType.eyebrow, color = azphaltOnSurface())
-        Text(value, style = AzphaltType.body, color = azphaltOnSurface())
+        // A link reads as one: underlined.
+        Text(
+            value,
+            style = AzphaltType.body,
+            color = azphaltOnSurface(),
+            textDecoration = if (onClick != null) androidx.compose.ui.text.style.TextDecoration.Underline else null,
+        )
     }
 }
 

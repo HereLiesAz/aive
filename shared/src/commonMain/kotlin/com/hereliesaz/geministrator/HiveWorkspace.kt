@@ -359,8 +359,9 @@ internal fun HiveControlsBar(
                     .weight(1f)
                     .heightIn(min = AzphaltMinTouchTarget)
                     .then(if (onStatusClick != null) Modifier.clickable(role = Role.Button, onClick = onStatusClick) else Modifier)
-                    .padding(horizontal = 14.dp)
-                    .azphaltLiveRegion(),
+                    // Not a live region: this line changes with every thought a creature has, and announcing
+                    // each one talks over the keeper. It reads when focused.
+                    .padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -421,7 +422,8 @@ internal fun HiveTissueFrame(height: Dp, building: Boolean, modifier: Modifier =
                 .fillMaxSize()
                 .then(if (building) Modifier.border(3.dp, Azphalt.Yellow) else Modifier),
         ) {
-            field()
+            // The tissue is Ink whatever the page ground: its content reads against Ink, not the ground.
+            AzphaltThemedSurface(Azphalt.Ink) { field() }
             HiveLegend(Modifier.align(Alignment.BottomStart).padding(horizontal = 14.dp, vertical = 10.dp))
         }
     }
