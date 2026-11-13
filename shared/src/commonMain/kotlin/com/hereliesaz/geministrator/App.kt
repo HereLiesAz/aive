@@ -529,7 +529,20 @@ fun App(
             ?: startupControlRoomDestination(hasConfiguredProvider = providers.any { it !is OnDeviceTextAgentProvider })
         var selectedTaskIdValue by rememberDurableStringState("navigation.selected-task-id")
         val selectedTaskId = selectedTaskIdValue.takeIf(String::isNotBlank)
-        var navigationHistory by remember { mutableStateOf(emptyList<ControlRoomDestination>()) }
+        var navigationHistory by remember { mutableStateOf(emptyList<NavEntry>()) }
+        // Where the keeper is now, with the creature and tab open there: what Back returns to (B1).
+        fun hereEntry() = NavEntry(
+            destination = destination,
+            taskId = selectedTaskId.orEmpty(),
+            tab = if (selectedTaskId != null) DurableUiState.store.getString("creature.panel.tab").orEmpty() else "",
+        )
+        // The one way to go to a place: it records where the keeper was, creature and tab included.
+        fun navigate(target: ControlRoomDestination) {
+            if (target == destination) return
+            navigationHistory = historyAfterNavigate(navigationHistory, hereEntry(), target)
+            destinationName = target.name
+            if (target != ControlRoomDestination.Overview) selectedTaskIdValue = ""
+        }
         val taskInspectorVisible = selectedTaskId != null &&
             destination == ControlRoomDestination.Overview
 
@@ -541,8 +554,14 @@ fun App(
             when {
                 taskInspectorVisible -> selectedTaskIdValue = ""
                 navigationHistory.isNotEmpty() -> {
-                    destinationName = navigationHistory.last().name
+                    val back = navigationHistory.last()
+                    destinationName = back.destination.name
                     navigationHistory = navigationHistory.dropLast(1)
+                    if (back.taskId.isNotEmpty()) {
+                        CreatureTabRestore.taskId = back.taskId
+                        CreatureTabRestore.tab = back.tab
+                        selectedTaskIdValue = back.taskId
+                    }
                 }
                 destination != ControlRoomDestination.Overview -> {
                     destinationName = ControlRoomDestination.Overview.name
@@ -555,9 +574,7 @@ fun App(
                 azphaltPackageImportRequest != null &&
                 destination != ControlRoomDestination.AddOns
             ) {
-                navigationHistory = navigationHistory + destination
-                destinationName = ControlRoomDestination.AddOns.name
-                selectedTaskIdValue = ""
+                navigate(ControlRoomDestination.AddOns)
             }
         }
 
@@ -741,23 +758,7 @@ fun App(
                     ControlRoom(
                         destination = destination,
                         destinations = destinations,
-                        onDestinationSelected = { target ->
-                            if (target != destination) {
-                                // The hive is home: reaching it clears the way back. Returning to a place
-                                // already on the way back pops to it, so Back never ping-pongs and the
-                                // history never grows past the places actually open.
-                                val earlier = navigationHistory.indexOf(target)
-                                navigationHistory = when {
-                                    target == ControlRoomDestination.Overview -> emptyList()
-                                    earlier >= 0 -> navigationHistory.take(earlier)
-                                    else -> navigationHistory + destination
-                                }
-                                destinationName = target.name
-                                if (target != ControlRoomDestination.Overview) {
-                                    selectedTaskIdValue = ""
-                                }
-                            }
-                        },
+                        onDestinationSelected = { target -> navigate(target) },
                         selectedTaskId = selectedTaskId,
                         onTaskSelected = { taskId ->
                             selectedTaskIdValue = if (selectedTaskId == taskId) "" else taskId

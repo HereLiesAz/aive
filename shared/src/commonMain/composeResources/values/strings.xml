@@ -853,8 +853,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="needs_echo_self_absorbed">SELF-ABSORBED</string>
     <string name="needs_echo_fevered">FEVERED</string>
     <string name="needs_echo_insane">INSANE</string>
-    <string name="needs_integrity">INTEGRITY</string>
-    <string name="needs_budget">BUDGET</string>
+    <string name="needs_integrity">MOOD (reliable this run)</string>
+    <string name="needs_budget">HP (its specialty's token budget)</string>
     <string name="needs_output_used">OUTPUT USED</string>
     <string name="needs_not_reported">not reported</string>
     <string name="needs_tokens_spent">%1$s tokens · no budget set</string>

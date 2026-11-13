@@ -344,7 +344,14 @@ fun ControlRoom(
         // Deselecting forgets the remembered creature, so reselecting it picks its opening tab again.
         if (selectedTaskId == null && creatureTabTask.isNotEmpty()) creatureTabTask = ""
         if (selectedTaskId != null && selectedTaskId != creatureTabTask) {
-            creatureTabName = openingTab(liveWorkflow?.run?.taskRuns?.get(TaskDefinitionId(selectedTaskId))).name
+            creatureTabName = restoredTabOrDefault(
+                CreatureTabRestore.taskId,
+                CreatureTabRestore.tab,
+                selectedTaskId,
+                openingTab(liveWorkflow?.run?.taskRuns?.get(TaskDefinitionId(selectedTaskId))).name,
+            )
+            CreatureTabRestore.taskId = ""
+            CreatureTabRestore.tab = ""
             creatureTabTask = selectedTaskId
         }
     }
