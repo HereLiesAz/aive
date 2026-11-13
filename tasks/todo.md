@@ -86,3 +86,13 @@ Decided with the keeper: App log is persisted (newest 500, scrubbed, on device);
 
 ## Review
 (filled in as each PR lands)
+
+## Hive: starting points and blockers
+A blocker is anything that must be created or obtained for a particular hive to be complete. The 36 steps of the Artifact tool are starting points for such things, not a checklist and not blockers themselves; the 13 that cannot run in Aive are listed in docs/Step-Templates.md and are not something to waive.
+- [x] Starting points: presets of the six templates, the diagram step and the files-on-a-branch step, with typed outputs and tests (`template/StepPresets.kt`, `ArtifactStepCoverage.kt`, `StepPresetsTest`).
+- [x] Blockers: data, the planner's `blockers`, state following the run, `hiveReached` held by an open one, Messages and finish sentences (`queen/Blockers.kt`, `BlockersTest`).
+- [ ] Keep a run's blockers across a restart (today memory only, like the hive signs).
+- [ ] The queen adds a blocker mid-run, and calls `assignStep` for one that has a starting template (the swarm change goes through the existing repair/validation path).
+- [ ] The keeper adds, marks done or drops a blocker in the existing hive form.
+- [ ] The Nanny's findings add blockers for the next hive; `Blockers.carryForward` is called when a run ends and read when the next is planned.
+- [ ] Nothing was compiled or run; CI verifies.
