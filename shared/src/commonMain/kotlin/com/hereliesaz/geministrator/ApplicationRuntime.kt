@@ -18,6 +18,7 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowKeeperPause
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
+import com.hereliesaz.geministrator.domain.isUntrusted
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.domain.activeRoles
@@ -994,9 +995,10 @@ class ApplicationRuntime private constructor(
         if (now - queenProposalsReadAt < QUEEN_SUGGEST_REFRESH_MILLIS) return
         queenProposalsReadAt = now
         try {
-            val candidates = queenCandidates(
-                definition, run, queenSignals(definition, run, roles, queenStalled[run.id.value]), queenCaps(), roles,
-            )
+            val signals = queenSignals(definition, run, roles, queenStalled[run.id.value])
+            val candidates = queenCandidates(definition, run, signals, queenCaps(), roles) +
+                com.hereliesaz.geministrator.queen.wordingCandidates(definition, run, queenWordings[run.id.value].orEmpty())
+            launchWordingCheckpoint(definition, run, signals)
             val rows = ledger.state().proposals.filter { it.source == ImprovementSource.Queen }
             // Rows left over from another run are settled; a row for this run is settled once it no longer stands.
             for (row in rows.filter { it.status == ProposalStatus.Proposed }) {
@@ -1043,6 +1045,74 @@ class ApplicationRuntime private constructor(
             throw cancellation
         } catch (_: Exception) {
             // Her sense of time is a courtesy; the swarm goes on.
+        }
+    }
+
+    /** Rewordings her model wrote for steps not yet started, by run id; each is offered as a suggestion, never applied. */
+    private val queenWordings = LinkedHashMap<String, List<com.hereliesaz.geministrator.queen.Wording>>()
+
+    /** Per run: how many checkpoint calls were made, when the last was, and the checkpoints already taken (one call each). */
+    private class WordingBook(var calls: Int = 0, var lastAtEpochMillis: Long? = null, val taken: MutableSet<String> = mutableSetOf())
+
+    private val wordingBooks = LinkedHashMap<String, WordingBook>()
+    private var wordingJob: kotlinx.coroutines.Job? = null
+
+    /**
+     * At a checkpoint (half done, or a second failure) asks her model, once, for new wording for the steps still to start.
+     * Single-flight, off the cycle, through the keeper's Source choice and pacing (the same machinery as her disputes), never
+     * for a goal from outside, and only when [com.hereliesaz.geministrator.queen.queenMayCall] allows. The result is kept as
+     * candidates for her ordinary suggestion pacing; the keeper's tap applies it.
+     */
+    private fun launchWordingCheckpoint(definition: WorkflowDefinition, run: WorkflowRun, signals: List<com.hereliesaz.geministrator.queen.QueenSignal>) {
+        if (wordingJob?.isActive == true) return
+        val checkpoint = com.hereliesaz.geministrator.queen.wordingCheckpoint(definition, run, signals) ?: return
+        val runId = run.id.value
+        val book = wordingBooks.getOrPut(runId) { WordingBook() }
+        if (!book.taken.add(checkpoint.name)) return
+        while (wordingBooks.size > 32) wordingBooks.remove(wordingBooks.keys.first())
+        val now = nowEpochMillis()
+        val caps = queenCaps()
+        // Fail closed: any dollar cap needs a known price, and she has none for her Source here, so she does not ask.
+        val price = if (caps.runCostCapUsd == null && caps.hourlySpendCapUsd == null) {
+            com.hereliesaz.geministrator.queen.PriceStatus.Free
+        } else {
+            com.hereliesaz.geministrator.queen.PriceStatus.Unknown
+        }
+        val allowed = com.hereliesaz.geministrator.queen.queenMayCall(
+            kind = com.hereliesaz.geministrator.queen.QueenCallKind.Checkpoint,
+            level = queenLevel(),
+            price = price,
+            estimateUsd = null,
+            caps = caps,
+            hourly = com.hereliesaz.geministrator.workflow.HourlySpend(0.0, false),
+            checkpointCalls = book.calls,
+            lastCheckpointAtEpochMillis = book.lastAtEpochMillis,
+            now = now,
+            frozenOrStopped = run.globalPause != null || run.spendPause != null || run.keeperPause != null,
+            objectiveOutside = run.objectiveProvenance.isUntrusted(),
+            creatureWaiting = false,
+        )
+        if (!allowed) {
+            book.taken.remove(checkpoint.name)
+            return
+        }
+        book.calls += 1
+        book.lastAtEpochMillis = now
+        val callContext = com.hereliesaz.geministrator.queen.QueenCallContext(pacing = providerRegistry.sourcePacing)
+        val rolesNow = roles
+        wordingJob = runtimeScope.launch(callContext) {
+            try {
+                val model = resolveDisputeModels()?.queen ?: return@launch
+                val made = com.hereliesaz.geministrator.queen.generateWordings(model, definition, run, rolesNow, checkpoint)
+                if (made.isNotEmpty()) {
+                    queenWordings[runId] = made
+                    while (queenWordings.size > 32) queenWordings.remove(queenWordings.keys.first())
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                // Her wording is a courtesy; the swarm goes on with the wording it has.
+            }
         }
     }
 
