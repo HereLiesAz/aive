@@ -261,7 +261,7 @@ private fun planningStage(
     reviewer: RoleDefinition,
     verdict: PlanningVerdict? = null,
 ): PlanningStage {
-    val planner = BuiltInRoles.Orchestrator
+    val planner = BuiltInRoles.Planner
     val first = plan?.firstStep()
     return PlanningStage(
         phase = phase,

@@ -1616,7 +1616,7 @@ private fun RoleDefinition.providerDepartment(): String = when (id.value) {
     "orchestrator" -> "Executive"
     "product-manager", "researcher", "ux-designer" -> "Product"
     "architect", "epa-representative", "implementation-engineer" -> "Engineering"
-    "crash-test-dummy", "qa-engineer", "adversarial-reviewer", "code-reviewer", "recovery-engineer" -> "Assurance"
+    "crash-test-dummy", "qa-engineer", "adversarial-reviewer", "reviewer", "plan-reviewer", "code-reviewer", "recovery-engineer" -> "Assurance"
     "release-engineer" -> "Delivery"
     else -> "Custom"
 }
