@@ -41,7 +41,7 @@ class OpenAiCompatibleChatApi(
     private val maxOutputTokenCap: Int = PlanOutputBudget.COMPATIBLE_CAP,
     /** True for a keyless endpoint used anonymously: it cannot bill, so its usage costs nothing. */
     private val freeOfCharge: Boolean = false,
-    client: HttpClient = openAiCompatibleClient(),
+    client: HttpClient = sharedLlmHttpClient(),
 ) : ToolCallingTextGenerationApi {
     private val baseUrl = baseUrl.trimEnd('/')
     private val client = client.config { followRedirects = false }
@@ -225,23 +225,6 @@ private fun requireCompleteFinishReason(finishReason: String?, usage: Compatible
         throw SpentGenerationFailure(
             "Compatible chat response was truncated because the provider reached its output-token limit", null,
             usage?.promptTokens, usage?.completionTokens, usage?.cachedTokens(),
-        )
-    }
-}
-
-private fun openAiCompatibleClient(): HttpClient = HttpClient {
-    expectSuccess = false
-    followRedirects = false
-    install(HttpTimeout) {
-        requestTimeoutMillis = 90_000L
-        connectTimeoutMillis = 15_000L
-    }
-    install(ContentNegotiation) {
-        json(
-            Json {
-                ignoreUnknownKeys = true
-                explicitNulls = false
-            },
         )
     }
 }
