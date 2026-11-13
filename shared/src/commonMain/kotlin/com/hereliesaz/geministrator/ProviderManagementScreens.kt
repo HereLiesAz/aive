@@ -110,6 +110,9 @@ import com.hereliesaz.geministrator.resources.confirm_reset_pairing_action
 import com.hereliesaz.geministrator.resources.confirm_reset_pairing_body
 import com.hereliesaz.geministrator.resources.confirm_reset_pairing_title
 import com.hereliesaz.geministrator.resources.firstrun_body
+import com.hereliesaz.geministrator.resources.credential_keyless_hint
+import com.hereliesaz.geministrator.resources.keyless_sources_off
+import com.hereliesaz.geministrator.resources.keyless_sources_on
 import com.hereliesaz.geministrator.resources.firstrun_connect
 import com.hereliesaz.geministrator.resources.firstrun_connect_hint
 import com.hereliesaz.geministrator.resources.firstrun_title
@@ -267,6 +270,8 @@ internal fun ProviderSettingsScreen(
     setupFileActions: SetupFileActions? = null,
     onExportDiagnosticBundle: suspend () -> String? = { null },
     onConfigureProvider: (String) -> Unit = {},
+    /** Connects a keyless Source with no screen; the one keyless switch uses it. */
+    onConnectFreeProvider: (String) -> Unit = {},
     onDisconnectProvider: (String) -> Unit = {},
     distributedComputeState: DistributedComputeUiState = DistributedComputeUiState(),
     onSaveDistributedCompute: (DistributedComputeConfiguration, String?) -> Unit = { _, _ -> },
@@ -350,6 +355,25 @@ internal fun ProviderSettingsScreen(
     ) {
       if (section == KeeperSection.Connections) {
         ProviderSectionLabel(stringResource(Res.string.settings_ai_providers))
+        // Keyless sources start on; this one switch turns them all off (or back on). A single source is
+        // disconnected on its own row below. What a keyless source is sent leaves the device: said once, here.
+        var keylessOff by remember { mutableStateOf(KeylessDefaults.allOff()) }
+        AzphaltPill(
+            if (keylessOff) stringResource(Res.string.keyless_sources_off) else stringResource(Res.string.keyless_sources_on),
+            "keyless-sources-switch",
+            selected = !keylessOff,
+            onClick = {
+                KeylessDefaults.setAll(
+                    on = keylessOff,
+                    connectedIds = connectedProviderIds,
+                    connect = onConnectFreeProvider,
+                    disconnect = onDisconnectProvider,
+                )
+                keylessOff = !keylessOff
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(stringResource(Res.string.credential_keyless_hint), style = AzphaltType.body, color = azphaltOnSurface())
         // No AI provider yet (a linked GitHub's OpenCode is no brain for a hive without a repository,
         // nor is a remote A2A agent, which runs only for roles that prefer it).
         if (ProviderCatalog.entries.none { it.id in connectedProviderIds && !ProviderCatalog.isA2aAgent(it.id) }) {

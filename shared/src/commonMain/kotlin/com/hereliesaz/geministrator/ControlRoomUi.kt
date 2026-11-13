@@ -1294,6 +1294,7 @@ private fun MainDestination(
                                 setupFileActions = setupFileActions,
                                 onExportDiagnosticBundle = onExportDiagnosticBundle,
                                 onConfigureProvider = onReconfigureProvider,
+                                onConnectFreeProvider = onConnectFreeProvider,
                                 onDisconnectProvider = onDisconnectProvider,
                                 distributedComputeState = distributedComputeState,
                                 onSaveDistributedCompute = onSaveDistributedCompute,

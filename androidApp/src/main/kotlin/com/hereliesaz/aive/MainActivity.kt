@@ -39,6 +39,7 @@ import com.hereliesaz.geministrator.AzphaltAlertDialog
 import com.hereliesaz.geministrator.AzphaltMotion
 import com.hereliesaz.geministrator.shouldReduceMotion
 import com.hereliesaz.geministrator.CrashReportingSetting
+import com.hereliesaz.geministrator.KeylessDefaults
 import com.hereliesaz.geministrator.LocalOrchestrationSpecialistSetting
 import com.hereliesaz.geministrator.LocalOrchestrationSpecialistStatus
 import com.hereliesaz.geministrator.OnDeviceSmallTaskPreference
@@ -191,6 +192,11 @@ class MainActivity : ComponentActivity() {
         val projectFileService = AndroidProjectFileService(this)
         val localRepositoryPicker = AndroidLocalRepositoryPicker(this, localRepositories)
         updateCoordinator = AndroidUpdateCoordinator(this)
+        // Keyless sources start on, once each: a source the keeper disconnects later stays off (docs/Keepers-Room.md).
+        KeylessDefaults.pending(providerCredentialStore.readAll().keys).let { plan ->
+            plan.connect.forEach { id -> runCatching { providerCredentialStore.write(id, ProviderCatalog.ANONYMOUS_CREDENTIAL) } }
+            KeylessDefaults.commit(plan)
+        }
         val initialCredentials = providerCredentialStore.readAll()
         val initialRepositoryCredentials = repositoryCredentialStore.readAll()
         val computeConfigurationStore = SettingsDistributedComputeConfigurationStore()

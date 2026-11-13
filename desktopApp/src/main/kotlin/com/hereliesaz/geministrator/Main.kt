@@ -87,6 +87,11 @@ fun main() {
     val providerCredentialStore = DesktopProviderCredentialStore()
     val projectFileService = DesktopProjectFileService()
     val repositoryCredentialStore = DesktopRepositoryCredentialStore()
+    // Keyless sources start on, once each: a source the keeper disconnects later stays off (docs/Keepers-Room.md).
+    KeylessDefaults.pending(readDesktopProviderCredentials(providerCredentialStore).keys).let { plan ->
+        plan.connect.forEach { id -> runCatching { providerCredentialStore.write(id, ProviderCatalog.ANONYMOUS_CREDENTIAL) } }
+        KeylessDefaults.commit(plan)
+    }
     val initialProviderCredentials = readDesktopProviderCredentials(providerCredentialStore)
     val initialRepositoryCredentials = readDesktopRepositoryCredentials(repositoryCredentialStore)
     val computeConfigurationStore = SettingsDistributedComputeConfigurationStore()
