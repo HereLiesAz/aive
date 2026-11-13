@@ -32,7 +32,11 @@ private external object AiveCredentialVault : JsAny {
 internal object WebCredentialStore {
     suspend fun read(storageKey: String): String? {
         val stored = window.localStorage.getItem(storageKey)?.takeIf(String::isNotBlank) ?: return null
-        if (!AiveCredentialVault.ready) return stored.trim()
+        if (!AiveCredentialVault.ready) {
+            // A sealed value is ciphertext: without Web Crypto it cannot be opened, and it must
+            // never be handed on as if it were the key.
+            return if (AiveCredentialVault.isSealed(stored)) null else stored.trim()
+        }
         if (!AiveCredentialVault.isSealed(stored)) {
             write(storageKey, stored.trim())
             return stored.trim()
