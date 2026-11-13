@@ -24,6 +24,22 @@ data class OrchestrationPlanStep(
     val roleId: String,
     val dependsOn: List<String> = emptyList(),
     val requiresHumanApproval: Boolean = false,
+    /**
+     * A step made from a catalog template (docs/Step-Templates.md): the template's id, and a literal or `@<step>.<port>`
+     * per input. The role is then chosen from the template, so [roleId] may be blank. Null for an ordinary step.
+     */
+    val templateId: String? = null,
+    val templateInputs: Map<String, String> = emptyMap(),
+)
+
+/** A template the planner may use: its id, title, input ports (required ones first) and what it may change. Not research text. */
+@Serializable
+data class OrchestrationTemplate(
+    val id: String,
+    val title: String,
+    val requiredPorts: List<String>,
+    val optionalPorts: List<String> = emptyList(),
+    val effects: List<String> = emptyList(),
 )
 
 @Serializable
@@ -43,6 +59,8 @@ data class OrchestrationPacket(
     val acceptanceCriteria: List<String> = emptyList(),
     val availableAgents: List<OrchestrationRole>,
     val availableTools: List<String> = emptyList(),
+    /** The closed catalog of step templates the planner may use; separate from [availableTools], which is untrusted text. */
+    val availableTemplates: List<OrchestrationTemplate> = emptyList(),
     val availableModels: List<String> = emptyList(),
     val resourceConstraints: Map<String, String> = emptyMap(),
     val retrievedMemory: List<String> = emptyList(),
@@ -78,7 +96,24 @@ fun OrchestrationPlan.validateAgainst(packet: OrchestrationPacket): Orchestratio
     steps.forEach { step ->
         require(step.name.isNotBlank()) { "Plan step ${step.id} has no name" }
         require(step.objective.isNotBlank()) { "Plan step ${step.id} has no objective" }
-        require(step.roleId in roleIds) { "Plan step ${step.id} references unavailable role ${step.roleId}" }
+        val templateId = step.templateId
+        if (templateId == null) {
+            require(step.roleId in roleIds) { "Plan step ${step.id} references unavailable role ${step.roleId}" }
+        } else {
+            val template = packet.availableTemplates.firstOrNull { it.id == templateId }
+            require(template != null) { "Plan step ${step.id} uses a template that is not offered: $templateId" }
+            // The queen may make only steps that change nothing outside their own output.
+            val builtIn = com.hereliesaz.geministrator.template.BuiltInTemplates.byId[templateId]
+            require(builtIn != null && !builtIn.effectful) { "Plan step ${step.id} uses a template the planner may not use: $templateId" }
+            val known = template.requiredPorts + template.optionalPorts
+            step.templateInputs.keys.forEach { port -> require(port in known) { "Plan step ${step.id} gives an input the template does not have: $port" } }
+            template.requiredPorts.forEach { port ->
+                require(!step.templateInputs[port].isNullOrBlank()) { "Plan step ${step.id} has no value for the required input $port" }
+            }
+            step.templateInputs.values.mapNotNull(com.hereliesaz.geministrator.template.StepInstantiation::boundTask).forEach { from ->
+                require(from.value in ids && from.value != step.id) { "Plan step ${step.id} takes an input from an unknown step ${from.value}" }
+            }
+        }
         require(step.id !in step.dependsOn) { "Plan step ${step.id} depends on itself" }
         step.dependsOn.forEach { dependency ->
             require(dependency in ids) { "Plan step ${step.id} references unknown dependency $dependency" }

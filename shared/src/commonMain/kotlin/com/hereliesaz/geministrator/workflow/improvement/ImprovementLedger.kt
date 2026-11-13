@@ -18,6 +18,8 @@ enum class ImprovementKind(val label: String) {
     EvidenceRule("evidence-rule"),
     /** A habit the swarm formed, offered as a governed step in a hive (from the habits layer). */
     HabitTask("habit-task"),
+    /** A revision of a step template or of a role's own definition: a child generation of its lineage (docs/Step-Templates.md). */
+    TaskTemplate("task-template"),
     Other("other"),
     ;
 

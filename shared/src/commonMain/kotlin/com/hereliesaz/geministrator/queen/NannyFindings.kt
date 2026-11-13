@@ -84,9 +84,14 @@ fun nannyCarryForward(
     now: Long,
 ): List<ImprovementProposal> {
     if (run.status != WorkflowRunStatus.Completed && run.status != WorkflowRunStatus.Failed && run.status != WorkflowRunStatus.Cancelled) return emptyList()
+    val report: HallMonitorReport? = latestReport(run)?.textContent?.let { runCatching { decodeHallMonitorReportPayload(it) }.getOrNull() }
     return nannyFindings(definition, run).mapNotNull { finding ->
         val id = nannyCarriedId(finding)
         if (existing.any { it.id == id }) return@mapNotNull null
+        // A finding about a template or a role becomes a revision of its lineage, not a note.
+        if (report != null && templateTargetOf(finding) != null) {
+            templateProposalFor(finding, report, definition, run, now)?.let { return@mapNotNull it }
+        }
         val usedId = finding.taskId?.let { t -> finding.action?.let { a -> queenSuggestionId(run, a, t) } }
         if (usedId != null && existing.any { it.id == usedId && it.status == ProposalStatus.Adopted }) return@mapNotNull null
         ImprovementProposal(

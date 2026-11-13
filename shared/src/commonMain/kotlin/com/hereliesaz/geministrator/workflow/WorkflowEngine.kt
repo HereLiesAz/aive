@@ -293,6 +293,7 @@ class WorkflowEngine(
                         estimatedInputTokens = ownEstimate,
                         excludedProviderIds = taskRun.failedProviders.toSet(),
                         failoverAllowed = isProviderAuto(role, task),
+                        requiresToolFilter = task.contract?.allowedTools?.isNotEmpty() == true,
                     )
                     val providerId = sessionGateway.resolveProvider(selection)
                     val providerLimit = definition.concurrencyPolicy.perProviderLimits[providerId] ?: Int.MAX_VALUE
@@ -860,7 +861,12 @@ class WorkflowEngine(
             } else {
                 null
             }
-            val mappedStatus = if (gateVerdict != null) {
+            // A step made from a template must hand back what its contract declares (StepOutputValidator.kt).
+            val contractViolations = producingTask?.contract
+                ?.takeIf { status == ManagedSessionStatus.Completed && gateVerdict == null }
+                ?.let { checkStepOutputs(it, mergeArtifacts(taskRun.artifacts, durableArtifacts)) }
+                .orEmpty()
+            val mappedStatus = if (gateVerdict != null || contractViolations.isNotEmpty()) {
                 TaskRunStatus.Failed
             } else {
                 when (status) {
@@ -915,6 +921,11 @@ class WorkflowEngine(
                             BlockingReason(
                                 code = GATE_VERDICT_BLOCKED,
                                 message = "The gate turned this work back (${gateVerdict.name.lowercase()}).",
+                            )
+                        } else if (contractViolations.isNotEmpty()) {
+                            BlockingReason(
+                                code = OUTPUT_CONTRACT_VIOLATION,
+                                message = contractViolationMessage(contractViolations),
                             )
                         } else {
                             taskRun.blockingReason
@@ -1035,6 +1046,7 @@ class WorkflowEngine(
             repository = project.repository,
             excludedProviderIds = taskRun.failedProviders.toSet(),
             failoverAllowed = isProviderAuto(role, task),
+            requiresToolFilter = task.contract?.allowedTools?.isNotEmpty() == true,
         )
     }
 

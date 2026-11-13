@@ -371,7 +371,7 @@ internal fun mutatesWithoutApproval(definition: WorkflowDefinition, task: TaskDe
     fun behindApproval(t: TaskDefinition): Boolean =
         t.approvalPolicy == ApprovalPolicy.HumanApproval || t.effectiveExecutor(t.roleId?.let { rolesById[it] }) is TaskExecutor.HumanApproval
     val role = task.roleId?.let { rolesById[it] }
-    if (!task.effectiveExecutor(role).canMutate(role)) return false
+    if (!task.effectiveExecutor(role).canMutate(task, role)) return false
     return !(behindApproval(task) || definition.tasks.any { it.id in task.dependsOn && behindApproval(it) })
 }
 

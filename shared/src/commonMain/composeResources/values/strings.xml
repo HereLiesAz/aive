@@ -888,7 +888,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="build_add_creature">Add creature</string>
     <string name="build_add_hint">It joins unwired. Tap it to wire it.</string>
     <string name="build_add_from_swarm">FROM THE SWARM</string>
-    <string name="build_add_from_steps">A STEP, NO AGENT</string>
+    <string name="build_add_from_steps">A STEP, RUN AS IT IS</string>
     <string name="build_step_tests">Run tests</string>
     <string name="build_step_repo_status">Repository status</string>
     <string name="build_step_repo_fetch">Fetch repository</string>
@@ -2084,4 +2084,38 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_say_missing_reviewer_no_room">I did not ask my reviewer to read the plan: the Source has no room for another request right now. I checked only what I can check myself. Connect another Source to give it room.</string>
     <string name="queen_say_missing_reviewer_no_second_source">I did not ask my reviewer to read the plan: I have one Source and it has no room right now. I checked only what I can check myself. A second Source would let my reviewer read it. Connect one.</string>
     <string name="queen_say_finished_not_reached">The swarm finished, but I cannot call the hive reached: %1$s of %2$s signs are not met. Step %3$s (%4$s) is where to look.</string>
+
+    <!-- Step templates: a step is a task for a creature with a contract around it (docs/Step-Templates.md). -->
+    <string name="build_add_from_templates">STEPS FOR A CREATURE</string>
+    <string name="step_template_write_document">Write a document</string>
+    <string name="step_template_make_page">Make a page</string>
+    <string name="step_template_text_to_table">Turn text into a table</string>
+    <string name="step_template_check_work">Check the work</string>
+    <string name="step_template_read_connected">Read from a connected tool</string>
+    <string name="step_template_change_connected">Change something in a connected tool</string>
+    <string name="step_port_brief">Brief</string>
+    <string name="step_port_sources">Sources</string>
+    <string name="step_port_content">Content</string>
+    <string name="step_port_text">Text</string>
+    <string name="step_port_columns">Columns</string>
+    <string name="step_port_work">Work to check</string>
+    <string name="step_port_requirements">Requirements</string>
+    <string name="step_port_question">Question</string>
+    <string name="step_port_target">Target</string>
+    <string name="step_port_change">Change</string>
+    <string name="step_input_from">Taken from %1$s</string>
+    <string name="step_input_optional">Optional</string>
+    <string name="step_effects_label">What it may change</string>
+    <string name="step_effect_none">Nothing outside its own output</string>
+    <string name="step_effect_reads">Reads from a connected tool</string>
+    <string name="step_effect_writes_branch">Writes to a branch of the repository</string>
+    <string name="step_effect_changes">Changes something in a connected tool</string>
+    <string name="step_effect_removes">Removes things in a connected tool</string>
+    <string name="step_effect_leaves_device">Sends data off this device</string>
+    <string name="step_tool_label">Tool it may use</string>
+    <string name="step_tool_none">None</string>
+    <string name="step_tool_name_hint">Name of the connected tool</string>
+    <string name="improvement_quick_change">quick change</string>
+    <string name="improvement_new_generation">new generation</string>
+    <string name="step_always_asks">Always asks you first, and tries once</string>
 </resources>

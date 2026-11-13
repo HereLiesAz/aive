@@ -158,6 +158,8 @@ data class TaskDefinition(
     val holdOutput: Boolean = false,
     /** How long the creature may work before the queen says it is taking too long; Auto for every older definition. */
     val timeLimit: TimeLimit = TimeLimit.Auto,
+    /** The step contract when this task was made from a step template (docs/Step-Templates.md); null for every other task. */
+    val contract: TaskContract? = null,
 )
 
 @Serializable

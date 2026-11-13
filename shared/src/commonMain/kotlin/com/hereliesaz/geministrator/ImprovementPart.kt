@@ -45,6 +45,8 @@ import com.hereliesaz.geministrator.resources.improvement_dismiss
 import com.hereliesaz.geministrator.resources.improvement_lead_note
 import com.hereliesaz.geministrator.resources.improvement_manual_noted
 import com.hereliesaz.geministrator.resources.improvement_meta
+import com.hereliesaz.geministrator.resources.improvement_new_generation
+import com.hereliesaz.geministrator.resources.improvement_quick_change
 import com.hereliesaz.geministrator.resources.improvement_no_loop
 import com.hereliesaz.geministrator.resources.improvement_none
 import com.hereliesaz.geministrator.resources.improvement_revert
@@ -105,7 +107,8 @@ internal fun ImprovementPart(
     // A decision is running: its buttons are off until it ends, so a second tap cannot start a second one.
     var deciding by remember { mutableStateOf(false) }
     val saveRole by rememberUpdatedState(onSaveRoleInstructions)
-    val adoption = remember(store, host) { ImprovementAdoption(store, host, { roleId, instructions -> saveRole(roleId, instructions) }) }
+    val templateStore = remember { com.hereliesaz.geministrator.template.SettingsTemplateStore() }
+    val adoption = remember(store, host) { ImprovementAdoption(store, host, { roleId, instructions -> saveRole(roleId, instructions) }, templates = templateStore) }
     var hasLoop by remember { mutableStateOf(true) }
     var message by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableStateOf(0) }
@@ -291,7 +294,16 @@ private fun ProposalCard(
     )
     // A hive-step proposal replaces a step's whole objective: show what it replaces, and what it would break in the loop.
     val preview = if (proposal.status == ProposalStatus.Proposed) ImprovementApplier.preview(proposal, roles, hives) else null
-    val eyebrow = status + " · " + source + " · " + proposal.kind.label + " · " + proposal.target + if (proposal.meta) " · " + stringResource(Res.string.improvement_meta) else ""
+    // A template revision says whether it is a quick change or a new generation, not its kind label.
+    val kindWord = if (proposal.kind == ImprovementKind.TaskTemplate) {
+        when (com.hereliesaz.geministrator.template.revisionModeOf(proposal.newText)) {
+            com.hereliesaz.geministrator.template.RevisionMode.Genetic -> stringResource(Res.string.improvement_new_generation)
+            else -> stringResource(Res.string.improvement_quick_change)
+        }
+    } else {
+        proposal.kind.label
+    }
+    val eyebrow = status + " · " + source + " · " + kindWord + " · " + proposal.target + if (proposal.meta) " · " + stringResource(Res.string.improvement_meta) else ""
     AzphaltRecord(
         seed = "improvement-${proposal.id}",
         eyebrow = eyebrow,

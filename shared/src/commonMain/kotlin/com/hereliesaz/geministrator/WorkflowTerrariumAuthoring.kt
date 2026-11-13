@@ -4,6 +4,7 @@ import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.toTaskExecutor
 import com.hereliesaz.geministrator.workflow.WorkflowGraphValidator
+import com.hereliesaz.geministrator.workflow.isEffectfulStep
 import com.hereliesaz.geministrator.workflow.humanReadable
 import com.hereliesaz.geministrator.distributed.withComputeDelegation
 
@@ -236,6 +237,13 @@ internal fun budTerrariumCreature(definition: WorkflowDefinition, taskId: TaskDe
 internal sealed interface TerrariumNewcomer {
     data class FromRole(val role: com.hereliesaz.geministrator.domain.RoleDefinition) : TerrariumNewcomer
     data class Step(val step: TerrariumStep) : TerrariumNewcomer
+
+    /** A step template, made at the version [base] resolves to, so the step pins it. [name] is its title. */
+    data class FromTemplate(
+        val template: com.hereliesaz.geministrator.template.StepTemplate,
+        val base: com.hereliesaz.geministrator.template.TemplateBase,
+        val name: String,
+    ) : TerrariumNewcomer
 }
 
 /** The programmatic steps Add creature offers, each a ready [com.hereliesaz.geministrator.domain.TaskExecutor]. */
@@ -289,11 +297,71 @@ internal fun addTerrariumCreature(definition: WorkflowDefinition, newcomer: Terr
             roleId = null,
             executor = newcomer.step.executor,
         )
+        is TerrariumNewcomer.FromTemplate -> com.hereliesaz.geministrator.template.StepInstantiation.task(
+            template = newcomer.template,
+            base = newcomer.base,
+            id = freshTerrariumTaskId(definition, newcomer.template.id),
+            name = newcomer.name,
+            inputs = emptyMap(),
+        )
     }
     val candidate = definition.copy(tasks = definition.tasks + task)
     val errors = WorkflowGraphValidator.validate(candidate)
     if (errors.isNotEmpty()) return TerrariumDependencyEditResult.Rejected(errors.joinToString("\n") { it.humanReadable() })
     return TerrariumDependencyEditResult.Applied(candidate)
+}
+
+/**
+ * A step's input: [value] is a literal, or `@<taskId>.<port>` to take it from another step (which it then waits for).
+ * A blank value clears it. Rejected when the step has no such port.
+ */
+internal fun setTerrariumContractInput(
+    definition: WorkflowDefinition,
+    taskId: TaskDefinitionId,
+    port: String,
+    value: String,
+): TerrariumDependencyEditResult {
+    val found = definition.tasks.firstOrNull { it.id == taskId }
+        ?: return TerrariumDependencyEditResult.Rejected("Unknown task '${taskId.value}'")
+    val contract = found.contract ?: return TerrariumDependencyEditResult.Rejected("This creature has no step inputs")
+    val template = com.hereliesaz.geministrator.template.BuiltInTemplates.byId[contract.template.id]
+    if (template == null || template.inputs.none { it.name == port }) {
+        return TerrariumDependencyEditResult.Rejected("This step has no '$port' input")
+    }
+    val trimmed = value.trim()
+    val inputs = if (trimmed.isEmpty()) contract.inputs - port else contract.inputs + (port to trimmed)
+    if (inputs == contract.inputs) return TerrariumDependencyEditResult.NoChange
+    val step = com.hereliesaz.geministrator.template.StepInstantiation
+    val fed = inputs.values.mapNotNull(step::boundTask).toSet()
+    val wasFed = contract.inputs.values.mapNotNull(step::boundTask).toSet()
+    val next = found.copy(
+        objective = step.objectiveWith(step.wordingOf(found.objective), inputs),
+        dependsOn = (found.dependsOn - wasFed) + fed,
+        contract = contract.copy(inputs = inputs),
+    )
+    val candidate = definition.copy(tasks = definition.tasks.map { if (it.id == taskId) next else it })
+    val errors = WorkflowGraphValidator.validate(candidate)
+    if (errors.isNotEmpty()) return TerrariumDependencyEditResult.Rejected(errors.joinToString("\n") { it.humanReadable() })
+    return TerrariumDependencyEditResult.Applied(candidate)
+}
+
+/** The one tool a step that takes one may use (by its offer name); blank clears it, so the step has none. */
+internal fun setTerrariumContractTool(
+    definition: WorkflowDefinition,
+    taskId: TaskDefinitionId,
+    tool: String,
+): TerrariumDependencyEditResult {
+    val found = definition.tasks.firstOrNull { it.id == taskId }
+        ?: return TerrariumDependencyEditResult.Rejected("Unknown task '${taskId.value}'")
+    val contract = found.contract ?: return TerrariumDependencyEditResult.Rejected("This creature has no step tool")
+    val template = com.hereliesaz.geministrator.template.BuiltInTemplates.byId[contract.template.id]
+    if (template == null || template.toolPick == com.hereliesaz.geministrator.template.ToolPick.None) {
+        return TerrariumDependencyEditResult.Rejected("This step takes no tool")
+    }
+    val tools = listOfNotNull(tool.trim().takeIf(String::isNotEmpty))
+    if (tools == contract.allowedTools) return TerrariumDependencyEditResult.NoChange
+    val next = found.copy(contract = contract.copy(allowedTools = tools))
+    return TerrariumDependencyEditResult.Applied(definition.copy(tasks = definition.tasks.map { if (it.id == taskId) next else it }))
 }
 
 /** Hold output: withhold the creature's artifacts from every consumer, or release them again. */
@@ -384,6 +452,11 @@ internal fun setTerrariumJob(
     val found = definition.tasks.firstOrNull { it.id == taskId }
         ?: return TerrariumDependencyEditResult.Rejected("Unknown task '${taskId.value}'")
     if (objective != null && objective.isBlank()) return TerrariumDependencyEditResult.Rejected("A job needs an objective")
+    // A step that changes something always asks first and tries once (THREAT_MODEL invariant 4a).
+    if (found.isEffectfulStep()) {
+        if (humanApproval == false) return TerrariumDependencyEditResult.Rejected("This step changes something, so it always asks you first")
+        if (maxAttempts != null && maxAttempts != 1) return TerrariumDependencyEditResult.Rejected("This step changes something, so it tries once")
+    }
     // A person's approval step never leaves this device; withComputeDelegation leaves it as it is.
     val task = runsOn?.let(found::withComputeDelegation) ?: found
     val next = task.copy(

@@ -19,6 +19,7 @@ import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
+import com.hereliesaz.geministrator.domain.anyEffectful
 import com.hereliesaz.geministrator.domain.isUntrusted
 import com.hereliesaz.geministrator.domain.isUntrustedContext
 import com.hereliesaz.geministrator.domain.labelledAtIntake
@@ -94,6 +95,13 @@ fun TaskExecutor.canMutate(role: RoleDefinition?): Boolean = when (this) {
 }
 
 /**
+ * [canMutate] for a task: also true when the task's step contract declares an effect that changes something
+ * (a connected-source tool call is not a role capability, so the role alone would miss it).
+ */
+fun TaskExecutor.canMutate(task: TaskDefinition, role: RoleDefinition?): Boolean =
+    canMutate(role) || (task.contract?.effects?.anyEffectful() == true)
+
+/**
  * The label the runtime gives what [this] executor produces. A research agent's findings and anything
  * from an external service, deployment or another pool device are external; null keeps the labels a
  * nested child run already gave its artifacts.
@@ -153,7 +161,7 @@ fun WorkflowDefinition.untrustedInputsForPrivilegedTask(
     executor: TaskExecutor,
     role: RoleDefinition?,
 ): List<ArtifactRef> {
-    if (!executor.canMutate(role)) return emptyList()
+    if (!executor.canMutate(task, role)) return emptyList()
     return taintInputs(run, task).filter(ArtifactRef::isUntrustedContext)
 }
 
