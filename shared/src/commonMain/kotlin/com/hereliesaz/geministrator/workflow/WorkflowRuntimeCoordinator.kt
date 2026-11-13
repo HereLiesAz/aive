@@ -347,6 +347,23 @@ class WorkflowRuntimeCoordinator(
                 ensureFailureEscalationGate(run = nextRun, taskId = taskId, reason = reason, now = nowEpochMillis)
                 continue
             }
+            // A step that used its whole token allowance is stopped, not tried again: another attempt would spend it again.
+            val allowanceStop = nextRun.taskRuns[taskId]?.blockingReason?.takeIf { it.code == STEP_ALLOWANCE_EXCEEDED }
+            if (allowanceStop != null) {
+                nextRun = engine.handleFailure(
+                    definition = definition,
+                    run = nextRun,
+                    taskDefinitionId = taskId,
+                    retryReason = RetryReason.ProviderFailure,
+                    reason = allowanceStop.message,
+                    nowEpochMillis = nowEpochMillis,
+                    allowRetry = false,
+                )
+                if (nextRun.taskRuns[taskId]?.status == TaskRunStatus.Escalated) {
+                    ensureFailureEscalationGate(run = nextRun, taskId = taskId, reason = allowanceStop.message, now = nowEpochMillis)
+                }
+                continue
+            }
             val previousStatus = state.run.taskRuns[taskId]?.status
             val outputRejected = nextRun.taskRuns[taskId]?.blockingReason?.takeIf { it.code == TASK_OUTPUT_REJECTED }
             val retryReason = when {

@@ -87,4 +87,23 @@ class StepTemplatePlanTest {
         }
         plan(OrchestrationPlanStep("a", "a", "o", "planner")).validateAgainst(packet)
     }
+    @Test
+    fun aPlannedStepStartsFromTheGenerationTheKeeperSelectedAndTheInstructionAsksForAStartingTemplate() {
+        val base = BuiltInTemplates.WriteDocument.base()
+        val revision = com.hereliesaz.geministrator.template.TemplateRevision(
+            kind = base.kind, templateId = base.id, version = 2, parentVersion = 1, generation = 1,
+            mutation = setOf(com.hereliesaz.geministrator.template.TunableField.Wording),
+            body = base.body.copy(wording = "Write the document with two levels of headings."), locked = base.locked,
+            before = base.body.wording, after = "Write the document with two levels of headings.", fitness = "f", proposalId = "p",
+            adoptedAtEpochMillis = 5,
+        )
+        val catalog = com.hereliesaz.geministrator.template.TemplateCatalog(BuiltInTemplates.bases(), listOf(revision))
+        val p = plan(templated("a", "write-document", mapOf("brief" to "x")))
+        val chosen = OrchestratedWorkflowFactory.create(WorkflowDefinitionId("w"), "o", p, packet, BuiltInRoles.all, catalog).tasks.single()
+        assertEquals("write-document@2", chosen.contract!!.template.key)
+        assertTrue(chosen.objective.startsWith("Write the document with two levels of headings."))
+        val builtIn = OrchestratedWorkflowFactory.create(WorkflowDefinitionId("w"), "o", p, packet, BuiltInRoles.all).tasks.single()
+        assertEquals("write-document@1", builtIn.contract!!.template.key)
+        assertTrue(BuiltInTemplates.PLANNER_INSTRUCTION.contains("reviewer can review"))
+    }
 }

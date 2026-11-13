@@ -201,6 +201,39 @@ internal class ImprovementAdoption(
         recorded(AdoptionResult.Done, decided)
     }
 
+    /**
+     * The keeper's selection of a new template generation: an adopted proposal whose revision is still a candidate beside
+     * its parent becomes the generation new steps use, once it has a new generation's worth of evidence behind it. The
+     * parent keeps its place in the lineage; Revert retires the selected branch and the parent runs again.
+     */
+    suspend fun select(id: String): AdoptionResult = decisions.withLock {
+        val proposal = waiting(id, ProposalStatus.Adopted) ?: return@withLock AdoptionResult.AlreadyDecided
+        if (proposal.kind != com.hereliesaz.geministrator.workflow.improvement.ImprovementKind.TaskTemplate) return@withLock AdoptionResult.AlreadyDecided
+        val kept = templates ?: return@withLock AdoptionResult.Cannot("No template store is available.")
+        val revision = kept.revisions().firstOrNull { it.proposalId == proposal.id && it.status == com.hereliesaz.geministrator.template.TemplateStatus.Candidate }
+            ?: return@withLock AdoptionResult.AlreadyDecided
+        // The evidence was counted by the code that drafted the proposal, never read from the Nanny's words.
+        val evidence = try {
+            kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                .decodeFromString(com.hereliesaz.geministrator.template.TemplateRevisionDraft.serializer(), proposal.newText).evidenceSteps
+        } catch (_: Exception) {
+            0
+        }
+        var selected = false
+        val at = now()
+        val failed = save {
+            kept.merge { all ->
+                val next = com.hereliesaz.geministrator.template.TemplateCatalog.select(all, revision.kind, revision.templateId, revision.version, evidence, at)
+                selected = next != null
+                next ?: all
+            }
+        }
+        if (failed != null) return@withLock failed
+        if (!selected) return@withLock AdoptionResult.Cannot("A new generation needs at least ${com.hereliesaz.geministrator.template.GENETIC_MIN_STEPS} steps of evidence; there are $evidence.")
+        appLog("Improvement", "Selected: ${proposal.summary} (${revision.kind.label} ${revision.templateId})")
+        AdoptionResult.Done
+    }
+
     suspend fun dismiss(id: String): AdoptionResult = decisions.withLock {
         val proposal = waiting(id, ProposalStatus.Proposed) ?: return@withLock AdoptionResult.AlreadyDecided
         if (!store.decide(proposal.id) { it.copy(status = ProposalStatus.Dismissed, decidedAtEpochMillis = now()) }) return@withLock AdoptionResult.AlreadyDecided

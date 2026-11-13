@@ -80,7 +80,7 @@ suspend fun ApplicationRuntime.launchSavedWorkflow(
         updatedAtEpochMillis = now,
     )
 
-    val globalLaunchRoles = activeRoles(resolveRoleCollection(persistence.roles.all()))
+    val globalLaunchRoles = com.hereliesaz.geministrator.template.LaunchRoles.resolve(activeRoles(resolveRoleCollection(persistence.roles.all())))
     val launchRoles = (supplementalRoles + globalLaunchRoles)
         .filter(com.hereliesaz.geministrator.domain.RoleDefinition::enabled)
         .distinctBy(com.hereliesaz.geministrator.domain.RoleDefinition::id)

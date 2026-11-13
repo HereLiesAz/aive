@@ -1064,7 +1064,7 @@ class ApplicationRuntime private constructor(
             ?: return@withLock "A step of this swarm has no role, so it cannot be extended."
         val gateApproved = run.taskRuns[TaskDefinitionId(com.hereliesaz.geministrator.orchestration.RunExtension.GATE_STEP_ID)]?.status == TaskRunStatus.Completed
         com.hereliesaz.geministrator.orchestration.RunExtension.refusal(currentSteps, extension, gateApproved)?.let { return@withLock it }
-        val rolesNow = run.roleSnapshot.filter(RoleDefinition::enabled).ifEmpty { activeRoles(resolveRoleCollection(persistence.roles.all())) }
+        val rolesNow = run.roleSnapshot.filter(RoleDefinition::enabled).ifEmpty { com.hereliesaz.geministrator.template.LaunchRoles.resolve(activeRoles(resolveRoleCollection(persistence.roles.all()))) }
         val inputs = com.hereliesaz.geministrator.orchestration.RequirementInputs(
             objective = run.objective,
             objectiveExternal = run.objectiveProvenance.isUntrusted(),
@@ -1087,6 +1087,7 @@ class ApplicationRuntime private constructor(
                 plan = com.hereliesaz.geministrator.orchestration.OrchestrationPlan(currentSteps + extension),
                 packet = packet,
                 roles = rolesNow,
+                templates = com.hereliesaz.geministrator.template.DeviceTemplates.catalog(),
             )
         } catch (failure: IllegalArgumentException) {
             return@withLock failure.message ?: "The steps were not accepted."
@@ -1558,6 +1559,16 @@ class ApplicationRuntime private constructor(
                 QueenAction.Rest -> {
                     setKeeperPause(true)
                     true
+                }
+                // The Nanny's finding about a template: put in the Improvement list now, where the keeper adopts it. Nothing running changes.
+                QueenAction.TemplateChange -> {
+                    val made = com.hereliesaz.geministrator.queen.nannyTemplateProposal(definition, run, proposal.target, now)
+                    if (made == null) {
+                        false
+                    } else {
+                        ledger.merge { state -> state.copy(proposals = state.proposals + if (state.proposals.any { it.id == made.id }) emptyList() else listOf(made)) }
+                        true
+                    }
                 }
                 // A shape change is only kept for next time: an ordinary note in the Improvement flow, never applied to this swarm.
                 QueenAction.AddCheck, QueenAction.SplitStep, QueenAction.ReorderSteps, QueenAction.AddApproval -> {

@@ -208,8 +208,10 @@ object BuiltInTemplates {
 
     /** Appended to the planner's instruction when templates are offered. */
     const val PLANNER_INSTRUCTION: String =
-        " A step may instead use one of availableTemplates: set templateId and give templateInputs a value for every required port " +
-            "(a literal, or @<step id>.<port> to take it from an earlier step that is also listed in dependsOn); roleId may then be left blank."
+        " Begin from a starting template for every step whose output a reviewer can review (a document, a page, a table, a diagram, a verdict): " +
+            "use one of availableTemplates, set templateId and give templateInputs a value for every required port " +
+            "(a literal, or @<step id>.<port> to take it from an earlier step that is also listed in dependsOn); roleId may then be left blank. " +
+            "Give a step a role of its own only when no template fits its output."
 
     /** Every built-in as a catalog base. */
     fun bases(roles: Collection<RoleDefinition> = haiveBuiltInRoles): List<TemplateBase> =
@@ -231,6 +233,20 @@ object RoleTemplates {
             "source" to (role.executionSource::class.simpleName ?: ""),
         ),
     )
+
+    /**
+     * [roles] as a run uses them: each role with the selected generation of its revision, and a role that has none, or whose
+     * revisions are retired, or that the keeper edited since the first revision was drafted, exactly as it is (the generic
+     * parent). A keeper's own edit always wins over a revision of the Nanny's. Pure.
+     */
+    fun resolveAll(roles: List<RoleDefinition>, revisions: List<TemplateRevision>): List<RoleDefinition> {
+        if (revisions.none { it.kind == TemplateKind.Role }) return roles
+        val catalog = TemplateCatalog(roles.map(::base), revisions)
+        return roles.map { role ->
+            val first = catalog.lineage(TemplateKind.Role, role.id.value).firstOrNull()
+            if (first == null || role.instructions != first.before) role else resolved(role, catalog)
+        }
+    }
 
     /** [role] with the current revision's instructions and budget; the role unchanged when none was adopted. */
     fun resolved(role: RoleDefinition, catalog: TemplateCatalog): RoleDefinition {

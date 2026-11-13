@@ -51,7 +51,7 @@ fun queenUpdate(
     /** What the hive still needs created or obtained (see [Blockers]); said as what is missing, and it holds the hive from being reached. */
     blockers: List<Blocker> = emptyList(),
 ): List<QueenNote> {
-    if (run.status.finished()) return listOf(finishNote(definition, run, hiveSigns, blockers))
+    if (run.status.finished()) return listOf(finishNote(definition, run, hiveSigns, blockers)) + stepAllowanceNotes(definition, run)
     val lead = missingNotes(run.id.value, missing, level) + blockerNotes(run.id.value, definition, run, blockers) + disputes + tutorialFailureNotes(definition, run)
     val stop = run.spendPause
     if (stop != null) return lead + allowanceNotes(run)
@@ -60,6 +60,7 @@ fun queenUpdate(
     notes += lead
     researchNote(run, research, level)?.let { notes += it }
     notes += waitSentences(definition, run, roles)
+    notes += stepAllowanceNotes(definition, run)
     notes += nannyRelay(definition, run, review)
     notes += suggestions
     // A suggestion already says what she noticed, so her "I noticed" line does not say it twice.

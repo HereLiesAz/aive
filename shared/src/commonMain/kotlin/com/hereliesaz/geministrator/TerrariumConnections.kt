@@ -282,6 +282,10 @@ private fun TerrariumAddCreature(
         }
         // Steps for a creature: a task with a contract around it, made at the version the catalog has now.
         Text(stringResource(Res.string.build_add_from_templates), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+        // The version the keeper selected, when there is one (the lineage on this device); the built-in otherwise.
+        val templateCatalog = androidx.compose.runtime.produceState<com.hereliesaz.geministrator.template.TemplateCatalog?>(initialValue = null) {
+            value = com.hereliesaz.geministrator.template.DeviceTemplates.catalog()
+        }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             com.hereliesaz.geministrator.template.BuiltInTemplates.all.forEach { template ->
                 val title = stepTemplateTitle(template)
@@ -289,7 +293,8 @@ private fun TerrariumAddCreature(
                     label = title,
                     seed = "add-template-${template.id}",
                     onClick = {
-                        onEdit(addTerrariumCreature(definition, TerrariumNewcomer.FromTemplate(template, template.base(), title)))
+                        val base = templateCatalog.value?.current(com.hereliesaz.geministrator.template.TemplateKind.Step, template.id) ?: template.base()
+                        onEdit(addTerrariumCreature(definition, TerrariumNewcomer.FromTemplate(template, base, title)))
                     },
                 )
             }

@@ -57,6 +57,7 @@ import com.hereliesaz.geministrator.resources.improvement_standing_examined
 import com.hereliesaz.geministrator.resources.improvement_standing_never
 import com.hereliesaz.geministrator.resources.improvement_standing_overdue
 import com.hereliesaz.geministrator.resources.improvement_standing_skipped
+import com.hereliesaz.geministrator.resources.improvement_select_generation
 import com.hereliesaz.geministrator.resources.improvement_status_adopted
 import com.hereliesaz.geministrator.resources.improvement_status_dismissed
 import com.hereliesaz.geministrator.resources.improvement_status_proposed
@@ -104,6 +105,8 @@ internal fun ImprovementPart(
     var state by remember { mutableStateOf(ImprovementState()) }
     var roles by remember { mutableStateOf<List<RoleDefinition>>(emptyList()) }
     var authored by remember { mutableStateOf<List<WorkflowDefinition>>(emptyList()) }
+    // Adopted proposals whose new generation is still a candidate beside its parent: the row offers to select it.
+    var candidates by remember { mutableStateOf<Set<String>>(emptySet()) }
     // A decision is running: its buttons are off until it ends, so a second tap cannot start a second one.
     var deciding by remember { mutableStateOf(false) }
     val saveRole by rememberUpdatedState(onSaveRoleInstructions)
@@ -116,6 +119,8 @@ internal fun ImprovementPart(
         // The other two mechanisms are mirrored into the one ledger, so all three are read and decided here.
         syncSources(store, memoryLayer)
         state = store.state()
+        candidates = runCatching { templateStore.revisions() }.getOrDefault(emptyList())
+            .filter { it.status == com.hereliesaz.geministrator.template.TemplateStatus.Candidate }.map { it.proposalId }.toSet()
         roles = host?.installedRoles().orEmpty()
         authored = host?.entries()?.filter { it.origin == WorkflowLibraryOrigin.Authored }?.map { it.definition }.orEmpty()
         hasLoop = host?.entries()?.any { it.definition.id.value == SelfImprovementLoop.HIVE_ID } ?: true
@@ -170,6 +175,13 @@ internal fun ImprovementPart(
                 hives = authored,
                 roles = roles,
                 busy = deciding,
+                selectable = proposal.id in candidates,
+                onSelect = {
+                    decide(scope, { deciding }, { deciding = it }) {
+                        message = describe(adoption.select(proposal.id))
+                        reload += 1
+                    }
+                },
                 onAdopt = {
                     decide(scope, { deciding }, { deciding = it }) {
                         message = describe(adoption.adopt(proposal.id))
@@ -268,6 +280,8 @@ private fun ProposalCard(
     hives: List<WorkflowDefinition>,
     roles: List<RoleDefinition>,
     busy: Boolean,
+    selectable: Boolean,
+    onSelect: () -> Unit,
     onAdopt: () -> Unit,
     onAddToHive: (WorkflowDefinition) -> Unit,
     onDismiss: () -> Unit,
@@ -332,6 +346,9 @@ private fun ProposalCard(
                         AzphaltPill(stringResource(Res.string.improvement_dismiss), "improvement-dismiss-${proposal.id}", enabled = !busy, onClick = onDismiss)
                     }
                     ProposalStatus.Adopted -> if (proposal.appliedBefore != null) {
+                        if (selectable) {
+                            AzphaltPill(stringResource(Res.string.improvement_select_generation), "improvement-select-${proposal.id}", tone = PillTone.Primary, enabled = !busy, onClick = onSelect)
+                        }
                         AzphaltPill(stringResource(Res.string.improvement_revert), "improvement-revert-${proposal.id}", enabled = !busy, onClick = onRevert)
                     }
                     else -> Unit

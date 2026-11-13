@@ -81,7 +81,7 @@ class HallMonitorSolutionTrialService(
         val sourceDefinition = requireNotNull(persistence.definitions.get(sourceRun.workflowDefinitionId)) {
             "Workflow definition ${sourceRun.workflowDefinitionId.value} was not found"
         }
-        val launchRoles = activeRoles(resolveRoleCollection(persistence.roles.all()))
+        val launchRoles = com.hereliesaz.geministrator.template.LaunchRoles.resolve(activeRoles(resolveRoleCollection(persistence.roles.all())))
             .filterNot { it.id == HallMonitorRole.id }
         require(launchRoles.isNotEmpty()) { "No active roles are available to run a Nanny solution trial" }
         val launchRoleIds = launchRoles.mapTo(linkedSetOf()) { it.id }

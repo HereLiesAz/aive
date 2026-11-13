@@ -119,6 +119,11 @@ enum class QueenVoice(val relay: QueenRelay?) {
     // --- A lesson that could not be written, and an optional step set aside (queen/TutorialFailures.kt). Kept apart, after every other voice. ---
     TutorialLessonFailed(QueenRelay.Watch),
     StepSkipped(QueenRelay.Watch),
+    // --- The Nanny's finding about a template, passed on mid-run (queen/NannyTemplateFindings.kt). Kept apart, after every other voice. ---
+    SuggestNannyTemplate(QueenRelay.Nanny),
+
+    // --- A step stopped at its token allowance (queen/QueenSignals.kt). Kept apart, after every other voice. ---
+    StepAllowanceStopped(QueenRelay.Watch),
 }
 
 /** Where a note leads: an existing place, never a new one. */

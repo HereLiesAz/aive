@@ -94,6 +94,22 @@ class TemplateCatalog(
             if (target.status != TemplateStatus.Candidate || evidenceSteps < GENETIC_MIN_STEPS) return null
             return revisions.map { if (it === target) it.copy(status = TemplateStatus.Approved) else it }
         }
+
+        /**
+         * The keeper's selection of a candidate generation: [promote], and the selection time becomes its adoption time,
+         * so of several siblings the one selected last is the one new steps use. Null when it cannot be selected.
+         */
+        fun select(
+            revisions: List<TemplateRevision>,
+            kind: TemplateKind,
+            id: String,
+            version: Int,
+            evidenceSteps: Int,
+            now: Long,
+        ): List<TemplateRevision>? =
+            promote(revisions, kind, id, version, evidenceSteps)?.map {
+                if (it.kind == kind && it.templateId == id && it.version == version) it.copy(adoptedAtEpochMillis = now) else it
+            }
     }
 }
 

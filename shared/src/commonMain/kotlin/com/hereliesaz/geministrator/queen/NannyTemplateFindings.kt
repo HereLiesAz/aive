@@ -1,15 +1,20 @@
 package com.hereliesaz.geministrator.queen
 
+import com.hereliesaz.geministrator.decodeHallMonitorReportPayload
 import com.hereliesaz.geministrator.domain.HallMonitorAction
 import com.hereliesaz.geministrator.domain.HallMonitorReport
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
+import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
+import com.hereliesaz.geministrator.template.BuiltInTemplates
 import com.hereliesaz.geministrator.template.RevisionAim
 import com.hereliesaz.geministrator.template.RevisionDirector
 import com.hereliesaz.geministrator.template.RevisionIntent
 import com.hereliesaz.geministrator.template.RevisionMode
+import com.hereliesaz.geministrator.template.TemplateCatalog
 import com.hereliesaz.geministrator.template.TemplateKind
+import com.hereliesaz.geministrator.template.TemplateRevisionRules
 import com.hereliesaz.geministrator.template.TemplateRevisionDraft
 import com.hereliesaz.geministrator.template.TemplateTarget
 import com.hereliesaz.geministrator.workflow.OUTPUT_CONTRACT_VIOLATION
@@ -120,4 +125,51 @@ fun templateProposalFor(
             600,
         ),
     )
+}
+
+private fun newestReport(run: WorkflowRun): HallMonitorReport? =
+    latestReport(run)?.textContent?.let { runCatching { decodeHallMonitorReportPayload(it) }.getOrNull() }
+
+/**
+ * The Nanny's mid-run finding about a template, as the queen decides it. She puts it before the keeper only when the
+ * change would be accepted as it stands: the aim and evidence are counted from this run, the thresholds (3 steps for a
+ * quick change, 10 for a new generation) are met, no locked field is touched and no limit is loosened. Anything else is
+ * not offered now and is carried to the next swarm as before ([nannyCarryForward]). Pure; no model. The check here is
+ * against the built-in versions; adopting it checks again against the lineage the keeper has.
+ */
+internal fun nannyTemplateCandidates(
+    definition: WorkflowDefinition,
+    run: WorkflowRun,
+    roles: Collection<RoleDefinition> = emptyList(),
+): List<QueenCandidate> {
+    val report = newestReport(run) ?: return emptyList()
+    val catalog = TemplateCatalog(if (roles.isEmpty()) BuiltInTemplates.bases() else BuiltInTemplates.bases(roles))
+    return nannyFindings(definition, run).mapNotNull { finding ->
+        val target = templateTargetOf(finding) ?: return@mapNotNull null
+        val proposal = templateProposalFor(finding, report, definition, run, 0L) ?: return@mapNotNull null
+        val draft = try {
+            Json { ignoreUnknownKeys = true }.decodeFromString(TemplateRevisionDraft.serializer(), proposal.newText)
+        } catch (_: Exception) {
+            return@mapNotNull null
+        }
+        val base = catalog.at(target.kind, target.id, target.version) ?: return@mapNotNull null
+        if (base.version != target.version) return@mapNotNull null
+        val check = TemplateRevisionRules.check(base, draft) as? TemplateRevisionRules.Check.Accepted ?: return@mapNotNull null
+        if (check.loosens.isNotEmpty()) return@mapNotNull null
+        QueenCandidate(
+            QueenAction.TemplateChange, finding.id, QueenVoice.SuggestNannyTemplate,
+            listOf(queenSlot(target.id), draft.evidenceSteps.toString()),
+            outside = false,
+        )
+    }
+}
+
+/**
+ * The ledger row (source Nanny) for the template finding [findingId] of the newest report, made now instead of at the end
+ * of the swarm; null when the finding or the report is gone. Its id is the one [nannyCarryForward] uses, so it is never twice.
+ */
+internal fun nannyTemplateProposal(definition: WorkflowDefinition, run: WorkflowRun, findingId: String, now: Long): ImprovementProposal? {
+    val report = newestReport(run) ?: return null
+    val finding = nannyFindings(definition, run).firstOrNull { it.id == findingId } ?: return null
+    return templateProposalFor(finding, report, definition, run, now)
 }
