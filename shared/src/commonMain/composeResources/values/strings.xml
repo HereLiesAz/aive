@@ -2094,4 +2094,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="tour_reply_sort_of">Sort of, say it another way</string>
     <string name="tour_reply_lost">Lost me, go slower</string>
     <string name="tour_reply_show">Show me on the real thing</string>
+    <!-- The training swarm -->
+    <string name="queen_say_training_offer">The swarm training a specialist for %1$s has a result. On the same practice tasks the generic role met %2$s and the draft specialist met %3$s. I will adopt it only if you approve it in Messages, and the generic role stays as it is.</string>
+    <string name="queen_say_training_stopped">The swarm training a specialist for %1$s has stopped, and I am offering nothing. The generic role is unchanged.</string>
+    <string name="queen_say_training_needs_you">The swarm training a specialist for %1$s could not be ruled on from its results. I have adopted nothing. It is yours to decide.</string>
 </resources>
