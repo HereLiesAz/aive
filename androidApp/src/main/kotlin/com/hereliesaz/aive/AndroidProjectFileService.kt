@@ -298,8 +298,17 @@ internal class AndroidProjectFileService(
         else -> resolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
     }
 
-    private fun recentLocations(): Set<String> =
-        preferences.getStringSet(RECENT_LOCATIONS_KEY, emptySet()).orEmpty().toSet()
+    // Android does not keep the order of a stored string set, so the order lives in its own
+    // newline-free ordered string (oldest first) next to the set; the set is kept for readers
+    // and for locations stored before the order existed.
+    private fun recentLocations(): Set<String> = orderedRecentLocations().toSet()
+
+    private fun orderedRecentLocations(): List<String> {
+        val stored = preferences.getStringSet(RECENT_LOCATIONS_KEY, emptySet()).orEmpty()
+        val order = preferences.getString(RECENT_ORDER_KEY, null).orEmpty()
+            .split('\n').filter { it in stored }
+        return order + stored.filter { it !in order }
+    }
 
     private fun rememberUri(uri: Uri) {
         rememberLocation(uri.toString(), includeRecent = uri.scheme == "content")
@@ -308,14 +317,15 @@ internal class AndroidProjectFileService(
     private fun rememberLocation(location: String, includeRecent: Boolean) {
         val editor = preferences.edit().putString(LAST_LOCATION_KEY, location)
         if (includeRecent) {
-            val next = recentLocations().toMutableSet().apply {
+            val next = orderedRecentLocations().toMutableList().apply {
                 remove(location)
                 add(location)
                 while (size > MAX_RECENT_FILES) {
-                    remove(first())
+                    removeAt(0)
                 }
             }
-            editor.putStringSet(RECENT_LOCATIONS_KEY, next)
+            editor.putStringSet(RECENT_LOCATIONS_KEY, next.toSet())
+            editor.putString(RECENT_ORDER_KEY, next.joinToString("\n"))
         }
         check(editor.commit()) {
             "Could not persist recent project-file location"
@@ -325,6 +335,7 @@ internal class AndroidProjectFileService(
     private companion object {
         const val PREFERENCES_NAME = "aive.project-files.v1"
         const val RECENT_LOCATIONS_KEY = "recent"
+        const val RECENT_ORDER_KEY = "recent_order"
         const val LAST_LOCATION_KEY = "last-location"
         const val MAX_RECENT_FILES = 24
     }

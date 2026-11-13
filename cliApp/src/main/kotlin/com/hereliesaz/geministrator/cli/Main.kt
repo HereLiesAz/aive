@@ -34,10 +34,11 @@ fun main(args: Array<String>) {
                 // Help works even when no service is listening.
                 val help = args.isEmpty() || args.first() in setOf("--help", "-h", "help")
                 if (help) {
-                    println("The Aive headless engine:\n  aive serve               Start the daemon and local keeper console\n" +
+                    println("Engine commands (handled here, not by the control API):\n  aive serve               Start the daemon and local keeper console\n" +
                         "  aive run --objective ...  Plan and run in this terminal\n" +
                         "  aive run --hive <id>      Run a saved hive in this terminal\n" +
-                        "  aive resume              Resume an interrupted run in this terminal\n")
+                        "  aive resume              Resume an interrupted run in this terminal\n" +
+                        "Control commands follow; this is one help listing, printed once.\n")
                 }
                 val transport = if (help) {
                     ControlTransport { _, _, _ -> throw ControlUnreachable("Headless engine not started") }
