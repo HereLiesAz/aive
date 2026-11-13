@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to **The Aive** are documented here from the current product line forward. Every merge to `main` ships a `0.9.6.BUILD` build; all of them are grouped under the `0.9.6` GitHub Release.
+All notable changes to **The Aive** are documented here from the current product line forward. Every merge to `main` ships a `MAJOR.MINOR.PATCH.BUILD` build (the line is `app.versionName` in `gradle.properties`; see docs/VERSIONING.md); builds of one patch line are grouped under one GitHub Release. The `0.9.6` heading below is where this log starts, not the current line.
 
 ## 0.9.6 — from 2026-09-19
 
