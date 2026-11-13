@@ -1960,6 +1960,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_say_practice_running">A practice run of one of her solutions is under way. It never changes the frozen swarm.</string>
     <string name="queen_say_practice_done">A practice run of one of her solutions has finished.</string>
     <string name="queen_say_practice_ended">A practice run of one of her solutions ended before it finished.</string>
+    <string name="queen_say_research_consulted">Before planning I looked at %1$s places and found %2$s leads. Nothing was connected or run.</string>
+    <string name="queen_say_research_skipped">Before planning I looked at %1$s places and could not use %2$s of them (declined, switched off or too slow), so I planned without them. Nothing was connected or run.</string>
 
     <string name="queen_row_eyebrow">From the queen</string>
     <string name="queen_title_status">How the swarm is doing</string>

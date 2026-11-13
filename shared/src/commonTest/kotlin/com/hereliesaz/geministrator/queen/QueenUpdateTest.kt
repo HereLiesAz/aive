@@ -112,4 +112,27 @@ class QueenUpdateTest {
         assertEquals(QueenLevel.Quiet, QueenLevel.parse("Loud"))
         assertEquals(QueenLevel.Helpful, QueenLevel.parse("Helpful"))
     }
+
+    @Test
+    fun researchLineShowsInQuietOnlyWhenSomethingRelevantWasSkipped() {
+        val run = qRun(qTaskRun("a", TaskRunStatus.Running))
+        val ok = com.hereliesaz.geministrator.research.ResearchRecord(
+            consulted = listOf(com.hereliesaz.geministrator.research.ResearchSource.Repository), leads = 1,
+        )
+        val skipped = ok.copy(
+            skipped = listOf(
+                com.hereliesaz.geministrator.research.ResearchSkip(
+                    com.hereliesaz.geministrator.research.ResearchSource.SearchA2A,
+                    com.hereliesaz.geministrator.research.ResearchSkipReason.Declined,
+                ),
+            ),
+        )
+        fun voices(r: com.hereliesaz.geministrator.research.ResearchRecord?, level: QueenLevel) =
+            queenUpdate(definition, run, roles, level, null, r).map { it.voice }.filter { it.name.startsWith("Research") }
+        assertEquals(emptyList(), voices(ok, QueenLevel.Quiet))
+        assertEquals(listOf(QueenVoice.ResearchSkipped), voices(skipped, QueenLevel.Quiet))
+        assertEquals(listOf(QueenVoice.ResearchConsulted), voices(ok, QueenLevel.Helpful))
+        assertEquals(emptyList(), voices(null, QueenLevel.Helpful))
+        assertEquals(listOf("1", "1"), queenUpdate(definition, run, roles, QueenLevel.Quiet, null, skipped).first().args)
+    }
 }

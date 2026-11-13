@@ -58,6 +58,8 @@ private fun voiceResource(voice: QueenVoice): StringResource = when (voice) {
         QueenVoice.PracticeRunning -> Res.string.queen_say_practice_running
         QueenVoice.PracticeDone -> Res.string.queen_say_practice_done
         QueenVoice.PracticeEnded -> Res.string.queen_say_practice_ended
+        QueenVoice.ResearchConsulted -> Res.string.queen_say_research_consulted
+        QueenVoice.ResearchSkipped -> Res.string.queen_say_research_skipped
 }
 
 @Composable

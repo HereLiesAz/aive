@@ -66,7 +66,7 @@ data class ResearchBudget(
     /** Total size of what the planner is shown. */
     val maxBytes: Int = 2_048,
     val maxEntryChars: Int = 280,
-    /** The whole step, local pass and lookups. */
+    /** The local pass, and each lookup, separately: the keeper's thinking time is never counted. */
     val wallClockMillis: Long = 20_000,
 )
 

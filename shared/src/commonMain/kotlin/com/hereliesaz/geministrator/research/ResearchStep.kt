@@ -15,7 +15,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 
 /** A pass over what is already on the device. Sends nothing anywhere. */
@@ -62,6 +61,7 @@ class ResearchStep(
         val consulted = mutableListOf<ResearchSource>()
         val skipped = mutableListOf<ResearchSkip>()
         var sent: String? = null
+        // The clock never runs while the keeper decides: the local pass and each lookup have their own allowance.
         try {
             withTimeout(budget.wallClockMillis) {
                 for ((source, pass) in local) {
@@ -74,50 +74,50 @@ class ResearchStep(
                         skipped += ResearchSkip(source, ResearchSkipReason.Failed)
                     }
                 }
-                var lookups = 0
-                for (candidate in candidates) {
-                    if (lookups >= budget.maxLookups) {
-                        skipped += ResearchSkip(candidate.source, ResearchSkipReason.Budget)
-                        continue
-                    }
-                    val query = ResearchQuery.minimal(objective)
-                    if (query == null) {
-                        skipped += ResearchSkip(candidate.source, ResearchSkipReason.NoQuery)
-                        continue
-                    }
-                    val decision = consent.decide(
-                        McpConsentRequest(
-                            serverId = candidate.serverId,
-                            serverName = candidate.serverName,
-                            serverLocation = candidate.serverLocation,
-                            toolName = candidate.toolName,
-                            argumentsPreview = "Look for agents by these words only: $query",
-                            runKey = runKey,
-                        ),
-                    )
-                    if (decision == McpConsentDecision.Deny) {
-                        skipped += ResearchSkip(candidate.source, ResearchSkipReason.Declined)
-                        continue
-                    }
-                    lookups++
-                    try {
-                        leads += candidate.lookup.search(query)
-                        consulted += candidate.source
-                        sent = query
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (_: ResearchUnavailable) {
-                        skipped += ResearchSkip(candidate.source, ResearchSkipReason.Unavailable)
-                    } catch (_: Exception) {
-                        skipped += ResearchSkip(candidate.source, ResearchSkipReason.Failed)
-                    }
-                }
             }
-        } catch (timeout: TimeoutCancellationException) {
-            // Whatever the pass reached stays; the rest is reported as not consulted.
+        } catch (_: TimeoutCancellationException) {
             val reached = consulted.toSet() + skipped.map { it.source }
-            val pending = (local.map { it.first } + candidates.map { it.source }).distinct().filter { it !in reached }
-            pending.forEach { skipped += ResearchSkip(it, ResearchSkipReason.TimedOut) }
+            local.map { it.first }.filter { it !in reached }.forEach { skipped += ResearchSkip(it, ResearchSkipReason.TimedOut) }
+        }
+        var lookups = 0
+        for (candidate in candidates) {
+            if (lookups >= budget.maxLookups) {
+                skipped += ResearchSkip(candidate.source, ResearchSkipReason.Budget)
+                continue
+            }
+            val query = ResearchQuery.minimal(objective)
+            if (query == null) {
+                skipped += ResearchSkip(candidate.source, ResearchSkipReason.NoQuery)
+                continue
+            }
+            val decision = consent.decide(
+                McpConsentRequest(
+                    serverId = candidate.serverId,
+                    serverName = candidate.serverName,
+                    serverLocation = candidate.serverLocation,
+                    toolName = candidate.toolName,
+                    argumentsPreview = "Look for agents by these words only: $query",
+                    runKey = runKey,
+                ),
+            )
+            if (decision == McpConsentDecision.Deny) {
+                skipped += ResearchSkip(candidate.source, ResearchSkipReason.Declined)
+                continue
+            }
+            lookups++
+            try {
+                leads += withTimeout(budget.wallClockMillis) { candidate.lookup.search(query) }
+                consulted += candidate.source
+                sent = query
+            } catch (_: TimeoutCancellationException) {
+                skipped += ResearchSkip(candidate.source, ResearchSkipReason.TimedOut)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: ResearchUnavailable) {
+                skipped += ResearchSkip(candidate.source, ResearchSkipReason.Unavailable)
+            } catch (_: Exception) {
+                skipped += ResearchSkip(candidate.source, ResearchSkipReason.Failed)
+            }
         }
         val kept = leads.toList()
         val offered = kept.toAvailableTools(budget).size

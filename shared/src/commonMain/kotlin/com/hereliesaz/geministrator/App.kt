@@ -168,6 +168,8 @@ fun App(
     codeExecution: com.hereliesaz.geministrator.mcp.CodeExecutionToolSource? = null,
     /** Where MCP servers' requests for input are shown; null where no keeper can be asked. */
     mcpElicitation: com.hereliesaz.geministrator.mcp.PromptingMcpElicitationGate? = null,
+    /** Whether the keeper turned the app's own control interface on; the queen reads its capability names only then. */
+    researchBridgeEnabled: () -> Boolean = { false },
 ) {
     val scope = rememberCoroutineScope()
     val workflowPersistence = remember(persistence) { persistence ?: com.hereliesaz.geministrator.persistence.WorkflowPersistenceFactory.durable }
@@ -324,6 +326,51 @@ fun App(
         }
     }
 
+    // The queen's research before planning: what is already connected here, then at most one question the keeper may decline.
+    val researchBridgeOn = researchBridgeEnabled()
+    val researchServers = mcpHost?.servers?.collectAsState()?.value.orEmpty()
+    val researchStep = remember(mcpHost, mcpConsent, researchBridgeOn, researchServers.isNotEmpty()) {
+        com.hereliesaz.geministrator.research.ResearchStep(
+            local = buildList {
+                if (mcpHost != null && researchServers.isNotEmpty()) {
+                    add(com.hereliesaz.geministrator.research.ResearchSource.ConnectedServer to com.hereliesaz.geministrator.research.ConnectedServersResearch(mcpHost))
+                }
+                if (researchBridgeOn) {
+                    add(
+                        com.hereliesaz.geministrator.research.ResearchSource.AppBridge to com.hereliesaz.geministrator.research.AppBridgeResearch(
+                            { true },
+                            listOf("status", "hives", "roles", "providers", "runs", "settings"),
+                        ),
+                    )
+                }
+            },
+            candidates = if (mcpConsent == null) {
+                emptyList()
+            } else {
+                listOf(
+                    com.hereliesaz.geministrator.research.ResearchCandidate(
+                        source = com.hereliesaz.geministrator.research.ResearchSource.SearchA2A,
+                        serverId = "research-searcha2a",
+                        serverName = "SearchA2A directory",
+                        serverLocation = com.hereliesaz.geministrator.research.SearchA2aMcpLookup.ENDPOINT,
+                        toolName = "search_agents",
+                        lookup = com.hereliesaz.geministrator.research.SearchA2aMcpLookup({
+                            com.hereliesaz.geministrator.mcp.McpStreamableHttpTransport(
+                                com.hereliesaz.geministrator.a2a.sharedExternalDiscoveryClient,
+                                com.hereliesaz.geministrator.research.SearchA2aMcpLookup.ENDPOINT,
+                            )
+                        }),
+                    ),
+                )
+            },
+            consent = mcpConsent ?: com.hereliesaz.geministrator.mcp.McpConsentGate.DenyUnasked,
+        )
+    }
+    val researchContext = com.hereliesaz.geministrator.research.ResearchContext(
+        connectedServers = researchServers.size,
+        bridgeEnabled = researchBridgeOn,
+    )
+
     // The keeper's answer to a reviewed plan: shown over the planning field, held until they press Start or Do not start.
     val askKeeper: suspend (com.hereliesaz.geministrator.orchestration.PlanDecision) -> Boolean = { decision ->
         val answer = CompletableDeferred<Boolean>()
@@ -405,6 +452,8 @@ fun App(
                 confirmPlan = askKeeper,
                 planStore = planStore,
                 objectiveProvenance = objectiveProvenance,
+                research = researchStep,
+                researchContext = researchContext,
             )
         } else {
             launchSteps.push("Starting the starter workflow…")

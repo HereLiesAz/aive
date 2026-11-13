@@ -12,6 +12,7 @@ import com.hereliesaz.geministrator.domain.normalized
 import com.hereliesaz.geministrator.domain.resolveRoleCollection
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
 import com.hereliesaz.geministrator.orchestration.OrchestrationPacket
+import com.hereliesaz.geministrator.research.toAvailableTools
 import com.hereliesaz.geministrator.orchestration.OrchestrationRole
 import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
@@ -62,7 +63,22 @@ private class PlanInputs(
     val rolesToPersist: List<RoleDefinition>? = null,
     /** Where [objective] came from; the run made from the plan keeps it. */
     val objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
+    /** What the queen consulted before planning, for the run's Story and Messages; null when she did not. */
+    val research: com.hereliesaz.geministrator.research.ResearchRecord? = null,
 ) {
+    fun withResearch(outcome: com.hereliesaz.geministrator.research.ResearchOutcome): PlanInputs {
+        if (outcome.record.isEmpty) return this
+        val tools = outcome.leads.toAvailableTools()
+        return PlanInputs(
+            projectName, objective, repository, existingProject, parentRunIds, launchRoles, plannerRoles,
+            packet.copy(
+                availableTools = tools,
+                instruction = if (tools.isEmpty()) packet.instruction else packet.instruction + com.hereliesaz.geministrator.research.RESEARCH_PLAN_INSTRUCTION,
+            ),
+            design, supplementalRoles, rolesToPersist, objectiveProvenance, outcome.record,
+        )
+    }
+
     fun fingerprint(reviewer: RoleDefinition): String = planInputsFingerprint(
         objective = objective,
         repository = repository,
@@ -216,6 +232,22 @@ private suspend fun ApplicationRuntime.startPlannedWorkflow(inputs: PlanInputs, 
         parentWorkflowRunIds = inputs.parentRunIds,
         objectiveProvenance = inputs.objectiveProvenance,
     )
+    inputs.research?.let { record ->
+        val runId = WorkflowRunId("run-$stamp")
+        rememberResearch(runId.value, record)
+        RepositoryWorkflowEventSink(persistence.events).append(
+            com.hereliesaz.geministrator.events.PolicyDecisionRecorded(
+                workflowRunId = runId,
+                effect = com.hereliesaz.geministrator.policy.PolicyEffect.Allow,
+                code = "research.before_planning",
+                action = "consult",
+                subjectType = "queen",
+                resourceType = "research",
+                reason = record.storyLine(),
+                occurredAtEpochMillis = now,
+            ),
+        )
+    }
     reportLaunchProgress("Loading the new run…")
     loadLatest()
 }
@@ -332,6 +364,9 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
     planStore: ReviewedPlanStore? = null,
     /** Where [objective] came from; a remote agent's request is not the keeper's own typing. */
     objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
+    /** The queen's research before planning (docs/Keepers-Room.md); null plans without it. */
+    research: com.hereliesaz.geministrator.research.ResearchStep? = null,
+    researchContext: com.hereliesaz.geministrator.research.ResearchContext = com.hereliesaz.geministrator.research.ResearchContext(),
 ) {
     reportLaunchProgress("Reading your objective…")
     val cleanObjective = objective.trim()
@@ -344,7 +379,18 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
         return
     }
 
-    val inputs = planInputs(projectName, objective, repository, existingProject, continuesWorkflowRunIds, objectiveProvenance = objectiveProvenance)
+    var inputs = planInputs(projectName, objective, repository, existingProject, continuesWorkflowRunIds, objectiveProvenance = objectiveProvenance)
+    if (research != null) {
+        reportLaunchProgress("Looking for what could help before planning…")
+        val outcome = try {
+            research.run(inputs.objective, researchContext.copy(repositoryLinked = researchContext.repositoryLinked || inputs.repository != null), "plan-${inputs.objective.hashCode()}")
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            com.hereliesaz.geministrator.research.ResearchOutcome.None
+        }
+        inputs = inputs.withResearch(outcome)
+    }
     val review = reviewRole(planReviewer, confirmPlan, inputs.launchRoles)
     val plan = planAndDecide(inputs, orchestrationRuntime, review, confirmPlan, planStore) ?: return
     startPlannedWorkflow(inputs, plan)
