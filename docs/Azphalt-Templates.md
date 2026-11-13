@@ -5,9 +5,10 @@ Every Azphalt package, built-in swarm and role starts from a template, or is lis
 ## The rule
 
 - **A role has a role template.** The merged template catalog makes a role template (kind role, id, version 1, generation 1, no parent, locked identity, capabilities, authorities and way of running) for every role the device has installed: the built-in roles, the Nanny, the node-character roles and every role a package installs. The Nanny improves it over generations by the same mechanism as a step template. Nothing is stored per role at install; the record is the role as installed, and a revision is stored beside it.
-- **A producing step starts from a template.** A step that makes something carries a contract naming its starting template (`write-document`, `check-work` or `text-to-table`), the typed output that template hands back, and its inputs. The criteria a reviewer checks stay the step's own acceptance criteria.
+- **A producing step starts from a template.** A step that makes something carries a contract naming its starting template (`write-document`, `check-work`, `text-to-table` or one of the presets below), the typed output that template hands back, and its inputs. The criteria a reviewer checks stay the step's own acceptance criteria.
 - **A starting-point contract changes nothing about how the step runs.** The contract is marked `startingPoint`: the step keeps the run's whole toolbox, is not held for a missing input, and is not failed on its output. The template is a starting point the Nanny can read and improve, and a step made from a template in Edit is still enforced as before. Saved swarms and package files with no contract load as they did; a contract written before the flag existed is an enforced one.
-- **A step that fits no starting template is a gap.** It is listed in `StepTemplateAssignments.gaps` with what it needs, and in the gap list below. A person's approval step makes nothing and needs neither.
+- **A step that fits no starting template is a gap.** It is listed in `StepTemplateAssignments.gaps` with what it needs. There are none today: the 26 steps the audit listed are covered (see Gaps closed). A person's approval step makes nothing and needs neither.
+- **A starting point declares no effect.** A step that began at an effectful template (`change-code`, the media templates) carries `effects: None` in its contract, so it is not held for approval and the run's rules for it are unchanged; the approval floor and the single attempt belong to a step made from the template in Edit.
 - **A new package cannot skip this.** `StepTemplateCoverageTest` reads every package under `docs/azphalt-packages` and every built-in swarm and fails when a step has no template and no gap entry, when a gap entry has no step, or when a role has no role template. A package that changes its files needs its version raised and its manifest digests recomputed (`npm run build` checks them); signing is done at release and was not touched.
 
 ## Counts
@@ -15,8 +16,8 @@ Every Azphalt package, built-in swarm and role starts from a template, or is lis
 | | Before | After |
 |---|---|---|
 | Role template records | every installed role (built-in, Nanny, node-character, package), by construction; the default catalog left out the Nanny | all of them; the default catalog adds the Nanny; tested for 128 role ids |
-| Package steps with a starting template | 0 of 101 | 90 of 101 (11 listed as gaps) |
-| Built-in swarm steps with a starting template | 0 of 68 (10 more are approval steps) | 53 of 68 (15 listed as gaps) |
+| Package steps with a starting template | 0 of 101 | 101 of 101 (the 11 gaps closed by `change-code`, the media, `localize-content` and `make-slides` templates) |
+| Built-in swarm steps with a starting template | 0 of 68 (10 more are approval steps) | 68 of 68 (the 15 gaps closed by `change-code`, `render-image`, `render-video` and the fixed-format templates) |
 | Swarms | 20 built-in (18 in the coding suite, the short film, the starter) and 66 workflow packages | the same |
 
 Built-in roles: 18 in the built-in list and the Nanny, and 6 node-character roles installed when a swarm needs them. Packages: 78 in all, 66 workflow packages (66 swarms, 101 steps) and 12 role packages, which carry 111 role files for 104 role ids.
@@ -147,35 +148,35 @@ Keys are `<swarm id>/<step id>`. The short film and the self-improvement loop ar
 | `suite-feature-delivery` | `requirements` | write-document |
 | `suite-feature-delivery` | `design` | write-document |
 | `suite-feature-delivery` | `challenge` | check-work |
-| `suite-feature-delivery` | `implement` | GAP: change-code |
+| `suite-feature-delivery` | `implement` | change-code |
 | `suite-feature-delivery` | `verify` | check-work |
 | `suite-feature-delivery` | `code-review` | check-work |
 | `suite-feature-delivery` | `release-approval` | approval step, needs none |
 | `suite-bug-fix` | `reproduce` | write-document |
 | `suite-bug-fix` | `diagnose` | write-document |
-| `suite-bug-fix` | `fix` | GAP: change-code |
-| `suite-bug-fix` | `regression-test` | GAP: change-code |
+| `suite-bug-fix` | `fix` | change-code |
+| `suite-bug-fix` | `regression-test` | change-code |
 | `suite-bug-fix` | `verify` | check-work |
 | `suite-bug-fix` | `code-review` | check-work |
 | `suite-bug-fix` | `release-approval` | approval step, needs none |
-| `suite-safe-refactor` | `characterize` | GAP: change-code |
+| `suite-safe-refactor` | `characterize` | change-code |
 | `suite-safe-refactor` | `plan` | write-document |
-| `suite-safe-refactor` | `refactor` | GAP: change-code |
+| `suite-safe-refactor` | `refactor` | change-code |
 | `suite-safe-refactor` | `verify` | check-work |
 | `suite-safe-refactor` | `code-review` | check-work |
 | `suite-safe-refactor` | `release-approval` | approval step, needs none |
 | `suite-test-coverage` | `survey` | write-document |
-| `suite-test-coverage` | `write-tests` | GAP: change-code |
+| `suite-test-coverage` | `write-tests` | change-code |
 | `suite-test-coverage` | `verify` | check-work |
 | `suite-test-coverage` | `code-review` | check-work |
 | `suite-test-coverage` | `release-approval` | approval step, needs none |
 | `suite-dependency-update` | `audit` | write-document |
-| `suite-dependency-update` | `update` | GAP: change-code |
+| `suite-dependency-update` | `update` | change-code |
 | `suite-dependency-update` | `verify` | check-work |
 | `suite-dependency-update` | `code-review` | check-work |
 | `suite-dependency-update` | `release-approval` | approval step, needs none |
 | `suite-docs-sync` | `find-drift` | write-document |
-| `suite-docs-sync` | `update-docs` | GAP: change-code |
+| `suite-docs-sync` | `update-docs` | change-code |
 | `suite-docs-sync` | `code-review` | check-work |
 | `suite-docs-sync` | `release-approval` | approval step, needs none |
 | `suite-release-prep` | `changelog` | write-document |
@@ -183,7 +184,7 @@ Keys are `<swarm id>/<step id>`. The short film and the self-improvement loop ar
 | `suite-release-prep` | `code-review` | check-work |
 | `suite-release-prep` | `release-approval` | approval step, needs none |
 | `suite-incident-hotfix` | `diagnose` | write-document |
-| `suite-incident-hotfix` | `hotfix` | GAP: change-code |
+| `suite-incident-hotfix` | `hotfix` | change-code |
 | `suite-incident-hotfix` | `verify` | check-work |
 | `suite-incident-hotfix` | `rollback-plan` | write-document |
 | `suite-incident-hotfix` | `release-approval` | approval step, needs none |
@@ -212,13 +213,13 @@ Keys are `<swarm id>/<step id>`. The short film and the self-improvement loop ar
 | `suite-weekly-tech-debt` | `survey` | write-document |
 | `suite-weekly-tech-debt` | `report` | write-document |
 | `short-film` | `concept` | write-document |
-| `short-film` | `storyboard` | GAP: fixed-format-result |
-| `short-film` | `style-sheet` | GAP: fixed-format-result |
-| `short-film` | `frames` | GAP: render-image |
-| `short-film` | `frame-review` | GAP: fixed-format-result |
-| `short-film` | `assemble` | GAP: render-video |
+| `short-film` | `storyboard` | fixed-format-result |
+| `short-film` | `style-sheet` | capped-text-result |
+| `short-film` | `frames` | render-image |
+| `short-film` | `frame-review` | fixed-format-result |
+| `short-film` | `assemble` | render-video |
 | `short-film` | `approve-film` | approval step, needs none |
-| `starter` | `implementation` | GAP: change-code |
+| `starter` | `implementation` | change-code |
 | `starter` | `verification` | check-work |
 | `starter` | `review` | check-work |
 | `starter` | `release-approval` | approval step, needs none |
@@ -226,8 +227,8 @@ Keys are `<swarm id>/<step id>`. The short film and the self-improvement loop ar
 
 Not listed per step, with the reason:
 
-- **The self-improvement loop** (`suite-self-improvement`). Its steps hand back the fixed proposal line grammar the improvement parser reads, and its integrity check compares the loop's structure. It is exempt in the test. It needs a `fixed-format-result` template first.
-- **Swarms the queen builds at run time** (training, the dispute test, node-character generation, and the swarm she plans from a hive). Their steps are generated by code with fixed result formats (`LESSON:`, `RULING:`, `GENERIC:` lines, assets). A swarm she plans can already use the starting templates by id; those steps are enforced. The generated ones also need `fixed-format-result` and the media templates.
+- **The self-improvement loop** (`suite-self-improvement`). Its steps hand back the fixed proposal line grammar the improvement parser reads, and its integrity check compares the loop's structure. It is exempt in the test. `fixed-format-result` now exists, but the loop's output is a line grammar a JSON-object check does not read, so it stays exempt.
+- **Swarms the queen builds at run time** (training, the dispute test, node-character generation, and the swarm she plans from a hive). Their steps are generated by code with fixed result formats (`LESSON:`, `RULING:`, `GENERIC:` lines, assets). A swarm she plans can already use the starting templates by id; those steps are enforced. The generated ones could start from `fixed-format-result` and the media templates; none is assigned yet.
 - **The tutorial.** It keeps using the generic built-in roles and has no prewritten lessons; the queen and her creatures generate them each run. The Adaptive Tutoring package is listed below.
 
 ## Azphalt packages
@@ -251,7 +252,7 @@ All 66 workflow packages. A role package carries no steps; its roles are in the 
 | `brand-identity-system` | 2. Identity Director | `identity-director` | write-document |
 | `campaign-planning` | 1. Campaign Strategist | `campaign-strategist` | write-document |
 | `character-sheet-generator` | 1. Character Design Briefer | `character-design-briefer` | write-document |
-| `character-sheet-generator` | 2. Firefly Character Sheet Render | `firefly-character-sheet-artist` | GAP: render-image |
+| `character-sheet-generator` | 2. Firefly Character Sheet Render | `firefly-character-sheet-artist` | render-image |
 | `character-sheet-generator` | 3. Character Consistency Reviewer | `character-consistency-reviewer` | check-work |
 | `competitive-intelligence` | 1. Competitive Analyst | `competitive-analyst` | write-document |
 | `content-strategy` | 1. Content Strategist | `content-strategist` | write-document |
@@ -271,19 +272,19 @@ All 66 workflow packages. A role package carries no steps; its roles are in the 
 | `evidence-synthesis` | 2. Methods Reviewer | `methods-reviewer` | check-work |
 | `exhibition-production` | 1. Exhibition Producer | `exhibition-producer` | write-document |
 | `experimental-design` | 1. Experimental Methodologist | `experimental-methodologist` | write-document |
-| `feature-delivery` | 1. Feature Engineer | `feature-engineer` | GAP: change-code |
+| `feature-delivery` | 1. Feature Engineer | `feature-engineer` | change-code |
 | `feature-delivery` | 2. Feature Reviewer | `feature-reviewer` | check-work |
 | `financial-model-qa` | 1. Financial Model Auditor | `financial-model-auditor` | check-work |
 | `game-vertical-slice` | 1. Game Director | `game-director` | write-document |
 | `game-vertical-slice` | 2. Playtest Analyst | `playtest-analyst` | check-work |
 | `grant-application` | 1. Grant Strategist | `grant-strategist` | write-document |
 | `idea-to-storyboard-to-video` | 1. Storyboard Scriptwriter | `storyboard-scriptwriter` | write-document |
-| `idea-to-storyboard-to-video` | 2. Firefly Storyboard Frames | `firefly-storyboard-artist` | GAP: render-image |
-| `idea-to-storyboard-to-video` | 3. Firefly Video Animation | `firefly-video-animator` | GAP: render-video |
+| `idea-to-storyboard-to-video` | 2. Firefly Storyboard Frames | `firefly-storyboard-artist` | render-image |
+| `idea-to-storyboard-to-video` | 3. Firefly Video Animation | `firefly-video-animator` | render-video |
 | `idea-to-storyboard-to-video` | 4. Production Final Reviewer | `production-final-reviewer` | check-work |
 | `interview-synthesis` | 1. Qualitative Synthesist | `qualitative-synthesist` | write-document |
 | `investigative-journalism` | 1. Investigative Reporter | `investigative-reporter` | write-document |
-| `localization-release` | 1. Localization Lead | `localization-lead` | GAP: localize-content |
+| `localization-release` | 1. Localization Lead | `localization-lead` | localize-content |
 | `long-form-book-production` | 1. Book Editor | `book-editor` | write-document |
 | `long-form-book-production` | 2. Manuscript Continuity Editor | `manuscript-continuity-editor` | check-work |
 | `meeting-to-execution` | 1. Execution Secretary | `execution-secretary` | text-to-table |
@@ -306,13 +307,13 @@ All 66 workflow packages. A role package carries no steps; its roles are in the 
 | `osint-source-verification` | 1. OSINT Provenance Analyst | `osint-provenance-analyst` | write-document |
 | `osint-source-verification` | 2. OSINT Verification Editor | `osint-verification-editor` | check-work |
 | `paperplanes-stratified-reconstruction` | 1. PaperPlanes Scene Director | `paperplanes-scene-director` | write-document |
-| `paperplanes-stratified-reconstruction` | 2. PaperPlanes Geometry Engineer | `paperplanes-geometry-engineer` | GAP: compose-media |
-| `paperplanes-stratified-reconstruction` | 3. PaperPlanes Occlusion Architect | `paperplanes-occlusion-architect` | GAP: compose-media |
-| `paperplanes-stratified-reconstruction` | 4. PaperPlanes Layer Engineer | `paperplanes-layer-engineer` | GAP: compose-media |
+| `paperplanes-stratified-reconstruction` | 2. PaperPlanes Geometry Engineer | `paperplanes-geometry-engineer` | compose-media |
+| `paperplanes-stratified-reconstruction` | 3. PaperPlanes Occlusion Architect | `paperplanes-occlusion-architect` | compose-media |
+| `paperplanes-stratified-reconstruction` | 4. PaperPlanes Layer Engineer | `paperplanes-layer-engineer` | compose-media |
 | `paperplanes-stratified-reconstruction` | 5. PaperPlanes Visual QC | `paperplanes-visual-qc` | check-work |
-| `podcast-production` | 1. Podcast Producer | `podcast-producer` | GAP: edit-audio |
+| `podcast-production` | 1. Podcast Producer | `podcast-producer` | edit-audio |
 | `podcast-production` | 2. Podcast Fact Editor | `podcast-fact-editor` | check-work |
-| `presentation-production` | 1. Presentation Editor | `presentation-editor` | GAP: make-slides |
+| `presentation-production` | 1. Presentation Editor | `presentation-editor` | make-slides |
 | `pricing-packaging-research` | 1. Pricing Researcher | `pricing-researcher` | write-document |
 | `privacy-impact-assessment` | 1. Privacy Risk Analyst | `privacy-risk-analyst` | write-document |
 | `process-redesign` | 1. Operations Designer | `operations-designer` | write-document |
@@ -327,7 +328,7 @@ All 66 workflow packages. A role package carries no steps; its roles are in the 
 | `scientific-literature-review` | 1. Review Scientist | `review-scientist` | write-document |
 | `search-visibility` | 1. Search Strategist | `search-strategist` | write-document |
 | `sketch-to-concept-art` | 1. Concept Brief Analyst | `concept-brief-analyst` | write-document |
-| `sketch-to-concept-art` | 2. Firefly Concept Render | `firefly-concept-artist` | GAP: render-image |
+| `sketch-to-concept-art` | 2. Firefly Concept Render | `firefly-concept-artist` | render-image |
 | `sketch-to-concept-art` | 3. Concept Art Reviewer | `concept-art-reviewer` | check-work |
 | `sop-process-engineering` | 1. Process Engineer | `process-engineer` | write-document |
 | `structured-hiring` | 1. Selection Designer | `selection-designer` | write-document |
@@ -338,22 +339,23 @@ All 66 workflow packages. A role package carries no steps; its roles are in the 
 | `ux-research-to-design` | 2. Interaction Designer | `interaction-designer` | write-document |
 | `vendor-evaluation` | 1. Vendor Evaluator | `vendor-evaluator` | write-document |
 
-## Gaps
+## Gaps closed
 
-Steps that fit none of the six starting templates, grouped by the template they need. These feed the catalog of starting templates being drafted.
+The audit listed 26 steps that fit none of the six starting templates. Each now has a preset (`template/StepPresets.kt`), made from a built-in template by changing data only: generic role, typed inputs, one tool or none, typed output with a compiled check, declared effects, a token allowance (carried, not yet enforced) and a single attempt where it changes something. Each step carries a `startingPoint` contract naming its preset. `StepTemplateAssignments.gaps` is empty and `StepTemplateCoverageTest` (`theTwentySixFormerGapsAreCoveredAndGuarded`) fails if any of the 26 loses its contract.
 
-| Needed template | Steps | Why none of the six fits | Steps listed |
-|---|---|---|---|
-| `change-code` | 11 | Writes files on a repository branch (an effect the six starting templates do not cover). | `suite-feature-delivery/implement`, `suite-bug-fix/fix`, `suite-bug-fix/regression-test`, `suite-safe-refactor/characterize`, `suite-safe-refactor/refactor`, `suite-test-coverage/write-tests`, `suite-dependency-update/update`, `suite-docs-sync/update-docs`, `suite-incident-hotfix/hotfix`, `starter/implementation`, `feature-delivery/feature-delivery-task-1` |
-| `render-image` | 4 | Makes pictures through an image service; no starting template makes media. | `short-film/frames`, `character-sheet-generator/character-sheet-generator-task-2`, `idea-to-storyboard-to-video/idea-to-storyboard-to-video-task-2`, `sketch-to-concept-art/sketch-to-concept-art-task-2` |
-| `render-video` | 2 | Makes or assembles video; no starting template makes media. | `short-film/assemble`, `idea-to-storyboard-to-video/idea-to-storyboard-to-video-task-3` |
-| `compose-media` | 3 | Builds geometry or composites layers; no starting template transforms media. | `paperplanes-stratified-reconstruction/paperplanes-stratified-reconstruction-task-2`, `paperplanes-stratified-reconstruction/paperplanes-stratified-reconstruction-task-3`, `paperplanes-stratified-reconstruction/paperplanes-stratified-reconstruction-task-4` |
-| `edit-audio` | 1 | Edits a recording; no starting template handles audio. | `podcast-production/podcast-production-task-1` |
-| `make-slides` | 1 | Makes a slide deck; make-page makes one page, not a deck. | `presentation-production/presentation-production-task-1` |
-| `localize-content` | 1 | Translates content in place and verifies strings; write-document does not carry the string check. | `localization-release/localization-release-task-1` |
-| `fixed-format-result` | 3 | Hands back a result in a fixed or size-bounded format that code reads (JSON, a line grammar, a capped block). | `short-film/storyboard`, `short-film/style-sheet`, `short-film/frame-review` |
+| Template | Made from | Effect and approval | Hands back | Steps |
+|---|---|---|---|---|
+| `change-code` | prepare files for a repository | writes a repository branch; asks first, once | `BRANCH:` and `FILES:` | 11: `suite-feature-delivery/implement`, `suite-bug-fix/fix`, `suite-bug-fix/regression-test`, `suite-safe-refactor/characterize`, `suite-safe-refactor/refactor`, `suite-test-coverage/write-tests`, `suite-dependency-update/update`, `suite-docs-sync/update-docs`, `suite-incident-hotfix/hotfix`, `starter/implementation`, `feature-delivery/feature-delivery-task-1` |
+| `render-image` | change something in a connected tool | changes a connected tool (an image tool); asks first, once | `TARGET:` and `CHANGED:` | 4: `short-film/frames`, `character-sheet-generator/character-sheet-generator-task-2`, `idea-to-storyboard-to-video/idea-to-storyboard-to-video-task-2`, `sketch-to-concept-art/sketch-to-concept-art-task-2` |
+| `render-video` | change something in a connected tool | as above, a video tool | `TARGET:` and `CHANGED:` | 2: `short-film/assemble`, `idea-to-storyboard-to-video/idea-to-storyboard-to-video-task-3` |
+| `compose-media` | change something in a connected tool | as above; works on a copy | `TARGET:` and `CHANGED:` | 3: `paperplanes-stratified-reconstruction/paperplanes-stratified-reconstruction-task-2`, `-task-3`, `-task-4` |
+| `edit-audio` | change something in a connected tool | as above; works on a copy, never the original | `TARGET:` and `CHANGED:` | 1: `podcast-production/podcast-production-task-1` |
+| `make-slides` | change something in a connected tool | as above, a slides tool | `TARGET:` and `CHANGED:` | 1: `presentation-production/presentation-production-task-1` |
+| `localize-content` | turn text into a table | changes nothing | a table `key,source,translation`, every column named | 1: `localization-release/localization-release-task-1` |
+| `fixed-format-result` | write a document | changes nothing | one JSON object | 2: `short-film/storyboard`, `short-film/frame-review` |
+| `capped-text-result` | write a document | changes nothing | one block of plain text, at most 20,000 characters | 1: `short-film/style-sheet` |
 
-Total: 26 steps, 11 in packages and 15 in built-in swarms.
+Total: 26 steps, 11 in packages and 15 in built-in swarms. The check on a result is the existing one for its shape: `localize-content` cannot see that a string was missed (it checks the table, not the strings), `fixed-format-result` checks that the output is one JSON object and not the fields the brief names, and `capped-text-result` holds the output to the general text cap, not to the film's own style-sheet length. Several of these steps are run by an external service (the frames, the assemble step, the Firefly steps) and not by a creature, so the contract there is a starting point for the Nanny to read and nothing more.
 
 Two weaker fits, assigned and not listed as gaps:
 
@@ -362,10 +364,9 @@ Two weaker fits, assigned and not listed as gaps:
 
 ## Packages left unchanged
 
-- `localization-release` and `presentation-production`: every step is a gap, so there is nothing to attach. Both need a template that does not exist.
 - The 12 role packages: they hold roles only, which have role templates without a change to their files.
-- Signing was not touched. The packages in this repository are packed unsigned and signed at release. The 64 packages that changed have their version raised by one patch and their manifest digests recomputed, which `npm run build` re-checks.
+- Signing was not touched. The packages in this repository are packed unsigned and signed at release. The 64 packages that changed have their version raised by one patch and their manifest digests recomputed, which `npm run build` re-checks; the 8 packages that carry the former gaps (11 steps) were raised by one more patch with their digests recomputed.
 
 ## How to add one
 
-A new package or built-in swarm: give each producing step a `contract` with `startingPoint` true for the template it starts from (see any package under `docs/azphalt-packages`), or add its `<swarm id>/<step id>` to `StepTemplateAssignments.gaps` with the gap it needs. Run `StepTemplateCoverageTest`.
+A new package or built-in swarm: give each producing step a `contract` with `startingPoint` true for the template it starts from (see any package under `docs/azphalt-packages`), or, if no template fits, add its `<swarm id>/<step id>` to `StepTemplateAssignments.gaps` with a new `StepGap` entry saying what it needs. Run `StepTemplateCoverageTest`.

@@ -146,6 +146,54 @@ class StepTemplateCoverageTest {
         }
     }
 
+    /**
+     * The 26 steps the Azphalt audit listed as gaps (change-code 10, render-image 5, fixed-format-result 3, render-video 2,
+     * compose-media 3, edit-audio 1, make-slides 1, localize-content 1; the style sheet's capped block has a template of
+     * its own), each with the template it now starts from. A step that loses its contract fails here.
+     */
+    private val formerGaps: Map<String, String> = mapOf(
+        "suite-feature-delivery/implement" to "change-code",
+        "suite-bug-fix/fix" to "change-code",
+        "suite-bug-fix/regression-test" to "change-code",
+        "suite-safe-refactor/characterize" to "change-code",
+        "suite-safe-refactor/refactor" to "change-code",
+        "suite-test-coverage/write-tests" to "change-code",
+        "suite-dependency-update/update" to "change-code",
+        "suite-docs-sync/update-docs" to "change-code",
+        "suite-incident-hotfix/hotfix" to "change-code",
+        "starter/implementation" to "change-code",
+        "feature-delivery/feature-delivery-task-1" to "change-code",
+        "short-film/frames" to "render-image",
+        "character-sheet-generator/character-sheet-generator-task-2" to "render-image",
+        "idea-to-storyboard-to-video/idea-to-storyboard-to-video-task-2" to "render-image",
+        "sketch-to-concept-art/sketch-to-concept-art-task-2" to "render-image",
+        "short-film/storyboard" to "fixed-format-result",
+        "short-film/frame-review" to "fixed-format-result",
+        "short-film/style-sheet" to "capped-text-result",
+        "short-film/assemble" to "render-video",
+        "idea-to-storyboard-to-video/idea-to-storyboard-to-video-task-3" to "render-video",
+        "paperplanes-stratified-reconstruction/paperplanes-stratified-reconstruction-task-2" to "compose-media",
+        "paperplanes-stratified-reconstruction/paperplanes-stratified-reconstruction-task-3" to "compose-media",
+        "paperplanes-stratified-reconstruction/paperplanes-stratified-reconstruction-task-4" to "compose-media",
+        "podcast-production/podcast-production-task-1" to "edit-audio",
+        "presentation-production/presentation-production-task-1" to "make-slides",
+        "localization-release/localization-release-task-1" to "localize-content",
+    )
+
+    @Test
+    fun theTwentySixFormerGapsAreCoveredAndGuarded() {
+        assertEquals(26, formerGaps.size)
+        assertEquals(emptyMap<String, StepGap>(), StepTemplateAssignments.gaps)
+        val tasks = allSwarms().flatMap { (key, definition) -> definition.tasks.map { "$key/${it.id.value}" to it } }.toMap()
+        for ((step, templateId) in formerGaps) {
+            val task = assertNotNull(tasks[step], "no such step $step")
+            val contract = assertNotNull(task.contract, "$step has no contract")
+            assertEquals(templateId, contract.template.id, step)
+            assertTrue(contract.startingPoint, step)
+            assertTrue(templateId in BuiltInTemplates.byId, step)
+        }
+    }
+
     @Test
     fun everyGapNamesWhatIsMissing() {
         assertTrue(StepGap.entries.all { it.needs.isNotBlank() && it.reason.isNotBlank() })

@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.template
 
+import com.hereliesaz.geministrator.domain.ApprovalPolicy
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ArtifactRef
@@ -75,6 +76,39 @@ class StepPresetsTest {
         }
         steps.filter { it.status == ArtifactStepStatus.Built }.forEach { assertTrue(it.templates.isNotEmpty(), it.path) }
         assertEquals(12, ArtifactStepCoverage.cannotRun.size)
+    }
+
+    @Test
+    fun theStepTemplatesThatFilledTheGapsAreGenericAndTheEffectfulOnesAskFirst() {
+        val effectful = listOf("change-code", "render-image", "render-video", "compose-media", "edit-audio", "make-slides")
+        for (id in effectful) {
+            val preset = BuiltInTemplates.byId.getValue(id)
+            assertTrue(preset.effectful && preset.planGate, id)
+            assertEquals(1, preset.body.maxAttempts, id)
+            assertNotNull(preset.body.budgetTokens, id)
+            val inputs = preset.inputs.associate { it.name to "x" }
+            val task = StepInstantiation.task(preset, preset.base(), TaskDefinitionId("t-$id"), id, inputs, tool = "tool.call")
+            assertEquals(ApprovalPolicy.HumanApproval, task.approvalPolicy, id)
+            assertEquals(1, task.retryPolicy.maxAttempts, id)
+            assertEquals(id, task.contract?.template?.id, id)
+        }
+        assertEquals(setOf(StepEffect.WritesRepositoryBranch), BuiltInTemplates.byId.getValue("change-code").effects)
+        for (id in listOf("localize-content", "fixed-format-result", "capped-text-result")) {
+            val preset = BuiltInTemplates.byId.getValue(id)
+            assertTrue(!preset.effectful && !preset.planGate, id)
+            assertNotNull(preset.body.budgetTokens, id)
+        }
+        assertEquals(StepOutputValidators.TABLE_CSV_FILLED, StepPresets.LocalizeContent.outputs.single().validatorId)
+        assertEquals(StepOutputValidators.JSON_OBJECT, StepPresets.FixedFormatResult.outputs.single().validatorId)
+        assertEquals(StepOutputValidators.FOUND_TEXT, StepPresets.CappedTextResult.outputs.single().validatorId)
+    }
+
+    @Test
+    fun aLocalizedTableNeedsEveryHeaderAndAResultNeedsOneJsonObject() {
+        assertNull(check(StepOutputValidators.TABLE_CSV_FILLED, "key,source,translation\nhello,Hello,Hola"))
+        assertNotNull(check(StepOutputValidators.TABLE_CSV_FILLED, "key,,translation\nhello,Hello,Hola"))
+        assertNull(check(StepOutputValidators.JSON_OBJECT, """{"shots":[{"id":"s01"}]}"""))
+        assertNotNull(check(StepOutputValidators.JSON_OBJECT, "The shots are s01."))
     }
 
     @Test
