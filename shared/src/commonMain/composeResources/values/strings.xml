@@ -2078,4 +2078,10 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="library_train_specialist">Train a specialist</string>
     <string name="library_train_started">Training started for %1$s. I will offer the result in Messages.</string>
     <string name="library_train_failed">Training could not start. Open a swarm first, and give the few words of the domain above.</string>
+    <!-- The reviewer not asked, and her finish guidance. Kept apart, appended. -->
+    <string name="queen_say_missing_reviewer_no_price">I did not ask my reviewer to read the plan: its model has no price I know, and you set a dollar cap, so I would not spend where I cannot count. I checked only what I can check myself. Change the caps, or connect a Source whose price I know.</string>
+    <string name="queen_say_missing_reviewer_over_cap">I did not ask my reviewer to read the plan: another request would take this hour past half of your hourly cap. I checked only what I can check myself. Change the caps if you want it asked.</string>
+    <string name="queen_say_missing_reviewer_no_room">I did not ask my reviewer to read the plan: the Source has no room for another request right now. I checked only what I can check myself. Connect another Source to give it room.</string>
+    <string name="queen_say_missing_reviewer_no_second_source">I did not ask my reviewer to read the plan: I have one Source and it has no room right now. I checked only what I can check myself. A second Source would let my reviewer read it. Connect one.</string>
+    <string name="queen_say_finished_not_reached">The swarm finished, but I cannot call the hive reached: %1$s of %2$s signs are not met. Step %3$s (%4$s) is where to look.</string>
 </resources>

@@ -40,9 +40,13 @@ fun hourlyCapAllows(hourlyCapUsd: Double?, spent: HourlySpend): Boolean =
     hourlyCapUsd == null || (spent.knownUsd < hourlyCapUsd && !spent.unpricedUsage)
 
 /** [base] that refuses (throws, so the dispute goes to the keeper) when [allows] says the keeper's caps do not. */
-fun cappedModel(base: QueenModel, allows: suspend () -> Boolean): QueenModel = QueenModel { prompt ->
-    if (!allows()) error("The keeper's spend cap leaves no room for the queen to answer")
-    base.answer(prompt)
+fun cappedModel(base: QueenModel, allows: suspend () -> Boolean): QueenModel = object : QueenModel {
+    override val uses: List<ModelUse> get() = base.uses
+
+    override suspend fun answer(prompt: String): String {
+        if (!allows()) error("The keeper's spend cap leaves no room for the queen to answer")
+        return base.answer(prompt)
+    }
 }
 
 /** Builds the models for one dispute from the current roles (read fresh, so a pin the keeper just set is honoured). Null: she is away. */

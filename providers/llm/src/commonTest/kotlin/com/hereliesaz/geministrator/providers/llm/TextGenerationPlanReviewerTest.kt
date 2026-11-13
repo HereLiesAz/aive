@@ -24,7 +24,7 @@ class TextGenerationPlanReviewerTest {
 
     private fun entry(id: String, api: TextGenerationApi) = PlanningApiEntry(id, id.replaceFirstChar(Char::uppercase), api)
 
-    private fun request(pinned: String? = null) = PlanReviewRequest(
+    private fun request(pinned: String? = null, plannerSource: String? = null) = PlanReviewRequest(
         packet = OrchestrationPacket(
             objective = "Ship it",
             availableAgents = listOf(OrchestrationRole("engineer", "Engineer", emptyList())),
@@ -34,6 +34,7 @@ class TextGenerationPlanReviewerTest {
         reviewerName = "Adversarial Reviewer",
         instructions = "Be cynical.",
         pinnedProviderId = pinned,
+        plannerSourceId = plannerSource,
     )
 
     @Test
@@ -43,7 +44,7 @@ class TextGenerationPlanReviewerTest {
 
         val verdict = TextGenerationPlanReviewer(listOf(entry("gemini", first), entry("openai", second))).review(request())
 
-        assertEquals(PlanVerdict.Reject("No tests."), verdict)
+        assertEquals(PlanVerdict.Reject("No tests.", answeredBy = "gemini"), verdict)
         assertTrue(second.prompts.isEmpty())
         assertTrue("Be cynical." in first.prompts.single() && "Objective: Ship it" in first.prompts.single())
     }
@@ -56,7 +57,7 @@ class TextGenerationPlanReviewerTest {
 
         val verdict = TextGenerationPlanReviewer(listOf(entry("gemini", down), entry("openai", rambling), entry("anthropic", good))).review(request())
 
-        assertEquals(PlanVerdict.Approve("Fine."), verdict)
+        assertEquals(PlanVerdict.Approve("Fine.", answeredBy = "anthropic"), verdict)
         assertEquals(1, down.prompts.size)
         assertEquals(1, rambling.prompts.size)
     }
@@ -80,6 +81,37 @@ class TextGenerationPlanReviewerTest {
         val failure = assertFailsWith<IllegalStateException> { reviewer.review(request(pinned = "gemini")) }
 
         assertTrue("pinned to gemini" in failure.message.orEmpty())
+    }
+
+    @Test
+    fun anUnpinnedReviewerAsksAnotherSourceThanThePlannersFirst() = runTest {
+        val planners = FakeApi { "VERDICT: REJECT\nSame Source." }
+        val other = FakeApi { "VERDICT: APPROVE\nSUGGEST | AddCheck | Add a test | Catches a regression | a" }
+        val reviewer = TextGenerationPlanReviewer(listOf(entry("gemini", planners), entry("openai", other)))
+
+        val verdict = reviewer.review(request(plannerSource = "gemini"))
+
+        assertEquals("openai", verdict.answeredBy)
+        assertTrue(planners.prompts.isEmpty())
+        assertEquals(1, verdict.suggestions.size)
+        assertTrue("SUGGEST | kind" in other.prompts.single())
+    }
+
+    @Test
+    fun theSameSourceReviewsWhenItIsTheOnlyOne() = runTest {
+        val only = FakeApi { "VERDICT: APPROVE" }
+
+        val verdict = TextGenerationPlanReviewer(listOf(entry("gemini", only))).review(request(plannerSource = "gemini"))
+
+        assertEquals("gemini", verdict.answeredBy)
+    }
+
+    @Test
+    fun itSaysWhichSourcesItMayAskForThePriceCheck() {
+        val uses = TextGenerationPlanReviewer(listOf(entry("gemini", FakeApi { "" }))).uses
+
+        assertEquals(listOf("gemini"), uses.map { it.sourceId })
+        assertTrue(uses.single().billsPerToken)
     }
 
     @Test

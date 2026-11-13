@@ -94,6 +94,12 @@ private fun voiceResource(voice: QueenVoice): StringResource = when (voice) {
         QueenVoice.SuggestReorderSteps -> Res.string.queen_say_suggest_reorder_steps
         QueenVoice.SuggestAddApproval -> Res.string.queen_say_suggest_add_approval
         QueenVoice.TrainingAdopted -> Res.string.queen_say_training_adopted
+        // The reviewer not asked, and her finish guidance.
+        QueenVoice.MissingReviewerNoPrice -> Res.string.queen_say_missing_reviewer_no_price
+        QueenVoice.MissingReviewerOverCap -> Res.string.queen_say_missing_reviewer_over_cap
+        QueenVoice.MissingReviewerNoRoom -> Res.string.queen_say_missing_reviewer_no_room
+        QueenVoice.MissingReviewerNoSecondSource -> Res.string.queen_say_missing_reviewer_no_second_source
+        QueenVoice.FinishedNotReached -> Res.string.queen_say_finished_not_reached
 }
 
 @Composable
@@ -135,7 +141,7 @@ internal fun queenTitle(note: QueenNote): String = stringResource(
     if (note.suggestion != null) Res.string.queen_title_suggestion else when (note.voice) {
         QueenVoice.StatusWorking, QueenVoice.StatusWorkingClear, QueenVoice.StatusIdle, QueenVoice.StatusIdleClear -> Res.string.queen_title_status
         QueenVoice.FinishedAll, QueenVoice.FinishedAllCost, QueenVoice.FinishedFailed,
-        QueenVoice.FinishedFailedNoStep, QueenVoice.FinishedStopped -> Res.string.queen_title_finish
+        QueenVoice.FinishedFailedNoStep, QueenVoice.FinishedStopped, QueenVoice.FinishedNotReached -> Res.string.queen_title_finish
         QueenVoice.TrainingOffer, QueenVoice.TrainingStopped, QueenVoice.TrainingNeedsYou, QueenVoice.TrainingAdopted -> Res.string.queen_title_training
         else -> when (note.relay) {
             QueenRelay.Waits -> Res.string.queen_title_waits

@@ -98,6 +98,13 @@ enum class QueenVoice(val relay: QueenRelay?) {
     SuggestReorderSteps(QueenRelay.Watch),
     SuggestAddApproval(QueenRelay.Watch),
     TrainingAdopted(QueenRelay.Watch),
+
+    // --- The reviewer not asked, and her finish guidance (queen/PlanningRecord.kt, queen/Guidance.kt). Kept apart, after every other voice. ---
+    MissingReviewerNoPrice(QueenRelay.Missing),
+    MissingReviewerOverCap(QueenRelay.Missing),
+    MissingReviewerNoRoom(QueenRelay.Missing),
+    MissingReviewerNoSecondSource(QueenRelay.Missing),
+    FinishedNotReached(null),
 }
 
 /** Where a note leads: an existing place, never a new one. */

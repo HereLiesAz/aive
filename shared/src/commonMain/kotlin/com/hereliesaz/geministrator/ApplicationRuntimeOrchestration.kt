@@ -39,6 +39,8 @@ import com.hereliesaz.geministrator.orchestration.planReviewerRole
 import com.hereliesaz.geministrator.orchestration.reviewUntilApproved
 import com.hereliesaz.geministrator.orchestration.reportLaunchProgress
 import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
+import com.hereliesaz.geministrator.queen.PlanningNotes
+import com.hereliesaz.geministrator.queen.PlanningRecord
 import com.hereliesaz.geministrator.workflow.OrchestratedWorkflowFactory
 import com.hereliesaz.geministrator.workflow.WorkflowDefinitionPreparer
 import com.hereliesaz.geministrator.workflow.WorkflowLaunchService
@@ -203,7 +205,7 @@ internal fun newWorkflowInstruction(objective: String, repository: RepositoryRef
 
 /** Makes the run from an approved [plan]: the workflow, the project, the run. */
 @OptIn(ExperimentalTime::class)
-private suspend fun ApplicationRuntime.startPlannedWorkflow(inputs: PlanInputs, plan: OrchestrationPlan) {
+private suspend fun ApplicationRuntime.startPlannedWorkflow(inputs: PlanInputs, plan: OrchestrationPlan, notes: PlanningNotes? = null) {
     val now = Clock.System.now().toEpochMilliseconds()
     val stamp = persistence.uniqueLaunchStamp(now, newProject = inputs.existingProject == null)
     val project = inputs.existingProject?.copy(
@@ -255,7 +257,10 @@ private suspend fun ApplicationRuntime.startPlannedWorkflow(inputs: PlanInputs, 
         parentWorkflowRunIds = inputs.parentRunIds,
         objectiveProvenance = inputs.objectiveProvenance,
     )
-    rememberMissing("run-$stamp", inputs.missing)
+    val skippedMissing = com.hereliesaz.geministrator.queen.missingForSkippedReviewer(notes?.record?.skipped, providerRegistry.linkedSourceIds().size)
+    rememberMissing("run-$stamp", inputs.missing + listOfNotNull(skippedMissing))
+    rememberHiveSigns("run-$stamp", com.hereliesaz.geministrator.queen.HiveSigns.nominated(plan))
+    notes?.let { recordPlanning(WorkflowRunId("run-$stamp"), definition.id.value, inputs.objectiveProvenance.isUntrusted(), it, now) }
     inputs.research?.let { record ->
         val runId = WorkflowRunId("run-$stamp")
         rememberResearch(runId.value, record)
@@ -275,6 +280,43 @@ private suspend fun ApplicationRuntime.startPlannedWorkflow(inputs: PlanInputs, 
     reportLaunchProgress("Loading the new run…")
     loadLatest()
 }
+
+/**
+ * Puts what planning did on the run's Story (one line) and keeps the reviewer's ideas beyond the requirements in the improvement
+ * ledger for the NEXT run: records only, never applied to this plan. A failure is swallowed: the run has already started.
+ */
+private suspend fun ApplicationRuntime.recordPlanning(
+    runId: WorkflowRunId,
+    definitionId: String,
+    objectiveOutside: Boolean,
+    notes: PlanningNotes,
+    now: Long,
+) {
+    try {
+        RepositoryWorkflowEventSink(persistence.events).append(
+            com.hereliesaz.geministrator.events.PolicyDecisionRecorded(
+                workflowRunId = runId,
+                effect = com.hereliesaz.geministrator.policy.PolicyEffect.Allow,
+                code = "queen.planning",
+                action = "plan",
+                subjectType = "queen",
+                resourceType = "plan",
+                reason = notes.record.storyLine(),
+                occurredAtEpochMillis = now,
+            ),
+        )
+        keepPlanSuggestions(
+            com.hereliesaz.geministrator.queen.planSuggestionRows(runId.value, definitionId, notes.suggestions, keptProposals(), now, objectiveOutside),
+        )
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        // The record is a courtesy to the Story and the next run; the run goes on.
+    }
+}
+
+/** The plan the keeper started, and what planning left for the run (see [PlanningNotes]); null notes when no review was made. */
+private class ChosenPlan(val plan: OrchestrationPlan, val notes: PlanningNotes?)
 
 /** The planning stage for the field, from the roles in hand. */
 private fun planningStage(
@@ -316,12 +358,12 @@ private suspend fun ApplicationRuntime.planAndDecide(
     review: Pair<PlanReviewer, RoleDefinition>?,
     confirmPlan: (suspend (PlanDecision) -> Boolean)?,
     planStore: ReviewedPlanStore?,
-): OrchestrationPlan? {
+): ChosenPlan? {
     reportLaunchProgress("Asking the planner for a swarm (${inputs.plannerRoles.size} roles available)…")
     // Only a launch that will be reviewed has a planning field: the planner's egg, the reviewer who hatches from it.
     review?.let { (_, role) -> reportPlanningStage(planningStage(inputs, PlanningPhase.Planning, null, 0, role)) }
     val firstPlan = orchestrationRuntime.plan(inputs.packet)
-    if (review == null) return firstPlan
+    if (review == null) return ChosenPlan(firstPlan, null)
     val (reviewer, role) = review
     val requirementInputs = com.hereliesaz.geministrator.orchestration.RequirementInputs(
         objective = inputs.objective,
@@ -340,8 +382,26 @@ private suspend fun ApplicationRuntime.planAndDecide(
         pinnedProviderId = role.preferredProviderId?.value,
         onStage = { phase, current, round -> reportPlanningStage(planningStage(inputs, phase, current, round, role)) },
         pureCheck = { candidate -> com.hereliesaz.geministrator.orchestration.Requirements.checkPure(requirementInputs, candidate, checklist) },
+        // The reviewer asks another Source than the planner's first, and is skipped (the checklist is the whole review) when the caps, a price or the room say so.
+        plannerSource = { orchestrationRuntime.lastSourceId },
+        reviewGate = { callsSoFar -> reviewGateFor(reviewer, callsSoFar) },
     )
     val plan = outcome.plan
+    val ruleResults = com.hereliesaz.geministrator.orchestration.Requirements.checkPure(requirementInputs, plan, checklist)
+    val notes = PlanningNotes(
+        record = PlanningRecord(
+            plannerRole = (inputs.staffing?.staff?.planner ?: BuiltInRoles.Planner).name,
+            plannerSource = orchestrationRuntime.lastSourceId,
+            reviewerRole = role.name,
+            reviewerSource = outcome.reviewerSource,
+            rounds = outcome.rounds.size,
+            skipped = outcome.skipped,
+            checkedByRules = ruleResults.size,
+            metByRules = ruleResults.count { it.verdict == com.hereliesaz.geministrator.orchestration.RequirementVerdict.Met },
+            suggestions = outcome.suggestions.size,
+        ),
+        suggestions = outcome.suggestions,
+    )
     reportPlanningStage(planningStage(inputs, PlanningPhase.AwaitingKeeper, plan, outcome.rounds.size, role, outcome.verdict()))
     reportLaunchProgress("Waiting for your decision on the plan…")
     // Kept while the keeper decides, so a restart does not cost them the plan or the reviewer's reasons.
@@ -364,6 +424,7 @@ private suspend fun ApplicationRuntime.planAndDecide(
             supplementalRoles = inputs.supplementalRoles,
             design = inputs.design,
             objectiveProvenance = inputs.objectiveProvenance,
+            notes = notes,
         ),
     )
     val start = checkNotNull(confirmPlan)(PlanDecision(inputs.objective, role.name, outcome, inputs.packet.availableAgents.associate { it.id to it.name }))
@@ -373,7 +434,7 @@ private suspend fun ApplicationRuntime.planAndDecide(
         return null
     }
     reportPlanningStage(planningStage(inputs, PlanningPhase.Started, plan, outcome.rounds.size, role))
-    return plan
+    return ChosenPlan(plan, notes)
 }
 
 @OptIn(ExperimentalTime::class)
@@ -424,8 +485,8 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
         inputs = inputs.withResearch(outcome)
     }
     val review = reviewRole(planReviewer, confirmPlan, inputs.launchRoles)
-    val plan = planAndDecide(inputs, orchestrationRuntime, review, confirmPlan, planStore) ?: return
-    startPlannedWorkflow(inputs, plan)
+    val chosen = planAndDecide(inputs, orchestrationRuntime, review, confirmPlan, planStore) ?: return
+    startPlannedWorkflow(inputs, chosen.plan, chosen.notes)
 }
 
 /**
@@ -457,8 +518,8 @@ internal suspend fun ApplicationRuntime.launchPlannedSavedWorkflow(
         objectiveProvenance = objectiveProvenance,
     )
     val review = reviewRole(planReviewer, confirmPlan, inputs.launchRoles) ?: return false
-    val plan = planAndDecide(inputs, orchestrationRuntime, review, confirmPlan, planStore) ?: return true
-    startPlannedWorkflow(inputs, plan)
+    val chosen = planAndDecide(inputs, orchestrationRuntime, review, confirmPlan, planStore) ?: return true
+    startPlannedWorkflow(inputs, chosen.plan, chosen.notes)
     return true
 }
 
@@ -509,6 +570,7 @@ suspend fun ApplicationRuntime.resumePendingPlanLaunch(
         plan = pending.plan,
         rounds = pending.rounds.map { PlanReviewRound(it.plan, if (it.approved) PlanVerdict.Approve(it.reasons) else PlanVerdict.Reject(it.reasons)) },
         problem = pending.problem,
+        skipped = pending.notes?.record?.skipped,
     )
     reportPlanningStage(planningStage(inputs, PlanningPhase.AwaitingKeeper, pending.plan, outcome.rounds.size, role, outcome.verdict()))
     reportLaunchProgress("Waiting for your decision on the plan…")
@@ -519,7 +581,7 @@ suspend fun ApplicationRuntime.resumePendingPlanLaunch(
         return true
     }
     reportPlanningStage(planningStage(inputs, PlanningPhase.Started, pending.plan, outcome.rounds.size, role))
-    startPlannedWorkflow(inputs, pending.plan)
+    startPlannedWorkflow(inputs, pending.plan, pending.notes)
     return true
 }
 

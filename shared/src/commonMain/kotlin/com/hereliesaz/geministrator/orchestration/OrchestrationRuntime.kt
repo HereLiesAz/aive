@@ -29,6 +29,11 @@ data class OrchestrationPlanStep(
 @Serializable
 data class OrchestrationPlan(
     val steps: List<OrchestrationPlanStep>,
+    /**
+     * What the planner expects to show that the hive is reached, as `done:step-id`, `artifact:step-id` or `nothing-failed`. Optional:
+     * the queen reads only the words she knows and checks them against the run (see queen/Guidance.kt).
+     */
+    val hiveSigns: List<String> = emptyList(),
 )
 
 @Serializable
@@ -51,6 +56,9 @@ data class OrchestrationPacket(
 interface OrchestrationAgentRuntime {
     suspend fun plan(packet: OrchestrationPacket): OrchestrationPlan
     suspend fun repair(packet: OrchestrationPacket): OrchestrationPlan
+
+    /** The Source that answered the last call, when this runtime knows it (the reviewer prefers another); null otherwise. */
+    val lastSourceId: String? get() = null
 }
 
 object NoOrchestrationAgentRuntime : OrchestrationAgentRuntime {

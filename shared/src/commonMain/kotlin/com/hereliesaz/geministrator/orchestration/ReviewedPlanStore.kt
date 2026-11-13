@@ -60,6 +60,8 @@ data class PendingPlanLaunch(
     val design: WorkflowDefinition? = null,
     /** Where [objective] came from; a plan made from a remote agent's objective stays marked after a restart. */
     val objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
+    /** What planning did and the ideas the reviewer had beyond the requirements, held until the keeper starts the run. Absent in an older blob. */
+    val notes: com.hereliesaz.geministrator.queen.PlanningNotes? = null,
 )
 
 /** Settings-backed store for the one [PendingPlanLaunch]. Unreadable state is no state: the keeper is simply asked afresh. */

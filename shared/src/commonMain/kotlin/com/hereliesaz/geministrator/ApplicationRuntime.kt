@@ -187,6 +187,72 @@ class ApplicationRuntime private constructor(
         while (queenMissing.size > 32) queenMissing.remove(queenMissing.keys.first())
     }
 
+    /**
+     * Whether the reviewer may be asked now, as the keeper's caps and the Sources see it ([com.hereliesaz.geministrator.queen.planningMayCall]):
+     * the reviewer's price from the price table, the real hourly spend (read only when an hourly cap is set) and the room on the
+     * Sources it may ask. [callsSoFar] counts the planning calls already made.
+     */
+    internal suspend fun reviewGateFor(
+        reviewer: com.hereliesaz.geministrator.orchestration.PlanReviewer,
+        callsSoFar: Int,
+    ): com.hereliesaz.geministrator.queen.CallDecision {
+        val caps = queenCaps()
+        val uses = reviewer.uses
+        val read = com.hereliesaz.geministrator.queen.priceRead(
+            uses,
+            com.hereliesaz.geministrator.providers.ModelPriceTable.Default,
+            com.hereliesaz.geministrator.queen.PlanningLimits.MAX_INPUT_TOKENS.toLong(),
+            com.hereliesaz.geministrator.queen.PlanningLimits.MAX_OUTPUT_TOKENS.toLong(),
+        )
+        val hourly = if (caps.hourlySpendCapUsd != null) {
+            com.hereliesaz.geministrator.workflow.hourlySpend(persistence, nowEpochMillis(), null, com.hereliesaz.geministrator.workflow.AmbientSpendLedger.Shared)
+        } else {
+            com.hereliesaz.geministrator.workflow.HourlySpend(0.0, false)
+        }
+        val noRoom = providerRegistry.keylessWithoutRoom()
+        val room = uses.isEmpty() || uses.any { it.sourceId !in noRoom }
+        return com.hereliesaz.geministrator.queen.planningMayCall(
+            com.hereliesaz.geministrator.queen.PlanningCaller.Reviewer, read.status, read.estimateUsd, caps, hourly, callsSoFar, room,
+        )
+    }
+
+    /**
+     * Holds the reviewer's ideas beyond the requirements in the improvement ledger as suggestions for the NEXT run (source QueenKept):
+     * records only, never applied to the running plan. A failure is swallowed; the run goes on.
+     */
+    internal suspend fun keepPlanSuggestions(rows: List<com.hereliesaz.geministrator.workflow.improvement.ImprovementProposal>) {
+        val ledger = queenLedger ?: return
+        if (rows.isEmpty()) return
+        try {
+            ledger.merge { state ->
+                state.copy(proposals = state.proposals + rows.filter { row -> state.proposals.none { it.id == row.id } })
+            }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            // The ideas are a courtesy to the next run; this one goes on.
+        }
+    }
+
+    /** The ledger's rows as they stand, so ideas already kept are not written again; empty with no ledger. */
+    internal suspend fun keptProposals(): List<com.hereliesaz.geministrator.workflow.improvement.ImprovementProposal> =
+        try {
+            queenLedger?.state()?.proposals.orEmpty()
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            emptyList()
+        }
+
+    /** What the planner named as the signs that each run's hive is reached (memory only; the default signs are checked when none are kept). */
+    private val hiveSignBook = LinkedHashMap<String, List<com.hereliesaz.geministrator.queen.HiveSign>>()
+
+    internal fun rememberHiveSigns(runId: String, signs: List<com.hereliesaz.geministrator.queen.HiveSign>) {
+        if (signs.isEmpty()) return
+        hiveSignBook[runId] = signs
+        while (hiveSignBook.size > 32) hiveSignBook.remove(hiveSignBook.keys.first())
+    }
+
     /** What she says about disputes she could not settle herself, per run (memory only; derived into Messages at each publish). */
     private val queenDisputes = LinkedHashMap<String, List<com.hereliesaz.geministrator.queen.QueenNote>>()
 
@@ -924,6 +990,82 @@ class ApplicationRuntime private constructor(
     }
 
     /**
+     * Adds the staffed steps [extension] to the run on screen after the keeper approved the plan (docs/Keepers-Room.md), for a swarm
+     * that asked for it by having the plan-approval step ([com.hereliesaz.geministrator.orchestration.RunExtension.GATE_STEP_ID]).
+     * Only a running swarm, not paused, frozen or stopped. The extension meets the validation any plan meets: the pure rules
+     * of [com.hereliesaz.geministrator.orchestration.RunExtension.refusal] (every added step comes after the approval, none repeats an id),
+     * `validateAgainst` through the factory that builds the steps, the requirements checklist's rules (a step that can change something
+     * needs an approval before it), and the graph validator. A step already in the run is never changed. Returns null when the steps were
+     * added, or why they were not (nothing is applied then). Never reachable from a remote interface: only the app calls it.
+     */
+    suspend fun extendRun(extension: List<com.hereliesaz.geministrator.orchestration.OrchestrationPlanStep>): String? = runtimeMutex.withLock {
+        val snapshot = current ?: return@withLock "No active workflow is loaded."
+        val run = newestRun(snapshot.state.run)
+        if (run.status != WorkflowRunStatus.Running) return@withLock "Only a swarm that is running can take more steps."
+        if (run.globalPause != null || run.spendPause != null || run.keeperPause != null) return@withLock "The swarm is paused or stopped."
+        val definition = snapshot.definition
+        val currentSteps = com.hereliesaz.geministrator.orchestration.RunExtension.stepsOf(definition)
+            ?: return@withLock "A step of this swarm has no role, so it cannot be extended."
+        val gateApproved = run.taskRuns[TaskDefinitionId(com.hereliesaz.geministrator.orchestration.RunExtension.GATE_STEP_ID)]?.status == TaskRunStatus.Completed
+        com.hereliesaz.geministrator.orchestration.RunExtension.refusal(currentSteps, extension, gateApproved)?.let { return@withLock it }
+        val rolesNow = run.roleSnapshot.filter(RoleDefinition::enabled).ifEmpty { activeRoles(resolveRoleCollection(persistence.roles.all())) }
+        val inputs = com.hereliesaz.geministrator.orchestration.RequirementInputs(
+            objective = run.objective,
+            objectiveExternal = run.objectiveProvenance.isUntrusted(),
+            roles = rolesNow,
+            availableRoleIds = rolesNow.map { it.id.value }.toSet(),
+        )
+        com.hereliesaz.geministrator.orchestration.RunExtension.introducedProblem(inputs, currentSteps, extension)?.let { return@withLock it }
+        val packet = com.hereliesaz.geministrator.orchestration.OrchestrationPacket(
+            objective = run.objective,
+            currentState = "extend-run",
+            availableAgents = rolesNow.map { role ->
+                com.hereliesaz.geministrator.orchestration.OrchestrationRole(role.id.value, role.name, role.authorities.map { it.name }.sorted())
+            },
+            instruction = "Add the staffed steps to the run after the keeper approved the plan.",
+        )
+        val built = try {
+            com.hereliesaz.geministrator.workflow.OrchestratedWorkflowFactory.create(
+                id = definition.id,
+                objective = run.objective,
+                plan = com.hereliesaz.geministrator.orchestration.OrchestrationPlan(currentSteps + extension),
+                packet = packet,
+                roles = rolesNow,
+            )
+        } catch (failure: IllegalArgumentException) {
+            return@withLock failure.message ?: "The steps were not accepted."
+        }
+        val appended = com.hereliesaz.geministrator.orchestration.RunExtension.append(definition, built, extension.map { it.id }.toSet())
+        val ready = when (appended) {
+            is com.hereliesaz.geministrator.orchestration.RunExtension.Appended.Refused -> return@withLock appended.reason
+            is com.hereliesaz.geministrator.orchestration.RunExtension.Appended.Ready -> appended
+        }
+        val now = decisionTime(nowEpochMillis(), run)
+        val fresh = com.hereliesaz.geministrator.workflow.WorkflowRunFactory.create(
+            definition = ready.definition,
+            workflowRunId = run.id,
+            projectId = run.projectId,
+            objective = run.objective,
+            nowEpochMillis = now,
+            taskRunIdFactory = { id -> TaskRunId("${run.id.value}:${id.value}:extend") },
+            roles = rolesNow,
+            parentWorkflowRunIds = run.parentWorkflowRunIds,
+            objectiveProvenance = run.objectiveProvenance,
+        )
+        // Every step already in the run keeps its own state; only the added steps take a new one.
+        val taskRuns = fresh.taskRuns.mapValues { (id, added) -> run.taskRuns[id] ?: added }
+        val followed = com.hereliesaz.geministrator.workflow.WorkflowRunFactory.refreshReadiness(
+            definition = ready.definition,
+            run = run.copy(taskRuns = taskRuns, definitionSnapshot = ready.definition, updatedAtEpochMillis = now),
+            nowEpochMillis = now,
+        )
+        persistence.runs.put(followed)
+        replaceCurrent(snapshot.copy(definition = ready.definition, state = snapshot.state.copy(run = followed)))
+        publishCurrent()
+        null
+    }
+
+    /**
      * Rewinds the active run to [taskDefinitionId] in place: that creature and what follows it start
      * again while the rest of the swarm keeps running ([WorkflowRuntimeCoordinator.rewind]).
      */
@@ -1128,7 +1270,7 @@ class ApplicationRuntime private constructor(
      * for a goal from outside, and only when [com.hereliesaz.geministrator.queen.queenMayCall] allows. The result is kept as
      * candidates for her ordinary suggestion pacing; the keeper's tap applies it.
      */
-    private fun launchWordingCheckpoint(definition: WorkflowDefinition, run: WorkflowRun, signals: List<com.hereliesaz.geministrator.queen.QueenSignal>) {
+    private suspend fun launchWordingCheckpoint(definition: WorkflowDefinition, run: WorkflowRun, signals: List<com.hereliesaz.geministrator.queen.QueenSignal>) {
         if (wordingJob?.isActive == true) return
         val checkpoint = com.hereliesaz.geministrator.queen.wordingCheckpoint(definition, run, signals) ?: return
         val runId = run.id.value
@@ -1137,25 +1279,43 @@ class ApplicationRuntime private constructor(
         while (wordingBooks.size > 32) wordingBooks.remove(wordingBooks.keys.first())
         val now = nowEpochMillis()
         val caps = queenCaps()
-        // Fail closed: any dollar cap needs a known price, and she has none for her Source here, so she does not ask.
-        val price = if (caps.runCostCapUsd == null && caps.hourlySpendCapUsd == null) {
-            com.hereliesaz.geministrator.queen.PriceStatus.Free
+        // Her model is resolved now, so the price check is of the Source she will really use (a pin, or any she may move to).
+        val models = try {
+            resolveDisputeModels()
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            null
+        }
+        if (models == null) {
+            book.taken.remove(checkpoint.name)
+            return
+        }
+        // Fail closed: under any dollar cap her model must be priced (from the price table) and half the hourly cap must be left.
+        val read = com.hereliesaz.geministrator.queen.priceRead(
+            models.queen.uses,
+            com.hereliesaz.geministrator.providers.ModelPriceTable.Default,
+            com.hereliesaz.geministrator.queen.PlanningLimits.QUEEN_INPUT_TOKENS.toLong(),
+            com.hereliesaz.geministrator.queen.PlanningLimits.QUEEN_OUTPUT_TOKENS.toLong(),
+        )
+        val hourly = if (caps.hourlySpendCapUsd != null) {
+            com.hereliesaz.geministrator.workflow.hourlySpend(persistence, now, null, com.hereliesaz.geministrator.workflow.AmbientSpendLedger.Shared)
         } else {
-            com.hereliesaz.geministrator.queen.PriceStatus.Unknown
+            com.hereliesaz.geministrator.workflow.HourlySpend(0.0, false)
         }
         val allowed = com.hereliesaz.geministrator.queen.queenMayCall(
             kind = com.hereliesaz.geministrator.queen.QueenCallKind.Checkpoint,
             level = queenLevel(),
-            price = price,
-            estimateUsd = null,
+            price = read.status,
+            estimateUsd = read.estimateUsd,
             caps = caps,
-            hourly = com.hereliesaz.geministrator.workflow.HourlySpend(0.0, false),
+            hourly = hourly,
             checkpointCalls = book.calls,
             lastCheckpointAtEpochMillis = book.lastAtEpochMillis,
             now = now,
             frozenOrStopped = run.globalPause != null || run.spendPause != null || run.keeperPause != null,
             objectiveOutside = run.objectiveProvenance.isUntrusted(),
-            creatureWaiting = false,
+            creatureWaiting = com.hereliesaz.geministrator.queen.creatureWaitingForRoom(run, providerRegistry.keylessWithoutRoom()),
         )
         if (!allowed) {
             book.taken.remove(checkpoint.name)
@@ -1167,8 +1327,7 @@ class ApplicationRuntime private constructor(
         val rolesNow = roles
         wordingJob = runtimeScope.launch(callContext) {
             try {
-                val model = resolveDisputeModels()?.queen ?: return@launch
-                val made = com.hereliesaz.geministrator.queen.generateWordings(model, definition, run, rolesNow, checkpoint)
+                val made = com.hereliesaz.geministrator.queen.generateWordings(models.queen, definition, run, rolesNow, checkpoint)
                 if (made.isNotEmpty()) {
                     queenWordings[runId] = made
                     while (queenWordings.size > 32) queenWordings.remove(queenWordings.keys.first())
@@ -1378,6 +1537,7 @@ class ApplicationRuntime private constructor(
                 missing = queenMissing[run.id.value].orEmpty(),
                 disputes = queenDisputes[run.id.value].orEmpty(),
                 stalledForMinutes = queenStalled[run.id.value],
+                hiveSigns = hiveSignBook[run.id.value].orEmpty(),
                 suggestions = if (run.globalPause == null && run.spendPause == null) {
                     queenSuggestionNotes(queenProposals, run)
                 } else {

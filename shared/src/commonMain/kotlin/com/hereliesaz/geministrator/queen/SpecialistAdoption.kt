@@ -43,14 +43,18 @@ private val ADOPTION_ENTRY_KINDS = setOf(
  * this request, answered in a Messages question or approval, that says yes. The specialist must be a new role with a parent
  * (the generic role is never edited or replaced) and carry at least one lesson.
  */
-internal fun adoptionRefusal(adoption: SpecialistAdoption, approval: SpecialistApproval?): AdoptionRefusal? = when {
-    adoption.roleId.isBlank() || adoption.parentRoleId.isBlank() || adoption.roleId == adoption.parentRoleId -> AdoptionRefusal.WouldReplaceTheGeneric
-    adoption.lessons.none { it.isNotBlank() } -> AdoptionRefusal.NothingToCarry
-    approval == null -> AdoptionRefusal.NoApproval
-    approval.adoption != adoption -> AdoptionRefusal.ApprovalIsForAnother
-    approval.entryKind !in ADOPTION_ENTRY_KINDS -> AdoptionRefusal.NotAMessagesEntry
-    !approval.approved -> AdoptionRefusal.NotApproved
-    else -> null
+internal fun adoptionRefusal(adoption: SpecialistAdoption, approval: SpecialistApproval?): AdoptionRefusal? {
+    if (adoption.roleId.isBlank() || adoption.parentRoleId.isBlank() || adoption.roleId == adoption.parentRoleId) return AdoptionRefusal.WouldReplaceTheGeneric
+    if (adoption.lessons.none { it.isNotBlank() }) return AdoptionRefusal.NothingToCarry
+    val approved = approval != null && approval.adoption == adoption && approval.entryKind in ADOPTION_ENTRY_KINDS && approval.approved
+    // Whether the keeper's yes is needed is asked of the one place that decides it (see needsKeeper); this only says which part is missing.
+    if (needsKeeper(Situation.Adopts(approved)) == null) return null
+    return when {
+        approval == null -> AdoptionRefusal.NoApproval
+        approval.adoption != adoption -> AdoptionRefusal.ApprovalIsForAnother
+        approval.entryKind !in ADOPTION_ENTRY_KINDS -> AdoptionRefusal.NotAMessagesEntry
+        else -> AdoptionRefusal.NotApproved
+    }
 }
 
 /**
