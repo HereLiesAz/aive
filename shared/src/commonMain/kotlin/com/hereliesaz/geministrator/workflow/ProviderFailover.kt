@@ -91,12 +91,12 @@ object ProviderFailover {
     /** What the keeper can do about [kind]. */
     fun fixFor(kind: ErrorKind): String = when (kind) {
         ErrorKind.OutOfCredit -> "Add credits in its billing settings."
-        ErrorKind.KeyRejected -> "Reconnect it in Settings with a valid key."
+        ErrorKind.KeyRejected -> "Reconnect it under Connections in the Keeper's room with a valid key."
         ErrorKind.RateLimited -> "Wait a minute."
         ErrorKind.Offline -> "Check your internet connection."
         ErrorKind.TimedOut, ErrorKind.ServerError -> "Try again in a moment."
         ErrorKind.OutputTooLong -> "Try a shorter description, or a provider with a larger limit."
-        ErrorKind.NoAgent, ErrorKind.BadRequest, ErrorKind.Other -> "Check it in Settings."
+        ErrorKind.NoAgent, ErrorKind.BadRequest, ErrorKind.Other -> "Check it under Connections in the Keeper's room."
     }
 
     /** The plain note shown when work moved on: not an error. */

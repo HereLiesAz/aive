@@ -651,10 +651,13 @@ internal fun openSpendLimits(
     keeperOpen: MutableState<Boolean>,
     onDestinationSelected: (ControlRoomDestination) -> Unit,
 ) {
-    keeperSectionName.value = (if (compact) KeeperSection.Device else KeeperSection.Limits).name
+    keeperSectionName.value = spendLimitsSection(compact).name
     keeperOpen.value = true
     onDestinationSelected(ControlRoomDestination.Settings)
 }
+
+/** Where the spend caps are: Limits on a wide window, This device on a phone. */
+internal fun spendLimitsSection(compact: Boolean): KeeperSection = if (compact) KeeperSection.Device else KeeperSection.Limits
 
 /** A repository's source and short, credential-free name; local Git uses its folder name. */
 internal fun shellRepositoryLabel(repository: RepositoryRef): String =
@@ -1232,6 +1235,7 @@ private fun MainDestination(
                     runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize(), onLiftSpendStop,
                     onOpenLimits = { openSpendLimits(compact, keeperSectionName, keeperOpen, onDestinationSelected) },
                     onOpenCreature = onOpenCreatureOn,
+                    compact = compact,
                 )
                 ControlRoomDestination.Stable -> Column(
                     Modifier.fillMaxSize().verticalScroll(rememberScrollState())

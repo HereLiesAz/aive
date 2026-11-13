@@ -115,6 +115,7 @@ internal fun LiveInboxScreen(
     onOpenLimits: (() -> Unit)? = null,
     /** Opens a creature's panel on a tab: where a question or a spent budget is resolved. */
     onOpenCreature: (taskId: String, tab: CreatureTab) -> Unit = { _, _ -> },
+    compact: Boolean = false,
 ) {
     if (runtimeState is ApplicationRuntimeState.Live) {
         val presentation = runtimeState.presentation
@@ -124,6 +125,7 @@ internal fun LiveInboxScreen(
                 onLiftSpendStop = onLiftSpendStop,
                 modifier = modifier,
                 onOpenLimits = onOpenLimits,
+                compact = compact,
             )
 
             presentation.run.globalPause != null -> HallMonitorPauseInboxScreen(

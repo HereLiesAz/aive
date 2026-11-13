@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="error_key_rejected">Key rejected. Reconnect this provider in Settings with a valid key.</string>
+    <string name="error_key_rejected">Key rejected. Reconnect this provider under Connections in the Keeper's room with a valid key.</string>
     <string name="error_out_of_credit">Out of credit with this provider. Add credits in its billing settings, or switch to another provider.</string>
     <string name="error_rate_limited">Rate limited. Wait a minute, or switch to another provider.</string>
     <string name="error_offline">Can't reach the service. Check your internet connection, then retry.</string>
@@ -9,7 +9,7 @@
     <string name="error_no_agent">No connected agent can do this work. Connect an AI provider, or give the hive a repository its agent works in.</string>
     <string name="error_output_too_long">The plan was too long for the provider's output limit. Try a shorter description, or a provider with a larger limit.</string>
     <string name="error_bad_request">The provider did not accept this request. Retry, or switch to another provider.</string>
-    <string name="error_other">Something went wrong. Retry, or check your provider in Settings.</string>
+    <string name="error_other">Something went wrong. Retry, or check your provider under Connections in the Keeper's room.</string>
     <string name="error_details_label">Technical details</string>
     <string name="error_details_show">Technical details</string>
     <string name="error_details_hide">Hide technical details</string>

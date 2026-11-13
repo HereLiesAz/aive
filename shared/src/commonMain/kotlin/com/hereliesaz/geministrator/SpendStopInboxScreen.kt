@@ -37,6 +37,8 @@ internal fun SpendStopInboxScreen(
     modifier: Modifier = Modifier,
     /** Opens the spend caps in the Keeper's room, so the cap that stopped the run can be raised. */
     onOpenLimits: (() -> Unit)? = null,
+    /** A phone: the caps sit under This device, not Limits, and the page says which. */
+    compact: Boolean = false,
 ) {
     val pause = presentation.run.spendPause ?: return
     Column(
@@ -60,7 +62,7 @@ internal fun SpendStopInboxScreen(
             endCap = stringResource(Res.string.spend_stop_stopped),
             well = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(stringResource(Res.string.spend_stop_how_to_lift), style = AzphaltType.body, color = azphaltOnSurface())
+                    Text(stringResource(Res.string.spend_stop_how_to_lift, stringResource(spendLimitsSection(compact).title)), style = AzphaltType.body, color = azphaltOnSurface())
                     AzphaltPill(
                         label = stringResource(Res.string.spend_stop_lift),
                         seed = "spend-stop-lift",
