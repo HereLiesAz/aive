@@ -146,6 +146,11 @@ class SqlProcedureStore(
                 mutation.artifactsToAdd.forEach { artifact ->
                     queries.insertArtifact(artifact.digest, json.encodeToString(ProcedureArtifact.serializer(), artifact))
                 }
+                // Receipts past the bank's cap are dropped oldest first (see InMemoryProcedureStore.MAX_TRACES).
+                val kept = next.traces.mapTo(hashSetOf()) { it.receiptKey }
+                (current.traces.map { it.receiptKey } + mutation.tracesToAdd.map { it.receiptKey })
+                    .filter { it !in kept }
+                    .forEach { queries.deleteTrace(it) }
                 queries.setRevision(next.revision.toString())
                 committed = true
             }

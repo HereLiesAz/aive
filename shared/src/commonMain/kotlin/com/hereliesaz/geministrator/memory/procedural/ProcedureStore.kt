@@ -105,7 +105,7 @@ class InMemoryProcedureStore(
         }
         val newDefinitions = snapshot.definitions + mutation.definitionsToAdd
         val newEvidence = snapshot.evidence + mutation.evidenceToAdd
-        val newTraces = snapshot.traces + mutation.tracesToAdd
+        val newTraces = capTraces(snapshot.traces + mutation.tracesToAdd)
         val newArtifacts = snapshot.artifacts + mutation.artifactsToAdd
         require(newDefinitions.all { it.ref.workflowId == workflowId }) {
             "Cannot write a procedure belonging to another workflow bank"
@@ -137,6 +137,17 @@ class InMemoryProcedureStore(
         mutation.artifactsToAdd.forEach { it.verify() }
         snapshot = ProcedureSnapshot(snapshot.revision + 1, newDefinitions, newEvidence, newTraces, newArtifacts)
         true
+    }
+
+    companion object {
+        /**
+         * The most execution receipts one bank keeps. When a commit would pass it, the oldest receipts
+         * (earliest stored) are dropped; definitions, evidence and artifacts are never pruned by this.
+         */
+        const val MAX_TRACES: Int = 5_000
+
+        internal fun capTraces(traces: List<ProcedureTrace>): List<ProcedureTrace> =
+            if (traces.size <= MAX_TRACES) traces else traces.takeLast(MAX_TRACES)
     }
 
     private fun validateInitial(initial: ProcedureSnapshot) {

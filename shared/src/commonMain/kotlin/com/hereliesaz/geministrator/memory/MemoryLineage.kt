@@ -20,7 +20,7 @@ import kotlinx.serialization.Serializable
  *   read-only, ranked after the lineage and labelled. Nothing outside the project is accessible.
  *
  * This graph is add-only: workflows, parent links and project expansions are appended and never
- * removed. Which memory is right is never decided here.
+ * removed, except that the oldest records past a generous limit are dropped ([MemoryLineageLog.capped]). Which memory is right is never decided here.
  */
 @Serializable
 data class MemoryWorkflowRecord(
@@ -51,7 +51,29 @@ data class MemoryLineageLog(
     val workflows: List<MemoryWorkflowRecord> = emptyList(),
     val parents: List<MemoryParentRecord> = emptyList(),
     val expansions: List<MemoryProjectExpansion> = emptyList(),
-)
+) {
+    /**
+     * The log with each list cut to its newest records, so the stored text cannot grow without limit.
+     * The oldest runs then stop being read as ancestors or project members (their banks are untouched);
+     * the limits are generous: [MAX_WORKFLOW_RECORDS], [MAX_PARENT_RECORDS], [MAX_EXPANSIONS].
+     */
+    fun capped(): MemoryLineageLog =
+        if (workflows.size <= MAX_WORKFLOW_RECORDS && parents.size <= MAX_PARENT_RECORDS && expansions.size <= MAX_EXPANSIONS) {
+            this
+        } else {
+            MemoryLineageLog(
+                workflows = workflows.takeLast(MAX_WORKFLOW_RECORDS),
+                parents = parents.takeLast(MAX_PARENT_RECORDS),
+                expansions = expansions.takeLast(MAX_EXPANSIONS),
+            )
+        }
+
+    companion object {
+        const val MAX_WORKFLOW_RECORDS: Int = 5_000
+        const val MAX_PARENT_RECORDS: Int = 10_000
+        const val MAX_EXPANSIONS: Int = 1_000
+    }
+}
 
 /** What [MemoryLineage.registerWorkflow] changed. */
 data class MemoryLineageChange(val newWorkflow: Boolean, val newParents: List<String>) {
@@ -106,7 +128,7 @@ class MemoryLineage(
             log = log.copy(parents = log.parents + MemoryParentRecord(workflowId, parent, atEpochMillis))
             added += parent
         }
-        save(log)
+        save(log.capped())
         MemoryLineageChange(newWorkflow, added)
     }
 
@@ -119,7 +141,7 @@ class MemoryLineage(
         return mutex.withLock {
             val log = load()
             val expansion = MemoryProjectExpansion(projectId, incorporatesProjectId, by, reason, atEpochMillis)
-            save(log.copy(expansions = log.expansions + expansion))
+            save(log.copy(expansions = log.expansions + expansion).capped())
             expansion
         }
     }

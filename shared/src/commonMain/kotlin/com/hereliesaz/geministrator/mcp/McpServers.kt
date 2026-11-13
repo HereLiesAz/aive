@@ -50,7 +50,7 @@ data class McpServerConfig(
 
 /** The configured servers, as JSON in the platform's general settings (no secrets). */
 class McpServerStore(
-    private val settings: Settings = Settings(),
+    private val settings: Settings = com.hereliesaz.geministrator.persistence.PrivateSettings.forKeys(DEFAULT_STORAGE_KEY),
     private val storageKey: String = DEFAULT_STORAGE_KEY,
 ) {
     private val json = Json {

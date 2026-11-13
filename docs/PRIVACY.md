@@ -57,7 +57,7 @@ Memory stages run on-device by default. If you set a memory stage to a hosted mo
 
 This data is used to restore workflows and continue runs after the application or browser restarts.
 
-The Android app sets `allowBackup="true"`. If Android device backup is on, the system may include workflow state, settings and the agent-memory databases in your device backup under Google's backup terms. Remembered text (see above) is kept in a settings file of its own on Android and is excluded from backup and device transfer, like the stored keys. Credentials and downloaded models are excluded from backup and device transfer (`data_extraction_rules.xml`, `backup_rules.xml`); credentials are also encrypted with an Android Keystore key that never leaves the device. You have to reconnect providers after a restore, and models download again when you reinstall them.
+The Android app sets `allowBackup="true"`. If Android device backup is on, the system may include workflow state, settings and the agent-memory databases in your device backup under Google's backup terms. Remembered text (see above) is kept in a settings file of its own on Android and is excluded from backup and device transfer, like the stored keys. The MCP server list and the trace exporter's OTLP headers are likewise kept in a settings file of their own on Android and excluded from backup and device transfer (you add them again after a restore). Credentials and downloaded models are excluded from backup and device transfer (`data_extraction_rules.xml`, `backup_rules.xml`); credentials are also encrypted with an Android Keystore key that never leaves the device. You have to reconnect providers after a restore, and models download again when you reinstall them.
 
 ## External providers and executors
 
