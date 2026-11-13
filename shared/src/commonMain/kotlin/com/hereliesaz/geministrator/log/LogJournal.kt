@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator.log
 
 import com.hereliesaz.geministrator.control.ControlRedaction
 import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
+import com.hereliesaz.geministrator.withPlatformLock
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -77,7 +78,8 @@ class LogJournal(
     private fun persist() {
         val store = settings ?: return
         if (storageKey.isEmpty()) return
-        runCatching { store.putString(storageKey, encodeLogLines(state.value)) }
+        // The latest lines are read inside the lock, so a slower earlier writer can never overwrite a newer one.
+        runCatching { withPlatformLock(store) { store.putString(storageKey, encodeLogLines(state.value)) } }
     }
 
     companion object {
