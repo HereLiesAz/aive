@@ -289,6 +289,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inbox_kind_question">Question</string>
     <string name="inbox_kind_budget">Budget spent</string>
     <string name="inbox_artifact_waiting">Artifact waiting</string>
+    <string name="inbox_action_answer">Answer it</string>
     <string name="inbox_question_where">Its agent asked you a question. Answer it on this creature’s Needs, in the hive.</string>
     <string name="inbox_budget_where">Raise it on this creature’s Mind, in the hive.</string>
 

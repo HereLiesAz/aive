@@ -344,15 +344,9 @@ fun ControlRoom(
         creatureTabTask = id
         onDestinationSelected(ControlRoomDestination.Overview)
     }
-    val openInbox = {
-        val waiting = liveWorkflow?.takeUnless { it.run.globalPause != null || it.run.spendPause != null || isHallMonitorTrial(it) }
-            ?.let { live -> firstCreatureNeedingYou(live, unseen = { key -> key !in inboxReadLog.read }) }
-        if (waiting != null) {
-            openCreatureOn(waiting, CreatureTab.Needs)
-        } else {
-            onDestinationSelected(ControlRoomDestination.Inbox)
-        }
-    }
+    // The Inbox lists everything waiting on the keeper, every row leading to where it is resolved; the header's
+    // badge and the rail open that list, not the first creature that waits.
+    val openInbox = { onDestinationSelected(ControlRoomDestination.Inbox) }
     // Where the spend caps are: Limits on a wide window, This device on a phone.
     val openLimits = { openSpendLimits(compact, keeperSectionName, keeperOpen, onDestinationSelected) }
     val flowchartLinks = FlowchartLinks(
@@ -844,6 +838,8 @@ private fun MainDestination(
     onTaskSelected: (String) -> Unit,
     /** Opens a creature from a link: reopens a set-aside panel, never closes an open one. */
     onOpenCreature: (String) -> Unit,
+    /** Opens a creature's panel on a given tab: where a question or a spent budget is resolved. */
+    onOpenCreatureOn: (String, CreatureTab) -> Unit = { _, _ -> },
     onLaunchWorkflow: (String, String, RepositoryRef?, List<WorkflowRunId>) -> Unit,
     onLoadLaunchableRuns: suspend () -> List<LaunchableRun> = { emptyList() },
     onApproveTask: (String) -> Unit,
@@ -1235,6 +1231,7 @@ private fun MainDestination(
                 ControlRoomDestination.Inbox -> LiveInboxScreen(
                     runtimeState, onApproveTask, onRejectPlan, onResolveEscalation, Modifier.fillMaxSize(), onLiftSpendStop,
                     onOpenLimits = { openSpendLimits(compact, keeperSectionName, keeperOpen, onDestinationSelected) },
+                    onOpenCreature = onOpenCreatureOn,
                 )
                 ControlRoomDestination.Stable -> Column(
                     Modifier.fillMaxSize().verticalScroll(rememberScrollState())
