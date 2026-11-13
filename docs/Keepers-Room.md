@@ -261,3 +261,7 @@ While a swarm runs the queen may offer a suggestion as a row of Messages (`Queen
 **Content from outside.** If the run's objective or the step's inputs came from outside your own typing, the row says **Based on content from outside. Look before you accept.**, a redo asks first (it always does), and a new job for a step is not offered or applied.
 
 **Badge.** Each open suggestion counts once toward the Messages badge and is read like any other item; the queen's other notes never count.
+
+## Training a specialist
+
+A swarm in the swarm library, started from your request or a queen suggestion, makes a specialist variant of a generic role for a domain. Its creatures are all generic roles. The Planner scopes the domain and writes practice tasks (new every run); the Researcher uses the same approved research path and only your few words; the Trainer drafts lessons, each with its source and fetch date, and may only tighten the limits (rounds, tasks, spend), never loosen them. The generic role and the draft attempt the same tasks, the Reviewer scores both, and the Nanny rules pass, refine or stop, citing a listed fact. The Antagonist may challenge once with a cited fact; if it is still not satisfied the queen settles it, and only with both creatures agreeing to her approach (otherwise it comes to you). On a pass the queen asks you in Messages with the practice results. She adopts it only after you approve; the variant keeps the generic role as its parent, which is never edited, plus its lessons.
