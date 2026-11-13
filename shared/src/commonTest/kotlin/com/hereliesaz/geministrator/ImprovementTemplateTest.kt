@@ -99,6 +99,7 @@ class ImprovementTemplateTest {
     @Test
     fun aRoleRevisionMayBeMoreSpecificButNeverChangeWhatTheRoleMayDo() = runTest {
         val role = BuiltInRoles.Planner
+        persistence.roles.put(role)
         val target = "role:${role.id.value}@1"
         waiting(
             proposal("r1", target, draft(target, wording = "Plan a beginner welding course in five short steps.")),
