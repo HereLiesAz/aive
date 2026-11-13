@@ -52,9 +52,9 @@ internal fun PromptSuggestBox(
     entryFilter: (PromptEntry) -> Boolean = { true },
     /** False when the field already has a menu of its own, which then offers the remembered entries itself. */
     showMenu: Boolean = true,
+    store: PromptHistoryStore = PromptHistory.store,
     content: @Composable (PromptFieldState) -> Unit,
 ) {
-    val store = PromptHistory.store
     val offering = PromptHistoryRules.shouldOffer(secret = secret, enabled = store.enabled())
     val entries = if (offering) store.entries(kind).filter(entryFilter) else emptyList()
 
