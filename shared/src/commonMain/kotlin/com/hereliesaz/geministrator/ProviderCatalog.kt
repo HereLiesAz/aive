@@ -29,6 +29,7 @@ object ProviderCatalog {
     const val CEREBRAS_ID = "cerebras"
     const val MISTRAL_ID = "mistral"
     const val HUGGING_FACE_ID = "huggingface"
+    const val POLLINATIONS_ID = "pollinations"
     const val OPENROUTER_ID = "openrouter"
     const val TOGETHER_ID = "together"
     const val FIREWORKS_ID = "fireworks"
@@ -124,6 +125,13 @@ object ProviderCatalog {
             apiKeyUrl = "https://console.mistral.ai/api-keys",
             credentialLabel = "Mistral API key",
             description = "Mistral's models. Needs an API key.",
+        ),
+        ProviderCatalogEntry(
+            id = POLLINATIONS_ID,
+            displayName = "Pollinations",
+            apiKeyUrl = "https://enter.pollinations.ai/",
+            credentialLabel = "Pollinations secret key",
+            description = "Hosted multimodal models. Requires a scoped user-authorized key. Account sign-in is available when Aive's public Pollinations App Key is configured. The approved expiry and spending budget are enforced by Pollinations.",
         ),
         ProviderCatalogEntry(
             id = HUGGING_FACE_ID,

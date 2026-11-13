@@ -65,9 +65,24 @@ and disconnect behavior remain unchanged. Aive does not persist an OAuth code,
 verifier, access token, or refresh token in workflow persistence. The connection
 may incur charges against the user's OpenRouter account.
 
-This does not authorize other providers. Hugging Face and Pollinations require
-their own registered public OAuth clients and provider-specific permissions,
-budgets, and token handling before account sign-in can be enabled for them.
+Hugging Face and Pollinations use a separate browser device-code authorization path.
+Register public OAuth clients owned by Aive, and supply their **public** client IDs as
+Gradle properties `aive.huggingfaceOAuthClientId` and `aive.pollinationsOAuthClientId`.
+For Hugging Face, register a public (no client secret) app with the `inference-api` permission.
+For Pollinations, register an App Key (`pk_`) with account spending and expiry constraints.
+Android exposes the account sign-in action only when the corresponding client ID is configured.
+The user opens the provider's verification page and enters the displayed device code. Aive
+checks the provider's token endpoint only on explicit user request, and persists only a
+successfully returned user authorization token through the platform's credential store.
+Neither public client ID is a user credential or can generate images on its own.
+
+Pollinations' approved user key can expire and then requires reauthorization; it does not
+include a refresh token. Hugging Face OAuth access tokens can also expire. The existing
+credential store currently records only the token string, not expiry or refresh metadata;
+therefore expired tokens must be replaced through a new sign-in rather than silently refreshed.
+This feature supplies account authorization, not a new Pollinations inference backend.
+It does not authorize other providers, and it does not convert consumer Google sign-in
+into an external provider API token.
 
 A product rename must never rename a persistence key merely for cosmetic consistency. Existing
 `haive.*` and `geministrator.*` keys are compatibility identifiers and remain valid storage
