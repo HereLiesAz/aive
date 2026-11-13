@@ -4,8 +4,10 @@ import com.hereliesaz.geministrator.CreatureTab
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
-import com.hereliesaz.geministrator.tour.TEACHING_WORKFLOW_ID_PREFIX
 import com.hereliesaz.geministrator.workflow.OPTIONAL_STEP_SKIPPED
+
+/** The id prefix of a teaching run's workflow; the lesson-failed line is worded only for a run whose id starts with it. */
+const val TEACHING_WORKFLOW_ID_PREFIX: String = "tutorial"
 
 /** The most failure lines one run shows at once: one plain line each, not a list of everything that went wrong. */
 private const val MAX_FAILURE_LINES = 2
