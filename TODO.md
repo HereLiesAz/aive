@@ -180,10 +180,10 @@ A checked box means implemented and covered by automated tests. It does not mean
 ## P1 — Delivery
 
 - [x] Keep `main` CI green across shared tests, providers, Android, Desktop, JS, and Wasm.
-- [x] Confirm Android release signing from reconstructed keystore material on CI.
-- [x] Add Google Play publishing using `PLAY_SERVICE_ACCOUNT_JSON` as a separate publishing job.
+- [x] Android release signing is supplied by the central `HereLiesAz/workflows` run (this repo holds no signing material; builds here stay unsigned).
+- [x] Google Play publishing happens in the central `HereLiesAz/workflows` android-play-release run, not in this repo.
 - [x] Automatically publish the desired Google Play internal-testing track after a successful release build.
-- [x] Ensure versionCode/versionName have one clear source of truth and cannot regress.
+- [x] versionName has one source (`gradle.properties`); versionCode is passed monotonically by the central release run (`-Papp.versionCode`), the checked-in value is only a local default.
 - [x] Verify GitHub Pages deployment after the rename to `aive` and `haive.js`.
 - [x] Package Desktop icon/metadata correctly for each supported OS.
 - [x] Add release notes/changelog generation from actual shipped changes.

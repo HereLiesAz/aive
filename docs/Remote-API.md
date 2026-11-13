@@ -8,7 +8,7 @@ Other apps can run prompts on The Aive's providers and launch workflows through 
 - The service requires `com.hereliesaz.aive.permission.REMOTE`, which has `signature` protection. Only apps signed with The Aive's release key can bind.
   - Clients only request it with `<uses-permission>`. They must not declare it: a second definition under a different signing key makes installation fail.
   - On Android 11 and later, clients also need a `<queries>` entry for both packages.
-- Both flavors declare the same permission name. Android lets two installed packages define one custom permission only when they are signed with the same certificate, so the Play and GitHub builds must keep sharing one signing key. If either flavor is ever signed with a different key (for example, Play App Signing re-signing the Play build with a Google-held key), installing the second flavor fails with `INSTALL_FAILED_DUPLICATE_PERMISSION`, and a client signed with the other key can no longer bind. Moving to per-flavor permission names would then be required, in IDEaz too.
+- Both flavors declare the same permission name. Android lets two installed packages define one custom permission only when they are signed with the same certificate, so the Play and GitHub builds must keep sharing one signing key. Signing now happens in the central `HereLiesAz/workflows` release runs, not in this repository, so this invariant cannot be checked from here; confirm it there when either run's key changes. If either flavor is ever signed with a different key (for example, Play App Signing re-signing the Play build with a Google-held key), installing the second flavor fails with `INSTALL_FAILED_DUPLICATE_PERMISSION`, and a client signed with the other key can no longer bind. Moving to per-flavor permission names would then be required, in IDEaz too.
 
 ## Transport
 
@@ -160,6 +160,8 @@ Android 13 and later ask for the notification permission when Remote access is t
 **Limitation: workflows over the relay start later.** Prompts run headless, as with the Messenger API. Workflows run on the runtime that belongs to The Aive's UI, so `launch` only queues the request in memory (`launched` confirms that) and the workflow starts when The Aive is next opened on that device; a `watch`ing client then receives its `launch_outcome` and `run_status`. A request still queued an hour after it arrived expires, as described under Behavior.
 
 ### Release steps
+
+These apply only when relay access is re-enabled (`AVAILABLE` is `false` today, so the Play foreground-service declaration and the notification prompt below are not needed now).
 
 - **Google Play Console.** The service uses the `specialUse` foreground service type, which needs a declaration under App content → Foreground service permissions: choose "Other" (special use), paste the subtype text from the manifest property `android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE`, describe the feature as above (opt-in, user-visible notification, encrypted link to the user's own app), and attach a short video of turning Remote access on. Without it a Play release that targets Android 14 or later is rejected.
 - **Cloudflare.** Deploy `relay/` (`cd relay && npx wrangler@4 deploy`) under the account whose workers.dev subdomain matches the default relay URL, or change `RelayProtocol.DEFAULT_RELAY_URL` to match.
