@@ -1,0 +1,85 @@
+# Memory model: audit and gap plan
+
+The owner's model (authoritative, verbatim):
+
+> Agent is supposed to reason through the contradiction out loud and that resolution will be condensed into the memory layer like everything else. The memory layer is not a tool that can be called on with a command. Keyword clouds are posted to the agents thought process as they are triggered by the thought process itself, or by what the agent says in chat. The more that the agent lingers on thoughts involving those keywords and the key phrases and the summaries that the memory layer will be injecting into the chat log where the agent can see it, the more and more precise and complete injections will come from the memory layer. Because of compounding and how memories condense around commonalities, actual precision isn't possible, just like with human memories.
+
+Reduced to tests: (1) no commands; (2) passive and associative, triggered by the agent's own thinking and chat; (3) injects keyword clouds, key phrases and summaries into the chat log; (4) lingering makes injections more precise and complete (compounding); (5) memories condense around commonalities, so recall is gist-like, never exact; (6) contradictions are reasoned out loud and the resolution is condensed like everything else.
+
+Paths below are under `shared/src/commonMain/kotlin/com/hereliesaz/geministrator/memory/` unless stated. Nothing was compiled or run; this is a source read.
+
+## Audit
+
+| Part | Verdict | Where | Why, and what would have to change |
+|---|---|---|---|
+| Memory package as a whole | PARTLY | `memory/` | Passive banking and cue machinery exist and fit. A command surface, exact-text recall and no compounding per topic do not. See rows below. |
+| `MemoryLayerController` (observer) | MATCHES | `MemoryLayerController.observer` | Hooks session start, every Message/Thinking/PlanGenerated event (`respondToThought`), user messages (`annotateUserMessage`) and finish. Nothing is called by the agent. Wired for all sessions at `ProviderBackedManagedSessionGateway` (`memoryObserver.onSessionEvent(handle, effectiveEvent) { message(...) }`). |
+| Session observer / banking | MATCHES | `MemorySessionObserver.kt`, `QueuedMemorySessionObserver` | Banks the whole session after the step, scrubbed. Memory's own lines carry `MEMORY_MESSAGE_MARKER` and are not re-banked. This is how reasoning "gets condensed like everything else". |
+| `recallForPrompt` and its seven blocks | PARTLY | `MemoryLayerController.recallForPrompt` | Runs only when the Query Composer plan says memory is needed (`recallMemory = !enoughEvidence && queries.isNotEmpty()`), so the prompt's cloud is skipped with it. `Memory protocol` teaches `/deliberate` (contradicts). `Relevant memory` and `Memory timeline` print verbatim text with numeric scores and node ids (not gist). `Role lessons` is unconditional and verbatim. `Memory`, `Recalled on request` and `Habits` fit. |
+| Keyword / tag clouds | MATCHES | `cueCloud`, `keywordCueHits`, `MemoryTagKeywords` | Triggered by the thought's own uncommon words via an inverted-index lookup; posted as `#tags`; paced by the dial. Gap: the cloud is also lost if the prompt-time path is gated off. |
+| Key phrases | PARTLY | `MemoryCueWatcher` (`Phrase`), `MemoryResolution.Phrase` | The cloud carries tags only. Phrases appear only as a trigger the agent writes ("Let me see what I remember about X"), not as something memory injects. |
+| Triggers from thinking and chat | PARTLY | `MemoryCueWatcher.read` | Echo and doubling are associative and fire without any syntax. `#tag` and the "what I remember about" phrase are command-like, and they bypass the dial and the frequency filter. Providers that cannot take a mid-session message get recalls as `pending` on the next prompt only. |
+| Summaries, consolidation, condensation | PARTLY | `MemoryConsolidation.kt`, `MemoryRewrite.kt`, `MemorySummaryTree.kt` | Memories fold into one shorter current version; size shrinks along an S-curve and never grows. But condensation "must restate its sources' values unchanged", so it is lossless on claimed values, not gist-like. Summaries are fine; what is shown is the stored text. |
+| Attention-gated recall dial | PARTLY | `AttentionGatedRecall.kt`, `MemoryAttention.kt` | A rate limiter (threshold, token-bucket interval, hysteresis, novelty window). It is passive, which fits. It does not implement "linger, get more": novelty (`noveltyCueIntervals`) suppresses repeats, and thresholds do not move with dwelling. |
+| Lingering and compounding | PARTLY | `MemoryCoRecall.kt`, `MemoryAssociationStrength.kt`, `recordAccess` | Co-recall adds an `AssociatedWith` edge (weight 0.3) every 3rd co-delivery, max 4 per pair; strength accumulates as `1 - Π(1 - w)`. Counts are in-process only (lost on restart). `recordAccess` writes `Recalled` edges only for resolved memories and only to fade their contradiction note. There is no per-agent, per-topic dwell counter, no reinforcement of the recalled memory or of the cue->memory link, and no decay by disuse. Injection size is fixed (`MAX_TRIGGERS_PER_THOUGHT` 3, `MAX_TRIGGER_SUMMARIES` 3, `MAX_SUMMARY_CHARS` 400). |
+| Gist-level recall | PARTLY | `recallSummaries`, `MemoryRecallHit.divergenceLines` | Summary resolution and outline levels exist. Output is still verbatim text (400 chars), with `[0.87]` scores and ids, which presents recall as exact. |
+| `MemoryDeliberationCommand` | CONTRADICTS | `MemoryDeliberationCommand.kt`, `respondToThought`, `MEMORY_PROTOCOL`, `divergenceLines` | A `/deliberate` command, taught in the protocol and templated under divergent hits (`⚖ to deliberate:`). The model has no commands. |
+| `MemoryDeliberationAbsorber` | PARTLY | `MemoryDeliberationAbsorber.kt` | The absorption fits: a resolution becomes the current version, losers become history, size fitted by `MemoryRewrite`. The input does not: it needs a structured `Deliberation` node with `chosen` and cited ids, which only the command creates. |
+| `RoleLessonBank` | PARTLY | `RoleLessonBank.kt`, `bankRoleLessons`, `roleLessons` | A passive per-role bank (fits) filled by keeper approval, not by experience, and injected unconditionally and verbatim every prompt rather than by association. Keeper-approved training is a separate deliberate path; it can stay, but delivery should follow the cue path. |
+| Queen's memory | CONTRADICTS (absence) | `orchestration/OrchestrationRuntime.kt` `retrievedMemory` | Field exists, nothing fills it. Not a model conflict, but the queen does not benefit from the background. |
+
+## Direct answers
+
+- **Per-turn from the agent's own thinking/chat?** Mostly yes mid-session (every Message, Thinking, PlanGenerated event and user message). Prompt-time recall is gated by a query plan, and `#tag`/phrase are explicit syntax. PARTLY.
+- **Strengthened by lingering?** Detected (doubling, echo) but not compounded per topic. Co-recall links exist but are in-process and slow. No.
+- **Gist-level rather than exact?** Condensed storage, exact rendering and value-preserving condensation. PARTLY.
+- **Resolution from out-loud reasoning rather than a command?** No. Only `/deliberate`.
+
+## Three biggest gaps
+
+1. **The `/deliberate` command is the only way a resolution is condensed.** Prose reasoning is never read as a resolution.
+2. **No compounding from lingering.** Nothing makes injections more complete or precise as an agent dwells; novelty suppression does the opposite, and the association counts are lost on restart.
+3. **Recall renders as exact.** Verbatim text, scores and ids, and value-preserving condensation, where the model wants gist. Also: prompt-time recall is skipped when the query plan says no.
+
+## Minimal change plan (not done; no code changed)
+
+### A. Replace `/deliberate` with absorbing a resolution from reasoning text
+
+1. Remove the command from the agent surface: drop the `/deliberate` sentence from `MEMORY_PROTOCOL` and the `⚖ to deliberate:` template line from `divergenceLines`. Keep the marker explanation.
+2. Detect an open contradiction in the agent's own text without a command. Memory already knows which hits it delivered as divergent (`MemoryRecallHit.conflicts`). In `respondToThought`, keep per-agent a short list of delivered divergent pairs (node ids plus their key terms), new field on `CueSession`.
+3. On each later thought or message, a deterministic detector (new small `MemoryResolutionReader`, pure function, test first) checks whether the text mentions both sides (by key terms, via the same tag keywords used for cues) and contains a resolution statement (a short sentence with cue words such as "so", "therefore", "in fact", "turns out", "the right one is", "out of date", "instead"). If so, take that sentence plus its context as the conclusion.
+4. Decide `chosen` deterministically: the side whose key terms the conclusion repeats and the other side's does not. If neither or both, record `chosen = null` (unresolved, which absorbs nothing, the existing rule).
+5. Call the existing `MemoryTool.deliberate(MemoryDeliberationRequest(...))` with `sourceSessionId` the agent, `citedNodeIds` the pair, `conclusion` the sentence. `MemoryDeliberationAbsorber` needs no change; it condenses the resolution as today. Delete `MemoryDeliberationCommand` and its test; update `MemoryLayerControllerTest`.
+6. Feedback stays passive and quiet: no "deliberation recorded" message. If recall later shows the resolved memory it is just the condensed current version.
+7. Optional, later and gated by price/allowance: a model-backed reader behind the same interface for resolutions the keyword pass misses. Do not add a model call by default.
+8. Update `docs/Memory-layer.md` (the "Agents record deliberations" paragraph and the protocol text) and `MemoryHabitsSection`/`deliberateHabit` wording if it names the command.
+
+### B. Reinforcement (lingering compounds)
+
+1. Add a per-agent, per-topic dwell counter in `CueSession` (key = normalized tag). Increment on every trigger that fires for the topic (explicit, echo, doubled) and on every cloud cue the agent echoes. Decay it with tokens consumed (`consumeTokens` already runs).
+2. Let dwell widen the injection: `MAX_TRIGGER_SUMMARIES` becomes `1 + min(dwell, 3)`, and summary resolution deepens (Tag, then Summary, then outline levels) as dwell grows. This is the "more precise and complete".
+3. Let dwell lower the dial threshold for that topic and replace the novelty block for it: a dwelt-on topic may surface new, not-yet-shown memories, but still not the same text twice.
+4. Persist reinforcement as add-only edges in the bank: extend `recordAccess` to write a `Recalled` edge for every delivered hit (not only resolved ones), and make `MemoryCoRecall` counts derive from stored edges, so they survive restart. Retrieval scoring uses `accumulateAssociationEvidence` over these, so repeated use ranks higher and rewrite weight (`MemoryRewrite`) already uses strength.
+5. Decay by disuse, deterministically: a read-time factor on `Recalled` edges by age, never deleting anything (history stays).
+
+### C. Gist, not exact
+
+1. In `recallForPrompt` and `respondToThought`, stop printing `[score]` and node ids; show time range and lineage only. Render summary-level text and trim to the first sentence or the outline level unless dwell is high.
+2. Rename the blocks' framing to say recalled gist, not facts. Condensation that must "restate values unchanged" can stay as the stored invariant; the rendering is what loosens. Decide with the owner whether storage should also stop promising value fidelity (this would be a larger change; see open questions).
+
+### D. Triggers and the prompt path
+
+1. Run the cue cloud for the task prompt whenever memory is active, outside the query-plan gate (only the heavy `Relevant memory` grip stays gated).
+2. Inject key phrases with the cloud: add `MemoryResolution.Phrase` hits for the strongest cue and print them after the tags.
+3. Treat `#tag` and "what I remember about" as ordinary echoes: remove their dial bypass, and stop listing them in the protocol. They may keep firing if the agent happens to write them.
+4. Role lessons: deliver through the cue path (when the thought touches a lesson's keywords), plus a one-line standing note, rather than an unconditional block.
+
+### E. Order and tests
+
+A first (removes the contradiction), then B, then C and D. Each step: pure-function tests first (`MemoryResolutionReader`, dwell counter, renderer), then wiring. CI compiles; nothing was compiled for this plan.
+
+## Could not determine
+
+- Whether any provider shows no Thinking events at all, so that only chat messages feed triggers. Not checked per provider.
+- Whether the owner wants stored condensation to stop preserving claimed values (a storage change), or only the rendering to be gist-like.
+- How well a keyword-based resolution reader will do against real agent prose; it needs real transcripts to tune.

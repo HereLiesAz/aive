@@ -128,3 +128,7 @@ Android CI failed on every push because (1) an Android string had an unescaped a
 
 - Owner correction: 'roles stay generic' meant only at the very beginning, for the first-run introductory tutorial workflow. I generalised it into a standing rule (reviewer/planner always generic, Nanny revisions rejected for domain wording) and told builders so. Roles, templates and the rest evolve over generations (memetic changes fast, genetic changes slow, both intentional).
 - Rule: when the owner scopes an instruction ('especially in the tutorial', 'for now', 'in the very beginning'), keep the scope in the code comments, docs and agent briefs. Do not widen it, and ask when a scope word is missing.
+
+## The owner's model is the spec, not the current code
+
+- Do not describe a layer from its current code: the owner's model is the spec. Ask what the mechanism is meant to be before documenting or extending it.
