@@ -316,6 +316,8 @@ internal fun RestingHive(
     LaunchedEffect(host) { roles.value = host?.installedRoles().orEmpty() }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         // The breadcrumb names the hive; a new one names itself in its own head as well.
+        // A hive at rest has no run: its cards link nowhere the live shell goes, and the shell does not follow its view.
+        androidx.compose.runtime.CompositionLocalProvider(LocalFlowchartLinks provides null, LocalHiveFlowchartView provides null) {
         GeministratorWorkflowTerrarium(
             definition = start,
             liveRun = remember(start.id) { restingWorkflowRun(start) },
@@ -358,6 +360,7 @@ internal fun RestingHive(
                 { staged, edit -> SwarmDraftBox(staged, host?.swarmDrafter, edit, redraft = true) }
             },
         )
+        }
         // An empty hive has nothing to launch yet; the launch bar comes with its first creature.
         if (!fresh || current.tasks.isNotEmpty()) HiveLaunchBar(current, onOpenConnections = onOpenConnections)
         // A hive with creatures can be written down as a hive card (HiveCardPanels.kt).
