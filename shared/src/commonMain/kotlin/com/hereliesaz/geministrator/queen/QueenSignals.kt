@@ -5,6 +5,7 @@ import com.hereliesaz.geministrator.creatureNeedsYou
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskRun
 import com.hereliesaz.geministrator.domain.TaskRunStatus
+import com.hereliesaz.geministrator.domain.isTerminal
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.workflow.isHeldForRoleBudget
@@ -61,6 +62,32 @@ fun queenSignals(definition: WorkflowDefinition, run: WorkflowRun, roles: Collec
     }
     return signals
 }
+
+/**
+ * One note per creature that has passed the time the queen allowed and is still working (Helpful only): she is
+ * still waiting, and the link opens the creature's Work tab, where the keeper can give it more time.
+ */
+internal fun slowNotes(definition: WorkflowDefinition, run: WorkflowRun): List<QueenNote> =
+    definition.tasks.mapNotNull { task ->
+        val taskRun = run.taskRuns[task.id] ?: return@mapNotNull null
+        if (taskRun.timedOutAttempts > 0 && !taskRun.status.isTerminal() && taskRun.status != TaskRunStatus.Escalated) {
+            // Stopped for taking too long, and going again (an Escalation has its own row and sentence).
+            return@mapNotNull QueenNote(
+                queenNoteId(run.id.value, "watch", "timedout", task.id.value, taskRun.timedOutAttempts.toString()),
+                QueenVoice.WatchTimedOut,
+                listOf((definition.tasks.indexOf(task) + 1).toString(), queenSlot(task.name), taskRun.timedOutAttempts.toString()),
+                QueenLink.Creature(task.id.value, CreatureTab.Work),
+            )
+        }
+        val allowed = com.hereliesaz.geministrator.workflow.slowCreatureAllowedMinutes(task, taskRun) ?: return@mapNotNull null
+        val step = definition.tasks.indexOf(task) + 1
+        QueenNote(
+            queenNoteId(run.id.value, "watch", "slow", task.id.value, taskRun.attempt.toString(), allowed.toString()),
+            QueenVoice.WatchSlow,
+            listOf(step.toString(), queenSlot(task.name), allowed.toString()),
+            QueenLink.Creature(task.id.value, CreatureTab.Work),
+        )
+    }
 
 /**
  * The queen's own "I noticed": at most one note, the most serious signal first. Said only for a

@@ -48,6 +48,7 @@ fun queenUpdate(
         watchRelay(definition, run, queenSignals(definition, run, roles))?.let { notes += it }
     }
     if (level == QueenLevel.Helpful) {
+        notes += slowNotes(definition, run)
         waitsDigest(definition, run)?.let { notes += it }
         notes += statusNote(definition, run, roles)
     }

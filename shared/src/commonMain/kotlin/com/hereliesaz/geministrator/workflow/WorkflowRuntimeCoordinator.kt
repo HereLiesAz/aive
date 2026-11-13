@@ -87,6 +87,13 @@ class WorkflowRuntimeCoordinator(
     private val spendCaps: () -> SpendCaps = { SpendCaps() },
     /** What billed generations outside any run spent; the hourly cap counts it. */
     private val ambientSpend: AmbientSpendLedger = AmbientSpendLedger.Shared,
+    /**
+     * The queen's own allowance for a creature that has started an attempt ([DeadlinePolicy.resolveAuto]); the
+     * default gives none, so a coordinator built without it times nothing.
+     */
+    private val deadlineAllowance: (TaskDefinition, TaskRun) -> Allowance = { _, _ -> Allowance.None },
+    /** Whether a creature past its hard point is stopped ([HARD_DEADLINES_ENABLED]); tests set it. */
+    private val enforceDeadlines: Boolean = HARD_DEADLINES_ENABLED,
 ) {
     private val gateCoordinator = ApprovalGateCoordinator(
         persistence.approvalGates,
@@ -298,6 +305,17 @@ class WorkflowRuntimeCoordinator(
         )
         nextRun = preserveArtifactTimestamps(state.run, nextRun)
         nextRun = reconcileSystemExecutors(project, definition, nextRun, nowEpochMillis)
+        val beforeDeadlines = nextRun
+        val progress = progressSeen(state.handles, nowEpochMillis)
+        val deadlines = DeadlineReducer.reduce(
+            definition, nextRun, nowEpochMillis, progressAt = { progress[it] }, autoFor = deadlineAllowance,
+            enforceHard = enforceDeadlines,
+        )
+        nextRun = deadlines.run
+        val hardStopped = deadlines.hardStops.keys
+        if (hardStopped.isNotEmpty()) {
+            nextRun = stopForDeadlines(project, definition, beforeDeadlines, nextRun, state.handles, hardStopped, nowEpochMillis)
+        }
         persistArtifacts(nextRun)
 
         val newlyFailedTaskIds = nextRun.taskRuns
@@ -316,6 +334,13 @@ class WorkflowRuntimeCoordinator(
 
         for (taskId in newlyFailedTaskIds) {
             if (nextRun.status.isTerminal()) break
+            if ((nextRun.taskRuns[taskId]?.timedOutAttempts ?: 0) >= MAX_TIMEOUTS) {
+                // Slow twice: the keeper decides, whatever the step's escalation policy says.
+                val reason = "Took longer than allowed twice. ${nextRun.taskRuns[taskId]?.progressMessage.orEmpty()}".trim()
+                nextRun = engine.escalateTimedOut(nextRun, taskId, reason, nowEpochMillis)
+                ensureFailureEscalationGate(run = nextRun, taskId = taskId, reason = reason, now = nowEpochMillis)
+                continue
+            }
             val previousStatus = state.run.taskRuns[taskId]?.status
             val retryReason = when (previousStatus) {
                 TaskRunStatus.Verifying -> RetryReason.VerificationFailed
@@ -379,7 +404,7 @@ class WorkflowRuntimeCoordinator(
             nextRun = nextRun.copy(status = WorkflowRunStatus.AwaitingHuman)
         }
 
-        var nextHandles = state.handles.filterKeys { taskId ->
+        var nextHandles = (state.handles - hardStopped).filterKeys { taskId ->
             nextRun.taskRuns[taskId]?.status !in setOf(
                 TaskRunStatus.Completed,
                 TaskRunStatus.Failed,
@@ -394,7 +419,7 @@ class WorkflowRuntimeCoordinator(
 
         // A handle the run no longer follows has read all it will: what it last reported is counted, and the
         // gateway forgets the session.
-        nextRun = settleDroppedHandles(nextRun, state.handles.filterKeys { it !in nextHandles }, nowEpochMillis)
+        nextRun = settleDroppedHandles(nextRun, (state.handles - hardStopped).filterKeys { it !in nextHandles }, nowEpochMillis)
 
         // Spend circuit breakers: a reached cap stops the whole run before anything else starts.
         spendCapTrip(previous = state.run, run = nextRun, nowEpochMillis = nowEpochMillis)?.let { trip ->
@@ -776,6 +801,49 @@ class WorkflowRuntimeCoordinator(
      * read (spend between the last poll and the stop is still spend), records it as usage events, and
      * lets the gateway forget the session. The caller adds [StoppedSessions.usage] to the run it keeps.
      */
+    /** The last count of new reports each session made, and when it last changed (under [cycleMutex]). */
+    private val progressMarks = mutableMapOf<TaskDefinitionId, Pair<Long, Long>>()
+
+    /** When each session last made a new report, for the creatures whose session has made any at all. */
+    private suspend fun progressSeen(
+        handles: Map<TaskDefinitionId, ManagedSessionHandle>,
+        now: Long,
+    ): Map<TaskDefinitionId, Long> {
+        progressMarks.keys.retainAll(handles.keys)
+        val seen = mutableMapOf<TaskDefinitionId, Long>()
+        for ((taskId, handle) in handles) {
+            val count = runCatching { sessionGateway.progressCount(handle) }.getOrNull()
+            if (count == null || count <= 0L) continue
+            val mark = progressMarks[taskId]
+            val at = if (mark == null || mark.first != count) now else mark.second
+            progressMarks[taskId] = count to at
+            seen[taskId] = at
+        }
+        return seen
+    }
+
+    /**
+     * Stops what the creatures that took too long were doing: their provider sessions and executor runs. What a
+     * stopped session spent is counted, so a spend cap still sees it.
+     */
+    private suspend fun stopForDeadlines(
+        project: Project,
+        definition: WorkflowDefinition,
+        before: WorkflowRun,
+        run: WorkflowRun,
+        handles: Map<TaskDefinitionId, ManagedSessionHandle>,
+        stopped: Set<TaskDefinitionId>,
+        nowEpochMillis: Long,
+    ): WorkflowRun {
+        cancelExternalRuns(
+            project, definition, before,
+            unfinishedExternalRuns(definition, before).filter { it.task.id in stopped },
+            nowEpochMillis,
+        )
+        val stop = stopSessions(run, handles.filterKeys { it in stopped }, nowEpochMillis)
+        return run.withStoppedUsage(stop.usage)
+    }
+
     private suspend fun stopSessions(
         run: WorkflowRun,
         handles: Map<TaskDefinitionId, ManagedSessionHandle>,
@@ -1710,6 +1778,9 @@ class WorkflowRuntimeCoordinator(
         )
         const val HOURLY_SPEND_RECHECK_MILLIS: Long = 60_000L
         const val MAX_SESSION_CANCEL_ATTEMPTS: Int = 5
+
+        /** A creature that took longer than allowed this many times goes to the keeper. */
+        const val MAX_TIMEOUTS: Int = 2
     }
 
     private fun TaskRunStatus.isActiveProviderStatus(): Boolean = this in setOf(

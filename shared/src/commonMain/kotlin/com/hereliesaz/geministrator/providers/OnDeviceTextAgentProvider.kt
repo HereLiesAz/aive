@@ -45,6 +45,7 @@ class OnDeviceTextAgentProvider(
     private val maxNewTokens: Int = DEFAULT_MAX_NEW_TOKENS,
 ) : AgentProvider {
     override val id: AgentProviderId = ID
+    override val workKind: com.hereliesaz.geministrator.workflow.WorkKind get() = com.hereliesaz.geministrator.workflow.WorkKind.OnDeviceModel
 
     private enum class Phase { AwaitingApproval, Ready, Cancelled }
 

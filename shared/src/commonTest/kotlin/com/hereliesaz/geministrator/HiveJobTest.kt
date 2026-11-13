@@ -87,4 +87,32 @@ class HiveJobTest {
         kotlin.test.assertTrue(approvalChangeNeedsConfirm(asksPersonNow = true))
         kotlin.test.assertFalse(approvalChangeNeedsConfirm(asksPersonNow = false))
     }
+
+    @Test
+    fun timeAllowedIsAutoByDefaultAndTheKeepersChoiceSticks() {
+        assertEquals(com.hereliesaz.geministrator.domain.TimeLimit.Auto, implement.timeLimit)
+        val limited = assertIs<TerrariumDependencyEditResult.Applied>(
+            setTerrariumJob(definition, implement.id, timeLimit = com.hereliesaz.geministrator.domain.TimeLimit.Minutes(30)),
+        ).definition.tasks.first { it.id == implement.id }
+        assertEquals(com.hereliesaz.geministrator.domain.TimeLimit.Minutes(30), limited.timeLimit)
+        assertEquals(
+            com.hereliesaz.geministrator.domain.TimeLimit.Off,
+            assertIs<TerrariumDependencyEditResult.Applied>(
+                setTerrariumJob(definition, implement.id, timeLimit = com.hereliesaz.geministrator.domain.TimeLimit.Off),
+            ).definition.tasks.first { it.id == implement.id }.timeLimit,
+        )
+    }
+
+    @Test
+    fun timeAllowedIsCoercedAndNoChangeWhenSame() {
+        val big = assertIs<TerrariumDependencyEditResult.Applied>(
+            setTerrariumJob(definition, implement.id, timeLimit = com.hereliesaz.geministrator.domain.TimeLimit.Minutes(480)),
+        ).definition
+        assertIs<TerrariumDependencyEditResult.NoChange>(
+            setTerrariumJob(big, implement.id, timeLimit = com.hereliesaz.geministrator.domain.TimeLimit.Minutes(480)),
+        )
+        assertIs<TerrariumDependencyEditResult.NoChange>(
+            setTerrariumJob(definition, implement.id, timeLimit = com.hereliesaz.geministrator.domain.TimeLimit.Auto),
+        )
+    }
 }

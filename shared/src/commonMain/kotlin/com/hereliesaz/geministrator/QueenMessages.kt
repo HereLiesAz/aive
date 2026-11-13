@@ -40,6 +40,8 @@ private fun voiceResource(voice: QueenVoice): StringResource = when (voice) {
         QueenVoice.WatchRepeatedFailure -> Res.string.queen_say_watch_repeated_failure
         QueenVoice.WatchBudget -> Res.string.queen_say_watch_budget
         QueenVoice.WatchFailedOver -> Res.string.queen_say_watch_failed_over
+        QueenVoice.WatchSlow -> Res.string.queen_say_watch_slow
+        QueenVoice.WatchTimedOut -> Res.string.queen_say_watch_timed_out
         QueenVoice.AllowanceStopRun -> Res.string.queen_say_allowance_stop_run
         QueenVoice.AllowanceStopHour -> Res.string.queen_say_allowance_stop_hour
         QueenVoice.AllowanceStopUnpriced -> Res.string.queen_say_allowance_stop_unpriced

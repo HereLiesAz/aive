@@ -85,6 +85,7 @@ internal class CliAgentProvider(
     private val tempRoot: File = File(System.getProperty("java.io.tmpdir").orEmpty()),
 ) : AgentProvider {
     override val id: AgentProviderId = AgentProviderId(spec.id)
+    override val workKind: com.hereliesaz.geministrator.workflow.WorkKind get() = com.hereliesaz.geministrator.workflow.WorkKind.CliAgent
 
     /** Mutating work on the keeper's computer is never routed here automatically. */
     override val explicitOnly: Boolean get() = true
@@ -197,7 +198,7 @@ internal class CliAgentProvider(
             }
             when {
                 result.startFailure != null -> return@channelFlow fail("Could not start ${spec.displayName}: ${result.startFailure}")
-                result.timedOut -> return@channelFlow fail("${spec.displayName} was stopped after ${timeoutMillis / 60_000} minutes.")
+                result.timedOut -> return@channelFlow fail("${spec.displayName} timed out and was stopped after ${timeoutMillis / 60_000} minutes.")
             }
             val final = reader.finish(result.exitCode)
             if (result.exitCode != 0 || final.isError) {

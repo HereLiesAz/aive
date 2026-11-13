@@ -180,6 +180,33 @@ enum class PromptReusePolicy {
     DisableCache,
 }
 
+/**
+ * How long this creature may work before the queen says it is taking too long (docs/Keepers-Room.md).
+ * Counts active time only: never the time spent waiting on the keeper.
+ */
+@Serializable
+sealed interface TimeLimit {
+    /** The queen sets it when the attempt starts (DeadlinePolicy). The default; what every older definition reads as. */
+    @Serializable data object Auto : TimeLimit
+
+    /** The keeper's own figure for active time. */
+    @Serializable data class Minutes(val value: Int) : TimeLimit {
+        init {
+            require(value in MIN_MINUTES..MAX_MINUTES) { "Minutes must be $MIN_MINUTES..$MAX_MINUTES" }
+        }
+    }
+
+    /** No limit for this creature (the keeper's choice; the creature still ends when its Source ends). */
+    @Serializable data object Off : TimeLimit
+
+    companion object {
+        const val MIN_MINUTES = 1
+        const val MAX_MINUTES = 480
+
+        fun minutes(value: Int): TimeLimit = Minutes(value.coerceIn(MIN_MINUTES, MAX_MINUTES))
+    }
+}
+
 @Serializable
 data class RetryPolicy(
     val maxAttempts: Int = 2,
