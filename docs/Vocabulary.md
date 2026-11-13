@@ -12,12 +12,19 @@ protocol fields do not follow it.
 | **Messages** | inbox (`LiveInboxScreen`, `InboxReadLog`) | The header's **Messages** button and the rail's Messages place: everything waiting on you. |
 | **Nanny** | Hall Monitor (`HallMonitorRole`, `HallMonitorGovernanceService`, the `hall-monitor` role id) | The role that watches the swarm's efficiency and can pause the hive for your review. |
 | **Host** | where an agent runs (`TaskExecutor`, the Hosts part of the Keeper's room, an orphan's endpoint host) | A creature's **Runs on** row and an orphan's **Host:** line: your device, a paired machine, or the orphan's own server. Different from its **Source** (what it thinks with). |
+| **Swarm** | workflow (`WorkflowDefinition`, `WorkflowRun` for one execution; `workflow` in code, files and persisted keys) | The saved, editable plan: the queen, her creatures and the strands between them. The swarm library (the Workflows destination), **New swarm**, **Delete swarm**, **Swarm options**, **Share swarm card**, the Store's **Swarms** tab, Schedules. |
+| **Hive** | the goal (today `Project` and the objective; D17: the project becomes the hive and gains a goal) | What the keeper wants done: **Your first hive**, **Feed the hive**, the **Hive** place and the **Hives** rail chip (the district, which still lists swarms grouped by the hive they last served). A hive can have many runs, and a swarm can serve many hives. |
+| **Run** | `WorkflowRun` (one execution of a swarm for a hive) | **Start run**, **Stop run**, **Run log**, **RUN n**, Past runs. D3 (Run or another word) is open; Run stays. |
 | **Orphan** | drifter (`A2aDrifters`, `DrifterTrouble`, `drifter-` role ids) | A remote A2A agent you can bring in and connect. |
 
 Kept as they are: **Memory**, **Breed**.
 
-Settled earlier: the **keeper** is you; the **queen** is the planner that drafts a hive for your approval; a **swarm**
-is a workflow and a **hive** is a goal in the technical docs (the screens still say hive and swarm where they did).
+Settled earlier: the **keeper** is you; the **queen** is the planner that drafts a swarm for your approval. Settled
+now: a **swarm** is the workflow (the saved definition and its plan), a **hive** is the goal the keeper wants achieved
+(a swarm pursues it; a hive has many runs and a swarm can serve many hives), and a **run** is one execution of a swarm.
+A GitHub Actions workflow keeps GitHub's word. Not yet done: the 47 "project" strings (a project is the hive, D17) and
+the two places that still mix the words by design: the district (see above) and the A2A Agent Card's own descriptions,
+which other programs read.
 
 ## Rules
 
