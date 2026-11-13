@@ -6,6 +6,7 @@ import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.policy.ApprovalEvidence
+import com.hereliesaz.geministrator.template.StepInstantiation
 import com.hereliesaz.geministrator.policy.InProcessPolicyDecisionPoint
 import com.hereliesaz.geministrator.policy.PolicyAction
 import com.hereliesaz.geministrator.policy.PolicyContext
@@ -27,6 +28,8 @@ sealed interface WorkflowValidationError {
     data class MissingExecutor(val taskId: TaskDefinitionId) : WorkflowValidationError
     data class MissingRepositoryMutationApproval(val taskId: TaskDefinitionId) : WorkflowValidationError
     data class MissingStepApproval(val taskId: TaskDefinitionId) : WorkflowValidationError
+    data class MissingContractInput(val taskId: TaskDefinitionId, val port: String) : WorkflowValidationError
+    data class UnboundContractInput(val taskId: TaskDefinitionId, val port: String) : WorkflowValidationError
     data class SelfDependency(val taskId: TaskDefinitionId) : WorkflowValidationError
     data class Cycle(val taskIds: Set<TaskDefinitionId>) : WorkflowValidationError
 }
@@ -44,6 +47,10 @@ fun WorkflowValidationError.humanReadable(): String = when (this) {
         "Repository mutation task '${taskId.value}' must depend on an unconditional human-approval task."
     is WorkflowValidationError.MissingStepApproval ->
         "Step '${taskId.value}' changes something outside its own output, so it needs your approval: turn its approval on, or put an approval step before it."
+    is WorkflowValidationError.MissingContractInput ->
+        "Step '${taskId.value}' needs its '$port' input before it can start."
+    is WorkflowValidationError.UnboundContractInput ->
+        "Step '${taskId.value}' takes its '$port' input from a step it does not wait for."
     is WorkflowValidationError.SelfDependency ->
         "Task '${taskId.value}' lists itself as a dependency. A task cannot depend on itself."
     is WorkflowValidationError.Cycle ->
@@ -101,6 +108,15 @@ object WorkflowGraphValidator {
             }
             if (conditionTarget != null && conditionTarget !in knownIds) {
                 errors += WorkflowValidationError.MissingConditionTarget(task.id, conditionTarget)
+            }
+
+            // A step's inputs are present, and each one taken from another step waits for that step.
+            task.contract?.let { contract ->
+                StepInstantiation.missingInputs(contract).forEach { errors += WorkflowValidationError.MissingContractInput(task.id, it) }
+                contract.inputs.forEach { (port, value) ->
+                    val from = StepInstantiation.boundTask(value)
+                    if (from != null && from !in task.dependsOn) errors += WorkflowValidationError.UnboundContractInput(task.id, port)
+                }
             }
 
             // A step that declares an effect is made only with an approval (invariant 4a).

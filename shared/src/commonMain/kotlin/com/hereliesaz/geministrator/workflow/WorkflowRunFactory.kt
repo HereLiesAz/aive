@@ -20,6 +20,7 @@ import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.policy.ApprovalEvidence
+import com.hereliesaz.geministrator.template.StepInstantiation
 import com.hereliesaz.geministrator.policy.InProcessPolicyDecisionPoint
 import com.hereliesaz.geministrator.policy.PolicyAction
 import com.hereliesaz.geministrator.policy.PolicyContext
@@ -32,6 +33,7 @@ import com.hereliesaz.geministrator.policy.isDenied
 
 object WorkflowRunFactory {
     const val EXECUTOR_INTEGRATION_UNAVAILABLE = "EXECUTOR_INTEGRATION_UNAVAILABLE"
+    const val CONTRACT_INPUT_MISSING = "CONTRACT_INPUT_MISSING"
     const val APPROVAL_NOT_GRANTED = "APPROVAL_NOT_GRANTED"
     /** A task skipped because its condition was not met: a branch not taken, not a failure. */
     const val CONDITION_NOT_MET = "CONDITION_NOT_MET"
@@ -226,7 +228,15 @@ object WorkflowRunFactory {
                 null
             }
             val mutationDenial = repositoryDenial ?: stepDenial
+            // A step whose required input has no value stays held, with the reason in plain words.
+            val missingInput = if (conditionMet) task.contract?.let(StepInstantiation::missingInputs).orEmpty() else emptyList()
             when {
+                missingInput.isNotEmpty() -> taskRun.copy(
+                    blockingReason = BlockingReason(
+                        code = CONTRACT_INPUT_MISSING,
+                        message = "This step needs its ${missingInput.joinToString(", ")} before it can start.",
+                    ),
+                )
                 mutationDenial != null -> taskRun.copy(
                     status = TaskRunStatus.Cancelled,
                     blockingReason = BlockingReason(
