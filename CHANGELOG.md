@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.9.6 — from 2026-09-19
 
+- **The tool loop has a token budget and no longer re-asks after a billed failure (V22).** The MCP tool loop capped rounds but not tokens (each round replays the whole exchange), and any failure of its first request, including a timeout or a 5xx that may have been billed, made the provider generate the answer again without tools. The loop now refuses tools for its last turn once 400,000 tokens are spent, and only a 400, 404 or 422 (the model not taking tools) falls back to a plain generation. Its JSON replies are read with a byte cap.
 - **Claude's thinking-mode fallback is atomic (V21).** Two streams refused at once for the same thinking mode each stepped the shared mode forward, skipping the fixed-budget mode straight to none. The step is now taken once under a lock.
 - **The inference state is bounded (V15).** The one stored value behind the compound-inference fabric (stream records, resource samples, run bindings, invocation sequences, data descriptors) only grew and was rewritten whole on every event. Each list now keeps its newest entries (2,000 records, 500 samples, 1,000 bindings, 2,000 sequences, 5,000 data descriptors); the value was already stored in chunks.
 - **Hosted text APIs share one HTTP client (V14).** Every hosted text API (and the memory clerks, which build one per call) created its own HTTP client and never closed it, leaking a connection pool and threads each time. They now share one process-wide client.

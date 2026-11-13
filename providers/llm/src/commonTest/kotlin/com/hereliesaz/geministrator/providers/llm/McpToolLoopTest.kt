@@ -167,6 +167,33 @@ class McpToolLoopTest {
     }
 
     @Test
+    fun aFailureThatMayHaveBeenBilledIsNotRetriedWithoutTools() = runTest {
+        var plainGenerations = 0
+        val api = object : ToolCallingTextGenerationApi {
+            override suspend fun generate(prompt: String): TextGenerationResult {
+                plainGenerations++
+                return TextGenerationResult("a second, paid answer")
+            }
+
+            override suspend fun converse(prompt: String, tools: List<McpToolOffer>, rounds: List<ToolRound>, allowTools: Boolean): ToolTurn =
+                error("HTTP 503: upstream unavailable")
+        }
+        val provider = TextLlmProvider(AgentProviderId("fake"), "Fake", api, tools = McpToolSource { FakeToolbox() })
+        val events = provider.observe(provider.start(request).providerRunId).toList()
+        assertEquals(0, plainGenerations, "the first request may have been billed; it is not asked a second time")
+        assertIs<AgentEvent.Failed>(events.last())
+    }
+
+    @Test
+    fun theLoopStopsOfferingToolsOnceItsTokenBudgetIsSpent() = runTest {
+        val model = ScriptedToolModel(alwaysCall = true)
+        // Each calling round spends 12 tokens: the third request is already past 20.
+        val outcome = McpToolLoop(maxRounds = 8, maxTotalTokens = 20L).run(model, "prompt", FakeToolbox())
+        assertEquals(listOf(true, true, false), model.seen.map { it.second })
+        assertEquals(2, outcome.calls.size)
+    }
+
+    @Test
     fun theLoopIsBoundedAndEndsWithToolsRefused() = runTest {
         val model = ScriptedToolModel(alwaysCall = true)
         val outcome = McpToolLoop(maxRounds = 3).run(model, "prompt", FakeToolbox())
