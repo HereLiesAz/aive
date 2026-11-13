@@ -49,6 +49,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
 
     steps:
       - name: Check out repository
@@ -364,6 +365,7 @@ jobs:
     if: (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     needs: version
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
@@ -496,6 +498,7 @@ jobs:
       - build
       - desktop-packages
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: write
 
