@@ -31,7 +31,7 @@ class SettingsMemoryCaptureJournal(
     private val maxChars: Int = MAX_CHARS,
 ) : MemoryCaptureJournal {
     private val mutex = Mutex()
-    private val serializer = MapSerializer(String.serializer(), MemorySessionEnvelope.serializer())
+    private val codec = MapSerializer(String.serializer(), MemorySessionEnvelope.serializer())
 
     override suspend fun record(key: String, unsent: MemorySessionEnvelope?) = mutex.withLock {
         val entries = read().toMutableMap()
@@ -40,7 +40,7 @@ class SettingsMemoryCaptureJournal(
             settings.remove(this.key)
             return@withLock
         }
-        val encoded = json.encodeToString(serializer, entries)
+        val encoded = json.encodeToString(codec, entries)
         if (unsent != null && encoded.length > maxChars) return@withLock
         settings.putString(this.key, encoded)
     }
@@ -49,7 +49,7 @@ class SettingsMemoryCaptureJournal(
 
     private fun read(): Map<String, MemorySessionEnvelope> {
         val raw = settings.getStringOrNull(key) ?: return emptyMap()
-        return runCatching { json.decodeFromString(serializer, raw) }.getOrDefault(emptyMap())
+        return runCatching { json.decodeFromString(codec, raw) }.getOrDefault(emptyMap())
     }
 
     companion object {
