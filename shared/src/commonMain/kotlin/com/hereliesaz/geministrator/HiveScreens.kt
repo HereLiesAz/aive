@@ -1,5 +1,9 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.prompts.PromptKind
+import com.hereliesaz.geministrator.prompts.PromptSuggestBox
+import com.hereliesaz.geministrator.prompts.PromptSuggestions
+import com.hereliesaz.geministrator.prompts.rememberPromptHistory
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -80,24 +84,46 @@ internal fun HiveLaunchBar(
     var objective by remember(key) { mutableStateOf("") }
     var repository by remember(key) { mutableStateOf("") }
     var message by remember(key) { mutableStateOf<String?>(null) }
+    val objectiveHistory = rememberPromptHistory(PromptKind.Objective)
+    val repositoryHistory = rememberPromptHistory(PromptKind.Repository)
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(
+        // Starts with the goal fed last, selected so typing replaces it.
+        PromptSuggestBox(
+            kind = PromptKind.Objective,
             value = objective,
             onValueChange = { objective = it },
-            label = { Text(stringResource(Res.string.hive_objective)) },
-            singleLine = true,
-            colors = azphaltTextFieldColors(),
             modifier = Modifier.fillMaxWidth(),
-        )
-        // Where the swarm works; blank keeps the current project's repository.
-        OutlinedTextField(
+            seed = PromptSuggestions.lastObjective(objectiveHistory.entries),
+            onSeeded = { objective = it },
+            resetKey = key,
+        ) { field ->
+            OutlinedTextField(
+                value = field.value,
+                onValueChange = field.onValueChange,
+                label = { Text(stringResource(Res.string.hive_objective)) },
+                singleLine = true,
+                colors = azphaltTextFieldColors(),
+                modifier = Modifier.fillMaxWidth().then(field.modifier),
+            )
+        }
+        // Where the swarm works; blank keeps the current project's repository, so it is offered, never filled in.
+        PromptSuggestBox(
+            kind = PromptKind.Repository,
             value = repository,
             onValueChange = { repository = it },
-            label = { Text(stringResource(Res.string.hive_repository)) },
-            singleLine = true,
-            colors = azphaltTextFieldColors(),
             modifier = Modifier.fillMaxWidth(),
-        )
+            resetKey = key,
+            entryFilter = { PromptSuggestions.locatorSource(it.text) != PromptSuggestions.LocatorSource.Local },
+        ) { field ->
+            OutlinedTextField(
+                value = field.value,
+                onValueChange = field.onValueChange,
+                label = { Text(stringResource(Res.string.hive_repository)) },
+                singleLine = true,
+                colors = azphaltTextFieldColors(),
+                modifier = Modifier.fillMaxWidth().then(field.modifier),
+            )
+        }
         AzphaltPill(
             label = stringResource(Res.string.hive_launch),
             seed = "hive-launch",
@@ -108,7 +134,11 @@ internal fun HiveLaunchBar(
                         onLaunch(objective.trim().ifBlank { null }, hiveRepository(repository))
                     }
                         .fold({ null }, { it.message ?: getString(Res.string.hive_launch_failed) })
-                    if (message == null) objective = ""
+                    if (message == null) {
+                        objectiveHistory.record(objective)
+                        repositoryHistory.record(repository)
+                        objective = ""
+                    }
                 }
             },
         )
