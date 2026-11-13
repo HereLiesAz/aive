@@ -41,6 +41,8 @@ data class ProviderSelectionRequest(
      * skips them unless a provider is required by id.
      */
     val excludedProviderIds: Set<AgentProviderId> = emptySet(),
+    /** The task declares tools: only a provider that enforces the allowed set may be chosen. */
+    val requiresToolFilter: Boolean = false,
     /**
      * True when the keeper left the provider to the app (no creature pinned to one): a failover-worthy
      * failure then moves the work to another connected provider (ProviderFailover.kt). False for a
@@ -214,6 +216,9 @@ class AgentProviderRegistry(
                 if (!provider.capabilities().supported.containsAll(required)) {
                     error("Provider ${constraints.providerId.value} does not satisfy required capabilities $required")
                 }
+                if (request.requiresToolFilter && !provider.enforcesToolFilter) {
+                    error("Provider ${constraints.providerId.value} cannot limit a step to its allowed tools")
+                }
                 if (!provider.supportsRepository(request.repository)) {
                     error(
                         if (request.repository == null) {
@@ -253,6 +258,7 @@ class AgentProviderRegistry(
         val unreadable = mutableListOf<AgentProvider>()
         for (provider in ordered) {
             if (provider.id in request.excludedProviderIds) continue
+            if (request.requiresToolFilter && !provider.enforcesToolFilter) continue
             val capabilities = readableCapabilities(provider)?.supported
             if (capabilities == null) {
                 unreadable += provider

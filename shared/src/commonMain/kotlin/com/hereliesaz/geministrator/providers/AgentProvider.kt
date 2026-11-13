@@ -83,6 +83,11 @@ data class AgentTaskRequest(
     /** Capabilities the workflow selected this provider to exercise for this task. */
     val requiredCapabilities: Set<AgentCapability> = emptySet(),
     val repository: RepositoryRef? = null,
+    /**
+     * The tools a step's contract allows, by offer name: null for a task with no contract (the run's whole toolbox);
+     * an empty list means no tool at all.
+     */
+    val allowedTools: List<String>? = null,
     val isolationHint: IsolationHint = IsolationHint.ProviderDefault,
     val requirePlanApproval: Boolean = false,
     val promptContext: PromptContext = PromptContext(),
@@ -222,6 +227,13 @@ interface AgentProvider {
      * because what it is sent leaves the device for a service that may log it and that limits requests.
      */
     val keyless: Boolean get() = false
+
+    /**
+     * True when this provider offers a task only the tools the task's request allows ([AgentTaskRequest.allowedTools]).
+     * A step that declares tools is never given to a provider that cannot say so: a vendor CLI or a remote agent
+     * brings tools of its own.
+     */
+    val enforcesToolFilter: Boolean get() = false
 
     /**
      * What kind of work this provider does, which sets the queen's reasonable wait for it

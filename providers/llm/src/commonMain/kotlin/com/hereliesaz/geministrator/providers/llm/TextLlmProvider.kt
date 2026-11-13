@@ -11,6 +11,7 @@ import com.hereliesaz.geministrator.domain.locationLabel
 import com.hereliesaz.geministrator.mcp.McpToolOutcome
 import com.hereliesaz.geministrator.mcp.McpToolSource
 import com.hereliesaz.geministrator.mcp.McpToolbox
+import com.hereliesaz.geministrator.mcp.restrictedTo
 import com.hereliesaz.geministrator.providers.AgentCapabilities
 import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.providers.AgentProvider
@@ -53,6 +54,9 @@ open class TextLlmProvider(
 ) : AgentProvider {
     /** Used without a key (an anonymous keyless endpoint): the one thing that cannot bill. */
     override val keyless: Boolean get() = !api.billsPerToken
+
+    /** Tools are offered only through [toolboxFor], which cuts them to the request's allowed set. */
+    override val enforcesToolFilter: Boolean get() = true
 
     private data class Session(
         val request: AgentTaskRequest,
@@ -394,7 +398,7 @@ open class TextLlmProvider(
         if (request.requirePlanApproval) return null
         val runKey = request.orchestrationContext.workflowRunId?.value ?: request.taskRunId.value
         return try {
-            source.toolbox(runKey)?.takeIf { it.offers.isNotEmpty() }
+            source.toolbox(runKey)?.takeIf { it.offers.isNotEmpty() }?.restrictedTo(request.allowedTools)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {

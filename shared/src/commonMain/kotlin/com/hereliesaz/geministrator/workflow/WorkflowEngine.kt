@@ -293,6 +293,7 @@ class WorkflowEngine(
                         estimatedInputTokens = ownEstimate,
                         excludedProviderIds = taskRun.failedProviders.toSet(),
                         failoverAllowed = isProviderAuto(role, task),
+                        requiresToolFilter = task.contract?.allowedTools?.isNotEmpty() == true,
                     )
                     val providerId = sessionGateway.resolveProvider(selection)
                     val providerLimit = definition.concurrencyPolicy.perProviderLimits[providerId] ?: Int.MAX_VALUE
@@ -1045,6 +1046,7 @@ class WorkflowEngine(
             repository = project.repository,
             excludedProviderIds = taskRun.failedProviders.toSet(),
             failoverAllowed = isProviderAuto(role, task),
+            requiresToolFilter = task.contract?.allowedTools?.isNotEmpty() == true,
         )
     }
 
