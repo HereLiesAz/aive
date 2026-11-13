@@ -12,6 +12,13 @@ import com.hereliesaz.geministrator.domain.activeRoles
 import com.hereliesaz.geministrator.domain.normalized
 import com.hereliesaz.geministrator.domain.resolveRoleCollection
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.teaching_failed_no_source
+import com.hereliesaz.geministrator.resources.teaching_failed_no_worker
+import com.hereliesaz.geministrator.resources.teaching_failed_not_small_enough
+import com.hereliesaz.geministrator.tour.TEACHING_WORKFLOW_ID_PREFIX
+import com.hereliesaz.geministrator.tour.TeachingPlanFloor
+import org.jetbrains.compose.resources.getString
 import com.hereliesaz.geministrator.orchestration.OrchestrationPacket
 import com.hereliesaz.geministrator.research.toAvailableTools
 import com.hereliesaz.geministrator.orchestration.OrchestrationRole
@@ -207,7 +214,13 @@ internal fun newWorkflowInstruction(objective: String, repository: RepositoryRef
 
 /** Makes the run from an approved [plan]: the workflow, the project, the run. */
 @OptIn(ExperimentalTime::class)
-private suspend fun ApplicationRuntime.startPlannedWorkflow(inputs: PlanInputs, plan: OrchestrationPlan, notes: PlanningNotes? = null) {
+private suspend fun ApplicationRuntime.startPlannedWorkflow(
+    inputs: PlanInputs,
+    plan: OrchestrationPlan,
+    notes: PlanningNotes? = null,
+    /** What the run's workflow id starts with; a teaching run's is [TEACHING_WORKFLOW_ID_PREFIX]. */
+    definitionIdPrefix: String = "workflow",
+) {
     val now = Clock.System.now().toEpochMilliseconds()
     val stamp = persistence.uniqueLaunchStamp(now, newProject = inputs.existingProject == null)
     val project = inputs.existingProject?.copy(
@@ -234,7 +247,7 @@ private suspend fun ApplicationRuntime.startPlannedWorkflow(inputs: PlanInputs, 
         )
     } else {
         OrchestratedWorkflowFactory.create(
-            id = WorkflowDefinitionId("workflow-$stamp"),
+            id = WorkflowDefinitionId("$definitionIdPrefix-$stamp"),
             objective = inputs.objective,
             plan = plan,
             packet = inputs.packet,
@@ -361,6 +374,8 @@ private suspend fun ApplicationRuntime.planAndDecide(
     review: Pair<PlanReviewer, RoleDefinition>?,
     confirmPlan: (suspend (PlanDecision) -> Boolean)?,
     planStore: ReviewedPlanStore?,
+    /** More rules code can check, added to the checklist's own: an Unmet one turns the plan back at no cost (the teaching floor). */
+    extraCheck: ((OrchestrationPlan) -> List<com.hereliesaz.geministrator.orchestration.RequirementResult>)? = null,
 ): ChosenPlan? {
     reportLaunchProgress("Asking the planner for a swarm (${inputs.plannerRoles.size} roles available)…")
     // Only a launch that will be reviewed has a planning field: the planner's egg, the reviewer who hatches from it.
@@ -384,13 +399,16 @@ private suspend fun ApplicationRuntime.planAndDecide(
         instructions = role.instructions,
         pinnedProviderId = role.preferredProviderId?.value,
         onStage = { phase, current, round -> reportPlanningStage(planningStage(inputs, phase, current, round, role)) },
-        pureCheck = { candidate -> com.hereliesaz.geministrator.orchestration.Requirements.checkPure(requirementInputs, candidate, checklist) },
+        pureCheck = { candidate ->
+            com.hereliesaz.geministrator.orchestration.Requirements.checkPure(requirementInputs, candidate, checklist) +
+                extraCheck?.invoke(candidate).orEmpty()
+        },
         // The reviewer asks another Source than the planner's first, and is skipped (the checklist is the whole review) when the caps, a price or the room say so.
         plannerSource = { orchestrationRuntime.lastSourceId },
         reviewGate = { callsSoFar -> reviewGateFor(reviewer, callsSoFar) },
     )
     val plan = outcome.plan
-    val ruleResults = com.hereliesaz.geministrator.orchestration.Requirements.checkPure(requirementInputs, plan, checklist)
+    val ruleResults = com.hereliesaz.geministrator.orchestration.Requirements.checkPure(requirementInputs, plan, checklist) + extraCheck?.invoke(plan).orEmpty()
     val notes = PlanningNotes(
         record = PlanningRecord(
             plannerRole = (inputs.staffing?.staff?.planner ?: BuiltInRoles.Planner).name,
@@ -490,6 +508,71 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
     val review = reviewRole(planReviewer, confirmPlan, inputs.launchRoles)
     val chosen = planAndDecide(inputs, orchestrationRuntime, review, confirmPlan, planStore) ?: return
     startPlannedWorkflow(inputs, chosen.plan, chosen.notes)
+}
+
+/**
+ * Starts the first-run tutorial (the teaching launch). The queen's planner plans a chain of small lessons for [goal] on every
+ * run, nothing prewritten; the teaching floor ([TeachingPlanFloor]) turns a plan back at no cost until its shape is right
+ * (the reviewer reads it too when there is one); and the run starts with no keeper confirmation, because every step is a lesson
+ * (the floor forbids approvals and any role but the generic Worker). Only generic roles are used.
+ *
+ * Returns null when the run started, else one plain line saying what is wrong and where to fix it (from string resources),
+ * for the place a launch error is shown. Nothing is started in that case.
+ */
+@OptIn(ExperimentalTime::class)
+suspend fun ApplicationRuntime.launchTeachingWorkflow(
+    projectName: String,
+    goal: String,
+    orchestrationRuntime: OrchestrationAgentRuntime,
+    planReviewer: PlanReviewer? = null,
+): String? {
+    val base = try {
+        planInputs(projectName, goal, null, null, emptyList())
+    } catch (failure: IllegalArgumentException) {
+        return failure.message
+    }
+    val worker = base.launchRoles.firstOrNull { it.id == BuiltInRoles.Worker.id && it.enabled }
+        ?: return getString(Res.string.teaching_failed_no_worker)
+    val broad = TeachingPlanFloor.isBroad(base.objective)
+    val inputs = PlanInputs(
+        projectName = base.projectName,
+        objective = base.objective,
+        repository = null,
+        existingProject = null,
+        parentRunIds = base.parentRunIds,
+        launchRoles = base.launchRoles,
+        plannerRoles = listOf(worker),
+        packet = base.packet.copy(
+            currentState = "teaching",
+            availableAgents = listOf(OrchestrationRole(worker.id.value, worker.name, worker.authorities.map { it.name }.sorted())),
+            availableTemplates = emptyList(),
+            instruction = TeachingPlanFloor.PLANNER_INSTRUCTION,
+        ),
+        missing = base.missing,
+        staffing = base.staffing,
+    )
+    val floor = { plan: OrchestrationPlan ->
+        TeachingPlanFloor.check(plan, worker.id.value, broad).map {
+            com.hereliesaz.geministrator.orchestration.RequirementResult(
+                it.rule, com.hereliesaz.geministrator.orchestration.RequirementVerdict.Unmet, it.message, byCode = true,
+            )
+        }
+    }
+    // Start iff the floor passes: no keeper confirmation (the keeper asked to be taught), and a reviewer that turned a plan
+    // back after the last round does not stop a plan whose shape is sound.
+    val confirm: suspend (PlanDecision) -> Boolean = { decision -> floor(decision.outcome.plan).isEmpty() }
+    val review = reviewRole(planReviewer, confirm, inputs.launchRoles)
+    val decided: ChosenPlan? = try {
+        planAndDecide(inputs, orchestrationRuntime, review, confirm, null, extraCheck = floor)
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        return getString(Res.string.teaching_failed_no_source)
+    }
+    val chosen = decided ?: return getString(Res.string.teaching_failed_not_small_enough)
+    if (floor(chosen.plan).isNotEmpty()) return getString(Res.string.teaching_failed_not_small_enough)
+    startPlannedWorkflow(inputs, chosen.plan, chosen.notes, TEACHING_WORKFLOW_ID_PREFIX)
+    return null
 }
 
 /**

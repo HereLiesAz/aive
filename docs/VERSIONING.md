@@ -88,3 +88,7 @@ Known constraint: `desktopApp/build.gradle.kts` fails the build unless public MA
 `0..99`, and BUILD is `0..65535` (the package-manager limit on a version component). Because BUILD is
 `github.run_number`, desktop packaging will stop building once the run number exceeds 65535 unless the
 encoding is revised.
+
+## Saved runs and newer entries
+
+`VerificationPolicy.Deterministic` (a step's compiled output check) is an additive entry of a stored type. A build that does not know it cannot read a saved swarm or run that holds one, so after a swarm that uses it has been saved, going back to an older build means starting that swarm again. `TaskDefinition.optional` and `TaskRun.lastFailure` are new fields with defaults and read as before in older data.

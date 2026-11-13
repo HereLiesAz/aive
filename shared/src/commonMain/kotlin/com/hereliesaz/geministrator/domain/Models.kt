@@ -160,6 +160,11 @@ data class TaskDefinition(
     val timeLimit: TimeLimit = TimeLimit.Auto,
     /** The step contract when this task was made from a step template (docs/Step-Templates.md); null for every other task. */
     val contract: TaskContract? = null,
+    /**
+     * An optional creature never ends the run when it fails: once its retries are used it is skipped, with its reason
+     * kept on the step, and the run goes on (and can still complete). False for every older definition.
+     */
+    val optional: Boolean = false,
 )
 
 @Serializable
@@ -251,6 +256,8 @@ data class TaskRun(
     val clock: TaskClock? = null,
     /** Attempts stopped for taking longer than allowed; kept across attempts, reset by the keeper's Retry. */
     val timedOutAttempts: Int = 0,
+    /** Why the last attempt was turned back (a failed output check), handed to the next attempt's prompt; null otherwise. */
+    val lastFailure: String? = null,
 ) {
     init {
         require(progress == null || progress in 0f..1f) { "Task progress must be normalized 0f..1f" }

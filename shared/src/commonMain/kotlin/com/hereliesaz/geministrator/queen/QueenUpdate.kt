@@ -52,7 +52,7 @@ fun queenUpdate(
     blockers: List<Blocker> = emptyList(),
 ): List<QueenNote> {
     if (run.status.finished()) return listOf(finishNote(definition, run, hiveSigns, blockers))
-    val lead = missingNotes(run.id.value, missing, level) + blockerNotes(run.id.value, definition, run, blockers) + disputes
+    val lead = missingNotes(run.id.value, missing, level) + blockerNotes(run.id.value, definition, run, blockers) + disputes + tutorialFailureNotes(definition, run)
     val stop = run.spendPause
     if (stop != null) return lead + allowanceNotes(run)
     if (run.globalPause != null) return lead + nannyRelay(definition, run, review)

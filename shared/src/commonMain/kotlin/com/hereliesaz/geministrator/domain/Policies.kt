@@ -16,6 +16,15 @@ sealed interface VerificationPolicy {
         val verifierRoleId: RoleDefinitionId,
         val criteria: List<String> = emptyList(),
     ) : VerificationPolicy
+
+    /**
+     * The step's output is checked by compiled code, never by a model: [validatorId] names a validator in the
+     * engine's `TaskOutputValidatorRegistry`. An id the registry does not hold is a violation (so a definition cannot
+     * add code), and a violation turns the attempt back like any failed verification. A build that does not know this
+     * entry cannot read a saved run that holds it (docs/VERSIONING.md).
+     */
+    @Serializable
+    data class Deterministic(val validatorId: String) : VerificationPolicy
 }
 
 /**
