@@ -105,6 +105,10 @@ import com.hereliesaz.geministrator.resources.inspector_excluded_by_redaction_po
 import com.hereliesaz.geministrator.resources.inspector_any_capable_provider
 import com.hereliesaz.geministrator.resources.inspector_approve_nested_gate
 import com.hereliesaz.geministrator.resources.inspector_approve_plan
+import com.hereliesaz.geministrator.resources.mind_change_in_roster
+import com.hereliesaz.geministrator.resources.mind_proposals_in_roster
+import com.hereliesaz.geministrator.resources.inspector_change_source
+import com.hereliesaz.geministrator.resources.inspector_trusted_steps
 import com.hereliesaz.geministrator.resources.inspector_plan_show_full
 import com.hereliesaz.geministrator.resources.inspector_plan_show_less
 import com.hereliesaz.geministrator.resources.inspector_approve_task
@@ -252,7 +256,6 @@ internal fun TechnicalInspector(
     // the job shows but does not change.
     val library = LocalWorkflowLibraryHost.current
     var savedJob by remember(liveWorkflow.definition.id) { mutableStateOf<WorkflowDefinition?>(null) }
-    var jobStatus by remember(selectedTaskId) { mutableStateOf<String?>(null) }
     LaunchedEffect(library, liveWorkflow.definition.id) {
         val stored = library?.let { host ->
             runCatching { host.entries() }.getOrNull()?.firstOrNull { it.definition.id == liveWorkflow.definition.id }?.definition
@@ -261,22 +264,6 @@ internal fun TechnicalInspector(
     }
     val jobDefinition = savedJob?.takeIf { saved -> saved.tasks.any { it.id == taskId } } ?: liveWorkflow.definition
     val jobTask = jobDefinition.tasks.first { it.id == taskId }
-    val editJob: ((TerrariumDependencyEditResult) -> Unit)? = library?.let { host ->
-        { edit ->
-            when (edit) {
-                is TerrariumDependencyEditResult.Applied -> scope.launch {
-                    runCatching { host.saveAuthored(edit.definition) }
-                        .onSuccess { saved ->
-                            savedJob = saved
-                            jobStatus = getString(Res.string.job_saved)
-                        }
-                        .onFailure { failure -> jobStatus = failure.message ?: getString(Res.string.job_not_saved) }
-                }
-                TerrariumDependencyEditResult.NoChange -> Unit
-                is TerrariumDependencyEditResult.Rejected -> jobStatus = edit.reason
-            }
-        }
-    }
     // Everything in the inspector sits on Ink, so its text, hints and fields take the exact
     // opposite of Ink from this surface rather than a colour of their own.
     AzphaltThemedSurface(Azphalt.Ink) {
@@ -391,6 +378,7 @@ internal fun TechnicalInspector(
                         style = AzphaltType.body,
                         color = azphaltOnSurface(),
                     )
+                    LinkText(stringResource(Res.string.inspector_trusted_steps), onClick = placeLinks.openDelegations)
                     if (providerPlan) {
                         AzphaltPill(
                             label = stringResource(Res.string.inspector_reject_plan),
@@ -422,6 +410,7 @@ internal fun TechnicalInspector(
                         onClick = { confirmingStop = true },
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    LinkText(stringResource(Res.string.inspector_change_source), onClick = { onTabChange(CreatureTab.Work) })
                 }
                 if (taskRun.isHeldForRoleBudget()) {
                     // The token budget circuit breaker: its role spent its budget in this run.
@@ -434,7 +423,11 @@ internal fun TechnicalInspector(
                     AzphaltPill(
                         label = stringResource(Res.string.inspector_raise_budget),
                         seed = "raise-budget-$selectedTaskId",
-                        onClick = { onTabChange(CreatureTab.Mind) },
+                        onClick = {
+                            val open = placeLinks.openRole
+                            val roleId = taskRun.assignedRoleId?.value
+                            if (open != null && roleId != null) open(roleId) else onTabChange(CreatureTab.Mind)
+                        },
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -449,22 +442,22 @@ internal fun TechnicalInspector(
                 HiveJobEditor(
                     definition = jobDefinition,
                     task = jobTask,
-                    onEdit = editJob,
+                    onEdit = null,
                     titled = false,
                     remoteAvailable = computeAvailable,
+                    onOpenEdit = placeLinks.openSwarmEditor,
+                    onOpenCompute = onOpenCompute,
                 )
                 // Which provider answers for it: Auto, or pinned. Saved on its role, like the Mind's.
                 role?.let { agentRole ->
                     CreatureProviderRow(
                         role = agentRole,
                         task = jobTask,
-                        roles = liveWorkflow.roles.filter { it.enabled && it.id.value != ROLE_COLLECTION_MARKER_ID },
                         connectedProviderIds = connectedProviderIds,
-                        onSaveRoleCollection = onSaveRoleCollection,
                         onOpenConnections = onOpenConnections,
+                        onOpenRole = placeLinks.openRole?.let { open -> { open(agentRole.id.value) } },
                     )
                 }
-                jobStatus?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface(), modifier = Modifier.azphaltLiveRegion()) }
                 // What it is doing, live: its own thinking and steps, apart from what you tell it.
                 CreatureActivity(taskRun, activity)
                 // Its whole trace: the hive's Timeline, this creature selected on it.
@@ -730,28 +723,25 @@ internal fun TechnicalInspector(
                 }
             }
             CreatureTab.Mind -> {
-                // Docked, its mind opens as a plain list of what it is; the editors follow.
-                if (onClose != null) MindDefinitionList(identity, providerName, role)
-                // Programmatic roles wear the neuron and never a kept creature: they only connect.
-                role?.takeIf { it.executionSource == com.hereliesaz.geministrator.domain.RoleExecutionSource.Agent }
-                    ?.let { CreaturePicker(it.id, agentName = { id -> liveWorkflow.roles.firstOrNull { r -> r.id.value == id }?.name }) }
-                // Inside the creature (docs/Swarm-OS.md): its config, changed here (docs/Keepers-Room.md,
-                // stage 3). Its genes never change; changing its mind hatches a new config.
-                role?.let { mind ->
-                    // Proposed edits of its instructions, each applied only when the keeper approves.
-                    RoleInstructionProposalPanel(
-                        roleId = mind.id,
-                        roles = liveWorkflow.roles.filter { it.enabled && it.id.value != ROLE_COLLECTION_MARKER_ID },
-                        onSaveRoleCollection = onSaveRoleCollection,
+                // What it is, as a list; each change (instructions, tools, budget, source, its kept creature and the
+                // proposed edits) is made on its role in the Roster, the one place, which this links to.
+                MindDefinitionList(identity, providerName, role)
+                val mindRoleId = role?.id?.value
+                if (mindRoleId != null) {
+                    val pending = pendingRoleInstructionProposals(role.id)
+                    if (pending > 0) {
+                        LinkText(
+                            stringResource(Res.string.mind_proposals_in_roster, pending.toString()),
+                            onClick = placeLinks.openRole?.let { open -> { open(mindRoleId) } },
+                        )
+                    }
+                    LinkText(
+                        stringResource(Res.string.mind_change_in_roster),
+                        onClick = placeLinks.openRole?.let { open -> { open(mindRoleId) } },
                     )
-                    CustomCompanyProviderScreen(
-                        runtimeState = ApplicationRuntimeState.Live(liveWorkflow),
-                        connectedProviderIds = connectedProviderIds,
-                        onSaveRoleCollection = onSaveRoleCollection,
-                        roleSurfaceFilePicker = roleSurfaceFilePicker,
-                        focusRole = mind.id,
-                    )
-                } ?: LiveInspectorLine(stringResource(Res.string.inspector_executor), executor.displayName())
+                } else {
+                    LiveInspectorLine(stringResource(Res.string.inspector_executor), executor.displayName())
+                }
             }
         }
     }

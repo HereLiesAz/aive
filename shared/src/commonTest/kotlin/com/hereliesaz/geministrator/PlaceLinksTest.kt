@@ -41,4 +41,14 @@ class PlaceLinksTest {
         assertNull(connectionsAddressRequest("   "))
         assertNull(connectionsAddressRequest("h".repeat(5000)))
     }
+
+    @Test
+    fun rosterAndSwarmEditRequestsAreTakenOnce() {
+        RosterRequests.roleId = "writer"
+        assertEquals("writer", RosterRequests.take())
+        assertNull(RosterRequests.take())
+        SwarmEditRequests.pending = true
+        assertEquals(true, SwarmEditRequests.take())
+        assertEquals(false, SwarmEditRequests.take())
+    }
 }

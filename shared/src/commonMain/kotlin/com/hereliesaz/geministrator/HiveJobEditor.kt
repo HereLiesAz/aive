@@ -46,6 +46,7 @@ import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.job_add
 import com.hereliesaz.geministrator.resources.job_add_criterion
 import com.hereliesaz.geministrator.resources.job_apply
+import com.hereliesaz.geministrator.resources.job_change_in_edit
 import com.hereliesaz.geministrator.resources.job_approval
 import com.hereliesaz.geministrator.resources.job_approval_none
 import com.hereliesaz.geministrator.resources.job_approval_person
@@ -90,6 +91,10 @@ internal fun HiveJobEditor(
     modifier: Modifier = Modifier,
     titled: Boolean = true,
     remoteAvailable: Boolean = false,
+    /** Read-only (no [onEdit]): the link to where the job is changed, the swarm's Edit view. Null leaves none. */
+    onOpenEdit: (() -> Unit)? = null,
+    /** Opens Compute, where it is chosen where a job runs. Null leaves the row plain. */
+    onOpenCompute: (() -> Unit)? = null,
 ) {
     var objective by remember(task.id, task.objective) { mutableStateOf(task.objective) }
     var newCriterion by remember(task.id) { mutableStateOf("") }
@@ -103,6 +108,10 @@ internal fun HiveJobEditor(
     }
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (titled) Text(stringResource(Res.string.job_job), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+        // Read-only here: the job is changed in the swarm's Edit view, one editor for it.
+        if (onEdit == null && onOpenEdit != null) {
+            LinkText(stringResource(Res.string.job_change_in_edit), onClick = onOpenEdit, color = azphaltOnSurface())
+        }
         val objectiveLabel = stringResource(Res.string.job_objective)
         JobLabel(objectiveLabel.uppercase())
         JobWell {
@@ -243,7 +252,7 @@ internal fun HiveJobEditor(
                     is ComputeDelegationTarget.Node -> Res.string.job_runs_chosen
                 },
             ),
-            onClick = null,
+            onClick = if (onEdit == null) onOpenCompute else null,
         )
         // Where it runs, as two choices; offered only when there is somewhere else to go (or back from).
         if (onEdit != null && task.isComputeDelegatable() && (remoteAvailable || runsOn != ComputeDelegationTarget.Local)) {

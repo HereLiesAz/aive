@@ -20,21 +20,19 @@ import com.hereliesaz.geministrator.resources.creature_provider_role_scope
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * A creature's provider (the panel's Work tab): Auto, or one connected provider. It reads and writes
- * the creature's role `preferredProviderId` through [onSaveRoleCollection], the path the role editors
- * save by, so nothing about approval or the task changes. [onSaveRoleCollection] null shows the
- * routing without changing it.
+ * A creature's provider (the panel's Work tab): Auto, or one connected provider, read only. It is the
+ * creature's role `preferredProviderId`, changed in the Roster (the one place), which [onOpenRole] opens.
  */
 @Composable
 internal fun CreatureProviderRow(
     role: RoleDefinition,
     task: TaskDefinition,
-    roles: List<RoleDefinition>,
     connectedProviderIds: Set<String>,
-    onSaveRoleCollection: ((List<RoleDefinition>) -> Unit)?,
     modifier: Modifier = Modifier,
     /** Opens Connections: a pinned provider that is not connected links there. Null leaves the warning without it. */
     onOpenConnections: (() -> Unit)? = null,
+    /** Opens the Roster on this creature's role, where its source is pinned. Null leaves the line plain. */
+    onOpenRole: (() -> Unit)? = null,
 ) {
     val routing = creatureProviderRouting(role, task) ?: return
     val pinnedId = (routing as? CreatureProviderRouting.Pinned)?.providerId
@@ -42,15 +40,6 @@ internal fun CreatureProviderRow(
     val pinnedByTask = providerPinnedByTask(pinnedId, role)
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(Res.string.creature_provider_label), style = AzphaltType.eyebrow, color = azphaltMutedOnSurface())
-        if (!pinnedByTask && onSaveRoleCollection != null) {
-            ProviderChoiceRow(
-                selectedProviderId = pinnedId,
-                connectedProviderIds = connectedProviderIds,
-                seedPrefix = "creature-provider-${task.id.value}",
-                pinnedLabel = pinnedId?.let { pinnedProviderName(it, role) },
-                onSelected = { selected -> onSaveRoleCollection(withRoleProvider(roles, role.id, selected)) },
-            )
-        }
         Text(
             text = if (pinnedId == null) {
                 stringResource(Res.string.creature_provider_auto_note)
@@ -75,7 +64,12 @@ internal fun CreatureProviderRow(
                 )
             }
         }
-        Text(stringResource(Res.string.creature_provider_role_scope, role.name), style = AzphaltType.body, color = azphaltMutedOnSurface())
+        // The pin is the role's, changed in the Roster: one place, so this is a link to it.
+        LinkText(
+            stringResource(Res.string.creature_provider_role_scope, role.name),
+            onClick = if (pinnedByTask) null else onOpenRole,
+            color = azphaltMutedOnSurface(),
+        )
     }
 }
 

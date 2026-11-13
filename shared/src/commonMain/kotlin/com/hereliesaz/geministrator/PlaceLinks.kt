@@ -27,6 +27,25 @@ internal object ConnectionsRequests {
     fun take(): String? = a2aAddress.also { a2aAddress = null }
 }
 
+/**
+ * A role the Roster should open on its form, handed over by a link elsewhere (a creature's Mind, its budget line).
+ * The Roster is the one place a role is changed; held as state and taken once, like [ConnectionsRequests].
+ */
+internal object RosterRequests {
+    var roleId: String? by mutableStateOf(null)
+
+    /** Takes the pending role id, leaving none. */
+    fun take(): String? = roleId.also { roleId = null }
+}
+
+/** Set by a link to the swarm editor (the Edit view); the terrarium opens Edit with it and takes it. */
+internal object SwarmEditRequests {
+    var pending: Boolean by mutableStateOf(false)
+
+    /** True once, when a request was pending. */
+    fun take(): Boolean = pending.also { pending = false }
+}
+
 /** An address worth handing to the form: trimmed, not blank, not absurd. */
 internal fun connectionsAddressRequest(raw: String?): String? =
     raw?.trim()?.takeIf { it.isNotEmpty() && it.length <= 2048 }
@@ -57,6 +76,12 @@ internal class PlaceLinks(
     val openConnections: ((a2aAddress: String?) -> Unit)? = null,
     /** Opens one source's connect or reconfigure screen (the existing onReconfigureProvider). */
     val openSource: ((providerId: String) -> Unit)? = null,
+    /** Opens the Roster on this role's form: the one place instructions, tools, budget and source change. */
+    val openRole: ((roleId: String) -> Unit)? = null,
+    /** Opens the Keeper's room on Delegations (trusted steps). */
+    val openDelegations: (() -> Unit)? = null,
+    /** Opens the swarm editor (Edit view) of the hive on screen, the selected creature kept. */
+    val openSwarmEditor: (() -> Unit)? = null,
 )
 
 internal val LocalPlaceLinks = staticCompositionLocalOf { PlaceLinks() }

@@ -780,6 +780,11 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="job_job">JOB</string>
     <string name="job_objective">Objective</string>
     <string name="job_apply">Apply</string>
+    <string name="job_change_in_edit">Change this job in Edit</string>
+    <string name="mind_change_in_roster">Change its instructions, tools, budget and source in the Roster</string>
+    <string name="mind_proposals_in_roster">%1$s proposed changes to its instructions: review them in the Roster</string>
+    <string name="inspector_change_source">Change its source</string>
+    <string name="inspector_trusted_steps">Trusted steps</string>
     <string name="job_criteria">ACCEPTANCE CRITERIA</string>
     <string name="job_add_criterion">Add a criterion</string>
     <string name="job_remove">Remove</string>
