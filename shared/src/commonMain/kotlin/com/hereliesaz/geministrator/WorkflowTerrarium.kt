@@ -306,6 +306,8 @@ internal fun GeministratorWorkflowTerrarium(
         Unit
     }
 
+    val runSegment = runSegmentLabel(rehearsal != null, liveRun.status.takeIf { isRealRun(liveRun.id.value) })
+    androidx.compose.runtime.CompositionLocalProvider(LocalRunSegment provides runSegment) {
     Column(modifier = modifier.fillMaxWidth()) {
         if (readOnly) {
             // It only watches: no controls above the field.
@@ -563,5 +565,6 @@ internal fun GeministratorWorkflowTerrarium(
                 modifier = Modifier.padding(top = 8.dp),
             )
         }
+    }
     }
 }

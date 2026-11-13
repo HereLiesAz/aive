@@ -112,8 +112,8 @@ internal fun TerrariumModeSegments(
                 .padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            listOf(
-                Triple("live", Res.string.build_live, !building && !flowchart),
+            listOfNotNull(
+                runSegmentString(LocalRunSegment.current)?.let { Triple("live", it, !building && !flowchart) },
                 Triple("build", Res.string.build_build, building && !flowchart),
                 Triple("flowchart", Res.string.hive_view_flowchart, flowchart),
             ).forEach { (mode, label, open) ->

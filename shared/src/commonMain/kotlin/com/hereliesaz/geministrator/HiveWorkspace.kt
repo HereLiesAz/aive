@@ -351,7 +351,9 @@ internal fun HiveControlsBar(
                         .padding(4.dp)
                         .selectableGroup(),
                 ) {
-                    ModeSegment(stringResource(Res.string.build_live), selected = !building && !flowchart) { onBuildingChange(false) }
+                    runSegmentText(LocalRunSegment.current)?.let { label ->
+                        ModeSegment(label, selected = !building && !flowchart) { onBuildingChange(false) }
+                    }
                     ModeSegment(stringResource(Res.string.build_build), selected = building && !flowchart) { onBuildingChange(true) }
                     ModeSegment(stringResource(Res.string.hive_view_flowchart), selected = flowchart, onClick = onFlowchartSelected)
                 }
