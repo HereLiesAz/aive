@@ -66,6 +66,8 @@ The Messages page (`LiveInboxScreen.kt`) on a wide window (820dp and up): KEEPER
 
 ## Navigation
 
+Every link goes through one typed `Destination` and one `navigate` (see [Navigation map](Navigation-Map.md)): a place, a Keeper's room part, Connections, a role (with a field of its form), a creature (with a tab), a hive or the swarm editor. The Swarm library's Store tab leads to the Store; there is one Store.
+
 On a phone there is no navigation row. One header sits over every screen (`ShellHeader` in `ControlRoomUi.kt`):
 
 - **The Aive** and the hive's state in a word: NEW, RESTING, WAKING, STOPPED, CAN'T REACH ITS AGENTS, or its run's status.
