@@ -209,6 +209,71 @@ class ApplicationRuntime private constructor(
      */
     var disputeModelSource: com.hereliesaz.geministrator.queen.DisputeModelSource? = null
 
+    /** Where an adopted specialist's lessons are banked (the memory layer's per-role bank); null where there is no memory layer. */
+    internal var roleLessonBank: RoleLessonBank? = null
+
+    // --- The training round driver's hooks (ApplicationRuntimeTrainingDriver.kt): her models, pacing, caps and the ledger. ---
+
+    /** Training runs whose Nanny ruling passed and was offered to the keeper: the only ones that may ever be adopted. */
+    internal val trainingOffered = linkedSetOf<String>()
+
+    internal fun keeperHourlyCapUsd(): Double? = queenCaps().hourlySpendCapUsd
+
+    internal suspend fun activeRunId(): String? = runtimeMutex.withLock { current?.state?.run?.id?.value }
+
+    internal suspend fun trainingModels(): DisputeModels? = resolveDisputeModels()
+
+    internal suspend fun republishState() {
+        runtimeMutex.withLock { publishCurrent() }
+    }
+
+    /**
+     * Runs [block] off the cycle as the queen's own work for [runId]: her calls keep the registry's per-Source pacing (a wait is
+     * hers, bounded, never the keeper's) and a move to another Source goes into the Story of the run. A failure is swallowed.
+     */
+    internal fun launchQueenWork(runId: String, block: suspend () -> Unit) {
+        val callContext = com.hereliesaz.geministrator.queen.QueenCallContext(
+            pacing = providerRegistry.sourcePacing,
+            onMoved = { from, to, why ->
+                rememberDisputeNotes(runId, listOf(com.hereliesaz.geministrator.queen.sourceMovedNote(runId, from, to, why)))
+                runtimeMutex.withLock { publishCurrent() }
+            },
+        )
+        runtimeScope.launch(callContext) {
+            try {
+                block()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                // The round's driver could not go on; the keeper still has the run and Messages.
+            }
+        }
+    }
+
+    /**
+     * Carries what an ended run found to the next swarm: the Nanny's findings the queen did not use, and [extra] rows (given the
+     * ledger's rows and the time). Nothing when the queen has no ledger. A failure is swallowed.
+     */
+    internal suspend fun carryEndedRunFindings(
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        extra: (List<com.hereliesaz.geministrator.workflow.improvement.ImprovementProposal>, Long) -> List<com.hereliesaz.geministrator.workflow.improvement.ImprovementProposal>,
+    ) {
+        val ledger = queenLedger ?: return
+        try {
+            val now = nowEpochMillis()
+            carryNannyFindings(ledger, definition, run, now)
+            val more = extra(ledger.state().proposals, now)
+            if (more.isNotEmpty()) {
+                ledger.merge { state -> state.copy(proposals = state.proposals + more.filter { m -> state.proposals.none { it.id == m.id } }) }
+            }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            // Carrying forward is a courtesy to the next swarm.
+        }
+    }
+
     /** The disputes already raised (run and report), so each is raised once, also after a restart. */
     private val raisedDisputes = com.hereliesaz.geministrator.queen.RaisedDisputes(
         load = { DurableUiState.store.getString(RAISED_DISPUTES_KEY) },

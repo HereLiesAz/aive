@@ -396,6 +396,9 @@ fun App(
         bridgeEnabled = researchBridgeOn,
     )
 
+    // Where an adopted specialist's lessons are banked: the memory layer's per-role bank.
+    LaunchedEffect(runtime, memoryLayer) { runtime?.attachRoleLessonBank(memoryLayer) }
+
     // Her models for disputes between creatures (queen/Disputes.kt): the keeper's linked Sources, the research she may commission.
     LaunchedEffect(runtime, researchStep, researchContext, queenModelFor) {
         val active = runtime ?: return@LaunchedEffect
@@ -792,6 +795,7 @@ fun App(
             host.swarmDrafter = orchestrationRuntime?.let { planner ->
                 { prompt: String -> runtime?.draftSwarm(prompt, planner, planReviewer) ?: SwarmDraftResult.Unavailable }
             }
+            host.specialistTrainer = { roleId: String, domain: String -> runtime?.startTrainingFromActive(roleId, domain) ?: false }
         }
 
         // Scheduled hives (docs/Scheduled-Workflows.md): while the app is open, a due schedule starts its

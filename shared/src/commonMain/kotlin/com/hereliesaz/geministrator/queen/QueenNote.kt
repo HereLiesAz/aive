@@ -97,6 +97,7 @@ enum class QueenVoice(val relay: QueenRelay?) {
     SuggestSplitStep(QueenRelay.Watch),
     SuggestReorderSteps(QueenRelay.Watch),
     SuggestAddApproval(QueenRelay.Watch),
+    TrainingAdopted(QueenRelay.Watch),
 }
 
 /** Where a note leads: an existing place, never a new one. */

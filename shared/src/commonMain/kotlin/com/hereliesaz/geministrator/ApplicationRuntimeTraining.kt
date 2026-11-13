@@ -14,6 +14,7 @@ import com.hereliesaz.geministrator.queen.TRAINING_LESSONS_ID
 import com.hereliesaz.geministrator.queen.TrainingRoles
 import com.hereliesaz.geministrator.queen.adoptSpecialist
 import com.hereliesaz.geministrator.queen.defaultTrainingLimits
+import com.hereliesaz.geministrator.queen.draftSpecialistRole
 import com.hereliesaz.geministrator.queen.parseLessons
 import com.hereliesaz.geministrator.queen.parseTrainerLimit
 import com.hereliesaz.geministrator.queen.tightenLimits
@@ -64,14 +65,18 @@ internal suspend fun ApplicationRuntime.launchTrainingSwarm(
         WorkflowDefinitionId("train-$now"), domain, parent, training, limits, round, findings,
     ) ?: return null
     val runId = WorkflowRunId("train-run-$now")
-    val used = listOf(parent, training.planner, training.researcher, training.trainer, training.reviewer, training.antagonist, training.nanny, training.queen)
+    val draft = draftSpecialistRole(parent)
+    val used = listOf(parent, draft, training.planner, training.researcher, training.trainer, training.reviewer, training.antagonist, training.nanny, training.queen)
         .distinctBy { it.id }
+    // The draft specialist lives in this run only (its snapshot); it is never stored as a role until the keeper approves adopting it.
+    val stored = used.filter { it.id != draft.id }
     return try {
         WorkflowLaunchService(
             preparer = WorkflowDefinitionPreparer(providerRegistry, used),
             persistence = persistence,
             eventSink = RepositoryWorkflowEventSink(persistence.events),
             roles = used,
+            rolesToPersist = stored,
         ).launch(
             project = project,
             definition = definition,
@@ -82,6 +87,8 @@ internal suspend fun ApplicationRuntime.launchTrainingSwarm(
             parentWorkflowRunIds = listOfNotNull(source.id),
         )
         loadLatest()
+        // The round is driven from here: the ruling, the challenge, the next round or the offer (ApplicationRuntimeTrainingDriver.kt).
+        startTrainingDriver(runId.value)
         runId.value
     } catch (cancelled: kotlinx.coroutines.CancellationException) {
         throw cancelled
@@ -98,8 +105,8 @@ internal fun trainerLimitOf(run: com.hereliesaz.geministrator.domain.WorkflowRun
  * Adopts the specialist a finished training run offered, only through the queen's gate ([adoptSpecialist]): the keeper's recorded
  * approval of exactly this specialist (the approved offer step in Messages) is required, the generic role is never edited, and the
  * variant is a new role with the generic role as its parent and the run that hatched it recorded. [bankLessons] is the seam to the
- * role's memory bank: it must store the lessons (each with its source and date) and say whether it did. Until the memory layer
- * can bank lessons per role it has no default, and without it nothing is adopted.
+ * role's memory bank: it must store the lessons (each with its source and date) and say whether it did. It defaults to the memory
+ * layer's per-role bank ([roleLessonBank]); with neither, nothing is adopted.
  */
 @OptIn(ExperimentalTime::class)
 internal suspend fun ApplicationRuntime.adoptTrainedSpecialist(
@@ -108,22 +115,51 @@ internal suspend fun ApplicationRuntime.adoptTrainedSpecialist(
     domain: String,
     bankLessons: (suspend (RoleDefinitionId, List<String>) -> Boolean)? = null,
 ): AdoptionResult? {
+    // Only a run whose Nanny ruling passed and was offered to the keeper can ever be adopted (a non-pass cancels the offer as well).
+    if (trainingRunId !in trainingOffered) return null
     val run = persistence.runs.get(WorkflowRunId(trainingRunId)) ?: return null
     val lessons = trainingStepText(run, TRAINING_LESSONS_ID)?.let(::parseLessons).orEmpty()
     val adoption = trainingAdoption(parentRoleId, domain, lessons) ?: return null
     val approval = trainingApproval(run, adoption, Clock.System.now().toEpochMilliseconds())
+    val lessonBank = roleLessonBank
     return adoptSpecialist(adoption, approval) { chosen ->
         val parent = persistence.roles.get(RoleDefinitionId(chosen.parentRoleId)) ?: BuiltInRoles.all.firstOrNull { it.id.value == chosen.parentRoleId }
         val id = RoleDefinitionId(chosen.roleId)
-        if (bankLessons == null || parent == null || persistence.roles.get(id) != null) {
-            false
-        } else if (!bankLessons(id, chosen.lessons)) {
+        if (parent == null || persistence.roles.get(id) != null) {
             false
         } else {
-            persistence.roles.put(
-                parent.copy(id = id, name = "${parent.name} · ${domain.trim().take(40)}", enabled = true, parents = listOf(parent.id), hatchedFromRunId = trainingRunId),
-            )
-            true
+            val banked = when {
+                bankLessons != null -> bankLessons(id, chosen.lessons)
+                lessonBank != null -> lessonBank.bank(id, parent.id, chosen.lessons)
+                else -> false
+            }
+            if (!banked) {
+                false
+            } else {
+                persistence.roles.put(
+                    parent.copy(id = id, name = "${parent.name} · ${domain.trim().take(40)}", enabled = true, parents = listOf(parent.id), hatchedFromRunId = trainingRunId),
+                )
+                true
+            }
         }
     }
+}
+
+/** The seam to the memory layer's per-role bank: stores a specialist's lessons under its role, the generic role as lineage parent. */
+fun interface RoleLessonBank {
+    suspend fun bank(roleId: RoleDefinitionId, parentRoleId: RoleDefinitionId, lessons: List<String>): Boolean
+}
+
+/** Wires the runtime's role-lesson bank to [layer] (null: no memory layer, so nothing is adopted). */
+internal fun ApplicationRuntime.attachRoleLessonBank(layer: com.hereliesaz.geministrator.memory.MemoryLayerController?) {
+    roleLessonBank = layer?.let { l -> RoleLessonBank { id, parent, lessons -> l.bankRoleLessons(id.value, parent.value, lessons) } }
+}
+
+/**
+ * The keeper starts a training swarm for the role [parentRoleId] and the few words [domain] (from the library's entry for a role).
+ * It is launched as an ordinary run from the active run's project. False when there is no active run or it cannot start.
+ */
+internal suspend fun ApplicationRuntime.startTrainingFromActive(parentRoleId: String, domain: String): Boolean {
+    val source = activeRunId() ?: return false
+    return launchTrainingSwarm(source, domain, parentRoleId, keeperSpendCapUsd = keeperHourlyCapUsd()) != null
 }

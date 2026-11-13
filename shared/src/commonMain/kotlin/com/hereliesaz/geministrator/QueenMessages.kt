@@ -93,6 +93,7 @@ private fun voiceResource(voice: QueenVoice): StringResource = when (voice) {
         QueenVoice.SuggestSplitStep -> Res.string.queen_say_suggest_split_step
         QueenVoice.SuggestReorderSteps -> Res.string.queen_say_suggest_reorder_steps
         QueenVoice.SuggestAddApproval -> Res.string.queen_say_suggest_add_approval
+        QueenVoice.TrainingAdopted -> Res.string.queen_say_training_adopted
 }
 
 @Composable
@@ -135,6 +136,7 @@ internal fun queenTitle(note: QueenNote): String = stringResource(
         QueenVoice.StatusWorking, QueenVoice.StatusWorkingClear, QueenVoice.StatusIdle, QueenVoice.StatusIdleClear -> Res.string.queen_title_status
         QueenVoice.FinishedAll, QueenVoice.FinishedAllCost, QueenVoice.FinishedFailed,
         QueenVoice.FinishedFailedNoStep, QueenVoice.FinishedStopped -> Res.string.queen_title_finish
+        QueenVoice.TrainingOffer, QueenVoice.TrainingStopped, QueenVoice.TrainingNeedsYou, QueenVoice.TrainingAdopted -> Res.string.queen_title_training
         else -> when (note.relay) {
             QueenRelay.Waits -> Res.string.queen_title_waits
             QueenRelay.Watch -> Res.string.queen_title_watch

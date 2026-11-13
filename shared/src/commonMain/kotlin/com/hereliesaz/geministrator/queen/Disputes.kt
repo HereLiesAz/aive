@@ -296,7 +296,7 @@ internal fun approachOf(dispute: Dispute, outcome: DisputeOutcome): Approach? = 
     is DisputeOutcome.NeedsKeeper -> null
 }
 
-private suspend fun askWithin(model: QueenModel, prompt: String, timeoutMillis: Long, mayCall: () -> Boolean): String? {
+internal suspend fun askWithin(model: QueenModel, prompt: String, timeoutMillis: Long, mayCall: () -> Boolean): String? {
     if (!mayCall()) return null
     // Waiting for a Source's turn is her wait (bounded in QueenCallContext), not the answer's time: the answer keeps its own limit.
     val turnWait = currentQueenCallContext()?.takeIf { it.paces }?.callBudgetMillis() ?: 0L

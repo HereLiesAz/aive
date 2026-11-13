@@ -2073,4 +2073,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_say_training_offer">The swarm training a specialist for %1$s has a result. On the same practice tasks the generic role met %2$s and the draft specialist met %3$s. I will adopt it only if you approve it in Messages, and the generic role stays as it is.</string>
     <string name="queen_say_training_stopped">The swarm training a specialist for %1$s has stopped, and I am offering nothing. The generic role is unchanged.</string>
     <string name="queen_say_training_needs_you">The swarm training a specialist for %1$s could not be ruled on from its results. I have adopted nothing. It is yours to decide.</string>
+    <string name="queen_say_training_adopted">I adopted the specialist for %1$s. It is a new role with the generic role as its parent, its lessons keep their sources and dates, and the generic role is unchanged.</string>
+    <string name="queen_title_training">The training swarm</string>
+    <string name="library_train_specialist">Train a specialist</string>
+    <string name="library_train_started">Training started for %1$s. I will offer the result in Messages.</string>
+    <string name="library_train_failed">Training could not start. Open a swarm first, and give the few words of the domain above.</string>
 </resources>

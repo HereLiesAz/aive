@@ -50,6 +50,12 @@ class WorkflowLibraryHost(
      */
     internal var swarmDrafter: (suspend (String) -> SwarmDraftResult)? = null
 
+    /**
+     * Starts a training swarm for a role and a few domain words (ApplicationRuntimeTraining.kt); null where there is no live runtime.
+     * The specialist is only ever offered to the keeper in Messages and adopted on the keeper's approval.
+     */
+    internal var specialistTrainer: (suspend (roleId: String, domain: String) -> Boolean)? = null
+
     suspend fun entries(): List<WorkflowLibraryEntry> {
         val installedPackages = storeService?.installed().orEmpty()
         val packageByDefinition = buildMap<String, String> {
@@ -241,6 +247,9 @@ class WorkflowLibraryHost(
         }
         return verdict
     }
+
+    /** Starts the training swarm for [roleId] and [domain]; false when it cannot start. */
+    suspend fun trainSpecialist(roleId: String, domain: String): Boolean = specialistTrainer?.invoke(roleId, domain) ?: false
 
     /** [repository] null keeps the current project's repository. */
     suspend fun run(

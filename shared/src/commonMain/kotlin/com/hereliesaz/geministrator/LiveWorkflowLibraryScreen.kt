@@ -37,6 +37,9 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.nullable
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.library_tasks
+import com.hereliesaz.geministrator.resources.library_train_failed
+import com.hereliesaz.geministrator.resources.library_train_specialist
+import com.hereliesaz.geministrator.resources.library_train_started
 import com.hereliesaz.geministrator.resources.library_active
 import com.hereliesaz.geministrator.resources.library_add_after_end
 import com.hereliesaz.geministrator.resources.library_after
@@ -429,6 +432,24 @@ internal fun LiveWorkflowLibraryScreen(
                                                             runCatching { host.run(currentDraft, runObjective) }
                                                                 .onSuccess { status = getString(Res.string.library_started, currentDraft.name) }
                                                                 .onFailure { loadError = it.message ?: getString(Res.string.library_workflow_launch_failed) }
+                                                        }
+                                                    },
+                                                )
+                                            }
+                                            val trainRole = selectedEntry?.role
+                                            if (host != null && trainRole != null) {
+                                                // The run objective field above is the domain: a few generic words, never the objective or paths.
+                                                AzphaltPill(
+                                                    label = stringResource(Res.string.library_train_specialist),
+                                                    seed = "workflow-train-specialist",
+                                                    onClick = {
+                                                        scope.launch {
+                                                            val started = runCatching { host.trainSpecialist(trainRole.id.value, runObjective) }.getOrDefault(false)
+                                                            if (started) {
+                                                                status = getString(Res.string.library_train_started, trainRole.name)
+                                                            } else {
+                                                                loadError = getString(Res.string.library_train_failed)
+                                                            }
                                                         }
                                                     },
                                                 )
