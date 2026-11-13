@@ -771,7 +771,10 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="creature_panel_close">Close the creature panel</string>
     <string name="mind_role">ROLE</string>
     <string name="build_live">Live</string>
-    <string name="build_build">Build</string>
+    <string name="run_segment_rehearsal">Rehearsal</string>
+    <string name="run_segment_success">Success</string>
+    <string name="run_segment_failed">Failed</string>
+    <string name="build_build">Edit</string>
     <string name="build_undo">Undo</string>
     <string name="build_rehearse">Rehearse</string>
     <string name="build_group">Cluster</string>
@@ -780,6 +783,11 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="job_job">JOB</string>
     <string name="job_objective">Objective</string>
     <string name="job_apply">Apply</string>
+    <string name="job_change_in_edit">Change this job in Edit</string>
+    <string name="mind_change_in_roster">Change its instructions, tools, budget and source in the Roster</string>
+    <string name="mind_proposals_in_roster">%1$s proposed changes to its instructions: review them in the Roster</string>
+    <string name="inspector_change_source">Change its source</string>
+    <string name="inspector_trusted_steps">Trusted steps</string>
     <string name="job_criteria">ACCEPTANCE CRITERIA</string>
     <string name="job_add_criterion">Add a criterion</string>
     <string name="job_remove">Remove</string>
@@ -848,8 +856,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="needs_echo_self_absorbed">SELF-ABSORBED</string>
     <string name="needs_echo_fevered">FEVERED</string>
     <string name="needs_echo_insane">INSANE</string>
-    <string name="needs_integrity">INTEGRITY</string>
-    <string name="needs_budget">BUDGET</string>
+    <string name="needs_integrity">MOOD (reliable this run)</string>
+    <string name="needs_budget">HP (its specialty's token budget)</string>
     <string name="needs_output_used">OUTPUT USED</string>
     <string name="needs_not_reported">not reported</string>
     <string name="needs_tokens_spent">%1$s tokens · no budget set</string>

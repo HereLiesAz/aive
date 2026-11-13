@@ -203,6 +203,13 @@ internal fun GeministratorWorkflowTerrarium(
 
     // Live watches the run; Build holds the field still and opens the wiring to edits.
     var building by remember(definition.id) { mutableStateOf(startInBuild) }
+    // A link elsewhere (a creature's job) asks for the editor: open it, the creature stays selected.
+    LaunchedEffect(SwarmEditRequests.pending) {
+        if (SwarmEditRequests.take() && !readOnly) {
+            building = true
+            flowView.value = false
+        }
+    }
     // While grouping, taps gather creatures instead of selecting one.
     var grouping by remember(definition.id) { mutableStateOf<Set<String>?>(null) }
 
@@ -299,6 +306,8 @@ internal fun GeministratorWorkflowTerrarium(
         Unit
     }
 
+    val runSegment = runSegmentLabel(rehearsal != null, liveRun.status.takeIf { isRealRun(liveRun.id.value) })
+    androidx.compose.runtime.CompositionLocalProvider(LocalRunSegment provides runSegment) {
     Column(modifier = modifier.fillMaxWidth()) {
         if (readOnly) {
             // It only watches: no controls above the field.
@@ -556,5 +565,6 @@ internal fun GeministratorWorkflowTerrarium(
                 modifier = Modifier.padding(top = 8.dp),
             )
         }
+    }
     }
 }

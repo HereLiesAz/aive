@@ -67,13 +67,15 @@ internal fun TerrariumModeToggle(
         return
     }
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        AzphaltPill(
-            label = stringResource(Res.string.build_live),
-            seed = "mode-live",
-            selected = !building && !flowchart,
-            role = Role.RadioButton,
-            onClick = { onBuildingChange(false) },
-        )
+        runSegmentText(LocalRunSegment.current)?.let { label ->
+            AzphaltPill(
+                label = label,
+                seed = "mode-live",
+                selected = !building && !flowchart,
+                role = Role.RadioButton,
+                onClick = { onBuildingChange(false) },
+            )
+        }
         AzphaltPill(
             label = stringResource(Res.string.build_build),
             seed = "mode-build",

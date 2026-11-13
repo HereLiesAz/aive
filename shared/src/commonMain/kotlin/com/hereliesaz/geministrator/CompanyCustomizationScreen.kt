@@ -362,6 +362,14 @@ internal fun CustomCompanyProviderScreen(
     LaunchedEffect(focused) {
         if (focused != null) editRole(focused)
     }
+    // A link elsewhere (a creature's Mind, its budget) opens the form on this role: the one place a role changes.
+    val requestedRole = RosterRequests.roleId
+    LaunchedEffect(requestedRole, visibleRoles) {
+        if (focusRole == null && requestedRole != null && visibleRoles.isNotEmpty()) {
+            RosterRequests.take()
+            visibleRoles.firstOrNull { it.id.value == requestedRole }?.let { editRole(it) }
+        }
+    }
     val activeRoleIds = liveWorkflow?.run?.taskRuns?.values
         ?.filter {
             it.status in setOf(
@@ -444,6 +452,21 @@ internal fun CustomCompanyProviderScreen(
         }
 
         if (showRoleForm && (focusRole == null || editingRoleId == focusRole.value)) {
+            // The role's kept creature and the changes proposed to its instructions: here, with the form that
+            // changes it, and not in a creature's panel (which links to this).
+            if (focusRole == null && editingRoleId != null) {
+                val editingRole = visibleRoles.firstOrNull { it.id.value == editingRoleId }
+                if (editingRole != null && editingRole.executionSource == RoleExecutionSource.Agent) {
+                    CreaturePicker(editingRole.id, agentName = { id -> visibleRoles.firstOrNull { r -> r.id.value == id }?.name })
+                }
+                if (editingRole != null) {
+                    RoleInstructionProposalPanel(
+                        roleId = editingRole.id,
+                        roles = visibleRoles,
+                        onSaveRoleCollection = onSaveRoleCollection,
+                    )
+                }
+            }
             // In a creature's Mind the tab and breadcrumb already say whose mind this is.
             if (focusRole == null) Text(
                 if (editingRoleId == null) stringResource(Res.string.swarm_add_orchestration_role) else stringResource(Res.string.swarm_edit_orchestration_role),

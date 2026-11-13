@@ -266,15 +266,6 @@ fun ControlRoom(
         openConnectionsPlace(keeperSectionName, keeperOpen, address, onDestinationSelected)
     }
     val openConnections: () -> Unit = { openConnectionsAt(null) }
-    // Built once and reading the latest callbacks, so providing it never recomposes everything under it.
-    val latestOpenConnectionsAt by rememberUpdatedState(openConnectionsAt)
-    val latestReconfigureProvider by rememberUpdatedState(onReconfigureProvider)
-    val placeLinks = remember {
-        PlaceLinks(
-            openConnections = { address -> latestOpenConnectionsAt(address) },
-            openSource = { id -> latestReconfigureProvider(id) },
-        )
-    }
     // The hive on screen: a resting hive when one is open (it shows even while another run is live),
     // else the live run's. The breadcrumb and the panel follow what is shown.
     val restingShown = restingHive.value.isNotBlank()
@@ -307,6 +298,32 @@ fun ControlRoom(
     // selected, so the field keeps the zoom level it showed and its other levels stay one step away.
     // Tapping the creature again reopens it; tapping bare ground or another creature lets it go.
     val closePanel: (String) -> Unit = { id -> panelSetAside = id }
+    // Built once and reading the latest callbacks, so providing it never recomposes everything under it.
+    val latestOpenConnectionsAt by rememberUpdatedState(openConnectionsAt)
+    val latestReconfigureProvider by rememberUpdatedState(onReconfigureProvider)
+    val latestDestinationSelected by rememberUpdatedState(onDestinationSelected)
+    val latestSelected by rememberUpdatedState(selectedTaskId)
+    val placeLinks = remember {
+        PlaceLinks(
+            openConnections = { address -> latestOpenConnectionsAt(address) },
+            openSource = { id -> latestReconfigureProvider(id) },
+            openRole = { roleId ->
+                RosterRequests.roleId = roleId
+                latestDestinationSelected(ControlRoomDestination.Company)
+            },
+            openDelegations = {
+                keeperSectionName.value = KeeperSection.Delegations.name
+                keeperOpen.value = true
+                latestDestinationSelected(ControlRoomDestination.Settings)
+            },
+            openSwarmEditor = {
+                // The editor is on the hive: show it, the creature stays selected, its sheet set aside.
+                SwarmEditRequests.pending = true
+                showTimeline.value = false
+                latestSelected?.let { panelSetAside = it }
+            },
+        )
+    }
     val inspectorVisible = selectedTaskId != null &&
         selectedTaskId != panelSetAside &&
         liveWorkflow != null &&
@@ -327,7 +344,14 @@ fun ControlRoom(
         // Deselecting forgets the remembered creature, so reselecting it picks its opening tab again.
         if (selectedTaskId == null && creatureTabTask.isNotEmpty()) creatureTabTask = ""
         if (selectedTaskId != null && selectedTaskId != creatureTabTask) {
-            creatureTabName = openingTab(liveWorkflow?.run?.taskRuns?.get(TaskDefinitionId(selectedTaskId))).name
+            creatureTabName = restoredTabOrDefault(
+                CreatureTabRestore.taskId,
+                CreatureTabRestore.tab,
+                selectedTaskId,
+                openingTab(liveWorkflow?.run?.taskRuns?.get(TaskDefinitionId(selectedTaskId))).name,
+            )
+            CreatureTabRestore.taskId = ""
+            CreatureTabRestore.tab = ""
             creatureTabTask = selectedTaskId
         }
     }
