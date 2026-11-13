@@ -110,3 +110,11 @@ The schedule ticker read the list, awaited a launch, then wrote its stale copy o
 - After any await on something slow, change only your own fields on the stored copy in one read-modify-write (`update`), and claim an action (compare on the field that says it was done) before doing it, not after.
 - A parse failure is not "empty": keep the raw text, refuse writes, and make the keeper's choice visible. A limit or a "done once" flag that guards money lives where a restart cannot reset it, and is taken before the spend.
 - A binding by id needs the content it was made for beside it (a fingerprint), checked at the moment of use.
+
+## Android CI red for a day: two things nobody compiled
+
+Android CI failed on every push because (1) an Android string had an unescaped apostrophe ("the relay's source", from a vocabulary sweep) and (2) a `when` over `ErrorKind` in `MainActivity` was not exhaustive after `BadRequest` was added. Neither shows up in the shared and desktop tests, and the Android modules cannot be compiled where most of the work was written.
+
+- Android `strings.xml` values must escape apostrophes as `\'` (and a leading `@` or `?`); check every string added or edited under `androidApp/src/main/res/`.
+- When an enum or sealed type gains an entry, grep the whole repo (shared, androidApp, desktopApp, webApp, providers, tests) for every `when` over it. When anything is removed or renamed, grep all modules and all test source sets for its uses.
+- A red CI that fails for unrelated PRs (even bot PRs) is a main-branch break: read the job log for the first real error (`grep "e: \|FAILED\|What went wrong"` over the downloaded log) before anything else.
