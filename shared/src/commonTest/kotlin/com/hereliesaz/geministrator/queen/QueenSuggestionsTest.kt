@@ -157,7 +157,7 @@ class QueenSuggestionsTest {
     }
 
     @Test
-    fun aSwarmWithANannyDoesNotGetTheQueensOwnRedo() {
+    fun aSwarmWithANannyStillGetsTheQueensOwnRedo() {
         val withNanny = qDefinition(
             qTask("a"),
             qTask("b").copy(dependsOn = setOf(TaskDefinitionId("a"))),
@@ -165,7 +165,7 @@ class QueenSuggestionsTest {
         )
         val run = qRun(qTaskRun("a", TaskRunStatus.Completed), qTaskRun("b", TaskRunStatus.Running, attempt = 3), qTaskRun("nanny", TaskRunStatus.Running))
         val found = queenCandidates(withNanny, run, queenSignals(withNanny, run, emptyList()), SpendCaps())
-        assertTrue(found.none { it.action == QueenAction.RedoFromStep })
+        assertTrue(found.any { it.action == QueenAction.RedoFromStep })
     }
 
     @Test

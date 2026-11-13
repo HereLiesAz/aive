@@ -111,9 +111,10 @@ private fun WorkflowRun.underWay(): Boolean = status == WorkflowRunStatus.Runnin
 
 /**
  * What the queen could suggest from [signals] and the run's cost, most serious first. Pure: the same state gives the
- * same candidates. She counts; she never judges whether the swarm works. In a swarm that has a Nanny she does not
- * suggest redoing or resting on her own: the Nanny's findings are relayed instead (see [nannyRelay]), and the only
- * rest she offers there is while the Nanny's report is still being checked.
+ * same candidates. The queen makes her own judgement of whether the swarm is working (a step that keeps failing, a
+ * Source that gave out, a budget running low), with or without a Nanny. The Nanny's job is different: making sure it
+ * works as well as possible. Her findings are relayed alongside (see [nannyRelay]), and the queen offers a rest while
+ * the Nanny's report is still being checked.
  */
 internal fun queenCandidates(
     definition: WorkflowDefinition,
@@ -124,24 +125,22 @@ internal fun queenCandidates(
     if (!run.live()) return emptyList()
     val nanny = hasNanny(definition, run)
     val found = mutableListOf<QueenCandidate>()
-    if (!nanny) {
-        // A failing step that builds on a finished one: the finished one is the place to go back to.
-        for (signal in signals.filterIsInstance<QueenSignal.RepeatedFailure>()) {
-            val task = definition.tasks.firstOrNull { it.id.value == signal.taskId } ?: continue
-            val upstream = definition.tasks.firstOrNull { dep ->
-                dep.id in task.dependsOn && run.taskRuns[dep.id]?.status == TaskRunStatus.Completed
-            } ?: continue
-            found += QueenCandidate(
-                QueenAction.RedoFromStep,
-                upstream.id.value,
-                QueenVoice.SuggestRedoStep,
-                listOf(
-                    stepNumber(definition, upstream.id.value).toString(), queenSlot(upstream.name),
-                    stepNumber(definition, task.id.value).toString(), signal.failedAttempts.toString(),
-                ),
-                outsideFor(definition, run, task.id.value),
-            )
-        }
+    // A failing step that builds on a finished one: the finished one is the place to go back to.
+    for (signal in signals.filterIsInstance<QueenSignal.RepeatedFailure>()) {
+        val task = definition.tasks.firstOrNull { it.id.value == signal.taskId } ?: continue
+        val upstream = definition.tasks.firstOrNull { dep ->
+            dep.id in task.dependsOn && run.taskRuns[dep.id]?.status == TaskRunStatus.Completed
+        } ?: continue
+        found += QueenCandidate(
+            QueenAction.RedoFromStep,
+            upstream.id.value,
+            QueenVoice.SuggestRedoStep,
+            listOf(
+                stepNumber(definition, upstream.id.value).toString(), queenSlot(upstream.name),
+                stepNumber(definition, task.id.value).toString(), signal.failedAttempts.toString(),
+            ),
+            outsideFor(definition, run, task.id.value),
+        )
     }
     for (signal in signals.filterIsInstance<QueenSignal.FailedOver>()) {
         val name = definition.tasks.firstOrNull { it.id.value == signal.taskId }?.name.orEmpty()
