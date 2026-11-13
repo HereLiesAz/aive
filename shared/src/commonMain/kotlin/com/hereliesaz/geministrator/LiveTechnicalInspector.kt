@@ -233,7 +233,7 @@ internal fun TechnicalInspector(
     // stays as it was, so a change takes effect from its next run. Without the library (previews)
     // the job shows but does not change.
     val library = LocalWorkflowLibraryHost.current
-    var savedJob by remember(liveWorkflow.definition) { mutableStateOf<WorkflowDefinition?>(null) }
+    var savedJob by remember(liveWorkflow.definition.id) { mutableStateOf<WorkflowDefinition?>(null) }
     var jobStatus by remember(selectedTaskId) { mutableStateOf<String?>(null) }
     LaunchedEffect(library, liveWorkflow.definition.id) {
         val stored = library?.let { host ->

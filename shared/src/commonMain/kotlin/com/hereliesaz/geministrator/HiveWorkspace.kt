@@ -249,13 +249,26 @@ internal fun QueuedFeedLauncher(
     onLaunchWorkflow: (String, String, com.hereliesaz.geministrator.domain.RepositoryRef?, List<WorkflowRunId>) -> Unit,
 ) {
     val due = queuedFeedDue(HiveFeedQueue.current, live?.run)
+    // The run the queue was last fed for. The queue is only dropped once the launch is confirmed, i.e. the
+    // hive on screen has moved on to a different run; a refused or failed launch keeps the objective.
+    var firedFor by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
     androidx.compose.runtime.LaunchedEffect(due, live?.run?.id) {
         val objective = due ?: return@LaunchedEffect
         val workflow = live ?: return@LaunchedEffect
-        HiveFeedQueue.clear()
+        firedFor = workflow.run.id.value
         onLaunchWorkflow(workflow.project.name, objective, workflow.project.repository, listOf(workflow.run.id))
     }
+    androidx.compose.runtime.LaunchedEffect(live?.run?.id) {
+        if (queuedFeedSettled(HiveFeedQueue.current, firedFor, live?.run)) {
+            HiveFeedQueue.clear()
+            firedFor = null
+        }
+    }
 }
+
+/** The queued feed was launched ([firedFor] its run) and the hive on screen is now a different run: it started. */
+internal fun queuedFeedSettled(queued: QueuedFeed?, firedFor: String?, run: WorkflowRun?): Boolean =
+    queued != null && firedFor == queued.runId && run != null && run.id.value != queued.runId
 
 /**
  * The hive page's title row: the run's state and project, the hive's name, what it was fed, and on

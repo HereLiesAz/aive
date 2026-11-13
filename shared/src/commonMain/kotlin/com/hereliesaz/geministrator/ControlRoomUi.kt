@@ -1103,7 +1103,13 @@ private fun MainDestination(
                                     selectedTaskId = selectedTaskId,
                                     onTaskSelected = onTaskSelected,
                                     onShowHive = { showTimeline = false },
-                                    logSources = remember(live.run.id, live.definition, memoryLayer) {
+                                    logSources = remember(
+                                        live.run.id,
+                                        live.definition,
+                                        memoryLayer,
+                                        // A reassigned creature moves its log lines to the new role.
+                                        live.run.taskRuns.values.map { Triple(it.id, it.taskDefinitionId, it.assignedRoleId) },
+                                    ) {
                                         val taskRunNames = live.run.taskRuns.values.associate { taskRun ->
                                             taskRun.id to (live.definition.tasks.firstOrNull { it.id == taskRun.taskDefinitionId }?.name ?: taskRun.taskDefinitionId.value)
                                         }
