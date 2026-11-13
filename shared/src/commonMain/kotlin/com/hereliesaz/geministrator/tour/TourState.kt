@@ -39,6 +39,8 @@ data class TourState(
     val missedShown: Boolean = false,
     /** Text the card shows in place of the sentence (a check-in's other way of saying it), or null. */
     val note: String? = null,
+    /** Further small cards still to show, one per "Got it", after "Lost me, go slower". */
+    val smallerQueue: List<String> = emptyList(),
     /** An open check-in's line; the card shows the four quick replies while it is set. */
     val checkInLine: String? = null,
 ) {
@@ -62,6 +64,7 @@ private fun TourState.advance(outcome: StepOutcome): TourState =
         explainOpen = false,
         missedShown = false,
         note = null,
+        smallerQueue = emptyList(),
         checkInLine = null,
     )
 
@@ -80,10 +83,14 @@ fun reduceTour(state: TourState, action: TourAction): TourState = when (action) 
             state.advance(StepOutcome.Met)
         } else state
     }
-    TourAction.Next -> if (state.current != null) state.advance(StepOutcome.Next) else state
+    TourAction.Next -> when {
+        state.smallerQueue.isNotEmpty() -> state.copy(note = state.smallerQueue.first(), smallerQueue = state.smallerQueue.drop(1))
+        state.current != null -> state.advance(StepOutcome.Next)
+        else -> state
+    }
     TourAction.KnowThis -> if (state.current != null) state.advance(StepOutcome.Skipped) else state
     TourAction.Back -> if (state.index > 0) {
-        state.copy(index = state.index - 1, explainOpen = false, missedShown = false, note = null, checkInLine = null)
+        state.copy(index = state.index - 1, explainOpen = false, missedShown = false, note = null, smallerQueue = emptyList(), checkInLine = null)
     } else state
     TourAction.Pause -> if (state.phase == TourPhase.Showing) state.copy(phase = TourPhase.Paused) else state
     TourAction.Resume -> if (state.phase != TourPhase.Showing) state.copy(phase = TourPhase.Showing) else state
