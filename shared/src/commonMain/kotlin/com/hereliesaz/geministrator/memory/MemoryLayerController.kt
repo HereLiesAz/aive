@@ -240,7 +240,32 @@ class MemoryLayerController(
     }
 
     private fun build(store: MemoryStore, settings: MemoryLayerSettings): AgentMemoryLayer =
-        AgentMemoryLayer.createWithMicroAgents(store, mutableEngines.value.agents, settings.policy)
+        AgentMemoryLayer.createWithMicroAgents(store, mutableEngines.value.agents, settings.policy).also { layer ->
+            (layer.sessionObserver as? QueuedMemorySessionObserver)?.journal = settingsStore.captureJournal
+        }
+
+    /**
+     * Sends what sessions had captured but not sent when the app last stopped: the journal's leftovers go
+     * into their workflows' queues, then the journal lets go of them. Returns how many were sent.
+     */
+    suspend fun recoverCapturedSessions(): Int {
+        if (!active) return 0
+        val held = settingsStore.captureJournal
+        var sent = 0
+        for ((key, envelope) in held.pending()) {
+            val workflow = envelope.workflowRunId ?: memoryWorkflowOf(null, envelope.taskRunId, envelope.sourceSessionId)
+            val recovered = runCatching {
+                registerWorkflow(workflow, envelope.projectId)
+                layerFor(workflow).queue.enqueueSession(envelope)
+            }.isSuccess
+            if (recovered) {
+                held.record(key, null)
+                sent++
+            }
+        }
+        if (sent > 0) drainSoon()
+        return sent
+    }
 
     /** Shows (and directs the screen's data operations at) [workflowId]'s bank. */
     suspend fun selectBank(workflowId: String) {
@@ -1391,6 +1416,7 @@ class MemoryLayerController(
         MemoryRuntimeBridge.promptContextProvider = promptContextProvider
         MemoryRuntimeBridge.procedureTraceSink = procedureTraceSink
         MemoryRuntimeBridge.procedureTraceReader = procedureTraceReader
+        scope.launch { runCatching { recoverCapturedSessions() } }
         drainSoon()
     }
 

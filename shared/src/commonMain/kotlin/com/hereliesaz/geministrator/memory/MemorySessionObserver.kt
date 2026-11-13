@@ -65,7 +65,15 @@ class QueuedMemorySessionObserver(
     private val queue: MemoryConsolidationQueue,
     private val maxCapturedEventChars: Int = 24_000,
     private val nowEpochMillis: () -> Long = ::systemNowEpochMillis,
+    /** At most one crash-journal write per capture in this many milliseconds (0 journals every part). */
+    private val journalIntervalMillis: Long = DEFAULT_JOURNAL_INTERVAL_MILLIS,
 ) : MemorySessionObserver {
+    /**
+     * Where what has not yet reached memory is kept, so a crash loses nothing and nothing is sent twice
+     * after a restart. Set by the controller; absent, captures live in memory only.
+     */
+    var journal: MemoryCaptureJournal? = null
+
     private data class Capture(
         val request: AgentTaskRequest,
         val userPrompt: String,
@@ -74,6 +82,8 @@ class QueuedMemorySessionObserver(
         var sentParts: Int = 0,
         /** How many envelopes this capture has sent; keeps episode ids unique per envelope. */
         var sends: Int = 0,
+        /** When the journal was last written for this capture; null until the first write. */
+        var journaledAt: Long? = null,
     )
 
     private val mutex = Mutex()
@@ -135,6 +145,7 @@ class QueuedMemorySessionObserver(
                 captures[handle] = Capture(request, workflowObjective, initialParts)
             }
         }
+        mutex.withLock { captures[handle] }?.let { journalUnsent(handle, it, force = true) }
     }
 
     override suspend fun onSessionEvent(handle: ManagedSessionHandle, event: AgentEvent) {
@@ -180,7 +191,8 @@ class QueuedMemorySessionObserver(
         } ?: return
 
         if (part.text.isBlank()) return
-        mutex.withLock { captures[handle]?.parts?.add(part) }
+        val capture = mutex.withLock { captures[handle]?.also { it.parts.add(part) } } ?: return
+        journalUnsent(handle, capture)
     }
 
     override suspend fun onSessionFinished(handle: ManagedSessionHandle, status: ManagedSessionStatus) {
@@ -217,31 +229,57 @@ class QueuedMemorySessionObserver(
             capture.sentParts = capture.parts.size
             fresh to capture.sends++
         }
+        queue.enqueueSession(envelopeOf(handle, capture, fresh + listOfNotNull(terminal), sequence))
+        // Only once it is in the queue does the journal let go of it: a failure above keeps it for the restart.
+        capture.journaledAt = null
+        runCatching { journal?.record(handle.providerRunId.value, null) }
+    }
+
+    private fun envelopeOf(
+        handle: ManagedSessionHandle,
+        capture: Capture,
+        parts: List<MemorySessionPart>,
+        sequence: Int,
+    ): MemorySessionEnvelope {
         val request = capture.request
         val context = request.orchestrationContext
         val cacheNamespace = request.promptContext.cacheNamespace
         val fallbackRoleId = cacheNamespace
             ?.substringAfter(':', missingDelimiterValue = "")
             ?.takeIf(String::isNotBlank)
-
-        queue.enqueueSession(
-            MemorySessionEnvelope(
-                sourceSessionId = handle.providerRunId.value,
-                projectId = context.projectId?.value,
-                // The workflow whose bank this session's memory goes to (a session outside any workflow is its own).
-                workflowRunId = memoryWorkflowOf(request, handle.providerRunId.value),
-                workflowDefinitionId = context.workflowDefinitionId?.value,
-                taskRunId = request.taskRunId.value,
-                taskDefinitionId = context.taskDefinitionId?.value,
-                roleId = context.roleId?.value ?: fallbackRoleId,
-                // Nothing is banked unscrubbed: role instructions, prompt blocks, artifacts and messages
-                // can all carry a key a run saw, and a bank outlives the run (and is recalled into others).
-                userPrompt = ControlRedaction.scrub(capture.userPrompt),
-                parts = (fresh + listOfNotNull(terminal)).map { it.copy(text = ControlRedaction.scrub(it.text)) },
-                closedAtEpochMillis = nowEpochMillis(),
-                sequence = sequence,
-            ),
+        return MemorySessionEnvelope(
+            sourceSessionId = handle.providerRunId.value,
+            projectId = context.projectId?.value,
+            // The workflow whose bank this session's memory goes to (a session outside any workflow is its own).
+            workflowRunId = memoryWorkflowOf(request, handle.providerRunId.value),
+            workflowDefinitionId = context.workflowDefinitionId?.value,
+            taskRunId = request.taskRunId.value,
+            taskDefinitionId = context.taskDefinitionId?.value,
+            roleId = context.roleId?.value ?: fallbackRoleId,
+            // Nothing is banked unscrubbed: role instructions, prompt blocks, artifacts and messages
+            // can all carry a key a run saw, and a bank outlives the run (and is recalled into others).
+            userPrompt = ControlRedaction.scrub(capture.userPrompt),
+            parts = parts.map { it.copy(text = ControlRedaction.scrub(it.text)) },
+            closedAtEpochMillis = nowEpochMillis(),
+            sequence = sequence,
         )
+    }
+
+    /**
+     * Keeps what [capture] holds past its cursor in the crash journal (at most once per
+     * [journalIntervalMillis] unless [force]d), so the parts survive a crash and, once sent, are not sent again.
+     */
+    private suspend fun journalUnsent(handle: ManagedSessionHandle, capture: Capture, force: Boolean = false) {
+        val target = journal ?: return
+        val now = nowEpochMillis()
+        val (fresh, sequence) = mutex.withLock {
+            val last = capture.journaledAt
+            if (!force && last != null && now - last < journalIntervalMillis) return
+            capture.journaledAt = now
+            capture.parts.subList(capture.sentParts, capture.parts.size).toList() to capture.sends
+        }
+        if (fresh.isEmpty()) return
+        runCatching { target.record(handle.providerRunId.value, envelopeOf(handle, capture, fresh, sequence)) }
     }
 }
 
@@ -257,6 +295,8 @@ fun memoryWorkflowOf(request: AgentTaskRequest, sessionId: String? = null): Stri
 )
 
 private const val MAX_ISSUED_MESSAGES = 128
+
+private const val DEFAULT_JOURNAL_INTERVAL_MILLIS = 2_000L
 
 internal const val MEMORY_RECALL_PROMPT_LABEL: String = "Relevant memory"
 

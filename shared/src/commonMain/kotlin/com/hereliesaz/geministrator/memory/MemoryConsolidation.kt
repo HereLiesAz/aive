@@ -906,7 +906,8 @@ private fun MemorySessionEnvelope.toEpisode(
     maxChunkChars: Int,
 ): MemoryEpisode {
     val source = buildList {
-        add(MemorySessionPart(MemorySourceKind.UserPrompt, "User prompt", userPrompt))
+        // The prompt goes into memory once, with a session's first envelope; later pieces of the same session do not repeat it.
+        if (sequence == 0) add(MemorySessionPart(MemorySourceKind.UserPrompt, "User prompt", userPrompt))
         addAll(parts)
     }
     var ordinal = 0
