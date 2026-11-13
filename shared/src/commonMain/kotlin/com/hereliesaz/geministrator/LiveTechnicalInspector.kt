@@ -105,6 +105,8 @@ import com.hereliesaz.geministrator.resources.inspector_excluded_by_redaction_po
 import com.hereliesaz.geministrator.resources.inspector_any_capable_provider
 import com.hereliesaz.geministrator.resources.inspector_approve_nested_gate
 import com.hereliesaz.geministrator.resources.inspector_approve_plan
+import com.hereliesaz.geministrator.resources.inspector_plan_show_full
+import com.hereliesaz.geministrator.resources.inspector_plan_show_less
 import com.hereliesaz.geministrator.resources.inspector_approve_task
 import com.hereliesaz.geministrator.resources.inspector_artifact
 import com.hereliesaz.geministrator.resources.inspector_artifacts
@@ -361,6 +363,10 @@ internal fun TechnicalInspector(
                             ),
                             live = true,
                         )
+                    }
+                    // What is about to be approved, read before the buttons (the whole plan is on Work).
+                    if (providerPlan) {
+                        PlanPreviewBlock(taskRun.progressMessage, seed = selectedTaskId)
                     }
                     AzphaltPill(
                         label = if (providerPlan) stringResource(Res.string.inspector_approve_plan) else stringResource(Res.string.inspector_approve_task),
@@ -958,4 +964,23 @@ private fun TaskExecutor.isAgentWork(): Boolean = when (this) {
     is TaskExecutor.RoleAgent -> true
     is TaskExecutor.Distributed -> delegate.isAgentWork()
     else -> false
+}
+
+/** The plan an approval waits on: its first lines, with Show full plan when there is more. */
+@Composable
+private fun PlanPreviewBlock(plan: String?, seed: String) {
+    val preview = planPreview(plan) ?: return
+    var full by remember(seed, plan) { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(AzphaltSpacing.s)) {
+        Text(stringResource(Res.string.inspector_plan), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+        Text(if (full) plan.orEmpty().trim() else preview.shown + if (preview.truncated) "…" else "", style = AzphaltType.body, color = azphaltOnSurface())
+        if (preview.truncated) {
+            AzphaltPill(
+                label = stringResource(if (full) Res.string.inspector_plan_show_less else Res.string.inspector_plan_show_full),
+                seed = "plan-full-$seed",
+                selected = full,
+                onClick = { full = !full },
+            )
+        }
+    }
 }
