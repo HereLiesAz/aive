@@ -28,6 +28,8 @@ class UserFacingErrorTest {
                 "Visit your billing tab.\",\"type\":\"payment_required_error\",\"param\":\"quota\",\"code\":\"payment_required\"}",
             "insufficient_quota: You exceeded your current quota, please check your plan and billing details.",
             "Your credit balance is too low to access the API",
+            // Ollama Cloud, from 2026-11-09: some cloud models need credits on the account.
+            "this model requires credits; add credits to your account to use it",
         ).forEach { assertEquals(ErrorKind.OutOfCredit, classifyError(it), it) }
     }
 

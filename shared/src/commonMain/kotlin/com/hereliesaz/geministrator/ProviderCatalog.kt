@@ -186,7 +186,7 @@ object ProviderCatalog {
             displayName = "Ollama Cloud",
             apiKeyUrl = "https://ollama.com/settings/keys",
             credentialLabel = "Ollama API key",
-            description = "Large open models (DeepSeek, Kimi, GLM, gpt-oss) hosted by Ollama. Needs an API key. Free tier with weekly limits.",
+            description = "Large open models (DeepSeek, Kimi, GLM, gpt-oss) hosted by Ollama. Needs an API key. A free plan has starter usage with limits; from 2026-11-09 gemma4:31b, gpt-oss:120b, gpt-oss:20b, nemotron-3-super and nemotron-3-ultra need credits added to the account.",
         ),
         ProviderCatalogEntry(
             id = ZAI_ID,
