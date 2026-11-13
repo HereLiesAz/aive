@@ -21,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import org.jetbrains.compose.resources.pluralStringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -54,7 +55,19 @@ import com.hereliesaz.geministrator.resources.keeper_agent_directory_searching
 import com.hereliesaz.geministrator.resources.keeper_agent_directory_no_results
 import com.hereliesaz.geministrator.resources.keeper_agent_directory_unavailable
 import com.hereliesaz.geministrator.resources.keeper_agent_directory_reported_tested
-import com.hereliesaz.geministrator.resources.keeper_agent_directory_ans_unverified
+import com.hereliesaz.geministrator.resources.keeper_agent_directory_count
+import com.hereliesaz.geministrator.resources.keeper_agent_directory_query_example
+import com.hereliesaz.geministrator.resources.keeper_orphan_card_only
+import com.hereliesaz.geministrator.resources.keeper_orphan_good_at
+import com.hereliesaz.geministrator.resources.keeper_orphan_host
+import com.hereliesaz.geministrator.resources.keeper_orphan_lives_elsewhere
+import com.hereliesaz.geministrator.resources.keeper_orphan_name_claim
+import com.hereliesaz.geministrator.resources.keeper_orphan_no_description
+import com.hereliesaz.geministrator.resources.keeper_orphan_source_declared
+import com.hereliesaz.geministrator.resources.keeper_orphan_source_not_stated
+import com.hereliesaz.geministrator.resources.keeper_orphan_unverified
+import com.hereliesaz.geministrator.resources.keeper_orphan_unverified_explain
+import com.hereliesaz.geministrator.resources.keeper_orphans_heading
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_unreachable
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_use_address
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_invalid_url
@@ -99,7 +112,9 @@ import com.hereliesaz.geministrator.resources.settings_a2a_server_warning
 import com.hereliesaz.geministrator.a2a.A2aAgentConnections
 import com.hereliesaz.geministrator.a2a.A2aDrifterSeeds
 import com.hereliesaz.geministrator.a2a.AgentDirectory
+import com.hereliesaz.geministrator.a2a.AgentDirectoryEntry
 import com.hereliesaz.geministrator.a2a.AgentDirectoryResults
+import com.hereliesaz.geministrator.a2a.orphanRowFacts
 import com.hereliesaz.geministrator.a2a.A2aDrifters
 import com.hereliesaz.geministrator.a2a.DrifterTrouble
 import com.hereliesaz.geministrator.resources.confirm_cancel
@@ -109,13 +124,9 @@ import com.hereliesaz.geministrator.resources.confirm_disconnect_title
 import com.hereliesaz.geministrator.resources.confirm_reset_pairing_action
 import com.hereliesaz.geministrator.resources.confirm_reset_pairing_body
 import com.hereliesaz.geministrator.resources.confirm_reset_pairing_title
-import com.hereliesaz.geministrator.resources.firstrun_body
 import com.hereliesaz.geministrator.resources.credential_keyless_hint
 import com.hereliesaz.geministrator.resources.keyless_sources_off
 import com.hereliesaz.geministrator.resources.keyless_sources_on
-import com.hereliesaz.geministrator.resources.firstrun_connect
-import com.hereliesaz.geministrator.resources.firstrun_connect_hint
-import com.hereliesaz.geministrator.resources.firstrun_title
 import com.hereliesaz.geministrator.resources.remote_access_advanced
 import com.hereliesaz.geministrator.resources.remote_access_advanced_explain
 import com.hereliesaz.geministrator.resources.remote_access_enter_code
@@ -382,14 +393,12 @@ internal fun ProviderSettingsScreen(
                 style = AzphaltType.body,
                 color = azphaltOnSurface(),
             )
-            FirstRunFreeProvidersCard(onConnect = onConfigureProvider)
         }
 
         var addingProvider by rememberDurableBooleanState("keeper.connections.adding-provider")
         // Read as state so adding or removing an A2A agent recomposes the lists built from the catalog.
         val a2aAgents by A2aAgentConnections.connections.collectAsState()
         val a2aAgentIds = a2aAgents.mapTo(hashSetOf()) { it.providerId }
-        val directoryAnsUnverified = stringResource(Res.string.keeper_agent_directory_ans_unverified)
 
         ProviderCatalog.entries.filter { it.id in connectedProviderIds }.forEach { entry ->
             val healthRaw = healthResults?.get(entry.id)
@@ -399,7 +408,7 @@ internal fun ProviderSettingsScreen(
                 name = entry.displayName,
                 detail = (health ?: stringResource(Res.string.settings_credential_configured)) +
                     (a2aAgents.firstOrNull { it.providerId == entry.id }?.ansName?.let {
-                        " · $directoryAnsUnverified: $it"
+                        " · " + stringResource(Res.string.keeper_orphan_name_claim, it)
                     } ?: ""),
                 status = health?.substringBefore(" ·") ?: stringResource(Res.string.common_connected),
                 connected = true,
@@ -485,8 +494,17 @@ internal fun ProviderSettingsScreen(
         val missingCard = stringResource(Res.string.keeper_a2a_agent_missing_card)
         val invalidCard = stringResource(Res.string.keeper_a2a_agent_invalid_card)
         val incompatibleCard = stringResource(Res.string.keeper_a2a_agent_unsupported_binding)
-        val connectedLabel = stringResource(Res.string.common_connected)
-        val directoryReportedTested = stringResource(Res.string.keeper_agent_directory_reported_tested)
+        // A link elsewhere (a hive card that uses an orphan) can open this form with an address filled in.
+        val requestedAddress = ConnectionsRequests.a2aAddress
+        LaunchedEffect(requestedAddress) {
+            if (requestedAddress != null) {
+                ConnectionsRequests.take()
+                a2aUrlDraft = requestedAddress
+                chosenAnsClaim = null
+                a2aUrlError = null
+                addingA2aAgent = true
+            }
+        }
         AddConnectionRow(
             label = stringResource(Res.string.keeper_add_a2a_agent),
             hint = stringResource(Res.string.keeper_add_a2a_agent_hint),
@@ -494,6 +512,7 @@ internal fun ProviderSettingsScreen(
             onToggle = { addingA2aAgent = !addingA2aAgent },
         )
         if (addingA2aAgent) {
+            ProviderSectionLabel(stringResource(Res.string.keeper_orphans_heading))
             Text(
                 stringResource(Res.string.keeper_a2a_agent_explain),
                 style = AzphaltType.body,
@@ -513,7 +532,7 @@ internal fun ProviderSettingsScreen(
                     directoryResults = null
                 },
                 label = stringResource(Res.string.keeper_agent_directory_query),
-                placeholder = "research, translation, economic data",
+                placeholder = stringResource(Res.string.keeper_agent_directory_query_example),
             )
             AzphaltPill(
                 label = if (directorySearching) stringResource(Res.string.keeper_agent_directory_searching)
@@ -556,33 +575,26 @@ internal fun ProviderSettingsScreen(
                         color = azphaltOnSurface(),
                     )
                 }
+                if (result.entries.isNotEmpty()) {
+                    Text(
+                        pluralStringResource(
+                            Res.plurals.keeper_agent_directory_count, result.entries.size, result.entries.size,
+                        ),
+                        style = AzphaltType.body,
+                        color = azphaltOnSurface(),
+                    )
+                    Text(stringResource(Res.string.keeper_orphan_card_only), style = AzphaltType.body, color = azphaltMutedOnSurface())
+                }
                 result.entries.forEach { entry ->
+                    val facts = orphanRowFacts(entry)
                     ConnectionRow(
                         name = entry.name,
-                        detail = buildString {
-                            append(entry.source)
-                            if (entry.registryReportsTaskTested) {
-                                append(" · ")
-                                append(directoryReportedTested)
-                            }
-                            if (entry.description.isNotBlank()) {
-                                append(" · ")
-                                append(entry.description)
-                            }
-                            if (entry.skills.isNotEmpty()) {
-                                append(" · ")
-                                append(entry.skills.joinToString(", "))
-                            }
-                            if (entry.ansName != null) {
-                                append(" · ")
-                                append(directoryAnsUnverified)
-                                append(": ")
-                                append(entry.ansName)
-                            }
-                        },
-                        status = if (entry.connectedProviderId != null) connectedLabel else null,
+                        detail = orphanDetail(entry),
+                        status = orphanBadges(connected = entry.connectedProviderId != null, livesElsewhere = facts.livesElsewhere),
                         connected = entry.connectedProviderId != null,
                         compact = compact,
+                        // A connected orphan links to where it is set up: its source screen.
+                        onDetailClick = entry.connectedProviderId?.let { id -> { onConfigureProvider(id) } },
                     ) {
                         if (entry.connectedProviderId == null) {
                             AzphaltPill(
@@ -602,10 +614,18 @@ internal fun ProviderSettingsScreen(
             if (directoryResults == null && suggestions.isNotEmpty()) {
                 Text(stringResource(Res.string.keeper_a2a_agent_suggestions), style = AzphaltType.body, color = azphaltOnSurface())
                 suggestions.forEach { seed ->
+                    // An example is an orphan like any other: the same badges, Source and Host lines.
+                    val example = AgentDirectoryEntry(
+                        cardUrl = seed.cardUrl,
+                        name = seed.name,
+                        description = "${seed.about} · Run by ${seed.runBy}",
+                        skills = emptyList(),
+                        source = "",
+                    )
                     ConnectionRow(
                         name = seed.name,
-                        detail = "${seed.about} · Run by ${seed.runBy}",
-                        status = null,
+                        detail = orphanDetail(example),
+                        status = orphanBadges(connected = false, livesElsewhere = orphanRowFacts(example).livesElsewhere),
                         connected = false,
                         compact = compact,
                     ) {
@@ -1545,35 +1565,46 @@ internal fun ProviderSettingsScreen(
     }
 }
 
-/** New-user shortcut: the keyless providers, each one tap from its connect screen. */
+/** The badges on one directory row, in one place and one size: Connected when it is, always Unverified, and Lives elsewhere unless it runs on this computer. */
 @Composable
-private fun FirstRunFreeProvidersCard(onConnect: (String) -> Unit) {
-    val keyless = ProviderCatalog.builtInEntries.filter { it.keyOptional }
-    if (keyless.isEmpty()) return
-    AzphaltRecord(
-        seed = "first-run-free",
-        eyebrow = stringResource(Res.string.firstrun_title),
-        title = stringResource(Res.string.firstrun_title),
-        body = stringResource(Res.string.firstrun_body),
-        endCap = null,
-        well = {
-            Column(verticalArrangement = Arrangement.spacedBy(AzphaltSpacing.s)) {
-                keyless.forEach { entry ->
-                    AzphaltPill(
-                        label = stringResource(Res.string.firstrun_connect, entry.displayName),
-                        seed = "first-run-${entry.id}",
-                        onClick = { onConnect(entry.id) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                Text(
-                    stringResource(Res.string.firstrun_connect_hint),
-                    style = AzphaltType.body,
-                    color = azphaltOnSurface(),
-                )
-            }
-        },
-    )
+private fun orphanBadges(connected: Boolean, livesElsewhere: Boolean): String = listOfNotNull(
+    stringResource(Res.string.common_connected).takeIf { connected },
+    stringResource(Res.string.keeper_orphan_unverified),
+    stringResource(Res.string.keeper_orphan_lives_elsewhere).takeIf { livesElsewhere },
+).joinToString(" · ")
+
+/**
+ * What one directory row says about an orphan, and no more: what it says it does, what it is good at, its Source and
+ * Host (not stated until the directory declares them; the host is the endpoint's own hostname, never a guessed vendor),
+ * its unverified name claim, a registry note only when there is one, and why none of it is proven.
+ */
+@Composable
+private fun orphanDetail(entry: AgentDirectoryEntry): String {
+    val facts = orphanRowFacts(entry)
+    return buildString {
+        append(entry.description.ifBlank { stringResource(Res.string.keeper_orphan_no_description) })
+        if (entry.skills.isNotEmpty()) {
+            append('\n')
+            append(stringResource(Res.string.keeper_orphan_good_at, entry.skills.joinToString(", ")))
+        }
+        append('\n')
+        append(
+            facts.declaredSource?.let { stringResource(Res.string.keeper_orphan_source_declared, it) }
+                ?: stringResource(Res.string.keeper_orphan_source_not_stated),
+        )
+        append('\n')
+        append(stringResource(Res.string.keeper_orphan_host, facts.hostLine))
+        entry.ansName?.let {
+            append('\n')
+            append(stringResource(Res.string.keeper_orphan_name_claim, it))
+        }
+        if (facts.registryTriedATest) {
+            append('\n')
+            append(stringResource(Res.string.keeper_agent_directory_reported_tested))
+        }
+        append('\n')
+        append(stringResource(Res.string.keeper_orphan_unverified_explain))
+    }
 }
 
 @Composable

@@ -229,6 +229,9 @@ internal fun TechnicalInspector(
     }
 
     val scope = rememberCoroutineScope()
+    // A source named on this sheet opens that source's own screen (the existing onReconfigureProvider).
+    val placeLinks = LocalPlaceLinks.current
+    val sourceLink: (String?) -> (() -> Unit)? = { id -> if (id == null) null else placeLinks.openSource?.let { open -> { open(id) } } }
     var messageDraftSaved by rememberDurableStringState(
         key = "inspector.${liveWorkflow.run.id.value}.$selectedTaskId.message",
     )
@@ -545,10 +548,11 @@ internal fun TechnicalInspector(
                 (taskRun.assignedRoleId?.value ?: task.roleId?.value)
                     ?.takeIf { it != executor.reference() }
                     ?.let { LiveInspectorLine(stringResource(Res.string.inspector_responsible_role), it) }
+                // The source that answered links to that source's own screen; with none yet, to Connections.
                 LiveInspectorLine(
                     stringResource(Res.string.inspector_provider),
                     taskRun.assignedProviderId?.value ?: "—",
-                    onClick = onOpenConnections,
+                    onClick = sourceLink(taskRun.assignedProviderId?.value) ?: onOpenConnections,
                 )
                 LiveInspectorLine(stringResource(Res.string.inspector_attempt), taskRun.attempt.toString())
                 LiveInspectorLine(stringResource(Res.string.inspector_provider_run), taskRun.providerRunId?.value ?: "—")
@@ -716,9 +720,13 @@ internal fun TechnicalInspector(
                             }
                         }
                     })
-                    LiveInspectorLine(stringResource(Res.string.inspector_provider_target), taskRun.assignedProviderId?.value ?: task.executor?.let { ex ->
-                        if (ex is TaskExecutor.RoleAgent) stringResource(Res.string.inspector_any_capable_provider) else "—"
-                    } ?: stringResource(Res.string.inspector_any_capable_provider))
+                    LiveInspectorLine(
+                        stringResource(Res.string.inspector_provider_target),
+                        taskRun.assignedProviderId?.value ?: task.executor?.let { ex ->
+                            if (ex is TaskExecutor.RoleAgent) stringResource(Res.string.inspector_any_capable_provider) else "—"
+                        } ?: stringResource(Res.string.inspector_any_capable_provider),
+                        onClick = sourceLink(taskRun.assignedProviderId?.value) ?: onOpenConnections,
+                    )
                 }
             }
             CreatureTab.Mind -> {

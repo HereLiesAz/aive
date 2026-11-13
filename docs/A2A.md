@@ -17,19 +17,19 @@ The existing duplex MCP channel ([DUPLEX_MCP](architecture/DUPLEX_MCP.md)) is se
 - Disconnecting an agent forgets both.
 
 **Agent Directory.** Under the same **Connect remote agent** form,
-**Search directory** sends only the search phrase on explicit request to
+**Look for orphans** (the Search directory button) sends only the search phrase on explicit request to
 [SearchA2A](https://searcha2a.azphalt.store/), which shares its public Agent Card
 inventory with Azphalt Store. The primary HTTPS API ranks indexed agent skills
 and descriptions with embeddings when available, or explicitly labelled keyword
 matching when not. If unavailable, Aive keyword-filters SearchA2A's published
 read-only catalog from GitHub. It no longer calls a2aregistry.org directly.
 Local connections and suggestions remain available if both network sources fail.
-Search results never connect or auto-assign an agent; choosing **Use address**
+Search results never connect or auto-assign an agent; choosing **Look** (the Use address button)
 fills the same independently validated Agent Card form.
 
 **One connection path, not an adoption marketplace.** A remote A2A agent is a service hosted by its operator, not an Azphalt role/workflow package. The old hive-edge sheet once combined Store packages with public A2A orphans to make both discoverable; it was removed because the Store and Connections already perform those jobs. The Agent Card is read in Connections using `A2aDrifters.read`, and only its validated name and URL become a connection. No role is created implicitly; the user can assign the connected source to a role in Swarm. The remote source cannot approve Aive's gates or gain repository authority. Disconnecting it removes its credential and connection as before. Existing roles and saved connections are preserved.
 
-**Suggested remote agents.** Before searching, the two independently hosted A2A examples in `A2aDrifterSeeds.SEEDS` are listed only when **Connect remote agent** is expanded, excluding already connected or dismissed services. **Use address** fills the Agent Card field; it does not contact that agent or grant access. **Connect agent** validates the card before adding it. **Dismiss** hides a suggestion on this device using the existing `aive.a2a.drifters.dismissed-seeds.v1` preference. Nothing is fetched from a suggestion unless the keeper connects it.
+**Suggested remote agents.** Before searching, the two independently hosted A2A examples in `A2aDrifterSeeds.SEEDS` are listed only when **Connect remote agent** is expanded, excluding already connected or dismissed services. **Look** fills the Agent Card field; it does not contact that agent or grant access. **Connect...** validates the card before adding it. **Dismiss** hides a suggestion on this device using the existing `aive.a2a.drifters.dismissed-seeds.v1` preference. Nothing is fetched from a suggestion unless the keeper connects it.
 
 A seed must need no key, serve its JSON-RPC endpoint on its card's origin, and answer `SendMessage` with something useful for free. Each entry records when and how it was checked. Current seeds, checked 2026-11-02 by reading the card without a token (no security schemes) and sending one real `SendMessage`; both were listed as reachable and passing by [a2aregistry.org](https://a2aregistry.org/):
 
