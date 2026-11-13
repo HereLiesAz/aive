@@ -123,7 +123,7 @@ The Aive installs `.github/workflows/aive-opencode-agent.yml` on the repository'
 
 **Mitigations in place**
 - Checkout uses `persist-credentials: false`, so no Git credential is stored in the working copy.
-- The runner deletes `GITHUB_TOKEN` and the raw task from the agent process's environment. The runner, not the agent, pushes the result branch. It uses the token in a one-off remote URL and scrubs the token from push error text.
+- The agent is started by `sudo -u aive-agent env -i` with only `PATH` and its own `HOME`, so it does not inherit `GITHUB_TOKEN` or the raw task. Both are set only on the step that runs OpenCode, not at job level, so the earlier `npm install` of OpenCode never sees them. The runner, not the agent, pushes the result branch, passing the token to git through the process environment (a one-off `http.extraheader`, never argv or a remote URL) and scrubbing it from push error text.
 - The workflow requests only `contents: write` and `checks: write`. The job token expires when the job ends, and the job has a 60-minute timeout.
 - The workflow contents are managed by the app. Before each dispatch The Aive compares the installed file with its bundled template. Installing or updating it always requires a person to approve a plan that says the file will be committed directly to the default branch, even for tasks that otherwise run without a plan gate. With the engine's plan gate that is the drafted plan; a run whose approved plan did not disclose the change stops for approval again before writing the file.
 - Results land on a new branch, never the default branch, and the task can require plan approval before dispatch. The patch is surfaced as a `CodeChange` artifact for review.
@@ -133,7 +133,7 @@ The Aive installs `.github/workflows/aive-opencode-agent.yml` on the repository'
 
 **Residual risks**
 - Prompt injection can put arbitrary code on the result branch. Treat the branch as untrusted until reviewed.
-- Removing the token from the agent's environment is defense in depth, not an isolation boundary. The agent's shell runs as the same runner user as the parent process that still holds the token.
+- The agent runs as a separate unprivileged user with a clean environment, which keeps the token out of its process environment; it is defense in depth, not a sandbox. The runner user's `sudo` and the workspace it hands over remain the boundary, and a flaw there would expose the token.
 - Free Zen models may log prompts.
 - Installing the workflow requires a GitHub token with Contents **and Workflows** write access. That token can rewrite any workflow in the repository.
 - The approved workflow install still commits directly to the default branch; repositories that protect that branch must add the file themselves.
@@ -628,7 +628,7 @@ Invariant 4, together with the gate-decider, approval-policy and add-on permissi
 
 ### Accepted risks
 
-- `.github/workflows/multiplatform.yml` consumes the shared `HereLiesAz/workflows` actions at `@main`. The owner made this deliberate decision because both repositories share one owner. It is recorded here as accepted, not as an item to fix.
+- The workflows under `.github/workflows/` consume the shared `HereLiesAz/workflows` actions (four-part-version, ci-report, patch-grouped-release) at `@main`. The owner made this deliberate decision because both repositories share one owner, so repinning them is the owner's call; it is recorded here as accepted, not as an item to fix. Third-party actions and the two vendored checkouts are pinned to full commit SHAs (see the README).
 - The crash relay key ships in the APK. It is a spam filter, not an authentication secret.
 
 ## Scheduled launches

@@ -42,7 +42,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Resolve four-part build version
         id: version
-        # TODO: pin HereLiesAz/workflows to a specific commit SHA instead of @main
+        # HereLiesAz/workflows is owner-controlled and referenced at @main on purpose (docs/THREAT_MODEL.md, Accepted risks).
         uses: HereLiesAz/workflows/.github/actions/four-part-version@main
         with:
           source-version-file: gradle.properties
@@ -63,7 +63,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Resolve four-part build version
-        # TODO: pin HereLiesAz/workflows to a specific commit SHA instead of @main
+        # HereLiesAz/workflows is owner-controlled and referenced at @main on purpose (docs/THREAT_MODEL.md, Accepted risks).
         uses: HereLiesAz/workflows/.github/actions/four-part-version@main
         with:
           source-version-file: gradle.properties
@@ -586,7 +586,7 @@ jobs:
 
       - name: Derive four-part release version
         id: version
-        # TODO: pin HereLiesAz/workflows to a specific commit SHA instead of @main
+        # HereLiesAz/workflows is owner-controlled and referenced at @main on purpose (docs/THREAT_MODEL.md, Accepted risks).
         uses: HereLiesAz/workflows/.github/actions/four-part-version@main
         with:
           source-version-file: gradle.properties
@@ -639,7 +639,7 @@ jobs:
           } > release-notes.md
 
       - name: Publish grouped patch release
-        # TODO: pin HereLiesAz/workflows to a specific commit SHA instead of @main
+        # HereLiesAz/workflows is owner-controlled and referenced at @main on purpose (docs/THREAT_MODEL.md, Accepted risks).
         uses: HereLiesAz/workflows/.github/actions/patch-grouped-release@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
