@@ -85,8 +85,14 @@ internal fun Modifier.azphaltEntrance(
     index: Int,
     count: Int,
 ): Modifier {
-    val progress = remember(entrance, index, count) { Animatable(0f) }
-    LaunchedEffect(entrance, index, count) {
+    // Reduced motion: it arrives already in place, with no slide, scale, rotation or stagger.
+    val reduce = AzphaltMotion.reduceMotion
+    val progress = remember(entrance, index, count, reduce) { Animatable(entranceStartProgress(reduce)) }
+    LaunchedEffect(entrance, index, count, reduce) {
+        if (reduce) {
+            progress.snapTo(1f)
+            return@LaunchedEffect
+        }
         progress.snapTo(0f)
         val interval = if (count > 6) 18L else 34L
         delay(interval * index)
@@ -137,11 +143,18 @@ internal fun Modifier.azphaltEntrance(
     }
 }
 
+/** Where an entrance starts: already arrived when motion is reduced. */
+internal fun entranceStartProgress(reduceMotion: Boolean): Float = if (reduceMotion) 1f else 0f
+
+/** The scale a selected subject grows to; it does not grow when motion is reduced. */
+internal fun selectedScale(selected: Boolean, reduceMotion: Boolean): Float =
+    if (selected && !reduceMotion) 1.018f else 1f
+
 /** Selected/open subjects transform in place rather than being replaced by a second component. */
 @Composable
 internal fun Modifier.azphaltSelectedTransform(selected: Boolean): Modifier {
     val scale by animateFloatAsState(
-        targetValue = if (selected) 1.018f else 1f,
+        targetValue = selectedScale(selected, AzphaltMotion.reduceMotion),
         animationSpec = tween(220, easing = HouseEase),
         label = "azphalt-selected-scale",
     )
@@ -169,8 +182,9 @@ internal fun AzphaltChildBand(
 ) {
     AnimatedVisibility(
         visible = visible,
-        enter = expandVertically(animationSpec = tween(280, easing = HouseEase)) + fadeIn(tween(140)),
-        exit = shrinkVertically(animationSpec = tween(240, easing = HouseEase)) + fadeOut(tween(110)),
+        // Reduced motion: no growing or shrinking, just a quick fade.
+        enter = if (AzphaltMotion.reduceMotion) fadeIn(tween(80)) else expandVertically(animationSpec = tween(280, easing = HouseEase)) + fadeIn(tween(140)),
+        exit = if (AzphaltMotion.reduceMotion) fadeOut(tween(60)) else shrinkVertically(animationSpec = tween(240, easing = HouseEase)) + fadeOut(tween(110)),
     ) {
         content()
     }

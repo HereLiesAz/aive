@@ -32,6 +32,10 @@ import com.hereliesaz.geministrator.resources.hive_repository
 import com.hereliesaz.geministrator.resources.hive_show_hive
 import com.hereliesaz.geministrator.resources.hive_timeline
 import com.hereliesaz.geministrator.resources.hive_timeline_empty
+import com.hereliesaz.geministrator.resources.hive_timeline_failed
+import com.hereliesaz.geministrator.resources.hive_timeline_loading
+import com.hereliesaz.geministrator.resources.hive_event_workflow
+import androidx.compose.foundation.lazy.LazyColumn
 import com.hereliesaz.geministrator.resources.launch_error_check_connections
 import com.hereliesaz.geministrator.resources.timeline_view_events
 import com.hereliesaz.geministrator.resources.timeline_view_log
@@ -156,7 +160,20 @@ internal fun RunTimeline(
     var events by remember(runKey) { mutableStateOf<List<WorkflowEvent>?>(null) }
     // Reload on every change of the run, but keep showing the last events meanwhile: only a different
     // run (runKey) starts blank, so the viewer's scroll position and tab survive live updates.
-    LaunchedEffect(runKey, refreshKey) { events = onLoadTimeline() }
+    var loadFailed by remember(runKey) { mutableStateOf(false) }
+    LaunchedEffect(runKey, refreshKey) {
+        // A failing loader is said, not thrown into the composition; the last events stay on screen.
+        try {
+            events = onLoadTimeline()
+            loadFailed = false
+        } catch (cancelled: kotlin.coroutines.cancellation.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            loadFailed = true
+        }
+    }
+    // Sorted once per load, not on every recomposition.
+    val sortedEvents = remember(events) { events?.sortedBy { it.occurredAtEpochMillis } }
     var view by rememberDurableStringState("overview.timeline.view", TIMELINE_WATERFALL)
     val shown = when {
         view == TIMELINE_MEMORY && memoryContent == null -> TIMELINE_WATERFALL
@@ -166,6 +183,9 @@ internal fun RunTimeline(
     }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(Res.string.hive_timeline), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+        if (loadFailed) {
+            Text(stringResource(Res.string.hive_timeline_failed), style = AzphaltType.body, color = azphaltOnSurface(), modifier = Modifier.azphaltLiveRegion())
+        }
         // The way back to the hive, always in view: the places row it also lives in scrolls off a phone.
         // It rides at the start of the views' own row: Overview, Waterfall, Events, Memory.
         val overview: (@Composable () -> Unit)? = onShowHive?.let { show ->
@@ -201,11 +221,35 @@ internal fun RunTimeline(
             )
             return@Column
         }
+        val workflowLabel = stringResource(Res.string.hive_event_workflow)
+        if (shown == TIMELINE_EVENTS && sortedEvents != null && sortedEvents.isNotEmpty()) {
+            // A long run has thousands of events: only the rows in view are composed.
+            LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(count = sortedEvents.size) { index ->
+                    val event = sortedEvents[index]
+                    // An event about a creature is a link to that creature, named, not its id.
+                    val eventTask = workflowEventTaskId(event)
+                    AzphaltRecord(
+                        seed = "event-${event.occurredAtEpochMillis}-${event::class.simpleName}",
+                        eyebrow = eventTask?.let(taskName) ?: workflowLabel,
+                        title = workflowEventLabel(event),
+                        body = workflowEventDetail(event),
+                        endCap = null,
+                        onClick = eventTask?.let { id -> { onTaskSelected(id.value) } },
+                    )
+                }
+            }
+            return@Column
+        }
         Column(
             modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            val list = events ?: return@Column
+            val list = events
+            if (list == null) {
+                if (!loadFailed) Text(stringResource(Res.string.hive_timeline_loading), style = AzphaltType.body, color = azphaltOnSurface())
+                return@Column
+            }
             if (list.isEmpty()) {
                 Text(stringResource(Res.string.hive_timeline_empty), style = AzphaltType.body, color = azphaltOnSurface())
                 return@Column
@@ -221,19 +265,6 @@ internal fun RunTimeline(
                     }
                 }
                 RunWaterfallChart(waterfall, taskName, selectedTaskId, onTaskSelected)
-                return@Column
-            }
-            list.sortedBy { it.occurredAtEpochMillis }.forEach { event ->
-                // An event about a creature is a link to that creature, named, not its id.
-                val eventTask = workflowEventTaskId(event)
-                AzphaltRecord(
-                    seed = "event-${event.occurredAtEpochMillis}-${event::class.simpleName}",
-                    eyebrow = eventTask?.let(taskName) ?: "workflow",
-                    title = workflowEventLabel(event),
-                    body = workflowEventDetail(event),
-                    endCap = null,
-                    onClick = eventTask?.let { id -> { onTaskSelected(id.value) } },
-                )
             }
         }
     }

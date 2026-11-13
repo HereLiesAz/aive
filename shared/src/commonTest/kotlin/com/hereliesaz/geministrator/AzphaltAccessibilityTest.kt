@@ -83,4 +83,13 @@ class AzphaltAccessibilityTest {
         assertEquals("Ship it", recordDescription("Ship it", "", null, null))
         assertEquals("Ship it, Task", recordDescription("Ship it", "Task", " ", ""))
     }
+
+    @Test
+    fun reducedMotionEntersInPlaceAndDoesNotGrowTheSelection() {
+        assertEquals(1f, entranceStartProgress(reduceMotion = true))
+        assertEquals(0f, entranceStartProgress(reduceMotion = false))
+        assertEquals(1f, selectedScale(selected = true, reduceMotion = true))
+        assertTrue(selectedScale(selected = true, reduceMotion = false) > 1f)
+        assertEquals(1f, selectedScale(selected = false, reduceMotion = false))
+    }
 }

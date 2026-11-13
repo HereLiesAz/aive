@@ -609,6 +609,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_launch_failed">The swarm could not launch.</string>
     <string name="hive_timeline">TIMELINE</string>
     <string name="hive_timeline_empty">Nothing has happened in this swarm yet.</string>
+    <string name="hive_timeline_loading">Loading the timeline…</string>
+    <string name="hive_timeline_failed">The timeline could not be loaded.</string>
+    <string name="hive_event_workflow">workflow</string>
     <string name="hive_show_timeline">Timeline</string>
     <string name="hive_show_hive">Overview</string>
     <string name="planning_title">THE PLAN IS BEING MADE</string>
