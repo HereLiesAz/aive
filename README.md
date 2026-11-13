@@ -51,7 +51,9 @@ npm --prefix relay test                     # relay Worker tests (Node 20+, no i
 node tools/puppet-rig/test/rig-core.mjs     # puppet-rig editor tests
 ~~~
 
-Release signing needs `HAIVE_KEYSTORE_PATH`, `KEYSTORE_PASSWORD` and `KEY_ALIAS`; without them release packaging fails on purpose.
+### Release signing
+
+Signed releases are built and published only by the central `HereLiesAz/workflows` `android-play-release` run (the repo's `android-play-release.yml` is a hand-off stub); this repo holds no signing material and `multiplatform.yml` builds unsigned debug and R8-minified variants. The central run keeps the upload key in its own environment named after this repository, writes it to `app/keystore.jks` and gives Gradle `HAIVE_KEYSTORE_PATH`, `HAIVE_KEYSTORE_TYPE=JKS`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD` (`androidApp/build.gradle.kts` also accepts `KEYSTORE_FILE` or a local `app/keystore.jks`). With none of them present a release build is simply unsigned.
 
 ### Bumping the vendor pins
 
