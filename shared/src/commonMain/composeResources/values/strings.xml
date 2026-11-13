@@ -2115,5 +2115,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="step_tool_label">Tool it may use</string>
     <string name="step_tool_none">None</string>
     <string name="step_tool_name_hint">Name of the connected tool</string>
+    <string name="improvement_quick_change">quick change</string>
+    <string name="improvement_new_generation">new generation</string>
     <string name="step_always_asks">Always asks you first, and tries once</string>
 </resources>

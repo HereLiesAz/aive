@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 /*
  * Templates and their lineage (docs/Step-Templates.md). A template is a starting point the Nanny can improve over
  * time: a step template (a task for a role) or a role template (a role's own definition). One mechanism serves both.
- * Every improvement is a child generation of the version it came from; siblings may coexist; retiring a revision
+ * Every improvement is a child of of the version it came from (a quick change stays in its parent's generation, a new generation is the next one); siblings may coexist; retiring a revision
  * archives its branch and keeps it. What a template is for and what it may change (its LOCKED fields) never changes
  * by a proposal alone.
  */
@@ -136,7 +136,7 @@ data class TemplateRevisionDraft(
 
 /**
  * An adopted revision: a child generation. [parentVersion] is the version it descends from (a built-in or another
- * revision), [generation] counts from the built-in (1 for its first child), [mutation] says what changed and
+ * revision), [generation] counts from the built-in, which is generation 1, [mutation] says what changed and
  * [fitness] is the Nanny's run evidence it was adopted on. [body] is the full result.
  */
 @Serializable

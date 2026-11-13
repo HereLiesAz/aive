@@ -58,6 +58,8 @@ internal class ImprovementAdoption(
     private val saveRole: suspend (roleId: String, instructions: String) -> Unit,
     private val roleLedger: () -> RoleInstructionProposalLedger = { RoleInstructionProposalsHost.ledger },
     private val now: () -> Long = ::currentEpochMillis,
+    /** The keeper's adopted template revisions (the lineage of step templates and roles); null when none is kept. */
+    private val templates: com.hereliesaz.geministrator.template.TemplateStore? = null,
 ) {
     private val decisions = Mutex()
 
@@ -108,7 +110,26 @@ internal class ImprovementAdoption(
                 RoleInstructionApproval.NotFound -> AdoptionResult.Stale
             }
         }
-        when (val plan = ImprovementApplier.plan(proposal, roles, hives)) {
+        when (val plan = ImprovementApplier.plan(proposal, roles, hives, templates?.revisions().orEmpty(), at)) {
+            is ImprovementApplier.Plan.TemplateRevision -> {
+                val store = templates ?: return@withLock AdoptionResult.Cannot("No template store is available.")
+                if (plan.stale) {
+                    this.store.decide(proposal.id) { it.copy(status = ProposalStatus.Superseded, decidedAtEpochMillis = at, note = "The template changed since it was drafted.") }
+                    return@withLock AdoptionResult.Stale
+                }
+                // The keeper's adoption is the selection: the revision is recorded only if its version is still free.
+                val recordedRevision = try {
+                    store.adopt(plan.revision)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    return@withLock AdoptionResult.SaveFailed(failure.message ?: failure::class.simpleName.orEmpty())
+                }
+                if (!recordedRevision) return@withLock AdoptionResult.Stale
+                val decided = this.store.decide(proposal.id) { it.copy(status = ProposalStatus.Adopted, decidedAtEpochMillis = at, appliedBefore = plan.before, appliedAfter = plan.after) }
+                appLog("Improvement", "Adopted: ${proposal.summary} (${plan.kind.label} ${plan.templateId})")
+                recorded(AdoptionResult.Done, decided)
+            }
             is ImprovementApplier.Plan.RoleInstructions -> {
                 save { saveRole(plan.roleId, plan.after) }?.let { return@withLock it }
                 val decided = store.decide(proposal.id) { it.copy(status = ProposalStatus.Adopted, decidedAtEpochMillis = at, appliedBefore = plan.before, appliedAfter = plan.after) }
@@ -143,6 +164,23 @@ internal class ImprovementAdoption(
         }
         val at = now()
         when (proposal.kind) {
+            com.hereliesaz.geministrator.workflow.improvement.ImprovementKind.TaskTemplate -> {
+                // Retiring archives the branch (it stays in the lineage); only the newest line can be put back.
+                val store = templates ?: return@withLock AdoptionResult.RevertConflict
+                val revision = store.revisions().firstOrNull { it.proposalId == proposal.id } ?: return@withLock AdoptionResult.RevertConflict
+                val catalog = com.hereliesaz.geministrator.template.TemplateCatalog(
+                    com.hereliesaz.geministrator.template.BuiltInTemplates.bases(roles()),
+                    store.revisions(),
+                )
+                val stillCurrent = revision.status == com.hereliesaz.geministrator.template.TemplateStatus.Candidate ||
+                    catalog.current(revision.kind, revision.templateId)?.version == revision.version
+                if (!stillCurrent) return@withLock AdoptionResult.RevertConflict
+                save {
+                    store.merge { all ->
+                        com.hereliesaz.geministrator.template.TemplateCatalog.retire(all, revision.kind, revision.templateId, revision.version)
+                    }
+                }?.let { return@withLock it }
+            }
             com.hereliesaz.geministrator.workflow.improvement.ImprovementKind.RoleInstruction -> {
                 val current = roles().firstOrNull { it.id.value == proposal.target }?.instructions
                 if (!ImprovementApplier.canRevert(proposal, current)) return@withLock AdoptionResult.RevertConflict

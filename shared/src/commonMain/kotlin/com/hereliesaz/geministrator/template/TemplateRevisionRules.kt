@@ -124,6 +124,13 @@ object TemplateRevisionRules {
     }
 }
 
+/** The mode a template proposal's text asks for, or null when the text is not a template draft. */
+fun revisionModeOf(proposalText: String): RevisionMode? = try {
+    kotlinx.serialization.json.Json { ignoreUnknownKeys = true }.decodeFromString(TemplateRevisionDraft.serializer(), proposalText).mode
+} catch (_: Exception) {
+    null
+}
+
 /** When the Nanny may propose: quick changes whenever there is evidence, new generations rarely, batched at a swarm's end. */
 fun proposalAllowed(mode: RevisionMode, evidenceSteps: Int, swarmEnded: Boolean): Boolean =
     evidenceSteps >= mode.minEvidenceSteps && (mode == RevisionMode.Memetic || swarmEnded)

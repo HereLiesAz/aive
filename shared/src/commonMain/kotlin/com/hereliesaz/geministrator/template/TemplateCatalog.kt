@@ -57,9 +57,9 @@ class TemplateCatalog(
     fun nextVersion(kind: TemplateKind, id: String): Int =
         maxOf(root(kind, id)?.version ?: 0, forTemplate(kind, id).maxOfOrNull { it.version } ?: 0) + 1
 
-    /** Generation of [version]: 0 for a built-in, a revision's own number otherwise. */
+    /** Generation of [version]: 1 for a built-in, a revision's own number otherwise. */
     fun generationOf(kind: TemplateKind, id: String, version: Int): Int =
-        forTemplate(kind, id).firstOrNull { it.version == version }?.generation ?: 0
+        forTemplate(kind, id).firstOrNull { it.version == version }?.generation ?: 1
 
     /** Every revision of one template, retired branches included: the lineage the keeper can read. */
     fun lineage(kind: TemplateKind, id: String): List<TemplateRevision> =
