@@ -1,5 +1,7 @@
 package com.hereliesaz.geministrator.providers.llm
 
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import com.hereliesaz.geministrator.net.HttpStatusFailure
 import com.hereliesaz.geministrator.net.parseRetryAfterMillis
 import com.hereliesaz.geministrator.domain.PromptReusePolicy
@@ -447,18 +449,28 @@ class AnthropicMessagesApi(
      * (current models), a fixed budget (Haiku 4.5 and older), then none.
      */
     private var thinkingMode = 0
+    private val thinkingModeLock = Mutex()
+
+    /**
+     * Moves past [rejected], the mode a refusal came from, and only if nobody has already: two streams refused at once for
+     * the same mode must advance one step between them, not two (which skipped the budget mode straight to none).
+     */
+    private suspend fun advancePast(rejected: Int) = thinkingModeLock.withLock {
+        if (thinkingMode == rejected) thinkingMode = rejected + 1
+    }
 
     override suspend fun stream(prompt: String, onChunk: suspend (TextGenerationChunk) -> Unit): TextGenerationResult =
         stream(CacheablePrompt(dynamicSuffix = prompt), onChunk)
 
     override suspend fun stream(prompt: CacheablePrompt, onChunk: suspend (TextGenerationChunk) -> Unit): TextGenerationResult {
         while (true) {
-            val mode = THINKING_MODES.getOrNull(thinkingMode)
+            val index = thinkingModeLock.withLock { thinkingMode }
+            val mode = THINKING_MODES.getOrNull(index)
             try {
                 return streamOnce(prompt, mode, onChunk)
             } catch (rejected: StreamRejected) {
                 if (mode == null || !rejected.rejectsReasoning()) throw rejected
-                thinkingMode++
+                advancePast(index)
             }
         }
     }

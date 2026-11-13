@@ -19,6 +19,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.OutgoingContent
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -71,6 +72,32 @@ class StreamingTextGenerationTest {
         assertFailsWith<OutputTruncatedException> {
             OpenAiCompatibleChatApi(LlmApiKeyProvider { "k" }, model = "m", baseUrl = "https://example.test/v1", client = compat).stream("go") {}
         }
+    }
+
+    @Test
+    fun twoStreamsRefusedAtOnceAdvanceTheThinkingModeOneStepNotTwo() = runTest {
+        val bodies = mutableListOf<String>()
+        val bothArrived = kotlinx.coroutines.CompletableDeferred<Unit>()
+        var firstRound = 0
+        val client = sseClient(bodies) { body ->
+            when {
+                "adaptive" in body -> {
+                    if (++firstRound == 2) bothArrived.complete(Unit)
+                    bothArrived.await()
+                    respond("""{"error":{"message":"thinking.type adaptive is not supported"}}""", HttpStatusCode.BadRequest)
+                }
+                "budget_tokens" in body -> sse(
+                    """{"type":"content_block_delta","delta":{"type":"text_delta","text":"ok"}}""",
+                    """{"type":"message_stop"}""",
+                )
+                else -> respond("""{"error":{"message":"the budget mode was skipped"}}""", HttpStatusCode.InternalServerError)
+            }
+        }
+        val api = AnthropicMessagesApi(LlmApiKeyProvider { "k" }, client = client)
+        val a = async { api.stream("one") {} }
+        val b = async { api.stream("two") {} }
+        assertEquals("ok", a.await().text)
+        assertEquals("ok", b.await().text)
     }
 
     @Test
