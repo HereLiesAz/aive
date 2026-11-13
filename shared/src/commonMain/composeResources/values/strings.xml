@@ -857,7 +857,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_delete_keep">Keep it</string>
     <string name="hive_delete_refused_live">A run of this swarm is live. Delete is back when it stops.</string>
     <string name="hive_delete_refused_circuit">Another swarm uses this one as a circuit, so it stays. Nothing was deleted.</string>
-    <string name="hive_delete_refused_package">This swarm came from a package. Remove the package in the Store instead. Nothing was deleted.</string>
+    <string name="hive_delete_refused_package">This swarm came from a package, so it goes when the package is removed. Nothing was deleted.</string>
+    <string name="hive_delete_open_store">Open the Store</string>
     <string name="hive_delete_refused_unknown">This swarm is already gone.</string>
     <string name="hive_delete_failed">The swarm could not be deleted. Nothing was changed.</string>
     <string name="build_knot_on_success">On success</string>
