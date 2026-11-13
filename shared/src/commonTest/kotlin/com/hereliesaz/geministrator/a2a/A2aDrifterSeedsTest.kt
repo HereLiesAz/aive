@@ -81,7 +81,8 @@ class A2aDrifterSeedsTest {
         val seed = A2aDrifterSeeds.SEEDS.first()
         A2aDrifters.offerSeeds(listOf(seed))
         val client = HttpClient(MockEngine { respond("", HttpStatusCode.ServiceUnavailable) })
-        val read = A2aDrifters.bringIn(seed.cardUrl, client, seeded = true)
+        // Closed when done: an engine left open outlives the test and can report its failure to whichever test runs next.
+        val read = try { A2aDrifters.bringIn(seed.cardUrl, client, seeded = true) } finally { client.close() }
         // The failure lands on the seed, which keeps its name.
         assertEquals(DrifterTrouble.Unreachable, read.trouble)
         assertEquals(seed.name, A2aDrifters.waiting.value.single().name)
