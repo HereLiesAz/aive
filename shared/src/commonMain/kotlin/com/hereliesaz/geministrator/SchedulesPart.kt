@@ -33,8 +33,6 @@ import com.hereliesaz.geministrator.resources.schedule_day_6
 import com.hereliesaz.geministrator.resources.schedule_day_7
 import com.hereliesaz.geministrator.resources.schedule_day_earlier
 import com.hereliesaz.geministrator.resources.schedule_day_later
-import com.hereliesaz.geministrator.resources.schedule_hour_earlier
-import com.hereliesaz.geministrator.resources.schedule_hour_later
 import com.hereliesaz.geministrator.resources.schedule_hours_less
 import com.hereliesaz.geministrator.resources.schedule_hours_more
 import com.hereliesaz.geministrator.resources.schedule_kind_daily
@@ -56,14 +54,11 @@ import com.hereliesaz.geministrator.resources.confirm_remove_schedule_action
 import com.hereliesaz.geministrator.resources.confirm_remove_schedule_body
 import com.hereliesaz.geministrator.resources.confirm_remove_schedule_title
 import com.hereliesaz.geministrator.resources.schedule_remove
-import com.hereliesaz.geministrator.resources.schedule_dst_eu
-import com.hereliesaz.geministrator.resources.schedule_dst_none
-import com.hereliesaz.geministrator.resources.schedule_dst_us
 import com.hereliesaz.geministrator.resources.schedule_pill_named
+import com.hereliesaz.geministrator.resources.schedule_time_error
+import com.hereliesaz.geministrator.resources.schedule_time_label
 import com.hereliesaz.geministrator.resources.schedule_unreadable
 import com.hereliesaz.geministrator.resources.schedule_unreadable_discard
-import com.hereliesaz.geministrator.resources.schedule_zone_east
-import com.hereliesaz.geministrator.resources.schedule_zone_west
 import com.hereliesaz.geministrator.resources.schedule_run_now
 import com.hereliesaz.geministrator.resources.schedule_run_now_note
 import com.hereliesaz.geministrator.resources.schedule_film_added
@@ -103,6 +98,12 @@ private fun dayLabel(day: Int): String = stringResource(
 
 private fun hourLabel(hour: Int) = hour.toString().padStart(2, '0') + ":00"
 
+/** The hour of a typed time of day: "7:00" and "07:00" are 7; null for anything else, so a half-typed time changes nothing. */
+internal fun parseScheduleHour(text: String): Int? {
+    val match = Regex("""(\d{1,2}):00""").matchEntire(text.trim()) ?: return null
+    return match.groupValues[1].toInt().takeIf { it in 0..23 }
+}
+
 /** "UTC", "UTC-6", "UTC+5:30". */
 internal fun offsetLabel(minutes: Int): String {
     if (minutes == 0) return "UTC"
@@ -135,6 +136,10 @@ internal fun SchedulesPart(compact: Boolean) {
     var unreadable by remember { mutableStateOf(false) }
     var confirmingDiscard by remember { mutableStateOf(false) }
     suspend fun refresh() {
+        // A schedule's hour is the device's own: bring its offset to the device's now (this also follows a daylight-saving change).
+        val device = deviceUtcOffsetMinutes()
+        store.all().filter { it.cadence.kind != ScheduleCadence.Kind.EveryHours && (it.utcOffsetMinutes != device || it.daylightSaving != DaylightSaving.None) }
+            .forEach { stale -> runCatching { store.update(stale.id) { it.copy(utcOffsetMinutes = device, daylightSaving = DaylightSaving.None) } } }
         items = store.all()
         unreadable = store.unreadable()
     }
@@ -316,40 +321,6 @@ private fun ScheduleCard(
                         )
                     }
                 }
-                if (schedule.cadence.kind != ScheduleCadence.Kind.EveryHours) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AzphaltPill(
-                            label = stringResource(Res.string.schedule_zone_west) + " (" + offsetLabel(schedule.utcOffsetMinutes) + ")",
-                            seed = "schedule-zone-west-${schedule.id}",
-                            onClick = { onEdit { it.copy(utcOffsetMinutes = (it.utcOffsetMinutes - 30).coerceAtLeast(-14 * 60), lastStartedAtEpochMillis = null, createdAtEpochMillis = currentEpochMillis()) } },
-                        )
-                        AzphaltPill(
-                            label = stringResource(Res.string.schedule_zone_east),
-                            seed = "schedule-zone-east-${schedule.id}",
-                            onClick = { onEdit { it.copy(utcOffsetMinutes = (it.utcOffsetMinutes + 30).coerceAtMost(14 * 60), lastStartedAtEpochMillis = null, createdAtEpochMillis = currentEpochMillis()) } },
-                        )
-                        // None, then the US rule, then the EU rule: the offset above is the winter one.
-                        AzphaltPill(
-                            label = stringResource(
-                                when (schedule.daylightSaving) {
-                                    DaylightSaving.None -> Res.string.schedule_dst_none
-                                    DaylightSaving.UnitedStates -> Res.string.schedule_dst_us
-                                    DaylightSaving.Europe -> Res.string.schedule_dst_eu
-                                },
-                            ),
-                            seed = "schedule-dst-${schedule.id}",
-                            onClick = {
-                                onEdit {
-                                    it.copy(
-                                        daylightSaving = DaylightSaving.entries[(it.daylightSaving.ordinal + 1) % DaylightSaving.entries.size],
-                                        lastStartedAtEpochMillis = null,
-                                        createdAtEpochMillis = currentEpochMillis(),
-                                    )
-                                }
-                            },
-                        )
-                    }
-                }
                 CadenceEditor(schedule.cadence) { cadence -> onEdit { it.copy(cadence = cadence, createdAtEpochMillis = currentEpochMillis(), lastStartedAtEpochMillis = null) } }
             }
         },
@@ -374,6 +345,19 @@ private fun CadenceEditor(cadence: ScheduleCadence, onChange: (ScheduleCadence) 
                 )
             }
         }
+        if (cadence.kind != ScheduleCadence.Kind.EveryHours) {
+            // The time is typed in the device's own time zone; the schedule follows it (see SchedulesPart's refresh).
+            var timeText by remember { mutableStateOf(hourLabel(cadence.hourUtc)) }
+            AzphaltTextField(
+                value = timeText,
+                onValueChange = { text ->
+                    timeText = text
+                    parseScheduleHour(text)?.let { hour -> if (hour != cadence.hourUtc) onChange(cadence.copy(hourUtc = hour)) }
+                },
+                label = stringResource(Res.string.schedule_time_label),
+                errorMessage = if (timeText.isNotBlank() && parseScheduleHour(timeText) == null) stringResource(Res.string.schedule_time_error) else null,
+            )
+        }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             when (cadence.kind) {
                 ScheduleCadence.Kind.EveryHours -> {
@@ -381,8 +365,6 @@ private fun CadenceEditor(cadence: ScheduleCadence, onChange: (ScheduleCadence) 
                     AzphaltPill(stringResource(Res.string.schedule_hours_more), "cadence-hours-more", onClick = { onChange(cadence.copy(everyHours = (cadence.everyHours + 1).coerceAtMost(24 * 31))) })
                 }
                 ScheduleCadence.Kind.Daily, ScheduleCadence.Kind.Weekly -> {
-                    AzphaltPill(stringResource(Res.string.schedule_hour_earlier), "cadence-hour-earlier", onClick = { onChange(cadence.copy(hourUtc = (cadence.hourUtc + 23) % 24)) })
-                    AzphaltPill(stringResource(Res.string.schedule_hour_later), "cadence-hour-later", onClick = { onChange(cadence.copy(hourUtc = (cadence.hourUtc + 1) % 24)) })
                     if (cadence.kind == ScheduleCadence.Kind.Weekly) {
                         AzphaltPill(stringResource(Res.string.schedule_day_earlier), "cadence-day-earlier", onClick = { onChange(cadence.copy(dayOfWeek = (cadence.dayOfWeek + 5) % 7 + 1)) })
                         AzphaltPill(stringResource(Res.string.schedule_day_later), "cadence-day-later", onClick = { onChange(cadence.copy(dayOfWeek = cadence.dayOfWeek % 7 + 1)) })
