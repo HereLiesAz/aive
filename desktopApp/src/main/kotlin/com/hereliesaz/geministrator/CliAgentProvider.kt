@@ -93,7 +93,8 @@ internal class CliAgentProvider(
 
     private val mutex = Mutex()
     private val sessions = mutableMapOf<ProviderRunId, Session>()
-    private val noHooks: File by lazy { Files.createTempDirectory(tempRoot.toPath(), "aive-cli-nohooks-").toFile() }
+    /** The empty hooks directory git is pointed at: one for the process (see [sharedNoHooksDir]), removed when it exits. */
+    internal val noHooks: File by lazy { sharedNoHooksDir(tempRoot) }
 
     /** Cheap, because selection asks every provider every time: empty while it is off or its program is gone. */
     override suspend fun capabilities(): AgentCapabilities =
@@ -273,6 +274,22 @@ internal class CliAgentProvider(
     private fun clean(text: String, max: Int = MAX_LINE_CHARS): String = ControlRedaction.scrub(text).take(max)
 
     companion object {
+        private val noHooksDirs = mutableMapOf<String, File>()
+
+        /**
+         * The empty directory git's `core.hooksPath` points at, shared by every provider with this [root] and deleted at exit.
+         * Each provider used to make its own and never remove it, and the providers are rebuilt whenever settings change, so
+         * the temp folder collected one directory per rebuild.
+         */
+        @Synchronized
+        internal fun sharedNoHooksDir(root: File): File {
+            val key = root.absolutePath
+            noHooksDirs[key]?.takeIf { it.isDirectory }?.let { return it }
+            return Files.createTempDirectory(root.toPath(), "aive-cli-nohooks-").toFile()
+                .also { it.deleteOnExit() }
+                .also { noHooksDirs[key] = it }
+        }
+
         const val DEFAULT_TIMEOUT_MILLIS = 30L * 60_000
         private const val GIT_TIMEOUT_MILLIS = 120_000L
         private const val MAX_GIT_OUTPUT_CHARS = 400_000

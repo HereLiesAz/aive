@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.providers.llm
 
+import com.hereliesaz.geministrator.net.boundedBodyText
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ArtifactKind
@@ -201,6 +202,9 @@ class GitLabWorkspaceAgentProvider(
         }
         return ProviderActionResult.Accepted
     }
+
+    // The generation runs inside observe(): collecting it again would bill it again.
+    override val observeDrivesBilledWork: Boolean = true
 
     override fun observe(runId: ProviderRunId): Flow<AgentEvent> = flow {
         val session = session(runId)
@@ -891,7 +895,7 @@ private fun RepositoryRef.gitLabApiBase(): String {
 }
 
 private suspend fun HttpResponse.requireSuccessBody(operation: String): String {
-    val body = bodyAsText()
+    val body = boundedBodyText()
     if (status.value !in 200..299) {
         error(
             "Unable to $operation: HTTP ${status.value}" +

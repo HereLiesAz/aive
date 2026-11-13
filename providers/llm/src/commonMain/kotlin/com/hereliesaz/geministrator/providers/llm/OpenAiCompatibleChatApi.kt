@@ -1,5 +1,8 @@
 package com.hereliesaz.geministrator.providers.llm
 
+import com.hereliesaz.geministrator.net.boundedBodyText
+import com.hereliesaz.geministrator.net.HttpStatusFailure
+import com.hereliesaz.geministrator.net.parseRetryAfterMillis
 import com.hereliesaz.geministrator.net.CleartextPolicy
 import com.hereliesaz.geministrator.providers.PromptCacheCapabilities
 import io.ktor.client.HttpClient
@@ -39,7 +42,7 @@ class OpenAiCompatibleChatApi(
     private val maxOutputTokenCap: Int = PlanOutputBudget.COMPATIBLE_CAP,
     /** True for a keyless endpoint used anonymously: it cannot bill, so its usage costs nothing. */
     private val freeOfCharge: Boolean = false,
-    client: HttpClient = openAiCompatibleClient(),
+    client: HttpClient = sharedLlmHttpClient(),
 ) : ToolCallingTextGenerationApi {
     private val baseUrl = baseUrl.trimEnd('/')
     private val client = client.config { followRedirects = false }
@@ -112,10 +115,12 @@ class OpenAiCompatibleChatApi(
         }
 
         if (response.status.value !in 200..299) {
-            val responseBody = response.bodyAsText().redactSecrets().take(800)
-            error(
-                "Unable to generate compatible chat response: HTTP ${response.status.value}" +
+            val responseBody = response.boundedBodyText().redactSecrets().take(800)
+            throw HttpStatusFailure(
+                status = response.status.value,
+                message = "Unable to generate compatible chat response: HTTP ${response.status.value}" +
                     responseBody.takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty(),
+                retryAfterMillis = parseRetryAfterMillis(response.headers[HttpHeaders.RetryAfter]),
             )
         }
 
@@ -148,6 +153,7 @@ class OpenAiCompatibleChatApi(
     override suspend fun stream(prompt: String, onChunk: suspend (TextGenerationChunk) -> Unit): TextGenerationResult {
         val apiKey = sendableApiKey()
         return withReasoningFallback(requestUsage, { requestUsage = false }) { usageOption ->
+            val onChunk = onChunk.cappedOutput("Compatible chat")
             val text = StringBuilder()
             val reasoning = StringBuilder()
             val splitter = ThinkTagSplitter()
@@ -220,23 +226,6 @@ private fun requireCompleteFinishReason(finishReason: String?, usage: Compatible
         throw SpentGenerationFailure(
             "Compatible chat response was truncated because the provider reached its output-token limit", null,
             usage?.promptTokens, usage?.completionTokens, usage?.cachedTokens(),
-        )
-    }
-}
-
-private fun openAiCompatibleClient(): HttpClient = HttpClient {
-    expectSuccess = false
-    followRedirects = false
-    install(HttpTimeout) {
-        requestTimeoutMillis = 90_000L
-        connectTimeoutMillis = 15_000L
-    }
-    install(ContentNegotiation) {
-        json(
-            Json {
-                ignoreUnknownKeys = true
-                explicitNulls = false
-            },
         )
     }
 }

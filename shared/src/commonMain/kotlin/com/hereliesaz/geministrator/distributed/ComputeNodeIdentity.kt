@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.distributed
 
+import com.hereliesaz.geministrator.net.boundedBodyText
 import com.russhwolf.settings.Settings
 import io.ktor.client.HttpClient
 import io.ktor.client.request.header
@@ -234,7 +235,7 @@ class ComputeNodeEnroller(
                 ),
             )
         }
-        val body = response.bodyAsText()
+        val body = response.boundedBodyText()
         if (!response.status.isSuccess()) {
             val error = runCatching { json.decodeFromString(ComputeRelayHttpError.serializer(), body) }.getOrNull()
             throw ComputeNodeEnrolmentException(

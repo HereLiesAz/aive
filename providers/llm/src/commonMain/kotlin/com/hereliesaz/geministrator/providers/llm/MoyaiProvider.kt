@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.providers.llm
 
+import com.hereliesaz.geministrator.net.boundedBodyText
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ArtifactKind
@@ -439,7 +440,7 @@ private class MoyaiApi(
 
     private suspend fun HttpResponse.requireSuccess(operation: String): HttpResponse {
         if (status.value in 200..299) return this
-        val detail = bodyAsText().redactSecrets().take(800)
+        val detail = boundedBodyText().redactSecrets().take(800)
         val message = "Unable to $operation: HTTP ${status.value}" + detail.takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty()
         if (status.value == 401 || status.value == 403) throw MoyaiSessionExpired(message)
         error(message)

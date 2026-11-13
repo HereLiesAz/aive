@@ -217,6 +217,8 @@ fun App(
                 spendCaps = { spendCapStore.caps },
                 traceExport = com.hereliesaz.geministrator.telemetry.WorkflowTraceExport.durable,
                 delegations = delegations,
+                // The runtime's cycle and its saves are not UI work.
+                runtimeDispatcher = kotlinx.coroutines.Dispatchers.Default,
             )
             projectIdToOpenAfterReload?.let { projectId ->
                 created.openProject(com.hereliesaz.geministrator.domain.ProjectId(projectId))

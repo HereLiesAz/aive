@@ -278,6 +278,10 @@ class OpenAiCompatibleChatApiTest {
         val cloudflare = HostedLlmProviders.entry(HostedLlmProviders.CLOUDFLARE_ID)!!
 
         HostedLlmProviders.textApi(cloudflare, "abc123:token")
+        // The account id becomes a URL path segment: nothing that can leave the segment is accepted.
+        listOf("a/b:token", "../x:token", "a?x=1:token", "a%2Fb:token", "a#b:token", "a b:token", "a.b:token").forEach { bad ->
+            assertFailsWith<IllegalArgumentException>(bad) { HostedLlmProviders.textApi(cloudflare, bad) }
+        }
         assertFailsWith<IllegalArgumentException> { HostedLlmProviders.textApi(cloudflare, "token-only") }
         assertNull(
             HostedLlmProviders.configured(mapOf(HostedLlmProviders.CLOUDFLARE_ID to "token-only")).firstOrNull(),

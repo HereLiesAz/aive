@@ -21,6 +21,8 @@ import com.hereliesaz.geministrator.workflow.ApprovalGateRepository
 import com.hereliesaz.geministrator.workflow.ApprovalGateStatus
 import com.hereliesaz.geministrator.workflow.FailureEscalationDecisionCommit
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.KSerializer
@@ -44,6 +46,11 @@ class SqlWorkflowPersistence(
     driver: SqlDriver,
     private val json: Json = SettingsWorkflowPersistence.defaultJson,
     migrateFrom: LegacySettingsMigration? = null,
+    /**
+     * Where the blocking SQLite calls run. The platforms' drivers are synchronous, so on the UI thread each read or
+     * write stalls a frame; the apps pass an IO dispatcher. Null runs on the caller, which a test's scheduler needs.
+     */
+    private val dispatcher: CoroutineDispatcher? = null,
 ) : DurableWorkflowPersistence {
     private val database = WorkflowDatabase(driver)
     private val queries = database.workflowQueries
@@ -246,6 +253,10 @@ class SqlWorkflowPersistence(
     }
 
     private suspend fun <T> locked(block: suspend () -> T): T = mutex.withLock {
+        if (dispatcher == null) lockedUnconfined(block) else withContext(dispatcher) { lockedUnconfined(block) }
+    }
+
+    private suspend fun <T> lockedUnconfined(block: suspend () -> T): T = run {
         pendingMigration?.let { migration ->
             // Attempted once per process. A failure (backup I/O, a newer Settings schema) leaves
             // the Settings state and the migration marker untouched, so a later start retries it;

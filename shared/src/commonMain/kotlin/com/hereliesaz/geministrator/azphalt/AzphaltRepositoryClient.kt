@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.azphalt
 
+import com.hereliesaz.geministrator.net.boundedBodyText
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.prepareGet
@@ -44,7 +45,7 @@ class AzphaltRepositoryClient(
     suspend fun index(): AzphaltRepositoryIndex {
         val response = httpClient.get("$repositoryUrl/.well-known/azphalt-repository.json")
         response.requireSuccess("read Azphalt repository index")
-        return json.decodeFromString(response.bodyAsText())
+        return json.decodeFromString(response.boundedBodyText())
     }
 
     suspend fun search(
@@ -109,14 +110,14 @@ class AzphaltRepositoryClient(
             }
         }
         response.requireSuccess("search Azphalt repository")
-        return json.decodeFromString(response.bodyAsText())
+        return json.decodeFromString(response.boundedBodyText())
     }
 
     suspend fun detail(packageId: String): AzphaltPackageDetail {
         val id = requirePackageId(packageId)
         val response = httpClient.get("$repositoryUrl/packages/$id")
         response.requireSuccess("read Azphalt package $id")
-        return json.decodeFromString(response.bodyAsText())
+        return json.decodeFromString(response.boundedBodyText())
     }
 
     suspend fun download(
@@ -183,7 +184,7 @@ class AzphaltRepositoryClient(
             setBody(json.encodeToString(normalized))
         }
         response.requireSuccess("check Azphalt package updates")
-        return json.decodeFromString<AzphaltUpdateCheckResponse>(response.bodyAsText()).updates
+        return json.decodeFromString<AzphaltUpdateCheckResponse>(response.boundedBodyText()).updates
     }
 
     suspend fun revocations(since: String? = null): List<AzphaltRevocation> {
@@ -193,7 +194,7 @@ class AzphaltRepositoryClient(
             }
         }
         response.requireSuccess("read Azphalt revocations")
-        return json.decodeFromString<AzphaltRevocationsResponse>(response.bodyAsText()).revocations
+        return json.decodeFromString<AzphaltRevocationsResponse>(response.boundedBodyText()).revocations
     }
 
     private suspend fun HttpResponse.requireSuccess(action: String) {
@@ -205,7 +206,7 @@ class AzphaltRepositoryClient(
     }
 
     private suspend fun HttpResponse.errorMessage(fallback: String): String {
-        val body = runCatching { bodyAsText().trim() }.getOrNull().orEmpty()
+        val body = runCatching { boundedBodyText().trim() }.getOrNull().orEmpty()
         return body.takeIf(String::isNotEmpty) ?: fallback
     }
 

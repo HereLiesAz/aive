@@ -32,6 +32,20 @@ suspend fun ByteReadChannel.readAllBounded(maxBytes: Int): ByteArray {
     return out.copyOf(size)
 }
 
+/** What a JSON or text reply is allowed to weigh when its caller has no tighter cap of its own. */
+const val DEFAULT_RESPONSE_MAX_BYTES: Int = 16 * 1024 * 1024
+
+/** The most of a failed reply's body that is kept: it is only quoted. */
+const val ERROR_RESPONSE_QUOTE_BYTES: Int = 16 * 1024
+
+/**
+ * The body as text with the right cap for its status: a success is read whole up to [maxBytes] (past that,
+ * [ResponseTooLargeException]); a failure is only quoted, so at most [ERROR_RESPONSE_QUOTE_BYTES] of it is read and the rest
+ * is ignored.
+ */
+suspend fun HttpResponse.boundedBodyText(maxBytes: Int = DEFAULT_RESPONSE_MAX_BYTES): String =
+    if (status.value in 200..299) boundedText(maxBytes) else boundedTextOrTruncated(ERROR_RESPONSE_QUOTE_BYTES)
+
 /** The body as UTF-8 text, never more than [maxBytes] bytes of it read; throws [ResponseTooLargeException] past that. */
 suspend fun HttpResponse.boundedText(maxBytes: Int): String {
     contentLength()?.let { if (it > maxBytes) throw ResponseTooLargeException(maxBytes.toLong()) }
@@ -56,7 +70,12 @@ suspend fun HttpResponse.boundedTextOrTruncated(maxBytes: Int): String {
  * together) it throws [ResponseTooLargeException] before the oversized line is assembled. A final line with no
  * terminator is returned; the end of the stream is null.
  */
-class BoundedLineReader(private val channel: ByteReadChannel, private val maxBytes: Long) {
+class BoundedLineReader(
+    private val channel: ByteReadChannel,
+    private val maxBytes: Long,
+    /** The most one line may hold; for a stream that lives long enough that no total cap fits it. */
+    private val maxLineBytes: Int = Int.MAX_VALUE,
+) {
     private var buffer = ByteArray(CHUNK_BYTES)
     private var start = 0
     private var end = 0
@@ -70,12 +89,14 @@ class BoundedLineReader(private val channel: ByteReadChannel, private val maxByt
             var i = scanned
             while (i < end && buffer[i] != NEWLINE) i++
             if (i < end) {
+                if (i - start > maxLineBytes) throw ResponseTooLargeException(maxLineBytes.toLong())
                 val lineEnd = if (i > start && buffer[i - 1] == RETURN) i - 1 else i
                 val line = buffer.decodeToString(start, lineEnd)
                 start = i + 1
                 return line
             }
             scanned = end
+            if (end - start > maxLineBytes) throw ResponseTooLargeException(maxLineBytes.toLong())
             if (eof) {
                 if (start == end) return null
                 val line = buffer.decodeToString(start, end)

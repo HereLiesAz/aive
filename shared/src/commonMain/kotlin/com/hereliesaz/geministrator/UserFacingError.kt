@@ -50,29 +50,38 @@ fun classifyError(raw: String?): ErrorKind {
         // A reply cut off at the provider's output limit: not a key, quota or outage problem.
         "truncated" in text && "token" in text -> ErrorKind.OutputTooLong
 
+        // What the provider said in its status and error codes decides first: a status or a code is a statement, a
+        // word in a body is not (a message about a "billing_address" field is no billing failure). A spent balance
+        // is named before the rest, since it often comes as a 429 that waiting will not fix.
+        paymentRequiredCode.containsMatchIn(text) ||
+            "payment required" in text || "payment_required" in text || "insufficient_quota" in text -> ErrorKind.OutOfCredit
+
         unauthorizedCode.containsMatchIn(text) ||
             "unauthorized" in text || "forbidden" in text || "invalid api key" in text ||
-            "invalid_api_key" in text || "incorrect api key" in text || "authentication" in text ||
-            "permission denied" in text -> ErrorKind.KeyRejected
-
-        // Before the rate limit: a spent balance often names its "quota", but waiting will not fix it.
-        paymentRequiredCode.containsMatchIn(text) ||
-            "payment required" in text || "payment_required" in text || "insufficient_quota" in text ||
-            "insufficient balance" in text || "insufficient credit" in text || "credit balance" in text ||
-            "out of credit" in text || "requires credits" in text || "add credits" in text || "need credits" in text || "billing" in text -> ErrorKind.OutOfCredit
+            "invalid_api_key" in text || "incorrect api key" in text -> ErrorKind.KeyRejected
 
         rateLimitCode.containsMatchIn(text) ||
-            "rate limit" in text || "rate-limit" in text || "ratelimit" in text ||
-            "too many requests" in text || "quota" in text || "resource_exhausted" in text -> ErrorKind.RateLimited
+            "too many requests" in text || "resource_exhausted" in text -> ErrorKind.RateLimited
 
         // A provider that is up but failing: failing over to another one is the right answer (ProviderFailover.kt).
         serverErrorCode.containsMatchIn(text) ||
-            "internal server error" in text || "bad gateway" in text || "service unavailable" in text ||
-            "overloaded" in text || "server error" in text -> ErrorKind.ServerError
+            "internal server error" in text || "bad gateway" in text || "service unavailable" in text -> ErrorKind.ServerError
 
         // A request the provider refused as malformed: its wording says which field, the keeper cannot fix that.
         badRequestCode.containsMatchIn(text) || "invalid_request" in text || "missing required parameter" in text ||
             "bad request" in text -> ErrorKind.BadRequest
+
+        // Last resort, no status or code to go on: the words alone. Before the rate limit, a spent balance that names
+        // its "quota" is still a balance.
+        "insufficient balance" in text || "insufficient credit" in text || "credit balance" in text ||
+            "out of credit" in text || "requires credits" in text || "add credits" in text || "need credits" in text ||
+            "billing" in text -> ErrorKind.OutOfCredit
+
+        "authentication" in text || "permission denied" in text -> ErrorKind.KeyRejected
+
+        "rate limit" in text || "rate-limit" in text || "ratelimit" in text || "quota" in text -> ErrorKind.RateLimited
+
+        "overloaded" in text || "server error" in text -> ErrorKind.ServerError
 
         "timeout" in text || "timed out" in text || "deadline exceeded" in text -> ErrorKind.TimedOut
 

@@ -1,5 +1,7 @@
 package com.hereliesaz.geministrator.duplex
 
+import com.hereliesaz.geministrator.net.BoundedLineReader
+import com.hereliesaz.geministrator.net.boundedBodyText
 import io.ktor.client.HttpClient
 import io.ktor.client.request.header
 import io.ktor.client.request.post
@@ -105,9 +107,10 @@ class DuplexMcpPeer(
             header(HttpHeaders.Accept, "text/event-stream")
         }.execute { response ->
             check(response.status.isSuccess()) { "duplex SSE unavailable: ${response.status.value}" }
-            val channel = response.bodyAsChannel()
+            // A notification stream lives as long as the peer: no total cap fits it, but no one line may be huge.
+            val lines = BoundedLineReader(response.bodyAsChannel(), Long.MAX_VALUE, maxLineBytes = MAX_SSE_LINE_BYTES)
             while (true) {
-                val line = channel.readUTF8Line() ?: break
+                val line = lines.readLine() ?: break
                 if (!line.startsWith("data: ")) continue
                 val frame = json.parseToJsonElement(line.removePrefix("data: ")).jsonObject
                 if (frame["method"]?.jsonPrimitive?.contentOrNull != "notifications/message") continue
@@ -134,7 +137,7 @@ class DuplexMcpPeer(
             setBody(request.toString())
         }
         check(response.status.isSuccess()) { "duplex MCP HTTP failure: ${response.status.value}" }
-        val rpc = json.parseToJsonElement(response.bodyAsText()).jsonObject
+        val rpc = json.parseToJsonElement(response.boundedBodyText()).jsonObject
         check(rpc["id"]?.jsonPrimitive?.long == id) { "duplex MCP response id mismatch" }
         check(rpc["error"] == null) { "duplex MCP RPC failure" }
         val result = rpc.getValue("result").jsonObject
@@ -177,3 +180,6 @@ data class DuplexRemoteStatus(
     val latestSequence: Long,
     val peerStreamOnline: Boolean,
 )
+
+/** The longest SSE line a duplex peer may send. */
+private const val MAX_SSE_LINE_BYTES: Int = 1024 * 1024

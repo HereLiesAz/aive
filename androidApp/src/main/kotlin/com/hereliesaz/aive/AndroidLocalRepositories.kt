@@ -1,5 +1,6 @@
 package com.hereliesaz.aive
 
+import com.hereliesaz.geministrator.net.isSafeChildName
 import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
@@ -90,6 +91,8 @@ internal class AndroidLocalRepositoryStore(context: Context) {
 
     private fun copyTree(treeUri: Uri, documentId: String, target: File) {
         children(treeUri, documentId).forEach { (id, name, isDirectory) ->
+            // The name is whatever the picked folder's provider says; one that is a path would write outside the copy.
+            if (!isSafeChildName(name)) throw IOException("The picked folder holds an entry whose name is not a plain file name.")
             val file = File(target, name)
             if (isDirectory) {
                 file.mkdirs()

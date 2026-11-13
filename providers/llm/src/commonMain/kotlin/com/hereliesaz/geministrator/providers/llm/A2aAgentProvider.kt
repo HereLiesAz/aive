@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.providers.llm
 
+import com.hereliesaz.geministrator.net.backoffMillis
 import com.hereliesaz.geministrator.a2a.A2aAgentCard
 import com.hereliesaz.geministrator.a2a.A2aArtifact
 import com.hereliesaz.geministrator.a2a.A2aCodec
@@ -74,7 +75,7 @@ class A2aAgentProvider(
     client: HttpClient = a2aClient(),
     private val pollIntervalMillis: Long = 2_000L,
     /** A remote task still unfinished after this long is reported as failed, not polled forever. */
-    private val maxObserveMillis: Long = 6L * 60L * 60L * 1_000L,
+    private val maxObserveMillis: Long = A2A_DEFAULT_MAX_OBSERVE_MILLIS,
     private val idFactory: () -> String = ::randomA2aId,
 ) : AgentProvider {
     private val api = A2aClientApi(cardUrl, bearerToken, client, idFactory)
@@ -173,6 +174,7 @@ class A2aAgentProvider(
         val startedAt = TimeSource.Monotonic.markNow()
         var consecutiveFailures = 0
         var lastState: A2aTaskState? = null
+        var unchangedPolls = 0
         val seenMessages = HashSet<String>()
         emit(AgentEvent.Progress(runId, "Connected to $displayName task ${runId.value.take(8)}"))
         while (true) {
@@ -196,7 +198,7 @@ class A2aAgentProvider(
                     sessionsMutex.withLock { sessions.remove(runId) }
                     return@flow
                 }
-                delay(pollIntervalMillis)
+                delay(backoffMillis(consecutiveFailures, null, baseMillis = pollIntervalMillis, capMillis = 30_000L))
                 continue
             } catch (failure: Exception) {
                 // One failed poll (a dropped connection, a 5xx) does not end a long-running task.
@@ -205,10 +207,12 @@ class A2aAgentProvider(
                     sessionsMutex.withLock { sessions.remove(runId) }
                     return@flow
                 }
-                delay(pollIntervalMillis)
+                delay(backoffMillis(consecutiveFailures, null, baseMillis = pollIntervalMillis, capMillis = 30_000L))
                 continue
             }
-            for (event in a2aTaskEvents(runId, task, lastState, seenMessages, displayName)) emit(event)
+            val events = a2aTaskEvents(runId, task, lastState, seenMessages, displayName)
+            for (event in events) emit(event)
+            unchangedPolls = if (events.isEmpty() && task.status.state == lastState) unchangedPolls + 1 else 0
             lastState = task.status.state
             if (task.status.state.isTerminal) {
                 if (task.status.state == A2aTaskState.Completed) {
@@ -222,7 +226,7 @@ class A2aAgentProvider(
                 sessionsMutex.withLock { sessions.remove(runId) }
                 return@flow
             }
-            delay(pollIntervalMillis)
+            delay(a2aPollDelayMillis(pollIntervalMillis, unchangedPolls))
         }
     }
 
@@ -542,6 +546,24 @@ internal class A2aClientApi(
         val ACCEPTED_OUTPUT_MODES = listOf("text/plain", "text/markdown", "application/json")
     }
 }
+
+/**
+ * How long to wait before the next poll of a task whose state has not changed for [unchangedPolls] polls: [baseMillis] for the
+ * first few, then growing by half each poll up to [capMillis]. A task that has been working for an hour does not need asking
+ * every two seconds; one that changes state is asked again quickly (the count resets).
+ */
+internal fun a2aPollDelayMillis(baseMillis: Long, unchangedPolls: Int, capMillis: Long = 30_000L): Long {
+    var delayMillis = baseMillis
+    repeat((unchangedPolls - A2A_FAST_POLLS).coerceAtLeast(0).coerceAtMost(64)) {
+        delayMillis = minOf(delayMillis * 3 / 2, maxOf(capMillis, baseMillis))
+    }
+    return delayMillis
+}
+
+/** Two hours: past it a remote task is reported as failed. Raise it for an agent that is known to run longer. */
+internal const val A2A_DEFAULT_MAX_OBSERVE_MILLIS: Long = 2L * 60L * 60L * 1_000L
+
+private const val A2A_FAST_POLLS = 5
 
 /** Polls that may fail in a row (dropped connection, 5xx) before the task is reported lost. */
 private const val MAX_CONSECUTIVE_POLL_FAILURES = 5

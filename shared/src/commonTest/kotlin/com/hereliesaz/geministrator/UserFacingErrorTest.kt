@@ -61,4 +61,22 @@ class UserFacingErrorTest {
         )
         assertEquals(ErrorKind.NoAgent, classifyError("OpenCode runs against a linked GitHub repository"))
     }
+
+    @Test
+    fun aStatusOrCodeDecidesBeforeAWordInTheBody() {
+        // A word in the body must not outrank the status the provider sent.
+        assertEquals(ErrorKind.RateLimited, classifyError("Unable to generate: HTTP 429: slow down, your billing is fine"))
+        assertEquals(ErrorKind.ServerError, classifyError("Unable to generate: HTTP 500: the quota service failed"))
+        assertEquals(ErrorKind.BadRequest, classifyError("Unable to generate: HTTP 400: invalid_request, field billing_address is missing"))
+        assertEquals(ErrorKind.KeyRejected, classifyError("Unable to generate: HTTP 401: see your billing page for a new key"))
+        // A code that says the balance is spent still wins over the 429 it rides on.
+        assertEquals(ErrorKind.OutOfCredit, classifyError("HTTP 429: {\"code\":\"insufficient_quota\"}"))
+    }
+
+    @Test
+    fun wordsAloneStillClassifyWhenThereIsNoStatus() {
+        assertEquals(ErrorKind.OutOfCredit, classifyError("Fix the billing page"))
+        assertEquals(ErrorKind.RateLimited, classifyError("You exceeded your quota"))
+        assertEquals(ErrorKind.ServerError, classifyError("The model is overloaded"))
+    }
 }

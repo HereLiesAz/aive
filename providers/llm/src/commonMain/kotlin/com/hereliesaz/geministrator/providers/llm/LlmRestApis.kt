@@ -1,5 +1,10 @@
 package com.hereliesaz.geministrator.providers.llm
 
+import com.hereliesaz.geministrator.net.boundedBodyText
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import com.hereliesaz.geministrator.net.HttpStatusFailure
+import com.hereliesaz.geministrator.net.parseRetryAfterMillis
 import com.hereliesaz.geministrator.domain.PromptReusePolicy
 import com.hereliesaz.geministrator.providers.PromptCacheCapabilities
 import com.hereliesaz.geministrator.providers.PromptCacheMode
@@ -135,20 +140,29 @@ internal suspend fun <T> withReasoningFallback(
     }
 }
 
-private fun defaultClient(): HttpClient = HttpClient {
-    expectSuccess = false
-    followRedirects = false
-    install(HttpTimeout) {
-        requestTimeoutMillis = 90_000L
-        connectTimeoutMillis = 15_000L
-    }
-    install(ContentNegotiation) {
-        json(
-            Json {
-                ignoreUnknownKeys = true
-                explicitNulls = false
-            },
-        )
+/**
+ * The one HTTP client the hosted text APIs share when they are not given their own. Each API used to build a client of its
+ * own, and the memory clerks build an API for every call, so clients (and their connection pools and threads) piled up
+ * and were never closed. The client lives as long as the process; each API derives its own view of it with [config].
+ */
+internal fun sharedLlmHttpClient(): HttpClient = sharedClient
+
+private val sharedClient: HttpClient by lazy {
+    HttpClient {
+        expectSuccess = false
+        followRedirects = false
+        install(HttpTimeout) {
+            requestTimeoutMillis = 90_000L
+            connectTimeoutMillis = 15_000L
+        }
+        install(ContentNegotiation) {
+            json(
+                Json {
+                    ignoreUnknownKeys = true
+                    explicitNulls = false
+                },
+            )
+        }
     }
 }
 
@@ -156,7 +170,7 @@ class OpenAiResponsesApi(
     private val apiKeyProvider: LlmApiKeyProvider,
     private val model: String = "gpt-5.6",
     private val baseUrl: String = "https://api.openai.com/v1",
-    client: HttpClient = defaultClient(),
+    client: HttpClient = sharedLlmHttpClient(),
 ) : TextGenerationApi {
     private val client = client.config { followRedirects = false }
 
@@ -219,6 +233,7 @@ class OpenAiResponsesApi(
 
     override suspend fun stream(prompt: String, onChunk: suspend (TextGenerationChunk) -> Unit): TextGenerationResult =
         withReasoningFallback(requestReasoning, { requestReasoning = false }) { reasoning ->
+            val onChunk = onChunk.cappedOutput("OpenAI")
             val text = StringBuilder()
             val thinking = StringBuilder()
             var usage: OpenAiUsage? = null
@@ -299,7 +314,7 @@ class XaiResponsesApi(
     private val apiKeyProvider: LlmApiKeyProvider,
     private val model: String = "grok-4.6",
     private val baseUrl: String = "https://api.x.ai/v1",
-    client: HttpClient = defaultClient(),
+    client: HttpClient = sharedLlmHttpClient(),
 ) : TextGenerationApi {
     private val delegate = OpenAiResponsesApi(
         apiKeyProvider = apiKeyProvider,
@@ -327,7 +342,7 @@ class AnthropicMessagesApi(
     private val apiKeyProvider: LlmApiKeyProvider,
     private val model: String = "claude-sonnet-5",
     private val baseUrl: String = "https://api.anthropic.com/v1",
-    client: HttpClient = defaultClient(),
+    client: HttpClient = sharedLlmHttpClient(),
 ) : ToolCallingTextGenerationApi {
     private val client = client.config { followRedirects = false }
 
@@ -435,18 +450,28 @@ class AnthropicMessagesApi(
      * (current models), a fixed budget (Haiku 4.5 and older), then none.
      */
     private var thinkingMode = 0
+    private val thinkingModeLock = Mutex()
+
+    /**
+     * Moves past [rejected], the mode a refusal came from, and only if nobody has already: two streams refused at once for
+     * the same mode must advance one step between them, not two (which skipped the budget mode straight to none).
+     */
+    private suspend fun advancePast(rejected: Int) = thinkingModeLock.withLock {
+        if (thinkingMode == rejected) thinkingMode = rejected + 1
+    }
 
     override suspend fun stream(prompt: String, onChunk: suspend (TextGenerationChunk) -> Unit): TextGenerationResult =
         stream(CacheablePrompt(dynamicSuffix = prompt), onChunk)
 
     override suspend fun stream(prompt: CacheablePrompt, onChunk: suspend (TextGenerationChunk) -> Unit): TextGenerationResult {
         while (true) {
-            val mode = THINKING_MODES.getOrNull(thinkingMode)
+            val index = thinkingModeLock.withLock { thinkingMode }
+            val mode = THINKING_MODES.getOrNull(index)
             try {
                 return streamOnce(prompt, mode, onChunk)
             } catch (rejected: StreamRejected) {
                 if (mode == null || !rejected.rejectsReasoning()) throw rejected
-                thinkingMode++
+                advancePast(index)
             }
         }
     }
@@ -456,6 +481,7 @@ class AnthropicMessagesApi(
         thinking: AnthropicThinking?,
         onChunk: suspend (TextGenerationChunk) -> Unit,
     ): TextGenerationResult {
+        val onChunk = onChunk.cappedOutput("Claude")
         val text = StringBuilder()
         val reasoning = StringBuilder()
         var inputUsage: AnthropicUsage? = null
@@ -537,7 +563,7 @@ class GeminiGenerateContentApi(
     private val apiKeyProvider: LlmApiKeyProvider,
     private val model: String = "gemini-3.8-flash",
     private val baseUrl: String = "https://generativelanguage.googleapis.com/v1beta",
-    client: HttpClient = defaultClient(),
+    client: HttpClient = sharedLlmHttpClient(),
 ) : ToolCallingTextGenerationApi {
     private val client = client.config { followRedirects = false }
 
@@ -610,6 +636,7 @@ class GeminiGenerateContentApi(
 
     override suspend fun stream(prompt: String, onChunk: suspend (TextGenerationChunk) -> Unit): TextGenerationResult =
         withReasoningFallback(requestThoughts, { requestThoughts = false }) { thoughts ->
+            val onChunk = onChunk.cappedOutput("Gemini")
             val text = StringBuilder()
             val reasoning = StringBuilder()
             var usage: GeminiUsageMetadata? = null
@@ -679,10 +706,12 @@ private suspend fun LlmApiKeyProvider.requireKey(providerName: String): String =
 
 private suspend fun HttpResponse.requireSuccess(operation: String) {
     if (status.value in 200..299) return
-    val responseBody = bodyAsText().redactSecrets().take(800)
-    error(
-        "Unable to $operation: HTTP ${status.value}" +
+    val responseBody = boundedBodyText().redactSecrets().take(800)
+    throw HttpStatusFailure(
+        status = status.value,
+        message = "Unable to $operation: HTTP ${status.value}" +
             responseBody.takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty(),
+        retryAfterMillis = parseRetryAfterMillis(headers[HttpHeaders.RetryAfter]),
     )
 }
 

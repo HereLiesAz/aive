@@ -89,3 +89,23 @@ class SettingsNodeCharacterAssetStore(
         const val DEFAULT_STORAGE_KEY: String = "aive.node-character.assets.v1"
     }
 }
+
+/**
+ * Where the pictures of a node creature are kept (the source character and its rig sheet). They are megabytes of PNG: held
+ * in an artifact's `uri` as a base64 data URI they were copied into every saved run, every cycle, and shown as text in the
+ * Inbox. A store keeps the bytes in a file and the artifact keeps only the reference [save] returns.
+ */
+interface NodeCharacterImageStore {
+    /** Keeps [png] under [key] (an artifact id; the implementation must not trust it as a file name) and returns its uri. */
+    suspend fun save(key: String, png: ByteArray): String
+}
+
+/** A store that keeps nothing but hands back a short uri: for tests. */
+class InMemoryNodeCharacterImageStore : NodeCharacterImageStore {
+    val images = mutableMapOf<String, ByteArray>()
+
+    override suspend fun save(key: String, png: ByteArray): String {
+        images[key] = png
+        return "memory:node-character/$key"
+    }
+}

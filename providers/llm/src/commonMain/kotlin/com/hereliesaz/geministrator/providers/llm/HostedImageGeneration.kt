@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.providers.llm
 
+import com.hereliesaz.geministrator.net.boundedBodyText
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ArtifactRef
@@ -202,7 +203,7 @@ class HostedImageGenerationExecutorIntegration(
         TaskExecutorExecution(TaskRunStatus.Failed, progressMessage = message)
 
     private suspend fun io.ktor.client.statement.HttpResponse.objectBody(): JsonObject {
-        val body = bodyAsText()
+        val body = boundedBodyText()
         check(status.value in 200..299) {
             "Provider returned HTTP ${status.value}"
         }

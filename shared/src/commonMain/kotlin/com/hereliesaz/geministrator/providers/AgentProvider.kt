@@ -216,6 +216,14 @@ interface AgentProvider {
      */
     val explicitOnly: Boolean get() = false
 
+    /**
+     * True when [observe] is itself the paid work (a text provider's generation runs inside the flow). Collecting it a
+     * second time would run, and bill, the work again, so the gateway never retries or re-collects such an observer: a
+     * fault ends the session as failed. False (the default) for a provider whose observe only watches work that is
+     * already running remotely, which is safe to resume.
+     */
+    val observeDrivesBilledWork: Boolean get() = false
+
     suspend fun capabilities(): AgentCapabilities
 
     /**

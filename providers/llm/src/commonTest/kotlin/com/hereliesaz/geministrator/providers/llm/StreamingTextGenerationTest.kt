@@ -19,6 +19,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.OutgoingContent
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -52,6 +53,51 @@ class StreamingTextGenerationTest {
         assertEquals(11L, result.inputTokens)
         assertEquals(7L, result.outputTokens)
         assertTrue("\"adaptive\"" in bodies.single() && "\"summarized\"" in bodies.single() && "\"stream\":true" in bodies.single())
+    }
+
+    @Test
+    fun aRunawayStreamIsStoppedAtTheOutputCapOnEveryHostedStream() = runTest {
+        val huge = "x".repeat(STREAM_MAX_OUTPUT_CHARS / 2 + 1)
+        fun delta(piece: String) = """{"type":"response.output_text.delta","delta":"$piece"}"""
+        val client = sseClient(mutableListOf()) { sse(delta(huge), delta(huge), """{"type":"response.completed","response":{}}""") }
+        val failure = assertFailsWith<OutputTruncatedException> {
+            OpenAiResponsesApi(LlmApiKeyProvider { "k" }, client = client).stream("go") {}
+        }
+        assertTrue("truncated" in failure.message.orEmpty())
+
+        val compat = sseClient(mutableListOf()) {
+            val chunk = """{"choices":[{"delta":{"content":"$huge"}}]}"""
+            sse(chunk, chunk, "[DONE]")
+        }
+        assertFailsWith<OutputTruncatedException> {
+            OpenAiCompatibleChatApi(LlmApiKeyProvider { "k" }, model = "m", baseUrl = "https://example.test/v1", client = compat).stream("go") {}
+        }
+    }
+
+    @Test
+    fun twoStreamsRefusedAtOnceAdvanceTheThinkingModeOneStepNotTwo() = runTest {
+        val bodies = mutableListOf<String>()
+        val bothArrived = kotlinx.coroutines.CompletableDeferred<Unit>()
+        var firstRound = 0
+        val client = sseClient(bodies) { body ->
+            when {
+                "adaptive" in body -> {
+                    if (++firstRound == 2) bothArrived.complete(Unit)
+                    bothArrived.await()
+                    respond("""{"error":{"message":"thinking.type adaptive is not supported"}}""", HttpStatusCode.BadRequest)
+                }
+                "budget_tokens" in body -> sse(
+                    """{"type":"content_block_delta","delta":{"type":"text_delta","text":"ok"}}""",
+                    """{"type":"message_stop"}""",
+                )
+                else -> respond("""{"error":{"message":"the budget mode was skipped"}}""", HttpStatusCode.InternalServerError)
+            }
+        }
+        val api = AnthropicMessagesApi(LlmApiKeyProvider { "k" }, client = client)
+        val a = async { api.stream("one") {} }
+        val b = async { api.stream("two") {} }
+        assertEquals("ok", a.await().text)
+        assertEquals("ok", b.await().text)
     }
 
     @Test
@@ -263,6 +309,41 @@ class StreamingTextGenerationTest {
         assertEquals("answer 2", result.text)
         assertEquals(2, thoughts.size)
         assertFalse(generation.offer("$MEMORY_MESSAGE_MARKER late"), "nothing is taken once the run ends")
+    }
+
+    @Test
+    fun anAbandonedStreamIsStillCountedInTheUsage() = runTest {
+        var calls = 0
+        lateinit var generation: InterruptibleGeneration
+        val api = object : TextGenerationApi {
+            override suspend fun generate(prompt: String) = error("not used")
+            override suspend fun stream(prompt: String, onChunk: suspend (TextGenerationChunk) -> Unit): TextGenerationResult {
+                calls++
+                onChunk(TextGenerationChunk.Thinking("The #ledger keeps drifting, so check how it was fixed before. "))
+                onChunk(TextGenerationChunk.Text("answer"))
+                return TextGenerationResult("answer", inputTokens = 100, outputTokens = 10)
+            }
+        }
+        generation = InterruptibleGeneration(api, maxInterrupts = 1)
+        val result = generation.run("TASK") { generation.offer("$MEMORY_MESSAGE_MARKER ledger: rebuilt") }
+        assertEquals(2, calls)
+        assertTrue((result.inputTokens ?: 0) > 100, "the abandoned attempt's prompt is billed too: ${result.inputTokens}")
+        assertTrue((result.outputTokens ?: 0) > 10, "the abandoned attempt's output is billed too: ${result.outputTokens}")
+    }
+
+    @Test
+    fun aCancelledSessionNobodyIsWatchingIsNotKeptForever() = runTest {
+        val api = object : TextGenerationApi {
+            override suspend fun generate(prompt: String) = TextGenerationResult("unused")
+        }
+        val provider = TextLlmProvider(AgentProviderId("text"), "Text", api)
+        val handle = provider.start(
+            AgentTaskRequest(taskRunId = TaskRunId("t"), objective = "Fix sync", roleInstructions = "Engineer", acceptanceCriteria = emptyList(), requirePlanApproval = true),
+        )
+        assertIs<ProviderActionResult.Accepted>(provider.approvePlan(handle.providerRunId), "a live session takes an approval")
+        provider.cancel(handle.providerRunId)
+        val rejected = assertIs<ProviderActionResult.Rejected>(provider.approvePlan(handle.providerRunId))
+        assertTrue("not available" in rejected.reason, "the cancelled session is gone, not parked in the map: ${rejected.reason}")
     }
 
     @Test
