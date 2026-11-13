@@ -203,7 +203,7 @@ sealed interface ComputeRelayClientMessage {
     /** Revokes another node's identity: its key stops working and its node ID cannot enrol again. */
     @Serializable
     @SerialName("revoke_node")
-    data class RevokeNode(val nodeId: String) : ComputeRelayClientMessage
+    data class RevokeNode(val nodeId: String, val ownerToken: String? = null) : ComputeRelayClientMessage
 }
 
 @Serializable

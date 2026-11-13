@@ -128,6 +128,8 @@ internal fun isAuthorized(authorizationHeader: String?, relayToken: String): Boo
 fun Application.computeRelayModule(
     relayToken: String,
     hub: ComputeRelayHub = ComputeRelayHub(),
+    /** The pool owner's token. Without one, no node may revoke another or re-enrol a revoked ID. */
+    ownerToken: String? = null,
 ) {
     require(relayToken.isNotBlank()) { "relayToken must not be blank" }
 
@@ -172,8 +174,10 @@ fun Application.computeRelayModule(
                 call.respondRelayError(HttpStatusCode.BadRequest, ComputeNodeAuth.ERROR_BAD_REQUEST, "Invalid enrolment request")
                 return@post
             }
+            val ownerAuthority = ownerToken != null &&
+                isAuthorized(call.request.headers[ComputeNodeAuth.HEADER_OWNER_TOKEN]?.let { "Bearer $it" }, ownerToken)
             try {
-                val enrolled = hub.pool(poolId).enrol(request)
+                val enrolled = hub.pool(poolId).enrol(request, ownerAuthority)
                 call.respondText(
                     relayJson.encodeToString(
                         ComputeNodeEnrolmentResponse.serializer(),
@@ -348,7 +352,11 @@ fun Application.computeRelayModule(
                             ComputeRelayClientMessage.ListEnrolledNodes -> {
                                 peer.send(ComputeRelayServerMessage.EnrolledNodes(pool.enrolledNodes()))
                             }
-                            is ComputeRelayClientMessage.RevokeNode -> pool.revoke(nodeId, message.nodeId)
+                            is ComputeRelayClientMessage.RevokeNode -> {
+                                val ownerAuthority = ownerToken != null && message.ownerToken != null &&
+                                    isAuthorized("Bearer ${message.ownerToken}", ownerToken)
+                                pool.revoke(nodeId, message.nodeId, ownerAuthority)
+                            }
                         }
                     } catch (e: IllegalArgumentException) {
                         peer.send(
@@ -397,11 +405,12 @@ fun main() {
         ?.let { EncryptedFileRelayStateStore(Path.of(it), token) }
         ?: NoopRelayStateStore
     val hub = ComputeRelayHub(stateStore = stateStore)
+    val ownerToken = System.getenv("AIVE_RELAY_OWNER_TOKEN")?.takeIf(String::isNotBlank)
     embeddedServer(
         factory = CIO,
         host = host,
         port = port,
     ) {
-        computeRelayModule(token, hub)
+        computeRelayModule(token, hub, ownerToken)
     }.start(wait = true)
 }

@@ -584,7 +584,7 @@ fun main() {
                         onRevokeComputeNode = { nodeId ->
                             computeSession?.let { session ->
                                 uiScope.launch {
-                                    runCatching { session.client.revokeNode(nodeId) }
+                                    runCatching { session.client.revokeNode(nodeId, System.getenv("AIVE_RELAY_OWNER_TOKEN")?.takeIf(String::isNotBlank)) }
                                         .onFailure { computeError = it.message }
                                 }
                             }

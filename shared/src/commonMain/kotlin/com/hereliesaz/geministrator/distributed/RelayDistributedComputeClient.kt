@@ -164,10 +164,13 @@ class RelayDistributedComputeClient(
         send(ComputeRelayClientMessage.ListEnrolledNodes)
     }
 
-    /** Revokes another node of the pool. The relay refuses a node revoking itself. */
-    suspend fun revokeNode(nodeId: String) {
+    /**
+     * Revokes another node of the pool. The relay accepts this only with the pool owner's token;
+     * without it a node can revoke only itself.
+     */
+    suspend fun revokeNode(nodeId: String, ownerToken: String? = null) {
         require(nodeId != node.nodeId) { "A node cannot revoke itself" }
-        send(ComputeRelayClientMessage.RevokeNode(nodeId))
+        send(ComputeRelayClientMessage.RevokeNode(nodeId, ownerToken))
     }
 
     /** Enrols this node's key unless the ledger says it already is. Uses the pool token. */
