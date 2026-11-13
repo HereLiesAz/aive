@@ -286,6 +286,7 @@ private fun ProposalCard(
             ImprovementSource.Habit -> Res.string.improvement_source_habit
             ImprovementSource.Queen -> Res.string.improvement_source_queen
             ImprovementSource.Nanny -> Res.string.improvement_source_nanny
+            ImprovementSource.QueenKept -> Res.string.improvement_source_queen
         },
     )
     // A hive-step proposal replaces a step's whole objective: show what it replaces, and what it would break in the loop.

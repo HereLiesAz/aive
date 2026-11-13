@@ -87,6 +87,12 @@ private fun voiceResource(voice: QueenVoice): StringResource = when (voice) {
         QueenVoice.TrainingOffer -> Res.string.queen_say_training_offer
         QueenVoice.TrainingStopped -> Res.string.queen_say_training_stopped
         QueenVoice.TrainingNeedsYou -> Res.string.queen_say_training_needs_you
+        QueenVoice.WatchStalled -> Res.string.queen_say_watch_stalled
+        QueenVoice.WatchRepeatedBlock -> Res.string.queen_say_watch_repeated_block
+        QueenVoice.SuggestAddCheck -> Res.string.queen_say_suggest_add_check
+        QueenVoice.SuggestSplitStep -> Res.string.queen_say_suggest_split_step
+        QueenVoice.SuggestReorderSteps -> Res.string.queen_say_suggest_reorder_steps
+        QueenVoice.SuggestAddApproval -> Res.string.queen_say_suggest_add_approval
 }
 
 @Composable
@@ -219,6 +225,13 @@ internal fun QueenSays(
             if (suggestion != null) {
                 if (note.outside) {
                     Text(stringResource(Res.string.queen_suggest_outside), style = AzphaltType.eyebrow, color = azphaltMutedOnSurface())
+                }
+                // A shape change is only kept for next time: never applied to this swarm.
+                if (suggestion.action.keepsForNextTime) {
+                    AzphaltPill(
+                        stringResource(Res.string.queen_suggest_keep), "queen-keep-${note.id}",
+                        onClick = { actions.decideSuggestion(suggestion.proposalId, true) },
+                    )
                 }
                 // A suggestion she applies herself has a button for it; one that only leads somewhere has its link.
                 if (suggestion.action.appliesHere) {

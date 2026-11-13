@@ -1242,6 +1242,7 @@ private fun MainDestination(
                                     selectedTaskId = selectedTaskId,
                                     onTaskSelected = onTaskSelected,
                                     onShowHive = { showTimeline = false },
+                                    queenNotes = live.queen,
                                     logSources = remember(
                                         live.run.id,
                                         live.definition,

@@ -640,6 +640,13 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_say_suggest_raise_allowance">This run has counted %1$s percent of its %2$s allowance, and many steps are still to do. You can change the allowance in the Keeper\'s room.</string>
     <string name="queen_say_suggest_rest_nanny">The nanny\'s report is with a second creature for checking. I can rest the swarm until that is settled: what is running finishes, nothing new starts, and you can resume it.</string>
     <string name="queen_say_suggest_nanny_finding">The Nanny found something about step %1$s (%2$s): another Source may serve it better. She works for the next run, and I am passing it on now so you can decide. You change a creature\'s Source on its Mind, and the change applies from the next run.</string>
+    <string name="queen_say_watch_stalled">Nothing has moved for %1$s minutes, no creature is working, and nothing waits on you. I am still watching. The Story shows where it stopped, and you can rest the swarm.</string>
+    <string name="queen_say_watch_repeated_block">%1$s steps are blocked for the same reason (%2$s). Fixing it once may free them all; start with step %3$s.</string>
+    <string name="queen_say_suggest_add_check">Step %1$s (%2$s) has failed several times after earlier work finished. A check between them would catch it sooner. This swarm keeps running as it is; I can keep the idea for next time.</string>
+    <string name="queen_say_suggest_split_step">Step %1$s (%2$s) keeps failing or running out of time. It may be too big for one creature. This swarm keeps running as it is; I can keep the idea of splitting it for next time.</string>
+    <string name="queen_say_suggest_reorder_steps">Several steps are blocked for the same reason, starting with step %1$s (%2$s). A different order may avoid it. This swarm keeps running as it is; I can keep the idea for next time.</string>
+    <string name="queen_say_suggest_add_approval">Step %1$s (%2$s) can change things, has no approval in front of it, and has failed more than once. An approval before it would let you look first. This swarm keeps running as it is; I can keep the idea for next time.</string>
+    <string name="queen_suggest_keep">Keep for next time</string>
     <string name="queen_say_suggest_reword_step">Step %1$s (%2$s) has not started. I would give it this job instead. Nothing changes until you accept.</string>
     <string name="queen_quote_queen_wording">The wording, quoted:</string>
     <string name="queen_suggest_accept">Go ahead</string>

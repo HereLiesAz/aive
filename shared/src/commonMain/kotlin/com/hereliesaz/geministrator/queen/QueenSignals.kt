@@ -23,6 +23,47 @@ sealed interface QueenSignal {
 
     /** A role used [percent] percent of its token budget and has steps left. */
     data class BudgetBurn(override val taskId: String, val roleName: String, val percent: Int) : QueenSignal
+
+    /** Nothing in the swarm has moved for [minutes], nothing waits on the keeper, and no creature is working. [taskId] is the first open step. */
+    data class Stalled(override val taskId: String, val minutes: Int) : QueenSignal
+
+    /** [steps] steps are blocked for the same reason [code]; [taskId] is the first of them. */
+    data class RepeatedBlock(override val taskId: String, val code: String, val steps: Int) : QueenSignal
+}
+
+/** What the queen saw of a run's progress, and when she first saw it: kept in the ledger so a restart does not reset the clock. */
+@kotlinx.serialization.Serializable
+data class QueenSighting(val runId: String, val fingerprint: String, val firstSeenAtEpochMillis: Long)
+
+/** Idle this long, with nothing to wait on, is a stall. Generous: a creature's own allowance has its own note. */
+const val STALL_MILLIS: Long = 10L * 60_000L
+
+/** The run's progress as a short id: each step's status and attempt. The same progress gives the same id. */
+fun progressFingerprint(definition: WorkflowDefinition, run: WorkflowRun): String =
+    queenNoteId(run.id.value, definition.tasks.joinToString(",") { t -> run.taskRuns[t.id]?.let { "${it.status.name}${it.attempt}" } ?: "-" })
+
+/** [sightings] with this run's progress noted: a new first-seen time when the progress changed, else unchanged. Keeps one per run. */
+fun observeProgress(sightings: List<QueenSighting>, definition: WorkflowDefinition, run: WorkflowRun, now: Long): List<QueenSighting> {
+    val fingerprint = progressFingerprint(definition, run)
+    val mine = sightings.firstOrNull { it.runId == run.id.value }
+    if (mine != null && mine.fingerprint == fingerprint) return sightings
+    return (sightings.filter { it.runId != run.id.value } + QueenSighting(run.id.value, fingerprint, now)).takeLast(64)
+}
+
+/**
+ * Whole minutes the run has been unchanged, or null when it is not stalled: under way, not rested or frozen or stopped,
+ * nothing waits on the keeper, no creature is working, and it has been the same since the queen first saw it for [STALL_MILLIS].
+ */
+fun stalledMinutes(definition: WorkflowDefinition, run: WorkflowRun, sightings: List<QueenSighting>, now: Long): Int? {
+    if (run.status != com.hereliesaz.geministrator.domain.WorkflowRunStatus.Running) return null
+    if (run.globalPause != null || run.spendPause != null || run.keeperPause != null) return null
+    val runs = run.taskRuns.values
+    if (runs.any(::creatureNeedsYou)) return null
+    val working = setOf(TaskRunStatus.Running, TaskRunStatus.Planning, TaskRunStatus.Verifying)
+    if (runs.any { it.status in working }) return null
+    val seen = sightings.firstOrNull { it.runId == run.id.value && it.fingerprint == progressFingerprint(definition, run) } ?: return null
+    val idle = now - seen.firstSeenAtEpochMillis
+    return if (idle >= STALL_MILLIS) (idle / 60_000L).toInt() else null
 }
 
 private const val BUDGET_BURN_PERCENT = 80
@@ -41,7 +82,13 @@ internal fun failedAttempts(taskRun: TaskRun): Int {
  * The signals in [run], in plan order. Pure: the same state gives the same signals. A step that
  * already waits on the keeper (it has its own row) raises none, and held attempts are not failures.
  */
-fun queenSignals(definition: WorkflowDefinition, run: WorkflowRun, roles: Collection<RoleDefinition>): List<QueenSignal> {
+fun queenSignals(
+    definition: WorkflowDefinition,
+    run: WorkflowRun,
+    roles: Collection<RoleDefinition>,
+    /** From [stalledMinutes], when the caller keeps sightings. */
+    stalledForMinutes: Int? = null,
+): List<QueenSignal> {
     val rolesById = roles.associateBy { it.id }
     val signals = mutableListOf<QueenSignal>()
     val burned = mutableSetOf<String>()
@@ -59,6 +106,17 @@ fun queenSignals(definition: WorkflowDefinition, run: WorkflowRun, roles: Collec
             val percent = (run.roleTokensSpent(role.id) * 100 / budget).toInt()
             if (percent >= BUDGET_BURN_PERCENT) signals += QueenSignal.BudgetBurn(task.id.value, role.name, percent.coerceAtMost(999))
         }
+    }
+    // The same reason blocking two or more steps: one fix may free them all.
+    val blocked = definition.tasks.mapNotNull { t ->
+        val reason = run.taskRuns[t.id]?.takeIf { it.status == TaskRunStatus.Blocked }?.blockingReason ?: return@mapNotNull null
+        t.id.value to reason.code
+    }
+    blocked.groupBy({ it.second }, { it.first }).entries.firstOrNull { it.key.isNotBlank() && it.value.size >= 2 }
+        ?.let { signals += QueenSignal.RepeatedBlock(it.value.first(), it.key, it.value.size) }
+    if (stalledForMinutes != null) {
+        val open = definition.tasks.firstOrNull { run.taskRuns[it.id]?.status.let { s -> s != TaskRunStatus.Completed && s != TaskRunStatus.Cancelled } }
+        signals += QueenSignal.Stalled(open?.id?.value.orEmpty(), stalledForMinutes)
     }
     return signals
 }
@@ -95,6 +153,8 @@ internal fun slowNotes(definition: WorkflowDefinition, run: WorkflowRun): List<Q
  */
 internal fun watchRelay(definition: WorkflowDefinition, run: WorkflowRun, signals: List<QueenSignal>): QueenNote? {
     val signal = signals.firstOrNull { it is QueenSignal.RepeatedFailure }
+        ?: signals.firstOrNull { it is QueenSignal.RepeatedBlock }
+        ?: signals.firstOrNull { it is QueenSignal.Stalled }
         ?: signals.firstOrNull { it is QueenSignal.BudgetBurn }
         ?: signals.firstOrNull { it is QueenSignal.FailedOver }
         ?: return null
@@ -112,6 +172,18 @@ internal fun watchRelay(definition: WorkflowDefinition, run: WorkflowRun, signal
             QueenVoice.WatchBudget,
             listOf(queenSlot(signal.roleName), signal.percent.toString()),
             QueenLink.Creature(signal.taskId, CreatureTab.Mind),
+        )
+        is QueenSignal.RepeatedBlock -> QueenNote(
+            queenNoteId(run.id.value, "watch", "block", signal.code, signal.steps.toString()),
+            QueenVoice.WatchRepeatedBlock,
+            listOf(signal.steps.toString(), queenSlot(signal.code), step.toString()),
+            QueenLink.Creature(signal.taskId, CreatureTab.Needs),
+        )
+        is QueenSignal.Stalled -> QueenNote(
+            queenNoteId(run.id.value, "watch", "stalled", signal.minutes.toString()),
+            QueenVoice.WatchStalled,
+            listOf(signal.minutes.toString()),
+            QueenLink.Story,
         )
         is QueenSignal.FailedOver -> QueenNote(
             queenNoteId(run.id.value, "watch", "failover", signal.taskId),

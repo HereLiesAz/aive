@@ -183,6 +183,7 @@ import com.hereliesaz.geministrator.resources.mind_tools
 import com.hereliesaz.geministrator.resources.creature_needs_nothing
 import com.hereliesaz.geministrator.resources.creature_tab_mind
 import com.hereliesaz.geministrator.resources.creature_tab_work
+import com.hereliesaz.geministrator.resources.queen_row_eyebrow
 import com.hereliesaz.geministrator.resources.creature_tab_needs
 import org.jetbrains.compose.resources.stringResource
 import com.hereliesaz.geministrator.resources.inspector_acceptance_criteria_count
@@ -459,6 +460,14 @@ internal fun TechnicalInspector(
                         onOpenConnections = onOpenConnections,
                         onOpenRole = placeLinks.openRole?.let { open -> { open(agentRole.id.value) } },
                     )
+                }
+                // What the queen has said about this creature (her place on its sheet); what needs you is in Messages.
+                val queenAbout = liveWorkflow.queen.filter {
+                    it.suggestion == null && (it.link as? com.hereliesaz.geministrator.queen.QueenLink.Creature)?.taskId == selectedTaskId
+                }
+                if (queenAbout.isNotEmpty()) {
+                    Text(stringResource(Res.string.queen_row_eyebrow).uppercase(), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+                    QueenSays(queenAbout, MessageActions(), showLink = false, onSelect = {})
                 }
                 // What it is doing, live: its own thinking and steps, apart from what you tell it.
                 CreatureActivity(taskRun, activity)

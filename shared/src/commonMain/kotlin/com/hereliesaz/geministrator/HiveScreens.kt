@@ -29,6 +29,7 @@ import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.hive_gone
 import com.hereliesaz.geministrator.resources.hive_launch
+import com.hereliesaz.geministrator.resources.queen_row_eyebrow
 import com.hereliesaz.geministrator.resources.hive_launch_failed
 import com.hereliesaz.geministrator.resources.hive_new_name
 import com.hereliesaz.geministrator.resources.hive_objective
@@ -186,6 +187,8 @@ internal fun RunTimeline(
     memoryContent: (@Composable () -> Unit)? = null,
     /** The logs behind the Log tab, last in the row. Null leaves the Log view out. */
     logSources: RunLogSources? = null,
+    /** What the queen says about this run, as her place in the Story (sentences only; what needs the keeper is in Messages). */
+    queenNotes: List<com.hereliesaz.geministrator.queen.QueenNote> = emptyList(),
 ) {
     var events by remember(runKey) { mutableStateOf<List<WorkflowEvent>?>(null) }
     // Reload on every change of the run, but keep showing the last events meanwhile: only a different
@@ -275,6 +278,11 @@ internal fun RunTimeline(
             modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            val said = queenNotes.filter { it.suggestion == null }
+            if (said.isNotEmpty()) {
+                Text(stringResource(Res.string.queen_row_eyebrow).uppercase(), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+                QueenSays(said, MessageActions(), showLink = false, onSelect = {})
+            }
             val list = events
             if (list == null) {
                 if (!loadFailed) Text(stringResource(Res.string.hive_timeline_loading), style = AzphaltType.body, color = azphaltOnSurface())

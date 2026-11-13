@@ -90,6 +90,13 @@ enum class QueenVoice(val relay: QueenRelay?) {
     TrainingOffer(QueenRelay.Watch),
     TrainingStopped(QueenRelay.Watch),
     TrainingNeedsYou(QueenRelay.Watch),
+    // --- Signals added later (queen/QueenSignals.kt) and her place on the creature sheet. Kept apart, after every other voice. ---
+    WatchStalled(QueenRelay.Watch),
+    WatchRepeatedBlock(QueenRelay.Watch),
+    SuggestAddCheck(QueenRelay.Watch),
+    SuggestSplitStep(QueenRelay.Watch),
+    SuggestReorderSteps(QueenRelay.Watch),
+    SuggestAddApproval(QueenRelay.Watch),
 }
 
 /** Where a note leads: an existing place, never a new one. */

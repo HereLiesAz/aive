@@ -44,6 +44,8 @@ fun queenUpdate(
     disputes: List<QueenNote> = emptyList(),
     /** Her suggestions still waiting on the keeper ([queenSuggestionNotes]); never while frozen, stopped or finished. */
     suggestions: List<QueenNote> = emptyList(),
+    /** How long the swarm has stood still, from [stalledMinutes]; null when it has not. */
+    stalledForMinutes: Int? = null,
 ): List<QueenNote> {
     if (run.status.finished()) return listOf(finishNote(definition, run))
     val lead = missingNotes(run.id.value, missing, level) + disputes
@@ -58,7 +60,7 @@ fun queenUpdate(
     notes += suggestions
     // A suggestion already says what she noticed, so her "I noticed" line does not say it twice.
     if (suggestions.isEmpty() && nannyPhase(definition, run) == NannyPhase.None) {
-        watchRelay(definition, run, queenSignals(definition, run, roles))?.let { notes += it }
+        watchRelay(definition, run, queenSignals(definition, run, roles, stalledForMinutes))?.let { notes += it }
     }
     if (level == QueenLevel.Helpful) {
         notes += slowNotes(definition, run)
