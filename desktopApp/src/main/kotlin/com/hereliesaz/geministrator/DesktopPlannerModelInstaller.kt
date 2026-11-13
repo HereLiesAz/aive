@@ -2,7 +2,7 @@ package com.hereliesaz.geministrator
 
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsText
+import com.hereliesaz.geministrator.net.boundedBodyText
 import io.ktor.http.isSuccess
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
@@ -139,7 +139,7 @@ internal class DesktopPlannerModelInstaller(
     private suspend fun loadReleaseAssets(): List<ReleaseAsset> {
         val response = httpClient.get(DesktopPlannerModel.RELEASE_API_URL)
         check(response.status.isSuccess()) { "Release metadata request failed: ${response.status}" }
-        val root = json.parseToJsonElement(response.bodyAsText()) as? JsonObject
+        val root = json.parseToJsonElement(response.boundedBodyText()) as? JsonObject
             ?: error("Release metadata is not a JSON object")
         val assets = root["assets"] as? JsonArray ?: error("Release metadata has no assets")
         return assets.mapNotNull { element ->
@@ -168,7 +168,7 @@ internal class DesktopPlannerModelInstaller(
     private suspend fun downloadText(url: String): String {
         val response = httpClient.get(url)
         check(response.status.isSuccess()) { "Download failed: ${response.status}" }
-        return response.bodyAsText()
+        return response.boundedBodyText()
     }
 
     private fun sha256(file: File): String {

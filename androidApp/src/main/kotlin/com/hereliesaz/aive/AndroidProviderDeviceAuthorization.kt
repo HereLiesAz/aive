@@ -4,7 +4,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.forms.FormDataContent
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsText
+import com.hereliesaz.geministrator.net.boundedBodyText
 import io.ktor.http.ContentType
 import io.ktor.http.Parameters
 import io.ktor.http.contentType
@@ -56,7 +56,7 @@ internal class AndroidProviderDeviceAuthorization(
         check(response.status.value in 200..299) {
             "Could not start $providerId account authorization (HTTP ${response.status.value})"
         }
-        val payload = json.parseToJsonElement(response.bodyAsText()).jsonObject
+        val payload = json.parseToJsonElement(response.boundedBodyText()).jsonObject
         val deviceCode = payload["device_code"]?.jsonPrimitive?.contentOrNull
             ?.takeIf { it.isNotBlank() } ?: error("Authorization response omitted device code")
         val userCode = payload["user_code"]?.jsonPrimitive?.contentOrNull
@@ -88,7 +88,7 @@ internal class AndroidProviderDeviceAuthorization(
                 }))
             }
         }
-        val payload = json.parseToJsonElement(response.bodyAsText()).jsonObject
+        val payload = json.parseToJsonElement(response.boundedBodyText()).jsonObject
         val providerError = payload["error"]?.jsonPrimitive?.contentOrNull
         if (providerError == "authorization_pending" || providerError == "slow_down") return null
         if (providerError != null || response.status.value !in 200..299) {
