@@ -30,9 +30,15 @@ class A2aDriftersTest {
 
     @AfterTest
     fun reset() {
+        // An engine left open outlives the test and can report its failure to whichever test runs next
+        // (kotlinx.coroutines.test.UncaughtExceptionsBeforeTest), so every client a test made is closed.
+        opened.forEach { it.close() }
+        opened.clear()
         A2aAgentConnections.useSettings(MapSettings())
         A2aDrifters.clear()
     }
+
+    private val opened = mutableListOf<HttpClient>()
 
     private val card = """
         {
@@ -50,13 +56,15 @@ class A2aDriftersTest {
     """.trimIndent()
 
     private fun client(requested: MutableList<String> = mutableListOf(), answer: (String) -> Pair<HttpStatusCode, String>) =
-        HttpClient(
+        newClient(
             MockEngine { request ->
                 requested += request.url.toString()
                 val (status, body) = answer(request.url.toString())
                 respond(body, status, headersOf(HttpHeaders.ContentType, "application/json"))
             },
         )
+
+    private fun newClient(engine: io.ktor.client.engine.HttpClientEngine): HttpClient = HttpClient(engine).also { opened += it }
 
     @Test
     fun aBareAddressIsReadFromItsWellKnownCard() = runTest {
@@ -81,7 +89,7 @@ class A2aDriftersTest {
         assertEquals(DrifterTrouble.Unreachable, down.trouble)
         assertEquals("HTTP 503", down.detail)
         assertEquals(DrifterTrouble.NotACard, A2aDrifters.read("https://agent.example", client { HttpStatusCode.OK to "<html>hi</html>" }).trouble)
-        val unreachable = HttpClient(MockEngine { error("connection refused") })
+        val unreachable = newClient(MockEngine { error("connection refused") })
         assertEquals(DrifterTrouble.Unreachable, A2aDrifters.read("https://agent.example", unreachable).trouble)
 
         val grpcOnly = """{"name":"G","supportedInterfaces":[{"url":"https://agent.example","protocolBinding":"GRPC"}]}"""
