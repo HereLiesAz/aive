@@ -711,6 +711,7 @@ class MemoryLayerController(
         override suspend fun annotateUserMessage(handle: ManagedSessionHandle, text: String): String {
             if (!active || text.isBlank()) return text
             val agentId = handle.taskRunId.value
+            layerFor(workflowOfAgent(agentId)).sessionObserver.onKeeperMessage(handle, text)
             val tokenCount = AttentionGatedRecall.approximateTokens(text, APPROXIMATE_CHARS_PER_TOKEN)
             attention.forAgent(agentId).consumeTokens(tokenCount)
             cueMutex.withLock { cueSessions[agentId]?.dwell?.consumeTokens(tokenCount) }
