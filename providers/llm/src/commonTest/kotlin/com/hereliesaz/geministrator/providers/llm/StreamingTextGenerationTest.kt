@@ -266,6 +266,26 @@ class StreamingTextGenerationTest {
     }
 
     @Test
+    fun anAbandonedStreamIsStillCountedInTheUsage() = runTest {
+        var calls = 0
+        lateinit var generation: InterruptibleGeneration
+        val api = object : TextGenerationApi {
+            override suspend fun generate(prompt: String) = error("not used")
+            override suspend fun stream(prompt: String, onChunk: suspend (TextGenerationChunk) -> Unit): TextGenerationResult {
+                calls++
+                onChunk(TextGenerationChunk.Thinking("The #ledger keeps drifting, so check how it was fixed before. "))
+                onChunk(TextGenerationChunk.Text("answer"))
+                return TextGenerationResult("answer", inputTokens = 100, outputTokens = 10)
+            }
+        }
+        generation = InterruptibleGeneration(api, maxInterrupts = 1)
+        val result = generation.run("TASK") { generation.offer("$MEMORY_MESSAGE_MARKER ledger: rebuilt") }
+        assertEquals(2, calls)
+        assertTrue((result.inputTokens ?: 0) > 100, "the abandoned attempt's prompt is billed too: ${result.inputTokens}")
+        assertTrue((result.outputTokens ?: 0) > 10, "the abandoned attempt's output is billed too: ${result.outputTokens}")
+    }
+
+    @Test
     fun aTextProviderEmitsThinkingAndTakesMemoryMidStream() = runTest {
         val prompts = mutableListOf<String>()
         lateinit var provider: TextLlmProvider

@@ -151,8 +151,8 @@ internal class ThinkTagSplitter {
  * the next streamed piece the generation stops and starts again with the original prompt, the
  * reasoning and answer so far, and what memory brought back, so the model continues with the
  * memory in view. At most [maxInterrupts] times per run; after that recalls are declined. Only
- * the final attempt's answer is returned. Usage covers that attempt only (an abandoned stream
- * reports none).
+ * the final attempt's answer is returned. Usage covers the final attempt plus an estimate for each
+ * abandoned one (a cut-off stream reports none, but the provider billed it).
  */
 class InterruptibleGeneration(
     private val api: TextGenerationApi,
@@ -199,6 +199,8 @@ class InterruptibleGeneration(
         try {
             if (isCancelled()) throw GenerationCancelled()
             var attemptPrompt = prompt
+            var abandonedInput = 0L
+            var abandonedOutput = 0L
             while (true) {
                 val reasoning = StringBuilder()
                 val answer = StringBuilder()
@@ -225,8 +227,18 @@ class InterruptibleGeneration(
                         takeRecalls()?.let { throw MemoryInterrupt(it) }
                     }
                     flush()
-                    return result
+                    return if (abandonedInput == 0L && abandonedOutput == 0L) {
+                        result
+                    } else {
+                        // An abandoned stream is billed too, and reports no usage: its estimate is added so the interrupts count.
+                        result.copy(
+                            inputTokens = (result.inputTokens ?: 0L) + abandonedInput,
+                            outputTokens = (result.outputTokens ?: 0L) + abandonedOutput,
+                        )
+                    }
                 } catch (interrupt: MemoryInterrupt) {
+                    abandonedInput += estimateTokens(attemptPrompt.text.length)
+                    abandonedOutput += estimateTokens(reasoning.length + answer.length)
                     attemptPrompt = continuation(prompt, reasoning.toString(), answer.toString(), interrupt.recalls)
                 }
             }
@@ -237,6 +249,9 @@ class InterruptibleGeneration(
             }
         }
     }
+
+    /** A deliberately high estimate (three characters a token) for a stream that was cut off and so reported nothing. */
+    private fun estimateTokens(chars: Int): Long = (chars + 2L) / 3L
 
     private suspend fun takeRecalls(): List<String>? = mutex.withLock {
         if (pending.isEmpty()) return@withLock null
