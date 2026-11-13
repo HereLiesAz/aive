@@ -536,7 +536,12 @@ class MemoryLayerController(
                     "Memory ${node.id.value} is tagged with workflow $tagged but is imported into $workflowId"
                 }
             }
-            requireSelectedOwnStore().replace(snapshot)
+            // Compare-and-set, as forgetting does: a session banked since the read is never silently dropped
+            // by a stale write; the revision is re-read and the (already validated) import installed again.
+            val own = requireSelectedOwnStore()
+            while (true) {
+                if (own.replaceIfRevision(own.read().revision, snapshot)) break
+            }
             resetLayers()
         }
         publish()
@@ -603,7 +608,10 @@ class MemoryLayerController(
                     if (bank.clear(current.revision)) break
                 }
             }
-            own.replace(MemorySnapshot())
+            // Compare-and-set, as forgetting does, so a deposit racing the clear is not half-erased.
+            while (true) {
+                if (own.replaceIfRevision(own.read().revision, MemorySnapshot())) break
+            }
             resetLayers()
         }
         publish()
