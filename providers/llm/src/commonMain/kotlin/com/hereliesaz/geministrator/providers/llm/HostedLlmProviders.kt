@@ -53,6 +53,7 @@ object HostedLlmProviders {
     const val OVHCLOUD_ID = ProviderCatalog.OVHCLOUD_ID
 
     private const val ACCOUNT_PLACEHOLDER = "{accountId}"
+    private val ACCOUNT_ID_PATTERN = Regex("[A-Za-z0-9_-]{1,64}")
 
     /** The hosted providers built into Aive. */
     val builtInEntries: List<HostedLlmProviderSpec> = listOf(
@@ -266,6 +267,11 @@ object HostedLlmProviders {
             val token = clean.substringAfter(':', missingDelimiterValue = "").trim()
             require(accountId.isNotEmpty() && token.isNotEmpty()) {
                 "${spec.displayName} credential must be ACCOUNT_ID:API_TOKEN"
+            }
+            // The id is spliced into the URL path: a slash, dots, a query or an encoded separator would send the key
+            // somewhere else on the host. Account ids are letters and digits.
+            require(ACCOUNT_ID_PATTERN.matches(accountId)) {
+                "${spec.displayName} account id may only contain letters, digits, dashes and underscores"
             }
             spec.baseUrl.replace(ACCOUNT_PLACEHOLDER, accountId) to token
         } else {
