@@ -200,7 +200,7 @@ fun findOutputFor(spec: OutputSpec, artifacts: List<ArtifactRef>): ArtifactRef? 
  * is met (or declares no outputs). Pure: the engine calls it beside the verdict gate when a task completes.
  */
 fun checkStepOutputs(contract: TaskContract, artifacts: List<ArtifactRef>): List<String> =
-    contract.outputs.mapNotNull { spec ->
+    if (contract.startingPoint) emptyList() else contract.outputs.mapNotNull { spec ->
         val artifact = findOutputFor(spec, artifacts)
             ?: return@mapNotNull "The step did not hand back its '${spec.name}' (${spec.kind.name})."
         StepOutputValidators.check(spec.validatorId, artifact)?.let { "'${spec.name}': $it" }

@@ -14,6 +14,7 @@ import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TestDesignPolicy
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
+import com.hereliesaz.geministrator.template.StepTemplateAssignments
 
 /** The external service that draws one frame per shot (providers/llm `FilmFramesExecutorIntegration`). */
 const val FILM_FRAMES_SERVICE: String = "film-frames"
@@ -54,7 +55,7 @@ object ShortFilmHive {
         FILM_TASK_FRAME_REVIEW, FILM_TASK_ASSEMBLE, FILM_TASK_APPROVE,
     )
 
-    fun definition(): WorkflowDefinition = WorkflowDefinition(
+    fun definition(): WorkflowDefinition = StepTemplateAssignments.apply(WorkflowDefinition(
         id = WorkflowDefinitionId(ID),
         name = NAME,
         description = DESCRIPTION,
@@ -139,7 +140,7 @@ object ShortFilmHive {
         ),
         integrationPolicy = IntegrationPolicy.Manual,
         testDesignPolicy = TestDesignPolicy.None,
-    )
+    ))
 
     /** The hive as an entry for the library host to install; never scheduled. */
     fun entry(): CreativeSuiteEntry = CreativeSuiteEntry(definition())

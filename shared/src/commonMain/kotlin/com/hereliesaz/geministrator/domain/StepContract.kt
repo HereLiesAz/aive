@@ -91,4 +91,11 @@ data class TaskContract(
     val effects: Set<StepEffect> = emptySet(),
     /** Declared allowance in tokens for this step; carried, not yet enforced by a breaker. */
     val tokenAllowance: Long? = null,
+    /**
+     * True for a step that existed before it named a template: the contract says which template the step started from
+     * and what that template hands back, and nothing more. It does not narrow the step's tools (it keeps the run's
+     * toolbox), does not hold the step for a missing input, and does not fail the step on its output. The Nanny can
+     * still read it by template and improve the template. False for a step made from a template, which is enforced.
+     */
+    val startingPoint: Boolean = false,
 )

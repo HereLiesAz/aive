@@ -82,7 +82,7 @@ internal fun buildProviderTaskRequest(
         contextArtifacts = dependencyArtifacts,
         requiredArtifacts = task.requiredArtifacts,
         repository = project.repository,
-        allowedTools = task.contract?.allowedTools,
+        allowedTools = task.contract?.takeUnless { it.startingPoint }?.allowedTools,
         // The provider stops for approval unless the policy decision point lets the plan proceed.
         requirePlanApproval = !InProcessPolicyDecisionPoint.decide(
             PolicyRequest(
