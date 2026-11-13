@@ -1,5 +1,7 @@
 package com.hereliesaz.geministrator.providers.llm
 
+import com.hereliesaz.geministrator.net.boundedTextOrTruncated
+import com.hereliesaz.geministrator.net.BoundedLineReader
 import com.hereliesaz.geministrator.net.parseRetryAfterMillis
 import com.hereliesaz.geministrator.net.RetryAfterHint
 import io.ktor.http.HttpHeaders
@@ -49,12 +51,14 @@ internal suspend fun HttpClient.postServerSentEvents(
         if (response.status.value !in 200..299) {
             throw StreamRejected(
                 response.status.value,
-                response.bodyAsText().redactSecrets().take(800),
+                response.boundedTextOrTruncated(ERROR_BODY_MAX_BYTES).redactSecrets().take(800),
                 operation,
                 parseRetryAfterMillis(response.headers[HttpHeaders.RetryAfter]),
             )
         }
-        val channel = response.bodyAsChannel()
+        // Lines are read with a byte cap: a server (or a proxy gone wrong) that never ends a line, or never ends the
+        // stream, costs at most the cap in memory instead of all of it.
+        val lines = BoundedLineReader(response.bodyAsChannel(), STREAM_MAX_WIRE_BYTES)
         var event: String? = null
         val data = StringBuilder()
         suspend fun dispatch() {
@@ -63,7 +67,7 @@ internal suspend fun HttpClient.postServerSentEvents(
             data.clear()
         }
         while (true) {
-            val line = channel.readUTF8Line() ?: break
+            val line = lines.readLine() ?: break
             when {
                 line.isEmpty() -> dispatch()
                 line.startsWith(":") -> Unit
@@ -301,5 +305,35 @@ class InterruptibleGeneration(
         const val MAX_MEMORY_INTERRUPTS = 3
         const val THINKING_CHUNK_CHARS = 400
         const val MIN_THINKING_CHUNK_CHARS = 80
+    }
+}
+
+/** Most bytes one streamed response may send, event framing included: far past any real answer, short of a runaway. */
+internal const val STREAM_MAX_WIRE_BYTES: Long = 64L * 1024 * 1024
+
+/** Most of an error response's body that is read, since only the start of it is quoted. */
+internal const val ERROR_BODY_MAX_BYTES: Int = 16 * 1024
+
+/** Most characters of answer plus reasoning one stream may produce (about half a million tokens): a runaway generation stops here. */
+internal const val STREAM_MAX_OUTPUT_CHARS: Int = 2_000_000
+
+/**
+ * [this] wrapped so the characters passed through it are counted: past [maxChars] the stream is abandoned with an
+ * [OutputTruncatedException] (it says "truncated", so it classifies as output too long) instead of growing without end.
+ * The provider has billed what was produced, so the caller still prices the attempt as a failure.
+ */
+internal fun (suspend (TextGenerationChunk) -> Unit).cappedOutput(
+    providerName: String,
+    maxChars: Int = STREAM_MAX_OUTPUT_CHARS,
+): suspend (TextGenerationChunk) -> Unit {
+    var produced = 0L
+    return { chunk ->
+        produced += chunk.text.length
+        if (produced > maxChars) {
+            throw OutputTruncatedException(
+                "$providerName stream was truncated at the output limit of $maxChars characters; output is incomplete",
+            )
+        }
+        this(chunk)
     }
 }

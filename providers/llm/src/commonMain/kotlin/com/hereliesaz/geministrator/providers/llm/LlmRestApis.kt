@@ -221,6 +221,7 @@ class OpenAiResponsesApi(
 
     override suspend fun stream(prompt: String, onChunk: suspend (TextGenerationChunk) -> Unit): TextGenerationResult =
         withReasoningFallback(requestReasoning, { requestReasoning = false }) { reasoning ->
+            val onChunk = onChunk.cappedOutput("OpenAI")
             val text = StringBuilder()
             val thinking = StringBuilder()
             var usage: OpenAiUsage? = null
@@ -458,6 +459,7 @@ class AnthropicMessagesApi(
         thinking: AnthropicThinking?,
         onChunk: suspend (TextGenerationChunk) -> Unit,
     ): TextGenerationResult {
+        val onChunk = onChunk.cappedOutput("Claude")
         val text = StringBuilder()
         val reasoning = StringBuilder()
         var inputUsage: AnthropicUsage? = null
@@ -612,6 +614,7 @@ class GeminiGenerateContentApi(
 
     override suspend fun stream(prompt: String, onChunk: suspend (TextGenerationChunk) -> Unit): TextGenerationResult =
         withReasoningFallback(requestThoughts, { requestThoughts = false }) { thoughts ->
+            val onChunk = onChunk.cappedOutput("Gemini")
             val text = StringBuilder()
             val reasoning = StringBuilder()
             var usage: GeminiUsageMetadata? = null

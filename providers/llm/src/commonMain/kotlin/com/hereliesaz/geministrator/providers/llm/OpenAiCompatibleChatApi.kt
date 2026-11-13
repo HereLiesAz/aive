@@ -152,6 +152,7 @@ class OpenAiCompatibleChatApi(
     override suspend fun stream(prompt: String, onChunk: suspend (TextGenerationChunk) -> Unit): TextGenerationResult {
         val apiKey = sendableApiKey()
         return withReasoningFallback(requestUsage, { requestUsage = false }) { usageOption ->
+            val onChunk = onChunk.cappedOutput("Compatible chat")
             val text = StringBuilder()
             val reasoning = StringBuilder()
             val splitter = ThinkTagSplitter()

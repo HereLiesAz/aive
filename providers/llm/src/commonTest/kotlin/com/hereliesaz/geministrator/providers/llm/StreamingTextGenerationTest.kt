@@ -55,6 +55,25 @@ class StreamingTextGenerationTest {
     }
 
     @Test
+    fun aRunawayStreamIsStoppedAtTheOutputCapOnEveryHostedStream() = runTest {
+        val huge = "x".repeat(STREAM_MAX_OUTPUT_CHARS / 2 + 1)
+        fun delta(piece: String) = """{"type":"response.output_text.delta","delta":"$piece"}"""
+        val client = sseClient(mutableListOf()) { sse(delta(huge), delta(huge), """{"type":"response.completed","response":{}}""") }
+        val failure = assertFailsWith<OutputTruncatedException> {
+            OpenAiResponsesApi(LlmApiKeyProvider { "k" }, client = client).stream("go") {}
+        }
+        assertTrue("truncated" in failure.message.orEmpty())
+
+        val compat = sseClient(mutableListOf()) {
+            val chunk = """{"choices":[{"delta":{"content":"$huge"}}]}"""
+            sse(chunk, chunk, "[DONE]")
+        }
+        assertFailsWith<OutputTruncatedException> {
+            OpenAiCompatibleChatApi(LlmApiKeyProvider { "k" }, model = "m", baseUrl = "https://example.test/v1", client = compat).stream("go") {}
+        }
+    }
+
+    @Test
     fun aModelThatRefusesAdaptiveThinkingFallsBackToABudgetThenNone() = runTest {
         val bodies = mutableListOf<String>()
         val client = sseClient(bodies) { body ->
