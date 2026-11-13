@@ -25,6 +25,13 @@ class PromptSuggestionsTest {
     }
 
     @Test
+    fun firstLaunchObjectiveUsesRememberedTextThenTheLessonGoal() {
+        assertEquals("Fix the build", PromptSuggestions.firstLaunchObjective(history, "Teach me how to use the Aive"))
+        assertEquals("Teach me how to use the Aive", PromptSuggestions.firstLaunchObjective(emptyList(), "Teach me how to use the Aive"))
+        assertNull(PromptSuggestions.firstLaunchObjective(emptyList(), " "))
+    }
+
+    @Test
     fun feedObjectiveSeedsFinishedRunObjectiveOnly() {
         assertEquals("Ship it", PromptSuggestions.feedObjective(" Ship it ", runFinished = true))
         assertNull(PromptSuggestions.feedObjective("", runFinished = true))

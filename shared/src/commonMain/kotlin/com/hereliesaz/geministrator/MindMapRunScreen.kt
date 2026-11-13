@@ -131,6 +131,9 @@ import com.hereliesaz.geministrator.resources.feed_gate_unsupported_repository
 import com.hereliesaz.geministrator.resources.first_hive_objective
 import com.hereliesaz.geministrator.resources.hive_what_it_made
 import com.hereliesaz.geministrator.resources.first_hive_hint
+import com.hereliesaz.geministrator.resources.first_hive_teach_seed
+import com.hereliesaz.geministrator.resources.first_hive_free_line
+import com.hereliesaz.geministrator.resources.first_hive_own_key
 import com.hereliesaz.geministrator.resources.first_hive
 import com.hereliesaz.geministrator.resources.overview_recover_delete_all_data
 import org.jetbrains.compose.resources.getString
@@ -307,11 +310,9 @@ internal fun MindMapRunScreen(
             val stableHost = LocalStableHost.current
             // The keeper's pick, else the first starter: read live, since the catalog can load after this
             // screen composes, and Feed it must keep a creature either way.
-            var explicitStarter by remember(stableHost) { mutableStateOf<String?>(null) }
-            val pickedStarter = explicitStarter ?: stableHost?.catalog?.starters?.firstOrNull()?.id
+            val pickedStarter = stableHost?.catalog?.starters?.firstOrNull()?.id
             if (firstLaunch) {
                 Text(stringResource(Res.string.first_hive), style = if (compact) AzphaltType.section else AzphaltType.hero, color = azphaltOnSurface())
-                FirstCreature(picked = pickedStarter, onPick = { explicitStarter = it })
                 Text(stringResource(Res.string.first_hive_hint), style = AzphaltType.body, color = azphaltOnSurface())
             } else {
                 RuntimeStateRecord(runtimeState, compact)
@@ -363,7 +364,7 @@ internal fun MindMapRunScreen(
             if (runtimeState is ApplicationRuntimeState.NoProject || runtimeState is ApplicationRuntimeState.NoRun) {
                 // Which project, and its name: up front for a project that exists, under Options on a first launch.
                 val projectFields: @Composable () -> Unit = {
-                    if (projectFileService != null) {
+                    if (projectFileService != null && !firstLaunch) {
                         Text(
                             stringResource(Res.string.overview_project),
                             style = AzphaltType.eyebrow,
@@ -657,10 +658,15 @@ internal fun MindMapRunScreen(
                 // Filled in with what was fed last, else a starting goal for the linked repository (a static template,
                 // no model call), selected so typing replaces it.
                 val starterLabel = PromptSuggestions.repositoryLabel(repositoryLocator)
-                val objectiveSeed = PromptSuggestions.firstObjective(
-                    objectiveHistory.entries,
-                    starterLabel?.let { stringResource(Res.string.prompt_starter_goal, it) },
-                )
+                val objectiveSeed = if (firstLaunch) {
+                    // The first run's seed: what was fed last on this device, else the lesson goal.
+                    PromptSuggestions.firstLaunchObjective(objectiveHistory.entries, stringResource(Res.string.first_hive_teach_seed))
+                } else {
+                    PromptSuggestions.firstObjective(
+                        objectiveHistory.entries,
+                        starterLabel?.let { stringResource(Res.string.prompt_starter_goal, it) },
+                    )
+                }
                 PromptSuggestBox(
                     kind = PromptKind.Objective,
                     value = objective,
@@ -717,14 +723,32 @@ internal fun MindMapRunScreen(
                         sourceNames(gate.sources),
                     )
                 }
-                gateMessage?.let { message ->
+                // A first launch connects the first free text source by itself, so the gate sentence is not shown.
+                val freeEntries = ProviderCatalog.firstRunFreeEntries()
+                val autoSource = firstLaunch && freeEntries.isNotEmpty()
+                if (autoSource) {
+                    LaunchedEffect(gate) {
+                        if (gate == FeedGate.Provider) onConnectFreeProvider(freeEntries.first().id)
+                    }
+                }
+                gateMessage?.takeUnless { autoSource && gate == FeedGate.Provider }?.let { message ->
                     Text(message, style = AzphaltType.body, color = azphaltOnSurface())
                 }
                 if (repositoryGated) repositoryFields()
-                if (gate == FeedGate.Provider || gate is FeedGate.Repository) {
+                if (autoSource && (gate == FeedGate.Provider || gate == FeedGate.Open)) {
+                    // One muted line instead of the gate, the free pills and the own-key pill.
+                    Text(stringResource(Res.string.first_hive_free_line), style = AzphaltType.body, color = azphaltOnSurface())
+                    AzphaltPill(
+                        tone = PillTone.Quiet,
+                        label = stringResource(Res.string.first_hive_own_key),
+                        seed = "first-hive-connect",
+                        onClick = onOpenSettings,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else if (gate == FeedGate.Provider || gate is FeedGate.Repository) {
                     // Something to think with, in one tap: the free gateways right here, the rest
                     // (your own key) in the Keeper's room.
-                    val free = ProviderCatalog.firstRunFreeEntries()
+                    val free = freeEntries
                     free.forEachIndexed { index, entry ->
                         AzphaltPill(
                             tone = if (index == 0 && gate == FeedGate.Provider) PillTone.Primary else PillTone.Quiet,
@@ -746,7 +770,7 @@ internal fun MindMapRunScreen(
                     )
                 }
                 AzphaltPill(
-                    tone = if (gate == FeedGate.Provider) PillTone.Quiet else PillTone.Primary,
+                    tone = if (gate == FeedGate.Provider && !autoSource) PillTone.Quiet else PillTone.Primary,
                     label = when {
                         firstLaunch -> stringResource(Res.string.first_hive_feed)
                         runtimeState is ApplicationRuntimeState.NoRun -> stringResource(Res.string.overview_start_run)
@@ -757,7 +781,7 @@ internal fun MindMapRunScreen(
                     onClick = {
                         onDismissLaunchError()
                         // A gated Feed it escorts to what is missing rather than starting work no agent can take.
-                        if (gate != FeedGate.Open) {
+                        if (gate != FeedGate.Open && !(autoSource && gate == FeedGate.Provider && objective.isNotBlank())) {
                             launchFieldsError = gateMessage
                             appLog("AiveLaunch", "Launch gated: $gate")
                             return@AzphaltPill

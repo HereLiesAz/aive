@@ -107,11 +107,11 @@ Closing the creature panel (the sheet dismissed, the dock's close, Back) only se
 
 ## First launch
 
-Every launch opens on the hive, not on a form or the Keeper's room (`MindMapRunScreen`, `FirstCreature`): the starters to keep one of, the first picked, and one field, **What should it work on?**, with **Feed it**. Feeding keeps the picked starter and names the hive from the first words it was fed (never from an empty tap). Its name, a repository and saved projects are under Options. Until there is a hive, its places' row is hidden.
+Every launch opens on the hive, not on a form or the Keeper's room (`MindMapRunScreen`, `FirstCreature`): one field, **What do you want to get done?**, with **Start**. The field starts with what you fed last on this device, else **Teach me how to use the Aive** (a fixed seed; no model is asked). Starting keeps the first starter (the starters are chosen in the Stable) and names the hive from the first words it was fed (never from an empty tap). **More** holds its name and a repository. One muted line says a free source is picked for you and that free sources may log what you write, with **Use my own key** beside it; the first free text source is connected on its own while none is. Until there is a hive, its places' row is hidden.
 
 Feed it is gated on what the connected agents can reach (`ProviderReach`, `FeedGate`), and the gate sits right above it with its resolution in place:
 
-- **No AI source** (a fresh install has the keyless gateways already on; this is the state after the keyless switch is turned off): the free keyless gateways, each a one-tap pill (**Use Kilo Gateway · free, no key**), with the one line that prompts and repository text sent to a keyless source leave the device and may be logged; then a quieter **Use your own key** pill to the Keeper's room. Feed it waits quietly.
+- **No AI source** (a fresh install has the keyless gateways already on; this is the state after the keyless switch is turned off): on the very first launch the first free text gateway is connected for you and the muted line above replaces the pills; elsewhere, the free keyless gateways, each a one-tap pill (**Use Kilo Gateway · free, no key**), with the one line that prompts and repository text sent to a keyless source leave the device and may be logged; then a quieter **Use your own key** pill to the Keeper's room. Feed it waits quietly.
 - **Every agent works only inside a repository** (OpenCode on GitHub Actions, linked with a GitHub token): the repository fields open above Feed it, offering only the kinds those agents work in, alongside the free gateways for work with no repository.
 - **A repository no agent works in:** the fields open there too, to choose another kind, or none.
 
