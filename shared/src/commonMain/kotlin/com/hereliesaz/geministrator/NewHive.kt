@@ -1,5 +1,10 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.prompts.PromptKind
+import com.hereliesaz.geministrator.resources.hive_new_name
+import com.hereliesaz.geministrator.prompts.PromptSuggestBox
+import com.hereliesaz.geministrator.prompts.PromptSuggestions
+import com.hereliesaz.geministrator.prompts.rememberPromptHistory
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -160,7 +165,17 @@ internal fun NewHiveBench(
             BenchHeading(stringResource(Res.string.hive_new_draft_title), stringResource(Res.string.hive_new_draft_help))
             SwarmDraftBox(definition, drafter, onEdit, redraft = false, onAdoptName = onRename)
         }
-        NewHiveNamer(key = definition.id.value, onRename = onRename)
+        // Once the planner has named the hive, the name is offered in the field to keep or change.
+        val defaultName = stringResource(Res.string.hive_new_name)
+        NewHiveNamer(
+            key = definition.id.value,
+            onRename = onRename,
+            suggestion = PromptSuggestions.hiveName(
+                drafted = definition.name.takeIf { it != defaultName },
+                objective = null,
+                nameFromObjective = { it },
+            ),
+        )
         BenchHeading(
             stringResource(if (canDraft) Res.string.hive_new_build_title else Res.string.hive_new_build_title_only),
             stringResource(Res.string.hive_new_build_help),
@@ -179,9 +194,16 @@ private fun BenchHeading(title: String, help: String) {
 
 /** "Name this hive…" and Save, in one Ink capsule. A blank name keeps the one it has. */
 @Composable
-internal fun NewHiveNamer(key: String, onRename: suspend (String) -> Unit, modifier: Modifier = Modifier) {
+internal fun NewHiveNamer(
+    key: String,
+    onRename: suspend (String) -> Unit,
+    modifier: Modifier = Modifier,
+    /** A name worth starting from, such as the one the planner drafted: the field starts with it, selected. */
+    suggestion: String? = null,
+) {
     val scope = rememberCoroutineScope()
     var draft by remember(key) { mutableStateOf("") }
+    val nameHistory = rememberPromptHistory(PromptKind.HiveName)
     var message by remember(key) { mutableStateOf<String?>(null) }
     val placeholder = stringResource(Res.string.hive_new_name_field)
     val save = {
@@ -193,7 +215,10 @@ internal fun NewHiveNamer(key: String, onRename: suspend (String) -> Unit, modif
                     onSuccess = { getString(Res.string.hive_new_saved, name) },
                     onFailure = { it.message ?: getString(Res.string.terrarium_could_not_stage_workflow_edit) },
                 )
-                if (saved.isSuccess) draft = ""
+                if (saved.isSuccess) {
+                    nameHistory.record(name)
+                    draft = ""
+                }
             }
         }
     }
@@ -210,24 +235,34 @@ internal fun NewHiveNamer(key: String, onRename: suspend (String) -> Unit, modif
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                BasicTextField(
+                PromptSuggestBox(
+                    kind = PromptKind.HiveName,
                     value = draft,
                     onValueChange = { draft = it },
-                    singleLine = true,
-                    textStyle = AzphaltType.body.copy(color = content),
-                    cursorBrush = SolidColor(content),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { save() }),
-                    modifier = Modifier.weight(1f).semantics { contentDescription = placeholder },
-                    decorationBox = { field ->
-                        Box(contentAlignment = Alignment.CenterStart) {
-                            if (draft.isEmpty()) {
-                                Text(placeholder, style = AzphaltType.body.copy(fontWeight = FontWeight.Normal), color = content.copy(alpha = 0.78f))
+                    modifier = Modifier.weight(1f),
+                    seed = suggestion,
+                    onSeeded = { draft = it },
+                    resetKey = key,
+                ) { input ->
+                    BasicTextField(
+                        value = input.value,
+                        onValueChange = input.onValueChange,
+                        singleLine = true,
+                        textStyle = AzphaltType.body.copy(color = content),
+                        cursorBrush = SolidColor(content),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { save() }),
+                        modifier = Modifier.fillMaxWidth().then(input.modifier).semantics { contentDescription = placeholder },
+                        decorationBox = { field ->
+                            Box(contentAlignment = Alignment.CenterStart) {
+                                if (draft.isEmpty()) {
+                                    Text(placeholder, style = AzphaltType.body.copy(fontWeight = FontWeight.Normal), color = content.copy(alpha = 0.78f))
+                                }
+                                field()
                             }
-                            field()
-                        }
-                    },
-                )
+                        },
+                    )
+                }
                 // Save is quiet until there is a name to save: lifted Ink, not the strong fill.
                 val ready = draft.isNotBlank()
                 val fill = if (ready) azphaltStrong() else AzphaltLiftedInk
