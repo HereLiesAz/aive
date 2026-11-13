@@ -21,6 +21,13 @@ class TourTargetsTest {
     }
 
     @Test
+    fun everyRegisteredTargetHasALabelLookupForTheTutorial() {
+        val lookup = File("src/commonMain/kotlin/com/hereliesaz/geministrator/intro/TutorialLabels.kt").readText()
+        val missing = TourTargetId.entries.filter { !lookup.contains("\"${it.labelKey}\" to getString(Res.string.${it.labelKey})") }.map { it.name }
+        assertEquals(emptyList<String>(), missing, "targets with no row in tutorialLabels()")
+    }
+
+    @Test
     fun everyLabelKeyIsARealString() {
         val keys = stringsDir.listFiles { f -> f.extension == "xml" }.orEmpty().flatMap { f ->
             Regex("""<string\s+name="([^"]+)"""").findAll(f.readText()).map { it.groupValues[1] }.toList()

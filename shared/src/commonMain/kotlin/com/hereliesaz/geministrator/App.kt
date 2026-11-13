@@ -475,6 +475,36 @@ fun App(
         }
     }
 
+    fun startTutorialIfAsked(objective: String) {
+        val modelFor = queenModelFor ?: return
+        if (!com.hereliesaz.geministrator.intro.TutorialRouter.isTutorialGoal(objective)) return
+        scope.launch {
+            try {
+                val roles = resolveRoleCollection(workflowPersistence.roles.all())
+                val base = modelFor(com.hereliesaz.geministrator.queen.orchestratorPin(roles))
+                if (base == null) {
+                    appLog("AiveTutorial", "No usable Source for the queen: the tutorial layer is not started")
+                    return@launch
+                }
+                val active = runtime
+                // Her calls here are held to the keeper's hourly spend cap, as in a dispute (a call it leaves no room for fails).
+                val capped = if (active == null) base else com.hereliesaz.geministrator.queen.cappedModel(base) { active.queenCallAllowed() }
+                val outcome = com.hereliesaz.geministrator.intro.TutorialLaunch.run(
+                    goal = objective,
+                    base = capped,
+                    roles = roles,
+                    labels = com.hereliesaz.geministrator.intro.tutorialLabels(),
+                    nowMillis = { currentEpochMillis() },
+                )
+                appLog("AiveTutorial", "Tutorial ended: $outcome")
+            } catch (failure: CancellationException) {
+                throw failure
+            } catch (failure: Exception) {
+                appLog("AiveTutorial", "Tutorial failed: ${failure::class.simpleName}")
+            }
+        }
+    }
+
     /**
      * Launches [objective] the way the launch form does; ignored while a launch is in progress.
      * [onFinished] receives null once the workflow started, or the failure; it is not called
@@ -516,6 +546,9 @@ fun App(
                 objectiveProvenance = objectiveProvenance,
             )
         }
+        // A goal that asks to be taught the app also starts the tutorial layer: the queen's planner and reviewers plan the
+        // lessons and a writer makes them, one ahead of the keeper (intro/TutorialDirector.kt). The hive runs as for any goal.
+        startTutorialIfAsked(objective)
     }
 
     // A reviewed plan the keeper was deciding on when the app last closed comes back, if nothing it was made from
