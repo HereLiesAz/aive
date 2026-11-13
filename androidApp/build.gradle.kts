@@ -77,6 +77,17 @@ val buildAndroidDjlTokenizerNative = registerAndroidRustLibrary(
     outputDir = generatedAndroidDjlTokenizerJniDir,
 )
 
+// Keystore file for release signing: HAIVE_KEYSTORE_PATH, else the central workflow's KEYSTORE_FILE,
+// else app/keystore.jks at the repository root. Null (unsigned release) when none exists.
+fun releaseKeystorePath(): String? {
+    val candidates = listOf(
+        System.getenv("HAIVE_KEYSTORE_PATH"),
+        System.getenv("KEYSTORE_FILE"),
+        rootProject.file("app/keystore.jks").path,
+    )
+    return candidates.firstOrNull { !it.isNullOrBlank() && File(it).isFile }
+}
+
 android {
     namespace = "com.hereliesaz.aive"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -106,10 +117,14 @@ android {
         jniLibs.srcDir(generatedAndroidDjlTokenizerJniDir.get().asFile)
     }
 
+    // Release signing is supplied by the central HereLiesAz/workflows android-play-release run: it
+    // writes the upload key to app/keystore.jks, exports KEYSTORE_FILE, KEYSTORE_PASSWORD, KEY_ALIAS and
+    // KEY_PASSWORD, and the profile's build_command sets HAIVE_KEYSTORE_PATH / HAIVE_KEYSTORE_TYPE.
+    // Locally and in Aive's own CI none of that exists and release stays unsigned (no failure).
     signingConfigs {
         create("release") {
-            val keyStorePath = System.getenv("HAIVE_KEYSTORE_PATH")
-            if (!keyStorePath.isNullOrBlank()) {
+            val keyStorePath = releaseKeystorePath()
+            if (keyStorePath != null) {
                 storeFile = file(keyStorePath)
                 storeType = System.getenv("HAIVE_KEYSTORE_TYPE") ?: "PKCS12"
                 storePassword = System.getenv("KEYSTORE_PASSWORD")
@@ -122,8 +137,7 @@ android {
 
     buildTypes {
         release {
-            val keyStorePath = System.getenv("HAIVE_KEYSTORE_PATH")
-            if (!keyStorePath.isNullOrBlank()) {
+            if (releaseKeystorePath() != null) {
                 signingConfig = signingConfigs.getByName("release")
             }
             // R8 shrinking; the resulting mapping.txt is uploaded to Play with each bundle.
@@ -173,31 +187,6 @@ tasks.matching { task ->
     task.name.startsWith("merge") && task.name.endsWith("JniLibFolders")
 }.configureEach {
     dependsOn(buildAndroidBitcosNative, buildAndroidDjlTokenizerNative)
-}
-
-// A release package without the keystore is unusable (Play rejects it; sideloads cannot update
-// the installed signature), so fail loudly instead of emitting an unsigned artifact. Minify-only
-// tasks stay unguarded: multiplatform.yml runs minify*ReleaseWithR8 on PRs without secrets.
-// Checked up front so a missing file, password or alias fails here, not later inside AGP.
-val releaseSigningProblem: String? = run {
-    val keyStorePath = System.getenv("HAIVE_KEYSTORE_PATH")
-    when {
-        keyStorePath.isNullOrBlank() -> "HAIVE_KEYSTORE_PATH is not set"
-        !file(keyStorePath).isFile -> "HAIVE_KEYSTORE_PATH ($keyStorePath) is not a file"
-        System.getenv("KEYSTORE_PASSWORD").isNullOrBlank() -> "KEYSTORE_PASSWORD is not set"
-        System.getenv("KEY_ALIAS").isNullOrBlank() -> "KEY_ALIAS is not set"
-        else -> null
-    }
-}
-// packagePlayRelease, packageGithubRelease, signPlayReleaseBundle; not packageXReleaseResources,
-// which R8 depends on.
-val releasePackagingTask = Regex("^(package[A-Z]\\w*Release|sign[A-Z]\\w*ReleaseBundle)$")
-tasks.matching { task -> releasePackagingTask.matches(task.name) }.configureEach {
-    doFirst {
-        check(releaseSigningProblem == null) {
-            "Release signing is not configured ($releaseSigningProblem): set HAIVE_KEYSTORE_PATH to an existing keystore, KEYSTORE_PASSWORD and KEY_ALIAS."
-        }
-    }
 }
 
 dependencies {
