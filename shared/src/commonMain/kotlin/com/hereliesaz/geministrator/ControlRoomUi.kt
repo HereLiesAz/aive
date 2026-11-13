@@ -454,7 +454,7 @@ fun ControlRoom(
             showTimeline.value && liveWorkflow != null && !restingShown
         },
         keeperPart = KeeperSection.entries.firstOrNull { it.name == keeperSectionName.value }
-            ?.takeIf { !compact || keeperOpen.value }?.let { stringResource(it.title) },
+            ?.takeIf { !compact || keeperOpen.value }?.let { stringResource(it.group.title) },
         onOpenDistrict = {
             if (destination == ControlRoomDestination.Overview) {
                 zoomOut()
@@ -729,7 +729,7 @@ fun ControlRoom(
     }
 }
 
-/** Opens the spend caps in the Keeper's room: Limits on a wide window, This device on a phone. */
+/** Opens the spend caps in the Keeper's room: its Allowance part. */
 internal fun openSpendLimits(
     compact: Boolean,
     keeperSectionName: MutableState<String>,
@@ -741,8 +741,8 @@ internal fun openSpendLimits(
     onDestinationSelected(ControlRoomDestination.Settings)
 }
 
-/** Where the spend caps are: Limits on a wide window, This device on a phone. */
-internal fun spendLimitsSection(compact: Boolean): KeeperSection = if (compact) KeeperSection.Device else KeeperSection.Limits
+/** Where the spend caps are: Allowance (the Limits part), on every width. */
+internal fun spendLimitsSection(@Suppress("UNUSED_PARAMETER") compact: Boolean): KeeperSection = KeeperSection.Limits
 
 /** A repository's source and short, credential-free name; local Git uses its folder name. */
 internal fun shellRepositoryLabel(repository: RepositoryRef): String =
@@ -1369,7 +1369,7 @@ private fun MainDestination(
                             else -> null
                         }
                     },
-                    content = { section, partModifier ->
+                    content = { parts, partModifier ->
                             ProviderSettingsScreen(
                                 connectedProviderIds = connectedProviderIds,
                                 onCheckProviderHealth = onCheckProviderHealth,
@@ -1394,9 +1394,9 @@ private fun MainDestination(
                                 localPlannerSetting = localPlannerSetting,
                                 localOrchestrationSpecialistSetting = localOrchestrationSpecialistSetting,
                                 onDeviceSmallTaskSetting = onDeviceSmallTaskSetting,
-                                section = section,
+                                sections = parts,
                                 compact = compact,
-                                trailing = {
+                                trailing = { section ->
                                     when (section) {
                                         KeeperSection.Connections -> {
                                             RepositoryConnections(

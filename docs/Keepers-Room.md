@@ -4,16 +4,18 @@ The Aive has two places: **the hive**, where all work happens (`Swarm-OS.md`), a
 
 ## Parts
 
-| Group | Part | Holds | Was |
-|---|---|---|---|
-| Feeds the hive | **Connections** | AI sources, remote A2A agents, repository hosts (GitHub, GitLab, Entire) | Settings › AI Sources, Repositories |
-| | **Compute** | the compute pool, and which work goes to which machine | Settings › Compute Pool, Compute |
-| The keeper | **Projects and data** | project files, the setup file, JSON export and import, delete everything | Settings › Projects, Data, Privacy |
-| | **Limits** (wide) | the spend caps: a cost cap per run and an hourly spend cap | This device |
-| | **This device** | spend caps (on a phone only), remote access, the A2A server (desktop), the local planner, local orchestration specialists, small tasks on this device | Settings › Remote Access, Local Planner, Local Orchestration |
-| | **Delegations** | gates a creature passes without asking, each with Revoke; how many approvals in a row earn an offer | (new) |
-| | **Appearance** | the ground, chosen from six swatches; Reduce motion; Always show creature labels | Settings › Appearance |
-| | **About and privacy** | crash reports, trace export (OpenTelemetry), remembered text (one switch, Clear remembered text), diagnostics | Settings › Crash Reports, Diagnostics |
+The room lists **six parts**, each with one sentence on the phone list (and as its heading on a wide window). They only regroup the earlier parts, whose sections below keep their names and contents; nothing is new.
+
+| Part | One sentence | Holds (the earlier parts) |
+|---|---|---|
+| **Sources and tools** | What your creatures think with, the tools they may use, and where their work lands. | **Connections** (AI sources, remote A2A agents, repository hosts, tools), **Local agents** |
+| **Allowance** | The most real money a run, or an hour, may spend. | **Limits**: the cost cap per run and the hourly spend cap, now on every width |
+| **Hosts** | Where your creatures run: this device, your other machines, and models that run here. | **This device** (remote access, the A2A server, the local planner, local orchestration specialists, small tasks), **Compute** (only where the build offers distributed compute) |
+| **Data and privacy** | Save, load, move or delete what The Aive keeps, and what it may report. | **Projects and data**, **About and privacy** |
+| **Routines and trust** | Swarms that start by themselves, what your creatures may do without asking you, and what they suggest. | **Schedules**, **Delegations**, **Improvement** |
+| **Look** | The colour behind your creatures. | **Appearance** |
+
+Sources and tools and Hosts are listed under "Feeds the hive", the rest under "The keeper". The names are the owner's recommended defaults (decision D12; Compute is renamed Hosts per D31). The room remembers the open part by its first section (`keeper.section`); the breadcrumb names the part (`KeeperGroup`).
 
 Compute shows only where the build offers distributed compute.
 
@@ -30,7 +32,7 @@ Memory is not here: it is a swarm of its own, running beside every other, so it 
 ## Layout
 
 - **Wide** (820dp and up): a page title (KEEPER'S ROOM, "Make it yours", one line), then an Ink list of the parts on the left (the open one filled Yellow, a part's count beside it) and the open part on its own Ink card on the right, under its group as the eyebrow, its name and its one-line lead. The spend caps have their own part, **Limits**. Appearance there is a grid of ground cards, three across (swatch, name, SELECTED on the current one), then setting rows, each a line about it and a switch; the whole row toggles.
-- **Phone:** there is no Limits part; the spend caps stay at the top of This device.
+- **Phone:** the spend caps are in Allowance, as on a wide window (they are no longer duplicated at the top of This device).
 - **Phone:** the list is its own page; a part opens over it with a "‹ Keeper's room" pill, and Back returns to the list. The header's gear opens the room from anywhere.
 - The room remembers the open part (`keeper.section`).
 
@@ -107,11 +109,11 @@ Closing the creature panel (the sheet dismissed, the dock's close, Back) only se
 
 ## First launch
 
-Every launch opens on the hive, not on a form or the Keeper's room (`MindMapRunScreen`, `FirstCreature`): the starters to keep one of, the first picked, and one field, **What should it work on?**, with **Feed it**. Feeding keeps the picked starter and names the hive from the first words it was fed (never from an empty tap). Its name, a repository and saved projects are under Options. Until there is a hive, its places' row is hidden.
+Every launch opens on the hive, not on a form or the Keeper's room (`MindMapRunScreen`, `FirstCreature`): one field, **What do you want to get done?**, with **Start**. The field starts with what you fed last on this device, else **Teach me how to use the Aive** (a fixed seed; no model is asked). Starting keeps the first starter (the starters are chosen in the Stable) and names the hive from the first words it was fed (never from an empty tap). **More** holds its name and a repository. One muted line says a free source is picked for you and that free sources may log what you write, with **Use my own key** beside it; the first free text source is connected on its own while none is. Until there is a hive, its places' row is hidden.
 
 Feed it is gated on what the connected agents can reach (`ProviderReach`, `FeedGate`), and the gate sits right above it with its resolution in place:
 
-- **No AI source** (a fresh install has the keyless gateways already on; this is the state after the keyless switch is turned off): the free keyless gateways, each a one-tap pill (**Use Kilo Gateway · free, no key**), with the one line that prompts and repository text sent to a keyless source leave the device and may be logged; then a quieter **Use your own key** pill to the Keeper's room. Feed it waits quietly.
+- **No AI source** (a fresh install has the keyless gateways already on; this is the state after the keyless switch is turned off): on the very first launch the first free text gateway is connected for you and the muted line above replaces the pills; elsewhere, the free keyless gateways, each a one-tap pill (**Use Kilo Gateway · free, no key**), with the one line that prompts and repository text sent to a keyless source leave the device and may be logged; then a quieter **Use your own key** pill to the Keeper's room. Feed it waits quietly.
 - **Every agent works only inside a repository** (OpenCode on GitHub Actions, linked with a GitHub token): the repository fields open above Feed it, offering only the kinds those agents work in, alongside the free gateways for work with no repository.
 - **A repository no agent works in:** the fields open there too, to choose another kind, or none.
 

@@ -403,12 +403,12 @@ class HiveScreenshotTest {
                     opening = section,
                     compact = compact,
                     statusOf = { if (it == KeeperSection.Connections) keeperCount(providers.size + 1) else null },
-                    content = { part, partModifier ->
+                    content = { parts, partModifier ->
                         ProviderSettingsScreen(
                             connectedProviderIds = providers,
-                            section = part,
+                            sections = parts,
                             compact = compact,
-                            trailing = {
+                            trailing = { part ->
                                 if (part == KeeperSection.Connections) {
                                     RepositoryConnections(setOf(RepositoryServiceCatalog.GITHUB_ID), {}, {}, compact)
                                 }

@@ -294,11 +294,11 @@ internal fun ProviderSettingsScreen(
     localPlannerSetting: LocalPlannerSetting? = null,
     localOrchestrationSpecialistSetting: LocalOrchestrationSpecialistSetting? = null,
     onDeviceSmallTaskSetting: OnDeviceSmallTaskSetting? = null,
-    /** The part of the Keeper's room this shows (docs/Keepers-Room.md). */
-    section: KeeperSection = KeeperSection.Connections,
+    /** The parts of the Keeper's room this shows, one after another (docs/Keepers-Room.md). */
+    sections: List<KeeperSection> = listOf(KeeperSection.Connections),
     compact: Boolean = false,
-    /** More of the same section, after this screen's own controls (repositories, compute assignments). */
-    trailing: @Composable ColumnScope.() -> Unit = {},
+    /** More of each part, after this screen's own controls (repositories, compute assignments). */
+    trailing: @Composable ColumnScope.(KeeperSection) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val uriHandler = LocalUriHandler.current
@@ -364,7 +364,7 @@ internal fun ProviderSettingsScreen(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(keeperContentPadding(compact)),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-      if (section == KeeperSection.Connections) {
+      if (KeeperSection.Connections in sections) {
         ProviderSectionLabel(stringResource(Res.string.settings_ai_providers))
         // Keyless sources start on; this one switch turns them all off (or back on). A single source is
         // disconnected on its own row below. What a keyless source is sent leaves the device: said once, here.
@@ -746,17 +746,17 @@ internal fun ProviderSettingsScreen(
 
         // Appearance: the page colour ("ground"). It lives here, not in the header, so every shell
         // (Android, Desktop, Web) offers it in one place (KeeperAppearance.kt).
-      if (section == KeeperSection.Appearance) {
+      if (KeeperSection.Appearance in sections) {
         KeeperAppearance(wide = !compact)
       }
 
       // Limits (wide): the spend caps. A phone has no Limits part and keeps them in This device.
-      if (section == KeeperSection.Limits || (section == KeeperSection.Device && compact)) {
+      if (KeeperSection.Limits in sections) {
         SpendCapsSettings()
         QueenLevelSettings()
       }
 
-      if (section == KeeperSection.About) {
+      if (KeeperSection.About in sections) {
         crashReportingSetting?.let { setting ->
             ProviderSectionLabel(stringResource(Res.string.settings_crash_reports))
             Text(
@@ -779,7 +779,7 @@ internal fun ProviderSettingsScreen(
 
       }
 
-      if (section == KeeperSection.Device) {
+      if (KeeperSection.Device in sections) {
         remoteAccessSetting?.let { setting ->
             ProviderSectionLabel(stringResource(Res.string.settings_remote_access))
             Text(
@@ -1091,7 +1091,7 @@ internal fun ProviderSettingsScreen(
 
       }
 
-      if (section == KeeperSection.Compute) {
+      if (KeeperSection.Compute in sections) {
         ProviderSectionLabel(stringResource(Res.string.settings_compute_pool))
         Text(
             stringResource(Res.string.settings_connect_this_device_to_the_same) +
@@ -1318,7 +1318,7 @@ internal fun ProviderSettingsScreen(
 
       }
 
-      if (section == KeeperSection.Projects) {
+      if (KeeperSection.Projects in sections) {
         if (projectFileService != null) {
             ProviderSectionLabel(stringResource(Res.string.settings_projects))
             Text(
@@ -1504,7 +1504,7 @@ internal fun ProviderSettingsScreen(
 
       }
 
-      if (section == KeeperSection.About) {
+      if (KeeperSection.About in sections) {
         ProviderSectionLabel(stringResource(Res.string.settings_diagnostics))
         if (diagnosticTriggered) {
             LaunchedEffect(Unit) {
@@ -1535,7 +1535,7 @@ internal fun ProviderSettingsScreen(
 
       }
 
-      if (section == KeeperSection.Projects) {
+      if (KeeperSection.Projects in sections) {
         ProviderSectionLabel(stringResource(Res.string.settings_privacy))
         if (!clearConfirm) {
             AzphaltPill(
@@ -1561,7 +1561,7 @@ internal fun ProviderSettingsScreen(
             }
         }
       }
-        trailing()
+        sections.sortedBy { it.ordinal }.forEach { part -> trailing(part) }
     }
 }
 
