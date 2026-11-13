@@ -214,6 +214,9 @@ class ApplicationRuntime private constructor(
     private var currentGeneration: Long = 0L
     private var cycleJob: Job? = null
     private val runtimeMutex = Mutex()
+
+    /** Serializes the keeper's accepts and dismissals of the queen's suggestions (apart from [runtimeMutex], which their side effects take). */
+    private val queenDecisionMutex = Mutex()
     /** Non-null while the UI is viewing a historical run; cycling continues on [current]. */
     private var viewingRun: ViewingRun? = null
     val state: StateFlow<ApplicationRuntimeState> = publisher.state
@@ -1005,53 +1008,63 @@ class ApplicationRuntime private constructor(
      * step that has not started, a rewind of one step and what follows it, the keeper's own pause), and only if that
      * took, marks it Adopted. A second tap, or a suggestion whose step has since started, changes nothing.
      */
-    internal suspend fun acceptQueenSuggestion(proposalId: String): QueenAccept {
-        val ledger = queenLedger ?: return QueenAccept.NothingChanged
+    internal suspend fun acceptQueenSuggestion(proposalId: String): QueenAccept = queenDecisionMutex.withLock {
+        val ledger = queenLedger ?: return@withLock QueenAccept.NothingChanged
         val proposal = ledger.state().proposals.firstOrNull {
             it.id == proposalId && it.source == ImprovementSource.Queen
-        } ?: return QueenAccept.NothingChanged
-        if (proposal.status != ProposalStatus.Proposed) return QueenAccept.NothingChanged
-        val action = QueenAction.parse(proposal.action) ?: return QueenAccept.NothingChanged
-        val (definition, run) = runtimeMutex.withLock {
-            val snapshot = current ?: return QueenAccept.NothingChanged
-            snapshot.definition to newestRun(snapshot.state.run)
-        }
+        } ?: return@withLock QueenAccept.NothingChanged
+        if (proposal.status != ProposalStatus.Proposed) return@withLock QueenAccept.NothingChanged
+        val action = QueenAction.parse(proposal.action) ?: return@withLock QueenAccept.NothingChanged
+        val seen = runtimeMutex.withLock {
+            current?.let { snapshot -> snapshot.definition to newestRun(snapshot.state.run) }
+        } ?: return@withLock QueenAccept.NothingChanged
+        val (definition, run) = seen
         if (run.id.value != proposal.cycleRunId ||
-            queenAcceptRefused(proposal, definition, run, roles)
-        ) return QueenAccept.NothingChanged
-        val took = when (action) {
-            QueenAction.RewordStep -> {
-                val edited = definition.copy(
-                    tasks = definition.tasks.map { if (it.id.value == proposal.target) it.copy(objective = proposal.newText) else it },
-                )
-                applyLiveDefinitionEdit(edited) > 0
-            }
-            QueenAction.RedoFromStep -> {
-                rewindToTask(TaskDefinitionId(proposal.target))
-                true
-            }
-            QueenAction.Rest -> {
-                setKeeperPause(true)
-                true
-            }
-            else -> false
-        }
-        if (!took) return QueenAccept.NothingChanged
+            queenAcceptRefused(proposal, definition, run, roles, queenCandidates(definition, run, queenSignals(definition, run, roles), queenCaps()))
+        ) return@withLock QueenAccept.NothingChanged
+        // Claim the row first (a compare-and-set), so only one tap runs the side effect; give it back if that does not take.
         val now = nowEpochMillis()
-        ledger.decide(proposalId) {
+        val claimed = ledger.decide(proposalId) {
             it.copy(
                 status = ProposalStatus.Adopted,
                 decidedAtEpochMillis = now,
                 note = "The keeper accepted it.",
             )
         }
+        if (!claimed) return@withLock QueenAccept.NothingChanged
+        val took = try {
+            when (action) {
+                QueenAction.RewordStep -> {
+                    val edited = definition.copy(
+                        tasks = definition.tasks.map { if (it.id.value == proposal.target) it.copy(objective = proposal.newText) else it },
+                    )
+                    applyLiveDefinitionEdit(edited) > 0
+                }
+                QueenAction.RedoFromStep -> {
+                    rewindToTask(TaskDefinitionId(proposal.target))
+                    true
+                }
+                QueenAction.Rest -> {
+                    setKeeperPause(true)
+                    true
+                }
+                else -> false
+            }
+        } catch (failure: Throwable) {
+            ledger.decide(proposalId, ProposalStatus.Adopted) { it.copy(status = ProposalStatus.Proposed, decidedAtEpochMillis = null, note = null) }
+            throw failure
+        }
+        if (!took) {
+            ledger.decide(proposalId, ProposalStatus.Adopted) { it.copy(status = ProposalStatus.Proposed, decidedAtEpochMillis = null, note = null) }
+            return@withLock QueenAccept.NothingChanged
+        }
         refreshQueenProposals()
-        return QueenAccept.Applied
+        QueenAccept.Applied
     }
 
     /** The keeper says no thanks. The same step and action are not offered again for two weeks. */
-    internal suspend fun dismissQueenSuggestion(proposalId: String): Boolean {
-        val ledger = queenLedger ?: return false
+    internal suspend fun dismissQueenSuggestion(proposalId: String): Boolean = queenDecisionMutex.withLock {
+        val ledger = queenLedger ?: return@withLock false
         val now = nowEpochMillis()
         val changed = ledger.decide(proposalId) {
             it.copy(
@@ -1061,7 +1074,7 @@ class ApplicationRuntime private constructor(
             )
         }
         refreshQueenProposals()
-        return changed
+        changed
     }
 
     private suspend fun refreshQueenProposals() {

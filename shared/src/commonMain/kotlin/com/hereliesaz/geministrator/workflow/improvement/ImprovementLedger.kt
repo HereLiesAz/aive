@@ -270,21 +270,23 @@ object ProposalRetention {
         return kept
     }
 
+    /**
+     * The queen's rows keep their own budget ([MAX_QUEEN], oldest first) and never count against [max]; the eviction
+     * pass over [max] looks only at the other sources, so adding a queen row can never drop another source's proposal.
+     */
     fun bound(all: List<ImprovementProposal>, max: Int = MAX): List<ImprovementProposal> {
         val proposals = boundQueen(all)
-        var excess = proposals.size - max
+        val others = proposals.filter { it.source != ImprovementSource.Queen }
+        var excess = others.size - max
         if (excess <= 0) return proposals
-        val drop = hashSetOf<Int>()
+        val drop = hashSetOf<ImprovementProposal>()
         for (status in dropOrder) {
-            for ((index, proposal) in proposals.withIndex()) {
+            for (proposal in others) {
                 if (excess <= 0) break
-                if (proposal.status == status) {
-                    drop += index
-                    excess -= 1
-                }
+                if (proposal.status == status && drop.add(proposal)) excess -= 1
             }
         }
-        return proposals.filterIndexed { index, _ -> index !in drop }
+        return proposals.filter { it !in drop }
     }
 }
 

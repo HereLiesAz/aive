@@ -240,6 +240,27 @@ class QueenSuggestionsTest {
     }
 
     @Test
+    fun redoIsRefusedOnceTheStepRecovered() {
+        val redo = made().single()
+        assertEquals(QueenAction.RedoFromStep.name, redo.action)
+        assertFalse(queenAcceptRefused(redo, definition, failing, listOf(engineerRole), candidates(failing)))
+        val recovered = qRun(
+            qTaskRun("a", TaskRunStatus.Completed),
+            qTaskRun("b", TaskRunStatus.Completed),
+            qTaskRun("c", TaskRunStatus.Running),
+        )
+        assertTrue(queenAcceptRefused(redo, definition, recovered, listOf(engineerRole), candidates(recovered)))
+    }
+
+    @Test
+    fun restIsRefusedWhenTheNannysReviewIsNoLongerPending() {
+        val rest = made().single().copy(action = QueenAction.Rest.name, target = QUEEN_RUN_SUBJECT)
+        val pending = listOf(QueenCandidate(QueenAction.Rest, QUEEN_RUN_SUBJECT, QueenVoice.SuggestRestNanny, emptyList(), outside = false))
+        assertFalse(queenAcceptRefused(rest, definition, failing, emptyList(), pending))
+        assertTrue(queenAcceptRefused(rest, definition, failing, emptyList(), emptyList()))
+    }
+
+    @Test
     fun outsideContentLabelsTheSuggestion() {
         val tainted = failing.copy(objectiveProvenance = ContextProvenance.ExternalContent)
         val proposal = queenNewProposals(definition, tainted, candidates(tainted), emptyList(), QueenLevel.Quiet, 1L).single()

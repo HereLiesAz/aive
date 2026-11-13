@@ -49,6 +49,15 @@ class ImprovementLedgerQueenTest {
     }
 
     @Test
+    fun fullLedgerKeepsOtherSourcesPendingWhenQueenRowsAreAdded() {
+        val loop = (1..ProposalRetention.MAX).map { row("l$it", ImprovementSource.Loop, it.toLong()) }
+        val queen = (1..30).map { row("q$it", ImprovementSource.Queen, 1000L + it) }
+        val kept = ProposalRetention.bound(loop + queen)
+        assertEquals(loop.map { it.id }, kept.filter { it.source == ImprovementSource.Loop }.map { it.id })
+        assertEquals(30, kept.count { it.source == ImprovementSource.Queen })
+    }
+
+    @Test
     fun decideIsCompareAndSet() = runBlocking<Unit> {
         val store = InMemoryImprovementStore()
         store.merge { it.copy(proposals = listOf(row("q", ImprovementSource.Queen, 1))) }
