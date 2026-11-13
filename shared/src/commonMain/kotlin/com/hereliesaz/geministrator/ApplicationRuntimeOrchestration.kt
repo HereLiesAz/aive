@@ -206,7 +206,7 @@ internal fun newWorkflowInstruction(objective: String, repository: RepositoryRef
     }
     if (TEACHING_WORDS.containsMatchIn(objective)) {
         append(" The objective is to teach: plan a survey of the material, a curriculum ordered by prerequisites, then one step per major part")
-        append(" that explains it with examples and a check of understanding (3 to 6 steps). Each step's result is text the keeper reads,")
+        append(" that explains it with examples and a check of understanding (size the plan to the material). Each step's result is text the keeper reads,")
         append(" so require no approval unless a step changes something.")
     }
     if (availableTools.isNotEmpty()) append(com.hereliesaz.geministrator.research.RESEARCH_PLAN_INSTRUCTION)
