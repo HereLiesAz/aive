@@ -2088,6 +2088,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_say_missing_reviewer_no_second_source">I did not ask my reviewer to read the plan: I have one Source and it has no room right now. I checked only what I can check myself. A second Source would let my reviewer read it. Connect one.</string>
     <string name="queen_say_missing_blocker">The hive is not complete: this still has to be made or obtained.</string>
     <string name="queen_say_finished_blockers_open">The swarm finished, but I cannot call the hive reached: %1$s of the things it needs have not been made or obtained yet.</string>
+    <string name="teaching_failed_no_worker">I cannot teach yet: the Worker creature is switched off. Switch it on in the Roster, then start again.</string>
+    <string name="teaching_failed_no_source">I could not reach a Source to plan the lessons. Open Connections to connect or fix one, then start again.</string>
+    <string name="teaching_failed_not_small_enough">I could not break this down into small enough steps. Try again, or connect a stronger Source in Connections.</string>
     <string name="queen_say_finished_not_reached">The swarm finished, but I cannot call the hive reached: %1$s of %2$s signs are not met. Step %3$s (%4$s) is where to look.</string>
     <string name="queen_say_blocker_added_queen">I found something this hive needs that nobody has made or obtained yet, so I added it to what the hive needs. The hive is not reached until it is made or obtained.</string>
     <string name="queen_say_blocker_added_nanny">The Nanny found something this hive needs that nobody has made or obtained yet, so I added it to what the hive needs. The hive is not reached until it is made or obtained.</string>
