@@ -133,11 +133,22 @@ class GitHubRepositoryChunkSource(
                 name.substringAfterLast('.', "").lowercase() in TEXT_EXTENSIONS
         }
 
-        /** Words the path shares with the request; a README always scores. */
+        /**
+         * Words the path shares with the request; an orientation file (a README, or a page directly in `docs/`) always
+         * scores, so a request that names no file ("teach me this app") still finds the project's own explanation of itself.
+         */
         fun pathScore(path: String, queryWords: Set<String>): Int {
             val words = BuiltInTextEmbedder.tokens(path.replace('/', ' ').replace('.', ' '))
             val shared = words.count { it in queryWords }
-            return shared + if (path.substringAfterLast('/').startsWith("README", ignoreCase = true)) 1 else 0
+            return shared + if (isOrientation(path)) 1 else 0
+        }
+
+        /** A README anywhere, or a Markdown page directly in a top-level `docs/` folder. */
+        fun isOrientation(path: String): Boolean {
+            val parts = path.split('/')
+            val name = parts.last()
+            return name.startsWith("README", ignoreCase = true) ||
+                (parts.size == 2 && parts[0].equals("docs", ignoreCase = true) && name.endsWith(".md", ignoreCase = true))
         }
     }
 }

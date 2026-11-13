@@ -36,7 +36,8 @@ fun interface ContextRetriever {
 
 /**
  * Chunks from every [sources] ranked by similarity to the request's objective, acceptance
- * criteria and role instructions; the best [maxChunks] at or above [minSimilarity].
+ * criteria and role instructions; the best [maxChunks] at or above [minSimilarity], or, when none reaches it,
+ * the best [floorChunks].
  *
  * Chunk vectors are cached by text (bounded by [maxCachedVectors]) and dropped when the embedder's
  * space changes, so a repository read on every request is embedded once.
@@ -46,6 +47,8 @@ class SimilarityContextRetriever(
     private val embedder: TextEmbedder = BuiltInTextEmbedder(),
     private val maxChunks: Int = 8,
     private val minSimilarity: Float = 0.2f,
+    /** When nothing reaches [minSimilarity], this many of the best chunks are kept anyway: a source's chunks are already picked by path. */
+    private val floorChunks: Int = 3,
     private val maxCachedVectors: Int = 4_096,
 ) : ContextRetriever {
     // Least recently used first. Guarded by [cacheMutex]: retrieve() suspends while embedding.
@@ -96,9 +99,9 @@ class SimilarityContextRetriever(
         val index = FlatVectorIndex(embedder.dimension)
         val byId = chunks.associateBy { it.id }
         chunks.forEach { chunk -> requestVectors[chunk.text]?.let { index.upsert(chunk.id, it) } }
-        return index.search(queryVector, maxChunks)
-            .filter { it.score >= minSimilarity }
-            .map { RetrievedChunk(byId.getValue(it.id), it.score) }
+        val ranked = index.search(queryVector, maxChunks)
+        val kept = ranked.filter { it.score >= minSimilarity }.ifEmpty { ranked.take(floorChunks) }
+        return kept.map { RetrievedChunk(byId.getValue(it.id), it.score) }
     }
 }
 
