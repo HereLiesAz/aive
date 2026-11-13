@@ -132,4 +132,21 @@ class SettingsInferenceFabricTest {
         assertNull(SettingsInferenceStateStore(settings).model("azphalt:com.example.detector:object-detection:0"))
     }
 
+
+    @Test
+    fun theStateKeepsOnlyTheNewestOfEachGrowingList() = runBlocking {
+        val state = SettingsInferenceStateStore(MapSettings(), limits = InferenceStateLimits(records = 5, resourceSamples = 3, providerRunBindings = 2, invocationSequences = 2, data = 2))
+        val providerId = AgentProviderId("p")
+        repeat(12) { index ->
+            state.appendRecord("inv-$index", InferenceStreamPayload.Terminal(InferenceTerminalStatus.Completed))
+            state.recordResourceSample(InferenceResourceSample("inv-$index", providerId, inputTokens = index.toLong()))
+            state.bindProviderRun("inv-$index", TaskRunId("t-$index"), providerId, ProviderRunId("run-$index"))
+            state.nextInvocationSequence(TaskRunId("t-$index"))
+        }
+        assertEquals(5, (0 until 12).sumOf { state.records("inv-$it").size })
+        assertEquals(3, (0 until 12).sumOf { state.resourceSamples("inv-$it").size })
+        assertNull(state.invocationId(providerId, ProviderRunId("run-0")), "the oldest binding is gone")
+        assertEquals("inv-11", state.invocationId(providerId, ProviderRunId("run-11")), "the newest is kept")
+        assertEquals(7L, state.records("inv-7").single().sequence + 7L, "sequences still start at zero per invocation")
+    }
 }

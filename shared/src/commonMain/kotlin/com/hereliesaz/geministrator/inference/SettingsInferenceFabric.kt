@@ -22,6 +22,26 @@ import kotlinx.serialization.json.Json
 private val settingsInferenceStateMutex = Mutex()
 
 /**
+ * The most entries of each list the inference state keeps. The whole state is one value that is read and rewritten on every
+ * dispatch and every event, and its lists only ever grew (every stream record, every resource sample, every run binding),
+ * so a long-lived install paid more for each write than the last. Past a limit the oldest entries are dropped: they belong
+ * to finished invocations, and the live ones are the newest.
+ */
+data class InferenceStateLimits(
+    val records: Int = 2_000,
+    val resourceSamples: Int = 500,
+    val providerRunBindings: Int = 1_000,
+    val invocationSequences: Int = 2_000,
+    val data: Int = 5_000,
+) {
+    init {
+        require(records > 0 && resourceSamples > 0 && providerRunBindings > 0 && invocationSequences > 0 && data > 0) {
+            "Inference state limits must be positive"
+        }
+    }
+}
+
+/**
  * Versioned durable state used by the Blueprint inference fabric.
  *
  * This store persists orchestration/indexing metadata only. Artifact payloads, memory contents,
@@ -32,6 +52,8 @@ class SettingsInferenceStateStore(
     private val settings: Settings,
     private val storageKey: String = DEFAULT_STORAGE_KEY,
     private val json: Json = defaultJson,
+    /** How much of each growing list is kept; the oldest entries go first. A test gives small ones. */
+    private val limits: InferenceStateLimits = InferenceStateLimits(),
 ) {
     suspend fun registerModel(model: InferenceModelDescriptor) = update { snapshot ->
         snapshot.copy(
@@ -193,7 +215,7 @@ class SettingsInferenceStateStore(
     }
 
     private fun writeUnlocked(snapshot: InferenceStateSnapshot) {
-        settings.putString(storageKey, json.encodeToString(InferenceStateSnapshot.serializer(), snapshot))
+        settings.putString(storageKey, json.encodeToString(InferenceStateSnapshot.serializer(), snapshot.bounded(limits)))
     }
 
     companion object {
@@ -385,6 +407,14 @@ class SettingsCompoundInferenceFabric(
         mediaType = mediaType,
     )
 }
+
+private fun InferenceStateSnapshot.bounded(limits: InferenceStateLimits): InferenceStateSnapshot = copy(
+    records = records.takeLast(limits.records),
+    resourceSamples = resourceSamples.takeLast(limits.resourceSamples),
+    providerRunBindings = providerRunBindings.takeLast(limits.providerRunBindings),
+    invocationSequences = invocationSequences.takeLast(limits.invocationSequences),
+    data = data.takeLast(limits.data),
+)
 
 @Serializable
 private data class InferenceStateSnapshot(
