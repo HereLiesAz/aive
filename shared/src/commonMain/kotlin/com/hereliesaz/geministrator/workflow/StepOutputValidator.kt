@@ -120,7 +120,10 @@ object StepOutputValidators {
         if (parsed.columns.isEmpty() || parsed.columns.all(String::isBlank)) return "The table has no header row."
         if (parsed.rows.isEmpty()) return "The table has no rows."
         if (parsed.rows.size > MAX_TABLE_ROWS) return "The table has more than $MAX_TABLE_ROWS rows."
-        if (filled && parsed.columns.any(String::isBlank)) return "Every column needs a header."
+        // The reader names a blank header "column_N", so the raw first row is what shows a missing one.
+        if (filled && DelimitedTableCodec.parse(text, ',', firstRowHeaders = false, maxRows = 1).rows.firstOrNull()?.values?.any { it.isNullOrBlank() } == true) {
+            return "Every column needs a header."
+        }
         return null
     }
 
