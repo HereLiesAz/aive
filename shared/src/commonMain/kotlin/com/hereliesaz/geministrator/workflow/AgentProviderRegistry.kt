@@ -64,6 +64,8 @@ class AgentProviderRegistry(
     inferenceSettings: Settings? = null,
     /** Which providers are passed over for now after a failover-worthy failure. */
     private val bench: ProviderBench = ProviderBench(),
+    /** Keeps keyless Sources inside the request limits their catalog text states. */
+    private val keylessPacer: KeylessPacer = KeylessPacer(),
 ) {
     private val defaultSettings: Settings by lazy { inferenceSettings ?: durableInferenceSettings() }
 
@@ -177,6 +179,11 @@ class AgentProviderRegistry(
         null
     }
 
+    /** Counts a request given to a keyless provider against its limit. */
+    private suspend fun notePicked(provider: AgentProvider) {
+        if (provider.keyless) healthMutex.withLock { keylessPacer.record(provider.id.value) }
+    }
+
     suspend fun select(request: ProviderSelectionRequest): AgentProvider {
         val required = buildSet {
             addAll(request.requiredCapabilities)
@@ -252,18 +259,25 @@ class AgentProviderRegistry(
         // (ProviderFailover: "a pinned creature reports the failure instead of switching silently").
         request.preferredProviderId
             ?.let { pin -> eligibleProviders.firstOrNull { (provider, _) -> provider.id == pin } }
-            ?.let { pinned -> return pinned.first }
+            ?.let { pinned -> return pinned.also { notePicked(it.first) }.first }
+
+        // A pin that cannot be met (its provider is not connected) is never met by a keyless Source: what a
+        // keyless gateway is sent leaves the device, and the keeper chose another provider for this creature.
+        if (request.preferredProviderId != null) eligibleProviders.removeAll { (provider, _) -> provider.keyless }
 
         // Providers on the bench (failed lately for a reason that is theirs) go last: the router sees
-        // only healthy ones while any exists, and the benched ones only when nothing else can do it.
+        // only healthy ones while any exists, and the benched ones only when nothing else can do it. Keyless
+        // Sources come after every keyed one, and only while under the limit their catalog text states.
         if (eligibleProviders.size > 1) {
-            val (healthy, benched) = healthMutex.withLock {
-                eligibleProviders.partition { (provider, _) -> !bench.isBenched(provider.id.value) }
+            val preferred = healthMutex.withLock {
+                preferKeyedThenKeyless(
+                    eligibleProviders.toList(),
+                    isBenched = bench::isBenched,
+                    hasRoom = keylessPacer::hasRoom,
+                )
             }
-            if (healthy.isNotEmpty() && benched.isNotEmpty()) {
-                eligibleProviders.clear()
-                eligibleProviders.addAll(healthy)
-            }
+            eligibleProviders.clear()
+            eligibleProviders.addAll(preferred)
         }
 
         // Auto work spreads over every healthy provider that can do it, one after another, instead of
@@ -299,8 +313,10 @@ class AgentProviderRegistry(
             if (route.decision == AgentRouteDecision.Local) {
                 val selected = route.selectedAgent
                     ?: error("Local agent routing returned no selected provider")
-                return eligibleProviders.firstOrNull { (provider, _) -> provider.id.value == selected }?.first
-                    ?: error("Local agent routing selected unavailable provider $selected")
+                return (
+                    eligibleProviders.firstOrNull { (provider, _) -> provider.id.value == selected }?.first
+                        ?: error("Local agent routing selected unavailable provider $selected")
+                    ).also { notePicked(it) }
             }
         }
 

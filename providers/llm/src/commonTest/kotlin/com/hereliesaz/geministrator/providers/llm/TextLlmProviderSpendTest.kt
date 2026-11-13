@@ -116,6 +116,23 @@ class TextLlmProviderSpendTest {
     }
 
     @Test
+    fun onlyAnAnonymousKeylessHostedSourceIsKeylessAndOllamaCloudIsNeverOne() {
+        val kilo = HostedLlmProviders.entry(com.hereliesaz.geministrator.ProviderCatalog.KILO_ID)!!
+        assertTrue(HostedLlmProviders.create(kilo, com.hereliesaz.geministrator.ProviderCatalog.ANONYMOUS_CREDENTIAL).keyless)
+        // The keeper's own Kilo key makes it a keyed Source: billed, ordered with the keyed ones.
+        assertEquals(false, HostedLlmProviders.create(kilo, "sk-kilo").keyless)
+        val ollama = HostedLlmProviders.entry(HostedLlmProviders.OLLAMA_CLOUD_ID)!!
+        assertEquals(false, ollama.keyOptional)
+        assertEquals(false, com.hereliesaz.geministrator.ProviderCatalog.entry(ollama.id)!!.keyOptional)
+        assertTrue(
+            runCatching {
+                HostedLlmProviders.create(ollama, com.hereliesaz.geministrator.ProviderCatalog.ANONYMOUS_CREDENTIAL)
+            }.isFailure,
+        )
+        assertEquals(emptyList(), HostedLlmProviders.configured(emptyMap()).map { it.id.value })
+    }
+
+    @Test
     fun aReplyCutOffAtTheLimitStillReportsWhatItSpent() = runTest {
         val provider = TextLlmProvider(
             AgentProviderId("hosted"), "Hosted",

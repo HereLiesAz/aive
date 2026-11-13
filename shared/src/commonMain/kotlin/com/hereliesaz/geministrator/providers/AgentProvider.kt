@@ -217,6 +217,13 @@ interface AgentProvider {
     val explicitOnly: Boolean get() = false
 
     /**
+     * True when this provider answers with no key of the keeper's (a free keyless gateway). Automatic choice puts
+     * such a provider behind every keyed one, and never moves a creature pinned to another provider onto it,
+     * because what it is sent leaves the device for a service that may log it and that limits requests.
+     */
+    val keyless: Boolean get() = false
+
+    /**
      * True when [observe] is itself the paid work (a text provider's generation runs inside the flow). Collecting it a
      * second time would run, and bill, the work again, so the gateway never retries or re-collects such an observer: a
      * fault ends the session as failed. False (the default) for a provider whose observe only watches work that is

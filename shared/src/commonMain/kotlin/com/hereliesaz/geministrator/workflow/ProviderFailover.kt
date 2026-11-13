@@ -192,3 +192,56 @@ class FailoverNotes(private val sink: (String) -> Unit) : AbstractCoroutineConte
 suspend fun reportFailoverNote(note: String) {
     coroutineContext[FailoverNotes]?.report(note)
 }
+
+/**
+ * Keeps automatic choice inside the request limits a keyless Source's catalog text states (Kilo: 200 an hour,
+ * OVHcloud: 2 a minute, each per IP address): a Source that has had its share in the window is passed over, as a
+ * benched one is, until the window moves on. A Source whose text names no number is not paced here; only the
+ * rate-limit answers it sends back bench it. Not thread-safe: the registry holds its lock.
+ */
+@OptIn(ExperimentalTime::class)
+class KeylessPacer(
+    private val now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+    private val limitOf: (String) -> com.hereliesaz.geministrator.ProviderCatalog.KeylessRateLimit? =
+        com.hereliesaz.geministrator.ProviderCatalog::keylessRateLimit,
+) {
+    private val starts = HashMap<String, ArrayList<Long>>()
+
+    /** True when [providerId] may be given another request now. */
+    fun hasRoom(providerId: String): Boolean {
+        val limit = limitOf(providerId) ?: return true
+        val recent = starts[providerId] ?: return true
+        val cutoff = now() - limit.windowMillis
+        recent.removeAll { it <= cutoff }
+        return recent.size < limit.requests
+    }
+
+    /** Counts a request given to [providerId]. */
+    fun record(providerId: String) {
+        if (limitOf(providerId) == null) return
+        starts.getOrPut(providerId) { ArrayList() }.add(now())
+    }
+}
+
+/**
+ * The candidates automatic choice may use now, in order of preference: healthy keyed providers, then healthy keyless
+ * ones with room under their limit, then benched keyed ones, then the rest. The first non-empty group wins, so a keyed
+ * provider the keeper added is always ahead of a keyless gateway, and a keyless one is the last resort, never an
+ * equal in the spread. With no keyless candidate it is the old rule: the healthy ones while any exists.
+ */
+internal fun <T> preferKeyedThenKeyless(
+    candidates: List<Pair<com.hereliesaz.geministrator.providers.AgentProvider, T>>,
+    isBenched: (String) -> Boolean,
+    hasRoom: (String) -> Boolean,
+): List<Pair<com.hereliesaz.geministrator.providers.AgentProvider, T>> {
+    val healthy = candidates.filter { !isBenched(it.first.id.value) }
+    val benched = candidates.filter { isBenched(it.first.id.value) }
+    val (keylessHealthy, keyedHealthy) = healthy.partition { it.first.keyless }
+    val (keylessBenched, keyedBenched) = benched.partition { it.first.keyless }
+    return listOf(
+        keyedHealthy,
+        keylessHealthy.filter { hasRoom(it.first.id.value) },
+        keyedBenched,
+        keylessHealthy + keylessBenched,
+    ).firstOrNull { it.isNotEmpty() } ?: candidates
+}

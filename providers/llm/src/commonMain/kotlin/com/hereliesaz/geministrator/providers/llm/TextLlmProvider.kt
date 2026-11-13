@@ -51,6 +51,9 @@ open class TextLlmProvider(
     /** What this provider's models cost; the app's one price list unless a test gives its own. */
     private val pricing: ModelPriceTable = ModelPriceTable.Default,
 ) : AgentProvider {
+    /** Used without a key (an anonymous keyless endpoint): the one thing that cannot bill. */
+    override val keyless: Boolean get() = !api.billsPerToken
+
     private data class Session(
         val request: AgentTaskRequest,
         val phase: MutableStateFlow<TextLlmSessionPhase>,
