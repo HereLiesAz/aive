@@ -112,6 +112,10 @@ enum class QueenVoice(val relay: QueenRelay?) {
 
     // --- A specialist worth training (queen/TrainingSuggestion.kt). Kept apart, after every other voice. ---
     SuggestTrainSpecialist(QueenRelay.Watch),
+    // --- Blockers found or made in the middle of a run (queen/Blockers.kt). Kept apart, after every other voice. ---
+    BlockerAddedQueen(QueenRelay.Missing),
+    BlockerAddedNanny(QueenRelay.Nanny),
+    BlockerMade(QueenRelay.Missing),
 }
 
 /** Where a note leads: an existing place, never a new one. */
@@ -139,7 +143,7 @@ sealed interface QueenLink {
 }
 
 /** What a quoted line is, so the keeper can see whose words they are. */
-enum class QueenQuoteLabel { NannyFinding, QueenReason, PracticeSolution, QueenApproach, Objection, StillMissing, QueenWording }
+enum class QueenQuoteLabel { NannyFinding, QueenReason, PracticeSolution, QueenApproach, Objection, StillMissing, QueenWording, NowMade }
 
 /** Text taken from the run, shown on its own labeled line: escaped, capped, never part of a sentence. */
 data class QueenQuote(val label: QueenQuoteLabel, val text: String)
