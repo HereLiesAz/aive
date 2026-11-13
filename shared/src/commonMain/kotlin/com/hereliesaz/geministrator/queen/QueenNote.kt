@@ -81,6 +81,9 @@ enum class QueenVoice(val relay: QueenRelay?) {
     SuggestRaiseAllowance(QueenRelay.Allowance),
     SuggestRestNanny(QueenRelay.Nanny),
     SuggestRewordStep(QueenRelay.Watch),
+
+    // --- The Nanny's findings handed to the queen (queen/NannyFindings.kt). Kept apart, after every other voice. ---
+    SuggestNannyFinding(QueenRelay.Nanny),
 }
 
 /** Where a note leads: an existing place, never a new one. */

@@ -971,6 +971,7 @@ class ApplicationRuntime private constructor(
     private suspend fun queenSuggestLocked(definition: WorkflowDefinition, run: WorkflowRun) {
         val ledger = queenLedger ?: return
         val now = nowEpochMillis()
+        carryNannyFindings(ledger, definition, run, now)
         if (now - queenProposalsReadAt < QUEEN_SUGGEST_REFRESH_MILLIS) return
         queenProposalsReadAt = now
         try {
@@ -996,6 +997,36 @@ class ApplicationRuntime private constructor(
             throw cancellation
         } catch (_: Exception) {
             // Her suggestions are a courtesy; the swarm goes on without them.
+        }
+    }
+
+    /** Runs whose unused Nanny findings are already in the ledger, so a finished run is read once. */
+    private val nannyCarried = mutableSetOf<String>()
+
+    /**
+     * When a run has ended, the Nanny's findings the queen did not use are recorded in the improvement ledger (source
+     * Nanny), which the next hive or swarm's planning reads. No model; a failure is swallowed.
+     */
+    private suspend fun carryNannyFindings(
+        ledger: com.hereliesaz.geministrator.workflow.improvement.ImprovementStore,
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        now: Long,
+    ) {
+        if (run.id.value in nannyCarried) return
+        if (run.status != WorkflowRunStatus.Completed && run.status != WorkflowRunStatus.Failed && run.status != WorkflowRunStatus.Cancelled) return
+        try {
+            val carried = com.hereliesaz.geministrator.queen.nannyCarryForward(definition, run, ledger.state().proposals, now)
+            if (carried.isNotEmpty()) {
+                ledger.merge { state ->
+                    state.copy(proposals = state.proposals + carried.filter { c -> state.proposals.none { it.id == c.id } })
+                }
+            }
+            nannyCarried += run.id.value
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            // Carrying forward is a courtesy to the next run; this one goes on.
         }
     }
 

@@ -96,9 +96,9 @@ internal data class QueenCandidate(
     val newText: String = "",
 )
 
-private fun stepNumber(definition: WorkflowDefinition, taskId: String) = definition.tasks.indexOfFirst { it.id.value == taskId } + 1
+internal fun stepNumber(definition: WorkflowDefinition, taskId: String) = definition.tasks.indexOfFirst { it.id.value == taskId } + 1
 
-private fun outsideFor(definition: WorkflowDefinition, run: WorkflowRun, taskId: String): Boolean {
+internal fun outsideFor(definition: WorkflowDefinition, run: WorkflowRun, taskId: String): Boolean {
     val task = definition.tasks.firstOrNull { it.id.value == taskId } ?: return run.objectiveProvenance.isUntrusted()
     return definition.taintInputs(run, task).any { it.isUntrustedContext() }
 }
@@ -158,6 +158,8 @@ internal fun queenCandidates(
         )
     }
     costPace(definition, run, caps)?.let { found += it }
+    // The Nanny's findings are one more input to her own judgement; she keeps her own candidate when both name the same step and action.
+    nannyCandidates(definition, run).forEach { n -> if (found.none { it.action == n.action && it.subject == n.subject }) found += n }
     if (nanny && nannyPhase(definition, run) == NannyPhase.AwaitingReview && run.keeperPause == null) {
         found += QueenCandidate(QueenAction.Rest, QUEEN_RUN_SUBJECT, QueenVoice.SuggestRestNanny, emptyList(), outside = false)
     }

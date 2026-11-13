@@ -43,6 +43,9 @@ enum class ImprovementSource {
 
     /** The queen's mid-run suggestions (per run, decided in Messages; see queen/QueenSuggestions.kt). */
     Queen,
+
+    /** The Nanny's findings that the queen did not use in the run, carried to the next hive or swarm (see queen/NannyFindings.kt). */
+    Nanny,
 }
 
 /**

@@ -28,7 +28,7 @@ enum class NannyPhase { None, Checking, AwaitingReview, SentBack, Rejected, Froz
 internal fun hasNanny(definition: WorkflowDefinition, run: WorkflowRun): Boolean =
     definition.tasks.any { it.roleId == HallMonitorRole.id } || run.taskRuns.values.any { it.assignedRoleId == HallMonitorRole.id }
 
-private fun latestReport(run: WorkflowRun): ArtifactRef? = run.taskRuns.values
+internal fun latestReport(run: WorkflowRun): ArtifactRef? = run.taskRuns.values
     .filter { it.assignedRoleId == HallMonitorRole.id && it.status == TaskRunStatus.Completed }
     .flatMap { it.artifacts }
     .filter { it.kind == ArtifactKind.HallMonitorReport }

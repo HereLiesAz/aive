@@ -30,6 +30,7 @@ import com.hereliesaz.geministrator.resources.improvement_replaces
 import com.hereliesaz.geministrator.resources.improvement_save_failed
 import com.hereliesaz.geministrator.resources.improvement_would_break_loop
 import com.hereliesaz.geministrator.resources.improvement_add_to_hive
+import com.hereliesaz.geministrator.resources.improvement_source_nanny
 import com.hereliesaz.geministrator.resources.improvement_source_queen
 import com.hereliesaz.geministrator.resources.improvement_source_habit
 import com.hereliesaz.geministrator.resources.improvement_source_loop
@@ -284,6 +285,7 @@ private fun ProposalCard(
             ImprovementSource.RoleHistory -> Res.string.improvement_source_role
             ImprovementSource.Habit -> Res.string.improvement_source_habit
             ImprovementSource.Queen -> Res.string.improvement_source_queen
+            ImprovementSource.Nanny -> Res.string.improvement_source_nanny
         },
     )
     // A hive-step proposal replaces a step's whole objective: show what it replaces, and what it would break in the loop.
