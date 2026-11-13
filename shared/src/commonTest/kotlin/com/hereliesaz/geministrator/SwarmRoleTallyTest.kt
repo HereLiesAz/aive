@@ -42,6 +42,19 @@ class SwarmRoleTallyTest {
     }
 
     @Test
+    fun theHivesOfARoleAreListedOnceEachInOrder() {
+        val hives = roleHives(
+            listOf(
+                hive("a", task("build", engineer.id), task("build-again", engineer.id)),
+                hive("b", task("build", engineer.id), task("check", qa.id)),
+            ),
+        )
+        assertEquals(listOf("a", "b"), hives.getValue(engineer.id).map { it.id.value })
+        assertEquals(listOf("b"), hives.getValue(qa.id).map { it.id.value })
+        assertNull(hives[reviewer.id])
+    }
+
+    @Test
     fun aRoleInNoHiveIsAbsent() {
         assertNull(roleHiveCounts(listOf(hive("a", task("build", engineer.id))))[reviewer.id])
         assertTrue(roleHiveCounts(emptyList()).isEmpty())

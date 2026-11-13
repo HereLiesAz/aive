@@ -5,6 +5,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import com.hereliesaz.geministrator.domain.HallMonitorScope
 
 /** The one route to Connections: every link to it, from any place, lands the same way. */
 class PlaceLinksTest {
@@ -72,5 +73,20 @@ class PlaceLinksTest {
         assertEquals(false, district.value)
         assertEquals("nightly-audit", resting.value)
         assertEquals(listOf(ControlRoomDestination.Overview), opened)
+    }
+
+    @Test
+    fun everyNannyScopeHasAPlaceAndALinkOnlyWhenTheRoomProvidesOne() {
+        HallMonitorScope.entries.forEach { scope ->
+            // The mapping is total: a new scope fails to compile until it is given a place.
+            val place = nannyScopePlace(scope)
+            assertNull(PlaceLinks().openScopePlace(place), "no links provided: the line stays plain")
+        }
+        val opened = mutableListOf<ControlRoomDestination>()
+        val links = PlaceLinks(openPlace = { opened += it })
+        links.openScopePlace(nannyScopePlace(HallMonitorScope.Role))?.invoke()
+        links.openScopePlace(nannyScopePlace(HallMonitorScope.MemoryLayer))?.invoke()
+        assertEquals(listOf(ControlRoomDestination.Company, ControlRoomDestination.Memory), opened)
+        assertEquals(ScopePlace.Sources, nannyScopePlace(HallMonitorScope.Model))
     }
 }

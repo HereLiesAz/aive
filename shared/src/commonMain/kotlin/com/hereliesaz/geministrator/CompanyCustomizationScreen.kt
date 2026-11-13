@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.hereliesaz.geministrator
 
 import androidx.compose.runtime.collectAsState
@@ -279,7 +281,8 @@ internal fun CustomCompanyProviderScreen(
     val roleFilter = SwarmRoleFilter.entries.firstOrNull { it.name == roleFilterValue } ?: SwarmRoleFilter.All
     // How many hives use each role, read from the saved hives; until read (or if they cannot be),
     // no count is shown rather than a guessed one.
-    var hiveCounts by remember { mutableStateOf<Map<RoleDefinitionId, Int>?>(null) }
+    var roleHiveList by remember { mutableStateOf<Map<RoleDefinitionId, List<WorkflowDefinition>>?>(null) }
+    val hiveCounts = roleHiveList?.let { lists -> lists.mapValues { it.value.size } }
     // Read once on arrival and again when the runtime changes shape (a project opened, a run began),
     // not on every recomposition: the loader is a fresh lambda each time the app recomposes.
     val loadDefinitions by rememberUpdatedState(onLoadWorkflowDefinitions)
@@ -287,7 +290,7 @@ internal fun CustomCompanyProviderScreen(
         val load = loadDefinitions
         if (load == null || focusRole != null) return@LaunchedEffect
         runCatching { load() }
-            .onSuccess { hiveCounts = roleHiveCounts(it) }
+            .onSuccess { roleHiveList = roleHives(it) }
             .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
     }
     val roleSurfacePickerScope = rememberCoroutineScope()
@@ -967,6 +970,18 @@ internal fun CustomCompanyProviderScreen(
                 endCap = if (role.id in activeRoleIds) stringResource(Res.string.swarm_working) else stringResource(Res.string.swarm_available),
                 well = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // "in N hives" names them: each opens, where its swarm is changed.
+                        val openHive = LocalPlaceLinks.current.openHive
+                        roleHiveList?.get(role.id)?.takeIf { it.isNotEmpty() }?.let { used ->
+                            androidx.compose.foundation.layout.FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                used.forEach { hive ->
+                                    LinkText(hive.name, onClick = openHive?.let { open -> { open(hive.id.value) } })
+                                }
+                            }
+                        }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             AzphaltPill(
                                 label = stringResource(Res.string.swarm_edit),

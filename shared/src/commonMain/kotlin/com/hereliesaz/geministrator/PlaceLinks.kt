@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextDecoration
+import com.hereliesaz.geministrator.domain.HallMonitorScope
 
 /**
  * An address the Connect remote agent form should open with, handed over by a link elsewhere (a hive card that
@@ -65,6 +66,27 @@ internal fun openConnectionsPlace(
     keeperOpen.value = true
     ConnectionsRequests.a2aAddress = connectionsAddressRequest(a2aAddress)
     onDestinationSelected(ControlRoomDestination.Settings)
+}
+
+/** The place a Nanny finding's scope is changed in. */
+internal enum class ScopePlace { Sources, Roster, Swarms, Memory }
+
+/** Where the thing a Nanny finding is about can be changed: its models in Connections, its roles in the Roster, and so on. */
+internal fun nannyScopePlace(scope: HallMonitorScope): ScopePlace = when (scope) {
+    HallMonitorScope.Model -> ScopePlace.Sources
+    HallMonitorScope.Role -> ScopePlace.Roster
+    HallMonitorScope.Workflow -> ScopePlace.Swarms
+    HallMonitorScope.Swarm -> ScopePlace.Swarms
+    HallMonitorScope.OrchestrationLayer -> ScopePlace.Roster
+    HallMonitorScope.MemoryLayer -> ScopePlace.Memory
+}
+
+/** The link that opens [place], or null when this screen has no [PlaceLinks]. */
+internal fun PlaceLinks.openScopePlace(place: ScopePlace): (() -> Unit)? = when (place) {
+    ScopePlace.Sources -> openConnections?.let { open -> { open(null) } }
+    ScopePlace.Roster -> openPlace?.let { open -> { open(ControlRoomDestination.Company) } }
+    ScopePlace.Swarms -> openPlace?.let { open -> { open(ControlRoomDestination.Workflows) } }
+    ScopePlace.Memory -> openPlace?.let { open -> { open(ControlRoomDestination.Memory) } }
 }
 
 /** The Keeper's room opened on one part (Schedules, Limits, Memory's neighbours...), not on whichever was left open. */
