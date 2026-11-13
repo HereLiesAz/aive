@@ -108,6 +108,9 @@ private fun voiceResource(voice: QueenVoice): StringResource = when (voice) {
         QueenVoice.BlockerAddedQueen -> Res.string.queen_say_blocker_added_queen
         QueenVoice.BlockerAddedNanny -> Res.string.queen_say_blocker_added_nanny
         QueenVoice.BlockerMade -> Res.string.queen_say_blocker_made
+        // A lesson that could not be written, and an optional step set aside.
+        QueenVoice.TutorialLessonFailed -> Res.string.queen_say_tutorial_lesson_failed
+        QueenVoice.StepSkipped -> Res.string.queen_say_step_skipped
 }
 
 @Composable

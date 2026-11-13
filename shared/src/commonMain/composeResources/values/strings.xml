@@ -2091,6 +2091,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="teaching_failed_no_worker">I cannot teach yet: the Worker creature is switched off. Switch it on in the Roster, then start again.</string>
     <string name="teaching_failed_no_source">I could not reach a Source to plan the lessons. Open Connections to connect or fix one, then start again.</string>
     <string name="teaching_failed_not_small_enough">I could not break this down into small enough steps. Try again, or connect a stronger Source in Connections.</string>
+    <string name="queen_say_tutorial_lesson_failed">I could not write lesson %1$s correctly after %2$s tries. Open its creature to try again or change its Source.</string>
+    <string name="queen_say_step_skipped">Step %1$s (%2$s) did not work out and it was optional, so I set it aside and the swarm went on. Open its creature to see why.</string>
     <string name="queen_say_finished_not_reached">The swarm finished, but I cannot call the hive reached: %1$s of %2$s signs are not met. Step %3$s (%4$s) is where to look.</string>
     <string name="queen_say_blocker_added_queen">I found something this hive needs that nobody has made or obtained yet, so I added it to what the hive needs. The hive is not reached until it is made or obtained.</string>
     <string name="queen_say_blocker_added_nanny">The Nanny found something this hive needs that nobody has made or obtained yet, so I added it to what the hive needs. The hive is not reached until it is made or obtained.</string>

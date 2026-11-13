@@ -116,6 +116,9 @@ enum class QueenVoice(val relay: QueenRelay?) {
     BlockerAddedQueen(QueenRelay.Missing),
     BlockerAddedNanny(QueenRelay.Nanny),
     BlockerMade(QueenRelay.Missing),
+    // --- A lesson that could not be written, and an optional step set aside (queen/TutorialFailures.kt). Kept apart, after every other voice. ---
+    TutorialLessonFailed(QueenRelay.Watch),
+    StepSkipped(QueenRelay.Watch),
 }
 
 /** Where a note leads: an existing place, never a new one. */
