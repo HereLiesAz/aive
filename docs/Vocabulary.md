@@ -39,3 +39,7 @@ which other programs read.
 
 `VocabularyInStringsTest` fails if a user-visible string resource uses one of the old words; its allowlist lists each
 legitimate exception with the reason.
+| **Start** / **Add to queue** | launch (`hive_launch`, `hive_feed_launch`, `onLaunchWorkflow`), queue (`HiveFeedQueue`) | The one verb for starting a run: the feed bar, the first run, the plan decision. While a run is going the feed bar reads Add to queue. |
+| **Practice run on a copy** | isolated counterfactual (`HallMonitorTrial`, the "Isolated Nanny counterfactual" description prefix, kept for saved trials) | A Nanny recommendation tried on a separate copy of the frozen swarm. |
+| **Frozen** | global pause (`globalPause`, `HallMonitorGlobalPause`) | A swarm the Nanny stopped for your review. Pause (yours) is a different thing: it lets what runs finish. |
+| **Running / done / failed or stopped / not run yet** | `NeighbourhoodState` Gestating / Hatched / Withered / Idle; comb labels Done / Stopped / Failed | A hive's state in the district and on its run combs. |
