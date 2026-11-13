@@ -800,7 +800,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_legend_working">Working</string>
     <string name="hive_legend_complete">Complete</string>
     <string name="hive_legend_waiting">Waiting</string>
-    <string name="hive_legend_note">Moving bodies never edits the swarm</string>
+    <string name="hive_legend_needs_you">Needs you, or failed</string>
+    <string name="hive_legend_note">A dot between two creatures: green if the first one finished, red if it did not</string>
     <string name="hive_feed_eyebrow">FEED THE HIVE</string>
     <string name="hive_feed_title">Give the swarm an objective</string>
     <string name="hive_feed_placeholder">What should this hive do next?</string>
