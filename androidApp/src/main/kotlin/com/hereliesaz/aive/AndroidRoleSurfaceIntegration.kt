@@ -16,9 +16,9 @@ import com.hereliesaz.geministrator.workflow.DelimitedTableCodec
 import com.hereliesaz.geministrator.workflow.RoleSurfaceIntegration
 import com.hereliesaz.geministrator.workflow.writableSurface
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
 import io.ktor.client.request.get
 import com.hereliesaz.geministrator.net.boundedBodyText
+import com.hereliesaz.geministrator.net.boundedBytes
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -258,7 +258,7 @@ internal class AndroidRoleSurfaceIntegration(
                 require(source.url.startsWith("https://", ignoreCase = true)) {
                     "Spreadsheet network sources must use HTTPS"
                 }
-                httpClient.get(source.url).body()
+                httpClient.get(source.url).boundedBytes()
             }
             is SpreadsheetSource.GoogleSheet ->
                 readSpreadsheetText(surface).encodeToByteArray()

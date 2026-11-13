@@ -17,7 +17,6 @@ import com.hereliesaz.geministrator.workflow.TaskExecutorContext
 import com.hereliesaz.geministrator.workflow.TaskExecutorExecution
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegration
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.header
@@ -657,7 +656,7 @@ class OpenAiNodeCharacterImageApi(
             )
         }
         val parsed: ResponsesResponse = try {
-            response.body()
+            json.decodeFromString(ResponsesResponse.serializer(), response.boundedBodyText())
         } catch (failure: Throwable) {
             meter?.recordUnpriced()
             throw failure
