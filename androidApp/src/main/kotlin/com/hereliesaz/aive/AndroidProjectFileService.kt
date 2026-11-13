@@ -86,13 +86,21 @@ internal class AndroidProjectFileService(
             val destination = File(directory, fileName.asIveFileName())
             val temporary = File(directory, destination.name + ".tmp")
             temporary.writeText(content)
-            if (destination.exists() && !destination.delete()) {
+            // One atomic replace: deleting the old file first left a window with no project file at all.
+            try {
+                try {
+                    java.nio.file.Files.move(
+                        temporary.toPath(),
+                        destination.toPath(),
+                        java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                    )
+                } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                    java.nio.file.Files.move(temporary.toPath(), destination.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                }
+            } catch (failure: java.io.IOException) {
                 temporary.delete()
-                error("Could not replace ${destination.name}")
-            }
-            check(temporary.renameTo(destination)) {
-                temporary.delete()
-                "Could not save ${destination.name}"
+                throw IllegalStateException("Could not save ${destination.name}", failure)
             }
             fileDescriptor(destination).also { descriptor ->
                 rememberLocation(descriptor.id, includeRecent = false)
