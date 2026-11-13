@@ -21,11 +21,23 @@ class QueenCallContext(
 ) : AbstractCoroutineContextElement(Key) {
     private var waitedMillis = 0L
 
+    /** What the current call (one stage's answer, across every Source it tries) has waited; null until [beginCall]. */
+    private var callWaitedMillis: Long? = null
+
+    /** A new call (one dispute stage's answer) starts: the per-call cap counts afresh, however many Sources it tries. */
+    fun beginCall() {
+        callWaitedMillis = 0L
+    }
+
     /** True when a call through this context may have to wait for a Source's turn. */
     val paces: Boolean get() = pacing != null
 
     /** The most one call may wait for a turn: her call limit, and what is left of the dispute's total. */
-    fun callBudgetMillis(): Long = pacingBudget(totalWaitMillis, waitedMillis, callWaitMillis)
+    fun callBudgetMillis(): Long {
+        val dispute = pacingBudget(totalWaitMillis, waitedMillis, callWaitMillis)
+        val spent = callWaitedMillis ?: return dispute
+        return minOf(dispute, maxOf(0L, callWaitMillis - spent))
+    }
 
     /**
      * Waits for [providerId]'s turn; true when it may be asked now (the wait counts as hers), false when its turn is further
@@ -35,6 +47,7 @@ class QueenCallContext(
         val gate = pacing ?: return true
         val waited = gate.await(providerId, callBudgetMillis()) ?: return false
         waitedMillis += waited
+        callWaitedMillis = callWaitedMillis?.plus(waited)
         return true
     }
 

@@ -88,6 +88,20 @@ class SourcePacingTest {
     }
 
     @Test
+    fun theCallCapCountsAcrossSourcesOfOneCallAndRestartsWithTheNextCall() = runTest {
+        val pacer = KeylessPacer(now = { testScheduler.currentTime }, limitOf = { twoAMinute })
+        val context = QueenCallContext(KeylessPacing(pacer, Mutex()), totalWaitMillis = 100_000L, callWaitMillis = 90_000L)
+        context.beginCall()
+        assertTrue(context.awaitTurn("ovh"))
+        assertTrue(context.awaitTurn("ovh"))
+        assertTrue(context.awaitTurn("ovh"))
+        // 60 s of this call's 90 s are spent, so the next Source tried gets 30 s, not a fresh 90 s.
+        assertEquals(30_000L, context.callBudgetMillis())
+        context.beginCall()
+        assertEquals(40_000L, context.callBudgetMillis())
+    }
+
+    @Test
     fun everyAnswerOfAPacedModelRunsInItsOwnFreshContext() = runTest {
         val seen = mutableListOf<QueenCallContext?>()
         val base = QueenModel { seen += currentQueenCallContext(); "ok" }
