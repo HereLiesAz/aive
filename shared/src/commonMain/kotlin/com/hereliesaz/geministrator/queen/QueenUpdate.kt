@@ -46,8 +46,10 @@ fun queenUpdate(
     suggestions: List<QueenNote> = emptyList(),
     /** How long the swarm has stood still, from [stalledMinutes]; null when it has not. */
     stalledForMinutes: Int? = null,
+    /** What the planner named as the signs that the hive is reached (see [HiveSigns]); empty means the default signs. */
+    hiveSigns: List<HiveSign> = emptyList(),
 ): List<QueenNote> {
-    if (run.status.finished()) return listOf(finishNote(definition, run))
+    if (run.status.finished()) return listOf(finishNote(definition, run, hiveSigns))
     val lead = missingNotes(run.id.value, missing, level) + disputes
     val stop = run.spendPause
     if (stop != null) return lead + allowanceNotes(run)
@@ -71,13 +73,24 @@ fun queenUpdate(
 }
 
 /** The finish note: all done (with its cost only when every cost is known), could not finish, or stopped. */
-internal fun finishNote(definition: WorkflowDefinition, run: WorkflowRun): QueenNote {
+internal fun finishNote(definition: WorkflowDefinition, run: WorkflowRun, hiveSigns: List<HiveSign> = emptyList()): QueenNote {
     val id = run.id.value
     val done = run.taskRuns.values.count { it.status == TaskRunStatus.Completed }
     return when (run.status) {
         WorkflowRunStatus.Completed -> {
             val cost = run.knownCostUsd()
-            if (cost > 0.0 && !run.hasUnpricedUsage()) {
+            val checks = checkHive(definition, run, hiveSigns)
+            val unmet = checks.count { !it.met }
+            val look = if (unmet > 0) firstUnmetStep(definition, run, checks) else null
+            if (unmet > 0 && look != null) {
+                // Finished is not reached: she says which signs the run does not show, and where to look.
+                QueenNote(
+                    queenNoteId(id, "finish", "not-reached", unmet.toString(), look.id.value),
+                    QueenVoice.FinishedNotReached,
+                    listOf(unmet.toString(), checks.size.toString(), step(definition, look.id.value).toString(), queenSlot(look.name)),
+                    QueenLink.Creature(look.id.value, CreatureTab.Work),
+                )
+            } else if (cost > 0.0 && !run.hasUnpricedUsage()) {
                 QueenNote(queenNoteId(id, "finish", "cost"), QueenVoice.FinishedAllCost, listOf(formatUsd(cost)), QueenLink.Story)
             } else {
                 QueenNote(queenNoteId(id, "finish", "all"), QueenVoice.FinishedAll, link = QueenLink.Story)

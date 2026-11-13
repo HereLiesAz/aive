@@ -259,6 +259,7 @@ private suspend fun ApplicationRuntime.startPlannedWorkflow(inputs: PlanInputs, 
     )
     val skippedMissing = com.hereliesaz.geministrator.queen.missingForSkippedReviewer(notes?.record?.skipped, providerRegistry.linkedSourceIds().size)
     rememberMissing("run-$stamp", inputs.missing + listOfNotNull(skippedMissing))
+    rememberHiveSigns("run-$stamp", com.hereliesaz.geministrator.queen.HiveSigns.nominated(plan))
     notes?.let { recordPlanning(WorkflowRunId("run-$stamp"), definition.id.value, inputs.objectiveProvenance.isUntrusted(), it, now) }
     inputs.research?.let { record ->
         val runId = WorkflowRunId("run-$stamp")

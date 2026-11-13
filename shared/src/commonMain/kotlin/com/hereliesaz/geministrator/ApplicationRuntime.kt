@@ -244,6 +244,15 @@ class ApplicationRuntime private constructor(
             emptyList()
         }
 
+    /** What the planner named as the signs that each run's hive is reached (memory only; the default signs are checked when none are kept). */
+    private val hiveSignBook = LinkedHashMap<String, List<com.hereliesaz.geministrator.queen.HiveSign>>()
+
+    internal fun rememberHiveSigns(runId: String, signs: List<com.hereliesaz.geministrator.queen.HiveSign>) {
+        if (signs.isEmpty()) return
+        hiveSignBook[runId] = signs
+        while (hiveSignBook.size > 32) hiveSignBook.remove(hiveSignBook.keys.first())
+    }
+
     /** What she says about disputes she could not settle herself, per run (memory only; derived into Messages at each publish). */
     private val queenDisputes = LinkedHashMap<String, List<com.hereliesaz.geministrator.queen.QueenNote>>()
 
@@ -1452,6 +1461,7 @@ class ApplicationRuntime private constructor(
                 missing = queenMissing[run.id.value].orEmpty(),
                 disputes = queenDisputes[run.id.value].orEmpty(),
                 stalledForMinutes = queenStalled[run.id.value],
+                hiveSigns = hiveSignBook[run.id.value].orEmpty(),
                 suggestions = if (run.globalPause == null && run.spendPause == null) {
                     queenSuggestionNotes(queenProposals, run)
                 } else {

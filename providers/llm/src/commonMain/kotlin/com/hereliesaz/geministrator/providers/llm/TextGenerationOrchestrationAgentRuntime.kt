@@ -67,7 +67,8 @@ class TextGenerationOrchestrationAgentRuntime(
 
     private companion object {
         const val PLAN_INSTRUCTION =
-            "Create an executable, dependency-correct workflow DAG for the objective."
+            "Create an executable, dependency-correct workflow DAG for the objective. " +
+                "In hiveSigns, optionally name what would show the objective is reached, each as done:step-id, artifact:step-id or nothing-failed."
         const val REPAIR_INSTRUCTION =
             "Repair the current DAG after the reported failures, preserving valid completed work."
         const val COMPACT_RETRY =
@@ -75,6 +76,6 @@ class TextGenerationOrchestrationAgentRuntime(
                 "plan: about half as many steps, names of at most 3 words, each objective at most 15 words, " +
                 "no optional fields, nothing outside the JSON object."
         const val PLAN_SCHEMA =
-            """{"steps":[{"id":"step-id","name":"short name","objective":"bounded worker objective","roleId":"available-role-id","dependsOn":["prior-step-id"],"requiresHumanApproval":false}]}"""
+            """{"steps":[{"id":"step-id","name":"short name","objective":"bounded worker objective","roleId":"available-role-id","dependsOn":["prior-step-id"],"requiresHumanApproval":false}],"hiveSigns":["done:last-step-id"]}"""
     }
 }
