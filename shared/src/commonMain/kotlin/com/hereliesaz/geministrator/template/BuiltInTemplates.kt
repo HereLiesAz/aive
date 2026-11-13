@@ -232,6 +232,20 @@ object RoleTemplates {
         ),
     )
 
+    /**
+     * [roles] as a run uses them: each role with the selected generation of its revision, and a role that has none, or whose
+     * revisions are retired, or that the keeper edited since the first revision was drafted, exactly as it is (the generic
+     * parent). A keeper's own edit always wins over a revision of the Nanny's. Pure.
+     */
+    fun resolveAll(roles: List<RoleDefinition>, revisions: List<TemplateRevision>): List<RoleDefinition> {
+        if (revisions.none { it.kind == TemplateKind.Role }) return roles
+        val catalog = TemplateCatalog(roles.map(::base), revisions)
+        return roles.map { role ->
+            val first = catalog.lineage(TemplateKind.Role, role.id.value).firstOrNull()
+            if (first == null || role.instructions != first.before) role else resolved(role, catalog)
+        }
+    }
+
     /** [role] with the current revision's instructions and budget; the role unchanged when none was adopted. */
     fun resolved(role: RoleDefinition, catalog: TemplateCatalog): RoleDefinition {
         val current = catalog.current(TemplateKind.Role, role.id.value) ?: return role

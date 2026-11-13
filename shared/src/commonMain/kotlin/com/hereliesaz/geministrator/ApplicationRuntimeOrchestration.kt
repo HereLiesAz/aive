@@ -121,7 +121,7 @@ private suspend fun ApplicationRuntime.planInputs(
     require(cleanObjective.isNotEmpty()) { "Objective is required" }
     val normalizedRepository = repository?.normalized()
     reportLaunchProgress("Gathering available agent roles…")
-    val globalRoles = activeRoles(resolveRoleCollection(persistence.roles.all()))
+    val globalRoles = com.hereliesaz.geministrator.template.LaunchRoles.resolve(activeRoles(resolveRoleCollection(persistence.roles.all())))
     val launchRoles = if (design == null) {
         globalRoles
     } else {
@@ -681,7 +681,7 @@ internal suspend fun ApplicationRuntime.draftSwarm(
     /** Reviews the draft before it is shown; what it said is added to the draft's notes. Null drafts unreviewed. */
     planReviewer: PlanReviewer? = null,
 ): SwarmDraftResult {
-    val roles = activeRoles(resolveRoleCollection(persistence.roles.all()))
+    val roles = com.hereliesaz.geministrator.template.LaunchRoles.resolve(activeRoles(resolveRoleCollection(persistence.roles.all())))
     // Only roles a linked provider can staff, as at launch; with none, offer them all so the failure names the gap.
     val staffable = swarmDraftRoles(roles)
         .filter { role -> providerRegistry.canStaff(role.capabilitiesRequired, null) }

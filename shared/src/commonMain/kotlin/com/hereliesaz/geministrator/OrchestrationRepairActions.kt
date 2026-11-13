@@ -39,7 +39,7 @@ suspend fun ApplicationRuntime.repairFailureEscalation(
         "Task ${taskDefinitionId.value} is not awaiting an escalation decision"
     }
 
-    val roles = activeRoles(resolveRoleCollection(persistence.roles.all()))
+    val roles = com.hereliesaz.geministrator.template.LaunchRoles.resolve(activeRoles(resolveRoleCollection(persistence.roles.all())))
     val completedTaskIds = presentation.run.taskRuns
         .filterValues { it.status == TaskRunStatus.Completed }
         .keys

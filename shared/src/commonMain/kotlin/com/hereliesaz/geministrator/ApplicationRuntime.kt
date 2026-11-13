@@ -1064,7 +1064,7 @@ class ApplicationRuntime private constructor(
             ?: return@withLock "A step of this swarm has no role, so it cannot be extended."
         val gateApproved = run.taskRuns[TaskDefinitionId(com.hereliesaz.geministrator.orchestration.RunExtension.GATE_STEP_ID)]?.status == TaskRunStatus.Completed
         com.hereliesaz.geministrator.orchestration.RunExtension.refusal(currentSteps, extension, gateApproved)?.let { return@withLock it }
-        val rolesNow = run.roleSnapshot.filter(RoleDefinition::enabled).ifEmpty { activeRoles(resolveRoleCollection(persistence.roles.all())) }
+        val rolesNow = run.roleSnapshot.filter(RoleDefinition::enabled).ifEmpty { com.hereliesaz.geministrator.template.LaunchRoles.resolve(activeRoles(resolveRoleCollection(persistence.roles.all()))) }
         val inputs = com.hereliesaz.geministrator.orchestration.RequirementInputs(
             objective = run.objective,
             objectiveExternal = run.objectiveProvenance.isUntrusted(),
