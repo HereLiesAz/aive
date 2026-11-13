@@ -45,6 +45,14 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.foundation.layout.requiredSize
+import com.hereliesaz.geministrator.resources.semantics_flip_card
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
@@ -123,6 +131,8 @@ internal fun PlatformNodeTerrarium(
     onGroundTapped: (() -> Unit)? = null,
     /** Zoom and focus held outside, for a controls bar that drives them; its own zoom buttons hide. */
     camera: TerrariumCamera? = null,
+    /** Edit's card flip: who shows their card, and the cards (null elsewhere: creatures never flip). */
+    flip: NodeFlip? = null,
 ) {
     MascotNodeTerrarium(
         subjects = subjects,
@@ -142,6 +152,7 @@ internal fun PlatformNodeTerrarium(
         onSurface = onSurface,
         onGroundTapped = onGroundTapped,
         camera = camera,
+        flip = flip,
     )
 }
 
@@ -164,6 +175,7 @@ private fun MascotNodeTerrarium(
     onSurface: (() -> Unit)?,
     onGroundTapped: (() -> Unit)?,
     camera: TerrariumCamera?,
+    flip: NodeFlip?,
 ) {
     if (subjects.isEmpty()) return
 
@@ -244,6 +256,7 @@ private fun MascotNodeTerrarium(
     val moveRightLabel = stringResource(Res.string.semantics_move_node_right)
     val moveUpLabel = stringResource(Res.string.semantics_move_node_up)
     val moveDownLabel = stringResource(Res.string.semantics_move_node_down)
+    val flipLabel = stringResource(Res.string.semantics_flip_card)
     fun motionPhase(): Float = if (reduceMotion) 0f else animatedMotionPhase
     fun linkPulse(): Float = if (reduceMotion) 0.5f else animatedLinkPulse
 
@@ -598,6 +611,16 @@ private fun MascotNodeTerrarium(
                 else -> mascotActivityLabel(node.label, node.state)
             }
             val taskLabel = node.subtitle?.trim().orEmpty()
+            // Edit's flip: the creature turns over to the step's card and back (the card is invisible until then).
+            val card = flip?.cards?.get(node.id)
+            val flipped = flip != null && card != null && flip.flippedId == node.id
+            val turn by animateFloatAsState(
+                targetValue = if (flipped) 1f else 0f,
+                animationSpec = if (reduceMotion) tween(CARD_FLIP_REDUCED_MS) else tween(CARD_FLIP_MS, easing = FastOutSlowInEasing),
+                label = "card-flip",
+            )
+            val flipSend = flip?.send
+            val cardWidth = creatureSize.coerceIn(120.dp, 176.dp)
 
             Box(
                 modifier = Modifier
@@ -614,11 +637,16 @@ private fun MascotNodeTerrarium(
                         alpha = if (focusNodes != null && node.id !in focusNodes) 0.4f else 1f
                     }
                     .semantics(mergeDescendants = true) {
-                        contentDescription = buildString {
-                            append(node.label)
-                            append(", ")
-                            append(action.lowercase())
-                            if (taskLabel.isNotEmpty()) append(", $taskLabel")
+                        contentDescription = if (flipped && card != null) {
+                            // The back: the card's own words, its step, who does it and how it stands.
+                            flowCardDescription(card, card.status?.label())
+                        } else {
+                            buildString {
+                                append(node.label)
+                                append(", ")
+                                append(action.lowercase())
+                                if (taskLabel.isNotEmpty()) append(", $taskLabel")
+                            }
                         }
                         role = Role.Button
                         selected = isSelected
@@ -632,16 +660,45 @@ private fun MascotNodeTerrarium(
                                 onNodeMoved(node.id, next)
                                 return true
                             }
-                            customActions = listOf(
+                            customActions = listOfNotNull(
                                 CustomAccessibilityAction(moveLeftLabel) { nudge(-step, 0f) },
                                 CustomAccessibilityAction(moveRightLabel) { nudge(step, 0f) },
                                 CustomAccessibilityAction(moveUpLabel) { nudge(0f, -step) },
                                 CustomAccessibilityAction(moveDownLabel) { nudge(0f, step) },
+                                flipSend?.takeIf { card != null }?.let { send ->
+                                    CustomAccessibilityAction(flipLabel) { send(CardFlipEvent.Tap(node.id)); true }
+                                },
                             )
                         }
                     }
-                    .pointerInput(editable, node.id, widthPx, heightPx, subjects, zoom) {
+                    // Escape turns a flipped card back (Back does too, in the shell).
+                    .onPreviewKeyEvent { event ->
+                        if (flipped && event.type == KeyEventType.KeyUp && event.key == Key.Escape) {
+                            flipSend?.invoke(CardFlipEvent.Back)
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    .pointerInput(editable, node.id, widthPx, heightPx, subjects, zoom, flipped) {
                         if (!editable) return@pointerInput
+                        // A flipped card is not moved: a swipe across it, in any direction, turns it back
+                        // (while its sheet is at the peek; the reducer decides), and nothing else drags it.
+                        if (flipped) {
+                            var swiped = false
+                            detectDragGestures(
+                                onDragStart = { swiped = false },
+                                onDragEnd = { swiped = false },
+                                onDragCancel = { swiped = false },
+                            ) { change, _ ->
+                                change.consume()
+                                if (!swiped) {
+                                    swiped = true
+                                    flipSend?.invoke(CardFlipEvent.SwipeAny(node.id))
+                                }
+                            }
+                            return@pointerInput
+                        }
                         detectDragGestures(
                             onDragStart = { start ->
                                 // A drag that starts on the tail (the lower part of the body) draws a tether.
@@ -717,6 +774,19 @@ private fun MascotNodeTerrarium(
                     .clickable(role = Role.Button) { onNodeSelected(node) },
                 contentAlignment = Alignment.Center,
             ) {
+              // The creature, no card: it turns away past 90 degrees (or fades, when motion is reduced).
+              Box(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        if (!reduceMotion) {
+                            rotationY = turn * 180f
+                            cameraDistance = 14f * this.density
+                        }
+                        alpha = if (reduceMotion) 1f - turn else if (turn < 0.5f) 1f else 0f
+                    },
+                contentAlignment = Alignment.Center,
+              ) {
                 when (tissue?.echo?.get(node.id)) {
                     // Insane: septic. A sick green halo it spreads to whatever reads its work.
                     EchoState.Insane -> Canvas(Modifier.fillMaxSize()) {
@@ -848,6 +918,23 @@ private fun MascotNodeTerrarium(
                         .background(if (isSelected) stateColor else stateColor.copy(alpha = 0.82f))
                         .padding(horizontal = 8.dp, vertical = 3.dp),
                 )
+              }
+              // The back: the step's card, turned a half-turn so it reads true once the creature is gone.
+              if (card != null && turn > 0f) {
+                FlowCardFace(
+                    node = card,
+                    selected = isSelected,
+                    modifier = Modifier
+                        .requiredSize(cardWidth, 76.dp)
+                        .graphicsLayer {
+                            if (!reduceMotion) {
+                                rotationY = turn * 180f - 180f
+                                cameraDistance = 14f * this.density
+                            }
+                            alpha = if (reduceMotion) turn else if (turn >= 0.5f) 1f else 0f
+                        },
+                )
+              }
             }
         }
 

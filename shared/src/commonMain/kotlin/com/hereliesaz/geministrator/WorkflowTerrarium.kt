@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import com.hereliesaz.conveyance.h2g2.H2g2WorkflowState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -212,6 +214,51 @@ internal fun GeministratorWorkflowTerrarium(
     }
     // While grouping, taps gather creatures instead of selecting one.
     var grouping by remember(definition.id) { mutableStateOf<Set<String>?>(null) }
+
+    // Edit's card flip (CardFlip.kt): a tapped creature turns over to its step's card, and its detail shows in
+    // the shell's sheet (or docked panel). Without a shell (a preview, the editor's bowl) the field keeps its own
+    // flip and shows the detail under itself.
+    val shellFlip = LocalCardFlip.current
+    val ownFlip = remember { CardFlipHost() }
+    val flipHost = shellFlip ?: ownFlip
+    val flipping = building && !readOnly && rehearsal == null
+    SideEffect {
+        flipHost.editing = flipping
+        flipHost.detail = { taskId, detailModifier ->
+            FlowchartCardDetailPanel(
+                taskId = taskId,
+                definition = stagedDefinition,
+                run = run,
+                roles = roles,
+                onShowStep = { other -> flipHost.send(CardFlipEvent.OtherNodeTapped(other)) },
+                modifier = detailModifier,
+            )
+        }
+    }
+    DisposableEffect(flipHost) {
+        onDispose {
+            flipHost.editing = false
+            flipHost.detail = null
+            flipHost.state = CardFlip()
+        }
+    }
+    val flippedId = flipHost.state.flippedId
+    // Leaving Edit, or the selection moving off the flipped creature (bare ground, a link to another), turns it back.
+    LaunchedEffect(selectedTaskId, flipping) {
+        val flipped = flipHost.state.flippedId
+        if (flipped != null && (!flipping || selectedTaskId != flipped)) flipHost.send(CardFlipEvent.Back)
+    }
+    // With no shell to select for it, a flip selects its creature itself.
+    if (shellFlip == null) LaunchedEffect(flippedId) {
+        if (flippedId != null && selectedTaskId != flippedId) onTaskSelected(flippedId)
+    }
+    val flowCards = remember(stagedDefinition, run, roles) {
+        com.hereliesaz.geministrator.workflow.WorkflowFlowchart.of(
+            stagedDefinition,
+            run,
+            roleName = { id -> roles.firstOrNull { it.id == id }?.name ?: id.value },
+        ).nodes.associateBy { it.id.value }
+    }
 
     // Framed, the controls bar drives the field's zoom and focus; unframed, the field keeps its own.
     val camera = remember(definition.id) { TerrariumCamera() }
@@ -420,7 +467,8 @@ internal fun GeministratorWorkflowTerrarium(
                         return@PlatformNodeTerrarium
                     }
                     if (node.id != TERRARIUM_ORCHESTRATOR_ID && stagedDefinition.tasks.any { it.id.value == node.id }) {
-                        onTaskSelected(node.id)
+                        // In Edit a tap turns the creature to its card (the shell selects it and opens the sheet).
+                        if (flipping) flipHost.send(CardFlipEvent.Tap(node.id)) else onTaskSelected(node.id)
                     }
                 },
                 onNodeMoved = { subjectId, position ->
@@ -448,6 +496,7 @@ internal fun GeministratorWorkflowTerrarium(
                 },
                 modifier = Modifier.fillMaxSize(),
                 camera = camera,
+                flip = if (flipping) NodeFlip(flippedId, flowCards, flipHost::send) else null,
             )
           }
             // An empty hive in Build says how it fills (mockup H6).
@@ -516,6 +565,10 @@ internal fun GeministratorWorkflowTerrarium(
         }
         if (frame == null) {
             Box(Modifier.fillMaxWidth().height(if (compact) 470.dp else 620.dp)) { shownField() }
+            // No shell to hold a sheet: the flipped card's detail sits under the field.
+            if (shellFlip == null && flipping) flippedId?.let { id ->
+                flipHost.detail?.invoke(id, Modifier.padding(top = 8.dp))
+            }
         } else {
             HiveTissueFrame(height = frame.tissueHeight, building = building) { shownField() }
             frame.feedBar()
