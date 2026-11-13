@@ -30,7 +30,6 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 /**
@@ -170,14 +169,13 @@ class ApplicationRuntimeQueenTest {
     }
 
     @Test
-    fun acceptRestIsTheKeepersOwnPause() = runBlocking<Unit> {
+    fun acceptRestWithoutAPendingNannyReviewChangesNothing() = runBlocking<Unit> {
         val fixture = Fixture().start()
         try {
             fixture.offer("q1", QueenAction.Rest, "swarm")
+            assertEquals(ApplicationRuntime.QueenAccept.NothingChanged, fixture.runtime.acceptQueenSuggestion("q1"))
             assertNull(fixture.live().run.keeperPause)
-            assertEquals(ApplicationRuntime.QueenAccept.Applied, fixture.runtime.acceptQueenSuggestion("q1"))
-            assertNotNull(fixture.live().run.keeperPause)
-            assertEquals(ProposalStatus.Adopted, fixture.status("q1"))
+            assertEquals(ProposalStatus.Proposed, fixture.status("q1"))
         } finally {
             fixture.scope.cancel()
         }

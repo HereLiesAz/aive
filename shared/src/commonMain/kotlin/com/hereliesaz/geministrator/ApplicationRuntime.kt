@@ -1017,7 +1017,7 @@ class ApplicationRuntime private constructor(
             snapshot.definition to newestRun(snapshot.state.run)
         }
         if (run.id.value != proposal.cycleRunId ||
-            queenAcceptRefused(proposal, definition, run, roles)
+            queenAcceptRefused(proposal, definition, run, roles, queenCandidates(definition, run, queenSignals(definition, run, roles), queenCaps()))
         ) return QueenAccept.NothingChanged
         val took = when (action) {
             QueenAction.RewordStep -> {

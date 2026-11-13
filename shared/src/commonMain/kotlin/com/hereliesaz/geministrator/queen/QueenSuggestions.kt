@@ -257,17 +257,25 @@ internal fun queenIsMoot(
     }
 }
 
-/** What accepting a row needs, checked again at the moment of the tap. True when she must not apply it. */
+/**
+ * What accepting a row needs, checked again at the moment of the tap. True when she must not apply it. With
+ * [candidates] (recomputed from the run now), a redo or a rest is also refused once the signal that prompted it is
+ * gone (the step recovered, the Nanny's review finished), so a stale tap never rewinds or pauses on old grounds.
+ */
 internal fun queenAcceptRefused(
     proposal: ImprovementProposal,
     definition: WorkflowDefinition,
     run: WorkflowRun,
     roles: Collection<RoleDefinition>,
+    candidates: List<QueenCandidate>? = null,
 ): Boolean {
     if (!run.live()) return true
     val action = QueenAction.parse(proposal.action) ?: return true
     if (!action.appliesHere) return true
     val task = definition.tasks.firstOrNull { it.id.value == proposal.target }
+    val stale = candidates != null && action != QueenAction.RewordStep &&
+        candidates.none { it.action == action && it.subject == proposal.target }
+    if (stale) return true
     return when (action) {
         QueenAction.RewordStep ->
             task == null || proposal.newText.isBlank() || proposal.outside ||
