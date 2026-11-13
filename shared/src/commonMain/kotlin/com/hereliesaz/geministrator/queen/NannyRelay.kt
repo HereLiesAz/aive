@@ -160,3 +160,35 @@ private fun frozenRelay(run: WorkflowRun, review: HallMonitorPauseReviewState?):
     }
     return notes
 }
+
+/** A disagreement between the Nanny and the Antagonist, read from the run alone: [key] is stable for one report. */
+class NannyDisputeCase(val key: String, val dispute: Dispute, val parties: List<Disputant>)
+
+/**
+ * The Antagonist has rejected the Nanny's report: two creatures disagree about whether it stands. Null in every other phase
+ * (a revise request is the normal back and forth between them, not a dispute). Options and facts are fixed words, never
+ * the report's own text; only setting the report aside or asking for a revision keeps every gate.
+ */
+fun nannyDispute(definition: WorkflowDefinition, run: WorkflowRun): NannyDisputeCase? {
+    if (nannyPhase(definition, run) != NannyPhase.Rejected) return null
+    val report = latestReport(run) ?: return null
+    return NannyDisputeCase(
+        key = "${run.id.value}:${reportId(report)}",
+        dispute = Dispute(
+            question = "The Antagonist rejected the Nanny's report. Does it stand?",
+            options = listOf(
+                DisputeOption("set-aside", "Set the Nanny's report aside and let the swarm go on", safe = true),
+                DisputeOption("revise", "Ask the Nanny for a revised report for the Antagonist to review again", safe = true),
+                DisputeOption("override", "Pass the Nanny's report to the keeper without the Antagonist's pass", safe = false),
+            ),
+            facts = mapOf(
+                "f1" to "The Antagonist's latest review of the Nanny's report is a rejection.",
+                "f2" to "A report reaches the keeper's freeze only after the Antagonist has passed it.",
+            ),
+        ),
+        parties = listOf(
+            Disputant(HallMonitorRole.id.value, HallMonitorRole.definition.name),
+            Disputant(BuiltInRoles.Antagonist.id.value, BuiltInRoles.Antagonist.name),
+        ),
+    )
+}

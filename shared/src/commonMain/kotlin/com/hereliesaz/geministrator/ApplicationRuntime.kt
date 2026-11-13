@@ -196,6 +196,15 @@ class ApplicationRuntime private constructor(
         while (queenDisputes.size > 32) queenDisputes.remove(queenDisputes.keys.first())
     }
 
+    /**
+     * Her model and the creatures' voices for disputes; null until the app wires one, and she is then away: a dispute goes to
+     * the keeper in Messages (see [queenDisputeLocked]).
+     */
+    internal var disputeModels: DisputeModels? = null
+
+    /** The disputes already raised here (run and report), so each is raised once. */
+    private val raisedDisputes = LinkedHashSet<String>()
+
     private data class Current(
         val project: Project,
         val definition: WorkflowDefinition,
@@ -1030,6 +1039,39 @@ class ApplicationRuntime private constructor(
         }
     }
 
+    /**
+     * The one honest place two creatures are in dispute today: the Antagonist rejected the Nanny's report. Raised once per report,
+     * off the cycle (her model calls and an investigation may take a while; the keeper's waiting is never counted). Nothing starts
+     * until both creatures agree to her approach; with no model wired she is away and the keeper has it.
+     */
+    private fun queenDisputeLocked(definition: WorkflowDefinition, run: WorkflowRun) {
+        val case = com.hereliesaz.geministrator.queen.nannyDispute(definition, run) ?: return
+        if (!raisedDisputes.add(case.key)) return
+        while (raisedDisputes.size > 64) raisedDisputes.remove(raisedDisputes.first())
+        val runId = run.id.value
+        val models = disputeModels
+        val researcher = models?.research
+        val researchPass: (suspend (String) -> List<String>?)? =
+            if (researcher == null) null else { missing -> researcher.findings(missing, "dispute-$runId") }
+        val investigator = com.hereliesaz.geministrator.queen.DisputeInvestigator(
+            research = researchPass,
+            test = { request -> launchDisputeTestSwarm(runId, case.dispute, request) },
+        )
+        runtimeScope.launch {
+            try {
+                raiseDispute(
+                    runId, case.dispute, case.parties, models?.queen, models?.voices.orEmpty(), investigator,
+                    findingsOf = investigator::findingsOf, mayCall = models?.mayCall ?: { true },
+                )
+                runtimeMutex.withLock { publishCurrent() }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                // She could not raise it; the Nanny's own review and the keeper still stand.
+            }
+        }
+    }
+
     /** What happened when the keeper accepted one of her suggestions. */
     internal enum class QueenAccept { Applied, NothingChanged }
 
@@ -1158,6 +1200,7 @@ class ApplicationRuntime private constructor(
                         val governed = governHallMonitorLocked(snapshot.project, nextState)
                         queenTickLocked(governed.run)
                         queenSuggestLocked(snapshot.definition, governed.run)
+                        queenDisputeLocked(snapshot.definition, governed.run)
                         replaceCurrent(snapshot.copy(state = governed))
                         publishCurrent()
                         approveDelegatedGatesLocked()
