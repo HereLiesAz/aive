@@ -804,7 +804,7 @@ class RelayPool(
         const val MAX_UNFINISHED_LEASES_PER_ORIGIN: Int = 64
 
         /** Leases, unfinished and retained terminal ones, one pool may hold. */
-        const val MAX_LEASES_PER_POOL: Int = 512
+        const val MAX_LEASES_PER_POOL: Int = 128
 
         /** An unfinished lease is cancelled and dropped this long after the relay accepted it. */
         const val MAX_UNFINISHED_LEASE_AGE_MILLIS: Long = 24L * 60L * 60L * 1_000L

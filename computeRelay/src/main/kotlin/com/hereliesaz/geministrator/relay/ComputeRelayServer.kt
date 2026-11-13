@@ -145,7 +145,7 @@ fun Application.computeRelayModule(
     install(WebSockets) {
         pingPeriod = 20.seconds
         timeout = 45.seconds
-        maxFrameSize = 8L * 1024L * 1024L
+        maxFrameSize = 4L * 1024L * 1024L
         masking = false
     }
 
