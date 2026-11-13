@@ -109,6 +109,9 @@ enum class QueenVoice(val relay: QueenRelay?) {
     // --- Blockers: what a hive still needs created or obtained (queen/Blockers.kt). Kept apart, after every other voice. ---
     MissingBlocker(QueenRelay.Missing),
     FinishedBlockersOpen(null),
+
+    // --- A specialist worth training (queen/TrainingSuggestion.kt). Kept apart, after every other voice. ---
+    SuggestTrainSpecialist(QueenRelay.Watch),
 }
 
 /** Where a note leads: an existing place, never a new one. */

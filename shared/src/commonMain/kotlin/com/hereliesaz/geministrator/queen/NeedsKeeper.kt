@@ -84,4 +84,6 @@ internal fun QueenAction.keeperSituation(): Situation? = when (this) {
     QueenAction.RewordStep, QueenAction.RedoFromStep, QueenAction.Rest,
     QueenAction.AddCheck, QueenAction.SplitStep, QueenAction.ReorderSteps, QueenAction.AddApproval,
     -> null
+    // She only leads to the Roster; adopting what comes of it is never hers without the keeper's approval.
+    QueenAction.TrainSpecialist -> Situation.Adopts(approved = false)
 }

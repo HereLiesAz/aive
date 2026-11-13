@@ -632,6 +632,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_say_suggest_add_check">Step %1$s (%2$s) has failed several times after earlier work finished. A check between them would catch it sooner. This swarm keeps running as it is; I can keep the idea for next time.</string>
     <string name="queen_say_suggest_split_step">Step %1$s (%2$s) keeps failing or running out of time. It may be too big for one creature. This swarm keeps running as it is; I can keep the idea of splitting it for next time.</string>
     <string name="queen_say_suggest_reorder_steps">Several steps are blocked for the same reason, starting with step %1$s (%2$s). A different order may avoid it. This swarm keeps running as it is; I can keep the idea for next time.</string>
+    <string name="queen_say_suggest_train_specialist">The %1$s role has been used %2$s times in one project. A specialist for that kind of work may do it better. Open the Roster and start training from the role\'s entry; nothing is adopted without your approval.</string>
     <string name="queen_say_suggest_add_approval">Step %1$s (%2$s) can change things, has no approval in front of it, and has failed more than once. An approval before it would let you look first. This swarm keeps running as it is; I can keep the idea for next time.</string>
     <string name="queen_suggest_keep">Keep for next time</string>
     <string name="queen_say_suggest_reword_step">Step %1$s (%2$s) has not started. I would give it this job instead. Nothing changes until you accept.</string>

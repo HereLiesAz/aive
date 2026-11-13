@@ -61,6 +61,9 @@ enum class QueenAction {
 
     /** A step that can change something and kept failing: put an approval in front of it (only ever adds one). */
     AddApproval,
+
+    /** A generic role has been used repeatedly in one domain: the keeper starts training a specialist from the Roster. Only leads there. */
+    TrainSpecialist,
     ;
 
     /** Whether the queen applies it herself on the keeper's tap; the others only lead somewhere. */
@@ -140,6 +143,8 @@ internal fun queenCandidates(
     caps: SpendCaps,
     /** For the shape changes: a step that can change something is told apart by its role. */
     roles: Collection<RoleDefinition> = emptyList(),
+    /** Finished uses of roles in earlier runs, for the training suggestion (empty: none is made). */
+    usage: List<RoleUse> = emptyList(),
 ): List<QueenCandidate> {
     if (!run.live()) return emptyList()
     val nanny = hasNanny(definition, run)
@@ -177,6 +182,7 @@ internal fun queenCandidates(
         )
     }
     found += shapeCandidates(definition, run, signals, roles)
+    found += trainingCandidates(usage, roles)
     costPace(definition, run, caps)?.let { found += it }
     // The Nanny's findings are one more input to her own judgement; she keeps her own candidate when both name the same step and action.
     nannyCandidates(definition, run).forEach { n -> if (found.none { it.action == n.action && it.subject == n.subject }) found += n }
@@ -391,6 +397,7 @@ fun queenSuggestionNotes(proposals: List<ImprovementProposal>, run: WorkflowRun)
             -> QueenLink.Creature(subject, CreatureTab.Work)
             QueenAction.SwapSource, QueenAction.RaiseBudget -> QueenLink.Creature(subject, CreatureTab.Mind)
             QueenAction.RaiseAllowance -> QueenLink.Limits
+            QueenAction.TrainSpecialist -> QueenLink.Roster
             QueenAction.Rest -> null
         }
         QueenNote(

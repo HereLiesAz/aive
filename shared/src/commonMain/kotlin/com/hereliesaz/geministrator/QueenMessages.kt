@@ -103,6 +103,7 @@ private fun voiceResource(voice: QueenVoice): StringResource = when (voice) {
         // Blockers: what the hive still needs made or obtained.
         QueenVoice.MissingBlocker -> Res.string.queen_say_missing_blocker
         QueenVoice.FinishedBlockersOpen -> Res.string.queen_say_finished_blockers_open
+        QueenVoice.SuggestTrainSpecialist -> Res.string.queen_say_suggest_train_specialist
 }
 
 @Composable
