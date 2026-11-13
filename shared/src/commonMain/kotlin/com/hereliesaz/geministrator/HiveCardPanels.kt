@@ -87,7 +87,7 @@ internal fun HiveCardSharePanel(definition: WorkflowDefinition, modifier: Modifi
     var refused by remember(definition.id) { mutableStateOf<HiveCardProblem?>(null) }
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(Res.string.hive_card_share_explain), style = AzphaltType.body, color = azphaltOnSurface())
-        AzphaltPill(
+        AzphaltToggle(
             label = stringResource(if (objectives) Res.string.hive_card_objectives_on else Res.string.hive_card_objectives_off),
             seed = "hive-card-objectives",
             selected = objectives,

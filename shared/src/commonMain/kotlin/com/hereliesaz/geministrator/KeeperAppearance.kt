@@ -82,11 +82,10 @@ private fun CreatureLabelsSwitch() {
         style = AzphaltType.body,
         color = azphaltOnSurface(),
     )
-    AzphaltPill(
+    AzphaltToggle(
         label = stringResource(if (on) Res.string.settings_creature_labels_always else Res.string.settings_creature_labels_crowded),
         seed = "creature-labels-toggle",
         selected = on,
-        role = Role.Switch,
         onClick = { CreatureLabels.updateAlwaysShow(!on) },
         modifier = Modifier.fillMaxWidth(),
     )
@@ -106,11 +105,10 @@ private fun ReduceMotionSwitch() {
         style = AzphaltType.body,
         color = azphaltOnSurface(),
     )
-    AzphaltPill(
+    AzphaltToggle(
         label = stringResource(if (on) Res.string.settings_reduce_motion_on else Res.string.settings_reduce_motion_off),
         seed = "reduce-motion-toggle",
         selected = on,
-        role = Role.Switch,
         onClick = { AzphaltMotion.updateKeeperReduceMotion(!on) },
         modifier = Modifier.fillMaxWidth(),
     )
@@ -258,9 +256,35 @@ private fun SwitchRow(title: String, line: String, on: Boolean, onChange: (Boole
     }
 }
 
+/**
+ * One toggle idiom for the Keeper's room: the setting's name on the left, a switch on the right, the whole row toggling. The
+ * name never says ON or OFF; the switch shows it. [seed] is kept so a call reads like the pill it replaced.
+ */
+@Composable
+internal fun AzphaltToggle(
+    label: String,
+    @Suppress("UNUSED_PARAMETER") seed: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = AzphaltMinTouchTarget)
+            .toggleable(value = selected, role = Role.Switch, onValueChange = { onClick() })
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text(label, style = AzphaltType.lead, color = azphaltOnSurface(), modifier = Modifier.weight(1f))
+        AzphaltSwitchTrack(selected)
+    }
+}
+
 /** The switch itself, drawn: on is the strong colour with a thumb in its opposite, off is muted. */
 @Composable
-private fun AzphaltSwitchTrack(on: Boolean) {
+internal fun AzphaltSwitchTrack(on: Boolean) {
     val strong = azphaltStrong()
     val track = if (on) strong else azphaltMutedOnSurface().copy(alpha = 0.45f)
     val thumb = if (on) strong.onOpposite() else azphaltOnSurface()

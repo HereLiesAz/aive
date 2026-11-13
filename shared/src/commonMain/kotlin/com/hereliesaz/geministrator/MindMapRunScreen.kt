@@ -139,6 +139,9 @@ import com.hereliesaz.geministrator.resources.first_hive_own_key
 import com.hereliesaz.geministrator.resources.first_hive
 import com.hereliesaz.geministrator.resources.overview_recover_delete_all_data
 import org.jetbrains.compose.resources.getString
+import com.hereliesaz.geministrator.resources.hive_cost_so_far
+import com.hereliesaz.geministrator.workflow.hasUnpricedUsage
+import com.hereliesaz.geministrator.workflow.knownCostUsd
 import com.hereliesaz.geministrator.resources.hive_status_line
 import androidx.compose.runtime.produceState
 import com.hereliesaz.geministrator.domain.WorkflowRun
@@ -1099,6 +1102,15 @@ private val WIDE_TISSUE_MIN = 460.dp
  */
 @Composable
 private fun hiveStatusLine(live: LiveWorkflowPresentation, activeTaskId: String?, activity: SessionActivityFeeds): String {
+    val line = hiveStatusLineBody(live, activeTaskId, activity)
+    // What providers have reported spending on this run so far; nothing is shown until something is reported.
+    val spent = live.run.knownCostUsd()
+    val unpriced = live.run.hasUnpricedUsage()
+    return if (spent <= 0.0 && !unpriced) line else line + " · " + stringResource(Res.string.hive_cost_so_far, formatWaterfallCost(spent) + if (unpriced) "+" else "")
+}
+
+@Composable
+private fun hiveStatusLineBody(live: LiveWorkflowPresentation, activeTaskId: String?, activity: SessionActivityFeeds): String {
     val run = live.run
     val activeRun = activeTaskId?.let { id -> run.taskRuns.values.firstOrNull { it.taskDefinitionId.value == id } }
         ?: return "${run.status.label()} · ${run.objective}"

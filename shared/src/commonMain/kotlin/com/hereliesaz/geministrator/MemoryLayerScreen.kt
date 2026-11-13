@@ -126,6 +126,7 @@ import com.hereliesaz.geministrator.resources.memory_keep_it
 import com.hereliesaz.geministrator.resources.memory_memories_condensed_together
 import com.hereliesaz.geministrator.resources.memory_memory_cleared
 import com.hereliesaz.geministrator.resources.memory_memory_is_not_available_in_this
+import com.hereliesaz.geministrator.resources.memory_advanced
 import com.hereliesaz.geministrator.resources.memory_memory_off
 import com.hereliesaz.geministrator.resources.memory_memory_on
 import com.hereliesaz.geministrator.resources.memory_model_blank_for_the_provider_s
@@ -350,6 +351,21 @@ private fun MemoryLayerControls(controller: MemoryLayerController, connectedProv
       }
     }
 
+    QueueSection(controller, settings)
+    SummariesSection(controller)
+    ProjectsSection(controller, settings)
+    ModelsSection(controller)
+    DataSection(controller)
+    // The tuning, the habits, the refinement data and which engine runs each stage are for tinkering: one tap away, folded by default.
+    var tuningOpen by remember { mutableStateOf(false) }
+    AzphaltPill(
+        stringResource(Res.string.memory_advanced),
+        "memory-advanced",
+        selected = tuningOpen,
+        onClick = { tuningOpen = !tuningOpen },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    if (tuningOpen) {
     MemorySectionLabel(stringResource(Res.string.memory_stage, selectedStage.stage.name))
     selectedStage.roles.forEach { role ->
         StageEngineEditor(
@@ -363,14 +379,10 @@ private fun MemoryLayerControls(controller: MemoryLayerController, connectedProv
         )
     }
 
-    QueueSection(controller, settings)
-    SummariesSection(controller)
-    MemoryHabitsSection(controller, settings)
-    MemoryRefinementDataSection()
-    ProjectsSection(controller, settings)
-    TuningSection(settings, onApply = { policy -> update { it.copy(policy = policy) } })
-    ModelsSection(controller)
-    DataSection(controller)
+        MemoryHabitsSection(controller, settings)
+        MemoryRefinementDataSection()
+        TuningSection(settings, onApply = { policy -> update { it.copy(policy = policy) } })
+    }
 }
 
 /**

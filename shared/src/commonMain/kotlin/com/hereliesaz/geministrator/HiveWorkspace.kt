@@ -84,6 +84,7 @@ import com.hereliesaz.geministrator.resources.hive_feed_title
 import com.hereliesaz.geministrator.resources.hive_feed_unqueue
 import com.hereliesaz.geministrator.resources.launch_error_check_connections
 import com.hereliesaz.geministrator.resources.hive_legend_complete
+import com.hereliesaz.geministrator.resources.hive_legend_needs_you
 import com.hereliesaz.geministrator.resources.hive_legend_note
 import com.hereliesaz.geministrator.resources.hive_legend_waiting
 import com.hereliesaz.geministrator.resources.hive_legend_working
@@ -473,17 +474,22 @@ internal fun HiveTissueFrame(height: Dp, building: Boolean, modifier: Modifier =
     }
 }
 
-/** What the field's colours mean, and that moving bodies never rewires anything. */
+/** What the marks on the field mean: the creature colours as they are drawn (needs you and failed share one), and the dot between two creatures. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 internal fun HiveLegend(modifier: Modifier = Modifier) {
     AzphaltThemedSurface(Azphalt.Ink) {
         val muted = azphaltMutedOnSurface()
-        Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        androidx.compose.foundation.layout.FlowRow(
+            modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             LegendKey(Azphalt.Yellow, stringResource(Res.string.hive_legend_working), muted)
             LegendKey(ClaspGreen, stringResource(Res.string.hive_legend_complete), muted)
             LegendKey(muted.copy(alpha = 0.55f), stringResource(Res.string.hive_legend_waiting), muted)
-            Spacer(Modifier.weight(1f))
-            Text(stringResource(Res.string.hive_legend_note), style = AzphaltType.endCap.copy(fontWeight = FontWeight.Bold), color = muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            LegendKey(AzphaltDanger, stringResource(Res.string.hive_legend_needs_you), muted)
+            Text(stringResource(Res.string.hive_legend_note), style = AzphaltType.endCap, color = muted)
         }
     }
 }

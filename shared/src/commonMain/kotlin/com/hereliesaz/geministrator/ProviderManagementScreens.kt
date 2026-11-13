@@ -129,6 +129,9 @@ import com.hereliesaz.geministrator.resources.confirm_reset_pairing_title
 import com.hereliesaz.geministrator.resources.credential_keyless_hint
 import com.hereliesaz.geministrator.resources.keyless_sources_off
 import com.hereliesaz.geministrator.resources.keyless_sources_on
+import com.hereliesaz.geministrator.resources.keeper_advanced_a2a
+import com.hereliesaz.geministrator.resources.keeper_advanced_data
+import com.hereliesaz.geministrator.resources.keeper_advanced_tracing
 import com.hereliesaz.geministrator.resources.remote_access_advanced
 import com.hereliesaz.geministrator.resources.remote_access_advanced_explain
 import com.hereliesaz.geministrator.resources.remote_access_enter_code
@@ -317,6 +320,9 @@ internal fun ProviderSettingsScreen(
     var revokeComputeNodeId by remember { mutableStateOf<String?>(null) }
     var resetPairingConfirm by remember { mutableStateOf(false) }
     var relayAdvancedOpen by remember { mutableStateOf(false) }
+    var aboutAdvancedOpen by remember { mutableStateOf(false) }
+    var dataAdvancedOpen by remember { mutableStateOf(false) }
+    var deviceAdvancedOpen by remember { mutableStateOf(false) }
     var healthResults by remember { mutableStateOf<Map<String, String>?>(null) }
     var healthChecking by remember { mutableStateOf(false) }
     var exportTriggered by remember { mutableStateOf(false) }
@@ -378,7 +384,7 @@ internal fun ProviderSettingsScreen(
         // Keyless sources start on; this one switch turns them all off (or back on). A single source is
         // disconnected on its own row below. What a keyless source is sent leaves the device: said once, here.
         var keylessOff by remember { mutableStateOf(KeylessDefaults.allOff()) }
-        AzphaltPill(
+        AzphaltToggle(
             if (keylessOff) stringResource(Res.string.keyless_sources_off) else stringResource(Res.string.keyless_sources_on),
             "keyless-sources-switch",
             selected = !keylessOff,
@@ -783,7 +789,7 @@ internal fun ProviderSettingsScreen(
                     color = azphaltOnSurface(),
                 )
             }
-            AzphaltPill(
+            AzphaltToggle(
                 if (setting.enabled) stringResource(Res.string.settings_automatic_crash_reports_on) else stringResource(Res.string.settings_automatic_crash_reports_off),
                 "crash-reporting-toggle",
                 selected = setting.enabled,
@@ -791,7 +797,14 @@ internal fun ProviderSettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        TraceExportSettingsSection()
+        AzphaltPill(
+            stringResource(Res.string.keeper_advanced_tracing),
+            "about-advanced",
+            selected = aboutAdvancedOpen,
+            onClick = { aboutAdvancedOpen = !aboutAdvancedOpen },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (aboutAdvancedOpen) TraceExportSettingsSection()
         PromptHistorySettingsSection()
 
       }
@@ -804,7 +817,7 @@ internal fun ProviderSettingsScreen(
                 style = AzphaltType.body,
                 color = azphaltOnSurface(),
             )
-            AzphaltPill(
+            AzphaltToggle(
                 if (setting.enabled) stringResource(Res.string.settings_remote_access_on) else stringResource(Res.string.settings_remote_access_off),
                 "remote-access-toggle",
                 selected = setting.enabled,
@@ -894,6 +907,15 @@ internal fun ProviderSettingsScreen(
         }
 
         a2aServerSetting?.let { setting ->
+            AzphaltPill(
+                stringResource(Res.string.keeper_advanced_a2a),
+                "device-advanced",
+                selected = deviceAdvancedOpen,
+                onClick = { deviceAdvancedOpen = !deviceAdvancedOpen },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        a2aServerSetting?.takeIf { deviceAdvancedOpen }?.let { setting ->
             ProviderSectionLabel(stringResource(Res.string.settings_a2a_server))
             var confirmingNewToken by remember { mutableStateOf(false) }
             Text(
@@ -901,7 +923,7 @@ internal fun ProviderSettingsScreen(
                 style = AzphaltType.body,
                 color = azphaltOnSurface(),
             )
-            AzphaltPill(
+            AzphaltToggle(
                 if (setting.enabled) stringResource(Res.string.settings_a2a_server_on) else stringResource(Res.string.settings_a2a_server_off),
                 "a2a-server-toggle",
                 selected = setting.enabled,
@@ -966,7 +988,7 @@ internal fun ProviderSettingsScreen(
             }
             setting.lan?.takeIf { setting.enabled }?.let { lan -> A2aLanControls(lan) }
             setting.providerCard?.takeIf { setting.enabled }?.let { card ->
-                AzphaltPill(
+                AzphaltToggle(
                     if (card.described) stringResource(Res.string.settings_a2a_providers_on) else stringResource(Res.string.settings_a2a_providers_off),
                     "a2a-providers-toggle",
                     selected = card.described,
@@ -1097,7 +1119,7 @@ internal fun ProviderSettingsScreen(
                     color = azphaltOnSurface(),
                 )
             }
-            AzphaltPill(
+            AzphaltToggle(
                 if (setting.enabled) stringResource(Res.string.settings_on_device_small_tasks_on) else stringResource(Res.string.settings_on_device_small_tasks_off),
                 "on-device-small-tasks-toggle",
                 selected = setting.enabled,
@@ -1209,7 +1231,7 @@ internal fun ProviderSettingsScreen(
             modifier = Modifier.fillMaxWidth(),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AzphaltPill(
+            AzphaltToggle(
                 if (sharingEnabledDraft) stringResource(Res.string.settings_sharing_compute_on) else stringResource(Res.string.settings_sharing_compute_off),
                 "distributed-sharing-toggle",
                 selected = sharingEnabledDraft,
@@ -1481,6 +1503,14 @@ internal fun ProviderSettingsScreen(
             SetupFileSection(projectFileService, setupFileActions)
         }
 
+        AzphaltPill(
+            stringResource(Res.string.keeper_advanced_data),
+            "data-advanced",
+            selected = dataAdvancedOpen,
+            onClick = { dataAdvancedOpen = !dataAdvancedOpen },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (dataAdvancedOpen) {
         ProviderSectionLabel(stringResource(Res.string.settings_data))
         if (exportTriggered) {
             LaunchedEffect(Unit) {
@@ -1537,10 +1567,11 @@ internal fun ProviderSettingsScreen(
                 })
             }
         }
+        }
 
       }
 
-      if (KeeperSection.About in sections) {
+      if (KeeperSection.About in sections && aboutAdvancedOpen) {
         ProviderSectionLabel(stringResource(Res.string.settings_diagnostics))
         if (diagnosticTriggered) {
             LaunchedEffect(Unit) {
@@ -1681,7 +1712,7 @@ private suspend fun <T> settingsActionOrNull(label: String, action: suspend () -
 /** **Open to this network** under the A2A server (docs/A2A.md); the cleartext warning sits beside the switch. */
 @Composable
 private fun A2aLanControls(lan: A2aLanSetting) {
-    AzphaltPill(
+    AzphaltToggle(
         if (lan.enabled) stringResource(Res.string.settings_a2a_lan_on) else stringResource(Res.string.settings_a2a_lan_off),
         "a2a-lan-toggle",
         selected = lan.enabled,

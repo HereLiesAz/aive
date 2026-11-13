@@ -62,8 +62,8 @@
     <string name="overview_enter_name">Enter a project name to start a run.</string>
     <string name="overview_enter_objective">Enter an objective to start a run.</string>
     <string name="overview_invalid_repository_location">Invalid repository location</string>
-    <string name="keyless_sources_on">Keyless sources: on</string>
-    <string name="keyless_sources_off">Keyless sources: off</string>
+    <string name="keyless_sources_on">Keyless sources</string>
+    <string name="keyless_sources_off">Keyless sources</string>
     <string name="remote_access_enter_code">Enter this code in IDEaz on your other device: Settings → The Aive.</string>
     <string name="remote_access_advanced">Advanced: relay server</string>
     <string name="remote_access_advanced_explain">The relay is a server that passes encrypted messages between your devices. Leave it blank to use the default relay run by the developer.</string>
@@ -142,9 +142,13 @@
     <string name="prompt_retry_with">Retry with: %1$s</string>
     <string name="prompt_remember_title">Remembered text</string>
     <string name="prompt_remember_intro">Fields for a goal, a repository, a swarm name or a message start with what you typed there before, or a starting suggestion made on this device. Up to 12 recent entries per kind are kept here, are never sent anywhere and are not in setup files. Fields for keys, tokens, pairing codes and the setup passphrase are never filled in or remembered.</string>
-    <string name="prompt_remember_on">Remembering text: on</string>
-    <string name="prompt_remember_off">Remembering text: off</string>
+    <string name="prompt_remember_on">Remembering text</string>
+    <string name="prompt_remember_off">Remembering text</string>
     <string name="prompt_remember_clear">Clear remembered text</string>
     <string name="prompt_remember_cleared">Remembered text cleared.</string>
     <string name="prompt_role_lesson">Add lesson: %1$s</string>
+    <string name="keeper_advanced_tracing">Advanced: tracing and diagnostics</string>
+    <string name="keeper_advanced_data">Advanced: raw data export and import</string>
+    <string name="keeper_advanced_a2a">Advanced: let other programs start swarms</string>
+    <string name="memory_advanced">Advanced: engines, habits and tuning</string>
 </resources>
