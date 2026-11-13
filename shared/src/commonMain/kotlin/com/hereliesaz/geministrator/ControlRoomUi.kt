@@ -930,15 +930,18 @@ private fun OverviewSectionTabs(
     destination: ControlRoomDestination,
     onDestinationSelected: (ControlRoomDestination) -> Unit,
     leading: @Composable () -> Unit = {},
+    /** Whether the live hive's own controls (Pause, Stop and the rest) have a row of their own under the places. */
+    showControls: Boolean = false,
     trailing: @Composable () -> Unit = {},
 ) {
     // On a wide window the rail holds the places; the row keeps only the hive's own pills.
     val places = compact
-    Row(
+    // Places (Hives, Team, Stable, Store) on one row; what the live hive does (Pause, Stop, Timeline, Share, More editing) on the next.
+    if (places) Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = hiveGutter(compact), vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (places) leading()
+        leading()
         // The Memory swarm is not a pill here: it is the last view in a live hive's Timeline row
         // (RunTimeline's memoryContent). The index stays the section's own, so the others keep their colours.
         if (places) ControlRoomDestination.OverviewSections.forEachIndexed { index, section ->
@@ -952,6 +955,11 @@ private fun OverviewSectionTabs(
                 },
             )
         }
+    }
+    if (showControls) Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = hiveGutter(compact), vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         trailing()
     }
 }
@@ -1117,11 +1125,11 @@ private fun MainDestination(
                             }
                         },
                     )
-                    if (compact) stopPill()
                 },
+                showControls = liveHive != null,
             ) {
-                // One row of places: the hive's own come after Swarm, Memory swarm and the Store.
-                if (!compact) stopPill()
+                // The hive's own controls, on their own row under the places.
+                stopPill()
                 liveHive?.let { live ->
                     AzphaltPill(
                         label = stringResource(if (showTimeline) Res.string.hive_show_hive else Res.string.hive_show_timeline),
