@@ -173,6 +173,8 @@ fun ControlRoom(
     onNannyReview: (HallMonitorReviewStep, Boolean) -> Unit = { _, _ -> },
     /** Starts an isolated practice run of one of the Nanny's solutions: finding id, solution index. */
     onNannyTestSolution: (String, Int) -> Unit = { _, _ -> },
+    /** The keeper accepts (true) or dismisses (false) one of the queen's suggestions, by its ledger id. */
+    onQueenSuggestion: (String, Boolean) -> Unit = { _, _ -> },
     onLiftSpendStop: () -> Unit = {},
     /** Stops the active run: every unfinished creature and provider session. */
     onStopRun: (WorkflowRunId) -> Unit = {},
@@ -626,6 +628,7 @@ fun ControlRoom(
                 onResolveEscalation = onResolveEscalation,
                 onNannyReview = onNannyReview,
                 onNannyTestSolution = onNannyTestSolution,
+                onQueenSuggestion = onQueenSuggestion,
                 onLiftSpendStop = onLiftSpendStop,
                 onStopRun = onStopRun,
                 onPauseRun = onPauseRun,
@@ -949,6 +952,7 @@ private fun MainDestination(
     onResolveEscalation: (String, Boolean) -> Unit,
     onNannyReview: (HallMonitorReviewStep, Boolean) -> Unit,
     onNannyTestSolution: (String, Int) -> Unit,
+    onQueenSuggestion: (String, Boolean) -> Unit,
     onLiftSpendStop: () -> Unit,
     onStopRun: (WorkflowRunId) -> Unit,
     /** Pause (true) or resume (false) the live hive; see [ApplicationRuntime.setKeeperPause]. */
@@ -1335,6 +1339,7 @@ private fun MainDestination(
                     compact = compact,
                     onNannyReview = onNannyReview,
                     onNannyTestSolution = onNannyTestSolution,
+                    onQueenSuggestion = onQueenSuggestion,
                     onOpenStory = {
                         showTimelineState.value = true
                         onDestinationSelected(ControlRoomDestination.Overview)

@@ -93,10 +93,10 @@ internal sealed interface MessageRow {
         override val countsToBadge: Boolean get() = true
     }
 
-    /** The queen speaking on her own: derived from the run, never counted, never read-marked. */
+    /** The queen speaking on her own: derived from the run. Only a suggestion waiting on the keeper counts toward the badge. */
     data class Queen(val note: com.hereliesaz.geministrator.queen.QueenNote) : MessageRow {
         override val key: String get() = "queen|" + note.id
-        override val countsToBadge: Boolean get() = false
+        override val countsToBadge: Boolean get() = note.countsToBadge
     }
 
     /** The run shown is an isolated practice run of one of the Nanny's solutions: progress only, no decision. */

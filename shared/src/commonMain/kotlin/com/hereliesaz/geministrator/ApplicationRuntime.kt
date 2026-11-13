@@ -63,6 +63,15 @@ import com.hereliesaz.geministrator.workflow.NestedWorkflowExecutorIntegration
 import com.hereliesaz.geministrator.workflow.ProviderBackedManagedSessionGateway
 import com.hereliesaz.geministrator.workflow.RoleSurfaceRuntimeRegistry
 import com.hereliesaz.geministrator.workflow.SpendCaps
+import com.hereliesaz.geministrator.workflow.improvement.ImprovementSource
+import com.hereliesaz.geministrator.workflow.improvement.ProposalStatus
+import com.hereliesaz.geministrator.queen.QueenAction
+import com.hereliesaz.geministrator.queen.queenAcceptRefused
+import com.hereliesaz.geministrator.queen.queenCandidates
+import com.hereliesaz.geministrator.queen.queenIsMoot
+import com.hereliesaz.geministrator.queen.queenNewProposals
+import com.hereliesaz.geministrator.queen.queenSignals
+import com.hereliesaz.geministrator.queen.queenSuggestionNotes
 import com.hereliesaz.geministrator.workflow.liftSpendPause
 import com.hereliesaz.geministrator.workflow.StarterWorkflowFactory
 import com.hereliesaz.geministrator.workflow.TaskExecutorIntegrationRegistry
@@ -141,6 +150,10 @@ class ApplicationRuntime private constructor(
     val delegations: ProgressiveDelegationStore? = null,
     /** How much the queen tells the keeper in Messages; read at each publish, so a change applies at the next cycle. */
     private val queenLevel: () -> com.hereliesaz.geministrator.queen.QueenLevel = { com.hereliesaz.geministrator.queen.QueenLevel.Quiet },
+    /** Where her suggestions are kept (the one improvement ledger); null means she makes none. */
+    private val queenLedger: com.hereliesaz.geministrator.workflow.improvement.ImprovementStore? = null,
+    /** The keeper's allowances, so she can say a run is close to its own. */
+    private val queenCaps: () -> SpendCaps = { SpendCaps() },
 ) {
     private data class QueenReview(
         val runId: String,
@@ -151,6 +164,10 @@ class ApplicationRuntime private constructor(
 
     /** The freeze review the queen last read; refreshed by the cycle while frozen, so publishing stays pure. */
     private var queenReview: QueenReview? = null
+
+    /** Her rows in the ledger, as the cycle last read them, so publishing stays pure and never waits on the store. */
+    private var queenProposals: List<com.hereliesaz.geministrator.workflow.improvement.ImprovementProposal> = emptyList()
+    private var queenProposalsReadAt: Long = 0L
 
     /** What the queen consulted before planning each run launched here (memory only; the Story keeps the line). */
     private val researchRecords = LinkedHashMap<String, com.hereliesaz.geministrator.research.ResearchRecord>()
@@ -943,10 +960,129 @@ class ApplicationRuntime private constructor(
         }
     }
 
+    /**
+     * The queen's suggestions, in the same cycle: reads her rows (at most every few seconds), settles those that no
+     * longer stand, and makes at most one new one when the pacing rules allow. Deterministic: no model is asked, and a
+     * failure is swallowed so the cycle goes on.
+     */
+    private suspend fun queenSuggestLocked(definition: WorkflowDefinition, run: WorkflowRun) {
+        val ledger = queenLedger ?: return
+        val now = nowEpochMillis()
+        if (now - queenProposalsReadAt < QUEEN_SUGGEST_REFRESH_MILLIS) return
+        queenProposalsReadAt = now
+        try {
+            val candidates = queenCandidates(
+                definition, run, queenSignals(definition, run, roles), queenCaps(),
+            )
+            val rows = ledger.state().proposals.filter { it.source == ImprovementSource.Queen }
+            // Rows left over from another run are settled; a row for this run is settled once it no longer stands.
+            for (row in rows.filter { it.status == ProposalStatus.Proposed }) {
+                if (row.cycleRunId != run.id.value || queenIsMoot(row, definition, run, candidates)) {
+                    ledger.decide(row.id) { it.copy(status = ProposalStatus.Superseded, decidedAtEpochMillis = now) }
+                }
+            }
+            val fresh = ledger.state().proposals.filter { it.source == ImprovementSource.Queen }
+            val made = queenNewProposals(definition, run, candidates, fresh, queenLevel(), now)
+            if (made.isNotEmpty()) {
+                ledger.merge { state ->
+                    state.copy(proposals = state.proposals + made.filter { m -> state.proposals.none { it.id == m.id } })
+                }
+            }
+            queenProposals = ledger.state().proposals.filter { it.source == ImprovementSource.Queen }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            // Her suggestions are a courtesy; the swarm goes on without them.
+        }
+    }
+
+    /** What happened when the keeper accepted one of her suggestions. */
+    internal enum class QueenAccept { Applied, NothingChanged }
+
+    /**
+     * The keeper accepts one of her suggestions. Only in the app (nothing remote or scripted reaches this). It
+     * re-checks that the suggestion still stands, applies it with the call the keeper already has (a live edit of a
+     * step that has not started, a rewind of one step and what follows it, the keeper's own pause), and only if that
+     * took, marks it Adopted. A second tap, or a suggestion whose step has since started, changes nothing.
+     */
+    internal suspend fun acceptQueenSuggestion(proposalId: String): QueenAccept {
+        val ledger = queenLedger ?: return QueenAccept.NothingChanged
+        val proposal = ledger.state().proposals.firstOrNull {
+            it.id == proposalId && it.source == ImprovementSource.Queen
+        } ?: return QueenAccept.NothingChanged
+        if (proposal.status != ProposalStatus.Proposed) return QueenAccept.NothingChanged
+        val action = QueenAction.parse(proposal.action) ?: return QueenAccept.NothingChanged
+        val (definition, run) = runtimeMutex.withLock {
+            val snapshot = current ?: return QueenAccept.NothingChanged
+            snapshot.definition to newestRun(snapshot.state.run)
+        }
+        if (run.id.value != proposal.cycleRunId ||
+            queenAcceptRefused(proposal, definition, run, roles)
+        ) return QueenAccept.NothingChanged
+        val took = when (action) {
+            QueenAction.RewordStep -> {
+                val edited = definition.copy(
+                    tasks = definition.tasks.map { if (it.id.value == proposal.target) it.copy(objective = proposal.newText) else it },
+                )
+                applyLiveDefinitionEdit(edited) > 0
+            }
+            QueenAction.RedoFromStep -> {
+                rewindToTask(TaskDefinitionId(proposal.target))
+                true
+            }
+            QueenAction.Rest -> {
+                setKeeperPause(true)
+                true
+            }
+            else -> false
+        }
+        if (!took) return QueenAccept.NothingChanged
+        val now = nowEpochMillis()
+        ledger.decide(proposalId) {
+            it.copy(
+                status = ProposalStatus.Adopted,
+                decidedAtEpochMillis = now,
+                note = "The keeper accepted it.",
+            )
+        }
+        refreshQueenProposals()
+        return QueenAccept.Applied
+    }
+
+    /** The keeper says no thanks. The same step and action are not offered again for two weeks. */
+    internal suspend fun dismissQueenSuggestion(proposalId: String): Boolean {
+        val ledger = queenLedger ?: return false
+        val now = nowEpochMillis()
+        val changed = ledger.decide(proposalId) {
+            it.copy(
+                status = ProposalStatus.Dismissed,
+                decidedAtEpochMillis = now,
+                note = "The keeper dismissed it.",
+            )
+        }
+        refreshQueenProposals()
+        return changed
+    }
+
+    private suspend fun refreshQueenProposals() {
+        val ledger = queenLedger ?: return
+        queenProposals = ledger.state().proposals.filter { it.source == ImprovementSource.Queen }
+        runtimeMutex.withLock { publishCurrent() }
+    }
+
     private fun queenNotesFor(definition: WorkflowDefinition, run: WorkflowRun): List<com.hereliesaz.geministrator.queen.QueenNote> =
         try {
             val review = queenReview?.takeIf { it.runId == run.id.value }?.state
-            com.hereliesaz.geministrator.queen.queenUpdate(definition, run, roles, queenLevel(), review, researchRecords[run.id.value], queenMissing[run.id.value].orEmpty(), queenDisputes[run.id.value].orEmpty())
+            com.hereliesaz.geministrator.queen.queenUpdate(
+                definition, run, roles, queenLevel(), review, researchRecords[run.id.value],
+                missing = queenMissing[run.id.value].orEmpty(),
+                disputes = queenDisputes[run.id.value].orEmpty(),
+                suggestions = if (run.globalPause == null && run.spendPause == null) {
+                    queenSuggestionNotes(queenProposals, run)
+                } else {
+                    emptyList()
+                },
+            )
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (_: Exception) {
@@ -977,6 +1113,7 @@ class ApplicationRuntime private constructor(
                         if (currentGeneration != snapshotGeneration || current !== snapshot) return@withLock
                         val governed = governHallMonitorLocked(snapshot.project, nextState)
                         queenTickLocked(governed.run)
+                        queenSuggestLocked(snapshot.definition, governed.run)
                         replaceCurrent(snapshot.copy(state = governed))
                         publishCurrent()
                         approveDelegatedGatesLocked()
@@ -1310,6 +1447,7 @@ class ApplicationRuntime private constructor(
     companion object {
         private const val CYCLE_INTERVAL_MILLIS = 1_000L
         private const val QUEEN_REVIEW_REFRESH_MILLIS = 2_000L
+        private const val QUEEN_SUGGEST_REFRESH_MILLIS = 5_000L
         private const val RETRY_BACKOFF_MILLIS = 2_000L
         private const val MAX_BACKOFF_MULTIPLIER = 15
         private const val TRANSIENT_FAILURE_LIMIT = 3
@@ -1354,6 +1492,8 @@ class ApplicationRuntime private constructor(
             spendCaps: () -> SpendCaps = { SpendCaps() },
             /** How much the queen tells the keeper in Messages (Keeper's room, This device); Quiet unless provided. */
             queenLevel: () -> com.hereliesaz.geministrator.queen.QueenLevel = { com.hereliesaz.geministrator.queen.QueenLevel.Quiet },
+            /** Where the queen's suggestions are kept and decided (the improvement ledger); none unless provided. */
+            queenLedger: com.hereliesaz.geministrator.workflow.improvement.ImprovementStore? = null,
             /** What this device's steps have taken, so the queen's Auto time allowance learns (Time allowed); keeps nothing unless provided. */
             deadlineHistory: com.hereliesaz.geministrator.workflow.DeadlineHistory =
                 com.hereliesaz.geministrator.workflow.DeadlineHistory.None,
@@ -1457,6 +1597,8 @@ class ApplicationRuntime private constructor(
                     nestedWorkflows,
                     delegations,
                     queenLevel,
+                    queenLedger,
+                    spendCaps,
                 )
             }
 

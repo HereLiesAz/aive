@@ -622,6 +622,23 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="improvement_source_loop">from the loop</string>
     <string name="improvement_source_role">from run history</string>
     <string name="improvement_source_habit">from a habit</string>
+
+    <!-- The queen's mid-run suggestions (queen/QueenSuggestions.kt). One block; the keeper decides each in Messages. -->
+    <string name="improvement_source_queen">from the queen</string>
+    <string name="queen_title_suggestion">A suggestion from the queen</string>
+    <string name="queen_say_suggest_redo_step">Step %3$s has failed %4$s times, and it builds on step %1$s (%2$s). I can count the failures but I cannot tell which step is at fault. I can redo step %1$s and everything after it; finished work before it stays.</string>
+    <string name="queen_say_suggest_swap_source">Step %1$s (%2$s) moved to another Source after the first one failed. Later steps may use the first one too. You change a creature\'s Source on its Mind, and the change applies from the next run.</string>
+    <string name="queen_say_suggest_raise_budget">The %1$s has used %2$s percent of its token budget and still has steps to do. Raising its budget on its Mind now avoids a stop.</string>
+    <string name="queen_say_suggest_raise_allowance">This run has counted %1$s percent of its %2$s allowance, and many steps are still to do. You can change the allowance in the Keeper\'s room.</string>
+    <string name="queen_say_suggest_rest_nanny">The nanny\'s report is with a second creature for checking. I can rest the swarm until that is settled: what is running finishes, nothing new starts, and you can resume it.</string>
+    <string name="queen_say_suggest_reword_step">Step %1$s (%2$s) has not started. I would give it this job instead. Nothing changes until you accept.</string>
+    <string name="queen_quote_queen_wording">The wording, quoted:</string>
+    <string name="queen_suggest_accept">Go ahead</string>
+    <string name="queen_suggest_dismiss">No thanks</string>
+    <string name="queen_suggest_outside">Based on content from outside. Look before you accept.</string>
+    <string name="queen_suggest_confirm_title">Go ahead with the queen\'s suggestion?</string>
+    <string name="queen_suggest_confirm_body">This changes the swarm that is running. Finished work before the step stays; the step and what follows it start again.</string>
+    <string name="queen_suggest_nothing_changed">That suggestion no longer applies, or was already decided. Nothing changed.</string>
     <string name="improvement_status_superseded">Superseded</string>
     <string name="improvement_add_to_hive">Add to %1$s</string>
     <string name="improvement_habit_added">Added to %1$s, behind its own approval step.</string>
