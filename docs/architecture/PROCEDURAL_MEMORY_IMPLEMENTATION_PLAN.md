@@ -1,3 +1,5 @@
+> **Superseded where it conflicts with [Memory-for-agents.md](../Memory-for-agents.md) and the owner's model: memory is not a tool; the only command is a bare `/remindme`; keyword clouds arrive by themselves in the agent's thinking and chat and go deeper the longer it lingers; recall is gist, never exact; a contradiction is reasoned out loud and its resolution is condensed like everything else.** Contradicted here: milestones 4 (validator and promotion policy), 5 (a procedural recall provider offering references) and 7 (a habit DAG runner) are superseded by [HABITS_AS_MEMORY.md](HABITS_AS_MEMORY.md); recall of procedures is the Habits prompt block, not a tool.
+
 # Procedural Memory: implementation and integration plan
 
 Status: **Foundation, opt-in execution receipts, and durable procedural sidecars implemented; no macro execution or validation is enabled.** Companion design: [PROCEDURAL_MEMORY.md](PROCEDURAL_MEMORY.md). Scope: Aive's four memory pillars (recollection, consolidation, reflexes, habits) and its agent-neutral duplex MCP transport.
