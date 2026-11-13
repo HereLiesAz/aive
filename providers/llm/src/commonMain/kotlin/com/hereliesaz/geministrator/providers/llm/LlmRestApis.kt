@@ -1,5 +1,7 @@
 package com.hereliesaz.geministrator.providers.llm
 
+import com.hereliesaz.geministrator.net.HttpStatusFailure
+import com.hereliesaz.geministrator.net.parseRetryAfterMillis
 import com.hereliesaz.geministrator.domain.PromptReusePolicy
 import com.hereliesaz.geministrator.providers.PromptCacheCapabilities
 import com.hereliesaz.geministrator.providers.PromptCacheMode
@@ -680,9 +682,11 @@ private suspend fun LlmApiKeyProvider.requireKey(providerName: String): String =
 private suspend fun HttpResponse.requireSuccess(operation: String) {
     if (status.value in 200..299) return
     val responseBody = bodyAsText().redactSecrets().take(800)
-    error(
-        "Unable to $operation: HTTP ${status.value}" +
+    throw HttpStatusFailure(
+        status = status.value,
+        message = "Unable to $operation: HTTP ${status.value}" +
             responseBody.takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty(),
+        retryAfterMillis = parseRetryAfterMillis(headers[HttpHeaders.RetryAfter]),
     )
 }
 

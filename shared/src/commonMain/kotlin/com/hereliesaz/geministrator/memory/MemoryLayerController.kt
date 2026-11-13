@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.memory
 
+import com.hereliesaz.geministrator.net.backoffMillis
 import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.memory.procedural.ProcedureTraceReader
 import com.hereliesaz.geministrator.memory.procedural.ProcedureTraceSink
@@ -94,6 +95,8 @@ class MemoryLayerController(
     private val nowEpochMillis: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     /** The pre-banks shared store kept as the migration backup, where this platform has one. */
     private val legacyBackup: LegacyMemoryBackup? = null,
+    /** How the drain waits after a failed packet; a test swaps it for one that does not sleep. */
+    private val pause: suspend (millis: Long) -> Unit = { kotlinx.coroutines.delay(it) },
 ) {
     private val drainMutex = Mutex()
     /** Prevent repeated terminal reconciliation from banking duplicate receipts in one process. */
@@ -370,6 +373,7 @@ class MemoryLayerController(
         publish()
         for (workflow in banks.known()) {
             val layer = layerFor(workflow)
+            var consecutiveFailures = 0
             while (active && !settings.value.consolidationPaused) {
                 val next = layer.store.read().nextWorkable(settings.value.policy)
                 mutableActivity.value = mutableActivity.value.copy(working = next?.stage, workingQueueId = next?.id)
@@ -385,6 +389,14 @@ class MemoryLayerController(
                 result.logText()?.let { journal.record(workflow, it) }
                 publish()
                 if (result == MemoryConsolidationResult.Idle) break
+                if (result is MemoryConsolidationResult.Failed) {
+                    // A failing clerk (a rate limit, an outage) is asked again after a growing wait that honours its
+                    // Retry-After, not at once: a tight retry loop is what turns one 429 into a ban.
+                    consecutiveFailures += 1
+                    pause(backoffMillis(consecutiveFailures, result.retryAfterMillis))
+                } else {
+                    consecutiveFailures = 0
+                }
             }
         }
     }

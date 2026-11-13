@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.memory
 
+import com.hereliesaz.geministrator.net.retryAfterHintMillis
 import com.hereliesaz.geministrator.vector.FlatVectorIndex
 import com.hereliesaz.geministrator.vector.HnswVectorIndex
 import com.hereliesaz.geministrator.vector.TextEmbedder
@@ -141,6 +142,8 @@ sealed interface MemoryConsolidationResult {
         val queueId: MemoryQueueId,
         val stage: MemoryConsolidationStage,
         val reason: String,
+        /** How long the provider asked to be left alone (its `Retry-After`), when it said. */
+        val retryAfterMillis: Long? = null,
     ) : MemoryConsolidationResult
 
     /** No queue work was due, but [count] pending pair summaries were written ([MemoryPairSummaries]). */
@@ -270,7 +273,7 @@ class MemoryConsolidator(
                 throw cancelled
             } catch (failure: Throwable) {
                 val reason = failure.message ?: failure::class.simpleName ?: "Memory manager failed"
-                return failed(processing, plan, reason)
+                return failed(processing, plan, reason, failure.retryAfterHintMillis())
             }
 
             if (entry.stage == MemoryConsolidationStage.Condensation && validated.size == 0) {
@@ -380,6 +383,7 @@ class MemoryConsolidator(
         entry: MemoryQueueEntry,
         plan: PacketPlan,
         reason: String,
+        retryAfterMillis: Long? = null,
     ): MemoryConsolidationResult {
         val clusterKey = plan.clusterKey
         if (clusterKey != null && entry.attempt + 1 >= policy.maxAttempts) {
@@ -387,7 +391,7 @@ class MemoryConsolidator(
             return MemoryConsolidationResult.Declined(entry.id, reason)
         }
         markFailed(entry, reason)
-        return MemoryConsolidationResult.Failed(entry.id, entry.stage, reason)
+        return MemoryConsolidationResult.Failed(entry.id, entry.stage, reason, retryAfterMillis)
     }
 
     private suspend fun decline(entry: MemoryQueueEntry, clusterKey: String, reason: String) {

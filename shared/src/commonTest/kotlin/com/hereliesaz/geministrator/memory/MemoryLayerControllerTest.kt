@@ -11,13 +11,18 @@ import kotlin.test.assertTrue
 private const val WORKFLOW = "wf"
 
 class MemoryLayerControllerTest {
-    private fun controller(store: MemoryStore = InMemoryMemoryStore(), provider: MemoryEngineProvider = object : MemoryEngineProvider {}) =
+    private fun controller(
+        store: MemoryStore = InMemoryMemoryStore(),
+        provider: MemoryEngineProvider = object : MemoryEngineProvider {},
+        pause: suspend (Long) -> Unit = {},
+    ) =
         MemoryLayerController(
             banks = MemoryBanks.inMemory(mapOf(WORKFLOW to store)),
             settingsStore = MemoryLayerSettingsStore(MapSettings()),
             engineProvider = provider,
             scope = CoroutineScope(Dispatchers.Unconfined),
             nowEpochMillis = { 1_000L },
+            pause = pause,
         )
 
     private suspend fun MemoryStore.bank(id: String, text: String) {
@@ -49,6 +54,25 @@ class MemoryLayerControllerTest {
         controller.updateSettings { it.copy(consolidationPaused = false, enabled = false) }
         controller.drain()
         assertTrue(store.read().queue.single().status != MemoryQueueStatus.Complete)
+    }
+
+    @Test
+    fun aFailingClerkIsAskedAgainAfterAGrowingWaitThatHonoursRetryAfter() = runBlocking {
+        val store = InMemoryMemoryStore()
+        store.bank("a", "First episode that will fail sectioning.")
+        val provider = object : MemoryEngineProvider {
+            override fun hostedAgent(role: MemoryMicroAgentRole, engine: MemoryStageEngine) =
+                HostedMemoryGenerativeRuntime.agent(role, engine, MemoryMicroAgentPlatform.Linux) {
+                    throw com.hereliesaz.geministrator.net.HttpStatusFailure(429, "Unable to generate: HTTP 429", retryAfterMillis = 30_000L)
+                }
+        }
+        val pauses = mutableListOf<Long>()
+        val controller = controller(store, provider) { pauses += it }
+        controller.updateSettings { it.withEngine(MemoryMicroAgentRole.Sectioner, MemoryStageEngine(MemoryEngineKind.HostedModel)) }
+        controller.drain()
+        assertTrue(pauses.size >= 2, "every failed attempt waits before the next: $pauses")
+        assertTrue(pauses.all { it >= 30_000L }, "never sooner than the provider asked: $pauses")
+        assertTrue(pauses.zipWithNext().all { (a, b) -> b >= a }, "the wait does not shrink while it keeps failing: $pauses")
     }
 
     @Test

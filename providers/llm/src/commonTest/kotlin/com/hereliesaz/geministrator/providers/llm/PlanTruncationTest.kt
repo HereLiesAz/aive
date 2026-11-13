@@ -124,8 +124,8 @@ class PlanTruncationTest {
         val b = FakeApi(truncations = 9)
         val failure = assertFailsWith<AllProvidersFailedException> { failover("Gemini" to a, "OpenAI" to b).plan(packet) }
         assertEquals(
-            "The plan was too long for the provider's output limit (tried Gemini, OpenAI). " +
-                "Try a shorter description, or a provider with a larger limit.",
+            "The plan was too long for the source's output limit (tried Gemini, OpenAI). " +
+                "Try a shorter description, or a source with a larger limit.",
             failure.message,
         )
         assertEquals(2, a.budgets.size)

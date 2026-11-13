@@ -1,5 +1,8 @@
 package com.hereliesaz.geministrator.providers.llm
 
+import com.hereliesaz.geministrator.net.parseRetryAfterMillis
+import com.hereliesaz.geministrator.net.RetryAfterHint
+import io.ktor.http.HttpHeaders
 import com.hereliesaz.geministrator.memory.MEMORY_MESSAGE_MARKER
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
@@ -24,8 +27,8 @@ sealed interface TextGenerationChunk {
 }
 
 /** A streaming request refused before any output (HTTP status and body), so it can be retried. */
-internal class StreamRejected(val status: Int, val body: String, operation: String) :
-    IllegalStateException("Unable to $operation: HTTP $status${body.takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty()}")
+internal class StreamRejected(val status: Int, val body: String, operation: String, override val retryAfterMillis: Long? = null) :
+    IllegalStateException("Unable to $operation: HTTP $status${body.takeIf(String::isNotBlank)?.let { ": $it" }.orEmpty()}"), RetryAfterHint
 
 /**
  * POSTs the request [configure] sets up and reads the response as server-sent events, calling [onEvent] with each event's
@@ -44,7 +47,12 @@ internal suspend fun HttpClient.postServerSentEvents(
         configure()
     }.execute { response ->
         if (response.status.value !in 200..299) {
-            throw StreamRejected(response.status.value, response.bodyAsText().redactSecrets().take(800), operation)
+            throw StreamRejected(
+                response.status.value,
+                response.bodyAsText().redactSecrets().take(800),
+                operation,
+                parseRetryAfterMillis(response.headers[HttpHeaders.RetryAfter]),
+            )
         }
         val channel = response.bodyAsChannel()
         var event: String? = null
