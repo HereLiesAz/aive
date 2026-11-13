@@ -79,7 +79,8 @@ fun planningMayCall(
         if (caller == PlanningCaller.Reviewer) CallDecision.ChecklistOnly(reason) else CallDecision.Refuse(reason)
     if (callsSoFar >= PlanningLimits.MAX_CALLS) return no(GateReason.CallLimit)
     if (caps.anyDollarCap()) {
-        if (price == PriceStatus.Unknown) return no(GateReason.UnpricedUnderCap)
+        // An unknown price under a dollar cap is the keeper's to decide, never hers (see needsKeeper): no call is made.
+        if (needsKeeper(Situation.Spends(price, dollarCap = true)) == KeeperReason.SpendsUnpriced) return no(GateReason.UnpricedUnderCap)
         val hourlyCap = caps.hourlySpendCapUsd
         if (hourlyCap != null) {
             if (hourly.unpricedUsage) return no(GateReason.UnpricedUsage)

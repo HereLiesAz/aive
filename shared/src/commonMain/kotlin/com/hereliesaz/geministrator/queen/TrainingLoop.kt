@@ -206,7 +206,9 @@ fun nannyRulingPrompt(facts: Map<String, String>): String = buildString {
 
 /** The fixed rules, used when no model rules or its ruling is invalid. Null when there is nothing readable to rule on. */
 fun rulingByRules(results: PracticeResults?, round: Int, limits: TrainingLimits): TrainingRuling {
-    if (results == null) return TrainingRuling.NeedsKeeper(TrainingKeeperWhy.NoReadableResults)
+    if (needsKeeper(Situation.Ruling(readable = results != null)) != null || results == null) {
+        return TrainingRuling.NeedsKeeper(TrainingKeeperWhy.NoReadableResults)
+    }
     fun ruled(call: TrainingCall, reason: String, fact: String) = TrainingRuling.Ruled(NannyRuling(call, reason, fact, byModel = false))
     return when {
         overTrainingSpend(results, limits) -> ruled(TrainingCall.Stop, "The practice spend reached its limit. [f3]", "f3")

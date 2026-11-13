@@ -53,7 +53,7 @@ fun acceptRuling(dispute: Dispute, reply: String): DisputeOutcome.Ruled? {
 /** The rules' answer with no model: the only safe option when there is exactly one, else the keeper decides. */
 fun settleByRules(dispute: Dispute): DisputeOutcome {
     val safe = dispute.options.filter { it.safe }
-    return if (safe.size == 1) {
+    return if (needsKeeper(Situation.Disagreement(settled = safe.size == 1)) == null) {
         DisputeOutcome.Ruled(safe.single().id, "Only one option keeps every gate.", byModel = false)
     } else {
         DisputeOutcome.NeedsKeeper("No single safe option settles it.")

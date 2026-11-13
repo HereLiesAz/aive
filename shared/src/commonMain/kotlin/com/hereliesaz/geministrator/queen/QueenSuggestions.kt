@@ -328,6 +328,8 @@ internal fun queenAcceptRefused(
     if (!run.live()) return true
     val action = QueenAction.parse(proposal.action) ?: return true
     if (action.keepsForNextTime) return false
+    // What is the keeper's to change (a Source, a budget, an allowance) is never applied by her: she only leads to it.
+    action.keeperSituation()?.let { if (needsKeeper(it) != null) return true }
     if (!action.appliesHere) return true
     val task = definition.tasks.firstOrNull { it.id.value == proposal.target }
     val stale = candidates != null && action != QueenAction.RewordStep &&
