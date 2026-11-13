@@ -38,6 +38,8 @@ internal object MemoryDeliberationAbsorber {
             .filter { it.kind != MemoryNodeKind.Deliberation }
         // Only a resolved contrast is absorbed: something other than the chosen memory must be cited.
         if (cited.none { it.id != chosen.id }) return MemoryStoreMutation()
+        // The memory judged correct must itself be one the deliberation cited.
+        if (cited.none { it.id == chosen.id }) return MemoryStoreMutation()
 
         fun currentVersions(id: MemoryNodeId): Set<MemoryNodeId> {
             val result = linkedSetOf<MemoryNodeId>()

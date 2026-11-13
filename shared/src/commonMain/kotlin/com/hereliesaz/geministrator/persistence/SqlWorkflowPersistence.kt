@@ -304,14 +304,17 @@ class SqlWorkflowPersistence(
     }
 
     private suspend fun writeProject(project: Project) {
+        guardOverwrite("project:${project.id.value}", Project.serializer()) { queries.project(project.id.value).awaitAsOneOrNull() }
         queries.upsertProject(project.id.value, project.encode(Project.serializer()))
     }
 
     private suspend fun writeDefinition(definition: WorkflowDefinition) {
+        guardOverwrite("definition:${definition.id.value}", WorkflowDefinition.serializer()) { queries.definition(definition.id.value).awaitAsOneOrNull() }
         queries.upsertDefinition(definition.id.value, definition.encode(WorkflowDefinition.serializer()))
     }
 
     private suspend fun writeRun(run: WorkflowRun) {
+        guardOverwrite("run:${run.id.value}", WorkflowRun.serializer()) { queries.run(run.id.value).awaitAsOneOrNull() }
         queries.upsertRun(run.id.value, run.projectId.value, run.updatedAtEpochMillis, run.encode(WorkflowRun.serializer()))
     }
 
@@ -320,10 +323,12 @@ class SqlWorkflowPersistence(
     }
 
     private suspend fun writeRole(role: RoleDefinition) {
+        guardOverwrite("role:${role.id.value}", RoleDefinition.serializer()) { queries.role(role.id.value).awaitAsOneOrNull() }
         queries.upsertRole(role.id.value, role.encode(RoleDefinition.serializer()))
     }
 
     private suspend fun writeArtifact(artifact: ArtifactRef) {
+        guardOverwrite("artifact:${artifact.id.value}", ArtifactRef.serializer()) { queries.artifact(artifact.id.value).awaitAsOneOrNull() }
         queries.upsertArtifact(
             artifact.id.value,
             artifact.taskRunId.value,
@@ -334,17 +339,30 @@ class SqlWorkflowPersistence(
 
     private suspend fun writeGate(gate: ApprovalGate) {
         val open = gate.status == ApprovalGateStatus.Pending || gate.status == ApprovalGateStatus.Applying
+        guardOverwrite("gate:${gate.id.value}", ApprovalGate.serializer()) { queries.gate(gate.id.value).awaitAsOneOrNull() }
         queries.upsertGate(gate.id.value, gate.workflowRunId.value, if (open) 1L else 0L, gate.createdAtEpochMillis, gate.encode(ApprovalGate.serializer()))
     }
 
     private fun <T> T.encode(serializer: KSerializer<T>): String = json.encodeToString(serializer, this)
+
+    /** Rows already checked or written this process, so a write reads the row it replaces only once. */
+    private val checkedBeforeWrite = HashSet<String>()
+
+    /**
+     * Before the first write to a row, quarantines the row it would replace if that cannot be decoded, so a write
+     * to an ID nothing has read yet cannot destroy the only copy of an unreadable payload.
+     */
+    private suspend fun <T> guardOverwrite(rowKey: String, serializer: KSerializer<T>, existing: suspend () -> String?) {
+        if (!checkedBeforeWrite.add(rowKey)) return
+        existing()?.decode(serializer)
+    }
 
     /** The decoded row, or null after quarantining a row that cannot be decoded. */
     private suspend fun <T> String.decode(serializer: KSerializer<T>): T? = try {
         json.decodeFromString(serializer, this)
     } catch (failure: Exception) {
         val kind = serializer.descriptor.serialName.substringAfterLast('.')
-        val key = "$QUARANTINE_PREFIX$kind:${hashCode().toUInt().toString(16)}"
+        val key = "$QUARANTINE_PREFIX$kind:${stableHash64(this)}"
         queries.putMeta(key, this)
         if (quarantinedRecords.none { it.key == key }) {
             quarantinedRecords = quarantinedRecords + QuarantinedRecord(key, kind, failure.message.orEmpty())
@@ -357,6 +375,16 @@ class SqlWorkflowPersistence(
             roles.isNotEmpty() || artifacts.isNotEmpty() || approvalGates.isNotEmpty()
 
     private companion object {
+        /** FNV-1a 64 over the payload, hex: wide enough that two different unreadable payloads do not share a key. */
+        fun stableHash64(text: String): String {
+            var hash = -0x340d631b7bdddcdbL
+            for (char in text) {
+                hash = hash xor char.code.toLong()
+                hash *= 0x100000001b3L
+            }
+            return hash.toULong().toString(16).padStart(16, '0')
+        }
+
         const val MIGRATED_FROM_SETTINGS = "migrated-from-settings"
         const val QUARANTINE_PREFIX = "quarantine:"
     }

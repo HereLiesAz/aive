@@ -2,7 +2,7 @@ package com.hereliesaz.geministrator
 
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsText
+import com.hereliesaz.geministrator.net.boundedBodyText
 import io.ktor.http.isSuccess
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
@@ -40,6 +40,14 @@ internal object DesktopPlannerModel {
     val downloadSizeLabel: String
         get() = "%.1f GB".format(DOWNLOAD_BYTES / (1024.0 * 1024.0 * 1024.0))
 }
+
+private val SAFE_ASSET_NAME = Regex("[A-Za-z0-9][A-Za-z0-9._-]{0,199}")
+private const val TRUSTED_DOWNLOAD_PREFIX = "https://github.com/HereLiesAz/aive/releases/download/"
+
+/** Whether a release asset may be fetched: a plain file name, and a download URL inside this project's releases. */
+internal fun isTrustedPlannerAsset(name: String, downloadUrl: String): Boolean =
+    SAFE_ASSET_NAME.matches(name) && ".." !in name &&
+        downloadUrl.startsWith(TRUSTED_DOWNLOAD_PREFIX) && downloadUrl.none { it.isWhitespace() }
 
 internal data class InstalledPlannerModel(
     val root: File,
@@ -139,14 +147,17 @@ internal class DesktopPlannerModelInstaller(
     private suspend fun loadReleaseAssets(): List<ReleaseAsset> {
         val response = httpClient.get(DesktopPlannerModel.RELEASE_API_URL)
         check(response.status.isSuccess()) { "Release metadata request failed: ${response.status}" }
-        val root = json.parseToJsonElement(response.bodyAsText()) as? JsonObject
+        val root = json.parseToJsonElement(response.boundedBodyText()) as? JsonObject
             ?: error("Release metadata is not a JSON object")
         val assets = root["assets"] as? JsonArray ?: error("Release metadata has no assets")
         return assets.mapNotNull { element ->
             val asset = element as? JsonObject ?: return@mapNotNull null
+            val name = asset["name"]?.jsonPrimitive?.content ?: return@mapNotNull null
+            val url = asset["browser_download_url"]?.jsonPrimitive?.content ?: return@mapNotNull null
+            if (!isTrustedPlannerAsset(name, url)) return@mapNotNull null
             ReleaseAsset(
-                name = asset["name"]?.jsonPrimitive?.content ?: return@mapNotNull null,
-                downloadUrl = asset["browser_download_url"]?.jsonPrimitive?.content ?: return@mapNotNull null,
+                name = name,
+                downloadUrl = url,
                 digest = asset["digest"]?.jsonPrimitive?.content,
                 size = asset["size"]?.jsonPrimitive?.content?.toLongOrNull(),
             )
@@ -168,7 +179,7 @@ internal class DesktopPlannerModelInstaller(
     private suspend fun downloadText(url: String): String {
         val response = httpClient.get(url)
         check(response.status.isSuccess()) { "Download failed: ${response.status}" }
-        return response.bodyAsText()
+        return response.boundedBodyText()
     }
 
     private fun sha256(file: File): String {

@@ -4,7 +4,7 @@ import java.util.Base64
 import io.ktor.client.HttpClient
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsText
+import com.hereliesaz.geministrator.net.boundedBodyText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import java.security.MessageDigest
@@ -51,7 +51,7 @@ internal class AndroidOpenRouterAccountAuthorization(
         check(response.status.value in 200..299) {
             "OpenRouter authorization failed (HTTP ${response.status.value}); start sign-in again"
         }
-        return Json.parseToJsonElement(response.bodyAsText()).jsonObject["key"]
+        return Json.parseToJsonElement(response.boundedBodyText()).jsonObject["key"]
             ?.jsonPrimitive?.content
             ?.takeIf { it.startsWith("sk-or-") }
             ?: error("OpenRouter did not issue a valid account credential")

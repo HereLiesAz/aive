@@ -121,7 +121,7 @@ class RelayNodeIdentityTest {
         relay.register(node("keeper"), keeperPeer)
         relay.register(node("rogue"), roguePeer)
 
-        relay.revoke("keeper", "rogue")
+        relay.revoke("keeper", "rogue", ownerAuthority = true)
 
         // Its live session is told and closed, and the others see it leave.
         assertTrue(roguePeer.messages.any { it is ComputeRelayServerMessage.Error && it.code == ComputeNodeAuth.ERROR_NODE_REVOKED })
@@ -137,9 +137,27 @@ class RelayNodeIdentityTest {
         assertEquals(ComputeNodeAuth.ERROR_NODE_REVOKED, reEnrol.code)
         assertFailsWith<NodeRevokedException> { relay.register(node("rogue"), RecordingPeer()) }
 
-        // A revoked node cannot revoke, and nobody can revoke themselves.
+        // A revoked node cannot revoke.
         assertFailsWith<IllegalStateException> { relay.revoke("rogue", "keeper") }
-        assertFailsWith<IllegalArgumentException> { relay.revoke("keeper", "keeper") }
+    }
+
+    @Test
+    fun aNodeRevokesOnlyItselfAndOnlyTheOwnerRevokesOthersOrReEnrols(): Unit = runBlocking {
+        val relay = RelayPool(pool, nowEpochMillis = { now })
+        val keeper = TestSigner()
+        val rogue = TestSigner()
+        relay.enrol(enrolment(keeper, "keeper"))
+        relay.enrol(enrolment(rogue, "rogue"))
+
+        assertFailsWith<IllegalStateException> { relay.revoke("rogue", "keeper") }
+        assertEquals(NodeAuthentication.Authenticated, relay.authenticateWith(keeper, "keeper"))
+
+        relay.revoke("rogue", "rogue")
+        assertEquals(NodeAuthentication.Revoked, relay.authenticateWith(rogue, "rogue"))
+        assertFailsWith<NodeEnrolmentException> { relay.enrol(enrolment(rogue, "rogue")) }
+
+        relay.enrol(enrolment(rogue, "rogue"), ownerAuthority = true)
+        assertEquals(NodeAuthentication.Authenticated, relay.authenticateWith(rogue, "rogue"))
     }
 
     @Test
@@ -160,7 +178,7 @@ class RelayNodeIdentityTest {
         relay.publish("worker", published)
         relay.claim("other", published.leaseId)
 
-        relay.revoke("keeper", "worker")
+        relay.revoke("keeper", "worker", ownerAuthority = true)
 
         assertTrue(keeper.messages.any { it is ComputeRelayServerMessage.LeaseRequeued && it.leaseId == "held" })
         assertTrue(other.messages.any { it is ComputeRelayServerMessage.LeaseCancelled && it.leaseId == "published" })
@@ -210,7 +228,7 @@ class RelayNodeIdentityTest {
         val before = RelayPool(pool, nowEpochMillis = { now }, stateStore = EncryptedFileRelayStateStore(directory, "token"))
         before.enrol(enrolment(keeper, "keeper"))
         before.enrol(enrolment(rogue, "rogue"))
-        before.revoke("keeper", "rogue")
+        before.revoke("keeper", "rogue", ownerAuthority = true)
 
         val after = RelayPool(pool, nowEpochMillis = { now }, stateStore = EncryptedFileRelayStateStore(directory, "token"))
 

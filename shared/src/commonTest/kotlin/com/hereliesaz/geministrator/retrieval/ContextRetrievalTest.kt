@@ -48,6 +48,29 @@ class ContextRetrievalTest {
     }
 
     @Test
+    fun whenNothingReachesTheThresholdTheBestFewAreKept() = runBlocking {
+        val source = ContextChunkSource {
+            listOf(
+                TextChunk("a", "A", "zebra quartz"),
+                TextChunk("b", "B", "yak vortex"),
+                TextChunk("c", "C", "xenon whale"),
+                TextChunk("d", "D", "walrus ember"),
+            )
+        }
+        val hits = SimilarityContextRetriever(listOf(source), minSimilarity = 0.99f).retrieve(request("teach me this app"))
+        assertEquals(3, hits.size)
+        assertTrue(SimilarityContextRetriever(listOf(source), minSimilarity = 0.99f, floorChunks = 0).retrieve(request("teach me this app")).isEmpty())
+    }
+
+    @Test
+    fun orientationFilesAlwaysScoreButNestedDocsDoNot() {
+        assertTrue(GitHubRepositoryChunkSource.pathScore("README.md", emptySet()) > 0)
+        assertTrue(GitHubRepositoryChunkSource.pathScore("docs/Swarm-OS.md", emptySet()) > 0)
+        assertEquals(0, GitHubRepositoryChunkSource.pathScore("docs/deep/Page.md", emptySet()))
+        assertEquals(0, GitHubRepositoryChunkSource.pathScore("src/Util.kt", emptySet()))
+    }
+
+    @Test
     fun vectorCacheEvictsTheLeastRecentlyUsedText() = runBlocking {
         val builtIn = BuiltInTextEmbedder()
         val embedded = mutableListOf<String>()

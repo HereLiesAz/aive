@@ -155,7 +155,8 @@ internal object CrashReporting {
                 }
             }.getOrDefault(-1)
             if (status in 200..299) return Outcome.Sent
-            if (status in 400..499 && status != 429) return Outcome.Rejected
+            // Only a report the gateway will never accept is dropped; other 4xx answers are kept and retried.
+            if (status == 410 || status == 413) return Outcome.Rejected
         }
         return Outcome.Failed
     }

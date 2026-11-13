@@ -19,6 +19,7 @@ import com.hereliesaz.geministrator.resources.hive_delete_failed
 import com.hereliesaz.geministrator.resources.hive_delete_keep
 import com.hereliesaz.geministrator.resources.hive_delete_refused_circuit
 import com.hereliesaz.geministrator.resources.hive_delete_refused_live
+import com.hereliesaz.geministrator.resources.hive_delete_open_store
 import com.hereliesaz.geministrator.resources.hive_delete_refused_package
 import com.hereliesaz.geministrator.resources.hive_delete_refused_unknown
 import com.hereliesaz.geministrator.resources.hive_delete_title
@@ -99,6 +100,9 @@ internal fun DeleteHiveControl(
     val scope = rememberCoroutineScope()
     var confirming by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
+    // A package's swarm is removed in the Store: the refusal says so and links there.
+    var fromPackage by remember { mutableStateOf(false) }
+    val openPlace = LocalPlaceLinks.current.openPlace
     val refusalText: suspend (HiveDeleteRefusal) -> String = { reason ->
         getString(
             when (reason) {
@@ -116,12 +120,16 @@ internal fun DeleteHiveControl(
             tone = PillTone.Danger,
             onClick = {
                 message = null
+                fromPackage = false
                 scope.launch {
                     runCatching { actions.check() }
                         .onSuccess { verdict ->
                             when (verdict) {
                                 HiveDeleteVerdict.Allowed -> confirming = true
-                                is HiveDeleteVerdict.Refused -> message = refusalText(verdict.reason)
+                                is HiveDeleteVerdict.Refused -> {
+                                    fromPackage = verdict.reason == HiveDeleteRefusal.FromPackage
+                                    message = refusalText(verdict.reason)
+                                }
                             }
                         }
                         .onFailure { message = getString(Res.string.hive_delete_failed) }
@@ -129,6 +137,12 @@ internal fun DeleteHiveControl(
             },
         )
         message?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface()) }
+        if (fromPackage && message != null) {
+            LinkText(
+                stringResource(Res.string.hive_delete_open_store),
+                onClick = openPlace?.let { open -> { open(ControlRoomDestination.AddOns) } },
+            )
+        }
     }
     if (confirming) {
         AzphaltAlertDialog(
@@ -233,7 +247,7 @@ internal fun HiveDeleteRequest(
 internal fun deletedHiveStandIn(run: WorkflowRun): WorkflowDefinition = WorkflowDefinition(
     id = run.workflowDefinitionId,
     name = DELETED_HIVE_NAME,
-    description = "This hive was deleted. Its runs stay in history and can be viewed, not resumed.",
+    description = "This swarm was deleted. Its runs stay in history and can be viewed, not resumed.",
     tasks = run.taskRuns.values.map { taskRun ->
         com.hereliesaz.geministrator.domain.TaskDefinition(
             id = taskRun.taskDefinitionId,
@@ -245,4 +259,4 @@ internal fun deletedHiveStandIn(run: WorkflowRun): WorkflowDefinition = Workflow
     },
 )
 
-internal const val DELETED_HIVE_NAME = "Deleted hive"
+internal const val DELETED_HIVE_NAME = "Deleted swarm"

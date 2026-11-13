@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.distributed
 
+import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.ScriptRunner
 import com.hereliesaz.geministrator.domain.TaskExecutor
@@ -110,12 +111,12 @@ class SystemExecutorDistributedWorkloadRunner(
             when (execution.status) {
                 TaskRunStatus.Completed -> return DistributedExecutionResult(
                     status = TaskRunStatus.Completed,
-                    artifacts = execution.artifacts,
+                    artifacts = execution.artifacts.map(::withoutLocalPaths),
                     progressMessage = execution.progressMessage,
                 )
                 TaskRunStatus.Failed -> return DistributedExecutionResult(
                     status = TaskRunStatus.Failed,
-                    artifacts = execution.artifacts,
+                    artifacts = execution.artifacts.map(::withoutLocalPaths),
                     progressMessage = execution.progressMessage,
                     failureMessage = execution.progressMessage ?: "Remote executor failed",
                 )
@@ -163,6 +164,9 @@ class SystemExecutorDistributedWorkloadRunner(
             )
             if (decision.isDenied) return decision.reason
         }
+        // Dispatching workflows runs code with the keeper's repository token, and the approval in
+        // the envelope cannot be verified here, so remote leases of these executors are refused.
+        remoteLeaseExecutorRefusal(delegate)?.let { return it }
         if (delegate.usesRepositoryCredentials()) {
             val repository = envelope.project.repository ?: return "the project has no linked repository"
             if (trustedRepositories().none { it.sameRepositoryAs(repository) }) {
@@ -192,6 +196,16 @@ class SystemExecutorDistributedWorkloadRunner(
         progressMessage = execution.progressMessage ?: progressMessage,
     )
 }
+
+/** Executors that spend the keeper's repository token on workflow dispatch never run for a remote lease. */
+internal fun remoteLeaseExecutorRefusal(delegate: TaskExecutor): String? =
+    if (delegate is TaskExecutor.GitHubAction ||
+        (delegate is TaskExecutor.Script && delegate.runner is ScriptRunner.GitHubActions)
+    ) {
+        "GitHub Actions work needs the keeper's approval on the origin device"
+    } else {
+        null
+    }
 
 /**
  * Returns why a claimed worker must stop executing, or null while it still owns a live lease.
@@ -342,3 +356,16 @@ class DistributedComputeWorker(
         }
     }
 }
+
+/**
+ * Artifacts that leave this device for a remote requester report file names, never absolute local paths. Local runs
+ * keep the full path (the test runner reads a worktree's path); only results sent back over a lease are scrubbed.
+ */
+internal fun withoutLocalPaths(artifact: ArtifactRef): ArtifactRef =
+    artifact.copy(metadata = artifact.metadata.mapValues { (_, value) -> scrubLocalPaths(value) })
+
+internal fun scrubLocalPaths(value: String): String =
+    value.split(' ').joinToString(" ") { token ->
+        val absolute = token.startsWith("/") || (token.length > 2 && token[1] == ':' && (token[2] == '/' || token[2] == '\\') && token[0].isLetter())
+        if (absolute) token.substringAfterLast('/').substringAfterLast('\\') else token
+    }

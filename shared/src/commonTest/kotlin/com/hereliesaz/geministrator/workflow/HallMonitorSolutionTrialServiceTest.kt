@@ -84,6 +84,11 @@ class HallMonitorSolutionTrialServiceTest {
         assertTrue(packet.instruction.contains("baseline", ignoreCase = true))
         assertTrue(packet.instruction.contains("Do not merge", ignoreCase = true))
         assertTrue(packet.artifacts.any { it.contains("Test narrower routing") })
+        assertTrue(packet.artifacts.all { it.startsWith("UNTRUSTED QUOTED DATA") })
+        // The plan waits behind an approval gate: every step without a dependency depends on it.
+        val gate = trialDefinition.tasks.first()
+        assertTrue(gate.executor is com.hereliesaz.geministrator.domain.TaskExecutor.HumanApproval)
+        assertTrue(trialDefinition.tasks.drop(1).all { it.dependsOn.isNotEmpty() })
     }
 
     @Test

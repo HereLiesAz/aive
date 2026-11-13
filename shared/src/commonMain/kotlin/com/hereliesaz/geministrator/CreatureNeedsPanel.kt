@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -96,10 +97,21 @@ private fun NeedMeter(label: String, value: Int?, color: Color, missing: String 
         verticalArrangement = Arrangement.spacedBy(5.dp),
         modifier = Modifier
             .semantics(mergeDescendants = true) { contentDescription = "$label, $shown" }
-            .then(if (onClick != null) Modifier.clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick) else Modifier),
+            .then(
+                if (onClick != null) {
+                    Modifier.defaultMinSize(minHeight = AzphaltMinTouchTarget)
+                        .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(label, style = AzphaltType.eyebrow, color = azphaltOnSurface())
+            // A meter that opens where it is changed is underlined, like every other link.
+            Text(
+                label, style = AzphaltType.eyebrow, color = azphaltOnSurface(),
+                textDecoration = if (onClick != null) androidx.compose.ui.text.style.TextDecoration.Underline else null,
+            )
             Text(shown, style = AzphaltType.body, color = azphaltOnSurface())
         }
         Box(

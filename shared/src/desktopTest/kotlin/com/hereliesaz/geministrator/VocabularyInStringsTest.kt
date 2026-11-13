@@ -7,20 +7,29 @@ import kotlin.test.assertTrue
 
 /**
  * The owner renamed five words in everything the keeper reads: Timeline -> Story, Provider -> Source,
- * Inbox -> Messages, Hall Monitor -> Nanny, Drifter -> Orphan (docs/Vocabulary.md). This scans the user-visible
+ * Inbox -> Messages, Hall Monitor -> Nanny, Drifter -> Orphan, the Build view of a swarm -> Edit, and workflow -> swarm (a swarm is the saved workflow, a hive is the goal; docs/Vocabulary.md). This scans the user-visible
  * string resources (every `values*` folder of the shared module and of the Android app) for the old words, like
  * [PlaceNamesInStringsTest]. Code identifiers, resource keys, persisted keys and protocol terms are not user text
  * and are not scanned: only the text between `<string ...>` and `</string>` is.
  */
 class VocabularyInStringsTest {
-    private val retired = Regex("""\b(timelines?|providers?|inbox(es)?|hall[ -]monitors?|drifters?)\b""", RegexOption.IGNORE_CASE)
+    private val retired = Regex("""\b(timelines?|providers?|inbox(es)?|hall[ -]monitors?|drifters?|build|workflows?)\b""", RegexOption.IGNORE_CASE)
 
     /**
-     * Resource name -> why the old word legitimately stays in that string. Empty today: every use in the
-     * resources named the app's own concept, so all were renamed. Add an entry only for a word that names
+     * Resource name -> why the old word legitimately stays in that string. Add an entry only for a word that names
      * something else (an external product's own term, a protocol field the keeper must type), and say why.
      */
-    private val allowed: Map<String, String> = emptyMap()
+    private val allowed: Map<String, String> = mapOf(
+        // "build" as an ordinary verb or a build version, never the view of a swarm (which is Edit).
+        "district_empty" to "verb: build a swarm",
+        "hive_new_build_title" to "verb: build it yourself (the tray of roles)",
+        "hive_new_build_title_only" to "verb: build it yourself (the tray of roles)",
+        "prompt_starter_swarm" to "verb: the starter prompt asks the swarm to build and review code",
+        "memory_memory_is_not_available_in_this" to "the app's build version",
+        // "workflow" as GitHub's own term: a GitHub Actions workflow file the keeper names.
+        "swarm_the_workflow_receives_the_role_task" to "a GitHub Actions workflow (GitHub's term)",
+        "swarm_workflow_file_or_id" to "a GitHub Actions workflow file or id (GitHub's term)",
+    )
 
     private val stringElement = Regex("""<string\s+name="([^"]+)"[^>]*>(.*?)</string>""", RegexOption.DOT_MATCHES_ALL)
 

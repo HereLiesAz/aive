@@ -84,4 +84,33 @@ class LocalRepositoryChunkSourceTest {
             root.deleteRecursively()
         }
     }
+
+    @Test
+    fun aRequestThatNamesNoFileStillFindsTheReadmeAndTheDocs() = runBlocking {
+        val root = Files.createTempDirectory("aive-local-orientation").toFile()
+        try {
+            git(root, "init", "-q")
+            git(root, "config", "user.email", "t@example.invalid")
+            git(root, "config", "user.name", "T")
+            File(root, "docs").mkdirs()
+            File(root, "src").mkdirs()
+            File(root, "README.md").writeText("# Aive\n\nA hive of agents that the keeper feeds goals.")
+            File(root, "docs/Keepers-Room.md").writeText("The Keeper's room is where everything that sets the hive up lives.")
+            File(root, "docs/deep").mkdirs()
+            File(root, "docs/deep/Nested.md").writeText("Nested page, not an orientation file.")
+            File(root, "src/Util.kt").writeText("class Util")
+            git(root, "add", ".")
+            git(root, "commit", "-q", "-m", "one")
+
+            val hits = SimilarityContextRetriever(listOf(LocalRepositoryChunkSource(GitCliRepositoryReader)))
+                .retrieve(request(root, "Teach me the ins and outs of this app"))
+
+            val labels = hits.map { it.chunk.label }
+            assertTrue(labels.any { "README.md" in it }, labels.toString())
+            assertTrue(labels.any { "docs/Keepers-Room.md" in it }, labels.toString())
+            assertTrue(labels.none { "Nested.md" in it || "Util.kt" in it }, labels.toString())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
 }
