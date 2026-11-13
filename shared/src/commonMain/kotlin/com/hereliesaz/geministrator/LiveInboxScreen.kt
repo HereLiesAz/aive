@@ -72,6 +72,7 @@ import com.hereliesaz.geministrator.resources.inbox_action_answer
 import com.hereliesaz.geministrator.resources.inbox_artifact_waiting
 import com.hereliesaz.geministrator.resources.inbox_budget_where
 import com.hereliesaz.geministrator.resources.inbox_kind_budget
+import com.hereliesaz.geministrator.resources.inbox_open_creature
 import com.hereliesaz.geministrator.resources.inbox_kind_escalation
 import com.hereliesaz.geministrator.resources.inbox_kind_nested
 import com.hereliesaz.geministrator.resources.inbox_kind_plan
@@ -637,6 +638,14 @@ private fun WaitDetail(
             color = azphaltMutedOnSurface(),
             modifier = Modifier.widthIn(max = 530.dp),
         )
+        // Every message points at the creature it is about, where it can be seen and changed.
+        if (entry.kind != InboxEntryKind.Question) {
+            LinkText(
+                stringResource(Res.string.inbox_open_creature),
+                onClick = { actions.openCreature(entry.taskId, CreatureTab.Needs) },
+                modifier = Modifier.widthIn(max = 530.dp),
+            )
+        }
         QueenSays(presentation.queen.filter { it.attachedTo == entry.key }, actions, showLink = false, onSelect = onSelect)
         if (entry.kind == InboxEntryKind.Escalation && !isPlainReason(taskRun.blockingReason?.message)) {
             ErrorDetailsToggle(raw = taskRun.blockingReason?.message, seed = "inbox-${entry.taskId}", modifier = Modifier.widthIn(max = 530.dp))
@@ -662,7 +671,7 @@ private fun WaitDetail(
         }
     }
     Spacer(Modifier.height(11.dp))
-    MessageActionRow(entry, actions, onConfirm)
+    MessageActionRow(entry, actions, onConfirm, taskRun.assignedRoleId?.value)
 }
 
 /**
@@ -727,8 +736,10 @@ private fun MessageActionRow(
     entry: InboxEntry,
     actions: MessageActions,
     onConfirm: (Pair<String, Boolean>) -> Unit,
+    roleId: String? = null,
 ) {
     val id = entry.taskId
+    val openRole = LocalPlaceLinks.current.openRole
     val buttons = messageActions(entry.kind)
     if (buttons.isEmpty()) return
     Row(Modifier.widthIn(max = 440.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -739,7 +750,8 @@ private fun MessageActionRow(
                 MessageAction.Retry -> ({ actions.resolveEscalation(id, true) })
                 MessageAction.Stop -> ({ onConfirm(id to true) })
                 MessageAction.Answer -> ({ actions.openCreature(id, CreatureTab.Needs) })
-                MessageAction.RaiseBudget -> ({ actions.openCreature(id, CreatureTab.Mind) })
+                // The budget is the role's: the button goes to where it is changed, the creature's Mind only when there is no Roster link.
+                MessageAction.RaiseBudget -> ({ if (roleId != null && openRole != null) openRole(roleId) else actions.openCreature(id, CreatureTab.Mind) })
             }
             // The first button is the main one, filled; the other is outlined.
             InboxAction(messageActionLabel(action), index == 0, onClick, Modifier.weight(1f))

@@ -87,10 +87,11 @@ internal fun HallMonitorPauseDetail(
                         )
                     } else {
                         report.findings.forEach { finding ->
-                            Text(
+                            // What it is about opens where that is changed (its models, roles, swarms or memory).
+                            LinkText(
                                 "${plainScope(finding.scope)} · ${finding.subject}".uppercase(),
+                                onClick = LocalPlaceLinks.current.openScopePlace(nannyScopePlace(finding.scope)),
                                 style = AzphaltType.eyebrow,
-                                color = azphaltOnSurface(),
                             )
                             Text(
                                 finding.observation,

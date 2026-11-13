@@ -318,8 +318,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inbox_kind_budget">Budget spent</string>
     <string name="inbox_artifact_waiting">Artifact waiting</string>
     <string name="inbox_action_answer">Answer it</string>
-    <string name="inbox_question_where">Its agent asked you a question. Answer it on this creature’s Needs, in the hive.</string>
-    <string name="inbox_budget_where">Raise it on this creature’s Mind, in the hive.</string>
+    <string name="inbox_open_creature">Open this creature</string>
+    <string name="inbox_question_where">Its agent asked you a question. Answer it on this creature’s Needs.</string>
+    <string name="inbox_budget_where">Raise it on this creature’s role, in the Roster.</string>
 
     <string name="inspector_excluded_by_redaction_policy">, %1$s excluded by redaction policy</string>
     <string name="inspector_any_capable_provider">any capable source</string>
@@ -554,7 +555,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="schedule_add_film">Add the short-film swarm (desktop)</string>
     <string name="schedule_film_added">Added the short-film swarm to your swarms. It needs the desktop app, an OpenAI connection and ffmpeg, and it is never scheduled.</string>
     <string name="schedule_film_present">The short-film swarm is already on this device.</string>
-    <string name="schedule_none">No schedules yet. Add the coding suite for six that report while the app is open, or set one up from any swarm.</string>
+    <string name="schedule_open_hive">Open its hive</string>
+    <string name="schedule_none">No schedules yet. Add the coding suite for six that report while the app is open.</string>
     <string name="schedule_on">On</string>
     <string name="schedule_off">Off</string>
     <string name="schedule_run_now">Run now</string>
@@ -636,13 +638,15 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_draft_adopted">Using %1$s: %2$d creatures. Undo takes them out again.</string>
     <string name="hive_draft_retry">Try again</string>
     <string name="hive_draft_problem_no_prompt">Say what the swarm is for first.</string>
-    <string name="hive_draft_problem_no_roles">No creatures are switched on to draft with. Switch some on in the Roster.</string>
+    <string name="hive_draft_problem_no_roles">No creatures are switched on to draft with.</string>
+    <string name="hive_draft_fix_roster">Switch creatures on in the Roster</string>
+    <string name="hive_draft_fix_sources">Link a source in Connections</string>
     <string name="hive_draft_problem_empty">The keeper came back with nothing. Try again, or say a little more.</string>
     <string name="hive_draft_problem_too_many">The keeper proposed more than %1$d creatures. Try a smaller job, or draft it in parts.</string>
     <string name="hive_draft_problem_unknown_role">The keeper chose a creature this swarm does not have. Try again.</string>
     <string name="hive_draft_problem_cycle">The keeper had creatures waiting on each other in a loop. Try again.</string>
     <string name="hive_draft_problem_unreadable">The keeper’s answer could not be read. Try again.</string>
-    <string name="hive_draft_unavailable">No queen is linked to draft with. Link a source in the Keeper’s room.</string>
+    <string name="hive_draft_unavailable">No queen is linked to draft with.</string>
     <string name="hive_not_yet_run">Not yet run</string>
     <string name="hive_objective">Objective for the next run</string>
     <string name="hive_repository">Repository: owner/repo or URL</string>
@@ -853,7 +857,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_delete_keep">Keep it</string>
     <string name="hive_delete_refused_live">A run of this swarm is live. Delete is back when it stops.</string>
     <string name="hive_delete_refused_circuit">Another swarm uses this one as a circuit, so it stays. Nothing was deleted.</string>
-    <string name="hive_delete_refused_package">This swarm came from a package. Remove the package in the Store instead. Nothing was deleted.</string>
+    <string name="hive_delete_refused_package">This swarm came from a package, so it goes when the package is removed. Nothing was deleted.</string>
+    <string name="hive_delete_open_store">Open the Store</string>
     <string name="hive_delete_refused_unknown">This swarm is already gone.</string>
     <string name="hive_delete_failed">The swarm could not be deleted. Nothing was changed.</string>
     <string name="build_knot_on_success">On success</string>

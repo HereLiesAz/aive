@@ -376,6 +376,8 @@ internal fun ConnectionRow(
     compact: Boolean,
     /** Makes the detail line a link to where it can be changed (a row's source, its role); null leaves it plain. */
     onDetailClick: (() -> Unit)? = null,
+    /** Makes the row's name a link to the thing it names (a role's form in the Roster, a hive); null leaves it plain. */
+    onNameClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     actions: @Composable () -> Unit,
 ) {
@@ -398,7 +400,7 @@ internal fun ConnectionRow(
                 val wide = !compact && maxWidth > 620.dp
                 if (wide) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Column(Modifier.width(170.dp)) { ConnectionName(name) }
+                        Column(Modifier.width(170.dp)) { ConnectionName(name, onNameClick) }
                         Column(Modifier.weight(1f)) { detail?.let { ConnectionDetail(it, onDetailClick) } }
                         status?.let { ConnectionStatus(it) }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { actions() }
@@ -406,7 +408,7 @@ internal fun ConnectionRow(
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.weight(1f)) { ConnectionName(name) }
+                            Box(Modifier.weight(1f)) { ConnectionName(name, onNameClick) }
                             status?.let { ConnectionStatus(it) }
                         }
                         detail?.let { ConnectionDetail(it, onDetailClick) }
@@ -419,7 +421,8 @@ internal fun ConnectionRow(
 }
 
 @Composable
-private fun ConnectionName(name: String) = Text(name, style = AzphaltType.lead, color = azphaltOnSurface())
+private fun ConnectionName(name: String, onClick: (() -> Unit)? = null) =
+    LinkText(name, onClick, style = AzphaltType.lead)
 
 @Composable
 private fun ConnectionDetail(detail: String, onClick: (() -> Unit)? = null) = LinkText(detail, onClick)

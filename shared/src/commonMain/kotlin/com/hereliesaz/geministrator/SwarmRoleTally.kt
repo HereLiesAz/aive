@@ -23,12 +23,20 @@ private fun TaskDefinition.roleIds(): Set<RoleDefinitionId> = setOfNotNull(
 )
 
 /**
- * How many hives (saved workflow definitions) give at least one task to each role. A role in no hive
- * is absent from the map; a hive counts once however many of its tasks the role holds.
+ * The hives (saved workflow definitions) that give at least one task to each role, in the order given. A role in no
+ * hive is absent from the map; a hive is listed once however many of its tasks the role holds. The Roster lists them
+ * as links, and [roleHiveCounts] counts them.
  */
+internal fun roleHives(definitions: Collection<WorkflowDefinition>): Map<RoleDefinitionId, List<WorkflowDefinition>> {
+    val byRole = linkedMapOf<RoleDefinitionId, MutableList<WorkflowDefinition>>()
+    definitions.distinctBy { it.id }.forEach { definition ->
+        definition.tasks.flatMapTo(mutableSetOf()) { it.roleIds() }.forEach { roleId ->
+            byRole.getOrPut(roleId) { mutableListOf() }.add(definition)
+        }
+    }
+    return byRole
+}
+
+/** How many hives give at least one task to each role (see [roleHives]). */
 internal fun roleHiveCounts(definitions: Collection<WorkflowDefinition>): Map<RoleDefinitionId, Int> =
-    definitions
-        .distinctBy { it.id }
-        .flatMap { definition -> definition.tasks.flatMapTo(mutableSetOf()) { it.roleIds() } }
-        .groupingBy { it }
-        .eachCount()
+    roleHives(definitions).mapValues { it.value.size }

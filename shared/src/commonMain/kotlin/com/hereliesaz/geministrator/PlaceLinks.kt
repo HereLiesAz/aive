@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextDecoration
+import com.hereliesaz.geministrator.domain.HallMonitorScope
 
 /**
  * An address the Connect remote agent form should open with, handed over by a link elsewhere (a hive card that
@@ -67,6 +68,54 @@ internal fun openConnectionsPlace(
     onDestinationSelected(ControlRoomDestination.Settings)
 }
 
+/** The place a Nanny finding's scope is changed in. */
+internal enum class ScopePlace { Sources, Roster, Swarms, Memory }
+
+/** Where the thing a Nanny finding is about can be changed: its models in Connections, its roles in the Roster, and so on. */
+internal fun nannyScopePlace(scope: HallMonitorScope): ScopePlace = when (scope) {
+    HallMonitorScope.Model -> ScopePlace.Sources
+    HallMonitorScope.Role -> ScopePlace.Roster
+    HallMonitorScope.Workflow -> ScopePlace.Swarms
+    HallMonitorScope.Swarm -> ScopePlace.Swarms
+    HallMonitorScope.OrchestrationLayer -> ScopePlace.Roster
+    HallMonitorScope.MemoryLayer -> ScopePlace.Memory
+}
+
+/** The link that opens [place], or null when this screen has no [PlaceLinks]. */
+internal fun PlaceLinks.openScopePlace(place: ScopePlace): (() -> Unit)? = when (place) {
+    ScopePlace.Sources -> openConnections?.let { open -> { open(null) } }
+    ScopePlace.Roster -> openPlace?.let { open -> { open(ControlRoomDestination.Company) } }
+    ScopePlace.Swarms -> openPlace?.let { open -> { open(ControlRoomDestination.Workflows) } }
+    ScopePlace.Memory -> openPlace?.let { open -> { open(ControlRoomDestination.Memory) } }
+}
+
+/** The Keeper's room opened on one part (Schedules, Limits, Memory's neighbours...), not on whichever was left open. */
+internal fun openKeeperPartPlace(
+    section: KeeperSection,
+    keeperSectionName: MutableState<String>,
+    keeperOpen: MutableState<Boolean>,
+    onDestinationSelected: (ControlRoomDestination) -> Unit,
+) {
+    keeperSectionName.value = section.name
+    keeperOpen.value = true
+    onDestinationSelected(ControlRoomDestination.Settings)
+}
+
+/**
+ * The Hive place opened on one hive at rest (a schedule's hive, a role's hive): off the district, no resting hive
+ * but this one, back on the Hive destination.
+ */
+internal fun openHivePlace(
+    definitionId: String,
+    district: MutableState<Boolean>,
+    restingHive: MutableState<String>,
+    onDestinationSelected: (ControlRoomDestination) -> Unit,
+) {
+    district.value = false
+    restingHive.value = definitionId
+    onDestinationSelected(ControlRoomDestination.Overview)
+}
+
 /**
  * Links that any screen can follow without threading a callback through every parent (the nav map's "everything is a
  * link"). The ControlRoom provides them; a preview or test that provides none follows none, and its lines stay plain.
@@ -82,6 +131,12 @@ internal class PlaceLinks(
     val openDelegations: (() -> Unit)? = null,
     /** Opens the swarm editor (Edit view) of the hive on screen, the selected creature kept. */
     val openSwarmEditor: (() -> Unit)? = null,
+    /** Opens one hive on the Hive place, at rest unless it has a live run. */
+    val openHive: ((definitionId: String) -> Unit)? = null,
+    /** Opens the Keeper's room on one part. */
+    val openKeeperPart: ((KeeperSection) -> Unit)? = null,
+    /** Opens a whole place: the Roster, the Stable, the Store, Messages, the Swarm library. */
+    val openPlace: ((ControlRoomDestination) -> Unit)? = null,
 )
 
 internal val LocalPlaceLinks = staticCompositionLocalOf { PlaceLinks() }

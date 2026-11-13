@@ -5,6 +5,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import com.hereliesaz.geministrator.domain.HallMonitorScope
 
 /** The one route to Connections: every link to it, from any place, lands the same way. */
 class PlaceLinksTest {
@@ -50,5 +51,42 @@ class PlaceLinksTest {
         SwarmEditRequests.pending = true
         assertEquals(true, SwarmEditRequests.take())
         assertEquals(false, SwarmEditRequests.take())
+    }
+
+    @Test
+    fun aKeeperPartLinkOpensThatPartInTheKeepersRoom() {
+        val section = mutableStateOf(KeeperSection.Connections.name)
+        val open = mutableStateOf(false)
+        val opened = mutableListOf<ControlRoomDestination>()
+        openKeeperPartPlace(KeeperSection.Schedules, section, open) { opened += it }
+        assertEquals(KeeperSection.Schedules.name, section.value)
+        assertEquals(true, open.value)
+        assertEquals(listOf(ControlRoomDestination.Settings), opened)
+    }
+
+    @Test
+    fun aHiveLinkOpensThatHiveAtRestOffTheDistrict() {
+        val district = mutableStateOf(true)
+        val resting = mutableStateOf("")
+        val opened = mutableListOf<ControlRoomDestination>()
+        openHivePlace("nightly-audit", district, resting) { opened += it }
+        assertEquals(false, district.value)
+        assertEquals("nightly-audit", resting.value)
+        assertEquals(listOf(ControlRoomDestination.Overview), opened)
+    }
+
+    @Test
+    fun everyNannyScopeHasAPlaceAndALinkOnlyWhenTheRoomProvidesOne() {
+        HallMonitorScope.entries.forEach { scope ->
+            // The mapping is total: a new scope fails to compile until it is given a place.
+            val place = nannyScopePlace(scope)
+            assertNull(PlaceLinks().openScopePlace(place), "no links provided: the line stays plain")
+        }
+        val opened = mutableListOf<ControlRoomDestination>()
+        val links = PlaceLinks(openPlace = { opened += it })
+        links.openScopePlace(nannyScopePlace(HallMonitorScope.Role))?.invoke()
+        links.openScopePlace(nannyScopePlace(HallMonitorScope.MemoryLayer))?.invoke()
+        assertEquals(listOf(ControlRoomDestination.Company, ControlRoomDestination.Memory), opened)
+        assertEquals(ScopePlace.Sources, nannyScopePlace(HallMonitorScope.Model))
     }
 }
