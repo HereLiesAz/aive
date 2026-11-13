@@ -1335,6 +1335,9 @@ class ApplicationRuntime private constructor(
             spendCaps: () -> SpendCaps = { SpendCaps() },
             /** How much the queen tells the keeper in Messages (Keeper's room, This device); Quiet unless provided. */
             queenLevel: () -> com.hereliesaz.geministrator.queen.QueenLevel = { com.hereliesaz.geministrator.queen.QueenLevel.Quiet },
+            /** What this device's steps have taken, so the queen's Auto time allowance learns (Time allowed); keeps nothing unless provided. */
+            deadlineHistory: com.hereliesaz.geministrator.workflow.DeadlineHistory =
+                com.hereliesaz.geministrator.workflow.DeadlineHistory.None,
             /** Opt-in OTLP trace export of finished runs (docs/architecture/OBSERVABILITY.md); null exports nothing. */
             traceExport: com.hereliesaz.geministrator.telemetry.WorkflowTraceExport? = null,
             /** The keeper's approval habits (workflow/ProgressiveDelegation.kt); null leaves every gate asking. */
@@ -1394,15 +1397,25 @@ class ApplicationRuntime private constructor(
                     spendCaps = spendCaps,
                     deadlineAllowance = { task, taskRun ->
                         val provider = taskRun.assignedProviderId?.let(registry::provider)
+                        val kind = com.hereliesaz.geministrator.workflow.DeadlinePolicy
+                            .kindOf(taskRun.executor ?: task.executor, provider?.workKind)
                         com.hereliesaz.geministrator.workflow.DeadlinePolicy.resolveAuto(
-                            kind = com.hereliesaz.geministrator.workflow.DeadlinePolicy
-                                .kindOf(taskRun.executor ?: task.executor, provider?.workKind),
+                            kind = kind,
                             size = com.hereliesaz.geministrator.workflow.StepSize(
                                 contextTokens = task.objective.length / 4,
                                 upstreamArtifacts = task.dependsOn.size,
                             ),
                             source = com.hereliesaz.geministrator.workflow.SourceTrait(keyless = provider?.keyless == true),
+                            history = deadlineHistory.samples(kind),
                         )
+                    },
+                    deadlineSample = { task, taskRun, activeMillis ->
+                        val provider = taskRun.assignedProviderId?.let(registry::provider)
+                        val kind = com.hereliesaz.geministrator.workflow.DeadlinePolicy
+                            .kindOf(taskRun.executor ?: task.executor, provider?.workKind)
+                        if (com.hereliesaz.geministrator.workflow.DeadlinePolicy.isTimed(kind)) {
+                            deadlineHistory.record(kind, activeMillis)
+                        }
                     },
                 )
                 val nestedWorkflows = WorkflowRunNestedWorkflowClient(
