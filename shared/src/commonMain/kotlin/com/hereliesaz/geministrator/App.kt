@@ -70,6 +70,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.app_approval_failed
+import com.hereliesaz.geministrator.resources.app_done
+import com.hereliesaz.geministrator.resources.app_done_approved
+import com.hereliesaz.geministrator.resources.app_done_paused
+import com.hereliesaz.geministrator.resources.app_done_resumed
+import com.hereliesaz.geministrator.resources.app_done_spend_stop_lifted
 import com.hereliesaz.geministrator.resources.app_unreachable
 import com.hereliesaz.geministrator.resources.queen_suggest_nothing_changed
 import com.hereliesaz.geministrator.resources.app_clear_failed
@@ -95,6 +100,7 @@ import com.hereliesaz.geministrator.resources.app_workflow_delegation_failed
 import com.hereliesaz.geministrator.resources.app_workflow_launch_failed
 import com.hereliesaz.geministrator.resources.app_launch_already_in_progress
 import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun App(
@@ -202,6 +208,14 @@ fun App(
     // A press (Approve, Stop, Pause...) that did not go through. It is said once, on the screen, and dismissed:
     // it never replaces the hive's own state, which a failed button press says nothing about.
     var actionFailure by remember { mutableStateOf<ActionFailure?>(null) }
+    // One line, said once and cleared by itself, after a keeper's decision went through (the failures above stay until dismissed).
+    var actionDone by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(actionDone) {
+        if (actionDone != null) {
+            delay(4_000)
+            actionDone = null
+        }
+    }
     val providerReach by produceState(ProviderReach.Unknown, providers) { value = providerReach(providers) }
     val launchSteps = remember { LiveStepsFeedModel(maxRows = 5) }
     val launchStepRows by launchSteps.rows.collectAsState()
@@ -935,6 +949,7 @@ fun App(
                             scope.launch {
                                 try {
                                     runtime?.approveTask(TaskDefinitionId(taskId))
+                                    actionDone = getString(Res.string.app_done_approved)
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
@@ -957,6 +972,7 @@ fun App(
                             scope.launch {
                                 try {
                                     runtime?.liftSpendStop()
+                                    actionDone = getString(Res.string.app_done_spend_stop_lifted)
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
@@ -968,6 +984,7 @@ fun App(
                             scope.launch {
                                 try {
                                     runtime?.setKeeperPause(paused)
+                                    actionDone = getString(if (paused) Res.string.app_done_paused else Res.string.app_done_resumed)
                                 } catch (failure: CancellationException) {
                                     throw failure
                                 } catch (failure: Exception) {
@@ -1350,6 +1367,15 @@ fun App(
                         raw = failure.raw,
                         seed = "action",
                         onDismiss = { actionFailure = null },
+                        modifier = Modifier.align(Alignment.TopCenter).padding(AzphaltSpacing.m).widthIn(max = 560.dp),
+                    )
+                }
+                actionDone?.let { done ->
+                    AzphaltNote(
+                        seed = "action-done",
+                        label = stringResource(Res.string.app_done),
+                        value = done,
+                        onClick = { actionDone = null },
                         modifier = Modifier.align(Alignment.TopCenter).padding(AzphaltSpacing.m).widthIn(max = 560.dp),
                     )
                 }

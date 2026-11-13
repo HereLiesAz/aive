@@ -14,6 +14,11 @@
     <string name="addons_no_workflow_add_ons_are_installed">No swarm add-ons are installed. Open the Store to find and install one.</string>
     <string name="addons_storage_error">Storage error: %1$s</string>
 
+    <string name="app_done">Done</string>
+    <string name="app_done_approved">Approved. The creature carries on.</string>
+    <string name="app_done_paused">Paused. What is running finishes; nothing new starts.</string>
+    <string name="app_done_resumed">Resumed. The swarm carries on.</string>
+    <string name="app_done_spend_stop_lifted">Spend stop lifted. Runs can start again.</string>
     <string name="app_approval_failed">Approval failed</string>
     <string name="app_clear_failed">Clear failed</string>
     <string name="app_escalation_decision_failed">Escalation decision failed</string>
