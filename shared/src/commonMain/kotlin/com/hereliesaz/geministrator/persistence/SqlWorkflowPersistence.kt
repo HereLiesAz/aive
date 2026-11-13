@@ -210,11 +210,41 @@ class SqlWorkflowPersistence(
         val hadData = locked {
             val had = queries.allProjects().awaitAsList().isNotEmpty() ||
                 queries.allRuns().awaitAsList().isNotEmpty()
+            // Recovery clears the rows; copy every raw payload into `meta` first (it is never cleared), as
+            // quarantine does for one unreadable row, so the damaged data can still be inspected or repaired.
+            val kept = if (had) keepRowsAsideUnlocked() else 0
             database.transaction { clearUnlocked() }
+            if (kept > 0) {
+                lastRecoveryNote = "Recovery cleared the workflow store; $kept raw records were kept in the database's meta table under '$CORRUPT_PREFIX'."
+            }
             had
         }
         lastCorruptionError = null
         return hadData
+    }
+
+    /** What the last [recoverFromCorruption] kept aside before clearing, or null when it kept nothing. */
+    var lastRecoveryNote: String? = null
+        private set
+
+    /** Copies each row's raw payload into `meta` as `corrupt:<kind>:<hash>`; returns how many. Never throws for one bad read. */
+    private suspend fun keepRowsAsideUnlocked(): Int {
+        var kept = 0
+        suspend fun keep(kind: String, rows: suspend () -> List<String>) {
+            val payloads = try { rows() } catch (cancellation: CancellationException) { throw cancellation } catch (_: Exception) { return }
+            payloads.forEach { payload ->
+                queries.putMeta("$CORRUPT_PREFIX$kind:${stableHash64(payload)}", payload)
+                kept++
+            }
+        }
+        keep("Project") { queries.allProjects().awaitAsList() }
+        keep("WorkflowDefinition") { queries.allDefinitions().awaitAsList() }
+        keep("WorkflowRun") { queries.allRuns().awaitAsList() }
+        keep("WorkflowEvent") { queries.allEvents().awaitAsList() }
+        keep("RoleDefinition") { queries.allRoles().awaitAsList() }
+        keep("ArtifactRef") { queries.allArtifacts().awaitAsList() }
+        keep("ApprovalGate") { queries.allGates().awaitAsList() }
+        return kept
     }
 
     /**
@@ -387,6 +417,7 @@ class SqlWorkflowPersistence(
 
         const val MIGRATED_FROM_SETTINGS = "migrated-from-settings"
         const val QUARANTINE_PREFIX = "quarantine:"
+        const val CORRUPT_PREFIX = "corrupt:"
     }
 }
 
