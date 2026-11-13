@@ -85,6 +85,7 @@
     <string name="semantics_move_node_right">Move right</string>
     <string name="semantics_move_node_up">Move up</string>
     <string name="semantics_move_node_down">Move down</string>
+    <string name="semantics_flip_card">Flip</string>
     <string name="job_switch_on">On</string>
     <string name="job_switch_off">Off</string>
     <string name="job_approval_off_title">Stop asking you first?</string>
