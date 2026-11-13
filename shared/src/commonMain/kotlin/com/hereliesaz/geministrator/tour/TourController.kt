@@ -45,14 +45,22 @@ object TourController {
 
     fun dispatch(action: TourAction) {
         val before = state ?: return
-        val after = reduceTour(before, action)
-        state = after
+        replace(reduceTour(before, action))
+    }
+
+    /** Puts [next] in place of the current state (a check-in answer's whole transition), saving the position when it moved. */
+    fun replace(next: TourState) {
+        val before = state ?: return
+        state = next
         syncTracking()
         val key = runKey
-        if (key != null && after.index != before.index) {
-            safe { DurableUiState.store.putString(storageKey(key), TourProgressCodec.encode(after)) }
+        if (key != null && next.index != before.index) {
+            safe { DurableUiState.store.putString(storageKey(key), TourProgressCodec.encode(next)) }
         }
     }
+
+    /** The plan has [total] steps now (a step that could not be written is dropped, honestly). */
+    fun setTotal(total: Int) = dispatch(TourAction.SetTotal(total))
 
     /** The keeper's quick reply to the open check-in; the transition itself is [CheckInTransitions]. */
     fun reply(reply: CheckInReply) {
