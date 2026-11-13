@@ -278,6 +278,22 @@ fun ControlRoom(
     // closed. Selecting another creature (or none) forgets it; tapping it again reopens its panel.
     var panelSetAside by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(selectedTaskId) { panelSetAside = setAsideAfterSelection(selectedTaskId, panelSetAside) }
+    // Edit's card flip (CardFlip.kt), shared with the terrarium that turns the creatures and with the sheet (or
+    // docked panel) that shows the flipped card's detail. A flip selects its creature and brings its panel
+    // back; turning it back sets the panel aside, as closing it does.
+    val flipHost = remember { CardFlipHost() }
+    val flippedId = flipHost.state.flippedId
+    var lastFlipped by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(flippedId) {
+        val previous = lastFlipped
+        lastFlipped = flippedId
+        if (flippedId != null) {
+            if (panelSetAside == flippedId) panelSetAside = null
+            if (selectedTaskId != flippedId) onTaskSelected(flippedId)
+        } else if (previous != null && flipHost.editing) {
+            panelSetAside = previous
+        }
+    }
     val selectCreature: (String) -> Unit = { id ->
         if (reopensSetAsidePanel(id, panelSetAside)) {
             panelSetAside = null
@@ -297,7 +313,10 @@ fun ControlRoom(
     // Closing the panel (sheet dismissed, dock's close, Back) only sets it aside: the creature stays
     // selected, so the field keeps the zoom level it showed and its other levels stay one step away.
     // Tapping the creature again reopens it; tapping bare ground or another creature lets it go.
-    val closePanel: (String) -> Unit = { id -> panelSetAside = id }
+    val closePanel: (String) -> Unit = { id ->
+        panelSetAside = id
+        flipHost.send(CardFlipEvent.Back)
+    }
     // Built once and reading the latest callbacks, so providing it never recomposes everything under it.
     val latestOpenConnectionsAt by rememberUpdatedState(openConnectionsAt)
     val latestReconfigureProvider by rememberUpdatedState(onReconfigureProvider)
@@ -379,6 +398,8 @@ fun ControlRoom(
         panelSetAside = null
         creatureTabName = tab.name
         creatureTabTask = id
+        // From a flipped card's button: the sheet opens up to the creature's own tabs.
+        if (flipHost.editing) flipHost.send(CardFlipEvent.SheetExpanded)
         onDestinationSelected(ControlRoomDestination.Overview)
     }
     // The Inbox lists everything waiting on the keeper, every row leading to where it is resolved; the header's
@@ -494,6 +515,8 @@ fun ControlRoom(
     }
     // A docked panel has no sheet to dismiss: Back closes it first.
     PlatformBackHandler(enabled = inspectorVisible && !compact) { selectedTaskId?.let(closePanel) }
+    // Back turns a flipped card back to its creature first.
+    PlatformBackHandler(enabled = flipHost.editing && flippedId != null) { flipHost.send(CardFlipEvent.Back) }
     // An objective queued in the feed bar starts once its swarm finishes, wherever the keeper is.
     QueuedFeedLauncher(liveWorkflow, onLaunchWorkflow)
 
@@ -515,6 +538,23 @@ fun ControlRoom(
         LocalHiveFlowchartView provides flowchartView,
         LocalFlowchartLinks provides flowchartLinks,
         LocalPlaceLinks provides placeLinks,
+        LocalCardFlip provides flipHost,
+    ) {
+    // Edit on a phone: a flipped card's sheet shows itself at its peek and drags up to the creature's own sheet.
+    val flipSheetShown = compact && flipHost.editing && flippedId != null &&
+        creatureSheetAllowed(editing = true, flipped = true)
+    CardFlipSheetHost(
+        host = flipHost,
+        enabled = compact,
+        showSheet = flipSheetShown,
+        sheet = {
+            flippedId?.let { id ->
+                flipHost.detail?.invoke(id, Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+                if (inspectorVisible && selectedTaskId == id) {
+                    creaturePanel(id, Modifier.fillMaxWidth().fillMaxHeight(0.72f), false)
+                }
+            }
+        },
     ) {
     BoxWithConstraints(
         modifier = Modifier
@@ -653,7 +693,15 @@ fun ControlRoom(
                         .width(DockedCreaturePanelWidth)
                         .fillMaxHeight()
                         .clip(RoundedCornerShape(19.dp)),
-                ) { creaturePanel(taskId, Modifier.fillMaxSize(), true) }
+                ) {
+                    Column(Modifier.fillMaxSize()) {
+                        // In Edit the flipped card's detail leads the docked panel (no bottom sheet on a wide screen).
+                        if (flipHost.editing && flippedId == taskId) {
+                            flipHost.detail?.invoke(taskId, Modifier.padding(8.dp))
+                        }
+                        Box(Modifier.weight(1f).fillMaxWidth()) { creaturePanel(taskId, Modifier.fillMaxSize(), true) }
+                    }
+                }
             }
             }
         }
@@ -662,7 +710,8 @@ fun ControlRoom(
         // The once-per-streak offer to stop asking for a non-mutating gate (workflow/ProgressiveDelegation.kt).
         delegations?.let { DelegationOfferDialog(it) }
 
-        if (inspectorVisible && compact && creatureSheetAllowed(editing = flowchartView.value, flipped = false)) {
+        // Live keeps the creature's modal sheet; Edit's own sheet is the flipped card's (CardFlipSheetHost above).
+        if (inspectorVisible && compact && creatureSheetAllowed(editing = flipHost.editing, flipped = false)) {
             selectedTaskId?.let { taskId ->
                 ModalBottomSheet(
                     onDismissRequest = { closePanel(taskId) },
@@ -680,6 +729,7 @@ fun ControlRoom(
                 }
             }
         }
+    }
     }
     }
 }
