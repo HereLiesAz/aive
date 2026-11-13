@@ -39,6 +39,8 @@ internal fun SpendStopDetail(
     onOpenLimits: (() -> Unit)? = null,
     /** A phone: the caps sit under This device, not Limits, and the page says which. */
     compact: Boolean = false,
+    /** The queen's sentence on this row. */
+    says: @Composable () -> Unit = {},
 ) {
     val pause = presentation.run.spendPause ?: return
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -55,6 +57,7 @@ internal fun SpendStopDetail(
             endCap = stringResource(Res.string.spend_stop_stopped),
             well = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    says()
                     Text(stringResource(Res.string.spend_stop_how_to_lift, stringResource(spendLimitsSection(compact).title)), style = AzphaltType.body, color = azphaltOnSurface())
                     AzphaltPill(
                         label = stringResource(Res.string.spend_stop_lift),

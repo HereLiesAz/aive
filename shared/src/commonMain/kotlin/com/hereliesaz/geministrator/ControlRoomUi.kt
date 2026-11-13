@@ -1248,6 +1248,11 @@ private fun MainDestination(
                     compact = compact,
                     onNannyReview = onNannyReview,
                     onNannyTestSolution = onNannyTestSolution,
+                    onOpenStory = {
+                        showTimelineState.value = true
+                        onDestinationSelected(ControlRoomDestination.Overview)
+                    },
+                    onOpenRun = onSwitchRun,
                 )
                 ControlRoomDestination.Stable -> Column(
                     Modifier.fillMaxSize().verticalScroll(rememberScrollState())

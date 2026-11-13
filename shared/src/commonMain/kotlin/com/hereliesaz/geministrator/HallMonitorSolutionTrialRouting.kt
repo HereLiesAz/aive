@@ -68,7 +68,7 @@ internal fun decodeHallMonitorReportPayload(raw: String): HallMonitorReport {
     )
 }
 
-private val HallMonitorReportJson = Json {
+internal val HallMonitorReportJson = Json {
     ignoreUnknownKeys = true
     isLenient = true
 }

@@ -17,7 +17,7 @@ import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.hall_monitor_resume_workflow
 import com.hereliesaz.geministrator.resources.hall_monitor_approve_recommendations
-import com.hereliesaz.geministrator.resources.hall_monitor_your_review
+import com.hereliesaz.geministrator.resources.queen_review_line
 import com.hereliesaz.geministrator.resources.common_approve
 import com.hereliesaz.geministrator.resources.common_inbox
 import com.hereliesaz.geministrator.resources.common_reject
@@ -55,6 +55,8 @@ internal fun HallMonitorPauseDetail(
     onTestSolution: (String, Int) -> Unit,
     modifier: Modifier = Modifier,
     onReview: (HallMonitorReviewStep, Boolean) -> Unit = { _, _ -> },
+    /** The queen's words on this freeze: what froze, her take, the practice runs. */
+    says: @Composable () -> Unit = {},
 ) {
     val pause = requireNotNull(presentation.run.globalPause)
     val reportArtifact = presentation.run.taskRuns.values
@@ -69,13 +71,13 @@ internal fun HallMonitorPauseDetail(
             seed = "hall-monitor-global-pause",
             eyebrow = stringResource(Res.string.hall_monitor_global_pause),
             title = report?.title ?: stringResource(Res.string.hall_monitor_hall_monitor_review),
-            body = buildString {
-                append(pause.reason)
-                append(stringResource(Res.string.hall_monitor_the_original_run_remains_frozen_while))
-            },
+            body = stringResource(Res.string.hall_monitor_the_original_run_remains_frozen_while).trim(),
             endCap = stringResource(Res.string.hall_monitor_paused),
             well = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    says()
+                    // The reason is a technical line (it names the report by an id the Nanny chose), not a sentence.
+                    ErrorDetailsToggle(raw = pause.reason, seed = "hall-monitor-reason")
                     if (report == null) {
                         Text(
                             reportResult.exceptionOrNull()?.message
@@ -86,7 +88,7 @@ internal fun HallMonitorPauseDetail(
                     } else {
                         report.findings.forEach { finding ->
                             Text(
-                                "${finding.scope.name.uppercase()} · ${finding.subject}",
+                                "${plainScope(finding.scope)} · ${finding.subject}".uppercase(),
                                 style = AzphaltType.eyebrow,
                                 color = azphaltOnSurface(),
                             )
@@ -103,7 +105,7 @@ internal fun HallMonitorPauseDetail(
                                         color = azphaltOnSurface(),
                                     )
                                     Text(
-                                        "${solution.action.name.uppercase()} · ${solution.target}",
+                                        "${plainAction(solution.action)} · ${solution.target}".uppercase(),
                                         style = AzphaltType.eyebrow,
                                         color = azphaltOnSurface(),
                                     )
@@ -131,7 +133,7 @@ internal fun HallMonitorPauseDetail(
                     }
 
                     Text(
-                        stringResource(Res.string.hall_monitor_your_review),
+                        stringResource(Res.string.queen_review_line),
                         style = AzphaltType.body,
                         color = azphaltOnSurface(),
                     )
@@ -159,7 +161,7 @@ internal fun HallMonitorPauseDetail(
                             AzphaltNote(
                                 seed = "hall-monitor-trial-${trial.id}",
                                 label = trial.solutionTitle,
-                                value = "${trial.action.name} · ${trial.workflowRunId.value}",
+                                value = "${plainAction(trial.action)} · ${trial.workflowRunId.value}",
                             )
                         }
                     }

@@ -99,6 +99,7 @@ import com.hereliesaz.geministrator.resources.inspector_raise_budget
 import com.hereliesaz.geministrator.resources.inspector_reject_plan
 import com.hereliesaz.geministrator.resources.inspector_retry_task
 import com.hereliesaz.geministrator.resources.inspector_stop_workflow
+import com.hereliesaz.geministrator.resources.queen_row_eyebrow
 import com.hereliesaz.geministrator.resources.runs_attempt_of
 import com.hereliesaz.geministrator.resources.runs_authority
 import com.hereliesaz.geministrator.resources.runs_human_decision_required
@@ -136,6 +137,8 @@ internal fun LiveInboxScreen(
     onNannyReview: (HallMonitorReviewStep, Boolean) -> Unit = { _, _ -> },
     /** Starts an isolated practice run of one of the Nanny's solutions: finding id, solution index. */
     onNannyTestSolution: (String, Int) -> Unit = { _, _ -> },
+    onOpenStory: (() -> Unit)? = null,
+    onOpenRun: (String) -> Unit = {},
 ) {
     if (runtimeState is ApplicationRuntimeState.Live) {
         MessagesPage(
@@ -149,6 +152,8 @@ internal fun LiveInboxScreen(
                 openCreature = onOpenCreature,
                 nannyReview = onNannyReview,
                 nannyTestSolution = onNannyTestSolution,
+                openStory = onOpenStory,
+                openRun = onOpenRun,
             ),
             compact = compact,
             modifier = modifier,
@@ -189,6 +194,10 @@ internal class MessageActions(
     val openCreature: (taskId: String, tab: CreatureTab) -> Unit = { _, _ -> },
     val nannyReview: (HallMonitorReviewStep, Boolean) -> Unit = { _, _ -> },
     val nannyTestSolution: (String, Int) -> Unit = { _, _ -> },
+    /** Opens the Story (the run's timeline). */
+    val openStory: (() -> Unit)? = null,
+    /** Opens another run, such as a practice run. */
+    val openRun: (String) -> Unit = {},
 )
 
 /** Why an escalated step stopped, in one plain line (no internal code); null when the run recorded no reason. */
@@ -297,6 +306,7 @@ internal fun MessagesPage(
                         onConfirm = { confirming = it },
                         compact = compact,
                         wide = true,
+                        onSelect = { selectedKey = it },
                         modifier = Modifier.weight(1.2f).widthIn(min = 430.dp).fillMaxHeight(),
                     )
                 }
@@ -318,6 +328,7 @@ internal fun MessagesPage(
                         onConfirm = { confirming = it },
                         compact = compact,
                         wide = false,
+                        onSelect = { selectedKey = it },
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -399,6 +410,11 @@ private fun messageListText(row: MessageRow, presentation: LiveWorkflowPresentat
         ),
         stringResource(Res.string.spend_stop_stopped),
     )
+    is MessageRow.Queen -> MessageListText(
+        stringResource(Res.string.queen_row_eyebrow).uppercase(),
+        queenTitle(row.note),
+        null,
+    )
     is MessageRow.PracticeRun -> MessageListText(
         stringResource(Res.string.hall_monitor_isolated_counterfactual),
         presentation.definition.name,
@@ -450,6 +466,7 @@ private fun messageRowTone(row: MessageRow): Color = when (row) {
     }
     is MessageRow.AllowanceStop -> AzphaltDanger
     is MessageRow.Freeze, is MessageRow.PracticeRun -> azphaltStrong()
+    is MessageRow.Queen -> azphaltMutedOnSurface()
 }
 
 @Composable
@@ -503,6 +520,7 @@ private fun MessageDetail(
     onConfirm: (Pair<String, Boolean>) -> Unit,
     compact: Boolean,
     wide: Boolean,
+    onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val ink = Azphalt.Ink
@@ -515,6 +533,25 @@ private fun MessageDetail(
                     color = azphaltOnSurface(),
                     modifier = Modifier.padding(30.dp),
                 )
+            }
+        }
+        is MessageRow.Queen -> Box(modifier.clip(RoundedCornerShape(19.dp)).background(ink)) {
+            AzphaltSurface(ink) {
+                Column(
+                    (if (wide) Modifier.fillMaxSize().verticalScroll(rememberScrollState()) else Modifier.fillMaxWidth())
+                        .padding(if (wide) 30.dp else 20.dp),
+                ) {
+                    Text(stringResource(Res.string.queen_row_eyebrow).uppercase(), style = AzphaltType.eyebrow, color = azphaltStrong())
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        queenTitle(row.note),
+                        style = AzphaltType.section,
+                        color = azphaltOnSurface(),
+                        modifier = Modifier.widthIn(max = 480.dp).semantics { heading() },
+                    )
+                    Spacer(Modifier.height(20.dp))
+                    QueenSays(listOf(row.note), actions, showLink = true, onSelect = onSelect)
+                }
             }
         }
         is MessageRow.Wait -> Box(modifier.clip(RoundedCornerShape(19.dp)).background(ink)) {
@@ -541,7 +578,7 @@ private fun MessageDetail(
                     (if (wide) Modifier.fillMaxSize().verticalScroll(rememberScrollState()) else Modifier.fillMaxWidth())
                         .padding(if (wide) 30.dp else 20.dp),
                 ) {
-                    WaitDetail(entry, presentation, actions, onConfirm)
+                    WaitDetail(entry, presentation, actions, onConfirm, onSelect)
                 }
             }
         }
@@ -555,14 +592,16 @@ private fun MessageDetail(
                     onLiftSpendStop = actions.liftSpendStop,
                     onOpenLimits = actions.openLimits,
                     compact = compact,
+                    says = { QueenSays(presentation.queen.filter { it.attachedTo == row.key }, actions, showLink = false, onSelect = onSelect) },
                 )
                 is MessageRow.Freeze -> HallMonitorPauseDetail(
                     presentation = presentation,
                     onTestSolution = actions.nannyTestSolution,
                     onReview = actions.nannyReview,
+                    says = { QueenSays(presentation.queen.filter { it.attachedTo == row.key }, actions, showLink = true, onSelect = onSelect) },
                 )
                 is MessageRow.PracticeRun -> HallMonitorTrialDetail(presentation)
-                is MessageRow.Wait -> Unit
+                is MessageRow.Wait, is MessageRow.Queen -> Unit
             }
         }
     }
@@ -575,6 +614,7 @@ private fun WaitDetail(
     presentation: LiveWorkflowPresentation,
     actions: MessageActions,
     onConfirm: (Pair<String, Boolean>) -> Unit,
+    onSelect: (String) -> Unit,
 ) {
     val task = presentation.definition.tasks.first { it.id.value == entry.taskId }
     val taskRun = presentation.run.taskRuns.getValue(task.id)
@@ -597,6 +637,7 @@ private fun WaitDetail(
             color = azphaltMutedOnSurface(),
             modifier = Modifier.widthIn(max = 530.dp),
         )
+        QueenSays(presentation.queen.filter { it.attachedTo == entry.key }, actions, showLink = false, onSelect = onSelect)
         if (entry.kind == InboxEntryKind.Escalation && !isPlainReason(taskRun.blockingReason?.message)) {
             ErrorDetailsToggle(raw = taskRun.blockingReason?.message, seed = "inbox-${entry.taskId}", modifier = Modifier.widthIn(max = 530.dp))
         }

@@ -93,6 +93,12 @@ internal sealed interface MessageRow {
         override val countsToBadge: Boolean get() = true
     }
 
+    /** The queen speaking on her own: derived from the run, never counted, never read-marked. */
+    data class Queen(val note: com.hereliesaz.geministrator.queen.QueenNote) : MessageRow {
+        override val key: String get() = "queen|" + note.id
+        override val countsToBadge: Boolean get() = false
+    }
+
     /** The run shown is an isolated practice run of one of the Nanny's solutions: progress only, no decision. */
     data class PracticeRun(override val key: String) : MessageRow {
         override val countsToBadge: Boolean get() = false
@@ -111,7 +117,8 @@ internal fun messageRows(presentation: LiveWorkflowPresentation): List<MessageRo
     val pause = run.globalPause
     if (pause != null) return listOf(MessageRow.Freeze(pauseInboxKey(run, pause)))
     val waits = inboxEntries(presentation).map { MessageRow.Wait(it) }
-    return if (isHallMonitorTrial(presentation)) listOf(MessageRow.PracticeRun("practice|${run.id.value}")) + waits else waits
+    val queen = presentation.queen.filter { it.attachedTo == null }.map { MessageRow.Queen(it) }
+    return if (isHallMonitorTrial(presentation)) listOf(MessageRow.PracticeRun("practice|${run.id.value}")) + waits + queen else waits + queen
 }
 
 /** The row to show: the one remembered as selected while it is listed, else the first. */
