@@ -26,12 +26,12 @@ import com.hereliesaz.geministrator.workflow.formatUsd
 import org.jetbrains.compose.resources.stringResource
 
 /**
- * The Inbox while a spend cap has stopped the hive (docs/Keepers-Room.md, This device): which cap,
- * what was spent, and the one act that resumes it. Like the Hall Monitor's pause, it speaks for the
- * whole hive, so it has the Inbox to itself.
+ * The detail of Messages' stop row while a spend cap has stopped the hive (docs/Keepers-Room.md, This
+ * device): which cap, what was spent, and the one act that resumes it. Like the Nanny's freeze, it
+ * speaks for the whole hive, so it is the only row.
  */
 @Composable
-internal fun SpendStopInboxScreen(
+internal fun SpendStopDetail(
     presentation: LiveWorkflowPresentation,
     onLiftSpendStop: () -> Unit,
     modifier: Modifier = Modifier,
@@ -41,14 +41,7 @@ internal fun SpendStopInboxScreen(
     compact: Boolean = false,
 ) {
     val pause = presentation.run.spendPause ?: return
-    Column(
-        modifier = modifier
-            .fillMaxHeight()
-            .verticalScroll(rememberScrollState())
-            .padding(26.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text(stringResource(Res.string.common_inbox), style = AzphaltType.hero, color = azphaltOnSurface())
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         AzphaltRecord(
             seed = "spend-stop",
             eyebrow = stringResource(Res.string.spend_stop_eyebrow),

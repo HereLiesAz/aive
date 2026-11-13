@@ -853,6 +853,35 @@ fun App(
                                 }
                             }
                         },
+                        onNannyReview = { step, approved ->
+                            scope.launch {
+                                try {
+                                    val activeRuntime = runtime ?: error("Runtime is unavailable")
+                                    activeRuntime.applyHallMonitorReviewStep(step, approved)
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    actionFailure = actionFailureOf(getString(Res.string.app_escalation_decision_failed), failure)
+                                }
+                            }
+                        },
+                        onNannyTestSolution = { findingId, solutionIndex ->
+                            scope.launch {
+                                try {
+                                    val activeRuntime = runtime ?: error("Runtime is unavailable")
+                                    val planner = orchestrationRuntime
+                                        ?: error(
+                                            "Nanny solution testing requires the orchestration model runtime on this platform. " +
+                                                "The paused workflow and recommendation were not changed.",
+                                        )
+                                    activeRuntime.testHallMonitorSolution(findingId, solutionIndex, planner)
+                                } catch (failure: CancellationException) {
+                                    throw failure
+                                } catch (failure: Exception) {
+                                    actionFailure = actionFailureOf(getString(Res.string.app_escalation_decision_failed), failure)
+                                }
+                            }
+                        },
                         onMessageAgent = { taskId, message ->
                             try {
                                 when (val result = runtime?.messageTask(TaskDefinitionId(taskId), message)) {

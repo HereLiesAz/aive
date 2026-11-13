@@ -164,6 +164,10 @@ fun ControlRoom(
     onApproveTask: (String) -> Unit,
     onRejectPlan: (String) -> Unit,
     onResolveEscalation: (String, Boolean) -> Unit,
+    /** The keeper's review of a frozen swarm (Messages): the decision on the recommendations, or resuming. */
+    onNannyReview: (HallMonitorReviewStep, Boolean) -> Unit = { _, _ -> },
+    /** Starts an isolated practice run of one of the Nanny's solutions: finding id, solution index. */
+    onNannyTestSolution: (String, Int) -> Unit = { _, _ -> },
     onLiftSpendStop: () -> Unit = {},
     /** Stops the active run: every unfinished creature and provider session. */
     onStopRun: (WorkflowRunId) -> Unit = {},
@@ -541,6 +545,8 @@ fun ControlRoom(
                 onApproveTask = onApproveTask,
                 onRejectPlan = onRejectPlan,
                 onResolveEscalation = onResolveEscalation,
+                onNannyReview = onNannyReview,
+                onNannyTestSolution = onNannyTestSolution,
                 onLiftSpendStop = onLiftSpendStop,
                 onStopRun = onStopRun,
                 onPauseRun = onPauseRun,
@@ -848,6 +854,8 @@ private fun MainDestination(
     onApproveTask: (String) -> Unit,
     onRejectPlan: (String) -> Unit,
     onResolveEscalation: (String, Boolean) -> Unit,
+    onNannyReview: (HallMonitorReviewStep, Boolean) -> Unit,
+    onNannyTestSolution: (String, Int) -> Unit,
     onLiftSpendStop: () -> Unit,
     onStopRun: (WorkflowRunId) -> Unit,
     /** Pause (true) or resume (false) the live hive; see [ApplicationRuntime.setKeeperPause]. */
@@ -1238,6 +1246,8 @@ private fun MainDestination(
                     onOpenLimits = { openSpendLimits(compact, keeperSectionName, keeperOpen, onDestinationSelected) },
                     onOpenCreature = onOpenCreatureOn,
                     compact = compact,
+                    onNannyReview = onNannyReview,
+                    onNannyTestSolution = onNannyTestSolution,
                 )
                 ControlRoomDestination.Stable -> Column(
                     Modifier.fillMaxSize().verticalScroll(rememberScrollState())

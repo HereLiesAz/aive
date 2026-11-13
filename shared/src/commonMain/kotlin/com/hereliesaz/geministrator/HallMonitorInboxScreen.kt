@@ -48,8 +48,9 @@ internal fun isHallMonitorTrial(presentation: LiveWorkflowPresentation): Boolean
         it.startsWith(HALL_MONITOR_TRIAL_DESCRIPTION_PREFIX) || it.startsWith(LEGACY_HALL_MONITOR_TRIAL_DESCRIPTION_PREFIX)
     } == true
 
+/** The detail of Messages' freeze row: the Nanny's report, its solutions, and the keeper's review. */
 @Composable
-internal fun HallMonitorPauseInboxScreen(
+internal fun HallMonitorPauseDetail(
     presentation: LiveWorkflowPresentation,
     onTestSolution: (String, Int) -> Unit,
     modifier: Modifier = Modifier,
@@ -63,14 +64,7 @@ internal fun HallMonitorPauseInboxScreen(
     val reportResult = runCatching { decodeHallMonitorReportPayload(reportArtifact?.textContent.orEmpty()) }
     val report = reportResult.getOrNull()
 
-    Column(
-        modifier = modifier
-            .fillMaxHeight()
-            .verticalScroll(rememberScrollState())
-            .padding(26.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text(stringResource(Res.string.common_inbox), style = AzphaltType.hero, color = azphaltOnSurface())
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         AzphaltRecord(
             seed = "hall-monitor-global-pause",
             eyebrow = stringResource(Res.string.hall_monitor_global_pause),
@@ -175,25 +169,21 @@ internal fun HallMonitorPauseInboxScreen(
     }
 }
 
+/**
+ * The detail of Messages' practice-run row: how far the isolated run of one of the Nanny's solutions
+ * has got, creature by creature. It decides nothing: a creature of it that waits on the keeper is a
+ * row of its own, with its own buttons.
+ */
 @Composable
-internal fun HallMonitorTrialInboxScreen(
+internal fun HallMonitorTrialDetail(
     presentation: LiveWorkflowPresentation,
-    onApproveTask: (String) -> Unit,
-    onRejectPlan: (String) -> Unit,
-    onResolveEscalation: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val taskRuns = presentation.run.taskRuns.values
     val completed = taskRuns.count { it.status == TaskRunStatus.Completed }
     val artifacts = taskRuns.flatMap { it.artifacts }
 
-    Column(
-        modifier = modifier
-            .fillMaxHeight()
-            .verticalScroll(rememberScrollState())
-            .padding(26.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(stringResource(Res.string.hall_monitor_test_solution), style = AzphaltType.hero, color = azphaltOnSurface())
         AzphaltRecord(
             seed = presentation.run.id.value,
@@ -219,9 +209,7 @@ internal fun HallMonitorTrialInboxScreen(
                             title = task?.name ?: taskRun.taskDefinitionId.value,
                             body = taskRun.progressMessage ?: task?.objective.orEmpty(),
                             endCap = taskRun.progress?.let { "${(it * 100).toInt()}%" },
-                            well = if (taskRun.artifacts.isEmpty() &&
-                                taskRun.status !in setOf(TaskRunStatus.AwaitingApproval, TaskRunStatus.Escalated)
-                            ) {
+                            well = if (taskRun.artifacts.isEmpty()) {
                                 null
                             } else {
                                 {
@@ -234,28 +222,6 @@ internal fun HallMonitorTrialInboxScreen(
                                                     ?: artifact.uri
                                                     ?: "stored",
                                             )
-                                        }
-                                        if (taskRun.status == TaskRunStatus.AwaitingApproval) {
-                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                AzphaltPill(stringResource(Res.string.common_approve), "trial-approve-${taskRun.id.value}", onClick = {
-                                                    onApproveTask(taskRun.taskDefinitionId.value)
-                                                })
-                                                if (taskRun.assignedProviderId != null) {
-                                                    AzphaltPill(stringResource(Res.string.common_reject), "trial-reject-${taskRun.id.value}", onClick = {
-                                                        onRejectPlan(taskRun.taskDefinitionId.value)
-                                                    })
-                                                }
-                                            }
-                                        }
-                                        if (taskRun.status == TaskRunStatus.Escalated) {
-                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                AzphaltPill(stringResource(Res.string.common_retry), "trial-retry-${taskRun.id.value}", onClick = {
-                                                    onResolveEscalation(taskRun.taskDefinitionId.value, true)
-                                                })
-                                                AzphaltPill(stringResource(Res.string.hall_monitor_stop), "trial-stop-${taskRun.id.value}", onClick = {
-                                                    onResolveEscalation(taskRun.taskDefinitionId.value, false)
-                                                })
-                                            }
                                         }
                                     }
                                 }
