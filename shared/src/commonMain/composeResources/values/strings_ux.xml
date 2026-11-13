@@ -150,4 +150,5 @@
     <string name="keeper_advanced_tracing">Advanced: tracing and diagnostics</string>
     <string name="keeper_advanced_data">Advanced: raw data export and import</string>
     <string name="keeper_advanced_a2a">Advanced: let other programs start swarms</string>
+    <string name="memory_advanced">Advanced: engines, habits and tuning</string>
 </resources>
