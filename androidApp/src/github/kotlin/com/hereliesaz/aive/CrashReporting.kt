@@ -161,6 +161,12 @@ internal object CrashReporting {
         return Outcome.Failed
     }
 
+    /** The queued reports as they will be posted, or null when none is queued; shown beside the toggle. */
+    fun preview(context: Context): String? =
+        pendingDir(context).listFiles()?.sortedBy(File::getName).orEmpty()
+            .joinToString("\n\n") { runCatching { it.readText() }.getOrDefault("") }
+            .takeIf(String::isNotBlank)
+
     private fun persist(context: Context, report: CrashReport) {
         val policy = policy(context)
         if (policy.alreadySent(report.signature, report.appVersionName)) return

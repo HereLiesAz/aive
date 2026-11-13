@@ -1520,6 +1520,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_on_device_small_tasks_no_model">No local model is installed yet. Install a memory stage's local model from the Memory swarm; this takes effect once one is installed.</string>
     <string name="settings_on_device_small_tasks_off">Small tasks on this device: OFF</string>
     <string name="settings_on_device_small_tasks_on">Small tasks on this device: ON</string>
+    <string name="settings_crash_reports_waiting">Waiting to be sent, exactly as it will be sent: %1$s</string>
     <string name="settings_crash_reports_intro">Off unless you turn it on. When enabled, crashes and app-not-responding events are sent automatically to the </string>
     <string name="settings_online"> online</string>
     <string name="settings_online_2">Online</string>

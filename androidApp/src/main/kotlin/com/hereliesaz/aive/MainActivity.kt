@@ -668,10 +668,14 @@ class MainActivity : ComponentActivity() {
                             },
                         ),
                         crashReportingSetting = if (CrashReporting.isSupported) {
-                            CrashReportingSetting(crashReportingEnabled) { enabled ->
-                                CrashReporting.setEnabled(this, enabled)
-                                crashReportingEnabled = enabled
-                            }
+                            CrashReportingSetting(
+                                enabled = crashReportingEnabled,
+                                onEnabledChange = { enabled ->
+                                    CrashReporting.setEnabled(this, enabled)
+                                    crashReportingEnabled = enabled
+                                },
+                                payloadPreview = { CrashReporting.preview(this) },
+                            )
                         } else {
                             null
                         },
