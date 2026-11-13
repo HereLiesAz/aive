@@ -118,3 +118,8 @@ Android CI failed on every push because (1) an Android string had an unescaped a
 - Android `strings.xml` values must escape apostrophes as `\'` (and a leading `@` or `?`); check every string added or edited under `androidApp/src/main/res/`.
 - When an enum or sealed type gains an entry, grep the whole repo (shared, androidApp, desktopApp, webApp, providers, tests) for every `when` over it. When anything is removed or renamed, grep all modules and all test source sets for its uses.
 - A red CI that fails for unrelated PRs (even bot PRs) is a main-branch break: read the job log for the first real error (`grep "e: \|FAILED\|What went wrong"` over the downloaded log) before anything else.
+
+## The queen judges whether a swarm works; the Nanny makes it work as well as possible
+
+- Owner correction: I told builders the queen makes no "is it working" judgement when a Nanny exists and only settles disputes. Wrong. They are two different functions: the queen makes her own judgement of whether a swarm is working (failing steps, a Source that gave out, budget), with or without a Nanny; the Nanny makes sure it works as well as possible (efficacy and efficiency). Neither replaces the other.
+- Rule: when the owner assigns a duty to one role, do not infer that a neighbouring role loses its own. Ask what each is for before removing behaviour from either.

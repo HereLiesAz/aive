@@ -57,7 +57,7 @@ fun queenUpdate(
     notes += nannyRelay(definition, run, review)
     notes += suggestions
     // A suggestion already says what she noticed, so her "I noticed" line does not say it twice.
-    if (suggestions.isEmpty() && nannyPhase(definition, run) == NannyPhase.None && definition.tasks.none { it.roleId == com.hereliesaz.geministrator.domain.HallMonitorRole.id }) {
+    if (suggestions.isEmpty() && nannyPhase(definition, run) == NannyPhase.None) {
         watchRelay(definition, run, queenSignals(definition, run, roles))?.let { notes += it }
     }
     if (level == QueenLevel.Helpful) {
