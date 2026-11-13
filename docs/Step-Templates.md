@@ -27,6 +27,10 @@ They appear in the swarm's Edit view under **Add creature**, in a group of their
 
 Older versions of the app ignore the contract and run the step as an ordinary task, without these checks.
 
+### Steps that start from a template
+
+A step that existed before it named a template (the built-in swarms and the Azphalt packages) carries a contract marked `startingPoint`. It names the template, what that template hands back and the step's own inputs, and nothing is enforced: the step keeps the run's whole toolbox, is not held for a missing input and is not failed on its output. The Nanny reads the template from it and can improve the template. The audit of which steps and roles have a template, and the gaps, is in [Azphalt templates](Azphalt-Templates.md).
+
 ## How a template improves: lineage
 
 The Nanny can propose a change to a step template or to a role's own definition. It uses the same mechanism for both and the same Improvement part; nothing new is shown.

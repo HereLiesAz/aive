@@ -11,7 +11,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class QueenShapeTest {
-    private val definition = qDefinition(qTask("a"), qTask("b").copy(dependsOn = listOf(TaskDefinitionId("a"))))
+    private val definition = qDefinition(qTask("a"), qTask("b").copy(dependsOn = setOf(TaskDefinitionId("a"))))
     private val run = qRun(qTaskRun("a", TaskRunStatus.Completed), qTaskRun("b", TaskRunStatus.Retrying, attempt = 4))
     private val roles = BuiltInRoles.all
 

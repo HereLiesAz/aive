@@ -13,6 +13,7 @@ import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TestDesignPolicy
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
+import com.hereliesaz.geministrator.template.StepTemplateAssignments
 import com.hereliesaz.geministrator.workflow.improvement.SelfImprovementLoop
 import com.hereliesaz.geministrator.workflow.schedule.ScheduleCadence
 
@@ -481,17 +482,21 @@ object CodingWorkflowSuite {
         vararg tasks: TaskDefinition,
         testDesign: TestDesignPolicy,
     ) = CodingSuiteEntry(
-        WorkflowDefinition(
-            id = WorkflowDefinitionId("suite-$slug"), name = name, description = description,
-            tasks = tasks.toList(), testDesignPolicy = testDesign,
+        StepTemplateAssignments.apply(
+            WorkflowDefinition(
+                id = WorkflowDefinitionId("suite-$slug"), name = name, description = description,
+                tasks = tasks.toList(), testDesignPolicy = testDesign,
+            ),
         ),
         CodingSuiteEntry.Kind.Delivers,
     )
 
     private fun reports(slug: String, name: String, description: String, vararg tasks: TaskDefinition) = CodingSuiteEntry(
-        WorkflowDefinition(
-            id = WorkflowDefinitionId("suite-$slug"), name = name, description = description,
-            tasks = tasks.toList(), testDesignPolicy = TestDesignPolicy.None,
+        StepTemplateAssignments.apply(
+            WorkflowDefinition(
+                id = WorkflowDefinitionId("suite-$slug"), name = name, description = description,
+                tasks = tasks.toList(), testDesignPolicy = TestDesignPolicy.None,
+            ),
         ),
         CodingSuiteEntry.Kind.Reports,
     )

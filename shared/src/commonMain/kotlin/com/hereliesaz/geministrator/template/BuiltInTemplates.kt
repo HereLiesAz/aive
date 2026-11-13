@@ -17,6 +17,7 @@ import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TemplateRef
 import com.hereliesaz.geministrator.domain.anyEffectful
+import com.hereliesaz.geministrator.domain.haiveBuiltInRoles
 import com.hereliesaz.geministrator.workflow.ArtifactVerdicts
 import com.hereliesaz.geministrator.workflow.StepOutputValidators
 
@@ -59,6 +60,10 @@ data class StepTemplate(
 }
 
 object BuiltInTemplates {
+    const val WRITE_DOCUMENT_ID: String = "write-document"
+    const val CHECK_WORK_ID: String = "check-work"
+    const val TEXT_TO_TABLE_ID: String = "text-to-table"
+
     private fun out(name: String, kind: ArtifactKind, media: String, schema: String, validator: String) =
         OutputSpec(name, kind, media, schema, validator)
 
@@ -207,7 +212,7 @@ object BuiltInTemplates {
             "(a literal, or @<step id>.<port> to take it from an earlier step that is also listed in dependsOn); roleId may then be left blank."
 
     /** Every built-in as a catalog base. */
-    fun bases(roles: Collection<RoleDefinition> = BuiltInRoles.all): List<TemplateBase> =
+    fun bases(roles: Collection<RoleDefinition> = haiveBuiltInRoles): List<TemplateBase> =
         (all + StepPresets.all).map(StepTemplate::base) + roles.map(RoleTemplates::base)
 }
 
@@ -307,6 +312,7 @@ object StepInstantiation {
 
     /** The ports of [contract]'s template that are required and have no value: the sentence the step is held with. */
     fun missingInputs(contract: TaskContract): List<String> {
+        if (contract.startingPoint) return emptyList()
         val template = BuiltInTemplates.byId[contract.template.id] ?: return emptyList()
         return template.inputs.filter { it.required && contract.inputs[it.name].isNullOrBlank() }.map { it.name }
     }

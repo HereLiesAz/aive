@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
 /** The hive is reached when the run shows the signs the planner named: typed and observable, never a model's opinion. */
 class GuidanceTest {
     private val definition = qDefinition(qTask("a"), qTask("b").copy(dependsOn = setOf(TaskDefinitionId("a"))))
-    private val artifact = ArtifactRef(ArtifactId("x"), ArtifactKind.entries.first(), TaskRunId("r-b"), "Result", createdAtEpochMillis = 1)
+    private val artifact = ArtifactRef(ArtifactId("x"), ArtifactKind.entries.first(), TaskRunId("r-b"), "Result", textContent = "done", createdAtEpochMillis = 1)
 
     private fun done(withArtifact: Boolean = true, bStatus: TaskRunStatus = TaskRunStatus.Completed, status: WorkflowRunStatus = WorkflowRunStatus.Completed) =
         qRun(

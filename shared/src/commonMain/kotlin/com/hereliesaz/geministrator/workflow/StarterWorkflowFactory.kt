@@ -12,6 +12,7 @@ import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TestDesignPolicy
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
+import com.hereliesaz.geministrator.template.StepTemplateAssignments
 
 object StarterWorkflowFactory {
     fun create(
@@ -45,7 +46,7 @@ object StarterWorkflowFactory {
         val reviewId = TaskDefinitionId("review")
         val releaseId = TaskDefinitionId("release-approval")
 
-        return WorkflowDefinition(
+        val definition = WorkflowDefinition(
             id = id,
             name = objective.take(80),
             description = "Starter workflow created from the live runtime empty state.",
@@ -93,6 +94,7 @@ object StarterWorkflowFactory {
             ),
             testDesignPolicy = TestDesignPolicy.BeforeAndAfterImplementation,
         )
+        return StepTemplateAssignments.apply(definition, StepTemplateAssignments.STARTER_KEY)
     }
 }
 

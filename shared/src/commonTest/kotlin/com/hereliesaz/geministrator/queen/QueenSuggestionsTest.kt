@@ -17,8 +17,9 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class QueenSuggestionsTest {
+    /** Step a sits behind a human approval, so b (which builds on it) is not offered an approval of its own. */
     private val definition = qDefinition(
-        qTask("a"),
+        qTask("a").copy(approvalPolicy = ApprovalPolicy.HumanApproval),
         qTask("b").copy(dependsOn = setOf(TaskDefinitionId("a"))),
         qTask("c").copy(dependsOn = setOf(TaskDefinitionId("b"))),
     )
@@ -217,11 +218,16 @@ class QueenSuggestionsTest {
 
     @Test
     fun shapeChangesAreNeverOnTheMenu() {
-        // Everything she can offer is one of these; no action removes or loosens an approval, skips a step or moves work to a writing Source.
+        // The live menu is these; the four shape changes are only ever kept for next time, and none removes or loosens an approval, skips a step or moves work to a writing Source.
         assertEquals(
             setOf("RewordStep", "RedoFromStep", "SwapSource", "RaiseBudget", "RaiseAllowance", "Rest"),
-            QueenAction.entries.map { it.name }.toSet(),
+            QueenAction.entries.filterNot { it.keepsForNextTime }.map { it.name }.toSet(),
         )
+        assertEquals(
+            setOf("AddCheck", "SplitStep", "ReorderSteps", "AddApproval"),
+            QueenAction.entries.filter { it.keepsForNextTime }.map { it.name }.toSet(),
+        )
+        assertTrue(QueenAction.entries.filter { it.keepsForNextTime }.none { it.appliesHere })
     }
 
     @Test
