@@ -237,3 +237,26 @@ class ResearchTest {
         assertTrue(line.contains("consulted linked repository") && line.contains("not consulted: SearchA2A directory (declined)"))
     }
 }
+
+class ResearchInvestigationTest {
+    private class Docs : LocalResearchSource {
+        override suspend fun leads(objective: String) = listOf(
+            ResearchLead("Linked repository docs", ResearchSource.Repository, "the keeper's own repository", "README.md", connected = true),
+        )
+    }
+
+    @Test
+    fun findingsAreCappedUntrustedReferenceLinesWithTheirSource() = runTest {
+        val research = ResearchInvestigation(ResearchStep(local = listOf(ResearchSource.Repository to Docs())), { ResearchContext(repositoryLinked = true) })
+        val found = research.findings("Which database does the app use?", "dispute-1")!!
+        assertEquals(1, found.size)
+        assertTrue(found.single().startsWith("[untrusted reference | linked repository"))
+    }
+
+    @Test
+    fun nothingToConsultOrNothingFoundIsNull() = runTest {
+        assertNull(ResearchInvestigation(ResearchStep()).findings("Which database?", "k"))
+        val research = ResearchInvestigation(ResearchStep(local = listOf(ResearchSource.Repository to Docs())), { ResearchContext(repositoryLinked = true) })
+        assertNull(research.findings("   ", "k"))
+    }
+}

@@ -1,23 +1,39 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.domain.BuiltInRoles
+import com.hereliesaz.geministrator.domain.TaskRunId
+import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
+import com.hereliesaz.geministrator.domain.WorkflowRunId
+import com.hereliesaz.geministrator.domain.activeRoles
+import com.hereliesaz.geministrator.domain.resolveRoleCollection
+import com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink
 import com.hereliesaz.geministrator.queen.Dispute
+import com.hereliesaz.geministrator.queen.InvestigationRequest
+import com.hereliesaz.geministrator.queen.disputeTestDefinition
+import com.hereliesaz.geministrator.research.ResearchInvestigation
+import com.hereliesaz.geministrator.workflow.WorkflowDefinitionPreparer
+import com.hereliesaz.geministrator.workflow.WorkflowLaunchService
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import com.hereliesaz.geministrator.queen.DisputeOutcome
 import com.hereliesaz.geministrator.queen.DisputeResolution
 import com.hereliesaz.geministrator.queen.Disputant
 import com.hereliesaz.geministrator.queen.Escalation
 import com.hereliesaz.geministrator.queen.EscalationReason
+import com.hereliesaz.geministrator.queen.InvestigationKind
 import com.hereliesaz.geministrator.queen.InvestigationLauncher
 import com.hereliesaz.geministrator.queen.QueenModel
+import com.hereliesaz.geministrator.queen.withFindings
 import com.hereliesaz.geministrator.queen.disputeNotes
 import com.hereliesaz.geministrator.queen.settleWithAgreement
 
 /**
- * The one place a dispute between two creatures is raised for the queen to settle. Nothing in the app calls it yet: no code
- * path detects two creatures in dispute today (the Nanny freeze is still settled by its own review), so this is the hook those
- * callers will use. No ruling, research or test starts until both [parties] agree to her stated approach (see
+ * The one place a dispute between two creatures is raised for the queen to settle. Called today from the cycle (see [ApplicationRuntime], the
+ * Nanny and the Antagonist); any other pair of creatures goes through here too. No ruling, research or test starts until both [parties] agree to her stated approach (see
  * [settleWithAgreement]); what she says about it, or about handing it to the keeper, is kept for [runId] and shown in Messages.
- * An agreed investigation is handed to [launcher]; with none, or when it cannot start one, the keeper has it
- * (TODO(queen-investigation-launcher): no launcher exists yet). [mayCall] is where the keeper's spend caps are checked before
+ * An agreed investigation is handed to [launcher] (see [DisputeInvestigator]); with none, or when it cannot start one, the
+ * keeper has it. A research that returns findings ([findingsOf]) makes them listed facts for the one ruling that follows;
+ * a test runs as its own swarm, which the keeper can open and stop. [mayCall] is where the keeper's spend caps are checked before
  * a model call; the models should already be metered.
  */
 internal suspend fun ApplicationRuntime.raiseDispute(
@@ -29,6 +45,8 @@ internal suspend fun ApplicationRuntime.raiseDispute(
     launcher: InvestigationLauncher? = null,
     /** True when this dispute already had its one investigation: she may not commission another. */
     investigated: Boolean = false,
+    /** The findings a research left under the id [launcher] returned; they become listed facts for one more ruling. */
+    findingsOf: (String) -> List<String> = { emptyList() },
     mayCall: () -> Boolean = { true },
 ): DisputeResolution {
     var resolution = settleWithAgreement(dispute, parties, queenModel, voices, allowInvestigation = !investigated, mayCall = mayCall)
@@ -48,5 +66,60 @@ internal suspend fun ApplicationRuntime.raiseDispute(
         }
     }
     rememberDisputeNotes(runId, disputeNotes(runId, dispute.question, parties, resolution, investigationRunId))
+    val found = if (request?.kind == InvestigationKind.Research && investigationRunId != null) findingsOf(investigationRunId) else emptyList()
+    if (found.isNotEmpty()) {
+        // One investigation per dispute: the second pass may not commission another, and both disputants agree again.
+        resolution = settleWithAgreement(dispute.withFindings(found), parties, queenModel, voices, allowInvestigation = false, mayCall = mayCall)
+        rememberDisputeNotes(runId, disputeNotes(runId, dispute.question, parties, resolution, null))
+    }
     return resolution
+}
+
+/**
+ * Her own model, the voice of each creature that may be in a dispute (by role id), and the research she may commission. Until
+ * the app gives the runtime one ([ApplicationRuntime.disputeModels]) she is away: a dispute then goes to the keeper in Messages.
+ * [mayCall] is where the keeper's spend caps are checked before a model call.
+ */
+class DisputeModels(
+    val queen: QueenModel,
+    val voices: Map<String, QueenModel> = emptyMap(),
+    val research: ResearchInvestigation? = null,
+    val mayCall: () -> Boolean = { true },
+)
+
+/**
+ * The Test investigation: a small swarm of generic Planner and Reviewer creatures that tries each safe disputed option on a
+ * small generated task and reports how each did ([disputeTestDefinition]). It is a normal persisted run, so the keeper's spend
+ * caps and each creature's time allowance apply, and the keeper can open it and stop it. Launched from the project of [runId],
+ * Manual integration, evidence only. Returns the new run's id, or null when it cannot start (no such run or project, a missing
+ * Planner or Reviewer, fewer than two safe options, or a launch that fails).
+ */
+@OptIn(ExperimentalTime::class)
+internal suspend fun ApplicationRuntime.launchDisputeTestSwarm(runId: String, dispute: Dispute, request: InvestigationRequest): String? {
+    val source = persistence.runs.get(WorkflowRunId(runId)) ?: return null
+    val project = persistence.projects.get(source.projectId) ?: return null
+    val roles = activeRoles(resolveRoleCollection(persistence.roles.all())).filter { it.enabled }
+    val planner = roles.firstOrNull { it.id == BuiltInRoles.Planner.id } ?: return null
+    val reviewer = roles.firstOrNull { it.id == BuiltInRoles.Reviewer.id } ?: return null
+    val now = Clock.System.now().toEpochMilliseconds()
+    val definitionId = WorkflowDefinitionId("dispute-test-$now")
+    val definition = disputeTestDefinition(definitionId, dispute, request, planner, reviewer) ?: return null
+    val testRunId = WorkflowRunId("dispute-test-run-$now")
+    val testRoles = listOf(planner, reviewer)
+    WorkflowLaunchService(
+        preparer = WorkflowDefinitionPreparer(providerRegistry, testRoles),
+        persistence = persistence,
+        eventSink = RepositoryWorkflowEventSink(persistence.events),
+        roles = testRoles,
+    ).launch(
+        project = project,
+        definition = definition,
+        workflowRunId = testRunId,
+        objective = "Try the disputed options and report how each did: ${dispute.question.replace('\n', ' ').trim().take(200)}",
+        nowEpochMillis = now,
+        taskRunIdFactory = { id -> TaskRunId("${testRunId.value}-${id.value}") },
+        parentWorkflowRunIds = listOf(source.id),
+    )
+    loadLatest()
+    return testRunId.value
 }
