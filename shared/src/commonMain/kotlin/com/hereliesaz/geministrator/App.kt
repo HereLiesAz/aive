@@ -110,6 +110,12 @@ fun App(
     orchestrationRuntime: OrchestrationAgentRuntime? = null,
     /** Reviews the planner's plan before a run exists, with the keeper's final say (orchestration/PlanReview.kt); null skips review. */
     planReviewer: PlanReviewer? = null,
+    /**
+     * The queen's own model for disputes, from the keeper's linked Sources: given the Source the keeper pinned on her role (or null),
+     * it returns a model, or null when none is usable and she is away. A pinned Source never switches silently. The Nanny's and the
+     * Antagonist's voices use the same model with their own role text.
+     */
+    queenModelFor: ((pinnedProviderId: String?) -> com.hereliesaz.geministrator.queen.QueenModel?)? = null,
     persistence: WorkflowPersistence? = null,
     projectFileService: ProjectFileService? = null,
     azphaltStoreService: AzphaltStoreService? = null,
@@ -389,6 +395,30 @@ fun App(
         connectedServers = researchServers.size,
         bridgeEnabled = researchBridgeOn,
     )
+
+    // Her models for disputes between creatures (queen/Disputes.kt): the keeper's linked Sources, the research she may commission.
+    LaunchedEffect(runtime, researchStep, researchContext, queenModelFor) {
+        val active = runtime ?: return@LaunchedEffect
+        val modelFor = queenModelFor
+        active.disputeModelSource = if (modelFor == null) {
+            null
+        } else {
+            com.hereliesaz.geministrator.queen.DisputeModelSource { roles ->
+                val base = modelFor(com.hereliesaz.geministrator.queen.orchestratorPin(roles))
+                if (base == null) {
+                    null
+                } else {
+                    DisputeModels(
+                        queen = base,
+                        voices = com.hereliesaz.geministrator.queen.disputeVoices(base, roles),
+                        research = researchStep?.let { step ->
+                            com.hereliesaz.geministrator.research.ResearchInvestigation(step, { researchContext })
+                        },
+                    )
+                }
+            }
+        }
+    }
 
     // The keeper's answer to a reviewed plan: shown over the planning field, held until they press Start or Do not start.
     val askKeeper: suspend (com.hereliesaz.geministrator.orchestration.PlanDecision) -> Boolean = { decision ->

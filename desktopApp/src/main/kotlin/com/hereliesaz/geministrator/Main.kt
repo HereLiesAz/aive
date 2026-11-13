@@ -62,6 +62,7 @@ import com.hereliesaz.geministrator.orchestration.OrchestrationQuestion
 import com.hereliesaz.geministrator.orchestration.PreferLocalOrchestrationAgentRuntime
 import com.hereliesaz.geministrator.providers.llm.TextGenerationOrchestrationAgentRuntime
 import com.hereliesaz.geministrator.providers.llm.configuredPlanReviewer
+import com.hereliesaz.geministrator.providers.llm.configuredQueenModel
 import com.hereliesaz.geministrator.providers.llm.configuredPlanningRuntime
 import com.hereliesaz.geministrator.providers.llm.memoryTextApi
 import com.hereliesaz.geministrator.memory.DesktopOrtMemorySessionManager
@@ -338,6 +339,8 @@ fun main() {
                 }
                 // The plan is read by a reviewer before a run exists; the keeper then has the final say.
                 val planReviewer = remember(credentials) { configuredPlanReviewer(credentials) }
+                // The queen's own model for disputes (and the Nanny's and Antagonist's voices): the Source pinned on her role, else automatic.
+                val queenModelFor = remember(credentials) { { pin: String? -> configuredQueenModel(credentials, pin) } }
                 LaunchedEffect(credentials) {
                     filmOpenAiConnection.set(credentials.cleanKey(ProviderCatalog.OPENAI_ID).orEmpty())
                     memoryEngines.hostedTextGenerator = { providerId, model, prompt ->
@@ -604,6 +607,7 @@ fun main() {
                         },
                         orchestrationRuntime = planningRuntime,
                         planReviewer = planReviewer,
+                        queenModelFor = queenModelFor,
                         localPlannerSetting = localPlannerSetting.takeIf { DesktopPlannerModel.ENABLED },
                         a2aServerSetting = a2aServerSetting,
                         externalWorkflowLaunchRequests = a2aPendingLaunches,

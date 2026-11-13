@@ -202,8 +202,17 @@ class ApplicationRuntime private constructor(
      */
     internal var disputeModels: DisputeModels? = null
 
-    /** The disputes already raised here (run and report), so each is raised once. */
-    private val raisedDisputes = LinkedHashSet<String>()
+    /**
+     * Builds her models for a dispute from the roles as they are now (see [com.hereliesaz.geministrator.queen.DisputeModelSource]); the app
+     * sets it. Null, or a source that returns null, leaves her away. Wins over [disputeModels].
+     */
+    var disputeModelSource: com.hereliesaz.geministrator.queen.DisputeModelSource? = null
+
+    /** The disputes already raised (run and report), so each is raised once, also after a restart. */
+    private val raisedDisputes = com.hereliesaz.geministrator.queen.RaisedDisputes(
+        load = { DurableUiState.store.getString(RAISED_DISPUTES_KEY) },
+        save = { DurableUiState.store.putString(RAISED_DISPUTES_KEY, it) },
+    )
 
     private data class Current(
         val project: Project,
@@ -1047,21 +1056,21 @@ class ApplicationRuntime private constructor(
     private fun queenDisputeLocked(definition: WorkflowDefinition, run: WorkflowRun) {
         val case = com.hereliesaz.geministrator.queen.nannyDispute(definition, run) ?: return
         if (!raisedDisputes.add(case.key)) return
-        while (raisedDisputes.size > 64) raisedDisputes.remove(raisedDisputes.first())
         val runId = run.id.value
-        val models = disputeModels
-        val researcher = models?.research
-        val researchPass: (suspend (String) -> List<String>?)? =
-            if (researcher == null) null else { missing -> researcher.findings(missing, "dispute-$runId") }
-        val investigator = com.hereliesaz.geministrator.queen.DisputeInvestigator(
-            research = researchPass,
-            test = { request -> launchDisputeTestSwarm(runId, case.dispute, request) },
-        )
         runtimeScope.launch {
             try {
+                val models = resolveDisputeModels()
+                val researcher = models?.research
+                val researchPass: (suspend (String) -> List<String>?)? =
+                    if (researcher == null) null else { missing -> researcher.findings(missing, "dispute-$runId") }
+                val investigator = com.hereliesaz.geministrator.queen.DisputeInvestigator(
+                    research = researchPass,
+                    test = { request -> launchDisputeTestSwarm(runId, case.dispute, request) },
+                )
                 raiseDispute(
                     runId, case.dispute, case.parties, models?.queen, models?.voices.orEmpty(), investigator,
                     findingsOf = investigator::findingsOf, mayCall = models?.mayCall ?: { true },
+                    testFacts = { testRunId -> readBackTestReport(testRunId) },
                 )
                 runtimeMutex.withLock { publishCurrent() }
             } catch (cancellation: CancellationException) {
@@ -1070,6 +1079,30 @@ class ApplicationRuntime private constructor(
                 // She could not raise it; the Nanny's own review and the keeper still stand.
             }
         }
+    }
+
+    /**
+     * Her models now: from the app's source with the current roles, each call held to the keeper's hourly spend cap (a call the
+     * cap leaves no room for fails, and the dispute goes to the keeper); else the fixed [disputeModels]; else none (she is away).
+     */
+    private suspend fun resolveDisputeModels(): DisputeModels? {
+        val source = disputeModelSource ?: return disputeModels
+        val roles = activeRoles(resolveRoleCollection(persistence.roles.all()))
+        val built = source.models(roles) ?: return null
+        val allows: suspend () -> Boolean = {
+            val cap = queenCaps().hourlySpendCapUsd
+            cap == null || com.hereliesaz.geministrator.queen.hourlyCapAllows(
+                cap,
+                com.hereliesaz.geministrator.workflow.hourlySpend(persistence, nowEpochMillis(), null, com.hereliesaz.geministrator.workflow.AmbientSpendLedger.Shared),
+            )
+        }
+        val queen = com.hereliesaz.geministrator.queen.cappedModel(built.queen, allows)
+        return DisputeModels(
+            queen = queen,
+            voices = built.voices.mapValues { (_, voice) -> com.hereliesaz.geministrator.queen.cappedModel(voice, allows) },
+            research = built.research?.withFactModel(queen),
+            mayCall = built.mayCall,
+        )
     }
 
     /** What happened when the keeper accepted one of her suggestions. */
@@ -1753,6 +1786,9 @@ internal fun repairKnownNodeCreatureRigCycle(definition: WorkflowDefinition): Wo
 
 @OptIn(ExperimentalTime::class)
 private fun nowEpochMillis(): Long = Clock.System.now().toEpochMilliseconds()
+
+/** Where the keys of raised disputes are kept (the app's durable UI state). */
+private const val RAISED_DISPUTES_KEY = "queen.disputes.raised"
 
 /**
  * The parents of a run the user launches as a continuation (one earlier run) or a merge (several):

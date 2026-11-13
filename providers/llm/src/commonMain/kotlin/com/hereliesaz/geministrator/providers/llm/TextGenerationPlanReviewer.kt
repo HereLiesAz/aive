@@ -49,8 +49,8 @@ fun configuredPlanReviewer(linked: Map<String, String>): PlanReviewer? =
     configuredPlanningApis(linked).takeIf { it.isNotEmpty() }?.let(::TextGenerationPlanReviewer)
 
 /**
- * The queen's model: asked in turn the linked LLMs, or only [pinnedProviderId] when her role pins one (it never
- * switches silently). Her answer is validated by `acceptRuling`; this only carries text.
+ * The queen's model, in two modes. Automatic (no pin, the default): the linked Sources in the routing order, keyless ones
+ * included, moving to the next when one fails, and saying so. Pinned: only [pinnedProviderId] (it never switches silently). Her answer is validated by `acceptRuling`; this only carries text.
  */
 class TextGenerationQueenModel(
     private val candidates: List<PlanningApiEntry>,
@@ -60,14 +60,18 @@ class TextGenerationQueenModel(
         val order = if (pinnedProviderId == null) candidates else candidates.filter { it.id == pinnedProviderId }
         if (order.isEmpty()) error("No linked LLM can answer for the queen")
         var last: Throwable? = null
-        for (candidate in order) {
+        for ((index, candidate) in order.withIndex()) {
             try {
                 return candidate.api.generate(prompt).text
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Throwable) {
                 last = failure
+                // Pinned: the keeper's choice, it never moves. Automatic: the next Source in the routing order, said in the Story.
                 if (pinnedProviderId != null) throw failure
+                order.getOrNull(index + 1)?.let { next ->
+                    reportLaunchProgress("${candidate.name} could not answer for the queen; asking ${next.name}…")
+                }
             }
         }
         throw last ?: error("No linked LLM can answer for the queen")

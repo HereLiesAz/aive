@@ -18,6 +18,7 @@ import com.hereliesaz.geministrator.providers.llm.OpenAiProvider
 import com.hereliesaz.geministrator.providers.llm.XaiProvider
 import com.hereliesaz.geministrator.providers.llm.configuredPlanningRuntime
 import com.hereliesaz.geministrator.providers.llm.configuredPlanReviewer
+import com.hereliesaz.geministrator.providers.llm.configuredQueenModel
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
 import com.hereliesaz.geministrator.orchestration.PlanReviewer
 import com.hereliesaz.geministrator.workflow.GitHubActionsExecutorIntegration
@@ -107,6 +108,12 @@ class HeadlessEngine private constructor(
                     persistence = persistence,
                     executorIntegrations = integrations,
                 )
+                // The queen's model for disputes: the Source pinned on her role, else automatic; none linked means she is away.
+                runtime.disputeModelSource = com.hereliesaz.geministrator.queen.DisputeModelSource { roles ->
+                    configuredQueenModel(providerCredentials, com.hereliesaz.geministrator.queen.orchestratorPin(roles))?.let { model ->
+                        com.hereliesaz.geministrator.DisputeModels(model, com.hereliesaz.geministrator.queen.disputeVoices(model, roles))
+                    }
+                }
                 val planner = configuredPlanningRuntime(providerCredentials)
                 val reviewer = configuredPlanReviewer(providerCredentials)
                 val authored = SettingsAuthoredWorkflowStore(
