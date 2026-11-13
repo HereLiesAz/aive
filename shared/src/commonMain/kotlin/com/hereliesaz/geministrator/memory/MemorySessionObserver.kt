@@ -28,6 +28,13 @@ interface MemorySessionObserver {
     suspend fun onSessionFinished(handle: ManagedSessionHandle, status: ManagedSessionStatus)
 
     /**
+     * The agent wrote `/remindme`: send the session so far to memory now. Only the parts not yet
+     * sent go; the capture stays, and the end of the session sends what comes after. Nothing is
+     * answered back.
+     */
+    suspend fun onRemindMe(handle: ManagedSessionHandle) = Unit
+
+    /**
      * A user message on its way into a running session. Returns the text to send: memory appends
      * its cue cloud for the user's words; observers without one return it unchanged.
      */
@@ -63,6 +70,10 @@ class QueuedMemorySessionObserver(
         val request: AgentTaskRequest,
         val userPrompt: String,
         val parts: MutableList<MemorySessionPart>,
+        /** How many of [parts] have already been sent to the queue (the cursor). */
+        var sentParts: Int = 0,
+        /** How many envelopes this capture has sent; keeps episode ids unique per envelope. */
+        var sends: Int = 0,
     )
 
     private val mutex = Mutex()
@@ -175,10 +186,40 @@ class QueuedMemorySessionObserver(
     override suspend fun onSessionFinished(handle: ManagedSessionHandle, status: ManagedSessionStatus) {
         if (status != ManagedSessionStatus.Completed && status != ManagedSessionStatus.Failed) return
         val capture = mutex.withLock { captures[handle] } ?: return
+        send(
+            handle,
+            capture,
+            MemorySessionPart(
+                kind = if (status == ManagedSessionStatus.Failed) MemorySourceKind.Failure else MemorySourceKind.Other,
+                label = "Terminal status",
+                text = status.name,
+            ),
+        )
+        mutex.withLock {
+            if (captures[handle] === capture) captures.remove(handle)
+        }
+    }
+
+    override suspend fun onRemindMe(handle: ManagedSessionHandle) {
+        val capture = mutex.withLock { captures[handle] } ?: return
+        send(handle, capture, terminal = null)
+    }
+
+    /**
+     * Sends the parts after the capture's cursor (plus [terminal], if any) as one envelope and moves
+     * the cursor past them, so each part reaches memory exactly once. Nothing new and no terminal
+     * part: nothing is sent. The capture itself is kept.
+     */
+    private suspend fun send(handle: ManagedSessionHandle, capture: Capture, terminal: MemorySessionPart?) {
+        val (fresh, sequence) = mutex.withLock {
+            val fresh = capture.parts.subList(capture.sentParts, capture.parts.size).toList()
+            if (fresh.isEmpty() && terminal == null) return
+            capture.sentParts = capture.parts.size
+            fresh to capture.sends++
+        }
         val request = capture.request
         val context = request.orchestrationContext
         val cacheNamespace = request.promptContext.cacheNamespace
-        val fallbackWorkflowRunId = cacheNamespace?.substringBefore(':')?.takeIf(String::isNotBlank)
         val fallbackRoleId = cacheNamespace
             ?.substringAfter(':', missingDelimiterValue = "")
             ?.takeIf(String::isNotBlank)
@@ -196,21 +237,11 @@ class QueuedMemorySessionObserver(
                 // Nothing is banked unscrubbed: role instructions, prompt blocks, artifacts and messages
                 // can all carry a key a run saw, and a bank outlives the run (and is recalled into others).
                 userPrompt = ControlRedaction.scrub(capture.userPrompt),
-                parts = (capture.parts.toList() + MemorySessionPart(
-                    kind = if (status == ManagedSessionStatus.Failed) {
-                        MemorySourceKind.Failure
-                    } else {
-                        MemorySourceKind.Other
-                    },
-                    label = "Terminal status",
-                    text = status.name,
-                )).map { it.copy(text = ControlRedaction.scrub(it.text)) },
+                parts = (fresh + listOfNotNull(terminal)).map { it.copy(text = ControlRedaction.scrub(it.text)) },
                 closedAtEpochMillis = nowEpochMillis(),
+                sequence = sequence,
             ),
         )
-        mutex.withLock {
-            if (captures[handle] === capture) captures.remove(handle)
-        }
     }
 }
 

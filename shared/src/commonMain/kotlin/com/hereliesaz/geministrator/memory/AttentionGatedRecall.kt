@@ -37,7 +37,7 @@ internal class AttentionGatedRecall(
 
     /** Tokens consumed so far, and when (in those tokens) each recent memory was surfaced. */
     private var tokens: Long = 0
-    private val surfacedAt = LinkedHashMap<MemoryNodeId, Long>()
+    private val surfacedAt = LinkedHashMap<Pair<MemoryNodeId, Int>, Long>()
 
     /** Cue credits: one is spent per surfacing; tokens refill one per cue interval, up to the burst. */
     private var credits: Double = policy.cueBurst.toDouble()
@@ -67,14 +67,38 @@ internal class AttentionGatedRecall(
      */
     suspend fun selectAlongside(rankedHits: List<MemoryRecallHit>): List<MemoryRecallHit> = select(rankedHits, ignoreInterval = true)
 
-    suspend fun select(rankedHits: List<MemoryRecallHit>, ignoreInterval: Boolean = false): List<MemoryRecallHit> = mutex.withLock {
-        // Memories surfaced within the novelty window are not offered again; the gate decides on
-        // what is left.
+    /**
+     * Only the novelty limit, for what the agent itself followed: nothing shown at this [depth]
+     * within the window is shown again, and what is shown is remembered. The dial's threshold and
+     * interval do not apply.
+     */
+    suspend fun fresh(hits: List<MemoryRecallHit>, depth: Int = 0): List<MemoryRecallHit> = mutex.withLock {
+        val novel = novelAt(hits, depth)
+        remember(novel, depth)
+        novel
+    }
+
+    private fun novelAt(hits: List<MemoryRecallHit>, depth: Int): List<MemoryRecallHit> {
         val window = policy.noveltyCueIntervals.toLong() * gate.cuePolicy(state).minimumIntervalTokens
-        val novel = rankedHits.filter { hit ->
-            val shownAt = surfacedAt[hit.node.id] ?: return@filter true
+        return hits.filter { hit ->
+            val shownAt = surfacedAt[hit.node.id to depth] ?: return@filter true
             tokens - shownAt >= window
         }
+    }
+
+    private fun remember(shown: List<MemoryRecallHit>, depth: Int) {
+        shown.forEach { surfacedAt.remove(it.node.id to depth); surfacedAt[it.node.id to depth] = tokens }
+        while (surfacedAt.size > RECENT_LIMIT) surfacedAt.remove(surfacedAt.keys.first())
+    }
+
+    /**
+     * [depth] is how far down the condensation what is shown goes (0 = gist). The novelty window is
+     * kept per memory and depth: a repeat at the same depth is held back, going deeper is not.
+     */
+    suspend fun select(rankedHits: List<MemoryRecallHit>, ignoreInterval: Boolean = false, depth: Int = 0): List<MemoryRecallHit> = mutex.withLock {
+        // Memories surfaced at this depth within the novelty window are not offered again; the gate
+        // decides on what is left.
+        val novel = novelAt(rankedHits, depth)
         if (novel.isEmpty()) return@withLock novel
         val scores = novel.map { it.score.coerceIn(0f, 1f) }.sortedDescending()
         val strongest = scores.first()
@@ -88,8 +112,7 @@ internal class AttentionGatedRecall(
             if (!ignoreInterval) credits -= 1.0
             open = true
             state = gate.markCueSurfaced(state)
-            novel.forEach { surfacedAt.remove(it.node.id); surfacedAt[it.node.id] = tokens }
-            while (surfacedAt.size > RECENT_LIMIT) surfacedAt.remove(surfacedAt.keys.first())
+            remember(novel, depth)
             novel
         } else {
             emptyList()

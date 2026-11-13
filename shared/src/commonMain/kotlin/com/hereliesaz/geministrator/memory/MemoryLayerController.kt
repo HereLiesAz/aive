@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlin.math.roundToInt
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import com.hereliesaz.geministrator.orchestration.MemoryResolution as QueryResolution
@@ -210,51 +209,15 @@ class MemoryLayerController(
         val pending: MutableList<String> = mutableListOf(),
         /** The protocol is starting context: given once, not with every prompt or cue. */
         var protocolGiven: Boolean = false,
+        /** What the agent is dwelling on and how deep injections go; this session only, never stored. */
+        val dwell: MemoryDwell = MemoryDwell(),
     )
 
     private val cueMutex = Mutex()
 
-    /** Links memories that keep being delivered together (adds edges only). */
-    private val coRecall = MemoryCoRecall(nowEpochMillis)
-
-    /**
-     * Records one add-only access event (a `Recalled` link from the resolving deliberation to the
-     * memory, in the reading workflow's own bank)
-     * for each delivered resolved memory: its contradiction history fades as these accumulate.
-     */
-    private fun recordAccess(layer: AgentMemoryLayer, hits: List<MemoryRecallHit>) {
-        val resolved = hits.filter { it.resolution != null && it.provenance?.readOnlyFromWorkflow == null }
-        if (resolved.isEmpty()) return
-        val store = layer.store
-        scope.launch {
-            runCatching {
-                while (true) {
-                    val snapshot = store.read()
-                    val existing = snapshot.edges.mapTo(hashSetOf()) { it.id }
-                    val edges = resolved.map { hit ->
-                        val count = snapshot.edges.count { it.relation == MemoryRelationKind.Recalled && it.to == hit.node.id }
-                        var n = count + 1
-                        while (MemoryEdgeId("recalled:${hit.node.id.value}:$n") in existing) n += 1
-                        // From the resolving deliberation to the memory (an edge needs two distinct ends).
-                        MemoryEdge(MemoryEdgeId("recalled:${hit.node.id.value}:$n"), hit.resolution!!.deliberation.id, hit.node.id, MemoryRelationKind.Recalled, createdAtEpochMillis = nowEpochMillis())
-                    }
-                    if (store.commit(snapshot.revision, MemoryStoreMutation(edgesToAdd = edges))) break
-                }
-            }
-        }
-    }
-
     /** Explicit history of a memory in [workflowId]'s lineage: what it replaced and was condensed from. */
     suspend fun history(workflowId: String, nodeId: MemoryNodeId): List<MemoryNode> = lineageStore(workflowId).read().historyOf(nodeId)
 
-    /** Co-recall links only memories of the workflow's own lineage; read-only hits are never linked. */
-    private fun recordCoRecall(layer: AgentMemoryLayer, hits: List<MemoryRecallHit>) {
-        val own = hits.filter { it.provenance?.readOnlyFromWorkflow == null }
-        if (own.size < 2) return
-        val store = layer.store
-        val ids = own.map { it.node.id }
-        scope.launch { runCatching { coRecall.recalledTogether(store, ids) } }
-    }
     private val cueSessions = mutableMapOf<String, CueSession>()
 
     private suspend fun cueSession(agentId: String, request: AgentTaskRequest? = null): CueSession = cueMutex.withLock {
@@ -687,8 +650,9 @@ class MemoryLayerController(
                 is AgentEvent.Thinking -> event.content
                 else -> null
             }
-            attention.forAgent(handle.taskRunId.value)
-                .consumeTokens(AttentionGatedRecall.approximateTokens(text, APPROXIMATE_CHARS_PER_TOKEN))
+            val tokenCount = AttentionGatedRecall.approximateTokens(text, APPROXIMATE_CHARS_PER_TOKEN)
+            attention.forAgent(handle.taskRunId.value).consumeTokens(tokenCount)
+            cueMutex.withLock { cueSessions[handle.taskRunId.value]?.dwell?.consumeTokens(tokenCount) }
         }
 
         override suspend fun onSessionEvent(
@@ -705,13 +669,20 @@ class MemoryLayerController(
                 else -> null
             } ?: return
             if (text.isBlank() || text.startsWith(MEMORY_MESSAGE_MARKER)) return
+            // The agent's own message asking for the session so far to be sent to memory now.
+            if (event is AgentEvent.Message && MemoryRemindMeCommand.isIn(text)) {
+                layerFor(workflowOfAgent(handle.taskRunId.value)).sessionObserver.onRemindMe(handle)
+                drainSoon()
+            }
             respondToThought(handle.taskRunId.value, text, reply)
         }
 
         override suspend fun annotateUserMessage(handle: ManagedSessionHandle, text: String): String {
             if (!active || text.isBlank()) return text
             val agentId = handle.taskRunId.value
-            attention.forAgent(agentId).consumeTokens(AttentionGatedRecall.approximateTokens(text, APPROXIMATE_CHARS_PER_TOKEN))
+            val tokenCount = AttentionGatedRecall.approximateTokens(text, APPROXIMATE_CHARS_PER_TOKEN)
+            attention.forAgent(agentId).consumeTokens(tokenCount)
+            cueMutex.withLock { cueSessions[agentId]?.dwell?.consumeTokens(tokenCount) }
             val cloud = runCatching { cueCloud(agentId, text) }.getOrNull() ?: return text
             return "$text\n\n$cloud"
         }
@@ -1186,7 +1157,9 @@ class MemoryLayerController(
         agentAttention.consumeTokens(
             AttentionGatedRecall.approximateTokens(request.objective + request.roleInstructions, APPROXIMATE_CHARS_PER_TOKEN),
         )
-        val (ranked, chronological) = gripPlan(request, queryPlan)
+        // The query plan gates only this heavy grip; the cue cloud below is drawn from the prompt's own words.
+        val planned = !queryPlan.enoughEvidence && queryPlan.queries.isNotEmpty()
+        val (ranked, chronological) = if (planned) gripPlan(request, queryPlan) else emptyList<MemoryRecallHit>() to emptySet<String>()
         // Cue-first: the Attention Deficit Dial decides whether deeper resolutions may surface.
         // The lineage first, whatever the gate's order; read-only hits after, labelled.
         val hits = agentAttention.select(ranked).sortedBy { it.provenance?.readOnlyFromWorkflow != null }
@@ -1197,8 +1170,6 @@ class MemoryLayerController(
             session.protocolGiven = true
             session.pending.toList().also { session.pending.clear() } to first
         }
-        recordCoRecall(layerFor(memoryWorkflowOf(request)), hits)
-        recordAccess(layerFor(memoryWorkflowOf(request)), hits)
         // Hits a chronological query found read in time order, apart from the rest.
         val (timeline, relevant) = hits.partition { it.node.id.value in chronological }
         val blocks = buildList {
@@ -1219,7 +1190,7 @@ class MemoryLayerController(
                     PromptContextBlock(
                         "Relevant memory",
                         untrustedRecall(
-                            relevant.map { "[${it.score.twoDecimals()}] ${it.sourceLabel()}${it.node.kind.name}: ${it.node.text}${it.divergenceLines()}" }
+                            relevant.map { "${it.sourceLabel()}${it.node.kind.name}: ${gistOf(it.node.text)}${it.gistNotes()}" }
                                 .joinWholeUnits(MAX_RECALL_CHARS),
                         ),
                     ),
@@ -1231,7 +1202,7 @@ class MemoryLayerController(
                         "Memory timeline",
                         untrustedRecall(
                             timeline.sortedWith(compareBy<MemoryRecallHit> { it.node.createdAtEpochMillis }.thenBy { it.node.id.value })
-                                .map { "${it.sourceLabel()}${it.node.kind.name}: ${it.node.text}${it.divergenceLines()}" }
+                                .map { "${it.sourceLabel()}${it.node.kind.name}: ${gistOf(it.node.text)}${it.gistNotes()}" }
                                 .joinWholeUnits(MAX_RECALL_CHARS),
                         ),
                     ),
@@ -1248,8 +1219,8 @@ class MemoryLayerController(
     // ---- recall triggers in the agent's own thinking -------------------------------------------
 
     /**
-     * Reads a chunk of an agent's thinking or output. Triggers (#tag, "what I remember about …",
-     * an echoed cue, a doubled word) recall summaries; otherwise the text's uncommon words may draw
+     * Reads a chunk of an agent's thinking or output. Triggers (an echoed cue, a doubled word, or a
+     * #tag or "what I remember about …" the agent happens to write) recall summaries; otherwise the text's uncommon words may draw
      * an ambient cue cloud of #tags. Both go back into the session through [reply]; a provider that
      * cannot take a message mid-session gets them with its next turn's prompt.
      */
@@ -1275,42 +1246,17 @@ class MemoryLayerController(
             }
         }
 
-        // Deliberations the agent records with the /deliberate session command.
-        MemoryDeliberationCommand.parse(text).forEach { parsed ->
-            val outcome = parsed.mapCatching { command ->
-                val request = session.request
-                tool.deliberate(
-                    command.toRequest(
-                        sourceSessionId = agentId,
-                        scope = MemoryBankScope(
-                            projectId = request?.orchestrationContext?.projectId?.value,
-                            workflowRunId = workflow,
-                            taskRunId = agentId,
-                        ),
-                        atEpochMillis = nowEpochMillis(),
-                    ),
-                )
-            }
-            deliver(
-                outcome.fold(
-                    onSuccess = { node -> "$MEMORY_MESSAGE_MARKER deliberation recorded (memory-node:${node.id.value})" },
-                    onFailure = { error -> "$MEMORY_MESSAGE_MARKER deliberation not recorded: ${error.message}" },
-                ),
-            )
-            if (outcome.isSuccess) publish()
-        }
-
         if (triggers.isNotEmpty()) {
             triggers.take(MAX_TRIGGERS_PER_THOUGHT).forEach { trigger ->
-                val hits = recallSummaries(workflow, trigger, session.request)
-                val shown = if (trigger.deliberate) hits else gate.select(hits)
+                // Each follow raises the topic's dwell, and the injection goes one level deeper.
+                val depth = cueMutex.withLock { session.dwell.hit(trigger.subject) }
+                val hits = recallSummaries(workflow, trigger, session.request, depth)
+                val shown = if (trigger.deliberate) gate.fresh(hits, depth.ordinal) else gate.select(hits, depth = depth.ordinal)
                 if (shown.isNotEmpty()) {
-                    recordCoRecall(layer, shown)
-                    recordAccess(layer, shown)
                     deliver(
                         buildString {
                             append(MEMORY_MESSAGE_MARKER).append(' ').append(MemoryCueWatcher.hashtag(trigger.subject)).append('\n')
-                            shown.forEach { append("- ").append(it.sourceLabel()).append(it.node.text.take(MAX_SUMMARY_CHARS)).append(it.divergenceLines()).append('\n') }
+                            shown.forEach { append("- ").append(it.sourceLabel()).append(gistOf(it.node.text, if (depth == MemoryDepth.Detail) DETAIL_GIST_CHARS else GIST_CHARS)).append(it.gistNotes()).append('\n') }
                         }.trimEnd(),
                     )
                 }
@@ -1357,7 +1303,10 @@ class MemoryLayerController(
         val hits = best.values.sortedByDescending { it.score }.take(MAX_RECALL_RESULTS)
         val cues = (if (alongside) gate.selectAlongside(hits) else gate.select(hits)).take(MemoryAttentionGate(attentionPolicy).cuePolicy(gate.currentState()).maxTags)
         if (cues.isEmpty()) return null
-        cueMutex.withLock { session.watcher.offered(cues.map { it.node.text }) }
+        cueMutex.withLock {
+            session.watcher.offered(cues.map { it.node.text })
+            cues.forEach { session.dwell.hit(it.node.text) }
+        }
         return "$MEMORY_MESSAGE_MARKER " + cues.joinToString(" ") { MemoryCueWatcher.hashtag(it.node.text) }
     }
 
@@ -1377,28 +1326,55 @@ class MemoryLayerController(
             .map { MemoryRecallHit(it.tag, MemoryTagKeywords.relevance(it.weight)) }
     }
 
-    private suspend fun recallSummaries(workflow: String, trigger: MemoryRecallTrigger, request: AgentTaskRequest?): List<MemoryRecallHit> {
+    /**
+     * What a followed topic brings back at [depth]: a gist (summaries), key phrases, finer summaries
+     * (more of them), or the memories those were condensed from. Read only; nothing stored changes.
+     */
+    private suspend fun recallSummaries(
+        workflow: String,
+        trigger: MemoryRecallTrigger,
+        request: AgentTaskRequest?,
+        depth: MemoryDepth = MemoryDepth.Gist,
+    ): List<MemoryRecallHit> {
+        val resolution = if (depth == MemoryDepth.Phrases) MemoryResolution.Phrase else MemoryResolution.Summary
+        val limit = if (depth >= MemoryDepth.Summaries) MAX_TRIGGER_SUMMARIES + DEEPER_EXTRA_SUMMARIES else MAX_TRIGGER_SUMMARIES
         suspend fun search(tool: MemoryTool, taskRunId: String?): List<MemoryRecallHit> = when (trigger) {
             is MemoryRecallTrigger.Phrase -> tool.grip(
                 MemoryQuery(
                     text = trigger.subject,
-                    resolution = MemoryResolution.Summary,
-                    maxResults = MAX_TRIGGER_SUMMARIES,
+                    resolution = resolution,
+                    maxResults = limit,
                     taskRunId = taskRunId,
                 ),
             ).hits
             else -> tool.grip(
                 MemoryTagQuery(
                     tags = listOf(trigger.subject),
-                    resolution = MemoryResolution.Summary,
-                    maxResults = MAX_TRIGGER_SUMMARIES,
+                    resolution = resolution,
+                    maxResults = limit,
                     scope = MemoryBankScope(taskRunId = taskRunId),
                 ),
             ).hits
         }
         // The lineage first; then, read-only and labelled, the project's other workflows.
         val own = withProvenance(workflow, search(layerFor(workflow).tool, request?.taskRunId?.value))
-        return own + readOnlyHits(workflow) { search(it, null) }.take(MAX_TRIGGER_SUMMARIES)
+        if (depth == MemoryDepth.Detail) return condensedFrom(workflow, own)
+        return own + readOnlyHits(workflow) { search(it, null) }.take(limit)
+    }
+
+    /** One step down the condensation: the memories [hits] were condensed from (own bank only). */
+    private suspend fun condensedFrom(workflow: String, hits: List<MemoryRecallHit>): List<MemoryRecallHit> {
+        val snapshot = layerFor(workflow).store.read()
+        val byId = snapshot.nodes.associateBy { it.id }
+        return hits.filter { it.provenance?.readOnlyFromWorkflow == null }
+            .flatMap { hit ->
+                snapshot.edges
+                    .filter { it.relation == MemoryRelationKind.CondensedFrom && it.from == hit.node.id }
+                    .mapNotNull { edge -> byId[edge.to] }
+                    .map { source -> MemoryRecallHit(source, hit.score) }
+            }
+            .distinctBy { it.node.id }
+            .take(MAX_TRIGGER_SUMMARIES + DEEPER_EXTRA_SUMMARIES)
     }
 
     /** The frequency filter: a word in more than the policy's share (and count) of memories is common. */
@@ -1437,7 +1413,8 @@ class MemoryLayerController(
     private companion object {
         const val MAX_TRIGGERS_PER_THOUGHT = 3
         const val MAX_TRIGGER_SUMMARIES = 3
-        const val MAX_SUMMARY_CHARS = 400
+        /** Finer summaries and sources: how many more may come back once the agent has lingered. */
+        const val DEEPER_EXTRA_SUMMARIES = 2
         const val MAX_PENDING_RECALLS = 8
         const val MAX_CLOUD_QUERY_WORDS = 12
         /** Three-letter function words, which keyword lookup (unlike the searched cue words) would otherwise keep. */
@@ -1457,11 +1434,10 @@ class MemoryLayerController(
          * A hint, not a requirement: recall runs on what an agent thinks and writes anyway (cue
          * clouds, echoes, doubled words). This only tells it what the marked lines are, once.
          */
-        val MEMORY_PROTOCOL = "Lines starting $MEMORY_MESSAGE_MARKER are your memory. #tags are things you remember; " +
-            "dwell on one (or write \"Let me see what I remember about …\") and more of it comes back. " +
-            "When memories diverge, record your conclusion on its own line: " +
-            "${MemoryDeliberationCommand.COMMAND} memory-node:<a> memory-node:<b> chosen=memory-node:<a> | <why> " +
-            "(chosen=none if it stays unresolved). Both memories are kept either way. " +
+        val MEMORY_PROTOCOL = "Lines starting $MEMORY_MESSAGE_MARKER are your memory. It arrives by itself as you think and write, " +
+            "and goes deeper the longer you stay on a topic; it is gist, never exact. " +
+            "If memories disagree, reason it out loud and state the resolution plainly. " +
+            "A line of just ${MemoryRemindMeCommand.COMMAND} sends this session so far to memory. " +
             RECALL_UNTRUSTED_NOTE
 
         const val RECALL_UNTRUSTED_NOTE: String =
@@ -1577,9 +1553,6 @@ internal fun MemoryRecallHit.divergenceLines(): String = buildString {
         append("\n  ↔ diverges (same subject, different content; both remembered): ").append(partner.text)
     }
     deliberations.forEach { append("\n  ✎ earlier deliberation: ").append(it.text) }
-    if (conflicts.isNotEmpty() && resolution == null) {
-        append("\n  ⚖ to deliberate: ").append(MemoryDeliberationCommand.template(node.id, conflicts.map { it.id }))
-    }
     // The summary of each link delivered with the hit, and the hit's summary-tree levels.
     pairSummaries.forEach { pair ->
         append("\n  ⇄ ").append(pair.relation.name).append(" link, together: ").append(pair.summary.text.replace('\n', ' '))
@@ -1621,9 +1594,4 @@ internal fun List<String>.joinWholeUnits(maxChars: Int, separator: String = "\n\
         if (isNotEmpty()) append(separator)
         append(unit)
     }
-}
-
-private fun Float.twoDecimals(): String {
-    val hundredths = (this * 100).roundToInt()
-    return "${hundredths / 100}.${(hundredths % 100).toString().padStart(2, '0')}"
 }

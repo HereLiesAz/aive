@@ -99,6 +99,46 @@ class MemoryCueWatcherTest {
     }
 
     @Test
+    fun lingeringOnATagGoesDeeperAndNeverChangesAStoredMemory() = runBlocking {
+        val store = InMemoryMemoryStore()
+        MemoryConsolidationQueue(store).enqueueSession(
+            MemorySessionEnvelope(
+                "s1",
+                workflowRunId = "session:agent-1",
+                userPrompt = "Move the memory store off JSON settings.",
+                parts = listOf(
+                    MemorySessionPart(
+                        MemorySourceKind.AgentNote,
+                        "Agent",
+                        "We decided to replace SettingsMemoryStore with an append-only log in MemoryLog.kt because every commit re-encoded the snapshot.",
+                    ),
+                ),
+                closedAtEpochMillis = 1L,
+            ),
+        )
+        val controller = MemoryLayerController(
+            banks = MemoryBanks.inMemory(mapOf("session:agent-1" to store)),
+            settingsStore = MemoryLayerSettingsStore(MapSettings()),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            nowEpochMillis = { 1_000L },
+        )
+        controller.drain()
+        val before = store.read()
+        val handle = ManagedSessionHandle(TaskRunId("agent-1"), AgentProviderId("p"), ProviderRunId("r"))
+        val sent = mutableListOf<String>()
+        // Four follows of the same tag: gist, key phrases, finer summaries, then what they were condensed from.
+        repeat(4) {
+            controller.observer.onSessionEvent(handle, AgentEvent.Thinking(ProviderRunId("r"), "Back to #SettingsMemoryStore and its storage.")) {
+                sent += it
+                ProviderActionResult.Accepted
+            }
+        }
+        assertTrue(sent.first().startsWith(MEMORY_MESSAGE_MARKER) && "append-only log" in sent.first(), sent.first())
+        assertEquals(before, store.read(), "surfacing writes nothing to a stored memory")
+    }
+
+    @Test
     fun userPromptsDrawACueCloudToo() = runBlocking {
         val store = InMemoryMemoryStore()
         MemoryConsolidationQueue(store).enqueueSession(
@@ -134,5 +174,18 @@ class MemoryCueWatcherTest {
         )
         val blocks = controller.promptContextProvider.recallFor(request, MemoryQueryPlan(emptyList(), enoughEvidence = false)).blocks
         assertTrue(blocks.any { it.label == "Memory" && it.content.startsWith("$MEMORY_MESSAGE_MARKER #") }, "$blocks")
+
+        // A plan that says memory is not needed skips only the heavy grip, never the prompt's cue cloud.
+        val gatedOff = MemoryQueryPlan(
+            listOf(com.hereliesaz.geministrator.orchestration.MemoryQuerySpec("keystore", com.hereliesaz.geministrator.orchestration.MemoryResolution.Summary, "TEST")),
+            enoughEvidence = true,
+        )
+        val gatedRequest = AgentTaskRequest(
+            TaskRunId("agent-4"), "Check the keystore signing", "", emptyList(),
+            orchestrationContext = AgentOrchestrationContext(workflowRunId = WorkflowRunId("wf-keys")),
+        )
+        val gated = controller.promptContextProvider.recallFor(gatedRequest, gatedOff).blocks
+        assertTrue(gated.any { it.label == "Memory" && it.content.startsWith("$MEMORY_MESSAGE_MARKER #") }, "$gated")
+        assertTrue(gated.none { it.label == "Relevant memory" || it.label == "Memory timeline" }, "$gated")
     }
 }

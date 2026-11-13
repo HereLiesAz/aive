@@ -119,4 +119,23 @@ class AttentionGatedRecallTest {
         agents.setLevel("a", 0.3f)
         assertEquals(0.3f, agents.forAgent("a").currentState().effectiveLevel)
     }
+
+    @Test
+    fun noveltyIsKeyedByDepthSoARepeatIsHeldBackButGoingDeeperIsNot() = runBlocking {
+        val recall = AttentionGatedRecall(MemoryAttentionPolicy())
+        assertEquals(ranked, recall.select(ranked))
+        assertTrue(recall.select(ranked).isEmpty(), "the same depth again is held back")
+        assertEquals(ranked, recall.select(ranked, depth = 1), "a deeper level of the same memories is allowed")
+        assertTrue(recall.select(ranked, depth = 1).isEmpty(), "and is itself held back at its own depth")
+    }
+
+    @Test
+    fun freshHoldsBackOnlyARepeatAtTheSameDepth() = runBlocking {
+        val recall = AttentionGatedRecall(MemoryAttentionPolicy())
+        assertEquals(ranked, recall.fresh(ranked, 2))
+        assertTrue(recall.fresh(ranked, 2).isEmpty())
+        assertEquals(ranked, recall.fresh(ranked, 3))
+        recall.consumeTokens(5_000)
+        assertEquals(ranked, recall.fresh(ranked, 2), "after the novelty window it may come again")
+    }
 }

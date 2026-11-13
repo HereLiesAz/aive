@@ -70,7 +70,7 @@ A checked box means implemented and covered by automated tests. It does not mean
 
 - [x] Document the compound-inference architecture and preserve the existing human-like memory/reconsolidation authority boundary.
 - [x] Keep memory contrasts apart: deterministic frame/filler contrast detection (with an entity alias table) bars contrasting memories from condensation for every engine; divergence markers, an add-only variant register and deliberation records are stored; recall returns divergent partners as one unit by default; only the engine writes `Supersedes`, and only on exact sentence coverage.
-- [x] Let a running agent record a deliberation (`MemoryTool.deliberate`) from its session; the `/deliberate` session command (`MemoryDeliberationCommand`), taught in the memory protocol and templated under every divergent hit.
+- [x] Let a running agent record a deliberation (`MemoryTool.deliberate`) from its session; the `/deliberate` session command that once did this was retired for agents (the owner's model has `/remindme` as the only command; docs/Memory-model-gap.md).
 - [x] Add provider-neutral compound-inference strategy and direct genealogy contracts.
 - [x] Attach baseline single-model compound-inference metadata to every `AgentTaskRequest`, including direct dependency artifact ancestry.
 - [x] Populate complete workflow/project/task/role coordinates before provider dispatch so genealogy is fully namespaced without fallback inference.

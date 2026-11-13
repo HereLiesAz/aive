@@ -363,6 +363,8 @@ data class MemorySessionEnvelope(
     val closedAtEpochMillis: Long,
     /** When what the session records happened, if known; the episode's [MemoryEpisode.occurredAtEpochMillis]. */
     val occurredAtEpochMillis: Long? = null,
+    /** Which envelope of its session this is (0 for the first); a session sent in pieces has one id per piece. */
+    val sequence: Int = 0,
 )
 
 /**

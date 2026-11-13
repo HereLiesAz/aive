@@ -152,16 +152,39 @@ the same for every clerk engine, and none of it judges which memory is right.
   workflow's bank) and a `Deliberation` node citing the memories (and naming the evidence) it
   considered (`Deliberates`). It may name the cited memory it judged correct (`chosen`), or conclude
   "unresolved" (`chosen = null`). It is never sectioned or condensed itself.
-- **Agents record deliberations from their session** with the `/deliberate` session command, one per
-  line of their thinking or output:
-  `/deliberate memory-node:<a> memory-node:<b> chosen=memory-node:<a> | <conclusion> | evidence=<what was considered>`
-  (`MemoryDeliberationCommand`). The ids before the first `|` are the memories cited; `chosen=` names
-  the one judged correct (it is cited too), `chosen=none` or no `chosen=` records "unresolved". The
-  controller calls `MemoryTool.deliberate` in the session's workflow bank, scoped to its project,
-  workflow and task run, and answers on the memory channel with the deliberation's id or why it was not
-  recorded (an unknown id, no conclusion). Agents are told the command in the one-time memory protocol,
-  and every divergent recall hit carries a ready template citing it and its partners
-  (`⚖ to deliberate: …`); a resolved memory no longer shows one.
+- **Agents do not record deliberations by command.** There is no `/deliberate`: an agent reasons a
+  contradiction out loud and states the resolution plainly, and that text is banked and condensed like
+  any other session text. A divergent recall hit is shown with its partners as `↔ diverges` and nothing
+  else (no template). `MemoryTool.deliberate` and `MemoryDeliberationAbsorber` remain as a typed seam
+  (and for tests and the keeper's own tooling); nothing in a running agent's session calls them.
+
+### What an agent sees in its chat (passive recall)
+
+- **The one command is `/remindme`**, bare, on a line of the agent's own message
+  (`MemoryRemindMeCommand`). It sends the session so far to memory now
+  (`MemorySessionObserver.onRemindMe`). The observer keeps a cursor per capture, the number of parts
+  already sent. `/remindme` enqueues the parts after the cursor (scrubbed with `ControlRedaction.scrub`,
+  through `MemoryConsolidationQueue.enqueueSession`) and advances the cursor without dropping the
+  capture; the end of the session sends only what came after, plus the terminal status. Each part
+  reaches memory once; a `/remindme` with nothing new does nothing; nothing is sent back. Episode ids
+  stay unique per envelope (`MemorySessionEnvelope.sequence`, appended to the id after the first).
+- **The first-prompt protocol** (`MEMORY_PROTOCOL`) says in a few words that memory arrives by itself,
+  to reason contradictions out loud and state the resolution, and that `/remindme` sends the session so
+  far to memory.
+- **The prompt's cue cloud is not gated by the query plan.** Only the heavy query grip (`Relevant
+  memory`, `Memory timeline`) waits on the plan's "memory is needed"; the cloud, protocol, role lessons
+  and habits come regardless.
+- **Lingering goes deeper.** `MemoryDwell` (held in the session, never stored) counts hits per topic: a
+  cue surfaced for it, or the agent following it. Each hit raises the depth one level, and the dwell
+  falls by one for every 300 tokens that pass. Levels: the keyword cloud and a gist; key phrases
+  (`MemoryResolution.Phrase`); finer summaries (more of them); and the detail the memories were
+  condensed from (`CondensedFrom` followed one step down, own bank only). The novelty window is keyed by
+  memory and depth: a repeat at the same depth is held back, going deeper is not. Surfacing writes
+  nothing to a stored memory: the co-recall (`AssociatedWith`) and access (`Recalled`) edges are no
+  longer written on recall (existing edges stay as stored).
+- **Gist rendering** (`MemoryGist.kt`). Injected recall shows the time range and lineage, a short
+  one-line summary (240 characters, 400 at the detail level), and notes for divergence and settled
+  contrasts; no numeric scores, no node ids, no full stored text. Storage is unchanged.
 
 ### Resolved contrasts: deliberation, then absorption
 
@@ -182,8 +205,10 @@ consolidated only after conscious judgment:
 Recall then returns the resolved memory as a single memory, not a divergence unit, so a model does not
 re-adjudicate it on every recall. Its contradiction history (`MemoryRecallHit.resolution`: the
 deliberation and the not-chosen side) is attached, and how much of it is rendered decays with access.
-Each recall that delivers it appends one access event (`Recalled`, from the resolving deliberation to
-the memory, in the reading workflow's bank; add-only, counted rather than kept as a mutable counter):
+Recall used to append one access event (`Recalled`, from the resolving deliberation to the memory) per
+delivery, and the note below faded with their count. Recall no longer writes it (surfacing changes no
+stored memory); the injected rendering says only "settled since", and the table describes the full
+rendering `divergenceLines`, which no injection uses now:
 
 | Recalls so far | Rendered under the memory |
 |---|---|
@@ -197,8 +222,8 @@ arrives: a new memory that contrasts with the resolved one is marked `Diverges` 
 and the pair is a divergence unit again.
 
 Unresolved differing memories therefore stay separate and marked, so recall brings them to an
-ordinary agent together. That agent may notice the discrepancy ("wait a sec…"), reason about it, and record its
-conclusion as a deliberation or bank it as new experience through the same pipeline
+ordinary agent together. That agent may notice the discrepancy ("wait a sec…"), reason about it out loud,
+and the resolution is banked as new experience through the same pipeline
 (`docs/architecture/MEMORY_BANKING_AND_ATTENTION.md`).
 
 ### Why not a self-edited knowledge wiki
@@ -931,7 +956,7 @@ To validate conscious conflict reasoning:
 3. A normal orchestrated Aive agent recalls both, as one unit.
 4. That agent may consciously notice and reason about the discrepancy.
 5. Its reasoning becomes ordinary session context.
-6. The resulting episode later passes through the same clerical pipeline, or the agent records its conclusion as a deliberation that cites both memories and leaves them and the marker in place.
+6. The resulting episode later passes through the same clerical pipeline, and its stated resolution is condensed like everything else.
 
 Contradiction awareness belongs to the ordinary agent, not to the memory clerks.
 
