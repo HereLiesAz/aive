@@ -894,7 +894,7 @@ private fun MemoryConsolidationStage.next(): MemoryConsolidationStage = when (th
 }
 
 private fun MemorySessionEnvelope.episodeId(): MemoryEpisodeId = MemoryEpisodeId(
-    "episode-${closedAtEpochMillis}-${sourceSessionId.hashCode().toString(16)}",
+    "episode-${closedAtEpochMillis}-${sourceSessionId.hashCode().toString(16)}" + if (sequence > 0) "-$sequence" else "",
 )
 
 private fun MemoryBankRequest.episodeId(sequence: Long): MemoryEpisodeId = MemoryEpisodeId(

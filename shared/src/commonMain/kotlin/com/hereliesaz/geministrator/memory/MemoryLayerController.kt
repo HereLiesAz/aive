@@ -705,6 +705,11 @@ class MemoryLayerController(
                 else -> null
             } ?: return
             if (text.isBlank() || text.startsWith(MEMORY_MESSAGE_MARKER)) return
+            // The agent's own message asking for the session so far to be sent to memory now.
+            if (event is AgentEvent.Message && MemoryRemindMeCommand.isIn(text)) {
+                layerFor(workflowOfAgent(handle.taskRunId.value)).sessionObserver.onRemindMe(handle)
+                drainSoon()
+            }
             respondToThought(handle.taskRunId.value, text, reply)
         }
 
