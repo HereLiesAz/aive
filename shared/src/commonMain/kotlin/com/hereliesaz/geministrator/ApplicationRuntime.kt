@@ -160,6 +160,15 @@ class ApplicationRuntime private constructor(
         while (researchRecords.size > 32) researchRecords.remove(researchRecords.keys.first())
     }
 
+    /** What the queen found missing when she staffed each run launched here (memory only; she says it once in Messages). */
+    private val queenMissing = LinkedHashMap<String, List<com.hereliesaz.geministrator.queen.Missing>>()
+
+    internal fun rememberMissing(runId: String, missing: List<com.hereliesaz.geministrator.queen.Missing>) {
+        if (missing.isEmpty()) return
+        queenMissing[runId] = missing
+        while (queenMissing.size > 32) queenMissing.remove(queenMissing.keys.first())
+    }
+
     private data class Current(
         val project: Project,
         val definition: WorkflowDefinition,
@@ -927,7 +936,7 @@ class ApplicationRuntime private constructor(
     private fun queenNotesFor(definition: WorkflowDefinition, run: WorkflowRun): List<com.hereliesaz.geministrator.queen.QueenNote> =
         try {
             val review = queenReview?.takeIf { it.runId == run.id.value }?.state
-            com.hereliesaz.geministrator.queen.queenUpdate(definition, run, roles, queenLevel(), review, researchRecords[run.id.value])
+            com.hereliesaz.geministrator.queen.queenUpdate(definition, run, roles, queenLevel(), review, researchRecords[run.id.value], queenMissing[run.id.value].orEmpty())
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (_: Exception) {

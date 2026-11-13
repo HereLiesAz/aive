@@ -65,6 +65,10 @@ private class PlanInputs(
     val objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
     /** What the queen consulted before planning, for the run's Story and Messages; null when she did not. */
     val research: com.hereliesaz.geministrator.research.ResearchRecord? = null,
+    /** What the queen found missing when she staffed her planner and reviewer, said once in Messages after the run starts. */
+    val missing: List<com.hereliesaz.geministrator.queen.Missing> = emptyList(),
+    /** Her planner and reviewer, staffed from the generic roles. */
+    val staffing: com.hereliesaz.geministrator.queen.QueenStaffing? = null,
 ) {
     fun withResearch(outcome: com.hereliesaz.geministrator.research.ResearchOutcome): PlanInputs {
         if (outcome.record.isEmpty) return this
@@ -75,7 +79,7 @@ private class PlanInputs(
                 availableTools = tools,
                 instruction = if (tools.isEmpty()) packet.instruction else packet.instruction + com.hereliesaz.geministrator.research.RESEARCH_PLAN_INSTRUCTION,
             ),
-            design, supplementalRoles, rolesToPersist, objectiveProvenance, outcome.record,
+            design, supplementalRoles, rolesToPersist, objectiveProvenance, outcome.record, missing, staffing,
         )
     }
 
@@ -125,6 +129,7 @@ private suspend fun ApplicationRuntime.planInputs(
             authorities = role.authorities.map { it.name }.sorted(),
         )
     }
+    val staffing = com.hereliesaz.geministrator.queen.staffQueen(launchRoles)
     val packet = if (design == null) {
         OrchestrationPacket(
             objective = cleanObjective,
@@ -154,7 +159,24 @@ private suspend fun ApplicationRuntime.planInputs(
         supplementalRoles = supplementalRoles,
         rolesToPersist = globalRoles.takeIf { design != null },
         objectiveProvenance = objectiveProvenance,
+        missing = staffingMissing(staffing, providerRegistry.linkedSourceIds()),
+        staffing = staffing,
     )
+}
+
+/**
+ * What is missing for the queen to plan and review, from her [staffing] and the [linkedSourceIds] that can answer:
+ * no Source, a disabled or broken planner or reviewer, both on one Source. Pure; nothing here blocks a launch.
+ */
+internal fun staffingMissing(staffing: com.hereliesaz.geministrator.queen.QueenStaffing, linkedSourceIds: List<String>): List<com.hereliesaz.geministrator.queen.Missing> {
+    val staff = staffing.staff
+    val fromSources = com.hereliesaz.geministrator.queen.missingForPlanning(
+        linkedSourceIds,
+        staff?.planner?.preferredProviderId?.value,
+        staff?.reviewer?.preferredProviderId?.value,
+    ).filter { staff != null || it.kind == com.hereliesaz.geministrator.queen.MissingKind.NoSource }
+    val none = fromSources.filter { it.kind == com.hereliesaz.geministrator.queen.MissingKind.NoSource }
+    return none + staffing.missing + (fromSources - none.toSet())
 }
 
 private val TEACHING_WORDS = Regex("\\b(teach|taught|tutor|learn|explain|walk me through|ins and outs|show me how)", RegexOption.IGNORE_CASE)
@@ -232,6 +254,7 @@ private suspend fun ApplicationRuntime.startPlannedWorkflow(inputs: PlanInputs, 
         parentWorkflowRunIds = inputs.parentRunIds,
         objectiveProvenance = inputs.objectiveProvenance,
     )
+    rememberMissing("run-$stamp", inputs.missing)
     inputs.research?.let { record ->
         val runId = WorkflowRunId("run-$stamp")
         rememberResearch(runId.value, record)
@@ -265,7 +288,7 @@ private fun planningStage(
     val first = plan?.firstStep()
     return PlanningStage(
         phase = phase,
-        planner = inputs.launchRoles.firstOrNull { it.id == planner.id } ?: planner,
+        planner = inputs.staffing?.staff?.planner ?: inputs.launchRoles.firstOrNull { it.id == planner.id } ?: planner,
         reviewer = reviewer,
         firstStepRole = first?.let { step -> inputs.launchRoles.firstOrNull { it.id.value == step.roleId } },
         firstStepName = first?.name,

@@ -23,3 +23,30 @@ fun missingForPlanning(linkedSourceIds: List<String>, plannerPin: String?, revie
     val reviewerSource = reviewerPin ?: linkedSourceIds.firstOrNull { it != plannerSource } ?: plannerSource
     if (plannerSource == reviewerSource && reviewerPin == null) add(Missing(MissingKind.SameSource, reviewerSource, MissingFix.ConnectSource))
 }
+
+/**
+ * What she says once in Messages about [missing]: one note per missing thing, with a link to the existing place
+ * where it is fixed. The advice that a second Source would give a truer second opinion is only for Helpful; the
+ * rest block her work and are always said. Stable ids, so the same state gives the same notes.
+ */
+internal fun missingNotes(runId: String, missing: List<Missing>, level: QueenLevel): List<QueenNote> =
+    missing
+        .filter { it.kind != MissingKind.SameSource || level == QueenLevel.Helpful }
+        .map { thing ->
+            val voice = when (thing.kind) {
+                MissingKind.NoSource -> QueenVoice.MissingNoSource
+                MissingKind.NoPlanner -> QueenVoice.MissingNoPlanner
+                MissingKind.NoReviewer -> QueenVoice.MissingNoReviewer
+                MissingKind.PairBroken -> QueenVoice.MissingPairBroken
+                MissingKind.SameSource -> QueenVoice.MissingSameSource
+            }
+            val args = when (thing.kind) {
+                MissingKind.NoPlanner, MissingKind.NoReviewer, MissingKind.PairBroken -> listOf(queenSlot(thing.detail.orEmpty(), 80))
+                MissingKind.NoSource, MissingKind.SameSource -> emptyList()
+            }
+            val link = when (thing.fix) {
+                MissingFix.ConnectSource -> QueenLink.Connections
+                MissingFix.EnableRole, MissingFix.EditRole -> QueenLink.Roster
+            }
+            QueenNote(queenNoteId(runId, "missing", thing.kind.name, thing.detail.orEmpty()), voice, args, link)
+        }

@@ -1340,6 +1340,8 @@ private fun MainDestination(
                         onDestinationSelected(ControlRoomDestination.Overview)
                     },
                     onOpenRun = onSwitchRun,
+                    onOpenConnections = onOpenConnections,
+                    onOpenRoster = { onDestinationSelected(ControlRoomDestination.Company) },
                 )
                 ControlRoomDestination.Stable -> Column(
                     Modifier.fillMaxSize().verticalScroll(rememberScrollState())

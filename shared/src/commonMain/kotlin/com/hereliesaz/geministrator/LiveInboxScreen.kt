@@ -140,6 +140,10 @@ internal fun LiveInboxScreen(
     onNannyTestSolution: (String, Int) -> Unit = { _, _ -> },
     onOpenStory: (() -> Unit)? = null,
     onOpenRun: (String) -> Unit = {},
+    /** Opens Connections: where a Source the queen found missing is connected. */
+    onOpenConnections: (() -> Unit)? = null,
+    /** Opens the Roster: where a role the queen found missing is switched on or edited. */
+    onOpenRoster: (() -> Unit)? = null,
 ) {
     if (runtimeState is ApplicationRuntimeState.Live) {
         MessagesPage(
@@ -155,6 +159,8 @@ internal fun LiveInboxScreen(
                 nannyTestSolution = onNannyTestSolution,
                 openStory = onOpenStory,
                 openRun = onOpenRun,
+                openConnections = onOpenConnections,
+                openRoster = onOpenRoster,
             ),
             compact = compact,
             modifier = modifier,
@@ -199,6 +205,10 @@ internal class MessageActions(
     val openStory: (() -> Unit)? = null,
     /** Opens another run, such as a practice run. */
     val openRun: (String) -> Unit = {},
+    /** Opens Connections, where a Source is connected. */
+    val openConnections: (() -> Unit)? = null,
+    /** Opens the Roster, where a role is switched on or edited. */
+    val openRoster: (() -> Unit)? = null,
 )
 
 /** Why an escalated step stopped, in one plain line (no internal code); null when the run recorded no reason. */
