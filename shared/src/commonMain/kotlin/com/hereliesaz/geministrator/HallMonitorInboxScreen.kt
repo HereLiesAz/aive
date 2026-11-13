@@ -163,7 +163,7 @@ internal fun HallMonitorPauseDetail(
                             AzphaltNote(
                                 seed = "hall-monitor-trial-${trial.id}",
                                 label = trial.solutionTitle,
-                                value = "${plainAction(trial.action)} · ${trial.workflowRunId.value}",
+                                value = plainAction(trial.action),
                             )
                         }
                     }
@@ -197,7 +197,7 @@ internal fun HallMonitorTrialDetail(
                 append(presentation.run.objective)
                 append(stringResource(Res.string.hall_monitor_the_paused_source_run_is_unchanged))
             },
-            endCap = presentation.run.status.name,
+            endCap = presentation.run.status.label(),
             well = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     AzphaltNote(
@@ -209,7 +209,7 @@ internal fun HallMonitorTrialDetail(
                         val task = presentation.definition.tasks.firstOrNull { it.id == taskRun.taskDefinitionId }
                         AzphaltRecord(
                             seed = "trial-task-${taskRun.id.value}",
-                            eyebrow = taskRun.status.name.uppercase(),
+                            eyebrow = taskRun.status.label().uppercase(),
                             title = task?.name ?: taskRun.taskDefinitionId.value,
                             body = taskRun.progressMessage ?: task?.objective.orEmpty(),
                             endCap = taskRun.progress?.let { "${(it * 100).toInt()}%" },
@@ -221,7 +221,7 @@ internal fun HallMonitorTrialDetail(
                                         taskRun.artifacts.forEach { artifact ->
                                             AzphaltNote(
                                                 seed = "trial-artifact-${artifact.id.value}",
-                                                label = "${artifact.kind.name} · ${artifact.label}",
+                                                label = artifact.label,
                                                 value = artifact.textContent?.take(240)
                                                     ?: artifact.uri
                                                     ?: "stored",

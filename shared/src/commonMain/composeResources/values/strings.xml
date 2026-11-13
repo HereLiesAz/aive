@@ -278,19 +278,19 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="runs_event_system">system</string>
     <string name="runs_event_executor">executor</string>
     <string name="improvement_evidence">Evidence: %1$s</string>
-    <string name="hall_monitor_global_pause">GLOBAL PAUSE</string>
+    <string name="hall_monitor_global_pause">FROZEN BY THE NANNY</string>
     <string name="hall_monitor_hall_monitor_review">Nanny review</string>
-    <string name="hall_monitor_isolated">Isolated</string>
-    <string name="hall_monitor_isolated_counterfactual">ISOLATED COUNTERFACTUAL</string>
-    <string name="hall_monitor_paused">PAUSED</string>
+    <string name="hall_monitor_isolated">On a copy</string>
+    <string name="hall_monitor_isolated_counterfactual">PRACTICE RUN</string>
+    <string name="hall_monitor_paused">FROZEN</string>
     <string name="hall_monitor_progress">PROGRESS</string>
     <string name="hall_monitor_stop">Stop</string>
-    <string name="hall_monitor_test_solution">TEST SOLUTION</string>
+    <string name="hall_monitor_test_solution">Try it on a copy</string>
     <string name="hall_monitor_the_hall_monitor_report_cannot_be">The Nanny report cannot be parsed into testable solutions.</string>
-    <string name="hall_monitor_the_original_run_remains_frozen_while">\n\nThe original run remains frozen while you review or test recommendations. Testing does not approve or apply anything.</string>
-    <string name="hall_monitor_the_paused_source_run_is_unchanged">\n\nThe paused source run is unchanged. This trial uses Manual integration and exists only to produce evidence.</string>
+    <string name="hall_monitor_the_original_run_remains_frozen_while">The Nanny froze this swarm because she noticed a problem. It stays frozen while you read her recommendations or try them out; trying one out does not approve or apply anything.</string>
+    <string name="hall_monitor_the_paused_source_run_is_unchanged">The frozen swarm is not touched. This practice run is a separate copy that you start by hand; it only shows what the change would do.</string>
     <string name="hall_monitor_trial_history">TRIAL HISTORY</string>
-    <string name="hall_monitor_validation">VALIDATION</string>
+    <string name="hall_monitor_validation">CHECKS</string>
 
     <string name="inbox_badge_none">Messages, nothing unread</string>
     <string name="inbox_badge_unread">Messages, %1$d unread</string>
