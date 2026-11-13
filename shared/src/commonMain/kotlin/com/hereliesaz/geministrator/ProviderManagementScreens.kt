@@ -129,6 +129,9 @@ import com.hereliesaz.geministrator.resources.confirm_reset_pairing_title
 import com.hereliesaz.geministrator.resources.credential_keyless_hint
 import com.hereliesaz.geministrator.resources.keyless_sources_off
 import com.hereliesaz.geministrator.resources.keyless_sources_on
+import com.hereliesaz.geministrator.resources.keeper_advanced_a2a
+import com.hereliesaz.geministrator.resources.keeper_advanced_data
+import com.hereliesaz.geministrator.resources.keeper_advanced_tracing
 import com.hereliesaz.geministrator.resources.remote_access_advanced
 import com.hereliesaz.geministrator.resources.remote_access_advanced_explain
 import com.hereliesaz.geministrator.resources.remote_access_enter_code
@@ -317,6 +320,9 @@ internal fun ProviderSettingsScreen(
     var revokeComputeNodeId by remember { mutableStateOf<String?>(null) }
     var resetPairingConfirm by remember { mutableStateOf(false) }
     var relayAdvancedOpen by remember { mutableStateOf(false) }
+    var aboutAdvancedOpen by remember { mutableStateOf(false) }
+    var dataAdvancedOpen by remember { mutableStateOf(false) }
+    var deviceAdvancedOpen by remember { mutableStateOf(false) }
     var healthResults by remember { mutableStateOf<Map<String, String>?>(null) }
     var healthChecking by remember { mutableStateOf(false) }
     var exportTriggered by remember { mutableStateOf(false) }
@@ -791,7 +797,14 @@ internal fun ProviderSettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        TraceExportSettingsSection()
+        AzphaltPill(
+            stringResource(Res.string.keeper_advanced_tracing),
+            "about-advanced",
+            selected = aboutAdvancedOpen,
+            onClick = { aboutAdvancedOpen = !aboutAdvancedOpen },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (aboutAdvancedOpen) TraceExportSettingsSection()
         PromptHistorySettingsSection()
 
       }
@@ -894,6 +907,15 @@ internal fun ProviderSettingsScreen(
         }
 
         a2aServerSetting?.let { setting ->
+            AzphaltPill(
+                stringResource(Res.string.keeper_advanced_a2a),
+                "device-advanced",
+                selected = deviceAdvancedOpen,
+                onClick = { deviceAdvancedOpen = !deviceAdvancedOpen },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        a2aServerSetting?.takeIf { deviceAdvancedOpen }?.let { setting ->
             ProviderSectionLabel(stringResource(Res.string.settings_a2a_server))
             var confirmingNewToken by remember { mutableStateOf(false) }
             Text(
@@ -1481,6 +1503,14 @@ internal fun ProviderSettingsScreen(
             SetupFileSection(projectFileService, setupFileActions)
         }
 
+        AzphaltPill(
+            stringResource(Res.string.keeper_advanced_data),
+            "data-advanced",
+            selected = dataAdvancedOpen,
+            onClick = { dataAdvancedOpen = !dataAdvancedOpen },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (dataAdvancedOpen) {
         ProviderSectionLabel(stringResource(Res.string.settings_data))
         if (exportTriggered) {
             LaunchedEffect(Unit) {
@@ -1537,10 +1567,11 @@ internal fun ProviderSettingsScreen(
                 })
             }
         }
+        }
 
       }
 
-      if (KeeperSection.About in sections) {
+      if (KeeperSection.About in sections && aboutAdvancedOpen) {
         ProviderSectionLabel(stringResource(Res.string.settings_diagnostics))
         if (diagnosticTriggered) {
             LaunchedEffect(Unit) {

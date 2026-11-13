@@ -147,4 +147,7 @@
     <string name="prompt_remember_clear">Clear remembered text</string>
     <string name="prompt_remember_cleared">Remembered text cleared.</string>
     <string name="prompt_role_lesson">Add lesson: %1$s</string>
+    <string name="keeper_advanced_tracing">Advanced: tracing and diagnostics</string>
+    <string name="keeper_advanced_data">Advanced: raw data export and import</string>
+    <string name="keeper_advanced_a2a">Advanced: let other programs start swarms</string>
 </resources>
