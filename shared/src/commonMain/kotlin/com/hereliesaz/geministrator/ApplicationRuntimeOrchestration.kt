@@ -138,7 +138,9 @@ private suspend fun ApplicationRuntime.planInputs(
             objective = cleanObjective,
             currentState = "new-workflow",
             availableAgents = agents,
-            instruction = newWorkflowInstruction(cleanObjective, normalizedRepository),
+            availableTemplates = com.hereliesaz.geministrator.template.BuiltInTemplates.forPlanner(),
+            instruction = newWorkflowInstruction(cleanObjective, normalizedRepository) +
+                com.hereliesaz.geministrator.template.BuiltInTemplates.PLANNER_INSTRUCTION,
         )
     } else {
         OrchestrationPacket(

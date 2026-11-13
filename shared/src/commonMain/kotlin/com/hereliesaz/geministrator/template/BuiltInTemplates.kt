@@ -153,6 +153,23 @@ object BuiltInTemplates {
     /** The steps the queen may make by herself: those that change nothing outside their own output. */
     val queenMayMake: List<StepTemplate> get() = all.filter { !it.effectful }
 
+    /** The templates offered to the planner, by id, with their input ports: only those that change nothing outside their output. */
+    fun forPlanner(): List<com.hereliesaz.geministrator.orchestration.OrchestrationTemplate> =
+        queenMayMake.map { template ->
+            com.hereliesaz.geministrator.orchestration.OrchestrationTemplate(
+                id = template.id,
+                title = template.id.replace('-', ' '),
+                requiredPorts = template.inputs.filter { it.required }.map { it.name },
+                optionalPorts = template.inputs.filter { !it.required }.map { it.name },
+                effects = template.effects.map { it.name },
+            )
+        }
+
+    /** Appended to the planner's instruction when templates are offered. */
+    const val PLANNER_INSTRUCTION: String =
+        " A step may instead use one of availableTemplates: set templateId and give templateInputs a value for every required port " +
+            "(a literal, or @<step id>.<port> to take it from an earlier step that is also listed in dependsOn); roleId may then be left blank."
+
     /** Every built-in as a catalog base. */
     fun bases(roles: Collection<RoleDefinition> = BuiltInRoles.all): List<TemplateBase> =
         all.map(StepTemplate::base) + roles.map(RoleTemplates::base)
