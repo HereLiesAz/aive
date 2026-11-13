@@ -677,7 +677,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_not_yet_run">Not yet run</string>
     <string name="hive_objective">Objective for the next run</string>
     <string name="hive_repository">Repository: owner/repo or URL</string>
-    <string name="hive_launch">Launch</string>
+    <string name="hive_launch">Start</string>
     <string name="hive_launch_failed">The run could not start.</string>
     <string name="hive_timeline">STORY</string>
     <string name="hive_timeline_empty">Nothing has happened in this swarm yet.</string>
@@ -702,7 +702,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="plan_decision_round_approved">Round %1$d: approved</string>
     <string name="plan_decision_step">%1$s · %2$s</string>
     <string name="plan_decision_needs_approval">needs your approval</string>
-    <string name="plan_decision_start">Start the run</string>
+    <string name="plan_decision_start">Start</string>
     <string name="plan_decision_decline">Do not start</string>
     <string name="creature_site">%1$s, a place the shared creature works at: %2$s</string>
     <string name="creature_egg_action">Egg, %1$d of %2$d feeders done</string>
@@ -797,6 +797,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_creatures_active">creatures active</string>
     <string name="hive_centre">Centre the swarm</string>
     <string name="hive_status_line">%1$s: %2$s</string>
+    <string name="hive_cost_so_far">%1$s spent so far</string>
     <string name="hive_legend_working">Working</string>
     <string name="hive_legend_complete">Complete</string>
     <string name="hive_legend_waiting">Waiting</string>
@@ -805,8 +806,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_feed_eyebrow">FEED THE HIVE</string>
     <string name="hive_feed_title">Give the swarm an objective</string>
     <string name="hive_feed_placeholder">What should this hive do next?</string>
-    <string name="hive_feed_launch">Launch</string>
-    <string name="hive_feed_queue">Queue</string>
+    <string name="hive_feed_launch">Start</string>
+    <string name="hive_feed_queue">Add to queue</string>
     <string name="hive_feed_queued">Next: %1$s · it starts when this run finishes</string>
     <string name="hive_feed_unqueue">Take it back</string>
     <string name="creature_panel_place">CREATURE · %1$d OF %2$d</string>
@@ -1271,7 +1272,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="overview_runtime_is_advancing_without_human_intervention">Runtime is advancing without human intervention.</string>
     <string name="overview_search_github_repositories_or_paste_url">Search GitHub repositories or paste URL</string>
     <string name="overview_search_gitlab_repositories_or_paste_url">Search GitLab repositories or paste URL</string>
-    <string name="overview_start_run">Start run</string>
+    <string name="overview_start_run">Start</string>
     <string name="overview_start_typing_to_search_your_own">Start typing to search. Your own repositories are ranked first; other accessible/public repositories appear as autocomplete suggestions. You can still paste any repository URL or shorthand manually.</string>
     <string name="overview_swarm_activity">SWARM ACTIVITY</string>
     <string name="overview_swarm_execution">SWARM EXECUTION</string>
