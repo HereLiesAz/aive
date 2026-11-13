@@ -253,6 +253,15 @@ class ApplicationRuntime private constructor(
         while (hiveSignBook.size > 32) hiveSignBook.remove(hiveSignBook.keys.first())
     }
 
+    /** What each run's hive still needs created or obtained (memory only; see queen/Blockers.kt). */
+    private val blockerBook = LinkedHashMap<String, List<com.hereliesaz.geministrator.queen.Blocker>>()
+
+    internal fun rememberBlockers(runId: String, blockers: List<com.hereliesaz.geministrator.queen.Blocker>) {
+        if (blockers.isEmpty()) return
+        blockerBook[runId] = blockers
+        while (blockerBook.size > 32) blockerBook.remove(blockerBook.keys.first())
+    }
+
     /** What she says about disputes she could not settle herself, per run (memory only; derived into Messages at each publish). */
     private val queenDisputes = LinkedHashMap<String, List<com.hereliesaz.geministrator.queen.QueenNote>>()
 
@@ -1538,6 +1547,7 @@ class ApplicationRuntime private constructor(
                 disputes = queenDisputes[run.id.value].orEmpty(),
                 stalledForMinutes = queenStalled[run.id.value],
                 hiveSigns = hiveSignBook[run.id.value].orEmpty(),
+                blockers = blockerBook[run.id.value].orEmpty(),
                 suggestions = if (run.globalPause == null && run.spendPause == null) {
                     queenSuggestionNotes(queenProposals, run)
                 } else {

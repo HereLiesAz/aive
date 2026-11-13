@@ -50,6 +50,11 @@ data class OrchestrationPlan(
      * the queen reads only the words she knows and checks them against the run (see queen/Guidance.kt).
      */
     val hiveSigns: List<String> = emptyList(),
+    /**
+     * What this hive still needs created or obtained, each as `sentence`, `sentence => template-id` or
+     * `sentence => template-id @ step-id`; optional. Read and checked by queen/Blockers.kt, like [hiveSigns].
+     */
+    val blockers: List<String> = emptyList(),
 )
 
 @Serializable

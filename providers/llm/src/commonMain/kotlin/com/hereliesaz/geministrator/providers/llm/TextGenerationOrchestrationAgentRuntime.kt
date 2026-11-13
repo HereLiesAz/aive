@@ -68,7 +68,9 @@ class TextGenerationOrchestrationAgentRuntime(
     private companion object {
         const val PLAN_INSTRUCTION =
             "Create an executable, dependency-correct workflow DAG for the objective. " +
-                "In hiveSigns, optionally name what would show the objective is reached, each as done:step-id, artifact:step-id or nothing-failed."
+                "In hiveSigns, optionally name what would show the objective is reached, each as done:step-id, artifact:step-id or nothing-failed. " +
+                "In blockers, optionally list what must still be created or obtained for the hive to be complete, each as one " +
+                "plain line, optionally followed by ` => template-id` from availableTemplates and ` @ step-id` of the step that makes it."
         const val REPAIR_INSTRUCTION =
             "Repair the current DAG after the reported failures, preserving valid completed work."
         const val COMPACT_RETRY =
