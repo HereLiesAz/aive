@@ -28,11 +28,21 @@ internal object CredentialTool {
         builder: ProcessBuilder,
         stdin: String? = null,
         timeoutSeconds: Long = TIMEOUT_SECONDS,
-    ): Result? {
+    ): Result? = execute(builder, stdin, timeoutSeconds).result
+
+    /** A finished command, or: [result] null with [timedOut] false when it could not start. */
+    data class Execution(val result: Result?, val timedOut: Boolean)
+
+    /** [run] that also says whether the command started but did not finish in time. */
+    fun execute(
+        builder: ProcessBuilder,
+        stdin: String? = null,
+        timeoutSeconds: Long = TIMEOUT_SECONDS,
+    ): Execution {
         val process = try {
             builder.redirectError(ProcessBuilder.Redirect.DISCARD).start()
         } catch (_: Exception) {
-            return null
+            return Execution(null, timedOut = false)
         }
         val output = StringBuffer()
         val io = Thread({
@@ -53,10 +63,10 @@ internal object CredentialTool {
         if (!finished) {
             runCatching { process.toHandle().descendants().forEach { it.destroyForcibly() } }
             process.destroyForcibly()
-            return null
+            return Execution(null, timedOut = true)
         }
         io.join(TimeUnit.SECONDS.toMillis(5))
-        return Result(process.exitValue(), output.toString())
+        return Execution(Result(process.exitValue(), output.toString()), timedOut = false)
     }
 
     /**

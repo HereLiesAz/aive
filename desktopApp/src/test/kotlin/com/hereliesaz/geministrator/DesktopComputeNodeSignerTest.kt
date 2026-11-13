@@ -6,6 +6,7 @@ import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -30,8 +31,8 @@ class DesktopComputeNodeSignerTest {
     fun theStoredIdentityIsReusedAndAnUnreadableOneIsReplaced() {
         var stored: String? = null
         var writes = 0
-        val first = DesktopComputeNodeSigner.loadOrCreate(read = { stored }, write = { stored = it; writes++ })
-        val second = DesktopComputeNodeSigner.loadOrCreate(read = { stored }, write = { stored = it; writes++ })
+        val first = DesktopComputeNodeSigner.loadOrCreate(read = { stored?.let { StoredSecret.Found(it) } ?: StoredSecret.Absent }, write = { stored = it; writes++ })
+        val second = DesktopComputeNodeSigner.loadOrCreate(read = { stored?.let { StoredSecret.Found(it) } ?: StoredSecret.Absent }, write = { stored = it; writes++ })
 
         assertEquals(first.publicKey, second.publicKey)
         assertEquals(1, writes)
@@ -39,8 +40,17 @@ class DesktopComputeNodeSignerTest {
         assertNull(DesktopComputeNodeSigner.decode("not a key"))
 
         stored = "garbage"
-        val third = DesktopComputeNodeSigner.loadOrCreate(read = { stored }, write = { stored = it; writes++ })
+        val third = DesktopComputeNodeSigner.loadOrCreate(read = { stored?.let { StoredSecret.Found(it) } ?: StoredSecret.Absent }, write = { stored = it; writes++ })
         assertTrue(third.publicKey != first.publicKey)
         assertEquals(2, writes)
+    }
+
+    @Test
+    fun anUnreadableStoreNeverCreatesOrOverwritesAnIdentity() {
+        var writes = 0
+        assertFailsWith<IdentityUnreadableException> {
+            DesktopComputeNodeSigner.loadOrCreate(read = { StoredSecret.Unreadable }, write = { writes++ })
+        }
+        assertEquals(0, writes)
     }
 }
