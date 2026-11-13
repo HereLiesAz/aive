@@ -260,6 +260,8 @@ While a swarm runs the queen may offer a suggestion as a row of Messages (`Queen
 
 **Content from outside.** If the run's objective or the step's inputs came from outside your own typing, the row says **Based on content from outside. Look before you accept.**, a redo asks first (it always does), and a new job for a step is not offered or applied.
 
+**Requirements, stalls, wording and shape changes.** Before a plan is shown, code checks it against what you wrote or set (`orchestration/Requirements.kt`): the step limit, approvals before anything that changes the repository, roles that are switched on, plain step names. A plan that fails is sent back without a model call, and a reviewer's yes never overrules it. Her own model calls go through one gate (`queen/PlanningGate.kt`): a known price under any dollar cap, half the hourly cap, the Source's pacing, and at most three checkpoint calls a run, ten minutes apart. She notices a swarm that has not moved for ten minutes with nothing waiting on you (first-seen times are kept in the ledger) and the same block in several steps. At Helpful, at half done and after a second failure, her model may write new wording for a step that has not started; the reply is a closed format, bounded and stripped, never asked for a goal from outside, and offered only as a suggestion. Repeated late failures can offer **Add a check**, **Split a step**, **Reorder** or **Add an approval**, each only to **Keep for next time** as an ordinary note in the Improvement flow. She appears in the Story and on a creature's Work tab with what she has said about it.
+
 **Badge.** Each open suggestion counts once toward the Messages badge and is read like any other item; the queen's other notes never count.
 
 ## Training a specialist
