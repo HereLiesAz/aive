@@ -218,7 +218,10 @@ class MemoryLayerControllerTest {
         assertEquals(0, store.read().episodes.size)
         controller.importJson(exported)
         assertEquals(1, store.read().episodes.size)
-        assertEquals(exported, controller.exportJson())
+        // Clear and import each commit by compare-and-set, so the store's revision advances; the records are what must round-trip.
+        fun records(json: String) =
+            SettingsMemoryStore.defaultJson.decodeFromString(MemorySnapshot.serializer(), json).copy(revision = 0L)
+        assertEquals(records(exported), records(controller.exportJson()))
     }
 
     @Test
