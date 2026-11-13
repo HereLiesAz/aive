@@ -4,8 +4,10 @@ import com.hereliesaz.geministrator.persistence.refuseIfUnreadable
 import com.hereliesaz.geministrator.persistence.readQuarantining
 import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.russhwolf.settings.Settings
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
@@ -21,28 +23,88 @@ import kotlinx.serialization.builtins.serializer
 class MemoryBanks(
     private val openBank: suspend (workflowId: String) -> MemoryStore,
     private val registry: MemoryBankRegistry = InMemoryMemoryBankRegistry(),
+    /** How many banks that hold a connection are kept open; the least recently used idle ones are closed past it. */
+    private val maxOpen: Int = DEFAULT_MAX_OPEN_BANKS,
 ) {
-    private val mutex = Mutex()
-    private val open = HashMap<String, MemoryStore>()
+    private class Slot(val store: MemoryStore) {
+        var inUse = 0
+    }
 
-    /** [workflowId]'s own bank, opened on first use. */
+    private val mutex = Mutex()
+
+    /** Open banks, least recently used first. */
+    private val open = LinkedHashMap<String, Slot>()
+    private val handles = HashMap<String, MemoryStore>()
+
+    /** [workflowId]'s own bank, opened on first use and reopened if it was closed while idle. */
     suspend fun store(workflowId: String): MemoryStore {
         val key = requireNotNull(memoryBankKey(workflowId)) { "A memory bank belongs to a workflow" }
         return mutex.withLock {
-            open.getOrPut(key) {
+            handles.getOrPut(key) {
                 registry.add(key)
-                WorkflowBankStore(key, openBank(key))
+                WorkflowBankStore(key, LeasedBankStore(key))
             }
         }
     }
 
+    /**
+     * Runs [block] on the bank's open store. The bank counts as in use meanwhile, so it is never closed under
+     * the call; once idle it may be closed (only a store with a connection to release) when too many are open.
+     */
+    private suspend fun <T> withBank(key: String, block: suspend (MemoryStore) -> T): T {
+        val slot = mutex.withLock {
+            val found = open.remove(key) ?: Slot(openBank(key))
+            open[key] = found
+            found.inUse++
+            found
+        }
+        try {
+            return block(slot.store)
+        } finally {
+            withContext(NonCancellable) {
+                mutex.withLock {
+                    slot.inUse--
+                    closeIdleBeyondLimit()
+                }
+            }
+        }
+    }
+
+    private fun closeIdleBeyondLimit() {
+        if (open.size <= maxOpen) return
+        val iterator = open.entries.iterator()
+        while (open.size > maxOpen && iterator.hasNext()) {
+            val entry = iterator.next()
+            val store = entry.value.store
+            // A store with no connection to release (Settings, in memory) keeps its data in the slot: never dropped.
+            if (entry.value.inUse == 0 && store is ClosableMemoryStore) {
+                store.close()
+                iterator.remove()
+            }
+        }
+    }
+
+    private inner class LeasedBankStore(private val key: String) : MemoryStore {
+        override suspend fun read(): MemorySnapshot = withBank(key) { it.read() }
+
+        override suspend fun commit(expectedRevision: Long, mutation: MemoryStoreMutation): Boolean =
+            withBank(key) { it.commit(expectedRevision, mutation) }
+
+        override suspend fun replace(snapshot: MemorySnapshot) = withBank(key) { it.replace(snapshot) }
+
+        override suspend fun replaceIfRevision(expectedRevision: Long, snapshot: MemorySnapshot): Boolean =
+            withBank(key) { it.replaceIfRevision(expectedRevision, snapshot) }
+    }
+
     /** Every workflow with a bank, by id. */
     suspend fun known(): List<String> =
-        (registry.known() + mutex.withLock { open.keys.toList() }).distinct().sorted()
+        (registry.known() + mutex.withLock { handles.keys.toList() }).distinct().sorted()
 
     val migrationState: MemoryBankRegistry get() = registry
 
     companion object {
+        const val DEFAULT_MAX_OPEN_BANKS: Int = 8
+
         /** Banks held in memory only (tests, previews). [initial] seeds given banks. */
         fun inMemory(initial: Map<String, MemoryStore> = emptyMap()): MemoryBanks =
             MemoryBanks({ key -> initial[key] ?: InMemoryMemoryStore(allowExternalReferences = true) }, InMemoryMemoryBankRegistry(initial.keys))

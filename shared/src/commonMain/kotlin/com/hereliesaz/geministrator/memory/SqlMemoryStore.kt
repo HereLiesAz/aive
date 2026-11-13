@@ -20,16 +20,19 @@ import kotlinx.serialization.json.Json
  * database per process: the cache assumes nothing else writes those tables.
  */
 class SqlMemoryStore(
-    driver: SqlDriver,
+    private val driver: SqlDriver,
     private val json: Json = SettingsMemoryStore.defaultJson,
     /** A workflow's own records in a lineage bank: may reference its ancestors' records (see [LineageMemoryStore]). */
     private val allowExternalReferences: Boolean = false,
-) : MemoryStore {
+) : ClosableMemoryStore {
     private val database = MemoryDatabase(driver)
     private val queries = database.memoryQueries
     private val mutex = Mutex()
     private var cached: MemorySnapshot? = null
     private var ids: MemoryIdIndex? = null
+
+    /** Releases the database connection; the store is reopened from its file, not reused. */
+    override fun close() = driver.close()
 
     override suspend fun read(): MemorySnapshot = mutex.withLock { loadUnlocked() }
 
