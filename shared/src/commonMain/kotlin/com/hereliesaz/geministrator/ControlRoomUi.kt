@@ -662,7 +662,7 @@ fun ControlRoom(
         // The once-per-streak offer to stop asking for a non-mutating gate (workflow/ProgressiveDelegation.kt).
         delegations?.let { DelegationOfferDialog(it) }
 
-        if (inspectorVisible && compact && creatureSheetAllowed(flowchart = flowchartView.value)) {
+        if (inspectorVisible && compact && creatureSheetAllowed(editing = flowchartView.value, flipped = false)) {
             selectedTaskId?.let { taskId ->
                 ModalBottomSheet(
                     onDismissRequest = { closePanel(taskId) },
