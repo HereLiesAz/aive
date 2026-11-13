@@ -109,7 +109,7 @@ enum class ControlRoomDestination(val label: String) {
     Workflows("Workflows"),
     Company("Roster"),
     Stable("Stable"),
-    Inbox("Inbox"),
+    Inbox("Messages"),
     Compute("Compute"),
     Memory("Memory swarm"),
     AddOns("AZPHALT STORE"),
@@ -284,10 +284,10 @@ fun ControlRoom(
     // A link to a creature opens it and never closes it: a tap on one that is already open does
     // nothing, and a creature whose panel was set aside gets that panel back.
     val openCreature: (String) -> Unit = { id ->
-        if (reopensSetAsidePanel(id, panelSetAside)) {
-            panelSetAside = null
-        } else if (id != selectedTaskId) {
-            onTaskSelected(id)
+        when (creatureOpenAction(id, selectedTaskId, panelSetAside)) {
+            CreatureOpenAction.ReopenPanel -> panelSetAside = null
+            CreatureOpenAction.Select -> onTaskSelected(id)
+            CreatureOpenAction.KeepOpen -> Unit
         }
     }
     // Closing the panel (sheet dismissed, dock's close, Back) only sets it aside: the creature stays
@@ -937,8 +937,10 @@ private fun MainDestination(
     // whichever it showed last. The hive on screen unless one is named: the resting hive names itself.
     val openHiveInWorkflows: (String?) -> Unit = { definitionId ->
         hiveScope.launch {
-            val id = definitionId
-                ?: (runtimeState as? ApplicationRuntimeState.Live)?.presentation?.run?.workflowDefinitionId?.value
+            val id = hiveToOpenInWorkflows(
+                definitionId,
+                (runtimeState as? ApplicationRuntimeState.Live)?.presentation?.run?.workflowDefinitionId?.value,
+            )
             hiveHost?.entries()?.firstOrNull { it.definition.id.value == id }?.let { entry ->
                 DurableUiState.store.openWorkflowsOn(entry)
             }

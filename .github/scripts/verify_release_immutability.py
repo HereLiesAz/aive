@@ -1,10 +1,21 @@
 #!/usr/bin/env python3
+"""Release immutability and version policy check.
+
+Scope: the forbidden-command scan covers EVERY workflow under .github/workflows (a release could be
+edited or deleted from any of them), while the version/asset fragments are specific to
+multiplatform.yml, the only workflow that builds and publishes the four-part-versioned release
+assets (APK, DEB, MSI, DMG). The Play bundle is versioned by versionCode, not by file name, so it
+has no name fragment to check. Also checks that the vendor checkout pins agree across workflows.
+"""
 from pathlib import Path
 import re
 
 workflow = Path(".github/workflows/multiplatform.yml").read_text(encoding="utf-8")
+all_workflows = {
+    path.name: path.read_text(encoding="utf-8")
+    for path in sorted(Path(".github/workflows").glob("*.yml"))
+}
 properties = Path("gradle.properties").read_text(encoding="utf-8")
-lower = workflow.lower()
 
 forbidden = {
     "rolling release": "rolling release job/name",
@@ -18,7 +29,28 @@ forbidden = {
     'git push origin "$tag_name" --force': "force-pushing a version tag",
 }
 
-violations = [label for token, label in forbidden.items() if token in lower]
+violations = [
+    f"{label} ({name})"
+    for name, text in all_workflows.items()
+    for token, label in forbidden.items()
+    if token in text.lower()
+]
+
+# The two vendor checkouts must be pinned to one full SHA each, identically everywhere.
+for repository in ("HereLiesAz/conveyance-h2g2", "HereLiesAz/Conveyance"):
+    pins = {}
+    for name, text in all_workflows.items():
+        for found in re.finditer(
+            r"repository: " + re.escape(repository) + r"\n\s+(?:path: [^\n]+\n\s+)?ref: ([^\s#]+)", text
+        ):
+            pins.setdefault(found.group(1), []).append(name)
+        if re.search(r"repository: " + re.escape(repository) + r"\n(?!\s+(?:path: [^\n]+\n\s+)?ref: )", text):
+            violations.append(f"{repository} checkout in {name} has no ref: pin")
+    for pin in pins:
+        if not re.fullmatch(r"[0-9a-f]{40}", pin):
+            violations.append(f"{repository} pin {pin} is not a full commit SHA")
+    if len(pins) > 1:
+        violations.append(f"{repository} is pinned to different SHAs: {sorted(pins)}")
 
 match = re.search(r"^app\.versionName=(\d+)\.(\d+)\.(\d+)\.(\d+)$", properties, re.MULTILINE)
 if not match:

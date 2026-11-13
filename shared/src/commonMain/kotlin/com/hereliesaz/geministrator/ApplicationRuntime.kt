@@ -1244,7 +1244,7 @@ class ApplicationRuntime private constructor(
                 failure,
             )
             is ManagedSessionFailure.ProviderUnavailable -> ApplicationRuntimeFailure.Disconnected(
-                failure.message ?: "Provider runtime is unavailable",
+                failure.message ?: "Source runtime is unavailable",
                 failure,
             )
             else -> ApplicationRuntimeFailure.Resume(

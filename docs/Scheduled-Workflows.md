@@ -1,6 +1,6 @@
 # Scheduled workflows
 
-A hive can start by itself, on a schedule (`workflow/schedule/`). **Keeper's room › Schedules** lists them: turn one on, change when it runs, run it now, or remove it. The coding suite ([Coding workflows](Coding-Workflows.md)) brings six, off.
+A hive can start by itself, on a schedule (`workflow/schedule/`). **Keeper's room › Schedules** lists them: turn one on, change when it runs, run it now, or remove it. The coding suite ([Coding workflows](Coding-Workflows.md)) brings seven, off.
 
 ## What a schedule is
 

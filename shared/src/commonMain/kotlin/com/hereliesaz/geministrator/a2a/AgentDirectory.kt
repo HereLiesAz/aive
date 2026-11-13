@@ -53,7 +53,7 @@ internal object LocalAgentDirectorySource : AgentDirectorySource {
                 AgentDirectoryEntry(
                     cardUrl = connection.cardUrl,
                     name = connection.name,
-                    description = "Connected remote A2A provider",
+                    description = "Connected remote A2A source",
                     skills = emptyList(),
                     source = name,
                     connectedProviderId = connection.providerId,

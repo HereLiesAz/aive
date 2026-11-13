@@ -160,3 +160,11 @@ tasks.whenTaskAdded(object : Action<Task> {
         }
     }
 })
+
+// SuiteCountsInDocsTest reads the docs, so a docs edit must re-run the desktop tests instead of
+// being served from the up-to-date check or the build cache.
+tasks.matching { it.name == "desktopTest" }.configureEach {
+    inputs.files(rootProject.fileTree("docs") { include("*.md") })
+        .withPropertyName("suiteCountDocs")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}

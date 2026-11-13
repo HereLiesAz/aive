@@ -266,7 +266,7 @@ Memory is organised like version-control history.
 | A launch given `continuesWorkflowRunIds = [r]` (`launchStarterWorkflow`, `launchOrchestratedWorkflow`, `launchSavedWorkflow`) | `[r]` | continuation |
 | A launch given two or more runs in `continuesWorkflowRunIds` | those runs, first = primary, duplicates collapsed | merge |
 | A nested workflow node starting its child run (`WorkflowRunNestedWorkflowClient`) | the dispatching run | continuation |
-| A Hall Monitor solution trial (counterfactual of a paused run) | the paused source run | continuation |
+| A Nanny solution trial (counterfactual of a paused run) | the paused source run | continuation |
 | Running a finished run again from a task (`ApplicationRuntime.rerunFromTask`, `TaskRerunPlanner`) | the finished run | continuation |
 | A plan repair after a failure escalation | the run's own parents, unchanged (the same run, rebuilt) | — |
 | Resume after restart, task retry, approve/reject, pause/resume | unchanged (the same run) | — |
@@ -565,7 +565,7 @@ The **Memory** destination (every platform) is the whole layer in one place, dri
 - **Terrarium:** an intake plus one creature per stage, in pipeline order. A creature is active while
   its stage processes a packet, ready while entries wait for it, blocked when entries are parked
   there, and complete once it has produced memories; the link into the working stage carries.
-- **Engines:** tap a creature to choose Programmatic, Local model or Hosted (with provider and model)
+- **Engines:** tap a creature to choose Programmatic, Local model or Hosted (with source and model)
   for each of its clerks; fallbacks and their reasons are shown.
 - **Queue:** waiting and parked counts; retry or discard parked entries.
 - **Tuning:** attempts before parking, packet size, similarity needed to condense, batch size.

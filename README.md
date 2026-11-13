@@ -10,7 +10,7 @@ Come to find out, both are now entire markets of their own, with very valuable c
 
 The Aive is an AI swarm orchestration manager featuring living workflows: an H2G2-inspired UI with an approachable, user-friendly fishbowl game-like interface for monitoring and managing roles and progress whose nodes represent real work and whose state comes from the runtime.
 
-Workflow nodes may be performed by AI providers such as specialized model agents, LLMs, coordinated sub-workflow roles, by people, or by systems like GitHub Actions, test runners, and deployment jobs. Progress belongs to the task run, not to a particular kind of worker.
+Workflow nodes may be performed by AI sources such as specialized model agents, LLMs, coordinated sub-workflow roles, by people, or by systems like GitHub Actions, test runners, and deployment jobs. Progress belongs to the task run, not to a particular kind of worker.
 
 ## Targets
 
@@ -31,7 +31,7 @@ Workflow nodes may be performed by AI providers such as specialized model agents
 - `buildSrc/` — Gradle build logic for generating and verifying brand assets
 - `native/` — Rust native code: `bitcos/` (BITCOS ternary-weight runtime) and `djl-tokenizer/` (16 KB-aligned Android build of DJL's tokenizer JNI library)
 - `tools/` — offline tooling: Azphalt package builder (`azp/`), BitNet benchmark, specialist optimization pipeline, Google Play asset generator
-- `vendor/` — not committed. `conveyance-h2g2` (the H2G2 style library) is built as a composite when present at `vendor/conveyance-h2g2`, with Conveyance at `vendor/conveyance-h2g2/vendor/Conveyance`. CI checks both out at pinned SHAs; to build locally, clone them there at the SHAs in `.github/workflows/multiplatform.yml` (the JitPack fallback has no desktop variant).
+- `vendor/` — not committed. `conveyance-h2g2` (the H2G2 style library) is built as a composite when present at `vendor/conveyance-h2g2`, with Conveyance at `vendor/conveyance-h2g2/vendor/Conveyance`. CI checks both out at pinned commit SHAs (`ref:` on each checkout in `.github/workflows/`); to build locally, clone them there at those SHAs (the JitPack fallback has no desktop variant). See "Bumping the vendor pins" below.
 - `docs/` — current product documentation and privacy policy
 - `docs/azphalt-packages/` — source for the Azphalt workflow/role packages packed by `tools/azp`
 - `docs/swarm-terrarium/` — terrarium node-creature design brief, character art and manifests
@@ -52,6 +52,16 @@ node tools/puppet-rig/test/rig-core.mjs     # puppet-rig editor tests
 ~~~
 
 Release signing needs `HAIVE_KEYSTORE_PATH`, `KEYSTORE_PASSWORD` and `KEY_ALIAS`; without them release packaging fails on purpose.
+
+### Bumping the vendor pins
+
+The `ref:` values for `HereLiesAz/conveyance-h2g2` and `HereLiesAz/Conveyance` are repeated in `multiplatform.yml`, `android-ci.yml`, `bitcos-engine.yml` and `dependency-submission.yml`, and must stay identical. To move them:
+
+1. Resolve the new commits: `git ls-remote https://github.com/HereLiesAz/conveyance-h2g2 HEAD`, and the same for `Conveyance`.
+2. Replace every `ref:` that carries the old SHA (`grep -rn "pinned: README" .github/workflows`).
+3. Check the local `vendor/` clones out at the same SHAs and run the tests before pushing.
+
+The shared `HereLiesAz/workflows` actions (version, release and CI report) are still referenced at `@main`: that repository is owner-controlled, so repinning them is the owner's call. Third-party actions are pinned to full commit SHAs with the tag in a trailing comment; Dependabot (`github-actions`) updates both.
 
 ## Documentation
 

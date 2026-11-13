@@ -95,7 +95,7 @@ object ProviderFailover {
         ErrorKind.RateLimited -> "Wait a minute."
         ErrorKind.Offline -> "Check your internet connection."
         ErrorKind.TimedOut, ErrorKind.ServerError -> "Try again in a moment."
-        ErrorKind.OutputTooLong -> "Try a shorter description, or a provider with a larger limit."
+        ErrorKind.OutputTooLong -> "Try a shorter description, or a source with a larger limit."
         ErrorKind.NoAgent, ErrorKind.BadRequest, ErrorKind.Other -> "Check it under Connections in the Keeper's room."
     }
 
@@ -107,18 +107,18 @@ object ProviderFailover {
     fun allFailedMessage(failures: List<ProviderFailure>): String {
         val distinct = failures.distinctBy { it.providerId }
         if (distinct.isNotEmpty() && distinct.all { it.kind == ErrorKind.OutputTooLong }) {
-            return "The plan was too long for the provider's output limit (tried " +
+            return "The plan was too long for the source's output limit (tried " +
                 distinct.joinToString(", ") { it.providerName } +
-                "). Try a shorter description, or a provider with a larger limit."
+                "). Try a shorter description, or a source with a larger limit."
         }
         val lines = distinct.joinToString(" ") { "${it.providerName} ${reasonPhrase(it.kind)}. ${fixFor(it.kind)}" }
-        return "Every connected provider failed, so this stopped. $lines"
+        return "Every connected source failed, so this stopped. $lines"
     }
 
     /** A creature the keeper pinned to a provider stays there; it says so and offers the switch. */
     fun pinnedMessage(failure: ProviderFailure): String =
         "${failure.providerName} ${reasonPhrase(failure.kind)}. This creature is set to use it, so it did not " +
-            "switch to another provider. ${fixFor(failure.kind)} Or choose another provider for this creature, " +
+            "switch to another source. ${fixFor(failure.kind)} Or choose another source for this creature, " +
             "or set it to choose automatically."
 
     /**

@@ -129,7 +129,7 @@ class HallMonitorSolutionTrialServiceTest {
             id = ArtifactId("report-artifact"),
             kind = ArtifactKind.HallMonitorReport,
             taskRunId = TaskRunId("hall-monitor-run"),
-            label = "Hall Monitor report",
+            label = "Nanny report",
             textContent = Json.encodeToString(HallMonitorReport.serializer(), report),
             createdAtEpochMillis = 10L,
         )
@@ -152,7 +152,7 @@ class HallMonitorSolutionTrialServiceTest {
             updatedAtEpochMillis = 50L,
             globalPause = WorkflowGlobalPause(
                 kind = WorkflowGlobalPauseKind.HallMonitorReview,
-                reason = "Review Hall Monitor recommendations",
+                reason = "Review Nanny recommendations",
                 reportArtifactId = reportArtifact.id,
                 antagonistReviewArtifactId = ArtifactId("antagonist-review"),
                 orchestratorGateId = ApprovalGateId("orchestrator-gate"),

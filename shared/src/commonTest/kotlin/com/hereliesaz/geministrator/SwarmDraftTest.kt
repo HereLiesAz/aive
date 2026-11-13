@@ -143,7 +143,7 @@ class SwarmDraftTest {
             ),
         )
         val failed = assertIs<SwarmDraftResult.ProviderFailed>(swarmDraftFailure(all))
-        assertTrue("too long for the provider's output limit" in failed.summary.orEmpty() && "A, B" in failed.summary.orEmpty())
+        assertTrue("too long for the source's output limit" in failed.summary.orEmpty() && "A, B" in failed.summary.orEmpty())
     }
 
     @Test

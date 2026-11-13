@@ -9,7 +9,7 @@ The Aive writes the current specification (1.0): `SendMessage`/`GetTask`/`Cancel
 
 The existing duplex MCP channel ([DUPLEX_MCP](architecture/DUPLEX_MCP.md)) is separate and unchanged.
 
-## Client: remote agents as providers
+## Client: remote agents as sources
 
 **Connecting one.** In **Keeper's room › Connections › Connect remote agent**, paste the Agent Card URL. A bare address (`https://agent.example`) means its `/.well-known/agent-card.json`. Aive reads the card without credentials or redirects and requires a usable JSON-RPC interface before adding the provider. It displays an address, response or compatibility error when validation fails. Next, provider setup handles keyless use or an optional bearer token. A remote agent is never selected automatically: assign its provider to a role in **Swarm** to use it.
 
@@ -27,7 +27,7 @@ Local connections and suggestions remain available if both network sources fail.
 Search results never connect or auto-assign an agent; choosing **Use address**
 fills the same independently validated Agent Card form.
 
-**One connection path, not an adoption marketplace.** A remote A2A agent is a service hosted by its operator, not an Azphalt role/workflow package. The old hive-edge sheet once combined Store packages with public A2A drifters to make both discoverable; it was removed because the Store and Connections already perform those jobs. The Agent Card is read in Connections using `A2aDrifters.read`, and only its validated name and URL become a connection. No role is created implicitly; the user can assign the connected provider to a role in Swarm. The remote provider cannot approve Aive's gates or gain repository authority. Disconnecting it removes its credential and connection as before. Existing roles and saved connections are preserved.
+**One connection path, not an adoption marketplace.** A remote A2A agent is a service hosted by its operator, not an Azphalt role/workflow package. The old hive-edge sheet once combined Store packages with public A2A orphans to make both discoverable; it was removed because the Store and Connections already perform those jobs. The Agent Card is read in Connections using `A2aDrifters.read`, and only its validated name and URL become a connection. No role is created implicitly; the user can assign the connected source to a role in Swarm. The remote source cannot approve Aive's gates or gain repository authority. Disconnecting it removes its credential and connection as before. Existing roles and saved connections are preserved.
 
 **Suggested remote agents.** Before searching, the two independently hosted A2A examples in `A2aDrifterSeeds.SEEDS` are listed only when **Connect remote agent** is expanded, excluding already connected or dismissed services. **Use address** fills the Agent Card field; it does not contact that agent or grant access. **Connect agent** validates the card before adding it. **Dismiss** hides a suggestion on this device using the existing `aive.a2a.drifters.dismissed-seeds.v1` preference. Nothing is fetched from a suggestion unless the keeper connects it.
 
@@ -40,7 +40,7 @@ A seed must need no key, serve its JSON-RPC endpoint on its card's origin, and a
 
 No official a2aproject agent is hosted publicly; its samples run locally. Public agents come and go: if a suggested agent stops answering, the Agent Card validation reports a failure, and the entry should be taken out of `SEEDS`.
 
-**When it runs.** `A2aAgentProvider` is `explicitOnly`. The router never picks it on its own; it runs only for roles that prefer it, or tasks that require it by id. Choose it as the role's provider in the swarm. It offers `PlanGeneration`, `PlanApproval` (through the engine-owned plan gate), `Messaging` and `Research`, and no repository access.
+**When it runs.** `A2aAgentProvider` is `explicitOnly`. The router never picks it on its own; it runs only for roles that prefer it, or tasks that require it by id. Choose it as the role's source in the swarm. It offers `PlanGeneration`, `PlanApproval` (through the engine-owned plan gate), `Messaging` and `Research`, and no repository access.
 
 **A task's life:**
 
@@ -93,7 +93,7 @@ Under the A2A server row, **Open to this network** is off by default, even thoug
 - **Binding.** While on, the server binds every IPv4 interface (`0.0.0.0`) on the same port. This computer still reaches it at `127.0.0.1`. The row lists the Agent Card URL on each of this computer's IPv4 addresses (up, not loopback, not link-local), re-read every 30 seconds. IPv6 is not served. A single chosen interface is not offered yet.
 - **Host check.** A request's `Host` must still be a loopback name, or one of this computer's own addresses as an IP literal. Host names are refused, so DNS rebinding still fails.
 - **Who may call.** A caller from another computer needs the bearer token *and* its IP address on the keeper's allowlist (preferences key `lan-allowed`). A caller with the right token whose address is not listed gets `403` and appears on the row as "`<address>` has the token and wants to send work", with **Allow**. Allowed addresses are listed with **Remove**. A caller without the token gets `401` and is never listed, so scanners cannot fill the list. At most 8 waiting addresses are shown, newest first. Callers on this computer need no entry. While the switch is off, every non-loopback caller is refused, card included.
-- **Why an allowlist and not an Inbox approval.** Approval in the hive's Needs/Inbox would need a new kind of wait that belongs to no run, plus a pending-client queue across restarts. The allowlist is deny-by-default, needs one keeper action per computer, is decided where the switch lives, and the "wants to send work" line gives the same first-contact prompt without new Inbox plumbing. It is keyed by address, not identity: see the threat model's residual risks.
+- **Why an allowlist and not a Messages approval.** Approval in the hive's Needs/Messages would need a new kind of wait that belongs to no run, plus a pending-client queue across restarts. The allowlist is deny-by-default, needs one keeper action per computer, is decided where the switch lives, and the "wants to send work" line gives the same first-contact prompt without new Messages plumbing. It is keyed by address, not identity: see the threat model's residual risks.
 - **Rate limit.** `SendMessage` is limited to 6 calls a minute per client (each network address; this computer counts as one client), whether or not the launch is accepted. Over the limit the answer is HTTP `429` with `Retry-After` in seconds. `GetTask` and `CancelTask` are not limited.
 - **Agent Card.** A caller that reached the server at a network address gets a card whose interface URL is `http://<that address>:<port>/a2a`. A caller on loopback gets the loopback URL. With the switch off the card never names a network address. The card is public, as A2A discovery expects, so anyone on the network can read it while the switch is on.
 - **No encryption.** It is plain HTTP. TLS is not offered: the JDK has no public way to make a certificate, and A2A clients would reject a self-signed one without pinning that they do not offer. The token and everything sent travel in clear text, and anyone else on the network can read them. The row says so beside the switch. Use it only on a trusted network, and press **New token** after using it on one you do not trust.
@@ -115,19 +115,19 @@ Under the A2A server row, **Open to this network** is off by default, even thoug
 - Tasks live in memory (the 64 most recent) and are lost when The Aive closes. The runs themselves persist as usual.
 - Turning the server off fails any queued launch.
 
-**Authority.** The server cannot approve a plan, task or gate, choose a provider, or touch a repository. A run it starts waits at its gates for the person at The Aive, like any other run.
+**Authority.** The server cannot approve a plan, task or gate, choose a source, or touch a repository. A run it starts waits at its gates for the person at The Aive, like any other run.
 
-### Describing providers
+### Describing sources
 
-The card can also say which providers the swarm can use, so another agent can see what a multi-provider hive is made of. **Keeper's room > This device > A2A server > Describe my providers in the card** controls it (desktop only; Android and web have no server).
+The card can also say which sources the swarm can use, so another agent can see what a multi-source hive is made of. **Keeper's room > This device > A2A server > Describe my sources in the card** controls it (desktop only; Android and web have no server).
 
 - **What is added.** One skill `provider:<id>` per provider that is linked here (the live provider registry holds only those), up to 24, sorted by id. Each has the name the app shows, the description "Linked provider. Reports: plan generation, research." built from its capability names, and tags `provider` plus the capability names. Each `role:<id>` skill gains the tag `provider:<id>` of its preferred provider (while that provider is linked) or `provider:auto`, and a clause "Provider: ..." in its description. A remote A2A agent shows as `provider:a2a-<hash>` named "Remote A2A agent", never by host.
 - **What is never added.** Keys, tokens, base URLs, account names or emails, model names, balances, anything from the secret stores. Only id, shown name and capabilities are read.
-- **Default (the rule).** If the keeper never pressed the switch, providers are described while the server is on this computer only, and left out as soon as **Open to this network** is on, since the card is then readable by the whole network. Once pressed, the choice is kept as set, on or off, on any network (`a2aDescribeProviders`, key `describe-providers` in the server's preferences). Loopback only is already limited to this computer's processes; the network is a wider audience, so it needs a deliberate yes.
+- **Default (the rule).** If the keeper never pressed the switch, sources are described while the server is on this computer only, and left out as soon as **Open to this network** is on, since the card is then readable by the whole network. Once pressed, the choice is kept as set, on or off, on any network (`a2aDescribeProviders`, key `describe-providers` in the server's preferences). Loopback only is already limited to this computer's processes; the network is a wider audience, so it needs a deliberate yes.
 
 ## Hive cards
 
-A hive card is a portable record of one hive: which role each creature has and which provider it runs on, plus its strands. It works on every platform and needs no server. It is an A2A 1.0 Agent Card (`A2aCodec.encodeCard`) whose skills are the creatures (`creature:<id>`, tagged `role:<id>` and `provider:<id>` or `provider:auto`), with the record itself in one `capabilities.extensions` entry, URI `urn:aive:a2a:ext:hive-card:v1`, `required: false`. It describes a hive and serves nothing, so it lists no interface. Code: `a2a/A2aHiveCard.kt`.
+A hive card is a portable record of one hive: which role each creature has and which source it runs on, plus its strands. It works on every platform and needs no server. It is an A2A 1.0 Agent Card (`A2aCodec.encodeCard`) whose skills are the creatures (`creature:<id>`, tagged `role:<id>` and `provider:<id>` or `provider:auto`), with the record itself in one `capabilities.extensions` entry, URI `urn:aive:a2a:ext:hive-card:v1`, `required: false`. It describes a hive and serves nothing, so it lists no interface. Code: `a2a/A2aHiveCard.kt`.
 
 The record (`params`): `format: "aive-hive-card"`, `version: 1`, `hive.name`, `includesObjectives`, and `creatures` (at most 12), each with `id`, `name`, `kind` (`role`, `approval` or `other`), `role` (role id), `assignment` (`pin` with `provider`, or `auto`), optional `cardUrl` (only for a pinned `a2a:` provider, and only an http(s) address without user info, query or fragment), `dependsOn` (strands) and, only if asked, a one-line `objective`.
 
@@ -148,6 +148,6 @@ The record (`params`): `format: "aive-hive-card"`, `version: 1`, `hive.name`, `i
 - `A2aServerLanTest.kt`: network callers refused while closed, the card's URL per caller, Host checks, the allowlist and waiting list, the per-client `SendMessage` limit, address normalization.
 - `A2aAgentConnectionsTest.kt`: URL rules and catalog entries.
 - `A2aDrifterSeedsTest.kt`: every seed is a normalized https card with its check written down, seeds wait unread, dismissal persists, a connected seed is not offered.
-- `A2aDriftersTest.kt`: reading a card and each failure, the stable creature, the waiting list, and the role a drifter takes (prefers its provider, `Research` only, no authority).
+- `A2aDriftersTest.kt`: reading a card and each failure, the stable creature, the waiting list, and the role an orphan takes (prefers its source, `Research` only, no authority).
 - `workflow/ContextTaintTest.kt`: an `a2a:` provider's output is external whatever its role.
 - `providers/llm/src/commonTest/.../A2aAgentProviderTest.kt`: the client against a mock agent, including the token-origin rule.

@@ -16,10 +16,10 @@ on:
       - main
   workflow_dispatch:
 
+# Least privilege: each job below declares what it needs. id-token is only for the central
+# ci-report action (and Pages deploy); pages: write is only for deploy-pages.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   # Main/release runs must never be cancelled after an immutable tag has been created.
@@ -32,14 +32,17 @@ jobs:
     name: Resolve four-part version
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Resolve four-part build version
         id: version
-        # TODO: pin HereLiesAz/workflows to a specific commit SHA instead of @main
+        # HereLiesAz/workflows is owner-controlled and referenced at @main on purpose (docs/THREAT_MODEL.md, Accepted risks).
         uses: HereLiesAz/workflows/.github/actions/four-part-version@main
         with:
           source-version-file: gradle.properties
@@ -49,14 +52,18 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - name: Resolve four-part build version
-        # TODO: pin HereLiesAz/workflows to a specific commit SHA instead of @main
+        # HereLiesAz/workflows is owner-controlled and referenced at @main on purpose (docs/THREAT_MODEL.md, Accepted risks).
         uses: HereLiesAz/workflows/.github/actions/four-part-version@main
         with:
           source-version-file: gradle.properties
@@ -67,36 +74,64 @@ jobs:
 
 
       - name: Check out h2g2
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: HereLiesAz/conveyance-h2g2
+          ref: 8ff45ea2fbf91f8b2fb22a542a87efdf9b856f0c # pinned: README "Bumping the vendor pins"
           path: vendor/conveyance-h2g2
 
       - name: Check out Conveyance
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: HereLiesAz/Conveyance
+          ref: 9d9a694c64d0bdfd1d6e9f38a1ad972bb5618ac4 # pinned: README "Bumping the vendor pins"
           path: vendor/conveyance-h2g2/vendor/Conveyance
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           distribution: temurin
           java-version: "21"
 
+      - name: Install ffmpeg
+        # FfmpegFilmPlanTest runs the real binary; on CI a missing ffmpeg fails it instead of skipping.
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg; then break; fi
+            [ "$attempt" -lt 3 ] || exit 1
+            sleep $((attempt * 10))
+          done
+
       - name: Set up Rust native toolchain
-        uses: dtolnay/rust-toolchain@v1
+        id: retry1
+        continue-on-error: true
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - name: Set up Rust native toolchain (retry after a failed download)
+        if: steps.retry1.outcome == 'failure'
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
           toolchain: stable
           targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
 
       - name: Install cargo-ndk
-        uses: taiki-e/install-action@v2
+        id: retry2
+        continue-on-error: true
+        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2
+        with:
+          tool: cargo-ndk
+
+      - name: Install cargo-ndk (retry after a failed download)
+        if: steps.retry2.outcome == 'failure'
+        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2
         with:
           tool: cargo-ndk
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
 
       - name: Reconstruct and verify Android signing keystore
         id: signing
@@ -154,6 +189,9 @@ jobs:
 
       - name: Test shared domain
         run: ./gradlew :shared:desktopTest
+
+      - name: Test desktop app
+        run: ./gradlew :desktopApp:test
 
       - name: Test distributed compute relay
         run: ./gradlew :computeRelay:test
@@ -319,7 +357,7 @@ jobs:
 
       - name: Upload GitHub Android release
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: aive-android-github-release
           path: androidApp/build/outputs/apk/github/release/*.apk
@@ -327,7 +365,7 @@ jobs:
 
       - name: Upload GitHub Android R8 mapping
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: aive-android-github-mapping
           path: androidApp/build/outputs/mapping/githubRelease/mapping.txt
@@ -335,7 +373,7 @@ jobs:
 
       - name: Upload Play Android release
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: aive-android-play-release
           path: androidApp/build/outputs/bundle/playRelease/*.aab
@@ -343,7 +381,7 @@ jobs:
 
       - name: Upload release notes
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: aive-release-notes
           path: fastlane/metadata/android/en-US/changelogs/
@@ -362,6 +400,10 @@ jobs:
     if: (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     needs: version
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 75
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -384,7 +426,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Use central four-part build version
         shell: bash
         env:
@@ -396,30 +438,40 @@ jobs:
           echo "Aive build version: $AIVE_VERSION"
 
       - name: Check out h2g2
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: HereLiesAz/conveyance-h2g2
+          ref: 8ff45ea2fbf91f8b2fb22a542a87efdf9b856f0c # pinned: README "Bumping the vendor pins"
           path: vendor/conveyance-h2g2
 
       - name: Check out Conveyance
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: HereLiesAz/Conveyance
+          ref: 9d9a694c64d0bdfd1d6e9f38a1ad972bb5618ac4 # pinned: README "Bumping the vendor pins"
           path: vendor/conveyance-h2g2/vendor/Conveyance
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           distribution: temurin
           java-version: "21"
 
       - name: Set up Rust native toolchain
-        uses: dtolnay/rust-toolchain@v1
+        id: retry3
+        continue-on-error: true
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+
+      - name: Set up Rust native toolchain (retry after a failed download)
+        if: steps.retry3.outcome == 'failure'
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
           toolchain: stable
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
 
       - name: Generate and verify desktop icons
         shell: bash
@@ -474,7 +526,7 @@ jobs:
           test "$(find desktopApp/build/generated/bitcos/desktop/bitcos -type f -maxdepth 1 | wc -l | tr -d ' ')" -ge 1
 
       - name: Upload native installer
-        uses: actions/upload-artifact@v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.path }}
@@ -492,48 +544,49 @@ jobs:
       - build
       - desktop-packages
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: write
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Download GitHub Android release
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: aive-android-github-release
           path: release-input/android
 
       - name: Download Linux installer
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: aive-desktop-linux
           path: release-input/linux
 
       - name: Download Windows installer
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: aive-desktop-windows
           path: release-input/windows
 
       - name: Download macOS installer
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: aive-desktop-macos
           path: release-input/macos
 
       - name: Download release notes
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: aive-release-notes
           path: release-input/notes
 
       - name: Derive four-part release version
         id: version
-        # TODO: pin HereLiesAz/workflows to a specific commit SHA instead of @main
+        # HereLiesAz/workflows is owner-controlled and referenced at @main on purpose (docs/THREAT_MODEL.md, Accepted risks).
         uses: HereLiesAz/workflows/.github/actions/four-part-version@main
         with:
           source-version-file: gradle.properties
@@ -586,7 +639,7 @@ jobs:
           } > release-notes.md
 
       - name: Publish grouped patch release
-        # TODO: pin HereLiesAz/workflows to a specific commit SHA instead of @main
+        # HereLiesAz/workflows is owner-controlled and referenced at @main on purpose (docs/THREAT_MODEL.md, Accepted risks).
         uses: HereLiesAz/workflows/.github/actions/patch-grouped-release@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -606,12 +659,16 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Verify standalone puppet-rig
         shell: bash
@@ -648,13 +705,13 @@ jobs:
           done
 
       - name: Configure GitHub Pages
-        uses: actions/configure-pages@v6
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
 
       - name: Upload GitHub Pages artifact
-        uses: actions/upload-pages-artifact@v5
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: ${{ runner.temp }}/aive-pages
 
       - name: Deploy GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5

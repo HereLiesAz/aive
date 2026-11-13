@@ -53,10 +53,10 @@ data class WorkflowGlobalPause(
             (orchestratorReviewProviderId == null) == (orchestratorReviewProviderRunId == null),
         ) { "Orchestrator review provider and run IDs must be present together" }
         require(solutionTrials.map { it.id }.distinct().size == solutionTrials.size) {
-            "Hall Monitor solution trial ids must be unique"
+            "Nanny solution trial ids must be unique"
         }
         require(solutionTrials.map { it.workflowRunId }.distinct().size == solutionTrials.size) {
-            "Hall Monitor solution trial workflow runs must be unique"
+            "Nanny solution trial workflow runs must be unique"
         }
     }
 }

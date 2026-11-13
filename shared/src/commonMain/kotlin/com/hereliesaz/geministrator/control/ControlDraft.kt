@@ -31,9 +31,9 @@ internal fun controlDraftOutcome(result: SwarmDraftResult): ControlDraftOutcome 
         },
     )
     is SwarmDraftResult.ProviderFailed ->
-        ControlDraftOutcome.Failed(ControlErrorCode.Unavailable, "The linked provider failed: ${classifyError(result.raw).name}")
+        ControlDraftOutcome.Failed(ControlErrorCode.Unavailable, "The linked source failed: ${classifyError(result.raw).name}")
     SwarmDraftResult.Unavailable ->
-        ControlDraftOutcome.Failed(ControlErrorCode.Unavailable, "No planner is linked; connect a provider in the app")
+        ControlDraftOutcome.Failed(ControlErrorCode.Unavailable, "No queen is linked; connect a source in the app")
 }
 
 /** Public headless/desktop adapter without leaking the internal swarm draft model. */

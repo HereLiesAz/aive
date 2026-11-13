@@ -29,6 +29,10 @@ Rules:
 2. Do the same for `androidApp/src/main/res/values/strings.xml` and `androidApp/src/github/res/values/strings.xml` (`values-<lang>/`).
 3. Missing keys fall back to English, so a partial translation is safe.
 
+## Vocabulary
+
+The app's own words (Story, Source, Messages, Nanny, Orphan, Memory, Breed) are fixed in every language; [Vocabulary](Vocabulary.md) maps them to the code's terms. Translate them consistently, and do not reintroduce the English words they replaced (Timeline, Provider, Inbox, Hall Monitor, Drifter): `VocabularyInStringsTest` scans the English resources for them.
+
 ## Intentionally not localized
 
 - Prompts, system prompts and objectives sent to models, workflow/role definitions and demo workflow data (e.g. `TerrariumPreview`), the `⟦memory⟧` marker and memory-clerk text.

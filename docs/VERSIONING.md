@@ -23,6 +23,22 @@ Maturity is encoded by the version number itself, not by prerelease suffixes:
 Do not append `-alpha`, `-beta`, `-rc`, or similar labels to `app.versionName`, Git tags,
 release titles, or installer names.
 
+## Where the version is defined
+
+There is one source of truth for the product version: `app.versionName` in `gradle.properties`
+(and `app.versionCode`, Android-only, beside it). The desktop installers, the Android build and the
+release workflow all read it; CI only substitutes the BUILD component.
+
+Two other places carry numbers that are not the product version:
+
+- `version.properties` in the repository root is maintained by an automation bot and is **not read
+  by the Aive build** (the build only reads `version.properties` inside the vendored Conveyance and
+  h2g2 checkouts, for their own Maven Local versions). Its number is unrelated to the release line.
+- The CHANGELOG headings name the release line (`0.9.6`, ...) a set of changes began in; they are
+  history, not a version input.
+
+`.github/scripts/verify_release_immutability.py` enforces the `gradle.properties` format in CI.
+
 ## Immutable build identity and patch-grouped GitHub Releases
 
 Every published build keeps its own permanent four-part Git tag:

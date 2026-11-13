@@ -64,7 +64,7 @@ internal fun projectWorkflowMindMap(
                 append(" · Executor: ")
                 append(executor.displayName())
                 taskRun?.assignedProviderId?.let {
-                    append(" · Provider: ")
+                    append(" · Source: ")
                     append(it.value)
                 }
                 taskRun?.externalRunId?.takeIf(String::isNotBlank)?.let {

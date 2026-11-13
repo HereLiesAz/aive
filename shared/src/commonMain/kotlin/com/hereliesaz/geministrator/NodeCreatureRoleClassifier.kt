@@ -101,6 +101,7 @@ internal fun classifyNodeCreatureRole(roleLabel: String): NodeCreatureRoleKind {
 
         // Watchers and continuity keepers.
         "hall monitor" in role ||
+            "nanny" in role ||
             "hall-monitor" in role ||
             "systems monitor" in role ||
             "continuity" in role ||

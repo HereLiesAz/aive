@@ -39,7 +39,7 @@ class SelfImprovementClauseTest {
         val entry = CodingWorkflowSuite.all().single { it.definition.id.value == SelfImprovementLoop.HIVE_ID }
         assertEquals(loop, entry.definition)
         assertNotNull(entry.schedule).also { assertTrue(it.withEvidence, "its objective is fed the swarm's evidence") }
-        assertTrue(loop.tasks.any { it.roleId == HallMonitorRole.id }, "the Hall Monitor is the observer")
+        assertTrue(loop.tasks.any { it.roleId == HallMonitorRole.id }, "the Nanny is the observer")
     }
 
     @Test
@@ -118,6 +118,47 @@ class SelfImprovementClauseTest {
         host.saveAuthored(stripped)
         assertEquals(stripped, persistence.definitions.get(id))
         assertTrue(LoopIntegrity.violations(stripped).isNotEmpty(), "and the checker says what they gave up")
+    }
+
+    @Test
+    fun point2_aCycleMustExamineTheLoopWithEvidenceAndAThinMetaNoChangeDoesNotCount() {
+        fun cycle(at: Long, meta: Int = 0, noChange: String? = null) = CycleRecord(runId = "r$at", atEpochMillis = at, proposals = meta, metaProposals = meta, metaNoChange = noChange)
+        val cites = "The loop's 4 steps finished in 3 of 3 cycles with 0 malformed lines, so no change is warranted."
+        // A proposal about the loop is an examination; so is a reason of a sentence's worth that cites a figure.
+        assertTrue(cycle(1, meta = 1).examinedLoop)
+        assertTrue(cycle(1, noChange = cites).examinedLoop)
+        // A bare gesture, a short reason and a long reason with no figure in it are not.
+        assertTrue(!cycle(1).examinedLoop)
+        assertTrue(!cycle(1, noChange = "Nothing to change.").examinedLoop)
+        assertTrue(!cycle(1, noChange = "The loop is fine as it is and there is nothing in it that needs any change at all.").examinedLoop)
+        assertEquals(60, MetaNoChange.MIN_CHARS)
+
+        // LoopObligation says when the loop has not examined itself.
+        val now = 100L * 24 * 3_600_000
+        assertEquals(LoopObligation.Standing.NeverRan, LoopObligation.standing(ImprovementState(), now))
+        assertEquals(LoopObligation.Standing.Examined, LoopObligation.standing(ImprovementState(cycles = listOf(cycle(now - 1_000, meta = 1))), now))
+        assertEquals(LoopObligation.Standing.LastCycleSkippedItself, LoopObligation.standing(ImprovementState(cycles = listOf(cycle(now - 1_000))), now))
+        assertEquals(LoopObligation.Standing.Overdue, LoopObligation.standing(ImprovementState(cycles = listOf(cycle(now - LoopObligation.MAX_GAP_MILLIS - 1, meta = 1))), now))
+    }
+
+    @Test
+    fun point6_anAdoptionKeepsBeforeAndAfterSoItCanBeRevertedOnlyWhileTheTextIsStillAsAdopted() {
+        val adopted = ImprovementProposal(
+            id = "p", cycleRunId = "r", kind = ImprovementKind.HiveStep, target = "${SelfImprovementLoop.HIVE_ID}/observe", summary = "s",
+            newText = "after", expectedEffect = "e", undo = "u", meta = false, createdAtEpochMillis = 1L,
+            status = ProposalStatus.Adopted, appliedBefore = "before", appliedAfter = "after",
+        )
+        // Reverting is possible while the text is what adoption wrote, and the before text is kept to restore.
+        assertTrue(ImprovementApplier.canRevert(adopted, currentText = "after"))
+        assertEquals("before", adopted.appliedBefore)
+        // A later edit is not undone, and a proposal that was never adopted has nothing to revert.
+        assertTrue(!ImprovementApplier.canRevert(adopted, currentText = "after, then edited by the keeper"))
+        assertTrue(!ImprovementApplier.canRevert(adopted.copy(status = ProposalStatus.Proposed), currentText = "after"))
+        // The ledger never forgets an adopted proposal, so a revert stays possible however full it gets.
+        val crowd = List(ProposalRetention.MAX + 5) { adopted.copy(id = "a$it") } + List(10) { adopted.copy(id = "d$it", status = ProposalStatus.Dismissed) }
+        val kept = ProposalRetention.bound(crowd)
+        assertTrue(kept.none { it.status == ProposalStatus.Dismissed }, "dismissed ones go first")
+        assertEquals(ProposalRetention.MAX + 5, kept.count { it.status == ProposalStatus.Adopted })
     }
 
     private fun withTask(id: String, change: (TaskDefinition) -> TaskDefinition) = loop.copy(tasks = loop.tasks.map { if (it.id.value == id) change(it) else it })
@@ -209,7 +250,7 @@ class SelfImprovementClauseTest {
 
         // The step declares another role, but dispatch runs the Hall Monitor.
         val monitorRuns = with(examine.copy(executor = TaskExecutor.RoleAgent(HallMonitorRole.id)))
-        assertTrue(LoopIntegrity.violations(monitorRuns).any { "independently of the Hall Monitor" in it })
+        assertTrue(LoopIntegrity.violations(monitorRuns).any { "independently of the Nanny" in it })
 
         // The challenger runs as the same role as the examiner although the declared ids differ.
         val sameRole = with(challenge.copy(executor = TaskExecutor.RoleAgent(examine.roleId!!)))
@@ -220,7 +261,7 @@ class SelfImprovementClauseTest {
         if (ancestorId != null) {
             val ancestor = loop.tasks.single { it.id == ancestorId }
             val sneaky = with(ancestor.copy(executor = TaskExecutor.RoleAgent(HallMonitorRole.id)))
-            assertTrue(LoopIntegrity.violations(sneaky).any { "independently of the Hall Monitor" in it })
+            assertTrue(LoopIntegrity.violations(sneaky).any { "independently of the Nanny" in it })
         }
     }
 }

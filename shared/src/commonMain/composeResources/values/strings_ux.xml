@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="error_key_rejected">Key rejected. Reconnect this provider under Connections in the Keeper's room with a valid key.</string>
-    <string name="error_out_of_credit">Out of credit with this provider. Add credits in its billing settings, or switch to another provider.</string>
-    <string name="error_rate_limited">Rate limited. Wait a minute, or switch to another provider.</string>
+    <string name="error_key_rejected">Key rejected. Reconnect this source under Connections in the Keeper's room with a valid key.</string>
+    <string name="error_out_of_credit">Out of credit with this source. Add credits in its billing settings, or switch to another source.</string>
+    <string name="error_rate_limited">Rate limited. Wait a minute, or switch to another source.</string>
     <string name="error_offline">Can't reach the service. Check your internet connection, then retry.</string>
-    <string name="error_timed_out">The service took too long to answer. Retry, or switch to another provider.</string>
-    <string name="error_server_error">The service is having trouble right now. Retry in a moment, or switch to another provider.</string>
-    <string name="error_no_agent">No connected agent can do this work. Connect an AI provider, or give the hive a repository its agent works in.</string>
-    <string name="error_output_too_long">The plan was too long for the provider's output limit. Try a shorter description, or a provider with a larger limit.</string>
-    <string name="error_bad_request">The provider did not accept this request. Retry, or switch to another provider.</string>
-    <string name="error_other">Something went wrong. Retry, or check your provider under Connections in the Keeper's room.</string>
+    <string name="error_timed_out">The service took too long to answer. Retry, or switch to another source.</string>
+    <string name="error_server_error">The service is having trouble right now. Retry in a moment, or switch to another source.</string>
+    <string name="error_no_agent">No connected agent can do this work. Connect an AI source, or give the hive a repository its agent works in.</string>
+    <string name="error_output_too_long">The plan was too long for the source's output limit. Try a shorter description, or a source with a larger limit.</string>
+    <string name="error_bad_request">The source did not accept this request. Retry, or switch to another source.</string>
+    <string name="error_other">Something went wrong. Retry, or check your source under Connections in the Keeper's room.</string>
     <string name="error_details_label">Technical details</string>
     <string name="error_details_show">Technical details</string>
     <string name="error_details_hide">Hide technical details</string>
     <string name="app_unreachable">Unreachable</string>
     <string name="confirm_cancel">Cancel</string>
     <string name="confirm_disconnect_title">Disconnect %1$s?</string>
-    <string name="confirm_disconnect_body">This removes the saved key from this device. To use the provider again you will need to paste a key again.</string>
+    <string name="confirm_disconnect_body">This removes the saved key from this device. To use the source again you will need to paste a key again.</string>
     <string name="confirm_disconnect_action">Disconnect</string>
     <string name="confirm_disconnect_repository_body">This removes the saved access token from this device. To use the service again you will need to paste a token again.</string>
     <string name="confirm_remove_llm_title">Remove %1$s?</string>
@@ -63,7 +63,7 @@
     <string name="overview_enter_objective">Enter an objective to start a run.</string>
     <string name="overview_invalid_repository_location">Invalid repository location</string>
     <string name="firstrun_title">Try it free, no key</string>
-    <string name="firstrun_body">No account needed. Pick one of these to get started; you can add a stronger provider later. Free gateways may log prompts and limit how many requests you can send, so keep confidential data out.</string>
+    <string name="firstrun_body">No account needed. Pick one of these to get started; you can add a stronger source later. Free gateways may log prompts and limit how many requests you can send, so keep confidential data out.</string>
     <string name="firstrun_connect">Connect %1$s</string>
     <string name="firstrun_connect_hint">Opens a screen where you confirm. No key is needed.</string>
     <string name="remote_access_enter_code">Enter this code in IDEaz on your other device: Settings → The Aive.</string>
@@ -78,9 +78,9 @@
     <string name="credential_keyless_hint">Free gateways take your prompts without a key and may log them, so keep confidential work out.</string>
     <string name="swarm_title">Swarm</string>
     <string name="creature_rig_gallery_title">Puppet-rig creatures</string>
-    <string name="inspector_hint_approve_plan">Approving lets the agent start making the changes in its plan. It may use your provider quota and change the repository.</string>
-    <string name="inspector_hint_approve_task">Approving lets this task go ahead. It may use your provider quota or change files or services.</string>
-    <string name="inspector_hint_approve_nested">Approving lets this step of the sub-workflow continue. It may use your provider quota or change files.</string>
+    <string name="inspector_hint_approve_plan">Approving lets the agent start making the changes in its plan. It may use your source quota and change the repository.</string>
+    <string name="inspector_hint_approve_task">Approving lets this task go ahead. It may use your source quota or change files or services.</string>
+    <string name="inspector_hint_approve_nested">Approving lets this step of the sub-workflow continue. It may use your source quota or change files.</string>
     <string name="semantics_selected">Selected</string>
     <string name="semantics_capillary">%1$s, feeding %2$s</string>
     <string name="semantics_move_node_left">Move left</string>
@@ -112,7 +112,7 @@
     <string name="confirm_discard_schedules_action">Discard it</string>
     <string name="cred_sign_in_with">Sign in with %1$s</string>
     <string name="cred_could_not_start_sign_in">Could not start account sign-in</string>
-    <string name="cred_enter_code">Enter code %1$s on the provider’s authorization page. The provider controls login and any Google sign-in. Charges may apply.</string>
+    <string name="cred_enter_code">Enter code %1$s on the source’s authorization page. The source controls login and any Google sign-in. Charges may apply.</string>
     <string name="cred_open_authorization_page">Open authorization page</string>
     <string name="cred_checking">Checking…</string>
     <string name="cred_i_have_authorized">I’ve authorized</string>
@@ -123,7 +123,7 @@
     <string name="cred_one_time_code">One-time authorization code</string>
     <string name="cred_connecting">Connecting…</string>
     <string name="cred_connect_account">Connect account</string>
-    <string name="memory_default_provider">default provider</string>
+    <string name="memory_default_provider">default source</string>
     <string name="memory_not_applied">Not applied: %1$s</string>
     <string name="memory_check_values">check the values</string>
     <string name="memory_legacy_backup_note">The memory kept before per-workflow banks is still on this device as a backup. It holds every workflow’s history in one place that Forget, retention and Forget everything do not reach. Records listed in the migration report as drawn from several workflows exist only there.</string>

@@ -69,8 +69,8 @@ object SelfImprovementLoop {
         val examine = step(
             "examine-loop", "Examine the loop itself", architect, RoleAuthority.ProposePlan,
             "Examine this self-improvement loop, as given under 'The loop, as it is now' in the objective: its steps, the evidence it is " +
-                "fed, the Hall Monitor's instructions, its schedule. Say what it misses, what it measures badly, what is wasted, and what " +
-                "you would change, with evidence from the run history. You work independently of the Hall Monitor's report. Nothing " +
+                "fed, the Nanny's instructions, its schedule. Say what it misses, what it measures badly, what is wasted, and what " +
+                "you would change, with evidence from the run history. You work independently of the Nanny's report. Nothing " +
                 "about the loop is off limits, and a finding that the loop is fine needs evidence too.",
         )
         val challengeLoop = step(
@@ -81,7 +81,7 @@ object SelfImprovementLoop {
         )
         val propose = step(
             "propose", "Propose improvements", product, RoleAuthority.ProposePlan,
-            "From the Hall Monitor's report (as challenged) and the examination of the loop (as challenged), write proposals, one per line, " +
+            "From the Nanny's report (as challenged) and the examination of the loop (as challenged), write proposals, one per line, " +
                 "exactly in this form:\n$GRAMMAR\n$ESCAPING\nkind is one of: $KINDS. A proposal changes nothing; the keeper decides each. Every " +
                 "expected effect must say how it would be measured from run history. You MUST include at least one proposal about the loop " +
                 "itself (kind loop-definition or evidence-rule, or a target that is the loop's own hive, role or schedule), or, only if the " +
@@ -109,7 +109,7 @@ object SelfImprovementLoop {
     fun describe(definition: WorkflowDefinition = definition(), hallMonitor: RoleDefinition = HallMonitorRole.definition): String = buildString {
         appendLine("Hive ${definition.name} (${definition.id.value}):")
         definition.tasks.forEach { appendLine("- ${it.name} [${it.roleId?.value}]: ${it.objective.replace(Regex("\\s+"), " ").take(360)}") }
-        appendLine("Hall Monitor instructions (start): ${hallMonitor.instructions.replace(Regex("\\s+"), " ").take(700)}")
+        appendLine("Nanny instructions (start): ${hallMonitor.instructions.replace(Regex("\\s+"), " ").take(700)}")
     }
 
     private fun step(id: String, name: String, role: RoleDefinition, authority: RoleAuthority?, objective: String, after: List<String> = emptyList()) =
@@ -161,7 +161,7 @@ object LoopIntegrity {
         } else {
             val author = effectiveRole(examine)
             if (author == null || author == HallMonitorRole.id || ancestors(tasks, examine.id).any { byId[it.value]?.let(::effectiveRole) == HallMonitorRole.id }) {
-                problems += "The loop must examine itself independently of the Hall Monitor: 'examine-loop' is not the Hall Monitor's step and does not wait on its report."
+                problems += "The loop must examine itself independently of the Nanny: 'examine-loop' is not the Nanny's step and does not wait on its report."
             }
         }
         if (challenge == null || challenge.dependsOn.none { it.value == "examine-loop" }) {

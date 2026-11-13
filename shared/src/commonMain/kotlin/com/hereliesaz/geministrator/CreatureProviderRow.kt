@@ -39,7 +39,7 @@ internal fun CreatureProviderRow(
     val routing = creatureProviderRouting(role, task) ?: return
     val pinnedId = (routing as? CreatureProviderRouting.Pinned)?.providerId
     // A task that requires a provider by id is pinned by the task, which this row does not edit.
-    val pinnedByTask = pinnedId != null && role.preferredProviderId == null
+    val pinnedByTask = providerPinnedByTask(pinnedId, role)
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(Res.string.creature_provider_label), style = AzphaltType.eyebrow, color = azphaltMutedOnSurface())
         if (!pinnedByTask && onSaveRoleCollection != null) {
@@ -61,7 +61,7 @@ internal fun CreatureProviderRow(
             color = azphaltOnSurface(),
         )
         // A pin to a provider that is not linked fails at once; say so where it can be fixed.
-        if (pinnedId != null && pinnedId !in connectedProviderIds) {
+        if (pinnedId != null && pinnedProviderNeedsConnection(pinnedId, connectedProviderIds)) {
             Text(
                 stringResource(Res.string.creature_provider_pinned_unconnected, pinnedProviderName(pinnedId, role)),
                 style = AzphaltType.body,

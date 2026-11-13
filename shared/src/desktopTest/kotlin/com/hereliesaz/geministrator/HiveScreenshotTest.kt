@@ -56,7 +56,7 @@ class HiveScreenshotTest {
             var image = scene.render(900_000_000L)
             for (ms in 1_000..settleMillis step 100) image = scene.render(ms * 1_000_000L)
             val bytes = image.encodeToData()!!.bytes
-            assertTrue(bytes.size > 10_000, "$name looks blank")
+            ScreenshotChecks.check(name, bytes, width, height)
             File(out, "$name.png").writeBytes(bytes)
         }
     }
@@ -266,7 +266,7 @@ class HiveScreenshotTest {
             @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
             androidx.compose.foundation.layout.FlowRow(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
                 AzphaltPill(label = "Your hive", seed = "zoom-out-district", onClick = {})
-                AzphaltPill(label = "Timeline", seed = "hive-timeline", onClick = {})
+                AzphaltPill(label = "Story", seed = "hive-timeline", onClick = {})
                 AzphaltPill(label = "More editing", seed = "hive-more-editing", onClick = {})
             }
         }
@@ -525,7 +525,7 @@ class HiveScreenshotTest {
         shoot("40-page-title", 2000, 500) {
             AzphaltPageTitle(
                 eyebrow = "Keeper attention",
-                title = "Inbox",
+                title = "Messages",
                 line = "Every creature that needs you, in one place.",
                 action = { AzphaltPill(label = "Mark all read", seed = "shot-mark-all", tone = PillTone.Primary, onClick = {}) },
             )

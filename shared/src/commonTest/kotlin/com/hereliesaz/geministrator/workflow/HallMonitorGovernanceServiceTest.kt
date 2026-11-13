@@ -193,7 +193,7 @@ class HallMonitorGovernanceServiceTest {
             id = ArtifactId("hall-report"),
             kind = ArtifactKind.HallMonitorReport,
             taskRunId = TaskRunId("hall-run"),
-            label = "Hall Monitor report",
+            label = "Nanny report",
             textContent = "{}",
             metadata = mapOf(HALL_MONITOR_REPORT_ID_METADATA to "report-1"),
             createdAtEpochMillis = 10L,
@@ -273,7 +273,7 @@ class HallMonitorGovernanceServiceTest {
             AgentProviderId("provider")
 
         override suspend fun createSession(request: ManagedSessionRequest): ManagedSessionHandle =
-            error("restart must reconnect the persisted Hall Monitor review session")
+            error("restart must reconnect the persisted Nanny review session")
 
         override suspend fun reconnect(
             handle: ManagedSessionHandle,

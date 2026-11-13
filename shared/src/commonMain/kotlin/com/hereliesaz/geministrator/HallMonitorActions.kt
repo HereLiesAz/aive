@@ -169,7 +169,7 @@ suspend fun ApplicationRuntime.testHallMonitorSolution(
 ): WorkflowRunId {
     val live = state.value as? ApplicationRuntimeState.Live ?: error("No active workflow is loaded")
     require(live.presentation.run.globalPause != null) {
-        "The active workflow is not globally paused for Hall Monitor review"
+        "The active workflow is not globally paused for Nanny review"
     }
     val trial = HallMonitorSolutionTrialService(persistence, providerRegistry).launch(
         sourceRun = live.presentation.run,
