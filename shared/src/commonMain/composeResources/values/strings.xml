@@ -71,6 +71,13 @@
     <string name="keeper_group_allowance">Allowance</string>
     <string name="keeper_group_allowance_lead">The most real money a run, or an hour, may spend. When it is reached every creature rests until you raise it.</string>
     <string name="keeper_group_hosts">Hosts</string>
+    <string name="devices_card_title">Your other devices</string>
+    <string name="devices_host_eyebrow">Host</string>
+    <string name="devices_paired_name">Paired device</string>
+    <string name="devices_state_online">Online</string>
+    <string name="devices_state_offline">Offline</string>
+    <string name="devices_state_paired_on">Paired, on</string>
+    <string name="devices_state_paired_off">Paired, off</string>
     <string name="keeper_group_hosts_lead">Where your creatures run: this device, your other machines, and models that run here.</string>
     <string name="keeper_group_data">Data and privacy</string>
     <string name="keeper_group_data_lead">Save, load, move or delete what The Aive keeps, and what it may report.</string>
