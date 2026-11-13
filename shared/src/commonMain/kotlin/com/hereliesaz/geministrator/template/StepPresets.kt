@@ -24,17 +24,29 @@ object StepPresets {
         validator: String? = null,
         outputs: List<OutputSpec>? = null,
         inputs: List<PortSpec>? = null,
+        budgetTokens: Long? = null,
     ): StepTemplate {
         val made = outputs ?: this.outputs.map { if (validator == null) it else it.copy(validatorId = validator) }
         return copy(
             id = id,
             inputs = inputs ?: this.inputs,
             outputs = made,
-            body = body.copy(wording = wording, validators = made.associate { it.name to it.validatorId }),
+            body = body.copy(
+                wording = wording,
+                validators = made.associate { it.name to it.validatorId },
+                budgetTokens = budgetTokens ?: body.budgetTokens,
+            ),
         )
     }
 
     private val rowsOut = listOf(out("rows", ArtifactKind.Research, "text/csv", "table/v1", StepOutputValidators.TABLE_CSV))
+
+    /** What a step that makes or edits media through one connected tool is given: the brief, what to build from, and where it goes. */
+    private val mediaInputs = listOf(
+        PortSpec("brief", PortType.Text, true),
+        PortSpec("content", PortType.Any, false),
+        PortSpec("target", PortType.Text, false),
+    )
 
     val DeckOutline = BuiltInTemplates.WriteDocument.preset(
         "deck-outline",
@@ -168,11 +180,103 @@ object StepPresets {
             "not merge. Hand back two lines, `BRANCH: <the branch>` and `FILES: <the files written, comma-separated>`.",
     )
 
+    val ChangeCode = BuiltInTemplates.PrepareFilesForRepository.preset(
+        "change-code",
+        "Make the code change the brief describes, using the content given, on the dedicated branch the target names " +
+            "(otherwise a new branch whose name starts with `aive/`), never on the default or a shared branch. Change only " +
+            "what the brief needs, follow the style of the code around it, and write or update the tests that cover the " +
+            "change. Do not push and do not merge: the later steps that ask the keeper do that. Hand back two lines, " +
+            "`BRANCH: <the branch>` and `FILES: <the files changed, comma-separated>`.",
+        budgetTokens = 60_000L,
+    )
+
+    val RenderImage = BuiltInTemplates.ChangeConnectedSource.preset(
+        "render-image",
+        "Make the images the brief describes with the one image tool you are offered, using the content given (a style, " +
+            "identity anchors, earlier images). Make each image once: if the target already holds one, keep it and make " +
+            "only what is missing. Do not change the descriptions you are given. Hand back two lines, `TARGET: <the " +
+            "images made>` and `CHANGED: <where each one was saved>`. If you cannot, say why and make nothing.",
+        inputs = mediaInputs,
+        budgetTokens = 30_000L,
+    )
+
+    val RenderVideo = BuiltInTemplates.ChangeConnectedSource.preset(
+        "render-video",
+        "Make the video the brief describes with the one video tool you are offered, from the content given (the frames " +
+            "or shots in their order, and their timing). Keep the order and the timing as given: drop no shot, reorder " +
+            "none and extend none. Make it once: if the target already holds the video, make no second one. Hand back two " +
+            "lines, `TARGET: <the video made>` and `CHANGED: <where it was saved>`. If you cannot, say why and make nothing.",
+        inputs = mediaInputs,
+        budgetTokens = 30_000L,
+    )
+
+    val ComposeMedia = BuiltInTemplates.ChangeConnectedSource.preset(
+        "compose-media",
+        "Build or combine the media the brief describes (geometry, layers, a scene) with the one tool you are offered, " +
+            "from the content given. Work on a copy: never overwrite the source material. Read what the target holds " +
+            "first, and if the work is already made, make no second one. Hand back two lines, `TARGET: <what you built " +
+            "or combined>` and `CHANGED: <what was made and where it was saved>`. If you cannot, say why and change nothing.",
+        inputs = mediaInputs,
+        budgetTokens = 30_000L,
+    )
+
+    val EditAudio = BuiltInTemplates.ChangeConnectedSource.preset(
+        "edit-audio",
+        "Edit the recording the target names as the brief describes, with the one audio tool you are offered. Work on a " +
+            "copy: never overwrite or delete the original recording. Make only the edits the brief asks for. Make them " +
+            "once. Hand back two lines, `TARGET: <the recording edited>` and `CHANGED: <the edits made and where the " +
+            "copy was saved>`. If you cannot, say why and change nothing.",
+        inputs = mediaInputs,
+        budgetTokens = 30_000L,
+    )
+
+    val MakeSlides = BuiltInTemplates.ChangeConnectedSource.preset(
+        "make-slides",
+        "Make the slide deck the brief describes, from the outline in the content given, with the one slides tool you " +
+            "are offered. One idea to a slide, and one consistent look across the deck. Make the deck once: if the target " +
+            "already holds it, make no second one. Hand back two lines, `TARGET: <the deck made>` and `CHANGED: <the " +
+            "slides made, in order>`. If you cannot, say why and change nothing.",
+        inputs = mediaInputs,
+        budgetTokens = 30_000L,
+    )
+
+    val LocalizeContent = BuiltInTemplates.TextToTable.preset(
+        "localize-content",
+        "Translate every string given in the text into the locale named, so that none is missed and none is added. Keep " +
+            "placeholders, markup and numbers exactly as they are. Hand back comma-separated text: the header row " +
+            "`key,source,translation`, then one row per string, in the order given. Quote any cell that holds a comma.",
+        StepOutputValidators.TABLE_CSV_FILLED,
+        inputs = listOf(
+            PortSpec("text", PortType.Text, true),
+            PortSpec("locale", PortType.Text, true),
+            PortSpec("columns", PortType.Text, false),
+        ),
+        budgetTokens = 40_000L,
+    )
+
+    val FixedFormatResult = BuiltInTemplates.WriteDocument.preset(
+        "fixed-format-result",
+        "Hand back the result the brief asks for as one JSON object in exactly the fields the brief names, and nothing " +
+            "else: no prose around it. Respect every limit the brief states (counts, lengths, allowed characters).",
+        outputs = listOf(out("result", ArtifactKind.Specification, "application/json", "fixed-format/v1", StepOutputValidators.JSON_OBJECT)),
+        budgetTokens = 20_000L,
+    )
+
+    val CappedTextResult = BuiltInTemplates.WriteDocument.preset(
+        "capped-text-result",
+        "Hand back the one block of plain text the brief asks for, and nothing else: no headings, no commentary. Keep " +
+            "to the length the brief states.",
+        outputs = listOf(out("text", ArtifactKind.Research, "text/plain", "capped-text/v1", StepOutputValidators.FOUND_TEXT)),
+        budgetTokens = 20_000L,
+    )
+
     /** Every preset, each its own template id and lineage. */
     val all: List<StepTemplate> = listOf(
         DeckOutline, DocsDraft, DesignTokens, DesignPage, ExplainerPage, DataPage, SheetTable,
         ReadOneItem, ListConnectedSource, QueryConnectedRows, ReadRepositoryFiles,
         ChangeConnectedRows, RemoveInConnectedSource,
         UpdateRepositoryFiles, AddAssetsToRepository, PrepareDownloadFiles,
+        ChangeCode, RenderImage, RenderVideo, ComposeMedia, EditAudio, MakeSlides,
+        LocalizeContent, FixedFormatResult, CappedTextResult,
     )
 }

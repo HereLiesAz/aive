@@ -61,8 +61,12 @@ Two templates joined the six: **Draw a diagram** (a Mermaid flowchart, checked b
 | `change-connected-rows` | change something in a connected tool | change records in a database or sheet tool | `TARGET:` and `CHANGED:` |
 | `remove-in-connected-source` | change something in a connected tool | remove one thing with a tool that asks on every call | `TARGET:` and `CHANGED:` |
 | `update-repository-files`, `add-assets-to-repository`, `prepare-download-files` | prepare files for a repository | change files on an existing branch, add assets, files to download | `BRANCH:` and `FILES:` |
+| `change-code` | prepare files for a repository | a code change with its tests on a dedicated branch | `BRANCH:` and `FILES:` |
+| `render-image`, `render-video`, `compose-media`, `edit-audio`, `make-slides` | change something in a connected tool | make or edit media or a deck with one tool (a copy, never the original) | `TARGET:` and `CHANGED:` |
+| `localize-content` | turn text into a table | every string translated into a named locale, a row each | comma-separated, every column named |
+| `fixed-format-result`, `capped-text-result` | write a document | a result code reads: one JSON object, or one block of plain text | one JSON object, or text |
 
-A preset that changes something keeps its approval floor and its single attempt, and the queen never makes one by herself. The presets are not in Add creature (they would crowd it); they are what a blocker names.
+A preset that changes something keeps its approval floor and its single attempt, and the queen never makes one by herself. Each carries a token allowance in its template body (carried, not yet enforced). The last four rows are the starting templates of the steps the Azphalt audit listed as gaps ([Azphalt templates](Azphalt-Templates.md)); a step that only *began* at an effectful one declares no effect, so nothing about how it runs changes. The presets are not in Add creature (they would crowd it); they are what a blocker names.
 
 ## Blockers
 

@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.template
 
+import com.hereliesaz.geministrator.domain.StepEffect
 import com.hereliesaz.geministrator.domain.TaskContract
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TemplateRef
@@ -13,22 +14,25 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinition
  * is missing, so a new built-in cannot ship without a template or a reasoned entry (StepTemplateCoverageTest).
  */
 
-/** What a step needs that no starting template gives yet: the template to draft, and why the existing ones do not fit. */
-enum class StepGap(val needs: String, val reason: String) {
-    ChangeCode("change-code", "Writes files on a repository branch, an effect the six starting templates do not cover."),
-    RenderImage("render-image", "Makes pictures through an image service; no starting template makes media."),
-    RenderVideo("render-video", "Makes or assembles video; no starting template makes media."),
-    ComposeMedia("compose-media", "Builds geometry or composites layers; no starting template transforms media."),
-    EditAudio("edit-audio", "Edits a recording; no starting template handles audio."),
-    MakeSlides("make-slides", "Makes a slide deck; make-page makes one page, not a deck."),
-    Localize("localize-content", "Translates content in place and verifies its strings; write-document does not carry that check."),
-    FixedFormat("fixed-format-result", "Hands back a result in a fixed or size-bounded format that code reads (JSON, a line grammar, a capped block)."),
-}
+/**
+ * What a step needs that no starting template gives yet: the template to draft, and why the existing ones do not fit.
+ * Empty today: every producing step has a template. A new step that fits none adds an entry here, so it ships with a reason.
+ */
+enum class StepGap(val needs: String, val reason: String);
 
 object StepTemplateAssignments {
     private const val WRITE = BuiltInTemplates.WRITE_DOCUMENT_ID
     private const val CHECK = BuiltInTemplates.CHECK_WORK_ID
     private const val TABLE = BuiltInTemplates.TEXT_TO_TABLE_ID
+    private const val CHANGE_CODE = "change-code"
+    private const val RENDER_IMAGE = "render-image"
+    private const val RENDER_VIDEO = "render-video"
+    private const val COMPOSE_MEDIA = "compose-media"
+    private const val EDIT_AUDIO = "edit-audio"
+    private const val MAKE_SLIDES = "make-slides"
+    private const val LOCALIZE = "localize-content"
+    private const val FIXED = "fixed-format-result"
+    private const val CAPPED = "capped-text-result"
 
     /** `<swarm id>/<step id>` of a step in the built-in swarms (the coding suite, the short film, the starter) to its starting template id. */
     val byStep: Map<String, String> = mapOf(
@@ -85,37 +89,25 @@ object StepTemplateAssignments {
         "short-film/concept" to WRITE,
         "starter/verification" to CHECK,
         "starter/review" to CHECK,
+        "suite-feature-delivery/implement" to CHANGE_CODE,
+        "suite-bug-fix/fix" to CHANGE_CODE,
+        "suite-bug-fix/regression-test" to CHANGE_CODE,
+        "suite-safe-refactor/characterize" to CHANGE_CODE,
+        "suite-safe-refactor/refactor" to CHANGE_CODE,
+        "suite-test-coverage/write-tests" to CHANGE_CODE,
+        "suite-dependency-update/update" to CHANGE_CODE,
+        "suite-docs-sync/update-docs" to CHANGE_CODE,
+        "suite-incident-hotfix/hotfix" to CHANGE_CODE,
+        "short-film/storyboard" to FIXED,
+        "short-film/style-sheet" to CAPPED,
+        "short-film/frames" to RENDER_IMAGE,
+        "short-film/frame-review" to FIXED,
+        "short-film/assemble" to RENDER_VIDEO,
+        "starter/implementation" to CHANGE_CODE,
     )
 
-    /** `<swarm id>/<step id>` to the gap, for the built-in swarms and the Azphalt packages in docs/azphalt-packages. */
-    val gaps: Map<String, StepGap> = mapOf(
-        "suite-feature-delivery/implement" to StepGap.ChangeCode,
-        "suite-bug-fix/fix" to StepGap.ChangeCode,
-        "suite-bug-fix/regression-test" to StepGap.ChangeCode,
-        "suite-safe-refactor/characterize" to StepGap.ChangeCode,
-        "suite-safe-refactor/refactor" to StepGap.ChangeCode,
-        "suite-test-coverage/write-tests" to StepGap.ChangeCode,
-        "suite-dependency-update/update" to StepGap.ChangeCode,
-        "suite-docs-sync/update-docs" to StepGap.ChangeCode,
-        "suite-incident-hotfix/hotfix" to StepGap.ChangeCode,
-        "short-film/storyboard" to StepGap.FixedFormat,
-        "short-film/style-sheet" to StepGap.FixedFormat,
-        "short-film/frames" to StepGap.RenderImage,
-        "short-film/frame-review" to StepGap.FixedFormat,
-        "short-film/assemble" to StepGap.RenderVideo,
-        "starter/implementation" to StepGap.ChangeCode,
-        "character-sheet-generator/character-sheet-generator-task-2" to StepGap.RenderImage,
-        "feature-delivery/feature-delivery-task-1" to StepGap.ChangeCode,
-        "idea-to-storyboard-to-video/idea-to-storyboard-to-video-task-2" to StepGap.RenderImage,
-        "idea-to-storyboard-to-video/idea-to-storyboard-to-video-task-3" to StepGap.RenderVideo,
-        "localization-release/localization-release-task-1" to StepGap.Localize,
-        "paperplanes-stratified-reconstruction/paperplanes-stratified-reconstruction-task-2" to StepGap.ComposeMedia,
-        "paperplanes-stratified-reconstruction/paperplanes-stratified-reconstruction-task-3" to StepGap.ComposeMedia,
-        "paperplanes-stratified-reconstruction/paperplanes-stratified-reconstruction-task-4" to StepGap.ComposeMedia,
-        "podcast-production/podcast-production-task-1" to StepGap.EditAudio,
-        "presentation-production/presentation-production-task-1" to StepGap.MakeSlides,
-        "sketch-to-concept-art/sketch-to-concept-art-task-2" to StepGap.RenderImage,
-    )
+    /** `<swarm id>/<step id>` to the gap, for the built-in swarms and the Azphalt packages in docs/azphalt-packages. None today. */
+    val gaps: Map<String, StepGap> = emptyMap()
 
     /** The swarm key the starter swarm is looked up under; its id is chosen by the caller. */
     const val STARTER_KEY: String = "starter"
@@ -139,7 +131,9 @@ object StepTemplateAssignments {
             port.name to if (port.name == "work") workLiteral(task) else task.objective
         },
         outputs = template.outputs,
-        effects = template.effects,
+        // A starting point enforces nothing, so it declares no effect: the approval floor of an effectful template
+        // arrives when a step is made from the template, never from the contract of a step that only began there.
+        effects = if (template.effectful) setOf(StepEffect.None) else template.effects,
         startingPoint = true,
     )
 
