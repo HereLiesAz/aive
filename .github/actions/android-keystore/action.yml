@@ -29,7 +29,7 @@ inputs:
     required: false
     default: ''
   expected-sha256:
-    description: KEYSTORE_SHA256 — expected certificate SHA-256 fingerprint.
+    description: KEYSTORE_SHA256 — expected certificate SHA-256 fingerprint. At least one of expected-sha256 / expected-sha1 is required; the action fails without either.
     required: false
     default: ''
   expected-sha1:
@@ -183,6 +183,12 @@ runs:
         echo "  SHA-256: $actual_sha256"
 
         fail=0
+        # Fail closed: a reconstructed keystore is only trusted when it is pinned to a known
+        # certificate. Unset expectations used to skip the check and sign with whatever was supplied.
+        if [ -z "${EXPECTED_SHA256:-}" ] && [ -z "${EXPECTED_SHA1:-}" ]; then
+          echo "::error::Neither KEYSTORE_SHA256 nor KEYSTORE_SHA1 is set; refusing to sign with an unpinned certificate."
+          exit 1
+        fi
         if [ -n "${EXPECTED_SHA256:-}" ] && \
            [ "$(printf '%s' "$actual_sha256" | norm)" != "$(printf '%s' "$EXPECTED_SHA256" | norm)" ]; then
           echo "::error::Certificate SHA-256 does not match KEYSTORE_SHA256."
