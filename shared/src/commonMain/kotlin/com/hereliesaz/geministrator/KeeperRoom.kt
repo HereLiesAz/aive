@@ -1,5 +1,7 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.tour.TourTargetId
+import com.hereliesaz.geministrator.tour.tourTarget
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -249,6 +251,7 @@ private fun KeeperNav(
                         this.selected = isSelected
                     }
                     .clickable { onSelect(section) }
+                    .then(keeperGroupTourTarget(section))
                     .padding(horizontal = 13.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -328,6 +331,7 @@ private fun KeeperSectionList(
                             this.selected = isSelected
                         }
                         .clickable { onSelect(section) }
+                        .then(keeperGroupTourTarget(section))
                         .padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -458,4 +462,15 @@ internal fun AddConnectionRow(label: String, hint: String, open: Boolean, onTogg
         Text((if (open) "− " else "+ ") + label, style = AzphaltType.lead, color = azphaltOnSurface())
         Text(hint, style = AzphaltType.body, color = azphaltMutedOnSurface())
     }
+}
+
+
+/** The registered tutorial id of a part of the Keeper's room list, or no tag for a part that has none. */
+private fun keeperGroupTourTarget(group: KeeperGroup): Modifier = when (group) {
+    KeeperGroup.Sources -> Modifier.tourTarget(TourTargetId.KEEPER_SOURCES)
+    KeeperGroup.Allowance -> Modifier.tourTarget(TourTargetId.KEEPER_ALLOWANCE)
+    KeeperGroup.Hosts -> Modifier.tourTarget(TourTargetId.KEEPER_HOSTS)
+    KeeperGroup.Routines -> Modifier.tourTarget(TourTargetId.KEEPER_ROUTINES)
+    KeeperGroup.Look -> Modifier.tourTarget(TourTargetId.KEEPER_LOOK)
+    KeeperGroup.Data -> Modifier
 }

@@ -1196,19 +1196,22 @@ class ApplicationRuntime private constructor(
         val source = disputeModelSource ?: return disputeModels
         val roles = activeRoles(resolveRoleCollection(persistence.roles.all()))
         val built = source.models(roles) ?: return null
-        val allows: suspend () -> Boolean = {
-            val cap = queenCaps().hourlySpendCapUsd
-            cap == null || com.hereliesaz.geministrator.queen.hourlyCapAllows(
-                cap,
-                com.hereliesaz.geministrator.workflow.hourlySpend(persistence, nowEpochMillis(), null, com.hereliesaz.geministrator.workflow.AmbientSpendLedger.Shared),
-            )
-        }
+        val allows: suspend () -> Boolean = { queenCallAllowed() }
         val queen = com.hereliesaz.geministrator.queen.cappedModel(built.queen, allows)
         return DisputeModels(
             queen = queen,
             voices = built.voices.mapValues { (_, voice) -> com.hereliesaz.geministrator.queen.cappedModel(voice, allows) },
             research = built.research?.withFactModel(queen),
             mayCall = built.mayCall,
+        )
+    }
+
+    /** True when the keeper's hourly spend cap leaves room for one more call of hers (also the tutorial's, see intro/TutorialLaunch.kt). */
+    internal suspend fun queenCallAllowed(): Boolean {
+        val cap = queenCaps().hourlySpendCapUsd
+        return cap == null || com.hereliesaz.geministrator.queen.hourlyCapAllows(
+            cap,
+            com.hereliesaz.geministrator.workflow.hourlySpend(persistence, nowEpochMillis(), null, com.hereliesaz.geministrator.workflow.AmbientSpendLedger.Shared),
         )
     }
 

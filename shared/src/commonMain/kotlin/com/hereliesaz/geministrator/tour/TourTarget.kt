@@ -65,6 +65,91 @@ enum class TourTargetId(
         place = "in the header on a phone, at the foot of the left rail on a wide window",
         alwaysVisible = true,
         observable = setOf(ExpectKind.Tapped),
+    ),
+    GOAL_FIELD(
+        labelKey = "first_hive_objective",
+        place = "on the first screen, where the keeper writes the hive (the goal)",
+    ),
+    OPTIONS_PILL(
+        labelKey = "first_hive_options",
+        place = "on the first screen, under the goal",
+    ),
+    FEED_IT_BUTTON(
+        labelKey = "first_hive_feed",
+        place = "on the first screen, under the goal and its options",
+    ),
+    RAIL_HIVE(
+        labelKey = "rail_hive",
+        place = "left rail of a wide window",
+    ),
+    RAIL_ROSTER(
+        labelKey = "rail_roster",
+        place = "left rail of a wide window",
+    ),
+    RAIL_STABLE(
+        labelKey = "rail_stable",
+        place = "left rail of a wide window",
+    ),
+    RAIL_MEMORY(
+        labelKey = "rail_memory",
+        place = "left rail of a wide window",
+    ),
+    RAIL_STORE(
+        labelKey = "rail_store",
+        place = "left rail of a wide window",
+    ),
+    VIEW_LIVE(
+        labelKey = "build_live",
+        place = "the view switch above a hive",
+    ),
+    VIEW_EDIT(
+        labelKey = "build_build",
+        place = "the view switch above a hive",
+    ),
+    HIVE_PAUSE(
+        labelKey = "hive_pause_run",
+        place = "above a hive while it runs",
+    ),
+    HIVE_STOP(
+        labelKey = "hive_stop_run",
+        place = "above a hive while it runs",
+    ),
+    CREATURE_TAB_NEEDS(
+        labelKey = "creature_tab_needs",
+        place = "on a creature's sheet, after a creature is opened",
+    ),
+    CREATURE_TAB_WORK(
+        labelKey = "creature_tab_work",
+        place = "on a creature's sheet, after a creature is opened",
+    ),
+    CREATURE_TAB_MIND(
+        labelKey = "creature_tab_mind",
+        place = "on a creature's sheet, after a creature is opened",
+    ),
+    KEEPER_SOURCES(
+        labelKey = "keeper_group_sources",
+        place = "a part of the Keeper's room (a list on the left of a wide window, a list of parts on a phone)",
+        needs = setOf(TourTargetId.KEEPERS_ROOM_GEAR),
+    ),
+    KEEPER_ALLOWANCE(
+        labelKey = "keeper_group_allowance",
+        place = "a part of the Keeper's room (a list on the left of a wide window, a list of parts on a phone)",
+        needs = setOf(TourTargetId.KEEPERS_ROOM_GEAR),
+    ),
+    KEEPER_HOSTS(
+        labelKey = "keeper_group_hosts",
+        place = "a part of the Keeper's room (a list on the left of a wide window, a list of parts on a phone)",
+        needs = setOf(TourTargetId.KEEPERS_ROOM_GEAR),
+    ),
+    KEEPER_ROUTINES(
+        labelKey = "keeper_group_routines",
+        place = "a part of the Keeper's room (a list on the left of a wide window, a list of parts on a phone)",
+        needs = setOf(TourTargetId.KEEPERS_ROOM_GEAR),
+    ),
+    KEEPER_LOOK(
+        labelKey = "keeper_group_look",
+        place = "a part of the Keeper's room (a list on the left of a wide window, a list of parts on a phone)",
+        needs = setOf(TourTargetId.KEEPERS_ROOM_GEAR),
     );
 
     companion object {

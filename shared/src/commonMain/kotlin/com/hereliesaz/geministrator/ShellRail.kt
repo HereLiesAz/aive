@@ -205,6 +205,14 @@ internal fun ShellRail(
                         labelled = labelled,
                         count = if (place == ShellRailPlace.Inbox) unreadInbox else 0,
                         onClick = { onPlace(place) },
+                        modifier = when (place) {
+                            ShellRailPlace.Hive -> Modifier.tourTarget(TourTargetId.RAIL_HIVE)
+                            ShellRailPlace.Swarm -> Modifier.tourTarget(TourTargetId.RAIL_ROSTER)
+                            ShellRailPlace.Stable -> Modifier.tourTarget(TourTargetId.RAIL_STABLE)
+                            ShellRailPlace.Memory -> Modifier.tourTarget(TourTargetId.RAIL_MEMORY)
+                            ShellRailPlace.Store -> Modifier.tourTarget(TourTargetId.RAIL_STORE)
+                            else -> Modifier
+                        },
                     )
                 }
             }
