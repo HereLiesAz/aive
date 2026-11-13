@@ -347,7 +347,7 @@ internal fun RestingHive(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         // The breadcrumb names the hive; a new one names itself in its own head as well.
         // A hive at rest has no run: its cards link nowhere the live shell goes, and the shell does not follow its view.
-        androidx.compose.runtime.CompositionLocalProvider(LocalFlowchartLinks provides null, LocalHiveFlowchartView provides null) {
+        androidx.compose.runtime.CompositionLocalProvider(LocalFlowchartLinks provides null) {
         GeministratorWorkflowTerrarium(
             definition = start,
             liveRun = remember(start.id) { restingWorkflowRun(start) },

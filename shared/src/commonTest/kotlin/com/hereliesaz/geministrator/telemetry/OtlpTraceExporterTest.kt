@@ -193,6 +193,11 @@ class OtlpTraceExporterTest {
         assertNotNull(spans)
         assertEquals(6, spans.size)
         assertNull(export.spansIfDue(finished, events), "a run is exported at most once")
+        assertFalse(store.isExported(TraceSamples.run.value), "not recorded before delivery")
+        export.batchFinished(spans, OtlpExportOutcome.GaveUp)
+        assertFalse(store.isExported(TraceSamples.run.value), "a batch that gave up leaves the run to be sent again")
+        assertNotNull(export.spansIfDue(finished, events))
+        export.batchFinished(spans, OtlpExportOutcome.Sent)
         assertTrue(store.isExported(TraceSamples.run.value))
         assertFalse(store.isExported("run-other"))
     }

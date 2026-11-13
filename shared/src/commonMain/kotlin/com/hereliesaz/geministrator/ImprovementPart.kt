@@ -125,7 +125,9 @@ internal fun ImprovementPart(
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(stringResource(Res.string.improvement_lead_note), style = AzphaltType.body, color = azphaltOnSurface())
-        Text(
+        // The cycle is added and run in Schedules: a standing line that asks for it opens that part.
+        val openSchedules = LocalPlaceLinks.current.openKeeperPart?.let { open -> { open(KeeperSection.Schedules) } }
+        LinkText(
             stringResource(
                 when (standing) {
                     LoopObligation.Standing.Examined -> Res.string.improvement_standing_examined
@@ -134,10 +136,11 @@ internal fun ImprovementPart(
                     LoopObligation.Standing.LastCycleSkippedItself -> Res.string.improvement_standing_skipped
                 },
             ),
-            style = AzphaltType.body, color = azphaltOnSurface(), modifier = Modifier.azphaltLiveRegion(),
+            onClick = openSchedules.takeIf { standing != LoopObligation.Standing.Examined },
+            modifier = Modifier.azphaltLiveRegion(),
         )
         if (!hasLoop) {
-            Text(stringResource(Res.string.improvement_no_loop), style = AzphaltType.body, color = azphaltOnSurface())
+            LinkText(stringResource(Res.string.improvement_no_loop), onClick = openSchedules)
         } else if (schedules != null) {
             AzphaltPill(
                 label = stringResource(Res.string.improvement_run_cycle),
@@ -153,8 +156,10 @@ internal fun ImprovementPart(
             )
         }
         message?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface(), modifier = Modifier.azphaltLiveRegion()) }
-        if (state.proposals.isEmpty()) Text(stringResource(Res.string.improvement_none), style = AzphaltType.body, color = azphaltOnSurface())
-        state.proposals.sortedByDescending { it.createdAtEpochMillis }.forEach { proposal ->
+        // The queen's suggestions are per run and decided in Messages, not here.
+        val listed = state.proposals.filter { it.source != ImprovementSource.Queen }
+        if (listed.isEmpty()) Text(stringResource(Res.string.improvement_none), style = AzphaltType.body, color = azphaltOnSurface())
+        listed.sortedByDescending { it.createdAtEpochMillis }.forEach { proposal ->
             ProposalCard(
                 proposal = proposal,
                 hives = authored,
@@ -277,6 +282,7 @@ private fun ProposalCard(
             ImprovementSource.Loop -> Res.string.improvement_source_loop
             ImprovementSource.RoleHistory -> Res.string.improvement_source_role
             ImprovementSource.Habit -> Res.string.improvement_source_habit
+            ImprovementSource.Queen -> Res.string.improvement_source_queen
         },
     )
     // A hive-step proposal replaces a step's whole objective: show what it replaces, and what it would break in the loop.

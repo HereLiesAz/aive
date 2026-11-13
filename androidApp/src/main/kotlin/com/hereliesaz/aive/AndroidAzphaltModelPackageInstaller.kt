@@ -65,6 +65,8 @@ internal class AndroidAzphaltModelPackageInstaller(
         val installedArtifacts = mutableListOf<InstalledAzphaltModelFile>()
         val descriptors = mutableListOf<InferenceModelDescriptor>()
 
+        var backedUp = false
+        var touchedFinal = false
         try {
             prepared.assets.forEachIndexed { index, asset ->
                 val assetDir = File(staging, "asset-$index")
@@ -119,7 +121,10 @@ internal class AndroidAzphaltModelPackageInstaller(
             backupDir.deleteRecursively()
             if (finalDir.exists()) {
                 check(finalDir.renameTo(backupDir)) { "Could not stage previous installed model version for replacement" }
+                backedUp = true
             }
+            // From here finalDir is this run's own (new or replacing), so a failure may remove it.
+            touchedFinal = true
             finalizeDirectory(staging, finalDir)
             descriptors.forEach { inferenceState.registerModel(it) }
 
@@ -148,10 +153,7 @@ internal class AndroidAzphaltModelPackageInstaller(
             staging.deleteRecursively()
             descriptors.forEach { inferenceState.removeModel(it.logicalModelId) }
             previousDescriptors.forEach { inferenceState.registerModel(it) }
-            finalDir.deleteRecursively()
-            if (backupDir.exists()) {
-                check(backupDir.renameTo(finalDir)) { "Could not restore previous model version after failed update" }
-            }
+            restoreAfterFailedSwap(finalDir, backupDir, touchedFinal = touchedFinal, backedUp = backedUp)
             throw failure
         }
     } }
@@ -418,7 +420,8 @@ internal class AndroidAzphaltModelPackageInstaller(
     }
 
     private fun normalizeChecksum(value: String): String =
-        value.trim().lowercase().removePrefix("sha256:").also {
+        // The store requires sha256-<hex>; sha256:<hex> and a bare digest are accepted too.
+        (com.hereliesaz.geministrator.azphalt.azphaltSha256Hex(value) ?: value.trim().lowercase()).also {
             require(it.matches(Regex("[0-9a-f]{64}"))) { "Invalid model SHA-256 checksum" }
         }
 
@@ -481,5 +484,17 @@ internal class AndroidAzphaltModelPackageInstaller(
         const val BACKEND_SHERPA = "sherpa-onnx-android"
         const val BACKEND_VOSK = "vosk-android"
         const val BACKEND_GENERIC = "generic-local-model"
+    }
+}
+
+/**
+ * Undoes a failed install of one package version. The installed directory is removed only when
+ * this run created or replaced it ([touchedFinal]); the previous version is put back only when this
+ * run moved it aside ([backedUp]). A failure before the swap leaves a working install untouched.
+ */
+internal fun restoreAfterFailedSwap(finalDir: File, backupDir: File, touchedFinal: Boolean, backedUp: Boolean) {
+    if (touchedFinal) finalDir.deleteRecursively()
+    if (backedUp && backupDir.exists()) {
+        check(backupDir.renameTo(finalDir)) { "Could not restore previous model version after failed update" }
     }
 }

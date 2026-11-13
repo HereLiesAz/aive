@@ -20,7 +20,7 @@
 
     <!-- In-app update prompt (AndroidUpdateUi) -->
     <string name="update_github_title">The Aive %1$s is available</string>
-    <string name="update_github_body">This copy was installed outside Google Play, so the update comes from GitHub. Open the release page, download the APK, then tap it to install; Android may ask you to allow installs from your browser. Installing over this copy keeps your projects, settings, credentials, roles, and workflows.</string>
+    <string name="update_github_body">This copy was installed outside Google Play, so the update comes from GitHub. Open the release page, download the APK, then tap it to install; Android may ask you to allow installs from your browser. Installing over this copy keeps your projects, settings, credentials, roles, and swarms.</string>
     <string name="update_open_github">Open GitHub release</string>
     <string name="update_later">Later</string>
     <string name="update_play_title">An update for The Aive is available</string>
@@ -45,7 +45,7 @@
     <string name="update_error_body">The Aive could not check for updates. Try again later.</string>
     <string name="update_dismiss">Dismiss</string>
     <string name="remote_problem_key_rejected">Key rejected. Check the relay address and reconnect.</string>
-    <string name="remote_problem_out_of_credit">Out of credit with the relay's source. Add credit there, or use another source.</string>
+    <string name="remote_problem_out_of_credit">Out of credit with the relay\'s source. Add credit there, or use another source.</string>
     <string name="remote_problem_rate_limited">The relay is rate limiting you. Wait a minute and try again.</string>
     <string name="remote_problem_offline">Can\'t reach the relay. Check your internet connection and try again.</string>
     <string name="remote_problem_timed_out">The relay took too long to answer. Try again.</string>

@@ -27,7 +27,7 @@ context-taint gates and repository permissions stay engine-owned.
 
 ## Discovering agents
 
-No external service is contacted on opening the page. **Search directory** under
+No external service is contacted on opening the page. **Look for orphans** (the Search directory button) under
 Keeper's room › Connections requires at least two typed characters and an explicit
 keeper action. Aive sends only those search terms to SearchA2A's public HTTPS
 `GET https://searcha2a-api.hereliesaz.workers.dev/api/v1/directory?q=...`.
@@ -68,16 +68,16 @@ agent uptime or publisher identity. Workers AI may consume Cloudflare inference
 quota, governed by SearchA2A's public per-IP limiter.
 ## Resolving and connecting
 
-1. **Use address** copies a candidate's card URL into the ordinary connection
+1. **Look** (it was Use address) copies a candidate's card URL into the ordinary connection
    form. This does not fetch the card or send a task.
-2. **Connect agent** fetches that card independently, with no credentials,
+2. **Connect...** (the Connect agent button) fetches that card independently, with no credentials,
    redirect following or implicit permissions. It requires a compatible JSON-RPC
    interface before storing the URL and sanitized name in `A2aAgentConnections`.
    If the keeper explicitly selected an ANS-discovered address and the independently
    fetched card is for that address, the publisher's ANS name and explicit host are
    also saved as **unverified provenance**, not an authentication credential.
    The optional bearer credential follows the existing platform credential flow.
-3. In the Swarm role editor the keeper explicitly assigns that connected
+3. In the Roster's role form the keeper explicitly assigns that connected
    provider. No role is invented from registry text.
 4. When work is sent, `A2aClientApi.endpoint()` re-reads the card and checks
    the endpoint's scheme and same-origin restriction before forwarding approved
@@ -105,7 +105,7 @@ can proxy standard A2A traffic. Its A2A policy advertises a gateway-facing
 Agent Card and rewrites advertised service URLs so clients use the gateway
 instead of bypassing the operator's access policies. An Aive keeper should
 connect to the **public gateway Agent Card URL**, not the hidden backend's
-URL, using the existing **Connect agent** flow. Aive re-fetches and checks
+URL, using the existing **Connect...** flow. Aive re-fetches and checks
 the card and endpoint as usual; gateway auth, Aive provider selection and
 Aive permissions remain independently enforced. Gateways are optional and
 do not become discovery authority or automatic failover targets.

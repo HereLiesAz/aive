@@ -203,6 +203,7 @@ class AzphaltStoreService(
         val manifest = verification.packageContents.manifest
         require(manifest.id == detail.id) { "Downloaded package id ${manifest.id} does not match repository package ${detail.id}" }
         require(manifest.kind == "asset") { "Downloaded model package ${manifest.id} is kind ${manifest.kind}" }
+        requireNotDowngrade(manifest.id, host.installed().firstOrNull { it.packageId == manifest.id }?.version, manifest.version)
         require(manifest.version == version) { "Downloaded package version ${manifest.version} does not match requested version $version" }
         requireTargetsAive(manifest.id, manifest.targetApps)
         val compat = azphaltCompatSatisfies(manifest.compat)
@@ -232,6 +233,11 @@ class AzphaltStoreService(
         val verified = verifier.verify(bytes, signingKeys)
         val manifest = verified.packageContents.manifest
         require(manifest.kind == "asset") { "Imported package ${manifest.id} is not a model asset package" }
+        requireNotDowngrade(
+            manifest.id,
+            modelInstaller?.installed()?.firstOrNull { it.packageId == manifest.id }?.version,
+            manifest.version,
+        )
         requireTargetsAive(manifest.id, manifest.targetApps)
 
         val revocationResult = runCatching { revocations() }
@@ -338,6 +344,7 @@ class AzphaltStoreService(
         val manifest = verification.packageContents.manifest
         require(manifest.id == detail.id) { "Downloaded package id ${manifest.id} does not match repository package ${detail.id}" }
         require(manifest.kind == "llm") { "Downloaded package ${manifest.id} is kind ${manifest.kind}" }
+        requireNotDowngrade(manifest.id, llmRegistry.all().firstOrNull { it.packageId == manifest.id }?.version, manifest.version)
         require(manifest.version == version) { "Downloaded package version ${manifest.version} does not match requested version $version" }
         requireTargetsAive(manifest.id, manifest.targetApps)
         val compat = azphaltCompatSatisfies(manifest.compat)
@@ -675,7 +682,7 @@ class AzphaltStoreService(
     }
 
     private fun requireSha256(value: String?, label: String) {
-        require(value?.lowercase()?.matches(Regex("sha256-[0-9a-f]{64}")) == true) {
+        require(azphaltSha256Hex(value) != null) {
             "Remote model $label requires a sha256-<hex> checksum"
         }
     }
@@ -758,17 +765,47 @@ internal fun azphaltVersionCore(version: String): List<Int>? =
     version.substringBefore('+').substringBefore('-').split('.').map { it.toIntOrNull() ?: return null }
 
 /**
+ * Orders two versions: the numeric core first, then a pre-release ("1.0.0-rc1") ranks below the plain
+ * release, and pre-release identifiers compare numerically when both are numbers, else as text.
+ * Null when either is not a dotted numeric version.
+ */
+internal fun compareAzphaltVersions(a: String, b: String): Int? {
+    val left = azphaltVersionCore(a) ?: return null
+    val right = azphaltVersionCore(b) ?: return null
+    for (i in 0 until maxOf(left.size, right.size)) {
+        val c = left.getOrElse(i) { 0 }.compareTo(right.getOrElse(i) { 0 })
+        if (c != 0) return c
+    }
+    val preA = a.substringBefore('+').substringAfter('-', "")
+    val preB = b.substringBefore('+').substringAfter('-', "")
+    if (preA.isEmpty() || preB.isEmpty()) return preA.isEmpty().compareTo(preB.isEmpty())
+    val ia = preA.split('.')
+    val ib = preB.split('.')
+    for (i in 0 until minOf(ia.size, ib.size)) {
+        val x = ia[i]
+        val y = ib[i]
+        val nx = x.toIntOrNull()
+        val ny = y.toIntOrNull()
+        val c = when {
+            nx != null && ny != null -> nx.compareTo(ny)
+            nx != null -> -1
+            ny != null -> 1
+            else -> x.compareTo(y)
+        }
+        if (c != 0) return c
+    }
+    return ia.size.compareTo(ib.size)
+}
+
+/**
  * An older package must not silently replace a newer installed one (a replayed old signed package would
- * reinstate a fixed vulnerability). Versions that cannot be compared are not blocked.
+ * reinstate a fixed vulnerability). A version that cannot be read as a version is not an upgrade of an
+ * installed one; when the installed version itself cannot be read there is nothing to compare against.
  */
 internal fun requireNotDowngrade(packageId: String, installed: String?, incoming: String) {
-    val have = installed?.let(::azphaltVersionCore) ?: return
-    val next = azphaltVersionCore(incoming) ?: return
-    val size = maxOf(have.size, next.size)
-    for (i in 0 until size) {
-        val x = have.getOrElse(i) { 0 }
-        val y = next.getOrElse(i) { 0 }
-        if (y < x) throw IllegalArgumentException("$packageId $incoming is older than the installed $installed; downgrades need explicit approval")
-        if (y > x) return
-    }
+    if (installed == null) return
+    if (azphaltVersionCore(installed) == null) return
+    val order = compareAzphaltVersions(installed, incoming)
+        ?: throw IllegalArgumentException("$packageId $incoming is not a readable version, so it cannot replace the installed $installed")
+    if (order > 0) throw IllegalArgumentException("$packageId $incoming is older than the installed $installed; downgrades need explicit approval")
 }

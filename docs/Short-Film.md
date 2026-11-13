@@ -1,12 +1,12 @@
-# The short-film hive
+# The short-film swarm
 
 An objective becomes a short film made of **still frames**: a concept, a storyboard, one style sheet, one picture per shot from the image model, a review that can send single shots back, an `.mp4` that ffmpeg assembles from them, and your approval. The result is a `Media` artifact of type `video/mp4`.
 
-**This hive needs the desktop app.** The frames step needs an OpenAI connection and the assemble step runs ffmpeg on your computer. On Android and the web the two steps have no executor, and the engine blocks them as "not available in this runtime" instead of waiting for them. It also **spends money** (one image per shot), so it runs only when you start it: it has no suggested schedule and is not part of the coding suite.
+**This swarm needs the desktop app.** The frames step needs an OpenAI connection and the assemble step runs ffmpeg on your computer. On Android and the web the two steps have no executor, and the engine blocks them as "not available in this runtime" instead of waiting for them. It also **spends money** (one image per shot), so it runs only when you start it: it has no suggested schedule and is not part of the coding suite.
 
-It is never run on a schedule: it spends money, so a schedule refuses a hive with the frames or assemble step (the schedule is turned off with a note saying so), and **Add the coding suite** never gives it one.
+It is never run on a schedule: it spends money, so a schedule refuses a swarm with the frames or assemble step (the schedule is turned off with a note saying so), and **Add the coding suite** never gives it one.
 
-Put it on the device with **Keeper's room › Schedules › Add the short-film hive (desktop)**. It arrives as a hive you authored and can edit (`ShortFilmHive`, `workflow/ShortFilmWorkflow.kt`); one already on the device is left alone, so your edits survive. Then launch it like any hive and type the objective: *a film about a lighthouse keeper who finds a letter*.
+Put it on the device with **Keeper's room › Schedules › Add the short-film swarm (desktop)**. It arrives as a swarm you authored and can edit (`ShortFilmHive`, `workflow/ShortFilmWorkflow.kt`); one already on the device is left alone, so your edits survive. Then launch it like any swarm and type the objective: *a film about a lighthouse keeper who finds a letter*.
 
 ## The steps
 
@@ -43,7 +43,7 @@ Every limit is a named constant (`workflow/FilmStoryboard.kt`), quoted in the me
 | `FILM_MAX_STYLE_CHARS` | 2000 | Cut, with a warning. |
 | `FILM_MAX_SHOT_ID_CHARS` | 40, letters, digits, `-` `_` | Refused: ids become file names. A missing id is made up (`s3`). |
 | `FILM_MAX_STORYBOARD_CHARS` | 200000 | Not parsed. |
-| `FILM_IMAGE_BUDGET_DEFAULT` | 40 images per workflow run | See below. |
+| `FILM_IMAGE_BUDGET_DEFAULT` | 40 images per run | See below. |
 | `FILM_FRAME_PARALLELISM` | 3 frames at a time | |
 | `FILM_SHOT_MAX_RETRIES` | 2 (so at most 3 tries per shot) | The shot fails, and the step says which. |
 | `FILM_FFMPEG_TIMEOUT_MILLIS` | 15 minutes | ffmpeg and everything it started is stopped. |
@@ -52,7 +52,7 @@ The parser accepts the JSON bare, in a fenced block (with or without a language 
 
 ## The image budget
 
-The frames step counts **every image it asks for, retries included**, per workflow run. If the storyboard needs more new images than the run has left, the step **fails before drawing anything** and says so:
+The frames step counts **every image it asks for, retries included**, per run. If the storyboard needs more new images than the run has left, the step **fails before drawing anything** and says so:
 
 ~~~
 The storyboard needs 50 new images, but this run's image budget is 40 and 0 are already used.
@@ -68,7 +68,7 @@ Frames are filed by the **film**, not by the run: `~/.aive/film/frames/film-<16 
 
 1. shots with no picture (a failed shot, a deleted file),
 2. shots the **frame review** sent back, and
-3. shots named in the frames step's own objective, if you edited it: a line `regenerate-shots: s03, s07` and **Run again from here** on the frames step. The line stays in the hive's text, so it is acted on **once per workflow run** (the same set of shots is not drawn again after a restart or a repeated check by the engine); name a different set, or send the shots back from the frame review, to draw them again.
+3. shots named in the frames step's own objective, if you edited it: a line `regenerate-shots: s03, s07` and **Run again from here** on the frames step. The line stays in the swarm's text, so it is acted on **once per run** (the same set of shots is not drawn again after a restart or a repeated check by the engine); name a different set, or send the shots back from the frame review, to draw them again.
 
 The reviewer states its result as a JSON object (or a line `regenerate-shots: s03, s07`); `FilmFrameReview.parse` reads it and keeps only valid ids:
 
@@ -97,7 +97,7 @@ It is run through the same argument-list runner as the CLI agents (`CliProcessRu
 
 | Thing | Place |
 |---|---|
-| Hive, storyboard parser, limits, review parser | `shared/…/workflow/ShortFilmWorkflow.kt`, `FilmStoryboard.kt`, `FilmFrameStore.kt` |
+| Swarm, storyboard parser, limits, review parser | `shared/…/workflow/ShortFilmWorkflow.kt`, `FilmStoryboard.kt`, `FilmFrameStore.kt` |
 | Frames step | `providers/llm/…/FilmFramesExecutorIntegration.kt` (uses `OpenAiNodeCharacterImageApi`, the node-character pipeline's client) |
 | Assemble step, ffmpeg plan, file store | `desktopApp/…/FilmAssembleExecutorIntegration.kt`, `FfmpegFilmPlan.kt`, `FileFilmFrameStore.kt` |
 | Registration | `desktopApp/…/Main.kt`, beside the test runner (see Open decisions) |
@@ -105,10 +105,10 @@ It is run through the same argument-list runner as the CLI agents (`CliProcessRu
 
 ## What is verified, and what is not
 
-- Verified by tests: the parser (fenced, malformed, over limits, hostile text), the hive's graph and order, the budget and the retries with a fake image API, three-at-a-time, partial regeneration, the argument builder, the path checks (including a link out of the folder), and the assemble step with a scripted runner.
+- Verified by tests: the parser (fenced, malformed, over limits, hostile text), the swarm's graph and order, the budget and the retries with a fake image API, three-at-a-time, partial regeneration, the argument builder, the path checks (including a link out of the folder), and the assemble step with a scripted runner.
 - Verified against a real ffmpeg: `FfmpegFilmPlanTest` runs the command with the ffmpeg on the computer that runs the tests, when there is one, and checks codec, pixel format, dimensions, length and the absence of audio with ffprobe. It was run with ffmpeg 6.1.1; other versions are not tested (the build is the same one the flags are written for, but `zoompan`, `xfade` and `-pattern_type` have changed between releases).
 - **Not verified: the image API.** No call to OpenAI was made while building this. The request is the node-character pipeline's, with a landscape size (`1536x1024`) and an opaque background; whether the model names that pipeline uses accept those sizes is not known.
-- **Not verified: the whole hive end to end** in the running app, with real agents writing the storyboard.
+- **Not verified: the whole swarm end to end** in the running app, with real agents writing the storyboard.
 
 ## Open decisions
 
@@ -118,13 +118,13 @@ Each is a default chosen to keep moving. **Wrong if** says what would show it is
 - **Editing one shot's prompt redraws every frame**, because the film's name includes every prompt. Wrong if you edit storyboards a shot at a time and want the other frames kept.
 - **The frame review is a text step.** It is given each shot's prompt and the frame's file location, not its pixels. Wrong if you expect it to find a six-fingered hand: only a source that opens image files can. Your approval of the film is where eyes land; there, send shots back with `regenerate-shots` in the frames step's objective.
 - **The gate is the assemble step, not the review step.** The review is not made to require a Verification artifact, because a failed review could not then record which shots to redraw. Wrong if you want the review step itself to show as failed.
-- **The budget counts every attempt, per workflow run, in memory.** Wrong if a failed call is free with your source (it overcounts), or you want a daily or per-film cap, or a setting in the app instead of an environment variable.
+- **The budget counts every attempt, per run, in memory.** Wrong if a failed call is free with your source (it overcounts), or you want a daily or per-film cap, or a setting in the app instead of an environment variable.
 - **40 images is lower than the 60 shots allowed.** A film of 41 to 60 shots needs the budget raised first. Wrong if you mean to make long films: raise the default.
 - **Frames are 3:2 and cropped to 16:9.** About a sixth of each picture's height is trimmed. Wrong if you want portrait or a different shape: change `FILM_FRAME_SIZE` and `FfmpegFilmPlan.DEFAULT_*`.
 - **Look: 8 % zoom, half-second crossfade, 25 fps, crf 20, 1280 x 720, silent.** Wrong if you want cuts, no motion, higher resolution or sound. Narration is kept in the storyboard but never drawn, spoken or sent to ffmpeg.
 - **Parallelism 3, two retries.** Wrong if your image quota is lower (rate-limit failures will show as failed shots) or higher.
 - **The two film steps are registered for this computer only,** beside the test runner and not with the node-character pipeline, because they read and write local files and run ffmpeg. Wrong if you want a pool node to draw the frames: the files would have to travel with it.
 - **Films and frames are not cleaned up.** `~/.aive/film` grows by a few megabytes per frame. Wrong if disk space matters: delete old folders by hand.
-- **No creative roles.** The hive reuses Product Manager, UX Designer and Adversarial Reviewer. Wrong if you want a storyboard artist or an art director: add the roles to your copy of the hive.
+- **No creative roles.** The swarm reuses Product Manager, UX Designer and Adversarial Reviewer. Wrong if you want a storyboard artist or an art director: add the roles to your copy of the swarm.
 - **OpenAI only.** The frames step uses the image tool the node-character pipeline already uses. Wrong if you want another image source: implement `FilmImageApi`.
 - **Its own install button.** It is not in the coding suite, since it needs a desktop and spends money. Wrong if you would rather have it appear with the other suites.

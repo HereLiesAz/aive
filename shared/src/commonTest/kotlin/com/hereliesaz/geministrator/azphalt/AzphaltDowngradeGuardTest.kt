@@ -13,4 +13,12 @@ class AzphaltDowngradeGuardTest {
         requireNotDowngrade("p", null, "0.0.1")
         requireNotDowngrade("p", "weird", "1.0.0")
     }
+
+    @Test
+    fun preReleasesRankBelowTheReleaseAndUnreadableVersionsAreNotUpgrades() {
+        assertFailsWith<IllegalArgumentException> { requireNotDowngrade("p", "1.0.0", "1.0.0-rc1") }
+        requireNotDowngrade("p", "1.0.0-rc1", "1.0.0")
+        requireNotDowngrade("p", "1.0.0-rc1", "1.0.0-rc2")
+        assertFailsWith<IllegalArgumentException> { requireNotDowngrade("p", "1.0.0", "v2") }
+    }
 }

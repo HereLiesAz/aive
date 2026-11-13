@@ -378,6 +378,8 @@ internal fun setTerrariumJob(
     maxAttempts: Int? = null,
     /** Where it runs: this device, any paired device, or one chosen device (the Compute place's targets). */
     runsOn: com.hereliesaz.geministrator.distributed.ComputeDelegationTarget? = null,
+    /** How long it may work before the queen says it is slow (Auto, the keeper's minutes, or no limit). */
+    timeLimit: com.hereliesaz.geministrator.domain.TimeLimit? = null,
 ): TerrariumDependencyEditResult {
     val found = definition.tasks.firstOrNull { it.id == taskId }
         ?: return TerrariumDependencyEditResult.Rejected("Unknown task '${taskId.value}'")
@@ -394,6 +396,12 @@ internal fun setTerrariumJob(
             false -> com.hereliesaz.geministrator.domain.ApprovalPolicy.None
         },
         retryPolicy = maxAttempts?.let { task.retryPolicy.copy(maxAttempts = it.coerceIn(1, 10)) } ?: task.retryPolicy,
+        timeLimit = when (timeLimit) {
+            is com.hereliesaz.geministrator.domain.TimeLimit.Minutes ->
+                com.hereliesaz.geministrator.domain.TimeLimit.minutes(timeLimit.value)
+            null -> task.timeLimit
+            else -> timeLimit
+        },
     )
     if (next == found) return TerrariumDependencyEditResult.NoChange
     return TerrariumDependencyEditResult.Applied(definition.copy(tasks = definition.tasks.map { if (it.id == taskId) next else it }))

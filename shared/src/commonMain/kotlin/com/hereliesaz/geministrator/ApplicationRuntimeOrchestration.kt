@@ -12,6 +12,7 @@ import com.hereliesaz.geministrator.domain.normalized
 import com.hereliesaz.geministrator.domain.resolveRoleCollection
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
 import com.hereliesaz.geministrator.orchestration.OrchestrationPacket
+import com.hereliesaz.geministrator.research.toAvailableTools
 import com.hereliesaz.geministrator.orchestration.OrchestrationRole
 import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
@@ -62,7 +63,26 @@ private class PlanInputs(
     val rolesToPersist: List<RoleDefinition>? = null,
     /** Where [objective] came from; the run made from the plan keeps it. */
     val objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
+    /** What the queen consulted before planning, for the run's Story and Messages; null when she did not. */
+    val research: com.hereliesaz.geministrator.research.ResearchRecord? = null,
+    /** What the queen found missing when she staffed her planner and reviewer, said once in Messages after the run starts. */
+    val missing: List<com.hereliesaz.geministrator.queen.Missing> = emptyList(),
+    /** Her planner and reviewer, staffed from the generic roles. */
+    val staffing: com.hereliesaz.geministrator.queen.QueenStaffing? = null,
 ) {
+    fun withResearch(outcome: com.hereliesaz.geministrator.research.ResearchOutcome): PlanInputs {
+        if (outcome.record.isEmpty) return this
+        val tools = outcome.leads.toAvailableTools()
+        return PlanInputs(
+            projectName, objective, repository, existingProject, parentRunIds, launchRoles, plannerRoles,
+            packet.copy(
+                availableTools = tools,
+                instruction = if (tools.isEmpty()) packet.instruction else packet.instruction + com.hereliesaz.geministrator.research.RESEARCH_PLAN_INSTRUCTION,
+            ),
+            design, supplementalRoles, rolesToPersist, objectiveProvenance, outcome.record, missing, staffing,
+        )
+    }
+
     fun fingerprint(reviewer: RoleDefinition): String = planInputsFingerprint(
         objective = objective,
         repository = repository,
@@ -109,12 +129,13 @@ private suspend fun ApplicationRuntime.planInputs(
             authorities = role.authorities.map { it.name }.sorted(),
         )
     }
+    val staffing = com.hereliesaz.geministrator.queen.staffQueen(launchRoles)
     val packet = if (design == null) {
         OrchestrationPacket(
             objective = cleanObjective,
             currentState = "new-workflow",
             availableAgents = agents,
-            instruction = "Create the minimal executable dependency-correct workflow DAG needed to satisfy the objective.",
+            instruction = newWorkflowInstruction(cleanObjective, normalizedRepository),
         )
     } else {
         OrchestrationPacket(
@@ -138,7 +159,45 @@ private suspend fun ApplicationRuntime.planInputs(
         supplementalRoles = supplementalRoles,
         rolesToPersist = globalRoles.takeIf { design != null },
         objectiveProvenance = objectiveProvenance,
+        missing = staffingMissing(staffing, providerRegistry.linkedSourceIds()),
+        staffing = staffing,
     )
+}
+
+/**
+ * What is missing for the queen to plan and review, from her [staffing] and the [linkedSourceIds] that can answer:
+ * no Source, a disabled or broken planner or reviewer, both on one Source. Pure; nothing here blocks a launch.
+ */
+internal fun staffingMissing(staffing: com.hereliesaz.geministrator.queen.QueenStaffing, linkedSourceIds: List<String>): List<com.hereliesaz.geministrator.queen.Missing> {
+    val staff = staffing.staff
+    val fromSources = com.hereliesaz.geministrator.queen.missingForPlanning(
+        linkedSourceIds,
+        staff?.planner?.preferredProviderId?.value,
+        staff?.reviewer?.preferredProviderId?.value,
+    ).filter { staff != null || it.kind == com.hereliesaz.geministrator.queen.MissingKind.NoSource }
+    val none = fromSources.filter { it.kind == com.hereliesaz.geministrator.queen.MissingKind.NoSource }
+    return none + staffing.missing + (fromSources - none.toSet())
+}
+
+private val TEACHING_WORDS = Regex("\\b(teach|taught|tutor|learn|explain|walk me through|ins and outs|show me how)", RegexOption.IGNORE_CASE)
+
+/**
+ * What the planner is told to do with a new objective. A linked repository is named, with the limit of what a step sees
+ * of it; an objective to teach or explain gets the shape of a lesson, since the minimal plan for it is one step that
+ * cannot read the repository.
+ */
+internal fun newWorkflowInstruction(objective: String, repository: RepositoryRef?, availableTools: List<String> = emptyList()): String = buildString {
+    append("Create the minimal executable dependency-correct workflow DAG needed to satisfy the objective.")
+    if (repository != null) {
+        append(" A repository is linked (").append(repository.name).append("). A step sees only short excerpts of it, its README and docs first,")
+        append(" so name the files or parts each step should read in that step's objective.")
+    }
+    if (TEACHING_WORDS.containsMatchIn(objective)) {
+        append(" The objective is to teach: plan a survey of the material, a curriculum ordered by prerequisites, then one step per major part")
+        append(" that explains it with examples and a check of understanding (3 to 6 steps). Each step's result is text the keeper reads,")
+        append(" so require no approval unless a step changes something.")
+    }
+    if (availableTools.isNotEmpty()) append(com.hereliesaz.geministrator.research.RESEARCH_PLAN_INSTRUCTION)
 }
 
 /** Makes the run from an approved [plan]: the workflow, the project, the run. */
@@ -158,7 +217,7 @@ private suspend fun ApplicationRuntime.startPlannedWorkflow(inputs: PlanInputs, 
         updatedAtEpochMillis = now,
     )
     reportLaunchProgress("Planner returned ${plan.steps.size} step${if (plan.steps.size == 1) "" else "s"}")
-    reportLaunchProgress("Assembling workflow…")
+    reportLaunchProgress("Assembling the swarm…")
     val definition = if (inputs.design != null) {
         // The saved design stays as drawn: the run is of the planned hive, under a new id.
         plannedHiveDefinition(
@@ -195,6 +254,23 @@ private suspend fun ApplicationRuntime.startPlannedWorkflow(inputs: PlanInputs, 
         parentWorkflowRunIds = inputs.parentRunIds,
         objectiveProvenance = inputs.objectiveProvenance,
     )
+    rememberMissing("run-$stamp", inputs.missing)
+    inputs.research?.let { record ->
+        val runId = WorkflowRunId("run-$stamp")
+        rememberResearch(runId.value, record)
+        RepositoryWorkflowEventSink(persistence.events).append(
+            com.hereliesaz.geministrator.events.PolicyDecisionRecorded(
+                workflowRunId = runId,
+                effect = com.hereliesaz.geministrator.policy.PolicyEffect.Allow,
+                code = "research.before_planning",
+                action = "consult",
+                subjectType = "queen",
+                resourceType = "research",
+                reason = record.storyLine(),
+                occurredAtEpochMillis = now,
+            ),
+        )
+    }
     reportLaunchProgress("Loading the new run…")
     loadLatest()
 }
@@ -208,11 +284,11 @@ private fun planningStage(
     reviewer: RoleDefinition,
     verdict: PlanningVerdict? = null,
 ): PlanningStage {
-    val planner = BuiltInRoles.Orchestrator
+    val planner = BuiltInRoles.Planner
     val first = plan?.firstStep()
     return PlanningStage(
         phase = phase,
-        planner = inputs.launchRoles.firstOrNull { it.id == planner.id } ?: planner,
+        planner = inputs.staffing?.staff?.planner ?: inputs.launchRoles.firstOrNull { it.id == planner.id } ?: planner,
         reviewer = reviewer,
         firstStepRole = first?.let { step -> inputs.launchRoles.firstOrNull { it.id.value == step.roleId } },
         firstStepName = first?.name,
@@ -240,7 +316,7 @@ private suspend fun ApplicationRuntime.planAndDecide(
     confirmPlan: (suspend (PlanDecision) -> Boolean)?,
     planStore: ReviewedPlanStore?,
 ): OrchestrationPlan? {
-    reportLaunchProgress("Asking the planner for a workflow (${inputs.plannerRoles.size} roles available)…")
+    reportLaunchProgress("Asking the planner for a swarm (${inputs.plannerRoles.size} roles available)…")
     // Only a launch that will be reviewed has a planning field: the planner's egg, the reviewer who hatches from it.
     review?.let { (_, role) -> reportPlanningStage(planningStage(inputs, PlanningPhase.Planning, null, 0, role)) }
     val firstPlan = orchestrationRuntime.plan(inputs.packet)
@@ -311,6 +387,9 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
     planStore: ReviewedPlanStore? = null,
     /** Where [objective] came from; a remote agent's request is not the keeper's own typing. */
     objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
+    /** The queen's research before planning (docs/Keepers-Room.md); null plans without it. */
+    research: com.hereliesaz.geministrator.research.ResearchStep? = null,
+    researchContext: com.hereliesaz.geministrator.research.ResearchContext = com.hereliesaz.geministrator.research.ResearchContext(),
 ) {
     reportLaunchProgress("Reading your objective…")
     val cleanObjective = objective.trim()
@@ -323,7 +402,18 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
         return
     }
 
-    val inputs = planInputs(projectName, objective, repository, existingProject, continuesWorkflowRunIds, objectiveProvenance = objectiveProvenance)
+    var inputs = planInputs(projectName, objective, repository, existingProject, continuesWorkflowRunIds, objectiveProvenance = objectiveProvenance)
+    if (research != null) {
+        reportLaunchProgress("Looking for what could help before planning…")
+        val outcome = try {
+            research.run(inputs.objective, researchContext.copy(repositoryLinked = researchContext.repositoryLinked || inputs.repository != null), "plan-${inputs.objective.hashCode()}")
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            com.hereliesaz.geministrator.research.ResearchOutcome.None
+        }
+        inputs = inputs.withResearch(outcome)
+    }
     val review = reviewRole(planReviewer, confirmPlan, inputs.launchRoles)
     val plan = planAndDecide(inputs, orchestrationRuntime, review, confirmPlan, planStore) ?: return
     startPlannedWorkflow(inputs, plan)
@@ -379,8 +469,8 @@ suspend fun ApplicationRuntime.resumePendingPlanLaunch(
     val inputs = try {
         val saved = pending.savedDefinitionId?.let { id ->
             // A hive in the library is read again, so an edit to it is seen; one a package brought is not saved, so the plan's own copy is used.
-            val definition = persistence.definitions.get(WorkflowDefinitionId(id)) ?: pending.design ?: error("The saved hive is gone")
-            definition to (savedHiveRoughDesign(definition) ?: error("The saved hive is no longer a rough design"))
+            val definition = persistence.definitions.get(WorkflowDefinitionId(id)) ?: pending.design ?: error("The saved swarm is gone")
+            definition to (savedHiveRoughDesign(definition) ?: error("The saved swarm is no longer a rough design"))
         }
         planInputs(
             projectName = pending.projectName,

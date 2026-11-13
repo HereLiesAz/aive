@@ -12,6 +12,7 @@ import com.hereliesaz.geministrator.resources.hive_stop_text
 import com.hereliesaz.geministrator.resources.hive_stop_title
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -44,6 +45,10 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.produceState
 import com.hereliesaz.geministrator.log.AppLog
+import com.hereliesaz.geministrator.tour.TourOverlayHost
+import com.hereliesaz.geministrator.tour.TourTargetId
+import com.hereliesaz.geministrator.tour.tourEscapeKey
+import com.hereliesaz.geministrator.tour.tourTarget
 import com.hereliesaz.geministrator.log.sessionScope
 import com.hereliesaz.geministrator.workflow.SessionActivityFeeds
 import com.hereliesaz.geministrator.workflow.ProgressiveDelegationStore
@@ -106,7 +111,7 @@ internal object ControlRoomBreakpoints {
 
 enum class ControlRoomDestination(val label: String) {
     Overview("Overview"),
-    Workflows("Workflows"),
+    Workflows("Swarm library"),
     Company("Roster"),
     Stable("Stable"),
     Inbox("Messages"),
@@ -164,6 +169,12 @@ fun ControlRoom(
     onApproveTask: (String) -> Unit,
     onRejectPlan: (String) -> Unit,
     onResolveEscalation: (String, Boolean) -> Unit,
+    /** The keeper's review of a frozen swarm (Messages): the decision on the recommendations, or resuming. */
+    onNannyReview: (HallMonitorReviewStep, Boolean) -> Unit = { _, _ -> },
+    /** Starts an isolated practice run of one of the Nanny's solutions: finding id, solution index. */
+    onNannyTestSolution: (String, Int) -> Unit = { _, _ -> },
+    /** The keeper accepts (true) or dismisses (false) one of the queen's suggestions, by its ledger id. */
+    onQueenSuggestion: (String, Boolean) -> Unit = { _, _ -> },
     onLiftSpendStop: () -> Unit = {},
     /** Stops the active run: every unfinished creature and provider session. */
     onStopRun: (WorkflowRunId) -> Unit = {},
@@ -255,25 +266,37 @@ fun ControlRoom(
     // The Keeper's room's open part, held here so the breadcrumb can name it.
     val keeperSectionName = rememberDurableStringState("keeper.section", KeeperSection.Connections.name)
     val keeperOpen = rememberDurableBooleanState("keeper.open")
-    // The creature's panel links a provider or integration to Connections itself, not to whichever
-    // Keeper's room section was left open last.
-    val openConnectionsFromPanel: () -> Unit = {
-        keeperSectionName.value = KeeperSection.Connections.name
-        keeperOpen.value = true
-        onDestinationSelected(ControlRoomDestination.Settings)
+    // Every link to Connections, from the creature's panel or anywhere else, goes through the one
+    // openConnectionsPlace: Connections itself, not whichever Keeper's room section was left open last.
+    val openConnectionsAt: (String?) -> Unit = { address ->
+        openConnectionsPlace(keeperSectionName, keeperOpen, address, onDestinationSelected)
     }
+    val openConnections: () -> Unit = { openConnectionsAt(null) }
     // The hive on screen: a resting hive when one is open (it shows even while another run is live),
     // else the live run's. The breadcrumb and the panel follow what is shown.
     val restingShown = restingHive.value.isNotBlank()
     // The hive's Timeline, held here so a creature's "Open its trace" can open it.
     val showTimeline = rememberDurableBooleanState("overview.timeline")
-    // Whether the hive is in Flowchart (not Live or Build): held here, shared with the terrarium, so the phone's
-    // creature sheet can stay out of it (a card's own detail panel answers the tap there).
-    val flowchartView = rememberDurableBooleanState("hive.view.flow")
     // A creature whose panel was set aside for its trace: still selected on the Timeline, its panel
     // closed. Selecting another creature (or none) forgets it; tapping it again reopens its panel.
     var panelSetAside by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(selectedTaskId) { panelSetAside = setAsideAfterSelection(selectedTaskId, panelSetAside) }
+    // Edit's card flip (CardFlip.kt), shared with the terrarium that turns the creatures and with the sheet (or
+    // docked panel) that shows the flipped card's detail. A flip selects its creature and brings its panel
+    // back; turning it back sets the panel aside, as closing it does.
+    val flipHost = remember { CardFlipHost() }
+    val flippedId = flipHost.state.flippedId
+    var lastFlipped by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(flippedId) {
+        val previous = lastFlipped
+        lastFlipped = flippedId
+        if (flippedId != null) {
+            if (panelSetAside == flippedId) panelSetAside = null
+            if (selectedTaskId != flippedId) onTaskSelected(flippedId)
+        } else if (previous != null && flipHost.editing) {
+            panelSetAside = previous
+        }
+    }
     val selectCreature: (String) -> Unit = { id ->
         if (reopensSetAsidePanel(id, panelSetAside)) {
             panelSetAside = null
@@ -293,7 +316,39 @@ fun ControlRoom(
     // Closing the panel (sheet dismissed, dock's close, Back) only sets it aside: the creature stays
     // selected, so the field keeps the zoom level it showed and its other levels stay one step away.
     // Tapping the creature again reopens it; tapping bare ground or another creature lets it go.
-    val closePanel: (String) -> Unit = { id -> panelSetAside = id }
+    val closePanel: (String) -> Unit = { id ->
+        panelSetAside = id
+        flipHost.send(CardFlipEvent.Back)
+    }
+    // Built once and reading the latest callbacks, so providing it never recomposes everything under it.
+    val latestOpenConnectionsAt by rememberUpdatedState(openConnectionsAt)
+    val latestReconfigureProvider by rememberUpdatedState(onReconfigureProvider)
+    val latestDestinationSelected by rememberUpdatedState(onDestinationSelected)
+    val latestSelected by rememberUpdatedState(selectedTaskId)
+    val placeLinks = remember {
+        PlaceLinks(
+            openConnections = { address -> latestOpenConnectionsAt(address) },
+            openSource = { id -> latestReconfigureProvider(id) },
+            openRole = { roleId ->
+                RosterRequests.roleId = roleId
+                latestDestinationSelected(ControlRoomDestination.Company)
+            },
+            openDelegations = {
+                openKeeperPartPlace(KeeperSection.Delegations, keeperSectionName, keeperOpen) { latestDestinationSelected(it) }
+            },
+            openHive = { id -> openHivePlace(id, district, restingHive) { latestDestinationSelected(it) } },
+            openKeeperPart = { part ->
+                openKeeperPartPlace(part, keeperSectionName, keeperOpen) { latestDestinationSelected(it) }
+            },
+            openPlace = { place -> latestDestinationSelected(place) },
+            openSwarmEditor = {
+                // The editor is on the hive: show it, the creature stays selected, its sheet set aside.
+                SwarmEditRequests.pending = true
+                showTimeline.value = false
+                latestSelected?.let { panelSetAside = it }
+            },
+        )
+    }
     val inspectorVisible = selectedTaskId != null &&
         selectedTaskId != panelSetAside &&
         liveWorkflow != null &&
@@ -314,7 +369,14 @@ fun ControlRoom(
         // Deselecting forgets the remembered creature, so reselecting it picks its opening tab again.
         if (selectedTaskId == null && creatureTabTask.isNotEmpty()) creatureTabTask = ""
         if (selectedTaskId != null && selectedTaskId != creatureTabTask) {
-            creatureTabName = openingTab(liveWorkflow?.run?.taskRuns?.get(TaskDefinitionId(selectedTaskId))).name
+            creatureTabName = restoredTabOrDefault(
+                CreatureTabRestore.taskId,
+                CreatureTabRestore.tab,
+                selectedTaskId,
+                openingTab(liveWorkflow?.run?.taskRuns?.get(TaskDefinitionId(selectedTaskId))).name,
+            )
+            CreatureTabRestore.taskId = ""
+            CreatureTabRestore.tab = ""
             creatureTabTask = selectedTaskId
         }
     }
@@ -332,16 +394,17 @@ fun ControlRoom(
         val run = liveWorkflow?.run ?: return@LaunchedEffect
         if (inspectorVisible && selectedTaskId != null) inboxReadLog.markRead(inboxItemKeys(run, selectedTaskId))
     }
-    // A creature's Needs, where a decision it waits on is made. Leaves Flowchart: its sheet is for Live and Build.
+    // A creature's Needs, where a decision it waits on is made.
     val openCreatureOn: (String, CreatureTab) -> Unit = { id, tab ->
         district.value = false
-        flowchartView.value = false
         if (selectedTaskId != id) onTaskSelected(id)
         // The panel belongs to the live hive: a resting hive left open would hide it.
         restingHive.value = ""
         panelSetAside = null
         creatureTabName = tab.name
         creatureTabTask = id
+        // From a flipped card's button: the sheet opens up to the creature's own tabs.
+        if (flipHost.editing) flipHost.send(CardFlipEvent.SheetExpanded)
         onDestinationSelected(ControlRoomDestination.Overview)
     }
     // The Inbox lists everything waiting on the keeper, every row leading to where it is resolved; the header's
@@ -357,7 +420,7 @@ fun ControlRoom(
         } else {
             null
         },
-        openConnections = openConnectionsFromPanel,
+        openConnections = openConnections,
         reconfigureProvider = onReconfigureProvider,
         openCreature = { id, tab -> openCreatureOn(id, tab) },
     )
@@ -400,7 +463,7 @@ fun ControlRoom(
             showTimeline.value && liveWorkflow != null && !restingShown
         },
         keeperPart = KeeperSection.entries.firstOrNull { it.name == keeperSectionName.value }
-            ?.takeIf { !compact || keeperOpen.value }?.let { stringResource(it.title) },
+            ?.takeIf { !compact || keeperOpen.value }?.let { stringResource(it.group.title) },
         onOpenDistrict = {
             if (destination == ControlRoomDestination.Overview) {
                 zoomOut()
@@ -417,6 +480,8 @@ fun ControlRoom(
         },
         onCloseCreature = { selectedTaskId?.let(onTaskSelected) },
         onCloseKeeperPart = if (compact && keeperOpen.value) ({ keeperOpen.value = false }) else null,
+        // The repository is linked and changed in Connections.
+        onOpenRepository = openConnections,
     )
 
     // The creature's panel: in a sheet on a phone, docked beside the page on wide screens.
@@ -439,7 +504,7 @@ fun ControlRoom(
                 roleSurfaceFilePicker = roleSurfaceFilePicker,
                 computeAvailable = ControlRoomDestination.Compute in destinations,
                 onSelectTask = onTaskSelected,
-                onOpenConnections = openConnectionsFromPanel,
+                onOpenConnections = openConnections,
                 onOpenCompute = if (ControlRoomDestination.Compute in destinations) {
                     { onDestinationSelected(ControlRoomDestination.Compute) }
                 } else {
@@ -457,6 +522,8 @@ fun ControlRoom(
     }
     // A docked panel has no sheet to dismiss: Back closes it first.
     PlatformBackHandler(enabled = inspectorVisible && !compact) { selectedTaskId?.let(closePanel) }
+    // Back turns a flipped card back to its creature first.
+    PlatformBackHandler(enabled = flipHost.editing && flippedId != null) { flipHost.send(CardFlipEvent.Back) }
     // An objective queued in the feed bar starts once its swarm finishes, wherever the keeper is.
     QueuedFeedLauncher(liveWorkflow, onLaunchWorkflow)
 
@@ -475,13 +542,31 @@ fun ControlRoom(
     }
     CompositionLocalProvider(
         LocalReleaseCreature provides releaseCreature,
-        LocalHiveFlowchartView provides flowchartView,
         LocalFlowchartLinks provides flowchartLinks,
+        LocalPlaceLinks provides placeLinks,
+        LocalCardFlip provides flipHost,
+    ) {
+    // Edit on a phone: a flipped card's sheet shows itself at its peek and drags up to the creature's own sheet.
+    val flipSheetShown = compact && flipHost.editing && flippedId != null &&
+        creatureSheetAllowed(editing = true, flipped = true)
+    CardFlipSheetHost(
+        host = flipHost,
+        enabled = compact,
+        showSheet = flipSheetShown,
+        sheet = {
+            flippedId?.let { id ->
+                flipHost.detail?.invoke(id, Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
+                if (inspectorVisible && selectedTaskId == id) {
+                    creaturePanel(id, Modifier.fillMaxWidth().fillMaxHeight(0.72f), false)
+                }
+            }
+        },
     ) {
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(ground.page)
+            .tourEscapeKey()
             .padding(contentPadding),
     ) {
         val railLabelled = maxWidth >= ShellRailLabelledFrom
@@ -530,7 +615,7 @@ fun ControlRoom(
             Row(Modifier.weight(1f).fillMaxWidth()) {
             MainDestination(
                 destination = destination,
-                onOpenSettings = { onDestinationSelected(ControlRoomDestination.Settings) },
+                onOpenConnections = openConnections,
                 computeAvailable = ControlRoomDestination.Compute in destinations,
                 onDestinationSelected = onDestinationSelected,
                 selectedTaskId = selectedTaskId,
@@ -541,6 +626,9 @@ fun ControlRoom(
                 onApproveTask = onApproveTask,
                 onRejectPlan = onRejectPlan,
                 onResolveEscalation = onResolveEscalation,
+                onNannyReview = onNannyReview,
+                onNannyTestSolution = onNannyTestSolution,
+                onQueenSuggestion = onQueenSuggestion,
                 onLiftSpendStop = onLiftSpendStop,
                 onStopRun = onStopRun,
                 onPauseRun = onPauseRun,
@@ -613,7 +701,15 @@ fun ControlRoom(
                         .width(DockedCreaturePanelWidth)
                         .fillMaxHeight()
                         .clip(RoundedCornerShape(19.dp)),
-                ) { creaturePanel(taskId, Modifier.fillMaxSize(), true) }
+                ) {
+                    Column(Modifier.fillMaxSize()) {
+                        // In Edit the flipped card's detail leads the docked panel (no bottom sheet on a wide screen).
+                        if (flipHost.editing && flippedId == taskId) {
+                            flipHost.detail?.invoke(taskId, Modifier.padding(8.dp))
+                        }
+                        Box(Modifier.weight(1f).fillMaxWidth()) { creaturePanel(taskId, Modifier.fillMaxSize(), true) }
+                    }
+                }
             }
             }
         }
@@ -622,7 +718,11 @@ fun ControlRoom(
         // The once-per-streak offer to stop asking for a non-mutating gate (workflow/ProgressiveDelegation.kt).
         delegations?.let { DelegationOfferDialog(it) }
 
-        if (inspectorVisible && compact && creatureSheetAllowed(flowchart = flowchartView.value)) {
+        // The tutorial layer: draws nothing unless a tour is running (tour/TourOverlay.kt).
+        TourOverlayHost()
+
+        // Live keeps the creature's modal sheet; Edit's own sheet is the flipped card's (CardFlipSheetHost above).
+        if (inspectorVisible && compact && creatureSheetAllowed(editing = flipHost.editing, flipped = false)) {
             selectedTaskId?.let { taskId ->
                 ModalBottomSheet(
                     onDismissRequest = { closePanel(taskId) },
@@ -642,9 +742,10 @@ fun ControlRoom(
         }
     }
     }
+    }
 }
 
-/** Opens the spend caps in the Keeper's room: Limits on a wide window, This device on a phone. */
+/** Opens the spend caps in the Keeper's room: its Allowance part. */
 internal fun openSpendLimits(
     compact: Boolean,
     keeperSectionName: MutableState<String>,
@@ -656,8 +757,8 @@ internal fun openSpendLimits(
     onDestinationSelected(ControlRoomDestination.Settings)
 }
 
-/** Where the spend caps are: Limits on a wide window, This device on a phone. */
-internal fun spendLimitsSection(compact: Boolean): KeeperSection = if (compact) KeeperSection.Device else KeeperSection.Limits
+/** Where the spend caps are: Allowance (the Limits part), on every width. */
+internal fun spendLimitsSection(@Suppress("UNUSED_PARAMETER") compact: Boolean): KeeperSection = KeeperSection.Limits
 
 /** A repository's source and short, credential-free name; local Git uses its folder name. */
 internal fun shellRepositoryLabel(repository: RepositoryRef): String =
@@ -688,12 +789,13 @@ private fun shellCrumbs(
     onOpenHive: () -> Unit,
     onCloseCreature: () -> Unit,
     onCloseKeeperPart: (() -> Unit)?,
+    onOpenRepository: (() -> Unit)? = null,
 ): List<ShellCrumb> = buildList {
     add(ShellCrumb(stringResource(Res.string.crumb_hive), "crumb-hive", onOpenDistrict))
     when {
         destination == ControlRoomDestination.Overview -> {
             if (inDistrict) return@buildList
-            repositoryName?.takeIf(String::isNotBlank)?.let { add(ShellCrumb(it, "crumb-repository", null)) }
+            repositoryName?.takeIf(String::isNotBlank)?.let { add(ShellCrumb(it, "crumb-repository", onOpenRepository)) }
             hiveName?.takeIf(String::isNotBlank)?.let { add(ShellCrumb(it, "crumb-a-hive", onOpenHive)) }
             if (creatureName == null) timelineName?.let { add(ShellCrumb(it, "crumb-timeline", null)) }
             creatureName?.let { add(ShellCrumb(it, "crumb-creature", onCloseCreature)) }
@@ -751,8 +853,8 @@ private fun ShellHeader(
                 )
             }
             if (!compact) Breadcrumb(crumbs, Modifier.weight(1f)) else Spacer(Modifier.weight(1f))
-            InboxBadge(unread = unreadInbox, onClick = onOpenInbox)
-            KeeperButton(selected = keeperOpen, onClick = onOpenKeeper)
+            InboxBadge(unread = unreadInbox, onClick = onOpenInbox, modifier = Modifier.tourTarget(TourTargetId.MESSAGES_BUTTON))
+            KeeperButton(selected = keeperOpen, onClick = onOpenKeeper, modifier = Modifier.tourTarget(TourTargetId.KEEPERS_ROOM_GEAR))
         }
         if (compact) Breadcrumb(crumbs, Modifier.fillMaxWidth())
     }
@@ -848,6 +950,9 @@ private fun MainDestination(
     onApproveTask: (String) -> Unit,
     onRejectPlan: (String) -> Unit,
     onResolveEscalation: (String, Boolean) -> Unit,
+    onNannyReview: (HallMonitorReviewStep, Boolean) -> Unit,
+    onNannyTestSolution: (String, Int) -> Unit,
+    onQueenSuggestion: (String, Boolean) -> Unit,
     onLiftSpendStop: () -> Unit,
     onStopRun: (WorkflowRunId) -> Unit,
     /** Pause (true) or resume (false) the live hive; see [ApplicationRuntime.setKeeperPause]. */
@@ -907,7 +1012,8 @@ private fun MainDestination(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
     runtimeState: ApplicationRuntimeState,
-    onOpenSettings: () -> Unit = {},
+    /** Opens Connections: the one route, held by the ControlRoom (see [openConnectionsPlace]). */
+    onOpenConnections: () -> Unit = {},
     onDestinationSelected: (ControlRoomDestination) -> Unit = {},
     computeAvailable: Boolean = true,
     district: MutableState<Boolean> = remember { mutableStateOf(false) },
@@ -925,13 +1031,6 @@ private fun MainDestination(
     val hiveScope = rememberCoroutineScope()
     // Stop run's confirmation: stopping cancels every unfinished creature, so it asks first.
     var confirmingStopRun by remember { mutableStateOf(false) }
-    // Every "check your connections" link lands on the Connections section itself, not on whichever
-    // Keeper's room section was left open last.
-    val openConnections: () -> Unit = {
-        keeperSectionName.value = KeeperSection.Connections.name
-        keeperOpen.value = true
-        onOpenSettings()
-    }
     // Workflows, opened on a hive: its workflow is selected first (and a draft left from another hive is
     // dropped, so Save cannot write to it), so the library shows the hive the keeper came from and not
     // whichever it showed last. The hive on screen unless one is named: the resting hive names itself.
@@ -1110,7 +1209,7 @@ private fun MainDestination(
                                     restingHiveId = ""
                                     onZoomOut()
                                 },
-                                onOpenConnections = openConnections,
+                                onOpenConnections = onOpenConnections,
                                 compact = compact,
                             )
                             AzphaltPill(
@@ -1191,7 +1290,7 @@ private fun MainDestination(
                             onImportProjectFile = onImportProjectFile,
                             onRecoverFromCorruption = onRecoverFromCorruption,
                             onRetryRuntime = onRetryRuntime,
-                            onOpenSettings = openConnections,
+                            onOpenSettings = onOpenConnections,
                             onValidateWorkflow = onValidateWorkflow,
                             availableRepositorySources = availableRepositorySources,
                             onPickLocalRepository = onPickLocalRepository,
@@ -1238,6 +1337,16 @@ private fun MainDestination(
                     onOpenLimits = { openSpendLimits(compact, keeperSectionName, keeperOpen, onDestinationSelected) },
                     onOpenCreature = onOpenCreatureOn,
                     compact = compact,
+                    onNannyReview = onNannyReview,
+                    onNannyTestSolution = onNannyTestSolution,
+                    onQueenSuggestion = onQueenSuggestion,
+                    onOpenStory = {
+                        showTimelineState.value = true
+                        onDestinationSelected(ControlRoomDestination.Overview)
+                    },
+                    onOpenRun = onSwitchRun,
+                    onOpenConnections = onOpenConnections,
+                    onOpenRoster = { onDestinationSelected(ControlRoomDestination.Company) },
                 )
                 ControlRoomDestination.Stable -> Column(
                     Modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -1281,7 +1390,7 @@ private fun MainDestination(
                             else -> null
                         }
                     },
-                    content = { section, partModifier ->
+                    content = { parts, partModifier ->
                             ProviderSettingsScreen(
                                 connectedProviderIds = connectedProviderIds,
                                 onCheckProviderHealth = onCheckProviderHealth,
@@ -1306,9 +1415,9 @@ private fun MainDestination(
                                 localPlannerSetting = localPlannerSetting,
                                 localOrchestrationSpecialistSetting = localOrchestrationSpecialistSetting,
                                 onDeviceSmallTaskSetting = onDeviceSmallTaskSetting,
-                                section = section,
+                                sections = parts,
                                 compact = compact,
-                                trailing = {
+                                trailing = { section ->
                                     when (section) {
                                         KeeperSection.Connections -> {
                                             RepositoryConnections(

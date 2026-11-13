@@ -72,7 +72,10 @@ internal class RemoteRelayStore(context: Context) {
      */
     fun restore(relayUrl: String?, storedPairing: String) {
         val pairing = requireNotNull(RemoteRelayPairing.fromStorage(storedPairing)) { "Remote access pairing is unreadable" }
-        relayUrl?.takeIf(String::isNotBlank)?.let { this.relayUrl = it }
+        // A file never moves an existing pairing to another relay: that needs a fresh pairing.
+        val current = pairing()
+        if (current != null && current.relay != pairing.relay) return
+        this.relayUrl = pairing.relay
         secrets.writeToken(pairing.toStorage())
     }
 

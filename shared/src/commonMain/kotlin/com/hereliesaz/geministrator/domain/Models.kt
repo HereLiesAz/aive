@@ -156,6 +156,8 @@ data class TaskDefinition(
     val executor: TaskExecutor? = null,
     /** Hold output (docs/Swarm-OS.md, keeper tools): its artifacts are withheld from every consumer. */
     val holdOutput: Boolean = false,
+    /** How long the creature may work before the queen says it is taking too long; Auto for every older definition. */
+    val timeLimit: TimeLimit = TimeLimit.Auto,
 )
 
 @Serializable
@@ -243,6 +245,10 @@ data class TaskRun(
      * not count against the task's retry budget ([com.hereliesaz.geministrator.workflow.FailurePolicyEvaluator]).
      */
     val heldAttempts: Int = 0,
+    /** The active-time clock of the current attempt; null until the queen starts one (docs/Keepers-Room.md). */
+    val clock: TaskClock? = null,
+    /** Attempts stopped for taking longer than allowed; kept across attempts, reset by the keeper's Retry. */
+    val timedOutAttempts: Int = 0,
 ) {
     init {
         require(progress == null || progress in 0f..1f) { "Task progress must be normalized 0f..1f" }

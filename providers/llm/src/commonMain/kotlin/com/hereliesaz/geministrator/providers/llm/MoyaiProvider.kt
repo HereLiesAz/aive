@@ -59,6 +59,7 @@ class MoyaiProvider(
     /** A session still unfinished after this long is reported as failed instead of being polled forever. */
     private val maxObserveMillis: Long = 6L * 60L * 60L * 1_000L,
 ) : AgentProvider {
+    override val workKind: com.hereliesaz.geministrator.workflow.WorkKind get() = com.hereliesaz.geministrator.workflow.WorkKind.LongCreative
     private val api = MoyaiApi(baseUrl, workspacePassword, client)
     private val sessionsMutex = Mutex()
     private val sessions = mutableMapOf<ProviderRunId, AgentTaskRequest>()
@@ -157,7 +158,7 @@ class MoyaiProvider(
         fun firstTimeSeen(text: String): Boolean = repliesInSnapshot.add(text)
         while (true) {
             if (startedAt.elapsedNow().inWholeMilliseconds > maxObserveMillis) {
-                emit(AgentEvent.Failed(runId, "Moyai session ${runId.value.take(8)} did not finish in time"))
+                emit(AgentEvent.Failed(runId, "Moyai session ${runId.value.take(8)} timed out: it did not finish in time"))
                 sessionsMutex.withLock { sessions.remove(runId) }
                 return@flow
             }

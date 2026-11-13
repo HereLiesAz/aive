@@ -93,6 +93,7 @@ import com.hereliesaz.geministrator.resources.memory_status_since_this_start
 import com.hereliesaz.geministrator.resources.memory_status_waiting
 import com.hereliesaz.geministrator.resources.memory_counted_since_this_bank_s_layer
 import com.hereliesaz.geministrator.resources.memory_default_provider
+import com.hereliesaz.geministrator.resources.memory_source_not_connected
 import com.hereliesaz.geministrator.resources.memory_defaults
 import com.hereliesaz.geministrator.resources.memory_discard
 import com.hereliesaz.geministrator.resources.memory_embedding_calls
@@ -474,6 +475,17 @@ private fun StageEngineEditor(
                     )
                 }
                 if (engine.kind == MemoryEngineKind.HostedModel) {
+                    // A source chosen here that is not connected links to where it is connected.
+                    engine.providerId?.takeIf { pinnedProviderNeedsConnection(it, connectedProviderIds) }?.let { id ->
+                        val openSource = LocalPlaceLinks.current.openSource
+                        LinkText(
+                            stringResource(
+                                Res.string.memory_source_not_connected,
+                                ProviderCatalog.entry(id)?.displayName ?: id,
+                            ),
+                            onClick = openSource?.let { open -> { open(id) } },
+                        )
+                    }
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.horizontalScroll(rememberScrollState()),

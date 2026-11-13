@@ -103,6 +103,8 @@ object ProcedureTraceRedactor {
         return candidate.takeIf { it.matches(ProcedureTrace.OPERATION) && ControlRedaction.scrub(it) == it }
     }
 
+    private const val MAX_SLASH_VALUE_CHARS = 40
+
     private val sensitiveName = Regex("(?i)(token|secret|password|passwd|credential|auth|bearer|key|private|cert)")
 
     /**
@@ -127,6 +129,8 @@ object ProcedureTraceRedactor {
         val name = rawName.lowercase().replace('-', '_')
         if (!name.matches(ProcedureTraceSlot.NAME) || sensitiveName.containsMatchIn(name)) return null
         if (ControlRedaction.scrub(value) != value) return null
+        // A long value with path separators is a path or a URL, whatever the input is called.
+        if ('/' in value && value.length > MAX_SLASH_VALUE_CHARS) return null
         val type = when {
             value.matches(ProcedureTraceSlot.INTEGER) -> ProcedureParameterType.Integer
             value == "true" || value == "false" -> ProcedureParameterType.Boolean

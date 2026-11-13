@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.hereliesaz.geministrator
 
 import androidx.compose.runtime.collectAsState
@@ -279,7 +281,8 @@ internal fun CustomCompanyProviderScreen(
     val roleFilter = SwarmRoleFilter.entries.firstOrNull { it.name == roleFilterValue } ?: SwarmRoleFilter.All
     // How many hives use each role, read from the saved hives; until read (or if they cannot be),
     // no count is shown rather than a guessed one.
-    var hiveCounts by remember { mutableStateOf<Map<RoleDefinitionId, Int>?>(null) }
+    var roleHiveList by remember { mutableStateOf<Map<RoleDefinitionId, List<WorkflowDefinition>>?>(null) }
+    val hiveCounts = roleHiveList?.let { lists -> lists.mapValues { it.value.size } }
     // Read once on arrival and again when the runtime changes shape (a project opened, a run began),
     // not on every recomposition: the loader is a fresh lambda each time the app recomposes.
     val loadDefinitions by rememberUpdatedState(onLoadWorkflowDefinitions)
@@ -287,7 +290,7 @@ internal fun CustomCompanyProviderScreen(
         val load = loadDefinitions
         if (load == null || focusRole != null) return@LaunchedEffect
         runCatching { load() }
-            .onSuccess { hiveCounts = roleHiveCounts(it) }
+            .onSuccess { roleHiveList = roleHives(it) }
             .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
     }
     val roleSurfacePickerScope = rememberCoroutineScope()
@@ -361,6 +364,14 @@ internal fun CustomCompanyProviderScreen(
     val focused = focusRole?.let { id -> visibleRoles.firstOrNull { it.id == id } }
     LaunchedEffect(focused) {
         if (focused != null) editRole(focused)
+    }
+    // A link elsewhere (a creature's Mind, its budget) opens the form on this role: the one place a role changes.
+    val requestedRole = RosterRequests.roleId
+    LaunchedEffect(requestedRole, visibleRoles) {
+        if (focusRole == null && requestedRole != null && visibleRoles.isNotEmpty()) {
+            RosterRequests.take()
+            visibleRoles.firstOrNull { it.id.value == requestedRole }?.let { editRole(it) }
+        }
     }
     val activeRoleIds = liveWorkflow?.run?.taskRuns?.values
         ?.filter {
@@ -444,6 +455,21 @@ internal fun CustomCompanyProviderScreen(
         }
 
         if (showRoleForm && (focusRole == null || editingRoleId == focusRole.value)) {
+            // The role's kept creature and the changes proposed to its instructions: here, with the form that
+            // changes it, and not in a creature's panel (which links to this).
+            if (focusRole == null && editingRoleId != null) {
+                val editingRole = visibleRoles.firstOrNull { it.id.value == editingRoleId }
+                if (editingRole != null && editingRole.executionSource == RoleExecutionSource.Agent) {
+                    CreaturePicker(editingRole.id, agentName = { id -> visibleRoles.firstOrNull { r -> r.id.value == id }?.name })
+                }
+                if (editingRole != null) {
+                    RoleInstructionProposalPanel(
+                        roleId = editingRole.id,
+                        roles = visibleRoles,
+                        onSaveRoleCollection = onSaveRoleCollection,
+                    )
+                }
+            }
             // In a creature's Mind the tab and breadcrumb already say whose mind this is.
             if (focusRole == null) Text(
                 if (editingRoleId == null) stringResource(Res.string.swarm_add_orchestration_role) else stringResource(Res.string.swarm_edit_orchestration_role),
@@ -944,6 +970,18 @@ internal fun CustomCompanyProviderScreen(
                 endCap = if (role.id in activeRoleIds) stringResource(Res.string.swarm_working) else stringResource(Res.string.swarm_available),
                 well = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // "in N hives" names them: each opens, where its swarm is changed.
+                        val openHive = LocalPlaceLinks.current.openHive
+                        roleHiveList?.get(role.id)?.takeIf { it.isNotEmpty() }?.let { used ->
+                            androidx.compose.foundation.layout.FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                used.forEach { hive ->
+                                    LinkText(hive.name, onClick = openHive?.let { open -> { open(hive.id.value) } })
+                                }
+                            }
+                        }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             AzphaltPill(
                                 label = stringResource(Res.string.swarm_edit),
@@ -1624,7 +1662,7 @@ private fun RoleDefinition.companyDepartment(): String = when (id.value) {
     "orchestrator" -> stringResource(Res.string.swarm_executive)
     "product-manager", "researcher", "ux-designer" -> stringResource(Res.string.swarm_product)
     "architect", "epa-representative", "implementation-engineer" -> stringResource(Res.string.swarm_engineering)
-    "crash-test-dummy", "qa-engineer", "adversarial-reviewer", "code-reviewer", "recovery-engineer" -> stringResource(Res.string.swarm_assurance)
+    "crash-test-dummy", "qa-engineer", "adversarial-reviewer", "reviewer", "plan-reviewer", "code-reviewer", "recovery-engineer" -> stringResource(Res.string.swarm_assurance)
     "release-engineer" -> stringResource(Res.string.swarm_delivery)
     else -> stringResource(Res.string.swarm_custom)
 }
