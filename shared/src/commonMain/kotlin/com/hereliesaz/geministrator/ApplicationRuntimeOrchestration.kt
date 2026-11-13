@@ -114,7 +114,7 @@ private suspend fun ApplicationRuntime.planInputs(
             objective = cleanObjective,
             currentState = "new-workflow",
             availableAgents = agents,
-            instruction = "Create the minimal executable dependency-correct workflow DAG needed to satisfy the objective.",
+            instruction = newWorkflowInstruction(cleanObjective, normalizedRepository),
         )
     } else {
         OrchestrationPacket(
@@ -139,6 +139,26 @@ private suspend fun ApplicationRuntime.planInputs(
         rolesToPersist = globalRoles.takeIf { design != null },
         objectiveProvenance = objectiveProvenance,
     )
+}
+
+private val TEACHING_WORDS = Regex("\\b(teach|taught|tutor|learn|explain|walk me through|ins and outs|show me how)", RegexOption.IGNORE_CASE)
+
+/**
+ * What the planner is told to do with a new objective. A linked repository is named, with the limit of what a step sees
+ * of it; an objective to teach or explain gets the shape of a lesson, since the minimal plan for it is one step that
+ * cannot read the repository.
+ */
+internal fun newWorkflowInstruction(objective: String, repository: RepositoryRef?): String = buildString {
+    append("Create the minimal executable dependency-correct workflow DAG needed to satisfy the objective.")
+    if (repository != null) {
+        append(" A repository is linked (").append(repository.name).append("). A step sees only short excerpts of it, its README and docs first,")
+        append(" so name the files or parts each step should read in that step's objective.")
+    }
+    if (TEACHING_WORDS.containsMatchIn(objective)) {
+        append(" The objective is to teach: plan a survey of the material, a curriculum ordered by prerequisites, then one step per major part")
+        append(" that explains it with examples and a check of understanding (3 to 6 steps). Each step's result is text the keeper reads,")
+        append(" so require no approval unless a step changes something.")
+    }
 }
 
 /** Makes the run from an approved [plan]: the workflow, the project, the run. */
