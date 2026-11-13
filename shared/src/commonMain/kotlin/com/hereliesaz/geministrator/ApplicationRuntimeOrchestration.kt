@@ -148,7 +148,7 @@ private val TEACHING_WORDS = Regex("\\b(teach|taught|tutor|learn|explain|walk me
  * of it; an objective to teach or explain gets the shape of a lesson, since the minimal plan for it is one step that
  * cannot read the repository.
  */
-internal fun newWorkflowInstruction(objective: String, repository: RepositoryRef?): String = buildString {
+internal fun newWorkflowInstruction(objective: String, repository: RepositoryRef?, availableTools: List<String> = emptyList()): String = buildString {
     append("Create the minimal executable dependency-correct workflow DAG needed to satisfy the objective.")
     if (repository != null) {
         append(" A repository is linked (").append(repository.name).append("). A step sees only short excerpts of it, its README and docs first,")
@@ -159,6 +159,7 @@ internal fun newWorkflowInstruction(objective: String, repository: RepositoryRef
         append(" that explains it with examples and a check of understanding (3 to 6 steps). Each step's result is text the keeper reads,")
         append(" so require no approval unless a step changes something.")
     }
+    if (availableTools.isNotEmpty()) append(com.hereliesaz.geministrator.research.RESEARCH_PLAN_INSTRUCTION)
 }
 
 /** Makes the run from an approved [plan]: the workflow, the project, the run. */
