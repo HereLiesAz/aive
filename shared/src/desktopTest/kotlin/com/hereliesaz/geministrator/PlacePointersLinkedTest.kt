@@ -39,8 +39,24 @@ class PlacePointersLinkedTest {
             "SwarmDraftPanel.kt" to "DraftFix",
             "HiveDeletion.kt" to "hive_delete_open_store",
             "LiveInboxScreen.kt" to "inbox_open_creature",
+            "ComputeDelegationScreen.kt" to "links.openRole",
+            "StableScreens.kt" to "openRole",
+            "MemorySimpleScreen.kt" to "onOpenTechnical",
+            "MascotNodeTerrarium.kt" to "badge.roleId",
+            "DistrictScreen.kt" to "KeeperSection.Projects",
+            "MindMapRunScreen.kt" to "onEyebrowClick",
+            "ProviderManagementScreens.kt" to "OtherDevicesCard",
         ).forEach { (file, marker) ->
             assertTrue(marker in source(file), "$file no longer links with $marker")
         }
+    }
+
+    @Test
+    fun aNannySolutionsTargetLinksLikeItsFindingsScope() {
+        val text = source("HallMonitorInboxScreen.kt")
+        assertTrue(
+            Regex("openScopePlace").findAll(text).count() >= 2,
+            "the finding's scope and the solution's target both open where that is changed",
+        )
     }
 }

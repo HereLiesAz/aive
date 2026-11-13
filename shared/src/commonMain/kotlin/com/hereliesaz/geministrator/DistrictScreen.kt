@@ -140,12 +140,18 @@ internal fun DistrictScreen(
             }
             // Laid out by project: the project of each hive's latest run; hives that never ran come last.
             val notYetRun = stringResource(Res.string.hive_not_yet_run)
+            val projectsLink = LocalPlaceLinks.current.openKeeperPart?.let { open -> { open(KeeperSection.Projects) } }
             neighbourhoods
                 .groupBy { hood -> hood.latestRunId?.let(projectOfRun::get) ?: notYetRun }
                 .entries
                 .sortedBy { (project, _) -> project == notYetRun }
                 .forEach { (project, hives) ->
-                    Text(project.uppercase(), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+                    // A project's files and export are in the Keeper's room: its header opens Projects.
+                    LinkText(
+                        project.uppercase(),
+                        onClick = if (project == notYetRun) null else projectsLink,
+                        style = AzphaltType.eyebrow,
+                    )
                     FlowRow(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),

@@ -105,10 +105,11 @@ internal fun HallMonitorPauseDetail(
                                         style = AzphaltType.lead,
                                         color = azphaltOnSurface(),
                                     )
-                                    Text(
+                                    // The thing it would change opens where that is changed, as the finding's scope does.
+                                    LinkText(
                                         "${plainAction(solution.action)} · ${solution.target}".uppercase(),
+                                        onClick = LocalPlaceLinks.current.openScopePlace(nannyScopePlace(finding.scope)),
                                         style = AzphaltType.eyebrow,
-                                        color = azphaltOnSurface(),
                                     )
                                     Text(
                                         solution.rationale,

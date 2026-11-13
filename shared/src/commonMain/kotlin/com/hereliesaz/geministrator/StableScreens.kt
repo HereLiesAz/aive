@@ -569,20 +569,20 @@ internal fun CreaturePicker(role: RoleDefinitionId, modifier: Modifier = Modifie
     Column(modifier = modifier.widthIn(max = StableMaxWidth).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(stringResource(Res.string.stable_its_creature), style = TitleType.copy(fontSize = 20.sp), color = azphaltOnSurface())
         Text(stringResource(Res.string.stable_its_creature_hint), style = NoteType, color = azphaltMutedOnSurface())
-        val elsewhere = mutableListOf<Pair<String, String>>()
+        val elsewhere = mutableListOf<Triple<String, String, String?>>()
         Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             stable.keys.forEach { key ->
                 val name = creatureName(stable, host.catalog, key)
                 val left = stable.available(key, except = role)
                 val selected = key == current
                 // Every one of it already lives in another agent: say which.
-                val livingIn = if (left == 0 && !selected) {
-                    stable.assignments.filter { (agent, creature) -> creature == key && agent != role.value }
-                        .keys.map { agentName(it) ?: another }.distinct().joinToString(", ")
+                val livesIn = if (left == 0 && !selected) {
+                    stable.assignments.filter { (agent, creature) -> creature == key && agent != role.value }.keys
                 } else {
                     null
                 }
-                if (livingIn != null) elsewhere += name to livingIn
+                val livingIn = livesIn?.map { agentName(it) ?: another }?.distinct()?.joinToString(", ")
+                if (livingIn != null) elsewhere += Triple(name, livingIn, livesIn?.firstOrNull { agentName(it) != null })
                 PickerRow(
                     rig = stable.rigOf(key),
                     title = name,
@@ -597,8 +597,15 @@ internal fun CreaturePicker(role: RoleDefinitionId, modifier: Modifier = Modifie
                 )
             }
         }
-        elsewhere.forEach { (name, agent) ->
-            Text(stringResource(Res.string.stable_living_in, name, agent), style = CaptionType, color = azphaltMutedOnSurface())
+        // The agent it lives in is changed in the Roster: the line opens that role.
+        val openRole = LocalPlaceLinks.current.openRole
+        elsewhere.forEach { (name, agent, agentId) ->
+            LinkText(
+                stringResource(Res.string.stable_living_in, name, agent),
+                onClick = agentId?.let { id -> openRole?.let { open -> { open(id) } } },
+                style = CaptionType,
+                color = azphaltMutedOnSurface(),
+            )
         }
     }
 }

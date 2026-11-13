@@ -81,6 +81,8 @@ internal fun ComputeDelegationScreen(
     embedded: Boolean = false,
 ) {
     val live = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
+    // A hive or a creature's role is changed in the hive and the Roster: these rows open them.
+    val links = LocalPlaceLinks.current
     val localNodeId = distributedComputeState.configuration.nodeId
     val nodes = distributedComputeState.onlineNodes
         .distinctBy(ComputeNodeDescriptor::nodeId)
@@ -160,6 +162,7 @@ internal fun ComputeDelegationScreen(
                 append(assignmentLabel(delegatableTasks, nodes))
             },
             endCap = stringResource(Res.string.compute_entire_graph),
+            onClick = links.openHive?.let { open -> { open(definition.id.value) } },
             well = {
                 DelegationTargets(
                     tasks = delegatableTasks,
@@ -194,6 +197,7 @@ internal fun ComputeDelegationScreen(
                     title = role?.name ?: roleId.value,
                     body = assignmentLabel(roleTasks, nodes),
                     endCap = stringResource(Res.string.compute_role_2),
+                    onClick = links.openRole?.let { open -> { open(roleId.value) } },
                     well = {
                         DelegationTargets(
                             tasks = roleTasks,
@@ -213,6 +217,7 @@ internal fun ComputeDelegationScreen(
                 title = task.name,
                 body = assignmentLabel(listOf(task), nodes),
                 endCap = stringResource(Res.string.compute_override),
+                onClick = links.openHive?.let { open -> { open(definition.id.value) } },
                 well = {
                     DelegationTargets(
                         tasks = listOf(task),

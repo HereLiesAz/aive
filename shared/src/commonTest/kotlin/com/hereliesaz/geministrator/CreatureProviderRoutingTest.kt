@@ -100,7 +100,7 @@ class CreatureProviderRoutingTest {
     @Test
     fun badgesAndDriftersNames() {
         val badges = creatureProviderBadges(listOf(pinnedTask, autoTask, driftTask)) { t -> roles.first { it.id == t.roleId } }
-        assertEquals(CreatureProviderBadge(CreatureProviderRouting.Auto, null), badges["auto"])
+        assertEquals(CreatureProviderBadge(CreatureProviderRouting.Auto, null, autoRole.id.value), badges["auto"])
         assertEquals("openai", (badges.getValue("pinned").routing as CreatureProviderRouting.Pinned).providerId)
         // The drifter wears its own name, not "a2a:agent.example".
         assertEquals("Drifter", badges.getValue("drifter").pinnedName)

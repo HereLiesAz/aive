@@ -884,6 +884,7 @@ internal fun MindMapRunScreen(
                 objective = run.objective.takeIf { it != liveWorkflow.definition.name },
                 runNumber = runNumber,
                 activity = hiveActivity(run),
+                onEyebrowClick = LocalPlaceLinks.current.openKeeperPart?.let { open -> { open(KeeperSection.Projects) } },
             )
             val status = hiveStatusLine(liveWorkflow, activeTaskId, activity)
             GeministratorWorkflowMindMap(
