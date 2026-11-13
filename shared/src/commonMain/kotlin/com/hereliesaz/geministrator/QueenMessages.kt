@@ -104,6 +104,10 @@ private fun voiceResource(voice: QueenVoice): StringResource = when (voice) {
         QueenVoice.MissingBlocker -> Res.string.queen_say_missing_blocker
         QueenVoice.FinishedBlockersOpen -> Res.string.queen_say_finished_blockers_open
         QueenVoice.SuggestTrainSpecialist -> Res.string.queen_say_suggest_train_specialist
+        // Blockers found or made in the middle of a run.
+        QueenVoice.BlockerAddedQueen -> Res.string.queen_say_blocker_added_queen
+        QueenVoice.BlockerAddedNanny -> Res.string.queen_say_blocker_added_nanny
+        QueenVoice.BlockerMade -> Res.string.queen_say_blocker_made
 }
 
 @Composable
@@ -146,6 +150,7 @@ internal fun queenTitle(note: QueenNote): String = stringResource(
         QueenVoice.StatusWorking, QueenVoice.StatusWorkingClear, QueenVoice.StatusIdle, QueenVoice.StatusIdleClear -> Res.string.queen_title_status
         QueenVoice.FinishedAll, QueenVoice.FinishedAllCost, QueenVoice.FinishedFailed,
         QueenVoice.FinishedFailedNoStep, QueenVoice.FinishedStopped, QueenVoice.FinishedNotReached, QueenVoice.FinishedBlockersOpen -> Res.string.queen_title_finish
+        QueenVoice.BlockerMade -> Res.string.queen_title_blocker_made
         QueenVoice.TrainingOffer, QueenVoice.TrainingStopped, QueenVoice.TrainingNeedsYou, QueenVoice.TrainingAdopted -> Res.string.queen_title_training
         else -> when (note.relay) {
             QueenRelay.Waits -> Res.string.queen_title_waits
@@ -211,6 +216,7 @@ internal fun QueenSays(
                             QueenQuoteLabel.Objection -> Res.string.queen_quote_objection
                             QueenQuoteLabel.StillMissing -> Res.string.queen_quote_still_missing
                             QueenQuoteLabel.QueenWording -> Res.string.queen_quote_queen_wording
+                            QueenQuoteLabel.NowMade -> Res.string.queen_quote_now_made
                         },
                     ),
                     style = AzphaltType.eyebrow,

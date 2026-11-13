@@ -5,14 +5,21 @@ import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
+import com.hereliesaz.geministrator.domain.isTerminal
 import com.hereliesaz.geministrator.orchestration.OrchestrationPlan
 import com.hereliesaz.geministrator.template.BuiltInTemplates
 import com.hereliesaz.geministrator.template.StepInstantiation
 import com.hereliesaz.geministrator.template.TemplateCatalog
 import com.hereliesaz.geministrator.template.TemplateKind
 import com.hereliesaz.geministrator.workflow.WorkflowGraphValidator
+import com.hereliesaz.geministrator.workflow.WorkflowRunFactory
 import com.hereliesaz.geministrator.workflow.humanReadable
+import com.russhwolf.settings.Settings
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.Json
 
 /*
  * Blockers (docs/Step-Templates.md). A blocker is something that has to be created or obtained for THIS hive to be
@@ -26,6 +33,9 @@ import kotlinx.serialization.Serializable
 
 enum class BlockerState { Open, InProgress, Done, Dropped }
 
+/** Who put a blocker on the hive, so Messages can say it in plain words. */
+enum class BlockerOrigin { Planner, Queen, Nanny, Keeper }
+
 @Serializable
 data class Blocker(
     val id: String,
@@ -36,6 +46,9 @@ data class Blocker(
     /** The step of the swarm that makes it, once there is one. */
     val stepId: String? = null,
     val state: BlockerState = BlockerState.Open,
+    val origin: BlockerOrigin = BlockerOrigin.Planner,
+    /** The step that is waiting on this blocker (a step held for an input it does not have); its Needs tab is where the keeper can supply it. */
+    val forStep: String? = null,
 ) {
     /** True while the hive is held: the blocker is open or being made. */
     val unmet: Boolean get() = state == BlockerState.Open || state == BlockerState.InProgress
@@ -94,6 +107,8 @@ object Blockers {
         templateId: String?,
         stepId: String?,
         byKeeper: Boolean,
+        origin: BlockerOrigin? = null,
+        forStep: String? = null,
     ): List<Blocker> {
         val line = cleanSentence(sentence)
         if (line.isBlank() || existing.size >= MAX) return existing
@@ -105,7 +120,14 @@ object Blockers {
             while ("b$n" in taken) n++
             chosen = "b$n"
         }
-        return existing + Blocker(chosen, line, startingTemplate(templateId, byKeeper), stepId?.trim()?.takeIf { it.isNotEmpty() })
+        return existing + Blocker(
+            id = chosen,
+            sentence = line,
+            templateId = startingTemplate(templateId, byKeeper),
+            stepId = stepId?.trim()?.takeIf { it.isNotEmpty() },
+            origin = origin ?: if (byKeeper) BlockerOrigin.Keeper else BlockerOrigin.Planner,
+            forStep = forStep?.trim()?.takeIf { it.isNotEmpty() },
+        )
     }
 
     /** [existing] with blocker [id] in [state]; unchanged when there is none. The keeper's mark (Done, Dropped) holds. */
@@ -119,8 +141,8 @@ object Blockers {
      */
     fun resolved(blockers: List<Blocker>, definition: WorkflowDefinition, run: WorkflowRun): List<Blocker> =
         blockers.map { blocker ->
-            val stepId = blocker.stepId
-            if (blocker.state == BlockerState.Done || blocker.state == BlockerState.Dropped || stepId == null) return@map blocker
+            if (blocker.state == BlockerState.Done || blocker.state == BlockerState.Dropped) return@map blocker
+            val stepId = blocker.stepId ?: return@map resolvedWithoutStep(blocker, definition, run)
             if (definition.tasks.none { it.id.value == stepId }) return@map blocker
             val status = run.taskRuns.values.firstOrNull { it.taskDefinitionId.value == stepId }?.status
             val state = when (status) {
@@ -131,6 +153,55 @@ object Blockers {
             }
             blocker.copy(state = state)
         }
+
+    /**
+     * A blocker with no step of its own is resolved by what the creatures hand in: the step that was waiting on it
+     * ([Blocker.forStep]) is no longer held for the input, or a finished step made from its starting template has output.
+     */
+    private fun resolvedWithoutStep(blocker: Blocker, definition: WorkflowDefinition, run: WorkflowRun): Blocker {
+        val forStep = blocker.forStep
+        if (forStep != null) {
+            val waiting = run.taskRuns.values.firstOrNull { it.taskDefinitionId.value == forStep } ?: return blocker
+            val stillHeld = waiting.blockingReason?.code == WorkflowRunFactory.CONTRACT_INPUT_MISSING
+            return if (stillHeld) blocker else blocker.copy(state = BlockerState.Done)
+        }
+        val templateId = blocker.templateId ?: return blocker
+        val made = definition.tasks.any { task ->
+            task.contract?.template?.id == templateId &&
+                run.taskRuns[task.id]?.let { it.status == TaskRunStatus.Completed && it.artifacts.isNotEmpty() } == true
+        }
+        return if (made) blocker.copy(state = BlockerState.Done) else blocker
+    }
+
+    /**
+     * The queen's own addition in the middle of a run: a step held because a required input has no value means something
+     * this hive needs is missing. One blocker per such step, never re-added (not even after the keeper dropped it); the
+     * step's own Needs tab is where it is changed. No model.
+     */
+    fun fromHeldSteps(existing: List<Blocker>, definition: WorkflowDefinition, run: WorkflowRun): List<Blocker> =
+        definition.tasks.fold(existing) { acc, task ->
+            val taskRun = run.taskRuns[task.id] ?: return@fold acc
+            if (taskRun.blockingReason?.code != WorkflowRunFactory.CONTRACT_INPUT_MISSING || taskRun.status.isTerminal()) return@fold acc
+            val needs = task.contract?.let(StepInstantiation::missingInputs).orEmpty()
+            if (needs.isEmpty() || acc.any { it.forStep == task.id.value }) return@fold acc
+            add(acc, "", queenText(task.name, 60) + " needs its " + needs.joinToString(", "), null, null, byKeeper = false, origin = BlockerOrigin.Queen, forStep = task.id.value)
+        }
+
+    /** A Nanny finding whose subject starts with this names something the hive needs: its observation is the sentence. */
+    const val NANNY_PREFIX = "missing:"
+
+    /** The Nanny's findings that name something missing, added once each (also not after the keeper dropped it). */
+    fun fromNannyFindings(existing: List<Blocker>, findings: List<NannyFinding>): List<Blocker> =
+        findings.fold(existing) { acc, finding ->
+            if (!finding.subject.trim().startsWith(NANNY_PREFIX, ignoreCase = true)) return@fold acc
+            val line = cleanSentence(finding.observation)
+            if (line.isBlank() || acc.any { it.sentence.equals(line, ignoreCase = true) }) return@fold acc
+            add(acc, "", line, null, null, byKeeper = false, origin = BlockerOrigin.Nanny)
+        }
+
+    /** The blockers as the run stands now: what the queen and the Nanny found added, then what the creatures made resolved. */
+    fun live(existing: List<Blocker>, definition: WorkflowDefinition, run: WorkflowRun, findings: List<NannyFinding>): List<Blocker> =
+        resolved(fromNannyFindings(fromHeldSteps(existing, definition, run), findings), definition, run)
 
     /** The blockers that still hold the hive. */
     fun unmet(blockers: List<Blocker>): List<Blocker> = blockers.filter { it.unmet }
@@ -178,16 +249,67 @@ object Blockers {
 }
 
 /**
- * What she says once in Messages about each blocker still unmet: the sentence is the existing "something is missing", with
- * the blocker's own words on a quoted line, linking to its step when it has one, else to the Story. Stable ids.
+ * What she says once in Messages about each blocker: one still unmet is said as what is missing (in her own words when she
+ * or the Nanny found it in the middle of the run), one the creatures have made as made. The blocker's own words are on a
+ * quoted line, never in her sentence. A blocker links to its step when it has one, else to the step that waits on it (its
+ * Needs tab), else to the Story. Stable ids.
  */
 internal fun blockerNotes(runId: String, definition: WorkflowDefinition, run: WorkflowRun, blockers: List<Blocker>): List<QueenNote> =
-    Blockers.unmet(Blockers.resolved(blockers, definition, run)).map { blocker ->
-        val step = blocker.stepId?.takeIf { id -> definition.tasks.any { it.id.value == id } }
-        QueenNote(
-            id = queenNoteId(runId, "missing", "blocker", blocker.id, blocker.state.name),
-            voice = QueenVoice.MissingBlocker,
-            link = if (step != null) QueenLink.Creature(step, CreatureTab.Work) else QueenLink.Story,
-            quotes = listOf(QueenQuote(QueenQuoteLabel.StillMissing, queenQuoteText(blocker.sentence, Blockers.MAX_SENTENCE))),
-        )
+    Blockers.resolved(blockers, definition, run).mapNotNull { blocker ->
+        val has = { id: String? -> id != null && definition.tasks.any { it.id.value == id } }
+        val link = when {
+            has(blocker.stepId) -> QueenLink.Creature(blocker.stepId.orEmpty(), CreatureTab.Work)
+            has(blocker.forStep) -> QueenLink.Creature(blocker.forStep.orEmpty(), CreatureTab.Needs)
+            else -> QueenLink.Story
+        }
+        val text = queenQuoteText(blocker.sentence, Blockers.MAX_SENTENCE)
+        when {
+            blocker.state == BlockerState.Done -> QueenNote(
+                id = queenNoteId(runId, "missing", "blocker", blocker.id, blocker.state.name),
+                voice = QueenVoice.BlockerMade,
+                link = link,
+                quotes = listOf(QueenQuote(QueenQuoteLabel.NowMade, text)),
+            )
+            blocker.unmet -> QueenNote(
+                id = queenNoteId(runId, "missing", "blocker", blocker.id, blocker.state.name),
+                voice = when (blocker.origin) {
+                    BlockerOrigin.Queen -> QueenVoice.BlockerAddedQueen
+                    BlockerOrigin.Nanny -> QueenVoice.BlockerAddedNanny
+                    BlockerOrigin.Planner, BlockerOrigin.Keeper -> QueenVoice.MissingBlocker
+                },
+                link = link,
+                quotes = listOf(QueenQuote(QueenQuoteLabel.StillMissing, text)),
+            )
+            else -> null
+        }
     }
+
+/** What the app keeps of every run's blockers across a restart: one JSON value, run id to its blockers. Unreadable reads as none. */
+object BlockerBook {
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    private val serializer = MapSerializer(String.serializer(), ListSerializer(Blocker.serializer()))
+
+    fun encode(book: Map<String, List<Blocker>>): String = json.encodeToString(serializer, book)
+
+    fun decode(text: String?): Map<String, List<Blocker>> {
+        if (text.isNullOrBlank()) return emptyMap()
+        return try {
+            json.decodeFromString(serializer, text)
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
+}
+
+/** [BlockerBook] in a Settings store (the one the workflow persistence keeps beside the runs). Callers hand it a store that may hold long values. */
+class BlockerStore(private val settings: Settings, private val key: String = DEFAULT_KEY) {
+    fun load(): Map<String, List<Blocker>> = BlockerBook.decode(settings.getStringOrNull(key))
+
+    fun save(book: Map<String, List<Blocker>>) {
+        settings.putString(key, BlockerBook.encode(book))
+    }
+
+    companion object {
+        const val DEFAULT_KEY = "aive.blockers.v1"
+    }
+}

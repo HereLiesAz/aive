@@ -2089,6 +2089,11 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_say_missing_blocker">The hive is not complete: this still has to be made or obtained.</string>
     <string name="queen_say_finished_blockers_open">The swarm finished, but I cannot call the hive reached: %1$s of the things it needs have not been made or obtained yet.</string>
     <string name="queen_say_finished_not_reached">The swarm finished, but I cannot call the hive reached: %1$s of %2$s signs are not met. Step %3$s (%4$s) is where to look.</string>
+    <string name="queen_say_blocker_added_queen">I found something this hive needs that nobody has made or obtained yet, so I added it to what the hive needs. The hive is not reached until it is made or obtained.</string>
+    <string name="queen_say_blocker_added_nanny">The Nanny found something this hive needs that nobody has made or obtained yet, so I added it to what the hive needs. The hive is not reached until it is made or obtained.</string>
+    <string name="queen_say_blocker_made">One of the things the hive needed has been made or obtained. It no longer holds the hive.</string>
+    <string name="queen_title_blocker_made">Something the hive needed is made</string>
+    <string name="queen_quote_now_made">What is now made or obtained, quoted:</string>
 
     <!-- Step templates: a step is a task for a creature with a contract around it (docs/Step-Templates.md). -->
     <string name="build_add_from_templates">STEPS FOR A CREATURE</string>

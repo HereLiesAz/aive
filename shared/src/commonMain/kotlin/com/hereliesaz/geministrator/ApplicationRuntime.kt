@@ -253,13 +253,60 @@ class ApplicationRuntime private constructor(
         while (hiveSignBook.size > 32) hiveSignBook.remove(hiveSignBook.keys.first())
     }
 
-    /** What each run's hive still needs created or obtained (memory only; see queen/Blockers.kt). */
+    /**
+     * What each run's hive still needs created or obtained (see queen/Blockers.kt). Kept in memory and written to the workflow
+     * persistence's own durable settings at every change, so it survives a restart; read back once, the first time it is asked.
+     */
     private val blockerBook = LinkedHashMap<String, List<com.hereliesaz.geministrator.queen.Blocker>>()
+    private var blockerBookLoaded = false
+    private val blockerStore: com.hereliesaz.geministrator.queen.BlockerStore by lazy {
+        com.hereliesaz.geministrator.queen.BlockerStore(
+            com.hereliesaz.geministrator.persistence.ChunkedStringSettings.unbounded(persistence.inferenceSettings),
+        )
+    }
+
+    private fun loadBlockerBook() {
+        if (blockerBookLoaded) return
+        blockerBookLoaded = true
+        try {
+            blockerStore.load().forEach { (runId, blockers) -> if (runId !in blockerBook) blockerBook[runId] = blockers }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            // Unreadable blockers read as none; the run itself is untouched.
+        }
+    }
+
+    private fun storeBlockers(runId: String, blockers: List<com.hereliesaz.geministrator.queen.Blocker>) {
+        loadBlockerBook()
+        blockerBook[runId] = blockers
+        while (blockerBook.size > 32) blockerBook.remove(blockerBook.keys.first())
+        try {
+            blockerStore.save(blockerBook)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            // Not saved this time; the next change writes it again.
+        }
+    }
 
     internal fun rememberBlockers(runId: String, blockers: List<com.hereliesaz.geministrator.queen.Blocker>) {
         if (blockers.isEmpty()) return
-        blockerBook[runId] = blockers
-        while (blockerBook.size > 32) blockerBook.remove(blockerBook.keys.first())
+        storeBlockers(runId, blockers)
+    }
+
+    /**
+     * The run's blockers as the run stands now: what the queen and the Nanny found in the middle of it added, what its
+     * creatures made resolved (see [com.hereliesaz.geministrator.queen.Blockers.live]). Saved when it changed.
+     */
+    private fun refreshBlockers(definition: WorkflowDefinition, run: WorkflowRun): List<com.hereliesaz.geministrator.queen.Blocker> {
+        loadBlockerBook()
+        val before = blockerBook[run.id.value].orEmpty()
+        val after = com.hereliesaz.geministrator.queen.Blockers.live(
+            before, definition, run, com.hereliesaz.geministrator.queen.nannyFindings(definition, run),
+        )
+        if (after != before) storeBlockers(run.id.value, after)
+        return after
     }
 
     /** What she says about disputes she could not settle herself, per run (memory only; derived into Messages at each publish). */
@@ -1562,7 +1609,7 @@ class ApplicationRuntime private constructor(
                 disputes = queenDisputes[run.id.value].orEmpty(),
                 stalledForMinutes = queenStalled[run.id.value],
                 hiveSigns = hiveSignBook[run.id.value].orEmpty(),
-                blockers = blockerBook[run.id.value].orEmpty(),
+                blockers = refreshBlockers(definition, run),
                 suggestions = if (run.globalPause == null && run.spendPause == null) {
                     queenSuggestionNotes(queenProposals, run)
                 } else {
