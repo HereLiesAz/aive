@@ -429,9 +429,10 @@ internal fun TechnicalInspector(
                         label = stringResource(Res.string.inspector_raise_budget),
                         seed = "raise-budget-$selectedTaskId",
                         onClick = {
-                            val open = placeLinks.openRole
                             val roleId = taskRun.assignedRoleId?.value
-                            if (open != null && roleId != null) open(roleId) else onTabChange(CreatureTab.Mind)
+                            if (roleId == null || !placeLinks.openRoleAt(roleId, RoleField.TokenBudget)) {
+                                onTabChange(CreatureTab.Mind)
+                            }
                         },
                         modifier = Modifier.fillMaxWidth(),
                     )

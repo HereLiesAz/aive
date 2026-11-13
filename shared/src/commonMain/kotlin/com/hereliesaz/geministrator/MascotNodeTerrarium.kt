@@ -906,8 +906,11 @@ private fun MascotNodeTerrarium(
                             .then(
                                 // Its Source is chosen on its role: the badge opens that role in the Roster.
                                 badge.roleId?.let { id ->
-                                    LocalPlaceLinks.current.openRole?.let { open ->
-                                        Modifier.clickable(role = Role.Button) { open(id) }
+                                    val links = LocalPlaceLinks.current
+                                    if (links.open != null || links.openRole != null) {
+                                        Modifier.clickable(role = Role.Button) { links.openRoleAt(id, RoleField.Source) }
+                                    } else {
+                                        null
                                     }
                                 } ?: Modifier,
                             )

@@ -673,12 +673,22 @@ fun App(
             taskId = selectedTaskId.orEmpty(),
             tab = if (selectedTaskId != null) DurableUiState.store.getString("creature.panel.tab").orEmpty() else "",
         )
-        // The one way to go to a place: it records where the keeper was, creature and tab included.
-        fun navigate(target: ControlRoomDestination) {
-            if (target == destination) return
-            navigationHistory = historyAfterNavigate(navigationHistory, hereEntry(), target)
-            destinationName = target.name
-            if (target != ControlRoomDestination.Overview) selectedTaskIdValue = ""
+        // The one way to go anywhere (Destination.kt): it records where the keeper was, creature and tab included,
+        // lands on the destination's place, and hands the rest (the Keeper's room part, the role, the creature)
+        // to the control room.
+        fun navigate(target: Destination) {
+            if (target !is Destination.Place) PendingDestination.request = target
+            val place = target.place
+            if (place == destination) return
+            navigationHistory = historyAfterNavigate(navigationHistory, hereEntry(), place)
+            destinationName = place.name
+            if (place != ControlRoomDestination.Overview) selectedTaskIdValue = ""
+        }
+        // The MCP consent question, set aside while the keeper looks at the server's row in Connections: it stays
+        // pending and comes back on leaving the Keeper's room.
+        var consentPeek by remember { mutableStateOf(false) }
+        LaunchedEffect(destination, mcpConsent) {
+            if (destination != ControlRoomDestination.Settings) consentPeek = false
         }
         val taskInspectorVisible = selectedTaskId != null &&
             destination == ControlRoomDestination.Overview
@@ -711,7 +721,7 @@ fun App(
                 azphaltPackageImportRequest != null &&
                 destination != ControlRoomDestination.AddOns
             ) {
-                navigate(ControlRoomDestination.AddOns)
+                navigate(Destination.Place(ControlRoomDestination.AddOns))
             }
         }
 
@@ -890,13 +900,22 @@ fun App(
         ) {
             Scaffold { paddingValues ->
               Box(modifier = Modifier.fillMaxSize()) {
-                mcpConsent?.let { McpConsentDialog(it) }
+                mcpConsent?.let {
+                    McpConsentDialog(
+                        gate = it,
+                        hidden = consentPeek && destination == ControlRoomDestination.Settings,
+                        onOpenServer = {
+                            consentPeek = true
+                            navigate(Destination.KeeperPart(KeeperSection.Connections))
+                        },
+                    )
+                }
                 mcpElicitation?.let { McpElicitationDialog(it) }
                 BoxWithConstraints(modifier = Modifier.fillMaxSize().launchBackdrop(launching)) {
                     ControlRoom(
                         destination = destination,
                         destinations = destinations,
-                        onDestinationSelected = { target -> navigate(target) },
+                        onDestinationSelected = { target -> navigate(Destination.Place(target)) },
                         selectedTaskId = selectedTaskId,
                         onTaskSelected = { taskId ->
                             selectedTaskIdValue = if (selectedTaskId == taskId) "" else taskId

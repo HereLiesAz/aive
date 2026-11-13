@@ -53,6 +53,7 @@ import com.hereliesaz.geministrator.resources.mcp_consent_allow_always
 import com.hereliesaz.geministrator.resources.mcp_consent_allow_run
 import com.hereliesaz.geministrator.resources.mcp_consent_body
 import com.hereliesaz.geministrator.resources.mcp_consent_deny
+import com.hereliesaz.geministrator.resources.mcp_consent_open_server
 import com.hereliesaz.geministrator.resources.mcp_consent_title
 import com.hereliesaz.geministrator.resources.mcp_remove_body
 import com.hereliesaz.geministrator.resources.mcp_remove_title
@@ -352,9 +353,16 @@ private fun ResearchRow(research: com.hereliesaz.geministrator.research.Research
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun McpConsentDialog(gate: PromptingMcpConsentGate) {
+internal fun McpConsentDialog(
+    gate: PromptingMcpConsentGate,
+    /** True while the keeper looks at the server's row in Connections: the question stays pending, out of the way. */
+    hidden: Boolean = false,
+    /** Opens the server's row in Connections (the one place it is changed); null leaves the name as plain text. */
+    onOpenServer: (() -> Unit)? = null,
+) {
     val request by gate.pending.collectAsState()
     val current = request ?: return
+    if (hidden) return
     MaterialTheme(colorScheme = GeministratorColors) {
         AlertDialog(
             onDismissRequest = { gate.answer(McpConsentDecision.Deny) },
@@ -364,17 +372,25 @@ internal fun McpConsentDialog(gate: PromptingMcpConsentGate) {
             shape = RoundedCornerShape(AzphaltShapes.dialogCorner),
             title = { Text(stringResource(Res.string.mcp_consent_title, current.serverName), fontWeight = FontWeight.Black) },
             text = {
-                // A long argument scrolls inside the dialog, so the three answers always stay on screen.
-                Text(
-                    modifier = Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
-                    text = stringResource(
-                        Res.string.mcp_consent_body,
-                        current.toolName,
-                        current.serverName,
-                        current.serverLocation,
-                        current.argumentsPreview,
-                    ),
-                )
+                Column {
+                    // A long argument scrolls inside the dialog, so the three answers always stay on screen.
+                    Text(
+                        modifier = Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState()),
+                        text = stringResource(
+                            Res.string.mcp_consent_body,
+                            current.toolName,
+                            current.serverName,
+                            current.serverLocation,
+                            current.argumentsPreview,
+                        ),
+                    )
+                    // The server's own row, with its switches, is where "always allow" is kept and changed.
+                    LinkText(
+                        stringResource(Res.string.mcp_consent_open_server, current.serverName),
+                        onClick = onOpenServer,
+                        color = Azphalt.Ink.onOpposite(),
+                    )
+                }
             },
             confirmButton = {
                 Button(

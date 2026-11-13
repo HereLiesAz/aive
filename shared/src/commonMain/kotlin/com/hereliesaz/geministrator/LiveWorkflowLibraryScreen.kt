@@ -117,7 +117,13 @@ internal fun LiveWorkflowLibraryScreen(
     var tabNameValue by rememberDurableStringState(WorkflowLibraryKeys.TAB, WorkflowLibraryTab.Library.name)
     var selectedKeyValue by rememberDurableStringState(WorkflowLibraryKeys.SELECTED_KEY)
     val tabState = WorkflowLibraryTabState(tabNameValue, selectedKeyValue)
-    val tab = tabState.resolvedTab(canSave)
+    // The Store is one place (AZPHALT STORE, with Sources connect and disconnect); this tab goes there rather than
+    // keep a second copy. Without a link to follow (a preview), it still shows the Store in place.
+    val openPlace = LocalPlaceLinks.current.openPlace
+    val storeIsLink = openPlace != null
+    val tab = tabState.resolvedTab(canSave).let { resolved ->
+        if (resolved == WorkflowLibraryTab.Store && storeIsLink) WorkflowLibraryTab.Library else resolved
+    }
     val selectedKey = selectedKeyValue.takeIf(String::isNotBlank)
     val applyTabState: (WorkflowLibraryTabState) -> Unit = { next ->
         tabNameValue = next.tabName
@@ -125,7 +131,7 @@ internal fun LiveWorkflowLibraryScreen(
     }
 
     LaunchedEffect(azphaltPackageImportRequest?.requestId) {
-        if (azphaltPackageImportRequest != null) {
+        if (azphaltPackageImportRequest != null && !storeIsLink) {
             tabNameValue = WorkflowLibraryTab.Store.name
         }
     }
@@ -317,7 +323,12 @@ internal fun LiveWorkflowLibraryScreen(
                 },
                 selectedKey = tab.name,
                 onSelected = { name ->
-                    WorkflowLibraryTab.fromName(name)?.let { applyTabState(tabState.selectTab(it, canSave)) }
+                    val picked = WorkflowLibraryTab.fromName(name)
+                    if (picked == WorkflowLibraryTab.Store && openPlace != null) {
+                        openPlace(ControlRoomDestination.AddOns)
+                    } else {
+                        picked?.let { applyTabState(tabState.selectTab(it, canSave)) }
+                    }
                 },
                 seedPrefix = "workflow-tab",
             )

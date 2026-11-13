@@ -35,8 +35,14 @@ internal object ConnectionsRequests {
 internal object RosterRequests {
     var roleId: String? by mutableStateOf(null)
 
+    /** The field of that role's form a link named (its budget, its Source), focused once the form is open. */
+    var field: RoleField? by mutableStateOf(null)
+
     /** Takes the pending role id, leaving none. */
     fun take(): String? = roleId.also { roleId = null }
+
+    /** Takes the pending field, leaving none. */
+    fun takeField(): RoleField? = field.also { field = null }
 }
 
 /** Set by a link to the swarm editor (the Edit view); the terrarium opens Edit with it and takes it. */
@@ -137,7 +143,23 @@ internal class PlaceLinks(
     val openKeeperPart: ((KeeperSection) -> Unit)? = null,
     /** Opens a whole place: the Roster, the Stable, the Store, Messages, the Swarm library. */
     val openPlace: ((ControlRoomDestination) -> Unit)? = null,
+    /** The one route to any [Destination]; the typed links above all go through it in the control room. */
+    val open: ((Destination) -> Unit)? = null,
 )
+
+/**
+ * Opens [roleId]'s form in the Roster with [field] focused, through whichever link this screen has; false when it has
+ * none, so the caller can fall back to the creature's Mind.
+ */
+internal fun PlaceLinks.openRoleAt(roleId: String, field: RoleField?): Boolean {
+    val route = open
+    val legacy = openRole
+    return when {
+        route != null -> { route(Destination.Role(roleId, field)); true }
+        legacy != null -> { legacy(roleId); true }
+        else -> false
+    }
+}
 
 internal val LocalPlaceLinks = staticCompositionLocalOf { PlaceLinks() }
 
