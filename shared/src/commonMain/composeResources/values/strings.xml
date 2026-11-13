@@ -500,7 +500,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_why_nothing_tests">nothing tests or checks %1$s yet</string>
     <string name="hive_why_nothing_feeds_builder">nothing feeds %1$s yet, and a planner could hand it a plan</string>
     <string name="hive_why_nothing_feeds_checker">%1$s has nothing to check yet, and someone has to do the work first</string>
-    <string name="hive_why_no_orchestrator">%1$s creatures and no orchestrator to keep them in order</string>
+    <string name="hive_why_no_orchestrator">%1$s creatures and no queen to keep them in order</string>
     <string name="hive_fn_researcher">a researcher</string>
     <string name="hive_fn_planner">a planner</string>
     <string name="hive_fn_environment">an environment planner</string>
@@ -634,17 +634,17 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="improvement_source_queen">from the queen</string>
     <string name="queen_title_suggestion">A suggestion from the queen</string>
     <string name="queen_say_suggest_redo_step">Step %3$s has failed %4$s times, and it builds on step %1$s (%2$s). I can count the failures but I cannot tell which step is at fault. I can redo step %1$s and everything after it; finished work before it stays.</string>
-    <string name="queen_say_suggest_swap_source">Step %1$s (%2$s) moved to another Source after the first one failed. Later steps may use the first one too. You change a creature\'s Source on its Mind, and the change applies from the next run.</string>
+    <string name="queen_say_suggest_swap_source">Step %1$s (%2$s) moved to another Source after the first one failed. Later steps may use the first one too. You change a creature's Source on its Mind, and the change applies from the next run.</string>
     <string name="queen_say_suggest_raise_budget">The %1$s has used %2$s percent of its token budget and still has steps to do. Raising its budget on its Mind now avoids a stop.</string>
-    <string name="queen_say_suggest_raise_allowance">This run has counted %1$s percent of its %2$s allowance, and many steps are still to do. You can change the allowance in the Keeper\'s room.</string>
-    <string name="queen_say_suggest_rest_nanny">The nanny\'s report is with a second creature for checking. I can rest the swarm until that is settled: what is running finishes, nothing new starts, and you can resume it.</string>
-    <string name="queen_say_suggest_nanny_finding">The Nanny found something about step %1$s (%2$s): another Source may serve it better. She works for the next run, and I am passing it on now so you can decide. You change a creature\'s Source on its Mind, and the change applies from the next run.</string>
+    <string name="queen_say_suggest_raise_allowance">This run has counted %1$s percent of its %2$s allowance, and many steps are still to do. You can change the allowance in the Keeper's room.</string>
+    <string name="queen_say_suggest_rest_nanny">The nanny's report is with a second creature for checking. I can rest the swarm until that is settled: what is running finishes, nothing new starts, and you can resume it.</string>
+    <string name="queen_say_suggest_nanny_finding">The Nanny found something about step %1$s (%2$s): another Source may serve it better. She works for the next run, and I am passing it on now so you can decide. You change a creature's Source on its Mind, and the change applies from the next run.</string>
     <string name="queen_say_watch_stalled">Nothing has moved for %1$s minutes, no creature is working, and nothing waits on you. I am still watching. The Story shows where it stopped, and you can rest the swarm.</string>
     <string name="queen_say_watch_repeated_block">%1$s steps are blocked for the same reason (%2$s). Fixing it once may free them all; start with step %3$s.</string>
     <string name="queen_say_suggest_add_check">Step %1$s (%2$s) has failed several times after earlier work finished. A check between them would catch it sooner. This swarm keeps running as it is; I can keep the idea for next time.</string>
     <string name="queen_say_suggest_split_step">Step %1$s (%2$s) keeps failing or running out of time. It may be too big for one creature. This swarm keeps running as it is; I can keep the idea of splitting it for next time.</string>
     <string name="queen_say_suggest_reorder_steps">Several steps are blocked for the same reason, starting with step %1$s (%2$s). A different order may avoid it. This swarm keeps running as it is; I can keep the idea for next time.</string>
-    <string name="queen_say_suggest_train_specialist">The %1$s role has been used %2$s times in one project. A specialist for that kind of work may do it better. Open the Roster and start training from the role\'s entry; nothing is adopted without your approval.</string>
+    <string name="queen_say_suggest_train_specialist">The %1$s role has been used %2$s times in one project. A specialist for that kind of work may do it better. Open the Roster and start training from the role's entry; nothing is adopted without your approval.</string>
     <string name="queen_say_suggest_add_approval">Step %1$s (%2$s) can change things, has no approval in front of it, and has failed more than once. An approval before it would let you look first. This swarm keeps running as it is; I can keep the idea for next time.</string>
     <string name="queen_suggest_keep">Keep for next time</string>
     <string name="queen_say_suggest_reword_step">Step %1$s (%2$s) has not started. I would give it this job instead. Nothing changes until you accept.</string>
@@ -652,7 +652,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_suggest_accept">Go ahead</string>
     <string name="queen_suggest_dismiss">No thanks</string>
     <string name="queen_suggest_outside">Based on content from outside. Look before you accept.</string>
-    <string name="queen_suggest_confirm_title">Go ahead with the queen\'s suggestion?</string>
+    <string name="queen_suggest_confirm_title">Go ahead with the queen's suggestion?</string>
     <string name="queen_suggest_confirm_body">This changes the swarm that is running. Finished work before the step stays; the step and what follows it start again.</string>
     <string name="queen_suggest_nothing_changed">That suggestion no longer applies, or was already decided. Nothing changed.</string>
     <string name="improvement_status_superseded">Superseded</string>
@@ -1917,7 +1917,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="terrarium_could_not_stage_workflow_edit">Could not stage swarm edit.</string>
     <string name="focus_creature">Creature</string>
     <string name="focus_neighbours">Neighbours</string>
-    <string name="focus_path_orchestrator">Path to the orchestrator</string>
+    <string name="focus_path_orchestrator">Path to the queen</string>
     <string name="focus_path_end">Path to the end goal</string>
     <string name="focus_path_active">Path to the active step</string>
     <string name="focus_path_blocks">Path to the blocks</string>
@@ -2014,7 +2014,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="creature_taking_longer">Taking longer than expected (allowed %1$s min)</string>
     <string name="inspector_time">TIME</string>
     <string name="queen_title_watch">The queen noticed something</string>
-    <string name="queen_title_nanny">The nanny\'s report</string>
+    <string name="queen_title_nanny">The nanny's report</string>
     <string name="queen_title_allowance">The allowance</string>
     <string name="queen_title_missing">Something is missing</string>
     <string name="queen_title_dispute">A disagreement</string>
@@ -2050,8 +2050,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_phrase_budget_spent">raise the budget that holds step %1$s</string>
     <string name="queen_scope_model">one of your Sources</string>
     <string name="queen_scope_role">one kind of creature</string>
-    <string name="queen_scope_workflow">the swarm\'s shape</string>
-    <string name="queen_scope_swarm">the swarm\'s shape</string>
+    <string name="queen_scope_workflow">the swarm's shape</string>
+    <string name="queen_scope_swarm">the swarm's shape</string>
     <string name="queen_scope_orchestrationlayer">how I plan and hand out work</string>
     <string name="queen_scope_memorylayer">memory</string>
     <string name="queen_action_retain">keep as is</string>
@@ -2064,7 +2064,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_action_restructure">rebuild the structure</string>
     <string name="queen_action_benchmark">measure first</string>
     <string name="queen_review_line">Your review. I read her report on my own; recommendations are never applied automatically. Resume continues the frozen swarm once both of us have decided.</string>
-    <string name="queen_level_title">The queen\'s updates</string>
+    <string name="queen_level_title">The queen's updates</string>
     <string name="queen_level_description">How much the queen tells you in Messages. Neither level sends anything to a model: she only reports what the swarm itself shows.</string>
     <string name="queen_level_quiet">Quiet</string>
     <string name="queen_level_quiet_line">What needs you, why a swarm stopped, what the nanny or I noticed, and one note when it finishes.</string>
@@ -2101,7 +2101,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_say_missing_reviewer_no_room">I did not ask my reviewer to read the plan: the Source has no room for another request right now. I checked only what I can check myself. Connect another Source to give it room.</string>
     <string name="queen_say_missing_reviewer_no_second_source">I did not ask my reviewer to read the plan: I have one Source and it has no room right now. I checked only what I can check myself. A second Source would let my reviewer read it. Connect one.</string>
     <string name="queen_say_missing_blocker">The hive is not complete: this still has to be made or obtained.</string>
-    <string name="queen_say_suggest_nanny_template">The Nanny found a better wording for the %1$s template, from %2$s steps of evidence. She works for the next swarm, and I decided to pass it on now. If you go ahead I put it in the Improvement list in the Keeper\'s room, where you adopt it or not. Nothing that is running changes.</string>
+    <string name="queen_say_suggest_nanny_template">The Nanny found a better wording for the %1$s template, from %2$s steps of evidence. She works for the next swarm, and I decided to pass it on now. If you go ahead I put it in the Improvement list in the Keeper's room, where you adopt it or not. Nothing that is running changes.</string>
     <string name="queen_say_step_allowance_stopped">I stopped step %1$s (%2$s): it used %3$s of its %4$s tokens. I did not try it again, since another attempt would spend them again. You can give it a larger allowance in its job.</string>
     <string name="queen_say_finished_blockers_open">The swarm finished, but I cannot call the hive reached: %1$s of the things it needs have not been made or obtained yet.</string>
     <string name="queen_say_tutorial_lesson_failed">I could not write lesson %1$s correctly after %2$s tries. Open its creature to try again or change its Source.</string>
