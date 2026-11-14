@@ -246,7 +246,8 @@ class MemoryLineage(
         val settings = settings ?: return memoryOnly
         val raw = settings.getStringOrNull(key) ?: return MemoryLineageLog()
         if (raw == decodedFrom) return decoded
-        return SettingsMemoryStore.defaultJson.decodeFromString(MemoryLineageLog.serializer(), raw).also {
+        // A log saved before the limits existed is cut to them when it is read.
+        return SettingsMemoryStore.defaultJson.decodeFromString(MemoryLineageLog.serializer(), raw).capped().also {
             decodedFrom = raw
             decoded = it
         }
