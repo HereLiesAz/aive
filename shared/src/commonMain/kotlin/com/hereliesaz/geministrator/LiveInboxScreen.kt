@@ -706,7 +706,11 @@ internal fun messageCopy(
     presentation: LiveWorkflowPresentation,
 ): String = when (entry.kind) {
     InboxEntryKind.PlanApproval, InboxEntryKind.TaskApproval -> buildString {
-        append(taskRun.progressMessage?.takeIf(String::isNotBlank) ?: task.objective)
+        val progress = taskRun.progressMessage?.takeIf(String::isNotBlank)
+        // A sending step is approved on the recipient and the exact draft, which only its objective carries: the
+        // plan the Source wrote never replaces them.
+        val sending = task.contract?.template?.id?.let(com.hereliesaz.geministrator.template.SendingApprovals::isSending) == true
+        append(if (sending) listOfNotNull(task.objective, progress).joinToString("\n\n") else progress ?: task.objective)
         append("\n\n")
         append(stringResource(if (entry.kind == InboxEntryKind.PlanApproval) Res.string.inspector_hint_approve_plan else Res.string.inspector_hint_approve_task))
         (task.approvalPolicy as? ApprovalPolicy.RoleApproval)?.let {

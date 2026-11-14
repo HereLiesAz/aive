@@ -35,6 +35,17 @@ class ArtifactContractTest(unittest.TestCase):
         )
         self.assertEqual([], artifact_contract_violations("w.yml", text))
 
+    def test_adjacent_steps_without_blank_line_are_checked_individually(self):
+        text = (
+            "      - uses: actions/upload-artifact@abc\n"
+            "        with:\n"
+            "          name: present\n"
+            "      - uses: actions/download-artifact@abc\n"
+            "        with:\n"
+            "          name: missing\n"
+        )
+        self.assertEqual(1, len(artifact_contract_violations("w.yml", text)))
+
     def test_real_workflows_satisfy_contract(self):
         root = Path(__file__).resolve().parents[2] / ".github" / "workflows"
         for path in root.glob("*.yml"):

@@ -120,7 +120,7 @@ object SendingApprovals {
     /**
      * [tasks] with the sending step [taskId] split into one step per recipient: the first keeps its id and the rest get
      * the next free `id-2`, `id-3`, each with the same draft and its own recipient, and every step that waited on the
-     * original waits on all of them. Unchanged when the step is not a sending step or names at most one recipient.
+     * original waits on all of them. Unchanged when the step is not a sending step, names at most one recipient, or still lacks a shared input or its tool.
      */
     fun splitPerRecipient(tasks: List<TaskDefinition>, taskId: TaskDefinitionId): List<TaskDefinition> {
         val task = tasks.firstOrNull { it.id == taskId } ?: return tasks
@@ -128,6 +128,16 @@ object SendingApprovals {
         if (!isSending(contract.template.id)) return tasks
         val recipients = recipientsOf(contract.inputs[StepPresetsSending.RECIPIENTS_PORT].orEmpty())
         if (recipients.size <= 1) return tasks
+        // Split only once the shared configuration (draft, target, tool) is complete: the form is filled in the
+        // order recipients, draft, tool, and siblings made earlier would keep the blanks of that moment.
+        val template = BuiltInTemplates.byId[contract.template.id]
+        if (template != null) {
+            val incomplete = template.inputs.any {
+                it.required && it.name != StepPresetsSending.RECIPIENTS_PORT && contract.inputs[it.name].isNullOrBlank()
+            }
+            if (incomplete) return tasks
+            if (template.toolPick != ToolPick.None && contract.allowedTools.isEmpty()) return tasks
+        }
         val taken = tasks.mapTo(mutableSetOf()) { it.id.value }
         val wording = StepInstantiation.wordingOf(task.objective)
         val made = recipients.mapIndexed { index, recipient ->

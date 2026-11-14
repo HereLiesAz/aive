@@ -365,7 +365,11 @@ internal fun setTerrariumContractTool(
     val tools = listOfNotNull(tool.trim().takeIf(String::isNotEmpty))
     if (tools == contract.allowedTools) return TerrariumDependencyEditResult.NoChange
     val next = found.copy(contract = contract.copy(allowedTools = tools))
-    return TerrariumDependencyEditResult.Applied(definition.copy(tasks = definition.tasks.map { if (it.id == taskId) next else it }))
+    val replaced = definition.tasks.map { if (it.id == taskId) next else it }
+    // The tool may be the last piece a multi-recipient sending step was waiting for before it splits.
+    return TerrariumDependencyEditResult.Applied(
+        definition.copy(tasks = com.hereliesaz.geministrator.template.SendingApprovals.splitPerRecipient(replaced, taskId)),
+    )
 }
 
 /** Hold output: withhold the creature's artifacts from every consumer, or release them again. */

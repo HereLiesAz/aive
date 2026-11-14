@@ -55,6 +55,25 @@ object UiStateSettings {
     var separate: Settings? = null
 }
 
+/**
+ * Before the UI state had a settings file of its own it lived in the default one. When a platform gives it
+ * its own file, the first run moves the old entries over (drafts, applied-once markers, source opt-outs) and
+ * clears them from the default file, so an in-place upgrade loses nothing. Does nothing once the new file
+ * holds any UI state, or when the old one holds none.
+ */
+internal object UiStateMigration {
+    fun migrate(from: Settings, to: Settings, rootKey: String = DurableUiStateStore.ROOT_KEY) {
+        val prefix = "$rootKey."
+        val old = from.keys.filter { it.startsWith(prefix) }
+        if (old.isEmpty() || to.keys.any { it.startsWith(prefix) }) return
+        old.forEach { key ->
+            val value = runCatching { from.getStringOrNull(key) }.getOrNull() ?: return@forEach
+            to.putString(key, value)
+            from.remove(key)
+        }
+    }
+}
+
 internal object DurableUiState {
     val store: DurableUiStateStore =
         DurableUiStateStore(UiStateSettings.separate ?: Settings()).also {

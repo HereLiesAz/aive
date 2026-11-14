@@ -4,7 +4,7 @@ package com.hereliesaz.geministrator
  * The durable UI state survives upgrades, so "where I was" would otherwise carry an old build's screens into
  * a new one. The store remembers the major.minor of the build that last wrote it; when the running build's
  * differs, the navigation keys below are forgotten. Drafts, applied-once markers and every other key are user
- * data and stay.
+ * data and stay; so does the selected workflow's key (an unsaved draft is recovered through it).
  */
 internal object UiStateVersionGate {
     const val VERSION_KEY: String = "ui-state.app-version"
@@ -26,7 +26,6 @@ internal object UiStateVersionGate {
         "inbox.selected",
         "azphalt-store.selected-package",
         WorkflowLibraryKeys.TAB,
-        WorkflowLibraryKeys.SELECTED_KEY,
         WorkflowLibraryKeys.SELECTED_TASK_ID,
     )
 

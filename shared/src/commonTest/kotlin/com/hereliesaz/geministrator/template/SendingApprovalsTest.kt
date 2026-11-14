@@ -103,4 +103,25 @@ class SendingApprovalsTest {
         )
         assertEquals(listOf(other), SendingApprovals.splitPerRecipient(listOf(other), TaskDefinitionId("w")))
     }
+
+    @Test
+    fun aListOfRecipientsIsNotSplitUntilTheDraftAndToolAreIn() {
+        val noDraft = StepInstantiation.task(
+            email, email.base(), TaskDefinitionId("mail"), "Send an email", mapOf("recipients" to "a@x.org, b@x.org"), tool = "mail.send",
+        )
+        val noTool = StepInstantiation.task(
+            email, email.base(), TaskDefinitionId("mail"), "Send an email",
+            mapOf("recipients" to "a@x.org, b@x.org", "draft" to "Hi"),
+        )
+        assertEquals(listOf(noDraft), SendingApprovals.splitPerRecipient(listOf(noDraft), TaskDefinitionId("mail")))
+        assertEquals(listOf(noTool), SendingApprovals.splitPerRecipient(listOf(noTool), TaskDefinitionId("mail")))
+    }
+
+    @Test
+    fun aDraftTooLongToCarryWholeIsRefusedNotCut() {
+        val long = task("a@x.org", "x".repeat(StepInstantiation.MAX_INPUT_CHARS + 1)).contract!!
+        assertEquals(listOf("a draft of at most 4000 characters"), StepInstantiation.missingInputs(long))
+        val exact = task("a@x.org", "x".repeat(StepInstantiation.MAX_INPUT_CHARS)).contract!!
+        assertEquals(emptyList(), StepInstantiation.missingInputs(exact))
+    }
 }

@@ -128,7 +128,12 @@ object Requirements {
                     ?.let { "Step ${it.id} can change something and the goal came from outside." }
                 REVIEW_ID -> plan.steps.firstOrNull { s ->
                     com.hereliesaz.geministrator.template.Producibles.reviewable(s.templateId) &&
-                        plan.steps.none { r -> r.templateId == com.hereliesaz.geministrator.template.BuiltInTemplates.CHECK_WORK_ID && s.id in r.dependsOn }
+                        plan.steps.none { r ->
+                            r.templateId == com.hereliesaz.geministrator.template.BuiltInTemplates.CHECK_WORK_ID &&
+                                // An input bound to the step (@id.port) is a dependency too: instantiation adds it.
+                                (s.id in r.dependsOn ||
+                                    r.templateInputs.values.any { v -> com.hereliesaz.geministrator.template.StepInstantiation.boundTask(v)?.value == s.id })
+                        }
                 }?.let { "Step ${it.id} makes something to be reviewed and no check of the work follows it." }
                 "R-roles" -> plan.steps.firstOrNull { it.roleId !in inputs.availableRoleIds }?.let { "Step ${it.id} uses a role that is not available." }
                 "R-words" -> plan.steps.firstOrNull { s ->
