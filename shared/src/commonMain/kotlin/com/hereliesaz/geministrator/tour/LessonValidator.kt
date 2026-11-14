@@ -41,6 +41,9 @@ object LessonValidator {
     private val json = Json { isLenient = false }
     private val allowedKeys = setOf("target", "sentence", "expect", "explain", "ifMissed", "checkIn", "anotherWay", "smaller", "bridge")
 
+    /** The first reason the reply is not shaped like a lesson (rule L1), or null; it needs no registry. */
+    fun shapeProblem(text: String): String? = parse(text).second.firstOrNull()?.message
+
     fun validate(text: String, ctx: LessonContext): LessonValidation {
         val parsed = parse(text)
         val payload = parsed.first ?: return LessonValidation.Invalid(parsed.second)

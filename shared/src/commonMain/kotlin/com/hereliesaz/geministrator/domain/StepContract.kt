@@ -34,9 +34,13 @@ fun Set<StepEffect>.anyEffectful(): Boolean = any { it.isEffectful }
 fun Set<StepEffect>.mutatesConnectedSource(): Boolean =
     StepEffect.MutatesConnectedSource in this || StepEffect.DestructiveConnectedSource in this
 
-/** The type of one input port. [Any] accepts every artifact. */
+/**
+ * The type of one input port, which is the kind of output it takes. [Any] accepts every artifact. [Table] is comma-separated
+ * text. The kinds after [Any] are the ones the starting templates need (docs/Step-Templates.md, "Kinds of output"): each has a
+ * compiled check in the output registry, and [PortTypes.of] says which an output is.
+ */
 @Serializable
-enum class PortType { Text, Markdown, Html, Table, Research, Any }
+enum class PortType { Text, Markdown, Html, Table, Research, Any, Json, Mermaid, Diff, Plan, Checklist, Script, Report, MediaBrief }
 
 @Serializable
 data class PortSpec(
