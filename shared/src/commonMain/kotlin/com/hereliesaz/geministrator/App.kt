@@ -714,9 +714,12 @@ fun App(
         }
         // The MCP consent question, set aside while the keeper looks at the server's row in Connections: it stays
         // pending and comes back on leaving the Keeper's room.
-        var consentPeek by remember { mutableStateOf(false) }
+        // Only the request the keeper set aside stays hidden: the next one that is asked is shown at once.
+        val pendingConsent = mcpConsent?.pending?.collectAsState()?.value
+        var consentPeekOf by remember { mutableStateOf<com.hereliesaz.geministrator.mcp.McpConsentRequest?>(null) }
+        val consentPeek = consentPeekOf != null && consentPeekOf === pendingConsent
         LaunchedEffect(destination, mcpConsent) {
-            if (destination != ControlRoomDestination.Settings) consentPeek = false
+            if (destination != ControlRoomDestination.Settings) consentPeekOf = null
         }
         val taskInspectorVisible = selectedTaskId != null &&
             destination == ControlRoomDestination.Overview
@@ -937,7 +940,7 @@ fun App(
                         gate = it,
                         hidden = consentPeek && destination == ControlRoomDestination.Settings,
                         onOpenServer = {
-                            consentPeek = true
+                            consentPeekOf = pendingConsent
                             navigate(Destination.KeeperPart(KeeperSection.Connections))
                         },
                     )
