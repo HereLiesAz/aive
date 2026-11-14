@@ -299,6 +299,5 @@ object StepPresets {
         UpdateRepositoryFiles, AddAssetsToRepository, PrepareDownloadFiles,
         ChangeCode, RenderImage, RenderVideo, ComposeMedia, EditAudio, MakeSlides,
         LocalizeContent, FixedFormatResult, CappedTextResult,
-    ) + catalog
-    ) + StepPresetsSending.all
+    ) + catalog + StepPresetsSending.all
 }

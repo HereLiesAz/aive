@@ -28,7 +28,8 @@ class StepTemplatePlanTest {
     fun theCatalogOffersNothingThatChangesAnything() {
         val ids = BuiltInTemplates.forPlanner().map { it.id }
         assertTrue("change-connected-source" !in ids)
-        assertEquals(BuiltInTemplates.queenMayMake.size, ids.size)
+        // The planner offers what the queen may make, minus the swarm's own internal steps.
+        assertEquals(BuiltInTemplates.queenMayMake.count { !com.hereliesaz.geministrator.template.TemplateGroups.isInternal(it.id) }, ids.size)
         assertTrue("brief" in ids && "tests-on-branch" !in ids)
         assertTrue(BuiltInTemplates.palette.filter { !it.effectful }.all { it.id in ids })
         assertTrue(ids.none { com.hereliesaz.geministrator.template.TemplateGroups.isInternal(it) })

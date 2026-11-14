@@ -123,7 +123,6 @@ private fun stepTemplateBaseTitle(template: StepTemplate) =
         "step_template_make_diagram" -> Res.string.step_template_make_diagram
         "step_template_prepare_files" -> Res.string.step_template_prepare_files
         else -> presetTitleResource(template.titleKey) ?: Res.string.step_template_change_connected
-        else -> Res.string.step_template_change_connected
     }
 
 /** The title of a palette group (`template_group_<id>`). */
@@ -159,10 +158,9 @@ internal fun stepPortLabel(port: String): String = stringResource(
         "requirements" -> Res.string.step_port_requirements
         "question" -> Res.string.step_port_question
         "change" -> Res.string.step_port_change
-        else -> presetPortResource(port) ?: Res.string.step_port_target
         "recipients" -> Res.string.step_port_recipients
         "draft" -> Res.string.step_port_draft
-        else -> Res.string.step_port_target
+        else -> presetPortResource(port) ?: Res.string.step_port_target
     },
 )
 

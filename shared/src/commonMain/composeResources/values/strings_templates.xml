@@ -76,7 +76,6 @@
     <string name="step_port_decision">Decision</string>
     <string name="step_port_description">Description</string>
     <string name="step_port_document">Document</string>
-    <string name="step_port_draft">Draft</string>
     <string name="step_port_evidence">Evidence</string>
     <string name="step_port_facts">Facts</string>
     <string name="step_port_fields">Fields</string>
