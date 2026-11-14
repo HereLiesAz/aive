@@ -47,4 +47,29 @@ class UiStateVersionGateTest {
         UiStateVersionGate.apply(store, "0.10.0.6")
         assertEquals("Limits", store.getString("keeper.section"))
     }
+
+    @Test
+    fun anUpgradeKeepsTheSelectedWorkflowSoADraftCanBeRecovered() {
+        val store = DurableUiStateStore(MapSettings())
+        store.putString(UiStateVersionGate.VERSION_KEY, "0.9")
+        store.putString(WorkflowLibraryKeys.SELECTED_KEY, "authored:x")
+        UiStateVersionGate.apply(store, "0.10.0.5")
+        assertEquals("authored:x", store.getString(WorkflowLibraryKeys.SELECTED_KEY))
+    }
+
+    @Test
+    fun migrationMovesTheOldDefaultFileEntriesOnce() {
+        val old = MapSettings()
+        val fresh = MapSettings()
+        old.putString("aive.ui-state.v1.sources.keyless.all-off", "true")
+        old.putString("unrelated", "x")
+        UiStateMigration.migrate(old, fresh)
+        assertEquals("true", fresh.getStringOrNull("aive.ui-state.v1.sources.keyless.all-off"))
+        assertNull(old.getStringOrNull("aive.ui-state.v1.sources.keyless.all-off"))
+        assertEquals("x", old.getStringOrNull("unrelated"))
+
+        old.putString("aive.ui-state.v1.late", "y")
+        UiStateMigration.migrate(old, fresh)
+        assertNull(fresh.getStringOrNull("aive.ui-state.v1.late"))
+    }
 }

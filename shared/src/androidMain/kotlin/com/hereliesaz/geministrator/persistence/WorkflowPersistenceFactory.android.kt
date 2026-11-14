@@ -4,8 +4,10 @@ import android.content.Context
 import app.cash.sqldelight.async.coroutines.synchronous
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import com.hereliesaz.geministrator.persistence.db.WorkflowDatabase
+import com.hereliesaz.geministrator.UiStateMigration
 import com.hereliesaz.geministrator.UiStateSettings
 import com.hereliesaz.geministrator.prompts.RememberedTextSettings
+import com.russhwolf.settings.Settings
 import com.russhwolf.settings.SharedPreferencesSettings
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +33,8 @@ object AndroidWorkflowPersistence {
             UiStateSettings.separate = SharedPreferencesSettings(
                 this.context!!.getSharedPreferences(UI_STATE_PREFERENCES, Context.MODE_PRIVATE),
             )
+            // Builds before the separate file kept this state in the default preferences: carry it over once.
+            runCatching { UiStateMigration.migrate(Settings(), UiStateSettings.separate!!) }
         }
         if (RememberedTextSettings.separate == null) {
             RememberedTextSettings.separate = SharedPreferencesSettings(
