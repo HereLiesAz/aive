@@ -117,16 +117,18 @@ android {
         jniLibs.srcDir(generatedAndroidDjlTokenizerJniDir.get().asFile)
     }
 
-    // Release signing is supplied by the central HereLiesAz/workflows android-play-release run: it
-    // writes the upload key to app/keystore.jks, exports KEYSTORE_FILE, KEYSTORE_PASSWORD, KEY_ALIAS and
-    // KEY_PASSWORD, and the profile's build_command sets HAIVE_KEYSTORE_PATH / HAIVE_KEYSTORE_TYPE.
-    // Locally and in Aive's own CI none of that exists and release stays unsigned (no failure).
+    // Release signing (GitHub APK in multiplatform.yml, Play bundle in the central android-play-release
+    // run). multiplatform.yml's android-keystore action exports HAIVE_KEYSTORE_PATH and
+    // HAIVE_KEYSTORE_TYPE; the central run writes app/keystore.jks and exports KEYSTORE_FILE. Both
+    // supply KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD. Without a keystore (local builds, PRs) the
+    // release build stays unsigned instead of failing.
     signingConfigs {
         create("release") {
             val keyStorePath = releaseKeystorePath()
             if (keyStorePath != null) {
                 storeFile = file(keyStorePath)
-                storeType = System.getenv("HAIVE_KEYSTORE_TYPE") ?: "PKCS12"
+                storeType = System.getenv("HAIVE_KEYSTORE_TYPE")?.takeUnless { it.isBlank() }
+                    ?: if (keyStorePath.endsWith(".jks", ignoreCase = true)) "JKS" else "PKCS12"
                 storePassword = System.getenv("KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("KEY_ALIAS")
                 keyPassword = System.getenv("KEY_PASSWORD").takeUnless { it.isNullOrBlank() }

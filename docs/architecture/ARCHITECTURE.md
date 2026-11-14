@@ -252,12 +252,13 @@ Yarn can try to download a local library from the npm registry. Rebuild the pinn
 publications before using this option locally; their native version alone does not identify
 the source revision.
 
-This repository holds no signing material and publishes no signed Android artifact. Signed Play and
-GitHub Android releases (including the Android `versionCode`, passed as `-Papp.versionCode`, and the
-16 KB native-alignment check on the signed bundle) are built and published by the central
-`HereLiesAz/workflows` runs (`android-play-release.yml`, `android-github-release.yml`). Here,
-`multiplatform.yml` builds unsigned debug and R8-minified variants, checks the native libraries'
-16 KB alignment, and publishes only the desktop installers.
+The sideloaded GitHub-flavor APK is built and signed by `multiplatform.yml` (the `android-keystore`
+action, then `assembleGithubRelease` and `bundlePlayRelease` with a timestamp-derived monotonic
+`versionCode`). It checks the native libraries' 16 KB alignment on every event and again on the signed
+Play bundle, uploads the signed APK, the R8 mapping and the Play bundle as workflow artifacts, and the
+`release` job attaches `TheAive-<version>-android.apk` to the grouped release alongside the desktop
+installers. Publishing to Google Play tracks is done by the central `HereLiesAz/workflows`
+`android-play-release.yml` run, not here.
 
 The checked-in release line remains four-part (`MAJOR.MINOR.PATCH.BUILD`). Exact builds keep
 immutable four-part Git tags, while GitHub Release objects are grouped by patch: all `0.9.6.x`
@@ -275,7 +276,7 @@ Every workflow in `.github/workflows/` follows the `HereLiesAz/workflows` policy
   in this repository and declare themselves with the central `ci-report` action. Release
   semantics inside `multiplatform.yml` come only from the central `four-part-version` and
   `patch-grouped-release` actions; the desktop installers take their version from the same
-  central action through the `version` job. Google Play publication is not in this repository:
+  central action through the `version` job. The signed GitHub APK is built here, but Google Play track publication is not in this repository:
   the central `android-play-release.yml` builds the `playRelease` bundle and publishes it to the
   internal track on every push to `main`.
 - **Centrally executed** (trackers carrying `# centralized-by: HereLiesAz/workflows`):

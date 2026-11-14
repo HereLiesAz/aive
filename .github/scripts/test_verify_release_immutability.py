@@ -42,6 +42,15 @@ class ArtifactContractTest(unittest.TestCase):
                 [], artifact_contract_violations(path.name, path.read_text(encoding="utf-8"))
             )
 
+    def test_android_apk_upload_and_download_names_match(self):
+        text = (Path(__file__).resolve().parents[2] / ".github" / "workflows" / "multiplatform.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("name: aive-android-github-release", text)
+        self.assertIn("TheAive-${VERSION_NAME}-android.apk", text)
+        self.assertIn("path: androidApp/build/outputs/apk/github/release/*.apk", text)
+        self.assertEqual([], artifact_contract_violations("multiplatform.yml", text))
+
 
 if __name__ == "__main__":
     unittest.main()

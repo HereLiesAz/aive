@@ -5,7 +5,7 @@ Scope: the forbidden-command scan covers EVERY workflow under .github/workflows 
 edited or deleted from any of them), while the version/asset fragments are specific to
 multiplatform.yml, the only workflow that builds and publishes the four-part-versioned release
 assets (APK, DEB, MSI, DMG). The Play bundle is versioned by versionCode, not by file name, so it
-has no name fragment to check. Also checks that the vendor checkout pins agree across workflows, and
+has no name fragment to check. The signed GitHub APK is built and uploaded by multiplatform.yml. Also checks that the vendor checkout pins agree across workflows, and
 that every artifact a workflow downloads is uploaded by a step in that same workflow.
 """
 from pathlib import Path
@@ -91,6 +91,8 @@ def main():
             "build job does not pass github.run_number to four-part-version action",
         'build-version: ${{ steps.version.outputs.version }}':
             "release job does not pass the four-part version to the release action",
+        'release-files/TheAive-${VERSION_NAME}-android.apk':
+            "APK release asset does not contain the full four-part version",
         'release-files/TheAive-${VERSION_NAME}.deb':
             "DEB release asset does not contain the full four-part version",
         'release-files/TheAive-${VERSION_NAME}.msi':

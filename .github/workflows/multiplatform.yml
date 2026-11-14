@@ -4,7 +4,8 @@ name: Build and Deploy
 # the central ci-report action, which registers this workflow `local`, `ci: true`.
 # Version and tag/grouping policy come from the central actions (four-part-version,
 # patch-grouped-release); this file keeps only aive-specific build, verification and
-# packaging steps. Google Play publication runs centrally in HereLiesAz/workflows
+# packaging steps. The sideloaded GitHub APK is built and signed here (android-keystore action);
+# Google Play track publication runs centrally in HereLiesAz/workflows
 # (android-play-release.yml; tracker: .github/workflows/android-play-release.yml).
 
 on:
@@ -133,6 +134,42 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
 
+      - name: Reconstruct and verify Android signing keystore
+        id: signing
+        if: github.event_name != 'pull_request'
+        uses: ./.github/actions/android-keystore
+        with:
+          keystore-private: ${{ secrets.KEYSTORE_PRIVATE }}
+          keystore-rsa: ${{ secrets.KEYSTORE_RSA }}
+          keystore-public: ${{ secrets.KEYSTORE_PUBLIC }}
+          keystore-chain: ${{ secrets.KEYSTORE_CHAIN }}
+          keystore-password: ${{ secrets.KEYSTORE_PASSWORD }}
+          key-alias: ${{ secrets.KEY_ALIAS }}
+          key-password: ${{ secrets.KEY_PASSWORD }}
+          expected-sha256: ${{ secrets.KEYSTORE_SHA256 }}
+          expected-sha1: ${{ secrets.KEYSTORE_SHA1 }}
+          expected-owner: ${{ secrets.KEYSTORE_OWNER }}
+
+      - name: Export Android signing path
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "HAIVE_KEYSTORE_PATH=${{ steps.signing.outputs.keystore-path }}" >> "$GITHUB_ENV"
+          echo "HAIVE_KEYSTORE_TYPE=${{ steps.signing.outputs.store-type }}" >> "$GITHUB_ENV"
+
+      - name: Select Android release versionCode
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          NOW_EPOCH=$(date -u +%s)
+          VERSION_CODE=$((NOW_EPOCH - 1500000000))
+          if [ "$VERSION_CODE" -le 0 ] || [ "$VERSION_CODE" -gt 2100000000 ]; then
+            echo "::error::Generated Android versionCode $VERSION_CODE is outside the Play-supported range"
+            exit 1
+          fi
+          echo "HAIVE_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "Android release versionCode: $VERSION_CODE"
+
       - name: Verify release immutability policy
         run: python3 .github/scripts/verify_release_immutability.py
 
@@ -185,21 +222,30 @@ jobs:
         run: ./gradlew :providers:llm:testAndroidHostTest
 
       - name: Build Android distributions
-        # Unsigned on every event: signed Play/GitHub releases are built and published by the central
-        # HereLiesAz/workflows android-play-release run (see "Release signing" in README.md).
-        # Release minification runs here so R8 keep-rule breaks surface before main.
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          ./gradlew -Papp.versionName="$AIVE_VERSION" \
-            :androidApp:assemblePlayDebug :androidApp:assembleGithubDebug \
-            :androidApp:minifyPlayReleaseWithR8 :androidApp:minifyGithubReleaseWithR8
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # Release minification runs on PRs too, so R8 keep-rule breaks surface before main.
+            ./gradlew -Papp.versionName="$AIVE_VERSION" \
+              :androidApp:assemblePlayDebug :androidApp:assembleGithubDebug \
+              :androidApp:minifyPlayReleaseWithR8 :androidApp:minifyGithubReleaseWithR8
+          else
+            ./gradlew -Papp.versionCode="$HAIVE_VERSION_CODE" \
+              -Papp.versionName="$AIVE_VERSION" \
+              :androidApp:bundlePlayRelease \
+              :androidApp:assembleGithubRelease
+          fi
 
       - name: Verify Android native runtime packaging
         shell: bash
         run: |
           set -euo pipefail
           # Existence, plus Google Play's 16 KB page-size rule: every LOAD segment of the 64-bit
-          # libraries must be aligned to at least 0x4000. The central android-play-release run
-          # re-checks the signed bundle; this catches a regression before it gets that far.
+          # libraries must be aligned to at least 0x4000. This checks the built native libraries on
+          # every event; "Verify 16 KB native library alignment" below re-checks the signed bundle.
           bad=0
           for abi in arm64-v8a armeabi-v7a x86_64; do
             for lib in \
@@ -220,6 +266,27 @@ jobs:
             done
           done
           test "$bad" -eq 0
+
+      - name: Verify 16 KB native library alignment
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Google Play requires every 64-bit native library to use >= 16 KB LOAD alignment.
+          AAB=$(find androidApp/build/outputs/bundle/playRelease -name '*.aab' -print -quit)
+          test -n "$AAB"
+          WORK=$(mktemp -d)
+          unzip -q "$AAB" 'base/lib/*' -d "$WORK"
+          bad=0
+          for so in $(find "$WORK/base/lib/arm64-v8a" "$WORK/base/lib/x86_64" -name '*.so' 2>/dev/null); do
+            align=$(readelf -lW "$so" | awk '/LOAD/ {print $NF}' | sort -u | head -1)
+            name=$(basename "$so")
+            if [ $((align)) -lt 16384 ]; then
+              echo "::error::$name is ${align}-aligned; 16 KB required"
+              bad=1
+            fi
+          done
+          exit $bad
 
       - name: Publish Conveyance for isolated web builds
         run: |
@@ -271,7 +338,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VARIANT_PATTERN='*playDebug*'
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            VARIANT_PATTERN='*playDebug*'
+          else
+            VARIANT_PATTERN='*playRelease*'
+          fi
           MATCHES=$(find androidApp/build/intermediates -type f -path "$VARIANT_PATTERN" -name 'AndroidManifest.xml' -print)
           if [ -z "$MATCHES" ]; then
             echo "::error::Could not find merged Play manifest for $VARIANT_PATTERN"
@@ -290,7 +361,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VARIANT_PATTERN='*githubDebug*'
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            VARIANT_PATTERN='*githubDebug*'
+          else
+            VARIANT_PATTERN='*githubRelease*'
+          fi
           MATCHES=$(find androidApp/build/intermediates -type f -path "$VARIANT_PATTERN" -name 'AndroidManifest.xml' -print)
           if [ -z "$MATCHES" ]; then
             echo "::error::Could not find merged GitHub manifest for $VARIANT_PATTERN"
@@ -306,8 +381,29 @@ jobs:
             exit 1
           fi
 
-      # Signed APK/AAB artifacts, R8 mappings and Play/GitHub publishing live in the central
-      # HereLiesAz/workflows android-play-release / android-github-release runs, not here.
+      - name: Upload GitHub Android release
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: aive-android-github-release
+          path: androidApp/build/outputs/apk/github/release/*.apk
+          if-no-files-found: error
+
+      - name: Upload GitHub Android R8 mapping
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: aive-android-github-mapping
+          path: androidApp/build/outputs/mapping/githubRelease/mapping.txt
+          if-no-files-found: error
+
+      - name: Upload Play Android release
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: aive-android-play-release
+          path: androidApp/build/outputs/bundle/playRelease/*.aab
+          if-no-files-found: error
 
       - name: Upload release notes
         if: github.event_name != 'pull_request'
@@ -484,9 +580,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      # The signed Android APK/AAB are built and published by the central HereLiesAz/workflows
-      # android-github-release / android-play-release runs (README.md), so this job publishes only
-      # the desktop installers this workflow actually uploads.
+      - name: Download GitHub Android release
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: aive-android-github-release
+          path: release-input/android
+
       - name: Download Linux installer
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
@@ -529,11 +628,13 @@ jobs:
           set -euo pipefail
           mkdir -p release-files
 
+          APK_SOURCE=$(find release-input/android -type f -name '*.apk' -print -quit)
           DEB_SOURCE=$(find release-input/linux -type f -name '*.deb' -print -quit)
           MSI_SOURCE=$(find release-input/windows -type f -name '*.msi' -print -quit)
           DMG_SOURCE=$(find release-input/macos -type f -name '*.dmg' -print -quit)
 
           for entry in \
+            "APK_SOURCE:$APK_SOURCE" \
             "DEB_SOURCE:$DEB_SOURCE" \
             "MSI_SOURCE:$MSI_SOURCE" \
             "DMG_SOURCE:$DMG_SOURCE"; do
@@ -546,6 +647,7 @@ jobs:
             fi
           done
 
+          cp "$APK_SOURCE" "release-files/TheAive-${VERSION_NAME}-android.apk"
           cp "$DEB_SOURCE" "release-files/TheAive-${VERSION_NAME}.deb"
           cp "$MSI_SOURCE" "release-files/TheAive-${VERSION_NAME}.msi"
           cp "$DMG_SOURCE" "release-files/TheAive-${VERSION_NAME}.dmg"
