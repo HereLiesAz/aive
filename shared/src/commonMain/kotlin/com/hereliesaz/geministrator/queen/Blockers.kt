@@ -47,7 +47,7 @@ data class Blocker(
     val stepId: String? = null,
     val state: BlockerState = BlockerState.Open,
     val origin: BlockerOrigin = BlockerOrigin.Planner,
-    /** The step that is waiting on this blocker (a step held for an input it does not have); its Needs tab is where the keeper can supply it. */
+    /** The step that is waiting on this blocker (a step held for an input it does not have); its Work tab (which leads to the swarm editor) is where the keeper can supply it. */
     val forStep: String? = null,
 ) {
     /** True while the hive is held: the blocker is open or being made. */
@@ -139,10 +139,12 @@ object Blockers {
      * step follows that step: finished means Done, working means InProgress, failed or stopped means Open again; a
      * step the swarm no longer has leaves the blocker as it was.
      */
-    fun resolved(blockers: List<Blocker>, definition: WorkflowDefinition, run: WorkflowRun): List<Blocker> =
-        blockers.map { blocker ->
+    fun resolved(blockers: List<Blocker>, definition: WorkflowDefinition, run: WorkflowRun): List<Blocker> {
+        // A finished step answers one blocker: the steps blockers already follow, or were answered by, are not offered again.
+        val claimed = blockers.mapNotNullTo(mutableSetOf()) { it.stepId }
+        return blockers.map { blocker ->
             if (blocker.state == BlockerState.Done || blocker.state == BlockerState.Dropped) return@map blocker
-            val stepId = blocker.stepId ?: return@map resolvedWithoutStep(blocker, definition, run)
+            val stepId = blocker.stepId ?: return@map resolvedWithoutStep(blocker, definition, run, claimed)
             if (definition.tasks.none { it.id.value == stepId }) return@map blocker
             val status = run.taskRuns.values.firstOrNull { it.taskDefinitionId.value == stepId }?.status
             val state = when (status) {
@@ -153,12 +155,18 @@ object Blockers {
             }
             blocker.copy(state = state)
         }
+    }
 
     /**
      * A blocker with no step of its own is resolved by what the creatures hand in: the step that was waiting on it
      * ([Blocker.forStep]) is no longer held for the input, or a finished step made from its starting template has output.
      */
-    private fun resolvedWithoutStep(blocker: Blocker, definition: WorkflowDefinition, run: WorkflowRun): Blocker {
+    private fun resolvedWithoutStep(
+        blocker: Blocker,
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        claimed: MutableSet<String>,
+    ): Blocker {
         val forStep = blocker.forStep
         if (forStep != null) {
             val waiting = run.taskRuns.values.firstOrNull { it.taskDefinitionId.value == forStep } ?: return blocker
@@ -166,17 +174,19 @@ object Blockers {
             return if (stillHeld) blocker else blocker.copy(state = BlockerState.Done)
         }
         val templateId = blocker.templateId ?: return blocker
-        val made = definition.tasks.any { task ->
-            task.contract?.template?.id == templateId &&
+        val made = definition.tasks.firstOrNull { task ->
+            task.id.value !in claimed && task.contract?.template?.id == templateId &&
                 run.taskRuns[task.id]?.let { it.status == TaskRunStatus.Completed && it.artifacts.isNotEmpty() } == true
-        }
-        return if (made) blocker.copy(state = BlockerState.Done) else blocker
+        } ?: return blocker
+        claimed += made.id.value
+        // It now follows the step that answered it, so the same step never answers a second blocker.
+        return blocker.copy(state = BlockerState.Done, stepId = made.id.value)
     }
 
     /**
      * The queen's own addition in the middle of a run: a step held because a required input has no value means something
      * this hive needs is missing. One blocker per such step, never re-added (not even after the keeper dropped it); the
-     * step's own Needs tab is where it is changed. No model.
+     * step's own Work tab, which leads to the swarm editor where its inputs are set, is where it is changed. No model.
      */
     fun fromHeldSteps(existing: List<Blocker>, definition: WorkflowDefinition, run: WorkflowRun): List<Blocker> =
         definition.tasks.fold(existing) { acc, task ->
@@ -191,17 +201,19 @@ object Blockers {
     const val NANNY_PREFIX = "missing:"
 
     /** The Nanny's findings that name something missing, added once each (also not after the keeper dropped it). */
-    fun fromNannyFindings(existing: List<Blocker>, findings: List<NannyFinding>): List<Blocker> =
+    fun fromNannyFindings(existing: List<Blocker>, findings: List<NannyFinding>, definition: WorkflowDefinition? = null): List<Blocker> =
         findings.fold(existing) { acc, finding ->
             if (!finding.subject.trim().startsWith(NANNY_PREFIX, ignoreCase = true)) return@fold acc
             val line = cleanSentence(finding.observation)
             if (line.isBlank() || acc.any { it.sentence.equals(line, ignoreCase = true) }) return@fold acc
-            add(acc, "", line, null, null, byKeeper = false, origin = BlockerOrigin.Nanny)
+            // A finding about one of the swarm's steps follows that step, so the blocker has a way to be resolved.
+            val step = finding.taskId?.takeIf { id -> definition?.tasks?.any { it.id.value == id } == true }
+            add(acc, "", line, null, step, byKeeper = false, origin = BlockerOrigin.Nanny)
         }
 
     /** The blockers as the run stands now: what the queen and the Nanny found added, then what the creatures made resolved. */
     fun live(existing: List<Blocker>, definition: WorkflowDefinition, run: WorkflowRun, findings: List<NannyFinding>): List<Blocker> =
-        resolved(fromNannyFindings(fromHeldSteps(existing, definition, run), findings), definition, run)
+        resolved(fromNannyFindings(fromHeldSteps(existing, definition, run), findings, definition), definition, run)
 
     /** The blockers that still hold the hive. */
     fun unmet(blockers: List<Blocker>): List<Blocker> = blockers.filter { it.unmet }
@@ -252,14 +264,14 @@ object Blockers {
  * What she says once in Messages about each blocker: one still unmet is said as what is missing (in her own words when she
  * or the Nanny found it in the middle of the run), one the creatures have made as made. The blocker's own words are on a
  * quoted line, never in her sentence. A blocker links to its step when it has one, else to the step that waits on it (its
- * Needs tab), else to the Story. Stable ids.
+ * Work tab, which leads to where its inputs are set), else to the Story. Stable ids.
  */
 internal fun blockerNotes(runId: String, definition: WorkflowDefinition, run: WorkflowRun, blockers: List<Blocker>): List<QueenNote> =
     Blockers.resolved(blockers, definition, run).mapNotNull { blocker ->
         val has = { id: String? -> id != null && definition.tasks.any { it.id.value == id } }
         val link = when {
             has(blocker.stepId) -> QueenLink.Creature(blocker.stepId.orEmpty(), CreatureTab.Work)
-            has(blocker.forStep) -> QueenLink.Creature(blocker.forStep.orEmpty(), CreatureTab.Needs)
+            has(blocker.forStep) -> QueenLink.Creature(blocker.forStep.orEmpty(), CreatureTab.Work)
             else -> QueenLink.Story
         }
         val text = queenQuoteText(blocker.sentence, Blockers.MAX_SENTENCE)
