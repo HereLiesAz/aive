@@ -9,7 +9,7 @@
     <string name="step_template_p_glossary">Glossary</string>
     <string name="step_template_p_translation">Translation</string>
     <string name="step_template_p_plan">Plan</string>
-    <string name="step_template_p_timeline">Timeline</string>
+    <string name="step_template_p_timeline">Schedule</string>
     <string name="step_template_p_meeting_notes">Meeting notes</string>
     <string name="step_template_p_decision_memo">Decision memo</string>
     <string name="step_template_p_risk_register">Risk register</string>

@@ -4,7 +4,7 @@ package com.hereliesaz.geministrator.template
  * How the Add creature palette arranges the step templates (docs/Step-Templates.md). The starting-templates catalog has
  * thirteen groups; each is a collapsible group in the palette that shows a few common templates and folds the rest under
  * a More. The nine templates of the Nanny, the queen and the training (swarm plan, tutorial lesson, tutorial check-in,
- * reworded step, practice result, training ruling, specialist lessons, Nanny finding, template or role revision) are
+ * reworded step, practice result, training report, specialist lessons, Nanny finding, template or role revision) are
  * internal: the palette's default view and the planner's list leave them out, and the palette's own fold brings them
  * back. Pure data and pure functions, so the arrangement is tested without a screen.
  */
@@ -36,7 +36,7 @@ object TemplateGroups {
     /** The internal nine: hidden from the planner's list and the palette's default view, never deleted. */
     val internal: Set<String> = linkedSetOf(
         "swarm-plan", "tutorial-lesson", "tutorial-check-in", "queen-reworded-step",
-        "practice-result", "training-ruling", "specialist-lessons", "nanny-finding", "revision-proposal",
+        "practice-result", "training-report", "specialist-lessons", "nanny-finding", "revision-proposal",
     )
 
     private fun group(id: String, vararg members: String) =
@@ -49,7 +49,7 @@ object TemplateGroups {
             "write-document", "docs-draft", "brief",
             "report", "summary", "one-page-explainer", "faq", "glossary", "translation", "localize-content", "deck-outline",
         ),
-        group("plans-and-records", "plan", "timeline", "meeting-notes", "decision-memo", "risk-register"),
+        group("plans-and-records", "plan", "timeline", "meeting-notes", "decision-memo", "risk-register", "checklist"),
         group("research-and-evidence", "research-brief", "source-list", "claim-check", "comparison-table"),
         group("checks-and-edits", "check-work", "critique", "proofread", "accessibility-check", "clarifying-questions"),
         group(
@@ -67,7 +67,7 @@ object TemplateGroups {
             "email-draft", "send-email", "send-chat-message",
             "send-reply", "negotiation-reply-draft", "press-release", "social-post-set", "policy-draft", "capped-text-result",
         ),
-        group("story-and-media-text", "short-film-outline", "script", "storyboard-text", "shot-list"),
+        group("story-and-media-text", "short-film-outline", "script", "storyboard-text", "shot-list", "image-brief", "audio-brief", "video-brief"),
         group(
             "software-writing",
             "spec", "api-doc", "adr",
@@ -77,7 +77,7 @@ object TemplateGroups {
             "software-changes",
             "change-code", "prepare-files-for-repository", "read-repository-files",
             "update-repository-files", "add-assets-to-repository", "prepare-download-files",
-            "test-plan", "test-cases", "code-change-on-branch", "tests-on-branch",
+            "test-plan", "test-cases", "code-change-on-branch", "tests-on-branch", "patch-draft",
         ),
         group(
             "connected-tools",
@@ -87,7 +87,7 @@ object TemplateGroups {
             "remove-from-connected-tool", "render-image", "render-video", "compose-media", "edit-audio", "make-slides",
         ),
         group("swarm-plans-and-teaching", "swarm-plan", "tutorial-lesson", "tutorial-check-in", "queen-reworded-step"),
-        group("training-and-improvement", "practice-result", "training-ruling", "specialist-lessons", "nanny-finding", "revision-proposal"),
+        group("training-and-improvement", "practice-result", "training-report", "specialist-lessons", "nanny-finding", "revision-proposal"),
     )
 
     private val other = TemplateGroup(OTHER_ID, "template_group_other", emptyList())

@@ -31,7 +31,7 @@ class StepTemplatePlanTest {
         // The planner offers what the queen may make, minus the swarm's own internal steps.
         assertEquals(BuiltInTemplates.queenMayMake.count { !com.hereliesaz.geministrator.template.TemplateGroups.isInternal(it.id) }, ids.size)
         assertTrue("brief" in ids && "tests-on-branch" !in ids)
-        assertTrue(BuiltInTemplates.palette.filter { !it.effectful }.all { it.id in ids })
+        assertTrue(BuiltInTemplates.palette.filter { !it.effectful && !com.hereliesaz.geministrator.template.TemplateGroups.isInternal(it.id) }.all { it.id in ids })
         assertTrue(ids.none { com.hereliesaz.geministrator.template.TemplateGroups.isInternal(it) })
         assertTrue(ids.none { it.startsWith("send-") })
     }
