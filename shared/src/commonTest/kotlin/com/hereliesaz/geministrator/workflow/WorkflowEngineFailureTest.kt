@@ -274,6 +274,50 @@ class WorkflowEngineFailureTest {
     }
 
     @Test
+    fun aStepStoppedForItsAllowanceIsNotReassignedEither() = runBlocking {
+        val taskId = TaskDefinitionId("implement")
+        val definition = WorkflowDefinition(
+            id = WorkflowDefinitionId("wf"),
+            name = "Workflow",
+            tasks = listOf(
+                TaskDefinition(
+                    id = taskId,
+                    name = "Implement",
+                    objective = "Implement",
+                    roleId = BuiltInRoles.ImplementationEngineer.id,
+                    retryPolicy = RetryPolicy(maxAttempts = 2, retryOn = setOf(RetryReason.ProviderFailure)),
+                    escalationPolicy = EscalationPolicy.Reassign(BuiltInRoles.RecoveryEngineer.id),
+                ),
+            ),
+        )
+        val created = WorkflowRunFactory.create(
+            definition = definition,
+            workflowRunId = WorkflowRunId("run"),
+            projectId = ProjectId("project"),
+            objective = "Objective",
+            nowEpochMillis = 0L,
+            taskRunIdFactory = { TaskRunId("task-run") },
+        )
+        val failed = created.copy(
+            taskRuns = created.taskRuns + (taskId to created.taskRuns.getValue(taskId).copy(status = TaskRunStatus.Failed)),
+        )
+        val engine = WorkflowEngine(sessionGateway = NoOpGateway, roles = BuiltInRoles.all, eventSink = InMemoryWorkflowEventSink())
+
+        val stopped = engine.handleFailure(
+            definition = definition,
+            run = failed,
+            taskDefinitionId = taskId,
+            retryReason = RetryReason.ProviderFailure,
+            reason = "allowance spent",
+            nowEpochMillis = 10L,
+            allowRetry = false,
+            allowReassign = false,
+        )
+        assertEquals(TaskRunStatus.Escalated, stopped.taskRuns.getValue(taskId).status)
+        assertEquals(WorkflowRunStatus.AwaitingHuman, stopped.status)
+    }
+
+    @Test
     fun failureRetriesThenReassignsWithoutLosingAuthorityDecision() = runBlocking {
         val taskId = TaskDefinitionId("implement")
         val definition = WorkflowDefinition(

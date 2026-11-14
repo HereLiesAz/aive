@@ -206,7 +206,7 @@ class RelayDistributedComputeClient(
 
     /** Enrols this node's key unless the ledger says it already is. Uses the pool token. */
     internal suspend fun ensureEnrolled() {
-        val fingerprint = ComputeNodeEnrolmentLedger.fingerprint(relayBaseUrl, poolId, node.nodeId, signer.publicKey)
+        val fingerprint = ComputeNodeEnrolmentLedger.fingerprint(relayBaseUrl, poolId, node.nodeId, signer.publicKey, ownerTokenHeld = !ownerToken.isNullOrBlank())
         if (enrolmentLedger.isEnrolled(fingerprint)) return
         try {
             enroller.enrol(node.nodeId, node.displayName)

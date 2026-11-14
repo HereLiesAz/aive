@@ -7,6 +7,10 @@ import com.hereliesaz.geministrator.providers.ProviderActionResult
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.workflow.ManagedSessionHandle
 import com.hereliesaz.geministrator.workflow.ManagedSessionStatus
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
@@ -78,6 +82,12 @@ class QueuedMemorySessionObserver(
      */
     var journal: MemoryCaptureJournal? = null
 
+    /**
+     * Where a trailing journal write runs: a part that arrives inside the journal interval is written once the
+     * interval ends, so a session that then goes quiet still has it on disk. Absent, only the next part writes.
+     */
+    var flushScope: CoroutineScope? = null
+
     private data class Capture(
         val request: AgentTaskRequest,
         val userPrompt: String,
@@ -88,7 +98,25 @@ class QueuedMemorySessionObserver(
         var sends: Int = 0,
         /** When the journal was last written for this capture; null until the first write. */
         var journaledAt: Long? = null,
-    )
+        /** The time the envelope being built carries; fixed until it is sent so a journaled copy and the sent one share an episode id. */
+        var closedAt: Long? = null,
+        /** The write waiting for the journal interval to end, if any. */
+        var trailingFlush: Job? = null,
+        /** Held for a whole send (snapshot, enqueue, cursor move) so envelopes of one capture reach the queue in order. */
+        val sendLock: Mutex = Mutex(),
+    ) {
+        /** Adds [part]; streamed thinking joins the unsent thinking before it so a scrub sees text a token boundary split. */
+        fun add(part: MemorySessionPart, mergeLimit: Int) {
+            val last = parts.lastOrNull()
+            if (part.label == THINKING_LABEL && parts.size > sentParts && last != null && last.label == part.label &&
+                last.text.length + part.text.length <= mergeLimit
+            ) {
+                parts[parts.size - 1] = last.copy(text = last.text + part.text)
+            } else {
+                parts.add(part)
+            }
+        }
+    }
 
     private val mutex = Mutex()
     private val captures = mutableMapOf<ManagedSessionHandle, Capture>()
@@ -162,7 +190,7 @@ class QueuedMemorySessionObserver(
             // Memory's own injected cues and recalls (the exact text it sent, noted by noteIssued) are not
             // experience to bank again. A marker at the start of an agent's own message proves nothing:
             // the agent writes its text, so that cannot be a way to keep a message out of memory.
-            is AgentEvent.Message -> if (mutex.withLock { event.content.trim() in issued }) null else MemorySessionPart(
+            is AgentEvent.Message -> if (MemoryRemindMeCommand.isOnly(event.content) || mutex.withLock { event.content.trim() in issued }) null else MemorySessionPart(
                 MemorySourceKind.Message,
                 "Agent message",
                 event.content.take(maxCapturedEventChars),
@@ -188,7 +216,7 @@ class QueuedMemorySessionObserver(
             // The whole session is context: reasoning is banked as well as watched for recall triggers.
             is AgentEvent.Thinking -> MemorySessionPart(
                 MemorySourceKind.AgentNote,
-                "Agent thinking",
+                THINKING_LABEL,
                 event.content.take(maxCapturedEventChars),
             )
             is AgentEvent.PlanApproved,
@@ -199,31 +227,40 @@ class QueuedMemorySessionObserver(
         } ?: return
 
         if (part.text.isBlank()) return
-        val capture = mutex.withLock { captures[handle]?.also { it.parts.add(part) } } ?: return
+        val capture = mutex.withLock { captures[handle]?.also { it.add(part, maxCapturedEventChars) } } ?: return
         journalUnsent(handle, capture)
     }
 
     override suspend fun onKeeperMessage(handle: ManagedSessionHandle, text: String) {
         if (text.isBlank()) return
         val part = MemorySessionPart(MemorySourceKind.Message, "Keeper message", text.take(maxCapturedEventChars))
-        val capture = mutex.withLock { captures[handle]?.also { it.parts.add(part) } } ?: return
+        val capture = mutex.withLock { captures[handle]?.also { it.add(part, maxCapturedEventChars) } } ?: return
         journalUnsent(handle, capture)
     }
 
     override suspend fun onSessionFinished(handle: ManagedSessionHandle, status: ManagedSessionStatus) {
         if (status != ManagedSessionStatus.Completed && status != ManagedSessionStatus.Failed) return
         val capture = mutex.withLock { captures[handle] } ?: return
-        send(
-            handle,
-            capture,
-            MemorySessionPart(
-                kind = if (status == ManagedSessionStatus.Failed) MemorySourceKind.Failure else MemorySourceKind.Other,
-                label = "Terminal status",
-                text = status.name,
-            ),
-        )
-        mutex.withLock {
-            if (captures[handle] === capture) captures.remove(handle)
+        capture.sendLock.withLock {
+            sendLocked(
+                handle,
+                capture,
+                MemorySessionPart(
+                    kind = if (status == ManagedSessionStatus.Failed) MemorySourceKind.Failure else MemorySourceKind.Other,
+                    label = "Terminal status",
+                    text = status.name,
+                ),
+            )
+            // A keeper message can land while the terminal envelope is being sent: send what came in, then let go.
+            while (true) {
+                val finished = mutex.withLock {
+                    val done = capture.sentParts >= capture.parts.size
+                    if (done && captures[handle] === capture) captures.remove(handle)
+                    done
+                }
+                if (finished) break
+                sendLocked(handle, capture, terminal = null)
+            }
         }
     }
 
@@ -234,20 +271,36 @@ class QueuedMemorySessionObserver(
 
     /**
      * Sends the parts after the capture's cursor (plus [terminal], if any) as one envelope and moves
-     * the cursor past them, so each part reaches memory exactly once. Nothing new and no terminal
-     * part: nothing is sent. The capture itself is kept.
+     * the cursor past them only once the queue has them, so each part reaches memory exactly once and a
+     * failed send is retried with the same parts. Nothing new and no terminal part: nothing is sent.
+     * The capture itself is kept.
      */
     private suspend fun send(handle: ManagedSessionHandle, capture: Capture, terminal: MemorySessionPart?) {
-        val (fresh, sequence) = mutex.withLock {
+        capture.sendLock.withLock { sendLocked(handle, capture, terminal) }
+    }
+
+    /** [send] for a caller that already holds the capture's send lock. */
+    private suspend fun sendLocked(handle: ManagedSessionHandle, capture: Capture, terminal: MemorySessionPart?) {
+        val (fresh, sequence, closedAt) = mutex.withLock {
             val fresh = capture.parts.subList(capture.sentParts, capture.parts.size).toList()
             if (fresh.isEmpty() && terminal == null) return
-            capture.sentParts = capture.parts.size
-            fresh to capture.sends++
+            Triple(fresh, capture.sends, capture.closedAt ?: nowEpochMillis().also { capture.closedAt = it })
         }
-        queue.enqueueSession(envelopeOf(handle, capture, fresh + listOfNotNull(terminal), sequence))
+        queue.enqueueSession(envelopeOf(handle, capture, fresh + listOfNotNull(terminal), sequence, closedAt))
+        val more = mutex.withLock {
+            capture.sentParts += fresh.size
+            capture.sends++
+            capture.closedAt = null
+            capture.journaledAt = null
+            capture.sentParts < capture.parts.size
+        }
         // Only once it is in the queue does the journal let go of it: a failure above keeps it for the restart.
-        capture.journaledAt = null
-        runCatchingCancellable { journal?.record(handle.providerRunId.value, null) }
+        // Parts that arrived while it was being sent stay journaled.
+        if (more) {
+            journalUnsent(handle, capture, force = true)
+        } else {
+            runCatchingCancellable { journal?.record(handle.providerRunId.value, null) }
+        }
     }
 
     private fun envelopeOf(
@@ -255,6 +308,7 @@ class QueuedMemorySessionObserver(
         capture: Capture,
         parts: List<MemorySessionPart>,
         sequence: Int,
+        closedAt: Long,
     ): MemorySessionEnvelope {
         val request = capture.request
         val context = request.orchestrationContext
@@ -275,7 +329,7 @@ class QueuedMemorySessionObserver(
             // can all carry a key a run saw, and a bank outlives the run (and is recalled into others).
             userPrompt = ControlRedaction.scrub(capture.userPrompt),
             parts = parts.map { it.copy(text = ControlRedaction.scrub(it.text)) },
-            closedAtEpochMillis = nowEpochMillis(),
+            closedAtEpochMillis = closedAt,
             sequence = sequence,
         )
     }
@@ -287,16 +341,54 @@ class QueuedMemorySessionObserver(
     private suspend fun journalUnsent(handle: ManagedSessionHandle, capture: Capture, force: Boolean = false) {
         val target = journal ?: return
         val now = nowEpochMillis()
-        val (fresh, sequence) = mutex.withLock {
+        val snapshot = mutex.withLock {
             val last = capture.journaledAt
-            if (!force && last != null && now - last < journalIntervalMillis) return
+            if (!force && last != null && now - last < journalIntervalMillis) {
+                scheduleTrailingFlush(handle, capture, journalIntervalMillis - (now - last))
+                return
+            }
             capture.journaledAt = now
-            capture.parts.subList(capture.sentParts, capture.parts.size).toList() to capture.sends
+            Triple(
+                capture.parts.subList(capture.sentParts, capture.parts.size).toList(),
+                capture.sends,
+                capture.closedAt ?: now.also { capture.closedAt = it },
+            )
         }
+        val (fresh, sequence, closedAt) = snapshot
         if (fresh.isEmpty()) return
-        runCatchingCancellable { target.record(handle.providerRunId.value, envelopeOf(handle, capture, fresh, sequence)) }
+        runCatchingCancellable { target.record(handle.providerRunId.value, envelopeOf(handle, capture, newestWithinBudget(fresh), sequence, closedAt)) }
+    }
+
+    /** Called with the mutex held: one write after [delayMillis], so a part skipped by the interval is not left for the next one. */
+    private fun scheduleTrailingFlush(handle: ManagedSessionHandle, capture: Capture, delayMillis: Long) {
+        val scope = flushScope ?: return
+        if (capture.trailingFlush?.isActive == true) return
+        capture.trailingFlush = scope.launch {
+            delay(delayMillis.coerceAtLeast(1L))
+            journalUnsent(handle, capture, force = true)
+        }
     }
 }
+
+/**
+ * [parts] cut from the front until what is left fits the journal's room for one session, so a capture that outgrew
+ * it keeps its newest parts on disk rather than none (a write over the limit is skipped, leaving the older snapshot).
+ */
+internal fun newestWithinBudget(parts: List<MemorySessionPart>, budgetChars: Int = JOURNAL_SESSION_BUDGET_CHARS): List<MemorySessionPart> {
+    var total = 0
+    var start = parts.size
+    while (start > 0) {
+        val next = total + parts[start - 1].text.length
+        if (next > budgetChars && start < parts.size) break
+        total = next
+        start--
+    }
+    return parts.subList(start, parts.size)
+}
+
+private const val JOURNAL_SESSION_BUDGET_CHARS = SettingsMemoryCaptureJournal.MAX_CHARS / 4
+
+private const val THINKING_LABEL = "Agent thinking"
 
 /**
  * The workflow a session's memory belongs to: its workflow run (from the orchestration context, else

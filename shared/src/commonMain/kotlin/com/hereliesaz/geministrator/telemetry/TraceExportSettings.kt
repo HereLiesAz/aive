@@ -36,7 +36,7 @@ class TraceExportSettingsStore(
     private val exportedKey: String = DEFAULT_EXPORTED_KEY,
 ) {
     /** Resolved at first use, not at construction, so the private file is chosen whatever order the platform starts in. */
-    private val backing: Settings by lazy { settings ?: com.hereliesaz.geministrator.persistence.PrivateSettings.forKeys(DEFAULT_KEY, DEFAULT_EXPORTED_KEY) }
+    private val backing: Settings by lazy { settings ?: com.hereliesaz.geministrator.persistence.PrivateSettings.forKeys(key, exportedKey) }
     fun load(): TraceExportSettings = backing.getStringOrNull(key)
         ?.let { encoded -> runCatching { json.decodeFromString(TraceExportSettings.serializer(), encoded) }.getOrNull() }
         ?: TraceExportSettings()

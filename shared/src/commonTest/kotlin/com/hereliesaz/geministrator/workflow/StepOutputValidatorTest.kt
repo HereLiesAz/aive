@@ -107,6 +107,15 @@ class StepOutputValidatorTest {
     }
 
     @Test
+    fun aProvidersGenericTextLabelFitsAnyTextSpecification() {
+        assertTrue(mediaTypeFits("text/markdown", "text/html"))
+        assertTrue(mediaTypeFits("text/plain", "text/csv"))
+        assertTrue(mediaTypeFits("text/markdown", "text/vnd.mermaid"))
+        assertFalse(mediaTypeFits("text/html", "text/markdown"))
+        assertFalse(mediaTypeFits("text/markdown", "application/json"))
+    }
+
+    @Test
     fun aContractWithNoOutputsAlwaysPasses() {
         assertTrue(checkStepOutputs(TaskContract(TemplateRef("x", 1)), emptyList()).isEmpty())
     }

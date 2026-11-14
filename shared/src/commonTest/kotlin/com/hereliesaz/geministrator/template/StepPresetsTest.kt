@@ -47,6 +47,8 @@ class StepPresetsTest {
         assertTrue(BuiltInTemplates.PrepareFilesForRepository !in BuiltInTemplates.queenMayMake)
         assertTrue(BuiltInTemplates.MakeDiagram in BuiltInTemplates.queenMayMake)
         assertEquals(setOf(StepEffect.None), StepPresets.ReadRepositoryFiles.effects)
+        // A read-only step must not resolve to a role that requires RepositoryWrite (providers pick their editing path from it).
+        assertEquals(BuiltInRoles.Reviewer.id, StepInstantiation.roleFor(StepPresets.ReadRepositoryFiles.roleHint))
     }
 
     @Test

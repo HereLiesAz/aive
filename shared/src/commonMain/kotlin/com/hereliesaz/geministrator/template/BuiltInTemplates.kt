@@ -331,14 +331,20 @@ object StepInstantiation {
         )
     }
 
-    /** [wording] followed by the literal [inputs] (a binding to another step is not text). */
+    /**
+     * [wording] followed by the [inputs]: a literal as its text, a binding to another step as a line saying that step's
+     * output fills the port (the artifacts themselves arrive as context, so this line is what tells two of them apart).
+     */
     fun objectiveWith(wording: String, inputs: Map<String, String>): String {
-        val literals = inputs.filterValues { boundTask(it) == null }
         return buildString {
             append(wording)
-            if (literals.isNotEmpty()) {
+            if (inputs.isNotEmpty()) {
                 append("\n\n").append(INPUTS_MARK)
-                literals.forEach { (port, value) -> append("\n- ").append(port).append(": ").append(value.take(MAX_INPUT_CHARS)) }
+                inputs.forEach { (port, value) ->
+                    val bound = boundTask(value)
+                    append("\n- ").append(port).append(": ")
+                    if (bound == null) append(value.take(MAX_INPUT_CHARS)) else append("the output of step ").append(bound.value)
+                }
             }
         }
     }

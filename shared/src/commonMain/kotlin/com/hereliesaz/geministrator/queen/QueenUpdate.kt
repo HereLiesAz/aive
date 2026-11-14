@@ -64,7 +64,10 @@ fun queenUpdate(
     // A run that has just finished still carries the training offer (the one suggestion that is made at the end of a run).
     if (run.status.finished()) {
         val training = suggestions.filter { it.suggestion?.action == QueenAction.TrainSpecialist }
-        return listOf(finishNote(definition, run, hiveSigns, blockers)) + stepAllowanceNotes(definition, run) + training + tutorialLines
+        // What the run made for its blockers and why a lesson or an optional step ended stay said after it finishes.
+        val kept = blockerNotes(run.id.value, definition, run, blockers).filter { it.voice == QueenVoice.BlockerMade } +
+            tutorialFailureNotes(definition, run)
+        return listOf(finishNote(definition, run, hiveSigns, blockers)) + stepAllowanceNotes(definition, run) + kept + training + tutorialLines
     }
     val lead = missingNotes(run.id.value, missing, level) + blockerNotes(run.id.value, definition, run, blockers) + disputes + tutorialFailureNotes(definition, run) + tutorialLines
     val stop = run.spendPause

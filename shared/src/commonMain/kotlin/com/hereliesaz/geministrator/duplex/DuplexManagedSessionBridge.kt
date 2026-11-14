@@ -110,6 +110,10 @@ class DuplexSessionObserver(
     override suspend fun annotateUserMessage(handle: ManagedSessionHandle, text: String): String =
         memory.annotateUserMessage(handle, text)
 
+    override suspend fun onKeeperMessage(handle: ManagedSessionHandle, text: String) {
+        memory.onKeeperMessage(handle, text)
+    }
+
     private suspend fun publish(event: AgentEvent) {
         val text = when (event) {
             is AgentEvent.Message -> event.content.takeUnless { it.startsWith(MEMORY_MESSAGE_MARKER) }

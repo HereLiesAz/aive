@@ -69,7 +69,8 @@ class InMemoryProcedureStore(
 
     override suspend fun replace(expectedRevision: Long, replacement: ProcedureSnapshot): Boolean = mutex.withLock {
         if (snapshot.revision != expectedRevision) return@withLock false
-        val next = replacement.copy(revision = snapshot.revision + 1)
+        // An imported archive is held to the same receipt limit as every other write.
+        val next = replacement.copy(revision = snapshot.revision + 1, traces = capTraces(replacement.traces))
         validateInitial(next)
         next.artifacts.forEach { it.verify() }
         snapshot = next

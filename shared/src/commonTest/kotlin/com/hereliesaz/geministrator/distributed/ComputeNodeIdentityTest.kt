@@ -228,4 +228,12 @@ class ComputeNodeIdentityTest {
         override val publicKey: String = "UFVCTElDLUtFWQ=="
         override fun sign(message: ByteArray): ByteArray = "signed:".encodeToByteArray() + message
     }
+
+    @Test
+    fun holdingTheOwnersTokenChangesWhatWasEnrolled() {
+        val without = ComputeNodeEnrolmentLedger.fingerprint("wss://relay.example", "pool", "desk", "key")
+        val with = ComputeNodeEnrolmentLedger.fingerprint("wss://relay.example", "pool", "desk", "key", ownerTokenHeld = true)
+        assertTrue(without != with, "a device enrolled before the token was set enrols again with it")
+        assertEquals(without, ComputeNodeEnrolmentLedger.fingerprint("wss://relay.example/", "pool", "desk", "key", ownerTokenHeld = false))
+    }
 }

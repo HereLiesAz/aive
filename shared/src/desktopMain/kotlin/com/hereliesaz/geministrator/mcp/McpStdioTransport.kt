@@ -34,6 +34,10 @@ class McpStdioTransport private constructor(
     private val writeLock = Mutex()
     private val pending = ConcurrentHashMap<Long, CompletableDeferred<JsonObject>>()
 
+    /** Why the reader has stopped, once it has: set before the waiting calls are failed, so a call that arrives later is refused at once. */
+    @Volatile
+    private var stopped: McpProtocolException? = null
+
     init {
         scope.launch { readLoop() }
     }
@@ -47,6 +51,8 @@ class McpStdioTransport private constructor(
         val answer = CompletableDeferred<JsonObject>()
         pending[id] = answer
         try {
+            // Checked after the call is registered: either the reader sees it when it fails the waiting calls, or this sees why it stopped.
+            stopped?.let { throw it }
             if (!process.isAlive) throw McpProtocolException("The MCP server process has exited")
             write(outgoing.message)
             return McpIncoming(null, answer.await())
@@ -81,10 +87,11 @@ class McpStdioTransport private constructor(
         } catch (_: StdioLineTooLongException) {
             // The stream cannot be resynchronised after an oversized line: fail the waiting calls and stop the server.
             failure = McpProtocolException("The MCP server sent a message that is too large; it was stopped")
-            runCatching { process.destroy() }
+            runCatching { stopProcess() }
         } catch (_: Exception) {
             // The stream closed; pending callers are failed below.
         } finally {
+            stopped = failure
             pending.values.forEach { it.completeExceptionally(failure) }
         }
     }
@@ -110,12 +117,15 @@ class McpStdioTransport private constructor(
     override suspend fun close() {
         withContext(Dispatchers.IO) {
             runCatching { writer.close() }
-            if (!process.waitFor(2, TimeUnit.SECONDS)) {
-                process.destroy()
-                if (!process.waitFor(2, TimeUnit.SECONDS)) process.destroyForcibly()
-            }
+            if (!process.waitFor(2, TimeUnit.SECONDS)) stopProcess()
         }
         scope.cancel()
+    }
+
+    /** Asks the server to end, waits a moment, then ends it for good: a server that ignores the request does not keep running. */
+    private fun stopProcess() {
+        process.destroy()
+        if (!process.waitFor(2, TimeUnit.SECONDS)) process.destroyForcibly()
     }
 
     companion object {

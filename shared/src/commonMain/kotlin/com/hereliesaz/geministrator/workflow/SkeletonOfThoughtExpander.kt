@@ -186,7 +186,7 @@ object SkeletonOfThoughtExpander {
                         executor = TaskExecutor.RoleAgent(aggregatorRole.id),
                         dependsOn = task.dependsOn + skeletonId + independenceId + expansionIds,
                         condition = task.condition,
-                        verificationPolicy = VerificationPolicy.None,
+                        verificationPolicy = task.verificationPolicy.takeIf { it is VerificationPolicy.Deterministic } ?: VerificationPolicy.None, // the compiled check judges the final output
                         compoundInferencePolicy = CompoundInferencePolicy.Single,
                     ),
                 )

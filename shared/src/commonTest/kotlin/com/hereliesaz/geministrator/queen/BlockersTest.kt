@@ -152,12 +152,12 @@ class BlockersTest {
     }
 
     @Test
-    fun aStepHeldForAnInputIsSaidInTheQueensOwnWordsAndLinksToItsNeedsTab() {
+    fun aStepHeldForAnInputIsSaidInTheQueensOwnWordsAndLinksToItsWorkTab() {
         val (def, _) = heldDefinition()
         val added = Blockers.live(emptyList(), def, heldRun(), emptyList())
         val note = blockerNotes("r1", def, heldRun(), added).single()
         assertEquals(QueenVoice.BlockerAddedQueen, note.voice)
-        assertEquals(QueenLink.Creature("held", CreatureTab.Needs), note.link)
+        assertEquals(QueenLink.Creature("held", CreatureTab.Work), note.link)
         assertEquals(QueenQuoteLabel.StillMissing, note.quotes.single().label)
     }
 
@@ -198,6 +198,32 @@ class BlockersTest {
         assertEquals(QueenVoice.BlockerMade, note.voice)
         assertEquals(QueenQuoteLabel.NowMade, note.quotes.single().label)
         assertTrue(Blockers.unmet(resolved).isEmpty())
+    }
+
+    @Test
+    fun oneFinishedStepAnswersOnlyOneOfTwoBlockersWithTheSameStartingTemplate() {
+        val def = assertIs<BlockerAssignment.Assigned>(Blockers.assignStep(definition, Blocker("b0", "A comparison table", "sheet-table"))).definition
+        val stepId = def.tasks.last().id.value
+        val artifact = ArtifactRef(
+            id = ArtifactId("x"), kind = ArtifactKind.Design, taskRunId = TaskRunId("r-$stepId"),
+            label = "table", textContent = "rows", createdAtEpochMillis = 1,
+        )
+        val run = qRun(qTaskRun("a", TaskRunStatus.Running), qTaskRun(stepId, TaskRunStatus.Completed, artifacts = listOf(artifact)))
+        val two = listOf(Blocker("b1", "A pricing table", "sheet-table"), Blocker("b2", "A feature table", "sheet-table"))
+        val first = Blockers.resolved(two, def, run)
+        assertEquals(listOf(BlockerState.Done, BlockerState.Open), first.map { it.state })
+        assertEquals(stepId, first[0].stepId)
+        // Said again later, it is still one answered and one waiting.
+        assertEquals(first.map { it.state }, Blockers.resolved(first, def, run).map { it.state })
+    }
+
+    @Test
+    fun aNannyFindingAboutAStepFollowsThatStep() {
+        val finding = NannyFinding("f1", "rep", "missing: the totals", "The totals are missing", taskId = "a", action = null, solutions = emptyList())
+        val added = Blockers.fromNannyFindings(emptyList(), listOf(finding), definition)
+        assertEquals("a", added.single().stepId)
+        val done = qRun(qTaskRun("a", TaskRunStatus.Completed), status = WorkflowRunStatus.Completed)
+        assertTrue(Blockers.unmet(Blockers.resolved(added, definition, done)).isEmpty())
     }
 
     @Test

@@ -261,8 +261,13 @@ interface ComputeNodeEnrolmentLedger {
     fun forget()
 
     companion object {
-        fun fingerprint(relayBaseUrl: String, poolId: String, nodeId: String, publicKey: String): String =
-            listOf(relayBaseUrl.trim().trimEnd('/'), poolId, nodeId, publicKey).joinToString("\n")
+        /**
+         * Holding the owner's token is part of what was enrolled: a device revoked earlier and then given the token
+         * enrols afresh with it, since only the owner's token can restore a revoked device. The token itself is never kept.
+         */
+        fun fingerprint(relayBaseUrl: String, poolId: String, nodeId: String, publicKey: String, ownerTokenHeld: Boolean = false): String =
+            listOfNotNull(relayBaseUrl.trim().trimEnd('/'), poolId, nodeId, publicKey, "owner-token".takeIf { ownerTokenHeld })
+                .joinToString("\n")
     }
 }
 

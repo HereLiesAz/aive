@@ -242,14 +242,17 @@ internal fun SchedulesPart(compact: Boolean) {
         }
         val openHive = LocalPlaceLinks.current.openHive
         items.forEach { schedule ->
-            ScheduleCard(
-                schedule,
-                // What it runs is the hive it belongs to: the card opens it.
-                onOpenHive = openHive?.let { open -> { open(schedule.workflowId) } },
-                onEdit = { change -> edit(schedule.id, change) },
-                onToggle = { toggle(schedule) },
-                onRemove = { scope.launch { runCatching { store.remove(schedule.id) }.onFailure { message = it.message }; reload += 1 } },
-            )
+            // Keyed by the schedule, so removing one above another does not hand its typed time to the card that moves up.
+            androidx.compose.runtime.key(schedule.id) {
+                ScheduleCard(
+                    schedule,
+                    // What it runs is the hive it belongs to: the card opens it.
+                    onOpenHive = openHive?.let { open -> { open(schedule.workflowId) } },
+                    onEdit = { change -> edit(schedule.id, change) },
+                    onToggle = { toggle(schedule) },
+                    onRemove = { scope.launch { runCatching { store.remove(schedule.id) }.onFailure { message = it.message }; reload += 1 } },
+                )
+            }
         }
     }
 }

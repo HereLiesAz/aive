@@ -208,16 +208,17 @@ class SqlWorkflowPersistence(
 
     override suspend fun recoverFromCorruption(): Boolean {
         val hadData = locked {
-            val had = queries.allProjects().awaitAsList().isNotEmpty() ||
-                queries.allRuns().awaitAsList().isNotEmpty()
-            // Recovery clears the rows; copy every raw payload into `meta` first (it is never cleared), as
-            // quarantine does for one unreadable row, so the damaged data can still be inspected or repaired.
-            val kept = if (had) keepRowsAsideUnlocked() else 0
+            // Recovery clears the rows; copy every raw payload of every table into `meta` first (it is never cleared), as
+            // quarantine does for one unreadable row, so the damaged data can still be inspected or repaired. A table that
+            // cannot be read stops the recovery before anything is cleared.
+            val kept = keepRowsAsideUnlocked()
             database.transaction { clearUnlocked() }
-            if (kept > 0) {
-                lastRecoveryNote = "Recovery cleared the workflow store; $kept raw records were kept in the database's meta table under '$CORRUPT_PREFIX'."
+            lastRecoveryNote = if (kept > 0) {
+                "Recovery cleared the workflow store; $kept raw records were kept in the database's meta table under '$CORRUPT_PREFIX'."
+            } else {
+                null
             }
-            had
+            kept > 0
         }
         lastCorruptionError = null
         return hadData
@@ -227,15 +228,22 @@ class SqlWorkflowPersistence(
     var lastRecoveryNote: String? = null
         private set
 
-    /** Copies each row's raw payload into `meta` as `corrupt:<kind>:<hash>`; returns how many. Never throws for one bad read. */
+    /**
+     * Copies each row's raw payload into `meta` as `corrupt:<kind>:<hash>` (a second identical payload gets `#2`, and so on, so
+     * duplicate rows are each kept); returns how many. Every table is read before anything is written, and a table that cannot be
+     * read throws, so recovery never clears rows it did not first keep.
+     */
     private suspend fun keepRowsAsideUnlocked(): Int {
-        var kept = 0
-        suspend fun keep(kind: String, rows: suspend () -> List<String>) {
-            val payloads = try { rows() } catch (cancellation: CancellationException) { throw cancellation } catch (_: Exception) { return }
-            payloads.forEach { payload ->
-                queries.putMeta("$CORRUPT_PREFIX$kind:${stableHash64(payload)}", payload)
-                kept++
+        val rows = mutableListOf<Pair<String, String>>()
+        suspend fun keep(kind: String, read: suspend () -> List<String>) {
+            val payloads = try {
+                read()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (failure: Exception) {
+                throw IllegalStateException("Recovery stopped: the $kind records could not be read to keep aside, so nothing was cleared.", failure)
             }
+            payloads.forEach { rows += kind to it }
         }
         keep("Project") { queries.allProjects().awaitAsList() }
         keep("WorkflowDefinition") { queries.allDefinitions().awaitAsList() }
@@ -244,7 +252,14 @@ class SqlWorkflowPersistence(
         keep("RoleDefinition") { queries.allRoles().awaitAsList() }
         keep("ArtifactRef") { queries.allArtifacts().awaitAsList() }
         keep("ApprovalGate") { queries.allGates().awaitAsList() }
-        return kept
+        val seen = mutableMapOf<String, Int>()
+        rows.forEach { (kind, payload) ->
+            val key = "$CORRUPT_PREFIX$kind:${stableHash64(payload)}"
+            val occurrence = (seen[key] ?: 0) + 1
+            seen[key] = occurrence
+            queries.putMeta(if (occurrence == 1) key else "$key#$occurrence", payload)
+        }
+        return rows.size
     }
 
     /**

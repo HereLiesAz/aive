@@ -162,7 +162,7 @@ object CentralizedMixtureOfAgentsExpander {
                         executor = TaskExecutor.RoleAgent(aggregatorRole.id),
                         dependsOn = task.dependsOn + proposerIds + governanceId,
                         condition = task.condition,
-                        verificationPolicy = VerificationPolicy.None,
+                        verificationPolicy = task.verificationPolicy.takeIf { it is VerificationPolicy.Deterministic } ?: VerificationPolicy.None, // the compiled check judges the final output
                         compoundInferencePolicy = CompoundInferencePolicy.Single,
                     ),
                 )

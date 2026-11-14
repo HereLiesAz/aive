@@ -28,6 +28,16 @@ class ProcedureTraceCapTest {
     }
 
     @Test
+    fun anImportedArchivePastTheCapIsCutToIt() = runTest {
+        val store = InMemoryProcedureStore("w")
+        val over = InMemoryProcedureStore.MAX_TRACES + 5
+        assertTrue(store.replace(0L, ProcedureSnapshot(traces = (1..over).map(::trace))))
+        val traces = store.read().traces
+        assertEquals(InMemoryProcedureStore.MAX_TRACES, traces.size)
+        assertEquals(over.toLong(), traces.last().recordedAtEpochMillis)
+    }
+
+    @Test
     fun aCommitPastTheCapKeepsTheNewestReceipts() = runTest {
         val store = InMemoryProcedureStore("w")
         val first = (1..InMemoryProcedureStore.MAX_TRACES).map(::trace)

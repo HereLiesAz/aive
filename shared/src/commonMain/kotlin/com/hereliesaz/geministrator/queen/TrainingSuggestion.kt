@@ -29,7 +29,8 @@ internal fun trainingCandidates(uses: List<RoleUse>, roles: Collection<RoleDefin
     return uses.groupBy { it.roleId }.mapNotNull { (roleId, ofRole) ->
         val role = byId[roleId] ?: return@mapNotNull null
         val generic = role.enabled && role.parents.isEmpty() && role.hatchedFromRunId == null && !roleId.endsWith(TRAINING_DRAFT_SUFFIX)
-        val hasSpecialist = roles.any { other -> other.parents.any { it.value == roleId } }
+        // A hatchling from a run is disabled until the keeper adopts it, so only an enabled child counts as a specialist.
+        val hasSpecialist = roles.any { other -> other.enabled && other.parents.any { it.value == roleId } }
         if (!generic || hasSpecialist) return@mapNotNull null
         val best = ofRole.groupBy { it.domain }.values
             .filter { it.size >= TRAIN_SUGGEST_MIN_USES && it.map { u -> u.runId }.distinct().size >= TRAIN_SUGGEST_MIN_RUNS }

@@ -50,6 +50,21 @@ class ScheduleTickerTest {
     }
 
     @Test
+    fun aDailyHourFollowsTheDevicesOffsetWithoutTheSchedulesScreenOpen() = runTest {
+        val store = InMemoryWorkflowScheduleStore()
+        store.put(due().copy(cadence = ScheduleCadence.daily(9), utcOffsetMinutes = 0))
+        val started = mutableListOf<String>()
+        // Nine in the morning at +2 hours is 07:00 UTC; the stored offset (0) would put it at 09:00 UTC.
+        fun ticker(offset: Int?) = ScheduleTicker(
+            store = store, now = { base + 7 * hour + hour / 2 }, runActive = { false },
+            start = { started += it.workflowId }, log = {}, deviceUtcOffsetMinutes = { offset },
+        )
+        assertEquals(ScheduleDecision.Idle, ticker(null).tick())
+        assertIs<ScheduleDecision.Start>(ticker(120).tick())
+        assertEquals(listOf("hive-s"), started)
+    }
+
+    @Test
     fun anActiveRunHoldsItOnceInTheLogAndItStartsWhenTheRunEnds() = runTest {
         val f = Fixture(base + 2 * hour, active = true)
         f.store.put(due())

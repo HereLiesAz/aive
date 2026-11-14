@@ -10,6 +10,7 @@ import com.hereliesaz.geministrator.domain.BlockingReason
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProviderConstraints
 import com.hereliesaz.geministrator.domain.ProviderRunId
+import com.hereliesaz.geministrator.domain.requiresToolFilter
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.RetryReason
 import com.hereliesaz.geministrator.domain.RoleDefinition
@@ -298,7 +299,7 @@ class WorkflowEngine(
                         estimatedInputTokens = ownEstimate,
                         excludedProviderIds = taskRun.failedProviders.toSet(),
                         failoverAllowed = isProviderAuto(role, task),
-                        requiresToolFilter = task.contract?.allowedTools?.isNotEmpty() == true || role.toolCeiling.isNotEmpty(),
+                        requiresToolFilter = task.contract?.requiresToolFilter() == true || role.toolCeiling.isNotEmpty(),
                     )
                     val providerId = sessionGateway.resolveProvider(selection)
                     val providerLimit = definition.concurrencyPolicy.perProviderLimits[providerId] ?: Int.MAX_VALUE
@@ -1065,8 +1066,22 @@ class WorkflowEngine(
             repository = project.repository,
             excludedProviderIds = taskRun.failedProviders.toSet(),
             failoverAllowed = isProviderAuto(role, task),
-            requiresToolFilter = task.contract?.allowedTools?.isNotEmpty() == true || role.toolCeiling.isNotEmpty(),
+            requiresToolFilter = task.contract?.requiresToolFilter() == true || role.toolCeiling.isNotEmpty(),
         )
+    }
+
+    /**
+     * Why [task]'s [artifacts] are turned back, or null when they stand: its contract's outputs first, then its compiled
+     * check. The same two checks a local session's output meets; a task run on another device meets them here, on
+     * the originating device, before anything waits on it. Pure.
+     */
+    fun outputRejection(task: TaskDefinition, artifacts: List<ArtifactRef>): BlockingReason? {
+        val violations = task.contract?.let { checkStepOutputs(it, artifacts) }.orEmpty()
+        if (violations.isNotEmpty()) return BlockingReason(OUTPUT_CONTRACT_VIOLATION, contractViolationMessage(violations))
+        val problems = (task.verificationPolicy as? VerificationPolicy.Deterministic)
+            ?.let { outputValidators.problems(it.validatorId, artifacts) }
+            .orEmpty()
+        return if (problems.isEmpty()) null else BlockingReason(TASK_OUTPUT_REJECTED, taskOutputRejectedMessage(problems))
     }
 
     suspend fun handleFailure(
@@ -1077,6 +1092,8 @@ class WorkflowEngine(
         reason: String,
         nowEpochMillis: Long,
         allowRetry: Boolean = true,
+        /** False for a step stopped for its allowance: another creature would spend it again, so the keeper decides. */
+        allowReassign: Boolean = true,
     ): WorkflowRun {
         require(!run.status.isTerminal()) { "Workflow ${run.id.value} is already ${run.status}" }
         val task = requireNotNull(definition.tasks.firstOrNull { it.id == taskDefinitionId }) {
@@ -1093,7 +1110,12 @@ class WorkflowEngine(
         )
         // An optional creature is tried as often as its retry policy says, then skipped: it is never a reason to stop the run
         // or to ask the keeper (docs/Keepers-Room.md, optional creatures).
-        val decision = if (task.optional && decided !is FailureDecision.Retry) FailureDecision.FailWorkflow else decided
+        val decision = when {
+            task.optional && decided !is FailureDecision.Retry -> FailureDecision.FailWorkflow
+            // A step stopped for want of allowance is not given to another creature either: that would spend it again.
+            !allowReassign && decided is FailureDecision.Reassign -> FailureDecision.RequireHumanDecision
+            else -> decided
+        }
 
         return when (decision) {
             is FailureDecision.Retry -> {

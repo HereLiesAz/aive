@@ -340,7 +340,9 @@ class WorkflowRuntimeCoordinator(
 
         for (taskId in newlyFailedTaskIds) {
             if (nextRun.status.isTerminal()) break
-            if ((nextRun.taskRuns[taskId]?.timedOutAttempts ?: 0) >= MAX_TIMEOUTS) {
+            // An optional creature is never a reason to ask the keeper: slow twice, it goes through the failure policy and is set aside.
+            val optionalStep = definition.tasks.firstOrNull { it.id == taskId }?.optional == true
+            if (!optionalStep && (nextRun.taskRuns[taskId]?.timedOutAttempts ?: 0) >= MAX_TIMEOUTS) {
                 // Slow twice: the keeper decides, whatever the step's escalation policy says.
                 val reason = "Took longer than allowed twice. ${nextRun.taskRuns[taskId]?.progressMessage.orEmpty()}".trim()
                 nextRun = engine.escalateTimedOut(nextRun, taskId, reason, nowEpochMillis)
@@ -358,6 +360,7 @@ class WorkflowRuntimeCoordinator(
                     reason = allowanceStop.message,
                     nowEpochMillis = nowEpochMillis,
                     allowRetry = false,
+                    allowReassign = false,
                 )
                 if (nextRun.taskRuns[taskId]?.status == TaskRunStatus.Escalated) {
                     ensureFailureEscalationGate(run = nextRun, taskId = taskId, reason = allowanceStop.message, now = nowEpochMillis)
@@ -1657,12 +1660,16 @@ class WorkflowRuntimeCoordinator(
                 val received = definition.labelTaskOutputs(next, task, ContextProvenance.ExternalContent, update.artifacts)
                 (taskRun.artifacts + received).distinctBy { it.id }
             }
+            // What came back from the pool is held to the step's contract and compiled check before anything waits on it.
+            val rejection = if (update.status == TaskRunStatus.Completed) engine.outputRejection(task, mergedArtifacts) else null
+            val settledStatus = if (rejection != null) TaskRunStatus.Failed else update.status
+            if (settledStatus != update.status && !TaskRunTransitions.canTransition(taskRun.status, settledStatus)) continue
             next = next.copy(
                 taskRuns = next.taskRuns + (
                     id to taskRun.copy(
-                        status = update.status,
+                        status = settledStatus,
                         artifacts = mergedArtifacts,
-                        blockingReason = null,
+                        blockingReason = rejection,
                         progress = update.progress
                             ?: if (update.status == TaskRunStatus.Completed) 1f else taskRun.progress,
                         progressMessage = update.progressMessage ?: taskRun.progressMessage,

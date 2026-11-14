@@ -1329,7 +1329,16 @@ class ApplicationRuntime private constructor(
      * Finished uses of each role in earlier runs, by project (the domain), for her training suggestion. Training runs are left out
      * (the swarm's own creatures are not a domain), and only the newest runs of each project are read.
      */
-    private suspend fun trainingUsage(): List<com.hereliesaz.geministrator.queen.RoleUse> =
+    private suspend fun trainingUsage(): List<com.hereliesaz.geministrator.queen.RoleUse> {
+        // The cycle asks every few seconds and the answer moves with finished runs, so it is read at most once a minute.
+        val now = nowEpochMillis()
+        trainingUsageCache?.takeIf { now - it.first < TRAINING_USAGE_REFRESH_MILLIS }?.let { return it.second }
+        return readTrainingUsage().also { trainingUsageCache = now to it }
+    }
+
+    private var trainingUsageCache: Pair<Long, List<com.hereliesaz.geministrator.queen.RoleUse>>? = null
+
+    private suspend fun readTrainingUsage(): List<com.hereliesaz.geministrator.queen.RoleUse> =
         persistence.projects.all().flatMap { project ->
             persistence.runs.byProject(project.id).sortedByDescending { it.updatedAtEpochMillis }.take(100)
                 .filter { r -> r.definitionSnapshot?.let { d -> com.hereliesaz.geministrator.queen.trainingRunInfo(d) } == null }
@@ -2036,6 +2045,7 @@ class ApplicationRuntime private constructor(
         private const val CYCLE_INTERVAL_MILLIS = 1_000L
         private const val QUEEN_REVIEW_REFRESH_MILLIS = 2_000L
         private const val QUEEN_SUGGEST_REFRESH_MILLIS = 5_000L
+        private const val TRAINING_USAGE_REFRESH_MILLIS = 60_000L
         private const val RETRY_BACKOFF_MILLIS = 2_000L
         private const val MAX_BACKOFF_MULTIPLIER = 15
         private const val TRANSIENT_FAILURE_LIMIT = 3
