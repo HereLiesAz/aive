@@ -54,7 +54,7 @@ class McpServerStore(
     private val storageKey: String = DEFAULT_STORAGE_KEY,
 ) {
     /** Resolved at first use, not at construction, so the private file is chosen whatever order the platform starts in. */
-    private val backing: Settings by lazy { settings ?: com.hereliesaz.geministrator.persistence.PrivateSettings.forKeys(DEFAULT_STORAGE_KEY) }
+    private val backing: Settings by lazy { settings ?: com.hereliesaz.geministrator.persistence.PrivateSettings.forKeys(storageKey) }
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
