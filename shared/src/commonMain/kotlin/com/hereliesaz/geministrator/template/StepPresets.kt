@@ -5,6 +5,20 @@ import com.hereliesaz.geministrator.domain.OutputSpec
 import com.hereliesaz.geministrator.domain.PortSpec
 import com.hereliesaz.geministrator.domain.PortType
 import com.hereliesaz.geministrator.domain.StepEffect
+import com.hereliesaz.geministrator.template.presets.ChecksAndEditsPresets
+import com.hereliesaz.geministrator.template.presets.ConnectedToolsPresets
+import com.hereliesaz.geministrator.template.presets.DataAndTablesPresets
+import com.hereliesaz.geministrator.template.presets.DocumentsPresets
+import com.hereliesaz.geministrator.template.presets.OutputKindsPresets
+import com.hereliesaz.geministrator.template.presets.PagesAndDiagramsPresets
+import com.hereliesaz.geministrator.template.presets.PlansAndRecordsPresets
+import com.hereliesaz.geministrator.template.presets.ResearchAndEvidencePresets
+import com.hereliesaz.geministrator.template.presets.SoftwareChangesPresets
+import com.hereliesaz.geministrator.template.presets.SoftwareWritingPresets
+import com.hereliesaz.geministrator.template.presets.StoryAndMediaTextPresets
+import com.hereliesaz.geministrator.template.presets.SwarmPlansAndTeachingPresets
+import com.hereliesaz.geministrator.template.presets.TrainingAndImprovementPresets
+import com.hereliesaz.geministrator.template.presets.WritingForPeoplePresets
 import com.hereliesaz.geministrator.workflow.StepOutputValidators
 
 /*
@@ -270,6 +284,13 @@ object StepPresets {
         budgetTokens = 20_000L,
     )
 
+    /** The starting templates of the catalog (template/presets, grouped as in [Producibles]), and the extra kinds of output. */
+    val catalog: List<StepTemplate> =
+        DocumentsPresets.all + PlansAndRecordsPresets.all + ResearchAndEvidencePresets.all + ChecksAndEditsPresets.all +
+            DataAndTablesPresets.all + PagesAndDiagramsPresets.all + WritingForPeoplePresets.all + StoryAndMediaTextPresets.all +
+            SoftwareWritingPresets.all + SoftwareChangesPresets.all + ConnectedToolsPresets.all +
+            SwarmPlansAndTeachingPresets.all + TrainingAndImprovementPresets.all + OutputKindsPresets.all
+
     /** Every preset, each its own template id and lineage. */
     val all: List<StepTemplate> = listOf(
         DeckOutline, DocsDraft, DesignTokens, DesignPage, ExplainerPage, DataPage, SheetTable,
@@ -278,5 +299,5 @@ object StepPresets {
         UpdateRepositoryFiles, AddAssetsToRepository, PrepareDownloadFiles,
         ChangeCode, RenderImage, RenderVideo, ComposeMedia, EditAudio, MakeSlides,
         LocalizeContent, FixedFormatResult, CappedTextResult,
-    ) + StepPresetsSending.all
+    ) + catalog + StepPresetsSending.all
 }

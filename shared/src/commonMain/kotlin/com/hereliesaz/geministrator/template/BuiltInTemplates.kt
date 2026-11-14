@@ -191,8 +191,12 @@ object BuiltInTemplates {
     /** Every template and preset by id: the closed catalog a step or a blocker may start from. */
     val byId: Map<String, StepTemplate> by lazy { (all + StepPresets.all).associateBy { it.id } }
 
-    /** The steps the queen may make by herself: those that change nothing outside their own output. */
-    val queenMayMake: List<StepTemplate> get() = all.filter { !it.effectful }
+    /**
+     * The steps the queen may make by herself: every template and preset that changes nothing outside its own output. There is
+     * no list of keeper-only templates: the permissions and trust policy in settings governs, and a step that changes something
+     * keeps its approval.
+     */
+    val queenMayMake: List<StepTemplate> get() = (all + StepPresets.all).filter { !it.effectful }
 
     /** Every template a keeper may add in Edit: the built-ins and the presets, grouped by [TemplateGroups] in the palette. */
     val palette: List<StepTemplate> get() = all + StepPresets.all

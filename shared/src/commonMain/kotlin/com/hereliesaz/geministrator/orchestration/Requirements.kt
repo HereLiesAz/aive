@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
  * tick is Pure and costs no model call; the rest is Judged by the reviewer. A requirement is never invented by a model.
  */
 
-enum class RequirementSource { Goal, Gates, Safety, Vocabulary, Structure, KeeperRole }
+enum class RequirementSource { Goal, Gates, Safety, Vocabulary, Structure, KeeperRole, Review }
 
 enum class RequirementCheck { Pure, Judged }
 
@@ -28,6 +28,9 @@ enum class RequirementVerdict { Met, Unmet, CannotTell }
 data class RequirementResult(val id: String, val verdict: RequirementVerdict, val evidence: String, val byCode: Boolean)
 
 data class RequirementChecklist(val items: List<Requirement>) {
+    /** The per-template floor: when true, every step that makes something reviewable must be followed by a check of the work. */
+    val requiresReview: Boolean get() = items.any { it.id == Requirements.REVIEW_ID }
+
     val judged: List<Requirement> get() = items.filter { it.check == RequirementCheck.Judged }
 }
 
@@ -39,6 +42,11 @@ data class RequirementInputs(
     val roles: List<RoleDefinition>,
     /** Roles the planner may use (a disabled or unstaffable role is not in it). */
     val availableRoleIds: Set<String>,
+    /**
+     * The keeper asked, at the start, for the work to be reviewed: the checklist then holds `R-review`. Left false, it is
+     * still set when the keeper's own words ask for a review (see [Requirements.asksForReview]); otherwise the queen decides.
+     */
+    val requireReview: Boolean = false,
 )
 
 object Requirements {
@@ -47,6 +55,15 @@ object Requirements {
     const val MAX_JUDGED = 12
     const val CLAUSE_CHARS = 200
     const val MAX_NAME_WORDS = 4
+    const val REVIEW_ID = "R-review"
+
+    private val reviewWords = Regex(
+        """\b(?:(?:must|should|need(?:s)? to|has to|have to|to|always|please)\s+(?:be\s+|get\s+|have\s+(?:a\s+|an\s+)?)?(?:reviewed|review|checked)|(?:with|and|plus)\s+(?:a\s+)?review|review(?:ed)?\s+(?:every|each|all|before))\b""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    /** True when the keeper's own words ask for the work to be reviewed. Pure; the queen decides otherwise. */
+    fun asksForReview(objective: String): Boolean = reviewWords.containsMatchIn(objective)
 
     private val clauseWords = Regex("""\b(must|should|never|only|without|at most|no more than|at least|within|before)\b""", RegexOption.IGNORE_CASE)
     private val stepLimit = Regex("""\b(?:at most|no more than|up to|max(?:imum)?(?: of)?)\s+(\d{1,2})\s+steps?\b""", RegexOption.IGNORE_CASE)
@@ -67,6 +84,9 @@ object Requirements {
         items += Requirement("R-gates", RequirementSource.Gates, "Every step that can change the repository sits behind the keeper's approval.", RequirementCheck.Pure)
         items += Requirement("R-roles", RequirementSource.KeeperRole, "Every step uses a role that is switched on.", RequirementCheck.Pure)
         items += Requirement("R-words", RequirementSource.Vocabulary, "Step names are at most $MAX_NAME_WORDS words and use the keeper's words.", RequirementCheck.Pure)
+        if (inputs.requireReview || (!inputs.objectiveExternal && asksForReview(inputs.objective))) {
+            items += Requirement(REVIEW_ID, RequirementSource.Review, "Every step that makes something a reviewer can review is followed by a check of the work.", RequirementCheck.Pure)
+        }
         if (inputs.objectiveExternal) {
             items += Requirement("R-outside", RequirementSource.Safety, "The goal came from outside: no step may change anything without approval.", RequirementCheck.Pure)
         }
@@ -106,6 +126,10 @@ object Requirements {
                     ?.let { "Step ${it.id} can change the repository and has no approval before it." }
                 "R-outside" -> plan.steps.firstOrNull { s -> rolesById[s.roleId]?.mutates() == true && !approvedAncestry(plan, s) }
                     ?.let { "Step ${it.id} can change something and the goal came from outside." }
+                REVIEW_ID -> plan.steps.firstOrNull { s ->
+                    com.hereliesaz.geministrator.template.Producibles.reviewable(s.templateId) &&
+                        plan.steps.none { r -> r.templateId == com.hereliesaz.geministrator.template.BuiltInTemplates.CHECK_WORK_ID && s.id in r.dependsOn }
+                }?.let { "Step ${it.id} makes something to be reviewed and no check of the work follows it." }
                 "R-roles" -> plan.steps.firstOrNull { it.roleId !in inputs.availableRoleIds }?.let { "Step ${it.id} uses a role that is not available." }
                 "R-words" -> plan.steps.firstOrNull { s ->
                     s.name.trim().split(Regex("\\s+")).size > MAX_NAME_WORDS || retired.containsMatchIn(s.name)

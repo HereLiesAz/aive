@@ -29,6 +29,14 @@ object StepOutputValidators {
     const val MERMAID_FLOWCHART = "mermaid-flowchart"
     const val JSON_OBJECT = "json-object"
     const val FILES_CHANGE = "files-change"
+    const val JSON_VALID = OutputKindChecks.JSON_VALID
+    const val MERMAID_DIAGRAM = OutputKindChecks.MERMAID_DIAGRAM
+    const val DIFF_UNIFIED = OutputKindChecks.DIFF_UNIFIED
+    const val CHECKLIST = OutputKindChecks.CHECKLIST
+    const val PLAN_STEPS = OutputKindChecks.PLAN_STEPS
+    const val SCRIPT_SCENES = OutputKindChecks.SCRIPT_SCENES
+    const val VERDICT_CRITERIA = OutputKindChecks.VERDICT_CRITERIA
+    const val CHANGE_ON_BRANCH = OutputKindChecks.CHANGE_ON_BRANCH
 
     const val MAX_DOCUMENT_CHARS: Int = 60_000
     const val MAX_PAGE_CHARS: Int = 500_000
@@ -49,7 +57,7 @@ object StepOutputValidators {
         MERMAID_FLOWCHART to ("diagram" to 1),
         JSON_OBJECT to ("json" to 1),
         FILES_CHANGE to ("files" to 1),
-    )
+    ) + OutputKindChecks.levels + NamedOutputChecks.levels + InternalOutputChecks.levels
 
     val ids: Set<String> get() = levels.keys
 
@@ -83,11 +91,14 @@ object StepOutputValidators {
             MERMAID_FLOWCHART -> mermaid(text)
             JSON_OBJECT -> jsonObject(text)
             FILES_CHANGE -> filesChange(text)
+            in OutputKindChecks.levels -> OutputKindChecks.check(id, artifact, text)
+            in NamedOutputChecks.levels -> NamedOutputChecks.check(id, text)
+            in InternalOutputChecks.levels -> InternalOutputChecks.check(id, text)
             else -> "Unknown output check '$id'."
         }
     }
 
-    private fun markdown(text: String, minHeadings: Int): String? {
+    internal fun markdown(text: String, minHeadings: Int): String? {
         if (text.length > MAX_DOCUMENT_CHARS) return "The document is longer than $MAX_DOCUMENT_CHARS characters."
         val headings = text.lineSequence().count { it.trimStart().startsWith("#") && it.trimStart().dropWhile { c -> c == '#' }.startsWith(" ") }
         return if (headings < minHeadings) "The document needs at least $minHeadings heading(s)." else null
@@ -111,7 +122,7 @@ object StepOutputValidators {
         return null
     }
 
-    private fun table(text: String, filled: Boolean): String? {
+    internal fun table(text: String, filled: Boolean): String? {
         val parsed = try {
             DelimitedTableCodec.parse(text, ',', firstRowHeaders = true, maxRows = MAX_TABLE_ROWS + 1)
         } catch (_: IllegalArgumentException) {
@@ -166,6 +177,10 @@ object StepOutputValidators {
     private val branchLine = Regex("""(?im)^\W*branch\W*[:=]\s*(\S+)""")
     private val filesLine = Regex("""(?im)^\W*files?\W*[:=]\s*\S""")
     private val sharedBranches = setOf("main", "master", "develop", "trunk", "head", "release")
+    internal val sharedBranchNames: Set<String> get() = sharedBranches
+
+    /** The sentence a files-on-a-branch result breaks, or null. */
+    internal fun filesChangeProblem(text: String): String? = filesChange(text)
 
     /** Files written on a dedicated branch: a BRANCH line that is not a shared branch, and a FILES line. */
     private fun filesChange(text: String): String? {

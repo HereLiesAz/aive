@@ -155,18 +155,18 @@ fun trainingDefinition(
             roles.reviewer, "Gives GENERIC and SPECIALIST scores over the same tasks.", listOf(TRAINING_GENERIC_ID, TRAINING_SPECIALIST_ID),
         ),
         step(
-            TRAINING_RULING_ID, "Rule pass, refine or stop",
-            "Rule `RULING: PASS`, `RULING: REFINE` or `RULING: STOP` with `REASON:` citing a listed fact in square brackets, from the practice results, the reviewer's findings and the cost. You write and release nothing.",
+            TRAINING_RULING_ID, "Write the training report: pass, refine or stop",
+            "Write the Nanny's training report as `RULING: PASS`, `RULING: REFINE` or `RULING: STOP` with `REASON:` citing a listed fact in square brackets, from the practice results, the reviewer's findings and the cost. You write and release nothing.",
             roles.nanny, "Names one listed option and cites a listed fact.", listOf(TRAINING_REVIEW_ID),
         ),
         step(
-            TRAINING_CHALLENGE_ID, "Challenge the ruling",
-            "Challenge the Nanny's ruling once with `CHALLENGE:` and `CITE:` naming a listed fact, or reply `CHALLENGE: NONE`. A challenge that cites no fact does not count. You rule nothing.",
+            TRAINING_CHALLENGE_ID, "Challenge the training report",
+            "Challenge the Nanny's training report once with `CHALLENGE:` and `CITE:` naming a listed fact, or reply `CHALLENGE: NONE`. A challenge that cites no fact does not count. You write no report.",
             roles.antagonist, "Cites a listed fact or says none was found.", listOf(TRAINING_RULING_ID),
         ),
         step(
             TRAINING_OFFER_ID, "Ask the keeper",
-            "If the ruling stands as pass, offer the keeper the specialist ${parent.name} for \"$words\" with the practice results as evidence. " +
+            "If the training report says pass and stands, offer the keeper the specialist ${parent.name} for \"$words\" with the practice results as evidence. " +
                 "Nothing is adopted until the keeper approves this step in Messages.",
             roles.queen, "The keeper has the practice results and decides.", listOf(TRAINING_CHALLENGE_ID), ApprovalPolicy.HumanApproval,
         ),
