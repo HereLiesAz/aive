@@ -163,7 +163,7 @@ object RefinementLadderExpander {
                         executor = TaskExecutor.RoleAgent(finalRole.id),
                         dependsOn = task.dependsOn + ladderIds,
                         condition = task.condition,
-                        verificationPolicy = VerificationPolicy.None,
+                        verificationPolicy = task.verificationPolicy.takeIf { it is VerificationPolicy.Deterministic } ?: VerificationPolicy.None, // the compiled check judges the final output
                         compoundInferencePolicy = CompoundInferencePolicy.Single,
                     ),
                 )
