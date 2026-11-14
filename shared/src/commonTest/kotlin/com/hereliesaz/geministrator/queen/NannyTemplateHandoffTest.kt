@@ -110,4 +110,13 @@ class NannyTemplateHandoffTest {
         assertEquals(nannyCarriedId(nannyFindings(definition, run).single()), row.id)
         assertNull(nannyTemplateProposal(definition, run, "missing", now = 7L))
     }
+
+    @Test
+    fun theSuggestionsSubjectNamesItsReportSoTwoReportsMayBothSayF1() {
+        val definition = definitionOf(3)
+        val run = runOf(3, finding(subject, HallMonitorAction.Rewrite, wording))
+        val candidate = nannyTemplateCandidates(definition, run).single()
+        assertEquals("rep:f1", candidate.subject)
+        assertNotNull(nannyTemplateProposal(definition, run, candidate.subject, now = 7L))
+    }
 }

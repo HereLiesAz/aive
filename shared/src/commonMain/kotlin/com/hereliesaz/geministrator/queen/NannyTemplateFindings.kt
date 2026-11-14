@@ -148,6 +148,9 @@ fun templateProposalFor(
     )
 }
 
+/** What a template suggestion is about: the finding within its own report, since two reports may both number a finding "f1". */
+internal fun nannyTemplateSubject(finding: NannyFinding): String = "${finding.reportId}:${finding.id}"
+
 private fun newestReport(run: WorkflowRun): HallMonitorReport? =
     latestReport(run)?.textContent?.let { runCatching { decodeHallMonitorReportPayload(it) }.getOrNull() }
 
@@ -178,7 +181,7 @@ internal fun nannyTemplateCandidates(
         val check = TemplateRevisionRules.check(base, draft) as? TemplateRevisionRules.Check.Accepted ?: return@mapNotNull null
         if (check.loosens.isNotEmpty()) return@mapNotNull null
         QueenCandidate(
-            QueenAction.TemplateChange, finding.id, QueenVoice.SuggestNannyTemplate,
+            QueenAction.TemplateChange, nannyTemplateSubject(finding), QueenVoice.SuggestNannyTemplate,
             listOf(queenSlot(target.id), draft.evidenceSteps.toString()),
             outside = false,
         )
@@ -191,6 +194,6 @@ internal fun nannyTemplateCandidates(
  */
 internal fun nannyTemplateProposal(definition: WorkflowDefinition, run: WorkflowRun, findingId: String, now: Long): ImprovementProposal? {
     val report = newestReport(run) ?: return null
-    val finding = nannyFindings(definition, run).firstOrNull { it.id == findingId } ?: return null
+    val finding = nannyFindings(definition, run).firstOrNull { it.id == findingId || nannyTemplateSubject(it) == findingId } ?: return null
     return templateProposalFor(finding, report, definition, run, now)
 }
