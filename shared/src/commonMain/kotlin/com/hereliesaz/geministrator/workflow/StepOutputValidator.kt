@@ -214,8 +214,20 @@ private fun baseMediaType(mediaType: String): String = mediaType.substringBefore
 fun findOutputFor(spec: OutputSpec, artifacts: List<ArtifactRef>): ArtifactRef? =
     artifacts.firstOrNull { artifact ->
         artifact.kind == spec.kind &&
-            (artifact.mediaType == null || baseMediaType(artifact.mediaType!!) == baseMediaType(spec.mediaType))
+            mediaTypeFits(artifact.mediaType, spec.mediaType)
     }
+
+/**
+ * Text providers label every reply "text/markdown" (or "text/plain") whatever it holds, so a generic text label
+ * fits any text specification; the content check then judges the text itself. A specific label must match.
+ */
+internal fun mediaTypeFits(artifactMediaType: String?, specMediaType: String): Boolean {
+    if (artifactMediaType == null) return true
+    val have = baseMediaType(artifactMediaType)
+    val want = baseMediaType(specMediaType)
+    if (have == want) return true
+    return (have == "text/markdown" || have == "text/plain") && want.startsWith("text/")
+}
 
 /**
  * Every way [artifacts] fall short of [contract]'s declared outputs, in plain sentences; empty when the contract
