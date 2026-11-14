@@ -17,6 +17,8 @@ import kotlinx.serialization.json.JsonObject
 const val OUTPUT_CONTRACT_VIOLATION: String = "OUTPUT_CONTRACT_VIOLATION"
 
 object StepOutputValidators {
+    /** Markdown with no heading required: a translation of a passage that has none must not need one invented. */
+    const val MARKDOWN_TEXT = "markdown-text"
     const val MARKDOWN_DOCUMENT = "markdown-document"
     const val MARKDOWN_SECTIONED = "markdown-document-sectioned"
     const val HTML_PAGE = "html-page"
@@ -45,6 +47,7 @@ object StepOutputValidators {
 
     /** Strictness within a family: a higher level accepts a subset of what a lower level accepts. */
     private val levels: Map<String, Pair<String, Int>> = mapOf(
+        MARKDOWN_TEXT to ("markdown" to 0),
         MARKDOWN_DOCUMENT to ("markdown" to 1),
         MARKDOWN_SECTIONED to ("markdown" to 2),
         HTML_PAGE to ("html" to 1),
@@ -79,6 +82,7 @@ object StepOutputValidators {
         if (!isKnown(id)) return "Unknown output check '$id'."
         if (text.isNullOrBlank()) return "The output is empty."
         return when (id) {
+            MARKDOWN_TEXT -> markdown(text, minHeadings = 0)
             MARKDOWN_DOCUMENT -> markdown(text, minHeadings = 1)
             MARKDOWN_SECTIONED -> markdown(text, minHeadings = 2)
             HTML_PAGE -> html(text, allowExternalUrls = true)

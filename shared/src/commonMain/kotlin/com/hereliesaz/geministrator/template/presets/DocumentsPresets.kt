@@ -60,7 +60,7 @@ internal object DocumentsPresets {
     val Translation: StepTemplate = PresetKit.make(
         BuiltInTemplates.WriteDocument, "translation", "worker",
         listOf(PortSpec("text", PortType.Markdown, true), PortSpec("language", PortType.Text, true)),
-        PresetKit.out("translation", ArtifactKind.Research, "text/markdown", "translation/v1", StepOutputValidators.MARKDOWN_DOCUMENT),
+        PresetKit.out("translation", ArtifactKind.Research, "text/markdown", "translation/v1", StepOutputValidators.MARKDOWN_TEXT),
         "Translate the text into the language named. Keep its headings, lists, markup, numbers and order exactly as they are. Hand it back as Markdown. Use only what the inputs give: invent no fact, figure or source, and do not claim to have sent, saved or published anything. Hand back the result and nothing else.",
         40_000L,
     )
