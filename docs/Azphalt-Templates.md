@@ -339,6 +339,10 @@ All 66 workflow packages. A role package carries no steps; its roles are in the 
 | `ux-research-to-design` | 2. Interaction Designer | `interaction-designer` | write-document |
 | `vendor-evaluation` | 1. Vendor Evaluator | `vendor-evaluator` | write-document |
 
+## The starting templates and the Azphalt steps
+
+The 66 starting templates ([Step templates](Step-Templates.md), "The starting templates") are the catalog a step of a package can name instead of a plain task. They add no assignment here: the steps above keep the starting points they have, and a package step that makes a document, a table, a page or a plan can now start from the closer template (a `report`, a `risk-register`, a `landing-page`, a `plan`) and be checked by its named headings or columns. `StepTemplateCoverageTest` still requires every step to name a template that exists in the catalog.
+
 ## Gaps closed
 
 The audit listed 26 steps that fit none of the six starting templates. Each now has a preset (`template/StepPresets.kt`), made from a built-in template by changing data only: generic role, typed inputs, one tool or none, typed output with a compiled check, declared effects, a token allowance (carried, not yet enforced) and a single attempt where it changes something. Each step carries a `startingPoint` contract naming its preset. `StepTemplateAssignments.gaps` is empty and `StepTemplateCoverageTest` (`theTwentySixFormerGapsAreCoveredAndGuarded`) fails if any of the 26 loses its contract.

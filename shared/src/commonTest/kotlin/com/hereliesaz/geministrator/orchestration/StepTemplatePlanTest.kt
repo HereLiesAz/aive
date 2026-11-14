@@ -28,6 +28,8 @@ class StepTemplatePlanTest {
     fun theCatalogOffersNothingThatChangesAnything() {
         val ids = BuiltInTemplates.forPlanner().map { it.id }
         assertTrue("change-connected-source" !in ids)
+        assertEquals(BuiltInTemplates.queenMayMake.size, ids.size)
+        assertTrue("brief" in ids && "tests-on-branch" !in ids)
         assertTrue(BuiltInTemplates.palette.filter { !it.effectful }.all { it.id in ids })
         assertTrue(ids.none { com.hereliesaz.geministrator.template.TemplateGroups.isInternal(it) })
         assertTrue(ids.none { it.startsWith("send-") })

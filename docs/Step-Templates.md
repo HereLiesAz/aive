@@ -91,6 +91,42 @@ Beside the step templates there are **37 starting role templates** (`domain/Role
 - **Budget classes.** Each role names a class, small, medium or large, not a number. The keeper sets what each class means in tokens one creature may spend in one run, in the Keeper's room under Spend caps (`BudgetClassStore`, kept on this device, `aive.budget-classes.v1`); the starting numbers are 200,000, 600,000 and 2,000,000. A number on the role itself (the creature's Mind) always wins, and a step's own allowance is a number of its own on top. A role with neither a class nor a number has no budget. The class is read when a step is considered (`effectiveTokenBudget`): it holds a step the way a role's own budget always did, and the keeper's changed number applies at the next cycle. The eight built-ins name their class by id, so a role stored before this change has one too.
 - **No tool ceiling by default.** A starting role carries none: only a step's contract narrows tools. The seam exists and is off. The Nanny may propose a ceiling on a role (a `TOOLS:` line in a Restructure solution for a role template) as a new generation, with at least ten steps of evidence and a stated aim; it stays a candidate and changes nothing until you select it (Use this generation). Once a role has one, a later change may only narrow it. A selected ceiling narrows a step's tools to the overlap of its contract's tools and the ceiling (`effectiveAllowedTools`), and makes the step need a Source that can limit tools.
 
+## The starting templates
+
+The starting-templates catalog (`template/Producibles.kt`, data only) lists **66 producibles in 13 groups**: things a swarm can be asked to make, each with a typed output a reviewer can be given. Every one is a step template with a deterministic contract: typed inputs, one typed output, declared effects and a compiled check. Fifty-nine are presets of their own in `template/presets/` (one file a group, made by `PresetKit` from a built-in by changing data only); seven reuse a template that already existed under another id (`check-work`, `read-connected-source`, `change-connected-source`, `design-tokens`, `list-from-connected-source` is `list-connected-source`, `remove-from-connected-tool` is `remove-in-connected-source`, `code-change-on-branch` is `change-code`). A test accounts for all 66 and for each template's check.
+
+| Group | Producibles |
+|---|---|
+| Documents and briefs | brief, report, summary, one-page-explainer, faq, glossary, translation |
+| Plans and records | plan, timeline, meeting-notes, decision-memo, risk-register |
+| Research and evidence | research-brief, source-list, claim-check, comparison-table |
+| Checks, critiques and edits | check-work, critique, proofread, accessibility-check, clarifying-questions |
+| Data and tables | csv-from-text, data-cleanup, extract-fields, spreadsheet-with-formulas, data-check-report |
+| Pages, diagrams and design | landing-page, dashboard-page, diagram-flowchart, design-tokens |
+| Writing for other people | email-draft, negotiation-reply-draft, press-release, social-post-set, policy-draft (all drafts: nothing is sent) |
+| Story and film text | short-film-outline, script, storyboard-text, shot-list |
+| Software documents | spec, api-doc, adr, changelog-entry, release-notes, pr-description, bug-report, repro-steps |
+| Software changes | test-plan, test-cases, code-change-on-branch, tests-on-branch (the last two change a branch: approval, one attempt) |
+| Connected tools | read-connected-source, list-from-connected-source, change-connected-source, update-connected-document, append-rows-to-connected-sheet, remove-from-connected-tool (the changes ask first) |
+| The swarm's plan and the tutorial | swarm-plan, tutorial-lesson, tutorial-check-in, queen-reworded-step |
+| Training and improvement | practice-result, training-report, specialist-lessons, nanny-finding, revision-proposal |
+
+The catalog's "training ruling" is the **Nanny's training report** (`training-report`). The old id `training-ruling` still reads as the new one (`Producibles.canonicalId`), and the stored task id `train-ruling` and the `RULING: PASS|REFINE|STOP` line the parsers read are unchanged.
+
+**Who may make them.** The queen may make every template and preset that changes nothing outside its own output. There is no list of keeper-only templates: the permissions and trust policy in settings is the one place that decides, and a step that changes something keeps its approval and its single attempt.
+
+## Kinds of output
+
+An input port has a type, which is the kind of output it takes. Besides Text, Markdown, Html, Table (comma-separated text), Research and Any, the kinds are **Json, Mermaid, Diff, Plan, Checklist, Script, Report and MediaBrief** (`PortType`; `PortTypes.of` says which an output is, `PortTypes.accepts` which a port takes). Each has a compiled check, never a script: `json-valid`, `mermaid-diagram` (any Mermaid kind; `mermaid-flowchart` stays the strict one), `diff-unified`, `checklist`, `plan-steps`, `script-scenes`, a headings check for a report and for a media brief, and tighter ones that name what must be there: `sections-*` (named headings), `columns-*` (named columns), `email-marked`, `policy-marked` and a few more (`workflow/NamedOutputChecks.kt`), `verdict-criteria` (a verdict with one `CRITERION n: met|unmet` line each), `change-on-branch`, and the shape checks of the swarm's own outputs (`workflow/InternalOutputChecks.kt`: plan, lesson, practice scores, training report, specialist lessons, the Nanny's report, a revision draft). A named check is tighter than the plain one of its family, so a revision may move to it and never away. Five more templates were added for kinds the 66 do not cover: `checklist`, `patch-draft` (a unified diff that is written, never applied), `image-brief`, `audio-brief` and `video-brief` (briefs for something to be made; nothing is made).
+
+Not enforced yet: binding an output to an input port of another type is not refused at build time (`PortTypes.accepts` is the rule; nothing calls it from the swarm validator). Checks that need the source of the work (a translation keeps its structure, a data cleanup keeps its columns, a dashboard's figures appear in the data) stay with the reviewer.
+
+## Review
+
+Every reviewable producible carries its criteria, what code already checked and what is left to the reviewer. **Check the work** takes its criteria from the template recorded on the work (`aive.template`), numbered by code (`CheckWorkSelection`), then any extra requirements, and the reviewer answers `VERDICT:` and one `CRITERION n:` line each (`verdict-criteria`). Work with no template is wrapped as a generic document with four fixed criteria (answers the task, claims supported by what was given, consistent, nothing named missing) and the verdict says so. It is **refused** when it is the result of a change in a connected tool or a repository, when it has no text, when it is itself a review, or when you switch the generic wrapper off. A model never invents criteria. `CheckWorkSelection` is the pure choice; the engine does not call it yet.
+
+**Require review.** You can add it at the start, in your goal, in your own words ("it must be reviewed"): the requirements checklist then holds `R-review` (`Requirements`, `RequirementInputs.requireReview`), and a plan in which a reviewable step is not followed by a check of the work is turned back by the same rules that turn back any plan. Otherwise the queen decides. No screen was added.
+
 ## Blockers
 
 A **blocker** is anything that must be created or obtained for a particular hive to be complete: a document, a page, a table, files on a branch, a read or a change of a connected tool, a thing only you can supply. It is typed data on the run: an id, one plain sentence, optionally a starting template from the closed catalog (a template or preset above, validated; "none" otherwise), optionally the step that makes it, and a state: open, in progress, done or dropped (`queen/Blockers.kt`).
