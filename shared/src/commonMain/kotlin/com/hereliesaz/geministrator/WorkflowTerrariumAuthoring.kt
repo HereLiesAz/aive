@@ -339,7 +339,11 @@ internal fun setTerrariumContractInput(
         dependsOn = (found.dependsOn - wasFed) + fed,
         contract = contract.copy(inputs = inputs),
     )
-    val candidate = definition.copy(tasks = definition.tasks.map { if (it.id == taskId) next else it })
+    // A sending step with several recipients becomes one step each, so each is approved on its own.
+    val replaced = definition.tasks.map { if (it.id == taskId) next else it }
+    val candidate = definition.copy(
+        tasks = com.hereliesaz.geministrator.template.SendingApprovals.splitPerRecipient(replaced, taskId),
+    )
     val errors = WorkflowGraphValidator.validate(candidate)
     if (errors.isNotEmpty()) return TerrariumDependencyEditResult.Rejected(errors.joinToString("\n") { it.humanReadable() })
     return TerrariumDependencyEditResult.Applied(candidate)

@@ -15,7 +15,7 @@ A template is a starting point, not a role. Each step runs as an existing role (
 | Read from a connected tool | Researcher | question, target (optional) | one tool you name | what it found, with the call named | reads only |
 | Change something in a connected tool | Worker | change, target, content | one tool you name | `TARGET:` and `CHANGED:` lines | changes a connected tool |
 
-They appear in the swarm's Edit view under **Add creature**, in a group of their own, and their inputs, tool and effects are rows of the creature's job. The queen may plan with the five that change nothing; **Change something in a connected tool** is added only by you, in Edit.
+They appear in the swarm's Edit view under **Add creature**, grouped (see below), and their inputs, tool and effects are rows of the creature's job. The queen may plan with the five that change nothing; **Change something in a connected tool** is added only by you, in Edit.
 
 ## What code enforces
 
@@ -68,7 +68,19 @@ Two templates joined the six: **Draw a diagram** (a Mermaid flowchart, checked b
 | `localize-content` | turn text into a table | every string translated into a named locale, a row each | comma-separated, every column named |
 | `fixed-format-result`, `capped-text-result` | write a document | a result code reads: one JSON object, or one block of plain text | one JSON object, or text |
 
-A preset that changes something keeps its approval floor and its single attempt, and the queen never makes one by herself. Each carries a token allowance in its template body (carried, not yet enforced). The last four rows are the starting templates of the steps the Azphalt audit listed as gaps ([Azphalt templates](Azphalt-Templates.md)); a step that only *began* at an effectful one declares no effect, so nothing about how it runs changes. The presets are not in Add creature (they would crowd it); they are what a blocker names.
+A preset that changes something keeps its approval floor and its single attempt, and the queen never makes one by herself. Each carries a token allowance in its template body (carried, not yet enforced). The last four rows are the starting templates of the steps the Azphalt audit listed as gaps ([Azphalt templates](Azphalt-Templates.md)); a step that only *began* at an effectful one declares no effect, so nothing about how it runs changes. The presets are in Add creature too, in the groups below, and they are what a blocker names.
+
+## The Add creature palette: groups, and what is hidden
+
+The palette does not list every template flat. It uses the thirteen groups of the starting-templates catalog (`template/TemplateGroups.kt`): documents; plans and records; research and evidence; checks, critiques and edits; data and tables; pages, diagrams and design; writing and sending to other people; story and film text; software documents; software changes and tests; connected tools; the swarm plan and the tutorial; training and improvement. Each group is one tap to open (the number on it is how many steps it holds), shows its three common steps, and folds the rest under **More**. A template no group names lands in a last group, **More steps**, so none is dropped. There is no search field in the palette, so none was added.
+
+The **internal nine** (swarm plan, tutorial lesson, tutorial check-in, reworded step, practice result, training ruling, specialist lessons, Nanny finding, template or role revision) are hidden from the palette's default view and from the planner's list; the planner may begin from any other template that changes nothing outside its own output. The palette's own fold, **The swarm's own steps**, brings them back, and it is shown only when such a template exists. Today they are steps the system runs itself (the training swarm, the tutorial, the Nanny and the queen), not step templates in code, so the fold has nothing to open yet.
+
+## Sending: one approval per recipient
+
+`send-email`, `send-chat-message` and `send-reply` (`template/StepPresetsSending.kt`) are effectful templates (they declare that data leaves the device and that a connected tool changes something), each one attempt, each behind the plan gate, so the existing approval path in Messages and the step-effect policy rule apply. The inputs are typed: `recipients` and `draft` (and `target`, the message replied to, for a reply). The queen never makes one; only you add one in Edit.
+
+The approval is per recipient. A step carries exactly one recipient and runs only then (`StepInstantiation.missingInputs` holds it with "one recipient" otherwise). Typing several recipients (comma, semicolon or line separated; repeats in any letter case counted once) splits the step into one step for each, with the same draft in each objective, which is what the approval shows; every step that waited on the original waits on all of them (`SendingApprovals.splitPerRecipient`). Nothing sends without the approval of that recipient's step. A recipient or draft taken from another step (`@step.port`) is not yet accepted: write the recipient in the step. The tool that sends is the one connected tool you pick; the draft is word for word.
 
 ## Blockers
 
