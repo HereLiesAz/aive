@@ -85,7 +85,13 @@ fun releaseKeystorePath(): String? {
         System.getenv("KEYSTORE_FILE"),
         rootProject.file("app/keystore.jks").path,
     )
-    return candidates.firstOrNull { !it.isNullOrBlank() && File(it).isFile }
+    // Resolve every candidate the way storeFile does (project-relative; absolute paths unchanged)
+    // so the existence check and the signing config always look at the same file.
+    return candidates
+        .filter { !it.isNullOrBlank() }
+        .map { file(it!!) }
+        .firstOrNull { it.isFile }
+        ?.path
 }
 
 android {
@@ -131,8 +137,16 @@ android {
                     ?: if (keyStorePath.endsWith(".jks", ignoreCase = true)) "JKS" else "PKCS12"
                 storePassword = System.getenv("KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("KEY_ALIAS")
-                keyPassword = System.getenv("KEY_PASSWORD").takeUnless { it.isNullOrBlank() }
-                    ?: System.getenv("KEYSTORE_PASSWORD")
+                // The android-keystore action rebuilds a PKCS12 keystore, and PKCS12 cannot hold a key
+                // password different from the store password (keytool ignores -destkeypass), so for
+                // that keystore the key is recovered with the store password.
+                val rebuiltPkcs12 = System.getenv("HAIVE_KEYSTORE_TYPE").equals("PKCS12", ignoreCase = true)
+                keyPassword = if (rebuiltPkcs12) {
+                    System.getenv("KEYSTORE_PASSWORD")
+                } else {
+                    System.getenv("KEY_PASSWORD").takeUnless { it.isNullOrBlank() }
+                        ?: System.getenv("KEYSTORE_PASSWORD")
+                }
             }
         }
     }
