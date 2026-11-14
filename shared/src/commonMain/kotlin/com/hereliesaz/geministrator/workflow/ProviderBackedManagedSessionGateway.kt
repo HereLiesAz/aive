@@ -459,7 +459,12 @@ class ProviderBackedManagedSessionGateway(
         } else {
             runCatching { memoryObserver.annotateUserMessage(handle, message) }.getOrDefault(message)
         }
-        providerFor(handle).sendMessage(handle.providerRunId, outgoing)
+        val result = providerFor(handle).sendMessage(handle.providerRunId, outgoing)
+        // The keeper's words are banked only once the provider took them: a refused message never reached the agent.
+        if (result is ProviderActionResult.Accepted && !message.startsWith(MEMORY_MESSAGE_MARKER)) {
+            recordMemory { memoryObserver.onKeeperMessage(handle, message) }
+        }
+        result
     }
 
     override suspend fun keeperQuestion(handle: ManagedSessionHandle): KeeperQuestionState? =
@@ -477,6 +482,8 @@ class ProviderBackedManagedSessionGateway(
         // The answer is structured data for the agent; memory's cue cloud is not added to it.
         val result = providerFor(handle).sendMessage(handle.providerRunId, answer)
         if (result is ProviderActionResult.Accepted) {
+            // The keeper's answer is part of the session, banked like any other message of theirs.
+            recordMemory { memoryObserver.onKeeperMessage(handle, answer) }
             mutex.withLock {
                 val current = snapshots[handle] ?: SessionSnapshot(ManagedSessionStatus.Unknown)
                 snapshots[handle] = current.copy(

@@ -12,4 +12,7 @@ internal object MemoryRemindMeCommand {
 
     /** True when [text] has a line that is exactly the command (surrounding blanks allowed, nothing else). */
     fun isIn(text: String): Boolean = LINE.containsMatchIn(text)
+
+    /** True when [text] is the command and nothing else: control syntax, not experience to bank. */
+    fun isOnly(text: String): Boolean = isIn(text) && LINE.replace(text, "").isBlank()
 }

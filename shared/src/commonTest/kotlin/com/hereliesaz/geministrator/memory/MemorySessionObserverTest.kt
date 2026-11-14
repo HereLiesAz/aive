@@ -155,4 +155,34 @@ class MemorySessionObserverTest {
         journaling.onSessionFinished(handle, ManagedSessionStatus.Completed)
         assertTrue(fakeJournal.entries.isEmpty())
     }
+
+    @Test
+    fun aBareRemindMeIsControlSyntaxAndBanksNothingByItself() = runBlocking {
+        val (store, observer, handle) = fixture()
+        observer.onSessionStarted(handle, request())
+        observer.onSessionEvent(handle, AgentEvent.Message(handle.providerRunId, "/remindme"))
+        observer.onRemindMe(handle)
+        observer.onSessionEvent(handle, AgentEvent.Message(handle.providerRunId, "/remindme"))
+        observer.onRemindMe(handle)
+        assertEquals(1, store.read().episodes.size, "only the session's own start is sent, never the commands")
+        assertFalse("/remindme" in bankedText(store))
+    }
+
+    @Test
+    fun aKeyRepeatedAcrossStreamedThinkingPiecesIsStillScrubbed() = runBlocking {
+        val (store, observer, handle) = fixture()
+        observer.onSessionStarted(handle, request())
+        observer.onSessionEvent(handle, AgentEvent.Thinking(handle.providerRunId, "I will use Authorization: Bearer "))
+        observer.onSessionEvent(handle, AgentEvent.Thinking(handle.providerRunId, key))
+        observer.onSessionFinished(handle, ManagedSessionStatus.Completed)
+        assertFalse(key in bankedText(store), bankedText(store))
+    }
+
+    @Test
+    fun aCaptureOverTheJournalRoomKeepsItsNewestParts() {
+        val parts = (1..5).map { MemorySessionPart(MemorySourceKind.Message, "m$it", "x".repeat(40)) }
+        assertEquals(listOf("m4", "m5"), newestWithinBudget(parts, budgetChars = 90).map { it.label })
+        assertEquals(listOf("m5"), newestWithinBudget(parts, budgetChars = 10).map { it.label })
+        assertEquals(parts, newestWithinBudget(parts, budgetChars = 1_000))
+    }
 }
