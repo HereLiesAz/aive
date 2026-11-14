@@ -48,6 +48,12 @@ class TrainingSuggestionTest {
     }
 
     @Test
+    fun anUnadoptedHatchlingIsNotYetASpecialist() {
+        val hatchling = role("qa-web", parents = listOf("qa"), enabled = false, hatched = "run-x")
+        assertEquals(1, trainingCandidates(uses("qa", "p1", 3, 2), listOf(role("qa"), hatchling)).size)
+    }
+
+    @Test
     fun mostUsedRoleComesFirst() {
         val roles = listOf(role("a"), role("b"))
         val found = trainingCandidates(uses("a", "p", 3, 2) + uses("b", "p", 9, 3), roles)
