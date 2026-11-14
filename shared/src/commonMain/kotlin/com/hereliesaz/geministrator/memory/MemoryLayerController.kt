@@ -542,10 +542,7 @@ class MemoryLayerController(
             }
             // Compare-and-set, as forgetting does: a session banked since the read is never silently dropped
             // by a stale write; the revision is re-read and the (already validated) import installed again.
-            val own = requireSelectedOwnStore()
-            while (true) {
-                if (own.replaceIfRevision(own.read().revision, snapshot)) break
-            }
+            replaceWhole(requireSelectedOwnStore(), snapshot)
             resetLayers()
         }
         publish()
@@ -600,6 +597,22 @@ class MemoryLayerController(
         publish()
     }
 
+    /**
+     * Installs [snapshot] over all of [own], as a compare-and-set against the revision just read. A bank whose records cannot
+     * be decoded has no revision to compare with, and it is exactly what Clear all and an import are for: it is replaced outright.
+     */
+    private suspend fun replaceWhole(own: MemoryStore, snapshot: MemorySnapshot) {
+        while (true) {
+            val revision = try {
+                own.read().revision
+            } catch (_: MemoryStoreCorruptionException) {
+                own.replace(snapshot)
+                return
+            }
+            if (own.replaceIfRevision(revision, snapshot)) return
+        }
+    }
+
     /** Clears the selected workflow's own records. Ancestors' and other workflows' banks are untouched. */
     suspend fun clearAll() {
         drainMutex.withLock {
@@ -613,9 +626,7 @@ class MemoryLayerController(
                 }
             }
             // Compare-and-set, as forgetting does, so a deposit racing the clear is not half-erased.
-            while (true) {
-                if (own.replaceIfRevision(own.read().revision, MemorySnapshot())) break
-            }
+            replaceWhole(own, MemorySnapshot())
             // What its sessions had captured but not sent is memory too; it must not come back at the next start.
             val held = settingsStore.captureJournal
             for ((key, envelope) in held.pending()) {
