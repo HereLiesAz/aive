@@ -159,7 +159,6 @@ internal fun LiveWorkflowLibraryScreen(
     var runObjectiveDraft by rememberDurableStringState("workflows.run-objective")
     // What was fed last fills an empty field (selected, never written as the draft); a role's field is its domain, so none there.
     var seededRunObjective by remember { mutableStateOf("") }
-    val runObjective = runObjectiveDraft.ifBlank { seededRunObjective }
     val runObjectiveHistory = com.hereliesaz.geministrator.prompts.rememberPromptHistory(com.hereliesaz.geministrator.prompts.PromptKind.Objective)
     var refreshGeneration by remember { mutableStateOf(0) }
 
@@ -246,6 +245,8 @@ internal fun LiveWorkflowLibraryScreen(
     }
 
     val selectedEntry = selectedKey?.let { key -> entries.orEmpty().firstOrNull { it.key == key } }
+    // A role's field is its domain, never the remembered objective, so a seed left from a workflow is not shown (or run) there.
+    val runObjective = runObjectiveDraft.ifBlank { if (selectedEntry?.role == null) seededRunObjective else "" }
     val pinnedDefinition = if (tabState.hasSelection) draft ?: selectedEntry?.definition else null
 
     Column(modifier = modifier.fillMaxSize()) {
