@@ -1237,6 +1237,8 @@ internal fun ProviderSettingsScreen(
                 "distributed-sharing-toggle",
                 selected = sharingEnabledDraft,
                 onClick = { sharingEnabledDraft = !sharingEnabledDraft },
+                // The toggle fills what it is given: weighted, it leaves the metered-network pill its own width.
+                modifier = Modifier.weight(1f),
             )
             AzphaltPill(
                 if (allowMeteredDraft) stringResource(Res.string.settings_metered_allowed) else stringResource(Res.string.settings_metered_blocked),
