@@ -10,6 +10,7 @@ import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.domain.RetryPolicy
 import com.hereliesaz.geministrator.domain.RetryReason
 import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.SpendCapKind
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
@@ -137,7 +138,26 @@ class SpendCircuitBreakerTest {
     }
 
     @Test
-    fun aRoleWithoutABudgetIsNeverStopped() = runTest {
+    fun aRoleWithNeitherANumberNorAClassIsNeverStopped() = runTest {
+        // The owner's rule: a role's own number wins, else its class's number, else no limit. A built-in role has a class
+        // (so no number still means its class number); this role is a custom one with neither.
+        val bare = engineer.copy(id = RoleDefinitionId("unclassed-engineer"), tokenBudget = null, budgetClass = null)
+        val bareExecutor = TaskExecutor.RoleAgent(bare.id)
+        val gateway = UsageGateway()
+        gateway.pending[ProviderRunId("run-working")] = ManagedSessionUsage(inputTokens = 1_000_000, outputTokens = 1_000_000)
+        val definition = definition(task(working).copy(roleId = bare.id, executor = bareExecutor))
+        val run = run(definition, taskRun(working, TaskRunStatus.Running, providerRunId = "run-working").copy(assignedRoleId = bare.id, executor = bareExecutor))
+
+        val result = coordinator(InMemoryWorkflowPersistence(), gateway, BuiltInRoles.all + bare)
+            .cycle(project(), definition, WorkflowRuntimeState(run, mapOf(working to handle(working, "run-working"))), 20L, ::artifactId)
+
+        assertEquals(TaskRunStatus.Running, result.run.taskRuns.getValue(working).status)
+        assertTrue(gateway.cancelled.isEmpty())
+    }
+
+    @Test
+    fun aRoleWithoutANumberRunsUnderItsClassBudget() = runTest {
+        // The built-in engineer has no number here but is a Large role: two million tokens spent reaches its class budget.
         val gateway = UsageGateway()
         gateway.pending[ProviderRunId("run-working")] = ManagedSessionUsage(inputTokens = 1_000_000, outputTokens = 1_000_000)
         val definition = definition(task(working))
@@ -146,8 +166,8 @@ class SpendCircuitBreakerTest {
         val result = coordinator(InMemoryWorkflowPersistence(), gateway, roles(budget = null))
             .cycle(project(), definition, WorkflowRuntimeState(run, mapOf(working to handle(working, "run-working"))), 20L, ::artifactId)
 
-        assertEquals(TaskRunStatus.Running, result.run.taskRuns.getValue(working).status)
-        assertTrue(gateway.cancelled.isEmpty())
+        assertEquals(ROLE_BUDGET_SPENT, result.run.taskRuns.getValue(working).blockingReason?.code)
+        assertEquals(listOf(ProviderRunId("run-working")), gateway.cancelled.map { it.providerRunId })
     }
 
     // ---- The keeper's pause ----

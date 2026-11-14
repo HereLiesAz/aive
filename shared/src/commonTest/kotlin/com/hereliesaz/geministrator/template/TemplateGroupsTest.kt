@@ -66,7 +66,9 @@ class TemplateGroupsTest {
         val internal = TemplateGroups.internal.map { id ->
             BuiltInTemplates.WriteDocument.copy(id = id)
         }
-        val mixed = everything + internal
+        // The nine real templates in the code are exactly the internal ids; the stand-ins below replace them in the mix.
+        assertEquals(TemplateGroups.internal, TemplateGroups.internalOf(everything).map { it.id }.toSet())
+        val mixed = TemplateGroups.visible(everything) + internal
         assertTrue(TemplateGroups.arrange(mixed).flatMap { it.shown + it.folded }.none { TemplateGroups.isInternal(it.id) })
         assertTrue(TemplateGroups.arrange(mixed).none { it.group.id == "swarm-plans-and-teaching" })
         val all = TemplateGroups.arrange(mixed, includeInternal = true).flatMap { it.shown + it.folded }

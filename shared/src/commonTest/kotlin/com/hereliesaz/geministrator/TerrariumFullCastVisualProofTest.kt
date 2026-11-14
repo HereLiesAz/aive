@@ -17,7 +17,7 @@ class TerrariumFullCastVisualProofTest {
 
         assertEquals(
             setOf(
-                "Orchestrator",
+                "Queen",
                 "Product Manager",
                 "Researcher",
                 "Architect",

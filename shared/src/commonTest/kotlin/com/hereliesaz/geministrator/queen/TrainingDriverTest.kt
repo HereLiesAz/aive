@@ -90,7 +90,7 @@ class TrainingCarryTest {
         val rows = trainingCarryForward("r1", "d1", "tax law", "Won on f2", listOf("Missed edge cases", " "), emptyList(), 5L)
         assertEquals(2, rows.size)
         assertTrue(rows.all { it.source == com.hereliesaz.geministrator.workflow.improvement.ImprovementSource.Nanny })
-        assertTrue(rows.first().summary.startsWith("Training: Ruling:"))
+        assertTrue(rows.first().summary.startsWith("Training: Training report:"))
         assertTrue(trainingCarryForward("r1", "d1", "tax law", "Won on f2", listOf("Missed edge cases"), rows, 6L).isEmpty())
     }
 
