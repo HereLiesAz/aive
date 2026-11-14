@@ -24,6 +24,9 @@ object TourController {
 
     val active: Boolean get() = state?.let { it.phase != TourPhase.Dismissed && !it.finished } == true
 
+    /** The closing question is on screen after the last step: the layer is drawn and Escape must still dismiss it. */
+    val closingOpen: Boolean get() = state?.let { it.phase != TourPhase.Dismissed && it.finished && it.checkInLine != null } == true
+
     /** Begins (or resumes) a tour for [runKey] (null: nothing is saved) with [total] planned steps. A saved position is restored. */
     fun start(runKey: String?, total: Int) {
         this.runKey = runKey

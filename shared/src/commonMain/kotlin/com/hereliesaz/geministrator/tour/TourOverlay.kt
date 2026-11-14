@@ -80,7 +80,7 @@ import org.jetbrains.compose.resources.stringResource
  * only consumes Escape while a tour is showing, and never traps focus.
  */
 fun Modifier.tourEscapeKey(): Modifier = onPreviewKeyEvent { event ->
-    if (TourController.active && event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
+    if ((TourController.active || TourController.closingOpen) && event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
         TourController.escape()
         true
     } else false

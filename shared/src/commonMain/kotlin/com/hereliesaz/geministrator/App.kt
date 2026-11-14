@@ -503,6 +503,8 @@ fun App(
             return
         }
         scope.launch {
+            // The run the tutorial started on, taken before anything else can replace the current one.
+            val tutorialRunId = runtime?.currentRunId()
             try {
                 val roles = resolveRoleCollection(workflowPersistence.roles.all())
                 val base = modelFor(com.hereliesaz.geministrator.queen.orchestratorPin(roles))
@@ -525,7 +527,7 @@ fun App(
                     nowMillis = { currentEpochMillis() },
                     // She follows the keeper through the tour and says so in Messages, at her level's pace (no model call for it).
                     level = { active?.queenLevelNow() ?: com.hereliesaz.geministrator.queen.QueenLevel.Quiet },
-                    say = { line -> scope.launch { active?.noteTutorial(line) } },
+                    say = { line -> scope.launch { active?.noteTutorial(line, tutorialRunId) } },
                 )
                 appLog("AiveTutorial", "Tutorial ended: $outcome")
             } catch (failure: CancellationException) {

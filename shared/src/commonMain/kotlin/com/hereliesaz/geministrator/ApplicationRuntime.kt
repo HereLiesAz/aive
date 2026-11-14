@@ -193,14 +193,18 @@ class ApplicationRuntime private constructor(
     /** What she has said in Messages while following the keeper through the tutorial, per run (memory only; see [noteTutorial]). */
     private val queenTutorial = LinkedHashMap<String, List<com.hereliesaz.geministrator.queen.QueenNote>>()
 
+    /** The id of the run on show now, for a caller that must keep speaking to this run later. */
+    internal suspend fun currentRunId(): String? = runtimeMutex.withLock { current?.state?.run?.id?.value }
+
     internal fun queenLevelNow(): com.hereliesaz.geministrator.queen.QueenLevel = queenLevel()
 
     /**
      * One of her lines while she follows the keeper through the tutorial (progress, slower, the closing line saying the hive is theirs):
      * kept for the current run and shown in Messages at her level ([com.hereliesaz.geministrator.queen.tutorialNotesFor]). A string, never model text.
      */
-    internal suspend fun noteTutorial(say: com.hereliesaz.geministrator.queen.TutorialSay) = runtimeMutex.withLock {
-        val id = current?.state?.run?.id?.value ?: return@withLock
+    internal suspend fun noteTutorial(say: com.hereliesaz.geministrator.queen.TutorialSay, runId: String? = null) = runtimeMutex.withLock {
+        // [runId] is the run the tutorial started on: a hive launched meanwhile must not receive its lines.
+        val id = runId ?: current?.state?.run?.id?.value ?: return@withLock
         queenTutorial[id] = com.hereliesaz.geministrator.queen.tutorialNotesAfter(queenTutorial[id].orEmpty(), id, say)
         while (queenTutorial.size > 32) queenTutorial.remove(queenTutorial.keys.first())
         publishCurrent()
