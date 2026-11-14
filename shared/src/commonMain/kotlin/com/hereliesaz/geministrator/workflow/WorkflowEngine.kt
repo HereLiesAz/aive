@@ -1078,6 +1078,8 @@ class WorkflowEngine(
         reason: String,
         nowEpochMillis: Long,
         allowRetry: Boolean = true,
+        /** False for a step stopped for its allowance: another creature would spend it again, so the keeper decides. */
+        allowReassign: Boolean = true,
     ): WorkflowRun {
         require(!run.status.isTerminal()) { "Workflow ${run.id.value} is already ${run.status}" }
         val task = requireNotNull(definition.tasks.firstOrNull { it.id == taskDefinitionId }) {
@@ -1094,7 +1096,12 @@ class WorkflowEngine(
         )
         // An optional creature is tried as often as its retry policy says, then skipped: it is never a reason to stop the run
         // or to ask the keeper (docs/Keepers-Room.md, optional creatures).
-        val decision = if (task.optional && decided !is FailureDecision.Retry) FailureDecision.FailWorkflow else decided
+        val decision = when {
+            task.optional && decided !is FailureDecision.Retry -> FailureDecision.FailWorkflow
+            // A step stopped for want of allowance is not given to another creature either: that would spend it again.
+            !allowReassign && decided is FailureDecision.Reassign -> FailureDecision.RequireHumanDecision
+            else -> decided
+        }
 
         return when (decision) {
             is FailureDecision.Retry -> {

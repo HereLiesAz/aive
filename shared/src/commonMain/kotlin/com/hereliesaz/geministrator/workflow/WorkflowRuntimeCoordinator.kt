@@ -340,7 +340,9 @@ class WorkflowRuntimeCoordinator(
 
         for (taskId in newlyFailedTaskIds) {
             if (nextRun.status.isTerminal()) break
-            if ((nextRun.taskRuns[taskId]?.timedOutAttempts ?: 0) >= MAX_TIMEOUTS) {
+            // An optional creature is never a reason to ask the keeper: slow twice, it goes through the failure policy and is set aside.
+            val optionalStep = definition.tasks.firstOrNull { it.id == taskId }?.optional == true
+            if (!optionalStep && (nextRun.taskRuns[taskId]?.timedOutAttempts ?: 0) >= MAX_TIMEOUTS) {
                 // Slow twice: the keeper decides, whatever the step's escalation policy says.
                 val reason = "Took longer than allowed twice. ${nextRun.taskRuns[taskId]?.progressMessage.orEmpty()}".trim()
                 nextRun = engine.escalateTimedOut(nextRun, taskId, reason, nowEpochMillis)
@@ -358,6 +360,7 @@ class WorkflowRuntimeCoordinator(
                     reason = allowanceStop.message,
                     nowEpochMillis = nowEpochMillis,
                     allowRetry = false,
+                    allowReassign = false,
                 )
                 if (nextRun.taskRuns[taskId]?.status == TaskRunStatus.Escalated) {
                     ensureFailureEscalationGate(run = nextRun, taskId = taskId, reason = allowanceStop.message, now = nowEpochMillis)
