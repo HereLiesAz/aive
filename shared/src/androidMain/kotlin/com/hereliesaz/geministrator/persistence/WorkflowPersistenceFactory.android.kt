@@ -4,6 +4,7 @@ import android.content.Context
 import app.cash.sqldelight.async.coroutines.synchronous
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import com.hereliesaz.geministrator.persistence.db.WorkflowDatabase
+import com.hereliesaz.geministrator.UiStateSettings
 import com.hereliesaz.geministrator.prompts.RememberedTextSettings
 import com.russhwolf.settings.SharedPreferencesSettings
 import java.io.File
@@ -24,6 +25,11 @@ object AndroidWorkflowPersistence {
         if (PrivateSettings.separate == null) {
             PrivateSettings.separate = SharedPreferencesSettings(
                 this.context!!.getSharedPreferences(PRIVATE_PREFERENCES, Context.MODE_PRIVATE),
+            )
+        }
+        if (UiStateSettings.separate == null) {
+            UiStateSettings.separate = SharedPreferencesSettings(
+                this.context!!.getSharedPreferences(UI_STATE_PREFERENCES, Context.MODE_PRIVATE),
             )
         }
         if (RememberedTextSettings.separate == null) {
@@ -52,6 +58,8 @@ object AndroidWorkflowPersistence {
 
     /** The preferences file (`aive_remembered_text.xml`) the backup rules exclude. */
     const val REMEMBERED_TEXT_PREFERENCES: String = "aive_remembered_text"
+    /** The preferences file (`aive_ui_state.xml`) holding the UI state; the backup rules exclude it. */
+    const val UI_STATE_PREFERENCES: String = "aive_ui_state"
     const val PRIVATE_PREFERENCES: String = "aive_private_settings"
 }
 

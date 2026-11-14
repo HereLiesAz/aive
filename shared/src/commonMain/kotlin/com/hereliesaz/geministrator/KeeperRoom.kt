@@ -184,6 +184,7 @@ internal fun KeeperRoom(
         if (open) {
             // The breadcrumb's "Keeper's room" step, or Back, returns to the list.
             Column(modifier.fillMaxSize()) {
+                AppVersionLine(Modifier.padding(start = 16.dp, top = 8.dp, end = 16.dp))
                 KeeperSectionHeading(selected.group, compact = true)
                 content(members, Modifier.weight(1f).fillMaxWidth())
             }

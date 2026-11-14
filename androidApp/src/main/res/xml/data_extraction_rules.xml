@@ -19,6 +19,7 @@
         <exclude domain="sharedpref" path="aive_azphalt_models.xml" />
         <exclude domain="sharedpref" path="aive_remembered_text.xml" />
         <exclude domain="sharedpref" path="aive_private_settings.xml" />
+        <exclude domain="sharedpref" path="aive_ui_state.xml" />
         <exclude domain="file" path="azphalt/models" />
     </cloud-backup>
     <device-transfer>
@@ -34,6 +35,7 @@
         <exclude domain="sharedpref" path="aive_azphalt_models.xml" />
         <exclude domain="sharedpref" path="aive_remembered_text.xml" />
         <exclude domain="sharedpref" path="aive_private_settings.xml" />
+        <exclude domain="sharedpref" path="aive_ui_state.xml" />
         <exclude domain="file" path="azphalt/models" />
     </device-transfer>
 </data-extraction-rules>

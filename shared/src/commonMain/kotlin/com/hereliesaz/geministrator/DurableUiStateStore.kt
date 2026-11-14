@@ -45,8 +45,21 @@ internal class DurableUiStateStore(
     }
 }
 
+/**
+ * A platform that can keep the UI state in a settings file of its own sets this before the first screen reads it.
+ * Android does, so its backup rules can leave exactly this state (where I was, applied-once markers) out of
+ * backup and device transfer: a reinstall starts fresh.
+ */
+object UiStateSettings {
+    @Volatile
+    var separate: Settings? = null
+}
+
 internal object DurableUiState {
-    val store: DurableUiStateStore = DurableUiStateStore()
+    val store: DurableUiStateStore =
+        DurableUiStateStore(UiStateSettings.separate ?: Settings()).also {
+            runCatching { UiStateVersionGate.apply(it, APP_VERSION_NAME) }
+        }
     val json: Json = Json {
         encodeDefaults = true
         ignoreUnknownKeys = true
