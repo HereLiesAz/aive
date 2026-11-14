@@ -8,6 +8,12 @@ package com.hereliesaz.geministrator.domain
  * Nanny can propose a better wording, a budget or (with evidence, and only if the keeper selects it) a tool ceiling.
  */
 
+/*
+ * One id differs from the catalog's: the catalog's `technical-writer` is `technical-writer-starter` here, because the
+ * Technical Documentation package already ships a different role with the id `technical-writer`, and two roles of one id
+ * would make that package refuse to install once the roster is saved.
+ */
+
 /** One entry of the set: [catalogId] is the catalog's id, [roleId] the role it is (a built-in keeps its own id). */
 data class RoleStartingTemplate(
     val catalogId: String,
@@ -29,7 +35,7 @@ object RoleStartingTemplates {
         RoleStartingTemplate("archivist", "archivist", "Archivist", BudgetClass.Small, builtIn = false),
         RoleStartingTemplate("writer", "writer", "Writer", BudgetClass.Medium, builtIn = false),
         RoleStartingTemplate("editor", "editor", "Editor", BudgetClass.Medium, builtIn = false),
-        RoleStartingTemplate("technical-writer", "technical-writer", "Technical writer", BudgetClass.Medium, builtIn = false),
+        RoleStartingTemplate("technical-writer", "technical-writer-starter", "Technical writer", BudgetClass.Medium, builtIn = false),
         RoleStartingTemplate("comms-drafter", "comms-drafter", "Communications drafter", BudgetClass.Small, builtIn = false),
         RoleStartingTemplate("email-drafter", "email-drafter", "Correspondence drafter", BudgetClass.Small, builtIn = false),
         RoleStartingTemplate("translator", "translator", "Translator", BudgetClass.Medium, builtIn = false),
@@ -131,7 +137,7 @@ object RoleStartingTemplates {
             budgetClass = BudgetClass.Medium,
         ),
         RoleDefinition(
-            id = RoleDefinitionId("technical-writer"),
+            id = RoleDefinitionId("technical-writer-starter"),
             name = "Technical writer",
             description = "Writes precise documents about software for the people who build or use it.",
             instructions = "Write the technical document the task asks for from the material given. Be exact about names, inputs, outputs and limits, and mark anything you could not confirm as unconfirmed. Use the headings the task names. If you may read the repository, say which files you read.",
