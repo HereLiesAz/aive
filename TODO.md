@@ -183,7 +183,7 @@ A checked box means implemented and covered by automated tests. It does not mean
 - [x] The GitHub-flavor APK is built and signed by `multiplatform.yml` (android-keystore action) and attached to the grouped release as `TheAive-<version>-android.apk`.
 - [x] Google Play track publishing happens in the central `HereLiesAz/workflows` android-play-release run, not in this repo.
 - [x] Automatically publish the desired Google Play internal-testing track after a successful release build.
-- [x] versionName has one source (`gradle.properties`); versionCode is passed monotonically (`-Papp.versionCode`, timestamp-derived in `multiplatform.yml`, set by the central run for Play); the checked-in value is only a local default.
+- [x] versionName has one source (`version.properties`; `gradle.properties` is only the local default); versionCode is passed monotonically (`-Papp.versionCode`, timestamp-derived in `multiplatform.yml`, set by the central run for Play); the checked-in value is only a local default.
 - [x] Verify GitHub Pages deployment after the rename to `aive` and `haive.js`.
 - [x] Package Desktop icon/metadata correctly for each supported OS.
 - [x] Add release notes/changelog generation from actual shipped changes.
