@@ -95,8 +95,10 @@ fun Modifier.tourEscapeKey(): Modifier = onPreviewKeyEvent { event ->
 @Composable
 fun TourOverlayHost() {
     val state = TourController.state
-    val visible = state != null && !state.finished && state.phase != TourPhase.Dismissed
-    if (state == null || !visible) return
+    if (state == null || state.phase == TourPhase.Dismissed) return
+    // After the last step the layer is gone, except while the closing question (do you feel you know what you are doing now) is open.
+    val closing = state.finished && state.checkInLine != null
+    if (state.finished && !closing) return
     PlatformBackHandler(enabled = true) { TourController.escape() }
     // The checkpoint allowance: after it, the "if missed" line shows once.
     LaunchedEffect(state.index, state.phase) {
@@ -109,8 +111,33 @@ fun TourOverlayHost() {
         PausedLine()
         return
     }
+    if (closing) {
+        ClosingCard(state.checkInLine.orEmpty())
+        return
+    }
     val step = state.current ?: return
     TourLayer(state, step)
+}
+
+/** The closing question on its own card: the same check-in line and the same four quick replies, with Stop to hide it. */
+@Composable
+private fun ClosingCard(line: String) {
+    Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.BottomCenter) {
+        AzphaltSurface(Azphalt.Ink) {
+            Column(
+                Modifier
+                    .widthIn(max = 520.dp)
+                    .clip(RoundedCornerShape(19.dp))
+                    .background(Azphalt.Ink)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(plain(line), style = AzphaltType.body, color = azphaltOnSurface())
+                CheckInReplies()
+                AzphaltPill(stringResource(Res.string.tour_stop), "tour-stop", onClick = { TourController.escape() })
+            }
+        }
+    }
 }
 
 @Composable
@@ -217,12 +244,7 @@ private fun TourCard(state: TourState, step: LessonPayload) {
             if (state.missedShown) Text(plain(step.ifMissed), style = AzphaltType.body, color = azphaltOnSurface())
             state.checkInLine?.let { line ->
                 Text(plain(line), style = AzphaltType.body, color = azphaltOnSurface())
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ReplyPill(stringResource(Res.string.tour_reply_yes), "tour-yes", CheckInReply.Yes)
-                    ReplyPill(stringResource(Res.string.tour_reply_sort_of), "tour-sort-of", CheckInReply.SortOf)
-                    ReplyPill(stringResource(Res.string.tour_reply_lost), "tour-lost", CheckInReply.Lost)
-                    ReplyPill(stringResource(Res.string.tour_reply_show), "tour-show", CheckInReply.ShowMe)
-                }
+                CheckInReplies()
             }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (state.index > 0) {
@@ -244,6 +266,17 @@ private fun TourCard(state: TourState, step: LessonPayload) {
                 AzphaltPill(stringResource(Res.string.tour_stop), "tour-stop", onClick = { TourController.escape() })
             }
         }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CheckInReplies() {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ReplyPill(stringResource(Res.string.tour_reply_yes), "tour-yes", CheckInReply.Yes)
+        ReplyPill(stringResource(Res.string.tour_reply_sort_of), "tour-sort-of", CheckInReply.SortOf)
+        ReplyPill(stringResource(Res.string.tour_reply_lost), "tour-lost", CheckInReply.Lost)
+        ReplyPill(stringResource(Res.string.tour_reply_show), "tour-show", CheckInReply.ShowMe)
     }
 }
 

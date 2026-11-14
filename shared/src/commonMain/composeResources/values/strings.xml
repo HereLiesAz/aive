@@ -2034,6 +2034,12 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_quote_objection">An objection, quoted:</string>
     <string name="queen_quote_still_missing">What is still missing, quoted:</string>
     <string name="queen_say_missing_queen_away">I have no Source to think with, so I cannot plan, teach or settle a dispute right now. Connect a Source in Connections and I will start.</string>
+    <string name="queen_say_tutorial_progress">You have done %1$s of %2$s steps of the tour. Answer any check-in with Lost me and I make the next steps smaller.</string>
+    <string name="queen_say_tutorial_slower">You said you were lost, so I wrote the next steps smaller and I will ask again sooner.</string>
+    <string name="queen_say_tutorial_hive_yours">That is the tour, and you showed me you are following. This hive is yours: it is your first hive, with your own swarm and your own run, and it goes on from here. Feed it more any time, or open a creature to see what it did.</string>
+    <string name="queen_say_tutorial_hive_yours_shaky">That is the tour, and some of it still felt shaky. This hive is yours all the same: it is your first hive, with your own swarm and your own run. Feed it a goal that begins with Teach me and I will go over any part again.</string>
+    <string name="queen_title_tutorial">Following your tour</string>
+    <string name="queen_title_tutorial_done">The tour is over</string>
     <string name="queen_say_missing_no_source">I have no Source to plan or review with, so I could not ask a planner or a reviewer. Connect a Source and I will use it. Until then I check only what I can check myself.</string>
     <string name="queen_say_missing_no_planner">My planner, %1$s, is switched off, so I have no one to break the hive into steps. Switch it on in Breeds.</string>
     <string name="queen_say_missing_no_reviewer">My reviewer, %1$s, is switched off, so no one checks the plan against what you asked. Switch it on in Breeds.</string>

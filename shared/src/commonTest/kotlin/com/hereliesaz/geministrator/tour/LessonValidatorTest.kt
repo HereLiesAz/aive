@@ -119,9 +119,12 @@ class LessonValidatorTest {
         for (bad in listOf("Which tab holds the budget?", "What is a Source?", "Explain the queen?", "Do you see Messages okay?")) {
             assertTrue("L11" in rules(payload(checkIn = bad)), bad)
         }
-        for (good in listOf("Are you with me so far?", "Does that make sense?", "Want me to slow down?")) {
+        for (good in listOf("Are you with me so far?", "Does that make sense?", "Want me to slow down?", "Do you feel you know what you are doing now?", "Do you feel confident to go on alone?")) {
             assertEquals(emptySet(), rules(payload(checkIn = good)), good)
         }
+        // The closing question asks how the keeper feels; any other "what" is still a quiz.
+        assertTrue("L11" in rules(payload(checkIn = "Do you know what a Source is?")))
+        assertTrue("L11" in rules(payload(checkIn = "Do you know what you are doing, and what a Source is?")))
         assertTrue("L11" in rules(payload(anotherWay = "Like Keeper's room, but busier.")))
     }
 

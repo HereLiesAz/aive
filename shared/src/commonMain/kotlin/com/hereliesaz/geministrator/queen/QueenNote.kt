@@ -130,6 +130,12 @@ enum class QueenVoice(val relay: QueenRelay?) {
 
     // --- The queen has no Source to think with when her own model is needed (queen/Missing.kt). Kept apart, after every other voice. ---
     MissingQueenAway(QueenRelay.Missing),
+
+    // --- The queen following the keeper through the tutorial (queen/TutorialNotes.kt). Kept apart, after every other voice. ---
+    TutorialProgress(QueenRelay.Watch),
+    TutorialSlower(QueenRelay.Watch),
+    TutorialHiveYours(null),
+    TutorialHiveYoursShaky(null),
 }
 
 /** Where a note leads: an existing place, never a new one. */

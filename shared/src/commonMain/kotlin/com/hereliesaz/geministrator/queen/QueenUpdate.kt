@@ -57,13 +57,16 @@ fun queenUpdate(
      * finishes or begins). Off by default so a caller that wants the plain Quiet set can still ask for it.
      */
     essentialStatus: Boolean = false,
+    /** Her lines while she follows the keeper through the tutorial ([tutorialNotesAfter]); the progress line shows at Helpful only. */
+    tutorial: List<QueenNote> = emptyList(),
 ): List<QueenNote> {
+    val tutorialLines = tutorialNotesFor(tutorial, level)
     // A run that has just finished still carries the training offer (the one suggestion that is made at the end of a run).
     if (run.status.finished()) {
         val training = suggestions.filter { it.suggestion?.action == QueenAction.TrainSpecialist }
-        return listOf(finishNote(definition, run, hiveSigns, blockers)) + stepAllowanceNotes(definition, run) + training
+        return listOf(finishNote(definition, run, hiveSigns, blockers)) + stepAllowanceNotes(definition, run) + training + tutorialLines
     }
-    val lead = missingNotes(run.id.value, missing, level) + blockerNotes(run.id.value, definition, run, blockers) + disputes + tutorialFailureNotes(definition, run)
+    val lead = missingNotes(run.id.value, missing, level) + blockerNotes(run.id.value, definition, run, blockers) + disputes + tutorialFailureNotes(definition, run) + tutorialLines
     val stop = run.spendPause
     if (stop != null) return lead + allowanceNotes(run)
     if (run.globalPause != null) return lead + nannyRelay(definition, run, review)

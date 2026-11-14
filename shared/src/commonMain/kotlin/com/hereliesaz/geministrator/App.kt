@@ -522,6 +522,9 @@ fun App(
                     roles = roles,
                     labels = com.hereliesaz.geministrator.intro.tutorialLabels(),
                     nowMillis = { currentEpochMillis() },
+                    // She follows the keeper through the tour and says so in Messages, at her level's pace (no model call for it).
+                    level = { active?.queenLevelNow() ?: com.hereliesaz.geministrator.queen.QueenLevel.Quiet },
+                    say = { line -> scope.launch { active?.noteTutorial(line) } },
                 )
                 appLog("AiveTutorial", "Tutorial ended: $outcome")
             } catch (failure: CancellationException) {

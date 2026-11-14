@@ -116,6 +116,11 @@ private fun voiceResource(voice: QueenVoice): StringResource = when (voice) {
         // A step stopped at its token allowance.
         QueenVoice.StepAllowanceStopped -> Res.string.queen_say_step_allowance_stopped
         QueenVoice.MissingQueenAway -> Res.string.queen_say_missing_queen_away
+        // The queen following the keeper through the tutorial.
+        QueenVoice.TutorialProgress -> Res.string.queen_say_tutorial_progress
+        QueenVoice.TutorialSlower -> Res.string.queen_say_tutorial_slower
+        QueenVoice.TutorialHiveYours -> Res.string.queen_say_tutorial_hive_yours
+        QueenVoice.TutorialHiveYoursShaky -> Res.string.queen_say_tutorial_hive_yours_shaky
 }
 
 @Composable
@@ -157,8 +162,10 @@ internal fun queenTitle(note: QueenNote): String = stringResource(
     if (note.suggestion != null) Res.string.queen_title_suggestion else when (note.voice) {
         QueenVoice.StatusWorking, QueenVoice.StatusWorkingClear, QueenVoice.StatusIdle, QueenVoice.StatusIdleClear -> Res.string.queen_title_status
         QueenVoice.FinishedAll, QueenVoice.FinishedAllCost, QueenVoice.FinishedFailed,
-        QueenVoice.FinishedFailedNoStep, QueenVoice.FinishedStopped, QueenVoice.FinishedNotReached, QueenVoice.FinishedBlockersOpen -> Res.string.queen_title_finish
+        QueenVoice.FinishedFailedNoStep, QueenVoice.FinishedStopped, QueenVoice.FinishedNotReached, QueenVoice.FinishedBlockersOpen,
+        QueenVoice.TutorialHiveYours, QueenVoice.TutorialHiveYoursShaky -> Res.string.queen_title_tutorial_done
         QueenVoice.BlockerMade -> Res.string.queen_title_blocker_made
+        QueenVoice.TutorialProgress, QueenVoice.TutorialSlower -> Res.string.queen_title_tutorial
         QueenVoice.TrainingOffer, QueenVoice.TrainingStopped, QueenVoice.TrainingNeedsYou, QueenVoice.TrainingAdopted -> Res.string.queen_title_training
         else -> when (note.relay) {
             QueenRelay.Waits -> Res.string.queen_title_waits
