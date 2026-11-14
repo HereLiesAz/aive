@@ -11,7 +11,7 @@ exact build. Every release build therefore has a unique immutable version even w
 belong to the same patch line.
 
 The checked-in `app.versionName` uses build `0` (for example `0.9.6.0`) as the local/development
-baseline. CI replaces only the fourth component with `github.run_number`. Re-running the same
+baseline. GitHub and desktop builds: CI replaces only the fourth component with `github.run_number`. Play builds are different: the central release run passes its own whole version name (the `version.properties` line, for example `0.60.7.1`) as `app.versionName`, so the Keeper's room on a Play install shows that number, not `gradle.properties`'s. The Keeper's room shows exactly the version the build was given. Re-running the same
 workflow run keeps the same build identity; a new workflow run receives a new build number.
 
 Maturity is encoded by the version number itself, not by prerelease suffixes:

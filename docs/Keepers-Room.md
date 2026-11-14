@@ -294,4 +294,4 @@ A swarm in the swarm library, started from your request or a queen suggestion, m
 
 ## The version
 
-The first line of the Keeper's room, on a phone and wide, is `The Aive <version>`: the four-part version the build was given (`app.versionName`, with CI's build number). It is written into the shared code at build time (`generateAppVersion` in `shared/build.gradle.kts`), so every platform shows the same line.
+The first line of the Keeper's room is `The Aive <version>`: on a wide screen above the page title, on a phone at the top of the list and also at the top of an open part. It shows the version the build was given, written into the shared code at build time (`generateAppVersion` in `shared/build.gradle.kts`). That version is not the same on every channel: Play builds are given the central version contract's number (the `version.properties` line), while GitHub and desktop builds get `app.versionName` from `gradle.properties` with CI's build number as the fourth part.
