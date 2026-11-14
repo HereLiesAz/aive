@@ -188,6 +188,8 @@ fun App(
     val workflowPersistence = remember(persistence) { persistence ?: com.hereliesaz.geministrator.persistence.WorkflowPersistenceFactory.durable }
     // The keeper's spend caps (Keeper's room, This device), read by the runtime every cycle.
     val spendCapStore = remember { SpendCapStore(com.russhwolf.settings.Settings()) }
+    // Publishes the keeper's budget-class numbers for the roles that name a class (BudgetClassStore.kt).
+    remember { BudgetClassStore(com.russhwolf.settings.Settings()) }
     val queenLevelStore = remember { QueenLevelStore(com.russhwolf.settings.Settings()) }
     // The one improvement ledger: the queen's suggestions are rows of it, decided in Messages.
     val improvementStore = remember { SettingsImprovementStore() }

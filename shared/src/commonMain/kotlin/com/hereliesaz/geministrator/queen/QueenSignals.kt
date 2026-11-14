@@ -4,6 +4,7 @@ import com.hereliesaz.geministrator.CreatureTab
 import com.hereliesaz.geministrator.creatureNeedsYou
 import com.hereliesaz.geministrator.domain.roleDisplayName
 import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.effectiveTokenBudget
 import com.hereliesaz.geministrator.domain.TaskRun
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.isTerminal
@@ -105,7 +106,7 @@ fun queenSignals(
         if (taskRun.failedProviders.isNotEmpty()) signals += QueenSignal.FailedOver(task.id.value)
         val roleId = taskRun.assignedRoleId ?: task.roleId
         val role = roleId?.let { rolesById[it] }
-        val budget = role?.tokenBudget
+        val budget = role?.effectiveTokenBudget()
         if (role != null && budget != null && budget > 0 && burned.add(role.id.value)) {
             val percent = (run.roleTokensSpent(role.id) * 100 / budget).toInt()
             if (percent >= BUDGET_BURN_PERCENT) signals += QueenSignal.BudgetBurn(task.id.value, role.name, percent.coerceAtMost(999))

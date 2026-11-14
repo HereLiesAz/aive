@@ -230,7 +230,7 @@ object RoleTemplates {
         kind = TemplateKind.Role,
         id = role.id.value,
         version = 1,
-        body = TemplateBody(wording = role.instructions, budgetTokens = role.tokenBudget),
+        body = TemplateBody(wording = role.instructions, allowedTools = role.toolCeiling, budgetTokens = role.tokenBudget),
         locked = mapOf(
             "kind" to "role",
             "id" to role.id.value,
@@ -254,11 +254,18 @@ object RoleTemplates {
         }
     }
 
-    /** [role] with the current revision's instructions and budget; the role unchanged when none was adopted. */
+    /**
+     * [role] with the current revision's instructions, budget and tool ceiling; the role unchanged when none was adopted.
+     * A role has no ceiling until a revision the keeper selected gives it one (an empty ceiling is none).
+     */
     fun resolved(role: RoleDefinition, catalog: TemplateCatalog): RoleDefinition {
         val current = catalog.current(TemplateKind.Role, role.id.value) ?: return role
         if (current.version == 1) return role
-        return role.copy(instructions = current.body.wording, tokenBudget = current.body.budgetTokens ?: role.tokenBudget)
+        return role.copy(
+            instructions = current.body.wording,
+            tokenBudget = current.body.budgetTokens ?: role.tokenBudget,
+            toolCeiling = current.body.allowedTools,
+        )
     }
 }
 

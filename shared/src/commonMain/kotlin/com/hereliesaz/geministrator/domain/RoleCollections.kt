@@ -2,9 +2,12 @@ package com.hereliesaz.geministrator.domain
 
 const val ROLE_COLLECTION_MARKER_ID: String = "__haive-role-collection__"
 
-/** Built-in roster exposed by the app, including governance roles defined outside [BuiltInRoles]. */
+/**
+ * Built-in roster exposed by the app, including governance roles defined outside [BuiltInRoles] and the 29 new starting
+ * role templates ([RoleStartingTemplates]), so Breeds, the tray and Add creature list them with no screen of their own.
+ */
 val haiveBuiltInRoles: List<RoleDefinition>
-    get() = BuiltInRoles.all + HallMonitorRole.definition
+    get() = BuiltInRoles.all + HallMonitorRole.definition + RoleStartingTemplates.roles
 
 fun resolveRoleCollection(stored: List<RoleDefinition>): List<RoleDefinition> {
     val marker = stored.firstOrNull { it.id.value == ROLE_COLLECTION_MARKER_ID }

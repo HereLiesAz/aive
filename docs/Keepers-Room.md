@@ -11,7 +11,7 @@ The room lists **six parts**, each with one sentence on the phone list (and as i
 | Part | One sentence | Holds (the earlier parts) |
 |---|---|---|
 | **Sources and tools** | What your creatures think with, the tools they may use, and where their work lands. | **Connections** (AI sources, remote A2A agents, repository hosts, tools), **Local agents** |
-| **Allowance** | The most real money a run, or an hour, may spend. | **Limits**: the cost cap per run and the hourly spend cap, now on every width |
+| **Allowance** | The most real money a run, or an hour, may spend; and what a small, medium and large token budget means for a creature's role. | **Limits**: the cost cap per run, the hourly spend cap and the three budget sizes, now on every width |
 | **Hosts** | Where your creatures run: this device, your other machines, and models that run here. | **This device** (remote access, the A2A server, the local planner, local orchestration specialists, small tasks), **Compute** (only where the build offers distributed compute), and **Your other devices**, a card at the top that lists each other compute node and the paired remote link with its state, one tap each to the part that holds it (a summary of what Compute and This device keep, not a new place) |
 | **Data and privacy** | Save, load, move or delete what The Aive keeps, and what it may report. | **Projects and data**, **About and privacy** |
 | **Routines and trust** | Swarms that start by themselves, what your creatures may do without asking you, and what they suggest. | **Schedules** (the self-improvement proposals sit under them), **Delegations** |
