@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.effectiveTokenBudget
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
@@ -727,7 +728,7 @@ internal fun MindDefinitionList(identity: String, provider: String?, role: RoleD
         role?.capabilitiesRequired?.takeIf { it.isNotEmpty() }?.let { needs ->
             add(stringResource(Res.string.mind_tools) to needs.sortedBy { it.ordinal }.joinToString(", ", transform = ::capabilityName))
         }
-        role?.let { add(stringResource(Res.string.mind_budget) to (it.tokenBudget?.toString() ?: stringResource(Res.string.mind_no_budget))) }
+        role?.let { add(stringResource(Res.string.mind_budget) to (it.effectiveTokenBudget()?.toString() ?: stringResource(Res.string.mind_no_budget))) }
     }
     val rule = azphaltMutedOnSurface().copy(alpha = 0.3f)
     Column(Modifier.fillMaxWidth()) {

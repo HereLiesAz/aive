@@ -8,6 +8,8 @@ object TemplateRevisionRules {
     const val MAX_CRITERIA = 20
     const val MAX_CRITERION_CHARS = 400
     const val MAX_INTENT_CHARS = 300
+    const val MAX_CEILING_TOOLS = 50
+    const val MAX_TOOL_NAME_CHARS = 100
 
     sealed interface Check {
         /** [loosens] names fields that loosen a limit: the keeper confirms those explicitly. */
@@ -67,8 +69,19 @@ object TemplateRevisionRules {
             }
         }
         draft.allowedTools?.let { tools ->
-            val extra = tools.filter { it !in base.body.allowedTools }
+            // A role has no tool ceiling by default (an empty set is none, not "no tools"). A revision may set one, from
+            // evidence, as a new generation: it stays a candidate until the keeper selects it. After that it only narrows.
+            val settingFirstCeiling = base.kind == TemplateKind.Role && base.body.allowedTools.isEmpty() && tools.isNotEmpty()
+            val extra = if (settingFirstCeiling) emptyList() else tools.filter { it !in base.body.allowedTools }
             when {
+                settingFirstCeiling && draft.mode != RevisionMode.Genetic ->
+                    reasons += "A tool ceiling on a role is a new generation, which you select; it is not a quick change."
+                settingFirstCeiling && (tools.size > MAX_CEILING_TOOLS || tools.any { it.isBlank() || it.length > MAX_TOOL_NAME_CHARS || !plain(it) }) ->
+                    reasons += "A tool name is empty, too long or not plain text, or there are more than $MAX_CEILING_TOOLS."
+                settingFirstCeiling -> {
+                    body = body.copy(allowedTools = tools.distinct())
+                    changed += TunableField.ToolsNarrowed
+                }
                 extra.isNotEmpty() -> reasons += "Tools may only be narrowed; '${extra.first()}' is not in the current set."
                 tools.toSet() != base.body.allowedTools.toSet() -> {
                     body = body.copy(allowedTools = tools.distinct())

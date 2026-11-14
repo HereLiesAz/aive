@@ -6,6 +6,7 @@ import com.hereliesaz.geministrator.domain.ApprovalPolicy
 import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.effectiveAllowedTools
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskRun
 import com.hereliesaz.geministrator.domain.TaskRunStatus
@@ -82,7 +83,8 @@ internal fun buildProviderTaskRequest(
         contextArtifacts = dependencyArtifacts,
         requiredArtifacts = task.requiredArtifacts,
         repository = project.repository,
-        allowedTools = task.contract?.takeUnless { it.startingPoint }?.allowedTools,
+        // The step's contract names its tools; a role's tool ceiling (none unless a selected revision set one) only narrows them.
+        allowedTools = effectiveAllowedTools(task.contract?.takeUnless { it.startingPoint }?.allowedTools, role.toolCeiling),
         // The provider stops for approval unless the policy decision point lets the plan proceed.
         requirePlanApproval = !InProcessPolicyDecisionPoint.decide(
             PolicyRequest(

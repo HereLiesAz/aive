@@ -171,6 +171,13 @@ data class RoleDefinition(
     val parents: List<RoleDefinitionId> = emptyList(),
     /** The run whose clearing hatched it; null for founders. */
     val hatchedFromRunId: String? = null,
+    /** The class of token budget it runs under when [tokenBudget] is null; the keeper sets what each class means (BudgetClass.kt). */
+    val budgetClass: BudgetClass? = null,
+    /**
+     * A ceiling on the tools its steps may use; empty means none, which is the default: only a step's contract narrows tools.
+     * It is set only by a revision the Nanny proposed and the keeper selected (docs/Step-Templates.md).
+     */
+    val toolCeiling: List<String> = emptyList(),
 )
 
 object BuiltInRoles {

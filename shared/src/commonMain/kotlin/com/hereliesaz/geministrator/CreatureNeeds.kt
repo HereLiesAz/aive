@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.effectiveTokenBudget
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskRunStatus
@@ -103,7 +104,7 @@ internal fun creatureNeeds(
 
     // The budget belongs to the agent (its role) and covers everything it spends in this run.
     val roleId = taskRun?.assignedRoleId ?: task.roleId
-    val budgetLeft = roleId?.let(rolesById::get)?.tokenBudget?.let { cap ->
+    val budgetLeft = roleId?.let(rolesById::get)?.effectiveTokenBudget()?.let { cap ->
         val spent = run.taskRuns.values.filter { it.assignedRoleId == roleId }.sumOf { it.usage?.totalTokens ?: 0 }
         (100 - spent * 100 / cap).coerceIn(0, 100).toInt()
     }

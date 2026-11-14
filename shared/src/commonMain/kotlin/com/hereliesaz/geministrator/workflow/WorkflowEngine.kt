@@ -13,6 +13,7 @@ import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.RetryReason
 import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.effectiveTokenBudget
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
@@ -95,8 +96,8 @@ class WorkflowEngine(
      */
     fun roleTokenBudget(run: WorkflowRun, roleId: RoleDefinitionId): Long? {
         val current = rolesById[roleId]
-        if (current != null) return current.tokenBudget
-        return run.roleSnapshot.firstOrNull { it.id == roleId }?.tokenBudget
+        if (current != null) return current.effectiveTokenBudget()
+        return run.roleSnapshot.firstOrNull { it.id == roleId }?.effectiveTokenBudget()
     }
 
     /** Whether [roleId] has spent its whole token budget in [run]. False when it has no budget. */
@@ -297,7 +298,7 @@ class WorkflowEngine(
                         estimatedInputTokens = ownEstimate,
                         excludedProviderIds = taskRun.failedProviders.toSet(),
                         failoverAllowed = isProviderAuto(role, task),
-                        requiresToolFilter = task.contract?.allowedTools?.isNotEmpty() == true,
+                        requiresToolFilter = task.contract?.allowedTools?.isNotEmpty() == true || role.toolCeiling.isNotEmpty(),
                     )
                     val providerId = sessionGateway.resolveProvider(selection)
                     val providerLimit = definition.concurrencyPolicy.perProviderLimits[providerId] ?: Int.MAX_VALUE
@@ -1064,7 +1065,7 @@ class WorkflowEngine(
             repository = project.repository,
             excludedProviderIds = taskRun.failedProviders.toSet(),
             failoverAllowed = isProviderAuto(role, task),
-            requiresToolFilter = task.contract?.allowedTools?.isNotEmpty() == true,
+            requiresToolFilter = task.contract?.allowedTools?.isNotEmpty() == true || role.toolCeiling.isNotEmpty(),
         )
     }
 

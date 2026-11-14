@@ -73,6 +73,24 @@ fun templateTargetOf(finding: NannyFinding): TemplateTarget? =
 
 private const val WORDING_CHARS = 4_000
 
+/** The line a solution's target may start with to propose a tool ceiling for a role: `TOOLS: read_file, search`. */
+internal const val TOOLS_MARK = "TOOLS:"
+
+/**
+ * A role solution's target split into a proposed tool ceiling (the names after [TOOLS_MARK], at most
+ * [TemplateRevisionRules.MAX_CEILING_TOOLS]) and the wording that remains (null when only a ceiling was proposed). A target without
+ * the line is all wording. Text only: the rules check the names, and only a keeper's selection applies them.
+ */
+internal fun splitToolCeiling(target: String): Pair<List<String>, String?> {
+    val lines = target.lines()
+    val at = lines.indexOfFirst { it.trimStart().startsWith(TOOLS_MARK) }
+    if (at < 0) return emptyList<String>() to target.takeIf { it.isNotBlank() }
+    val tools = lines[at].trimStart().removePrefix(TOOLS_MARK).split(',').map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        .take(TemplateRevisionRules.MAX_CEILING_TOOLS)
+    val rest = lines.filterIndexed { i, _ -> i != at }.joinToString("\n").trim()
+    return tools to rest.takeIf { it.isNotEmpty() }
+}
+
 /**
  * The ledger row (source Nanny, kind task-template) for a template finding of a finished run, or null when the finding
  * is not about a template or offers no Rewrite or Restructure solution. The draft is carried as the row's text and
@@ -89,7 +107,9 @@ fun templateProposalFor(
     val reportFinding = report.findings.firstOrNull { it.id == finding.id } ?: return null
     val solution = reportFinding.solutions.firstOrNull { it.action == HallMonitorAction.Rewrite || it.action == HallMonitorAction.Restructure }
         ?: return null
-    val genetic = solution.action == HallMonitorAction.Restructure
+    // A role may be given a tool ceiling by a new generation only: it stays a candidate until the keeper selects it.
+    val (ceiling, wording) = if (target.kind == TemplateKind.Role) splitToolCeiling(solution.target) else emptyList<String>() to solution.target
+    val genetic = solution.action == HallMonitorAction.Restructure || ceiling.isNotEmpty()
     val tally = tallyFor(target, definition, run)
     val aim = aimFor(tally)
     val intent = RevisionIntent(
@@ -101,7 +121,8 @@ fun templateProposalFor(
     )
     val draft = TemplateRevisionDraft(
         target = target.key,
-        wording = solution.target.take(WORDING_CHARS),
+        wording = wording?.take(WORDING_CHARS),
+        allowedTools = ceiling.takeIf { it.isNotEmpty() },
         mode = if (genetic) RevisionMode.Genetic else RevisionMode.Memetic,
         intent = intent,
         evidenceSteps = tally.steps,

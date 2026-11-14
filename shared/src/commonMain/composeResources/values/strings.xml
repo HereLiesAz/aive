@@ -1481,6 +1481,11 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_spend_run_cap">Cost cap per run (USD)</string>
     <string name="settings_spend_hourly_cap">Spend cap per hour, across runs (USD)</string>
     <string name="settings_spend_cap_invalid">Enter a dollar amount above zero, or leave it blank.</string>
+    <string name="settings_budget_classes_description">A creature's role names a size of token budget, not a number: small, medium or large. Set what each size means here, in tokens one creature may spend in one run. Leave a size blank for its starting number. A budget typed on a creature's Mind is used instead of its size.</string>
+    <string name="settings_budget_class_small">Small budget (tokens per creature per run)</string>
+    <string name="settings_budget_class_medium">Medium budget (tokens per creature per run)</string>
+    <string name="settings_budget_class_large">Large budget (tokens per creature per run)</string>
+    <string name="settings_budget_class_invalid">Enter a whole number of tokens above zero, or leave it blank.</string>
     <string name="spend_stop_eyebrow">SPEND CAP</string>
     <string name="spend_stop_title_run">This run reached its cost cap</string>
     <string name="spend_stop_title_hourly">The swarm reached its hourly spend cap</string>
