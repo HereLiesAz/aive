@@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.hereliesaz.geministrator.azphalt.AzphaltPackageImportRequest
 import com.hereliesaz.geministrator.azphalt.AzphaltStoreService
+import com.hereliesaz.geministrator.domain.keeperName
 import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.ContextProvenance
@@ -904,11 +905,15 @@ fun App(
             ).run()
         }
 
-        val rolesByName = (liveRun?.roles.orEmpty() + BuiltInRoles.all).associate { it.name to it.id }
+        // The mascots are labelled with the keeper-facing name (the orchestrator reads Queen), so the rig lookup
+        // knows both that and the stored name.
+        val rolesByName = (liveRun?.roles.orEmpty() + BuiltInRoles.all)
+            .flatMap { listOf(it.keeperName() to it.id, it.name to it.id) }
+            .toMap()
         // A role that runs a script or an action rather than an agent is programmatic work: it wears the neuron, never a kept creature.
         val programmaticRoles = (liveRun?.roles.orEmpty() + BuiltInRoles.all)
             .filter { it.executionSource != com.hereliesaz.geministrator.domain.RoleExecutionSource.Agent }
-            .mapTo(hashSetOf()) { it.name }
+            .flatMapTo(hashSetOf()) { listOf(it.name, it.keeperName()) }
         CompositionLocalProvider(
             LocalWorkflowLibraryHost provides workflowLibraryHost,
             LocalWorkflowScheduleStore provides scheduleStore,
