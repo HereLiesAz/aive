@@ -121,6 +121,25 @@ class RoleStartingTemplatesTest {
         assertIs<TemplateRevisionRules.Check.Accepted>(TemplateRevisionRules.check(withCeiling, ceilingDraft(RevisionMode.Genetic, 10, listOf("a"))))
     }
 
+    @Test
+    fun aCeilingCannotBeClearedByAnEmptyRevision() {
+        val withCeiling = RoleTemplates.base(writer.copy(toolCeiling = listOf("a", "b")))
+        assertIs<TemplateRevisionRules.Check.Refused>(TemplateRevisionRules.check(withCeiling, ceilingDraft(RevisionMode.Genetic, 10, emptyList())))
+    }
+
+    @Test
+    fun aRaiseAboveTheClassAllowanceCountsAsLoosening() {
+        val base = RoleTemplates.base(writer)
+        val classBudget = assertNotNull(base.classBudgetTokens)
+        val raise = TemplateRevisionDraft(
+            target = TemplateTarget(TemplateKind.Role, writer.id.value, 1).key,
+            budgetTokens = classBudget + 1, mode = RevisionMode.Genetic, intent = intent, evidenceSteps = 10,
+        )
+        assertEquals(listOf("the allowance"), assertIs<TemplateRevisionRules.Check.Accepted>(TemplateRevisionRules.check(base, raise)).loosens)
+        val cut = raise.copy(budgetTokens = classBudget - 1)
+        assertTrue(assertIs<TemplateRevisionRules.Check.Accepted>(TemplateRevisionRules.check(base, cut)).loosens.isEmpty())
+    }
+
     private fun candidate(status: TemplateStatus) = RoleTemplates.base(writer).let { base ->
         TemplateRevision(
             kind = TemplateKind.Role, templateId = writer.id.value, version = 2, parentVersion = 1, generation = 2,

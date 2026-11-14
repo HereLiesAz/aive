@@ -94,6 +94,8 @@ data class TemplateBase(
     val body: TemplateBody,
     val locked: Map<String, String>,
     val toolsOpen: Boolean = false,
+    /** The allowance a budget class enforces while [body] names none, so a revision's raise is judged against it. */
+    val classBudgetTokens: Long? = null,
 )
 
 /** What a Nanny proposal names: `step:<id>@<version>` or `role:<id>@<version>`. */

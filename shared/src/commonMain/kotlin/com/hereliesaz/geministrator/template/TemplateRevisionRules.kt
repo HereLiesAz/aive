@@ -82,6 +82,9 @@ object TemplateRevisionRules {
                     body = body.copy(allowedTools = tools.distinct())
                     changed += TunableField.ToolsNarrowed
                 }
+                // An empty ceiling means no ceiling, so "narrowing" to nothing would lift the one that stands.
+                tools.isEmpty() && base.body.allowedTools.isNotEmpty() ->
+                    reasons += "A tool ceiling cannot be cleared; it may only be narrowed."
                 extra.isNotEmpty() -> reasons += "Tools may only be narrowed; '${extra.first()}' is not in the current set."
                 tools.toSet() != base.body.allowedTools.toSet() -> {
                     body = body.copy(allowedTools = tools.distinct())
@@ -110,7 +113,7 @@ object TemplateRevisionRules {
             }
         }
         draft.budgetTokens?.let { budget ->
-            val current = base.body.budgetTokens
+            val current = base.body.budgetTokens ?: base.classBudgetTokens
             when {
                 budget <= 0 -> reasons += "The allowance must be above zero."
                 budget == current -> Unit

@@ -17,6 +17,7 @@ import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TemplateRef
 import com.hereliesaz.geministrator.domain.anyEffectful
+import com.hereliesaz.geministrator.domain.effectiveTokenBudget
 import com.hereliesaz.geministrator.domain.haiveBuiltInRoles
 import com.hereliesaz.geministrator.workflow.ArtifactVerdicts
 import com.hereliesaz.geministrator.workflow.StepOutputValidators
@@ -235,6 +236,7 @@ object RoleTemplates {
         id = role.id.value,
         version = 1,
         body = TemplateBody(wording = role.instructions, allowedTools = role.toolCeiling, budgetTokens = role.tokenBudget),
+        classBudgetTokens = if (role.tokenBudget == null) role.effectiveTokenBudget() else null,
         locked = mapOf(
             "kind" to "role",
             "id" to role.id.value,
