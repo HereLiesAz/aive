@@ -62,7 +62,7 @@ enum class QueenAction {
     /** A step that can change something and kept failing: put an approval in front of it (only ever adds one). */
     AddApproval,
 
-    /** A generic role has been used repeatedly in one domain: the keeper starts training a specialist from the Roster. Only leads there. */
+    /** A generic role has been used repeatedly in one domain: the keeper starts training a specialist from its swarm library entry. Only leads there. */
     TrainSpecialist,
     /**
      * The Nanny's mid-run finding about a step or role template, passed on now instead of at the end of the swarm. On the
@@ -151,7 +151,8 @@ internal fun queenCandidates(
     /** Finished uses of roles in earlier runs, for the training suggestion (empty: none is made). */
     usage: List<RoleUse> = emptyList(),
 ): List<QueenCandidate> {
-    if (!run.live()) return emptyList()
+    // A run that has just finished still offers training (the keeper has the evidence in front of them); nothing else is offered then.
+    if (!run.live()) return if (run.status == WorkflowRunStatus.Completed) trainingCandidates(usage, roles) else emptyList()
     val nanny = hasNanny(definition, run)
     val found = mutableListOf<QueenCandidate>()
     // A failing step that builds on a finished one: the finished one is the place to go back to.
@@ -317,8 +318,9 @@ internal fun queenIsMoot(
     run: WorkflowRun,
     candidates: List<QueenCandidate>,
 ): Boolean {
-    if (!run.underWay()) return true
     val action = QueenAction.parse(proposal.action) ?: return true
+    // A training offer is not moot once the run has finished: that is when it is offered.
+    if (!run.underWay()) return !(action == QueenAction.TrainSpecialist && run.status == WorkflowRunStatus.Completed)
     return when (action) {
         QueenAction.RewordStep -> run.taskRuns[com.hereliesaz.geministrator.domain.TaskDefinitionId(proposal.target)]?.status !in OPEN_STATUSES
         // While frozen or stopped nothing applies, and the row waits; it is not moot.
@@ -405,7 +407,7 @@ fun queenSuggestionNotes(proposals: List<ImprovementProposal>, run: WorkflowRun)
             -> QueenLink.Creature(subject, CreatureTab.Work)
             QueenAction.SwapSource, QueenAction.RaiseBudget -> QueenLink.Creature(subject, CreatureTab.Mind)
             QueenAction.RaiseAllowance -> QueenLink.Limits
-            QueenAction.TrainSpecialist -> QueenLink.Roster
+            QueenAction.TrainSpecialist -> QueenLink.Library(subject)
             QueenAction.Rest -> null
             QueenAction.Rest, QueenAction.TemplateChange -> null
         }

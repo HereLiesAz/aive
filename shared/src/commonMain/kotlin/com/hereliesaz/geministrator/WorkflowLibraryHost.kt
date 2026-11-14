@@ -24,6 +24,9 @@ enum class WorkflowLibraryOrigin {
     Role,
 }
 
+/** The swarm library's entry key for the role [roleId] (the entry that carries the "Train a specialist" control). */
+internal fun roleLibraryKey(roleId: String): String = "role:$roleId"
+
 data class WorkflowLibraryEntry(
     val key: String,
     val definition: WorkflowDefinition,
@@ -89,7 +92,7 @@ class WorkflowLibraryHost(
             .filter(RoleDefinition::enabled)
             .map { role ->
                 WorkflowLibraryEntry(
-                    key = "role:${role.id.value}",
+                    key = roleLibraryKey(role.id.value),
                     definition = WorkflowComposer.roleAsWorkflow(role),
                     origin = WorkflowLibraryOrigin.Role,
                     packageId = installedPackages.firstOrNull { pkg -> pkg.roles.any { it.id == role.id } }?.packageId,

@@ -493,14 +493,20 @@ fun App(
     }
 
     fun startTutorialIfAsked(objective: String) {
-        val modelFor = queenModelFor ?: return
         if (!com.hereliesaz.geministrator.intro.TutorialRouter.isTutorialGoal(objective)) return
+        val modelFor = queenModelFor
+        if (modelFor == null) {
+            scope.launch { runtime?.noteQueenAway() }
+            return
+        }
         scope.launch {
             try {
                 val roles = resolveRoleCollection(workflowPersistence.roles.all())
                 val base = modelFor(com.hereliesaz.geministrator.queen.orchestratorPin(roles))
                 if (base == null) {
                     appLog("AiveTutorial", "No usable Source for the queen: the tutorial layer is not started")
+                    // The keeper is told once in Messages, with a link to Connections.
+                    runtime?.noteQueenAway()
                     return@launch
                 }
                 val active = runtime

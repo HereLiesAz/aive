@@ -1378,6 +1378,13 @@ private fun MainDestination(
                     onOpenRun = onSwitchRun,
                     onOpenConnections = onOpenConnections,
                     onOpenRoster = { onDestinationSelected(ControlRoomDestination.Company) },
+                    onOpenRoleLibrary = { roleId ->
+                        hiveScope.launch {
+                            val key = com.hereliesaz.geministrator.queen.QueenLink.Library(roleId).entryKey
+                            hiveHost?.entries()?.firstOrNull { it.key == key }?.let { entry -> DurableUiState.store.openWorkflowsOn(entry) }
+                            onDestinationSelected(ControlRoomDestination.Workflows)
+                        }
+                    },
                 )
                 ControlRoomDestination.Stable -> Column(
                     Modifier.fillMaxSize().verticalScroll(rememberScrollState())

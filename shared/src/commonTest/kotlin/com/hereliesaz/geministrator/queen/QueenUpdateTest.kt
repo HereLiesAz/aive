@@ -135,4 +135,20 @@ class QueenUpdateTest {
         assertEquals(emptyList(), voices(null, QueenLevel.Helpful))
         assertEquals(listOf("1", "1"), queenUpdate(definition, run, roles, QueenLevel.Quiet, null, skipped).first().args)
     }
+
+    @Test
+    fun quietShowsOnlyTheStatusLineWhenAskedAndNoDigest() {
+        val run = qRun(qTaskRun("a", TaskRunStatus.Completed), qTaskRun("b", TaskRunStatus.Running), qTaskRun("c", TaskRunStatus.Created))
+        val essential = queenUpdate(definition, run, roles, QueenLevel.Quiet, essentialStatus = true)
+        assertEquals(listOf(QueenVoice.StatusWorkingClear), essential.map { it.voice })
+        assertEquals(listOf("1", "3", "2", "Task b"), essential.single().args)
+        val waiting = qRun(qTaskRun("a", TaskRunStatus.AwaitingApproval), qTaskRun("b", TaskRunStatus.Escalated), qTaskRun("c", TaskRunStatus.Running))
+        assertTrue(queenUpdate(definition, waiting, roles, QueenLevel.Quiet, essentialStatus = true).none { it.voice == QueenVoice.WaitsMany })
+        // The status row changes id as the swarm changes state, so it is one living line.
+        val later = qRun(qTaskRun("a", TaskRunStatus.Completed), qTaskRun("b", TaskRunStatus.Completed), qTaskRun("c", TaskRunStatus.Running))
+        assertTrue(essential.single().id != queenUpdate(definition, later, roles, QueenLevel.Quiet, essentialStatus = true).single().id)
+        // A finished run still says only its finish note.
+        val done = qRun(qTaskRun("a", TaskRunStatus.Completed), status = WorkflowRunStatus.Completed)
+        assertEquals(listOf(QueenVoice.FinishedAll), queenUpdate(definition, done, roles, QueenLevel.Quiet, essentialStatus = true).map { it.voice })
+    }
 }

@@ -188,6 +188,19 @@ class ApplicationRuntime private constructor(
     }
 
     /**
+     * Her own model was needed (the tutorial's start) and no Source could give one: one plain Messages line on the current run
+     * ([com.hereliesaz.geministrator.queen.missingWhenQueenAway]), said once per run, leading to Connections.
+     */
+    internal suspend fun noteQueenAway() = runtimeMutex.withLock {
+        val id = current?.state?.run?.id?.value ?: return@withLock
+        val known = queenMissing[id].orEmpty()
+        val next = com.hereliesaz.geministrator.queen.missingWhenQueenAway(known)
+        if (next.size == known.size) return@withLock
+        rememberMissing(id, next)
+        publishCurrent()
+    }
+
+    /**
      * Whether the reviewer may be asked now, as the keeper's caps and the Sources see it ([com.hereliesaz.geministrator.queen.planningMayCall]):
      * the reviewer's price from the price table, the real hourly spend (read only when an hourly cap is set) and the room on the
      * Sources it may ask. [callsSoFar] counts the planning calls already made.
@@ -1621,6 +1634,8 @@ class ApplicationRuntime private constructor(
                 stalledForMinutes = queenStalled[run.id.value],
                 hiveSigns = hiveSignBook[run.id.value].orEmpty(),
                 blockers = refreshBlockers(definition, run),
+                // Quiet is the default level; it still shows her one status line, so she is not absent from a running swarm.
+                essentialStatus = true,
                 suggestions = if (run.globalPause == null && run.spendPause == null) {
                     queenSuggestionNotes(queenProposals, run)
                 } else {

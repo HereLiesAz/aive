@@ -50,8 +50,19 @@ fun queenUpdate(
     hiveSigns: List<HiveSign> = emptyList(),
     /** What the hive still needs created or obtained (see [Blockers]); said as what is missing, and it holds the hive from being reached. */
     blockers: List<Blocker> = emptyList(),
+    /**
+     * Quiet's one essential line: the "Done so far / what I am doing" status ([statusNote]) shows at Quiet too, so the queen is
+     * never absent from a running swarm. Quiet keeps everything else quiet (no digest of waits, no slow notes). The line is
+     * derived from the run, so it is the same single row, replaced whenever the swarm's state changes (it starts, a step
+     * finishes or begins). Off by default so a caller that wants the plain Quiet set can still ask for it.
+     */
+    essentialStatus: Boolean = false,
 ): List<QueenNote> {
-    if (run.status.finished()) return listOf(finishNote(definition, run, hiveSigns, blockers)) + stepAllowanceNotes(definition, run)
+    // A run that has just finished still carries the training offer (the one suggestion that is made at the end of a run).
+    if (run.status.finished()) {
+        val training = suggestions.filter { it.suggestion?.action == QueenAction.TrainSpecialist }
+        return listOf(finishNote(definition, run, hiveSigns, blockers)) + stepAllowanceNotes(definition, run) + training
+    }
     val lead = missingNotes(run.id.value, missing, level) + blockerNotes(run.id.value, definition, run, blockers) + disputes + tutorialFailureNotes(definition, run)
     val stop = run.spendPause
     if (stop != null) return lead + allowanceNotes(run)
@@ -70,6 +81,8 @@ fun queenUpdate(
     if (level == QueenLevel.Helpful) {
         notes += slowNotes(definition, run)
         waitsDigest(definition, run)?.let { notes += it }
+        notes += statusNote(definition, run, roles)
+    } else if (essentialStatus) {
         notes += statusNote(definition, run, roles)
     }
     return notes
