@@ -194,9 +194,15 @@ object BuiltInTemplates {
     /** The steps the queen may make by herself: those that change nothing outside their own output. */
     val queenMayMake: List<StepTemplate> get() = all.filter { !it.effectful }
 
-    /** The templates offered to the planner, by id, with their input ports: only those that change nothing outside their output. */
+    /** Every template a keeper may add in Edit: the built-ins and the presets, grouped by [TemplateGroups] in the palette. */
+    val palette: List<StepTemplate> get() = all + StepPresets.all
+
+    /**
+     * The templates offered to the planner, by id, with their input ports: any template that changes nothing outside its
+     * output, except the internal nine ([TemplateGroups.internal]), which the planner never begins from.
+     */
     fun forPlanner(): List<com.hereliesaz.geministrator.orchestration.OrchestrationTemplate> =
-        queenMayMake.map { template ->
+        palette.filter { !it.effectful && !TemplateGroups.isInternal(it.id) }.map { template ->
             com.hereliesaz.geministrator.orchestration.OrchestrationTemplate(
                 id = template.id,
                 title = template.id.replace('-', ' '),
@@ -330,6 +336,8 @@ object StepInstantiation {
     fun missingInputs(contract: TaskContract): List<String> {
         if (contract.startingPoint) return emptyList()
         val template = BuiltInTemplates.byId[contract.template.id] ?: return emptyList()
-        return template.inputs.filter { it.required && contract.inputs[it.name].isNullOrBlank() }.map { it.name }
+        val missing = template.inputs.filter { it.required && contract.inputs[it.name].isNullOrBlank() }.map { it.name }
+        // A sending step asks the keeper once per recipient, so it runs with exactly one.
+        return if (missing.isEmpty() && SendingApprovals.needsOneRecipient(contract)) listOf("one recipient") else missing
     }
 }

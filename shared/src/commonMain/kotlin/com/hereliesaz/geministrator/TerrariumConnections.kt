@@ -26,6 +26,9 @@ import com.hereliesaz.geministrator.resources.build_add_from_steps
 import com.hereliesaz.geministrator.resources.build_add_from_templates
 import com.hereliesaz.geministrator.resources.build_add_from_swarm
 import com.hereliesaz.geministrator.resources.build_add_hint
+import com.hereliesaz.geministrator.resources.template_group_fewer
+import com.hereliesaz.geministrator.resources.template_group_internal
+import com.hereliesaz.geministrator.resources.template_group_more
 import com.hereliesaz.geministrator.resources.build_step_repo_fetch
 import com.hereliesaz.geministrator.resources.build_step_repo_status
 import com.hereliesaz.geministrator.resources.build_step_tests
@@ -287,18 +290,49 @@ private fun TerrariumAddCreature(
         val templateCatalog = androidx.compose.runtime.produceState<com.hereliesaz.geministrator.template.TemplateCatalog?>(initialValue = null) {
             value = com.hereliesaz.geministrator.template.DeviceTemplates.catalog()
         }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            com.hereliesaz.geministrator.template.BuiltInTemplates.all.forEach { template ->
-                val title = stepTemplateTitle(template)
-                AzphaltPill(
-                    label = title,
-                    seed = "add-template-${template.id}",
-                    onClick = {
-                        val base = templateCatalog.value?.current(com.hereliesaz.geministrator.template.TemplateKind.Step, template.id) ?: template.base()
-                        onEdit(addTerrariumCreature(definition, TerrariumNewcomer.FromTemplate(template, base, title)))
-                    },
-                )
+        val everyTemplate = com.hereliesaz.geministrator.template.BuiltInTemplates.palette
+        var showInternal by remember { mutableStateOf(false) }
+        var openGroups by remember { mutableStateOf(emptySet<String>()) }
+        var moreGroups by remember { mutableStateOf(emptySet<String>()) }
+        val addTemplate: (com.hereliesaz.geministrator.template.StepTemplate, String) -> Unit = { template, title ->
+            val base = templateCatalog.value?.current(com.hereliesaz.geministrator.template.TemplateKind.Step, template.id) ?: template.base()
+            onEdit(addTerrariumCreature(definition, TerrariumNewcomer.FromTemplate(template, base, title)))
+        }
+        // The catalog's groups: each folds open to its common steps, and its own More folds out the rest.
+        com.hereliesaz.geministrator.template.TemplateGroups.arrange(everyTemplate, showInternal).forEach { view ->
+            val open = view.group.id in openGroups
+            AzphaltPill(
+                label = templateGroupTitle(view.group),
+                seed = "add-group-${view.group.id}",
+                selected = open,
+                endCap = view.total.toString(),
+                onClick = { openGroups = if (open) openGroups - view.group.id else openGroups + view.group.id },
+            )
+            if (open) {
+                val more = view.group.id in moreGroups
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    (if (more) view.shown + view.folded else view.shown).forEach { template ->
+                        val title = stepTemplateTitle(template)
+                        AzphaltPill(label = title, seed = "add-template-${template.id}", onClick = { addTemplate(template, title) })
+                    }
+                    if (view.folded.isNotEmpty()) {
+                        AzphaltPill(
+                            label = if (more) stringResource(Res.string.template_group_fewer) else stringResource(Res.string.template_group_more, view.folded.size),
+                            seed = "add-more-${view.group.id}",
+                            onClick = { moreGroups = if (more) moreGroups - view.group.id else moreGroups + view.group.id },
+                        )
+                    }
+                }
             }
+        }
+        // The internal nine are left out of the default view; this fold brings them back, only when there are any.
+        if (com.hereliesaz.geministrator.template.TemplateGroups.internalOf(everyTemplate).isNotEmpty()) {
+            AzphaltPill(
+                label = stringResource(Res.string.template_group_internal),
+                seed = "add-internal",
+                selected = showInternal,
+                onClick = { showInternal = !showInternal },
+            )
         }
     }
 }
