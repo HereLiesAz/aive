@@ -61,9 +61,12 @@ data class MemoryLineageLog(
         if (workflows.size <= MAX_WORKFLOW_RECORDS && parents.size <= MAX_PARENT_RECORDS && expansions.size <= MAX_EXPANSIONS) {
             this
         } else {
+            val keptWorkflows = workflows.takeLast(MAX_WORKFLOW_RECORDS)
+            val kept = keptWorkflows.mapTo(hashSetOf()) { it.workflowId }
             MemoryLineageLog(
-                workflows = workflows.takeLast(MAX_WORKFLOW_RECORDS),
-                parents = parents.takeLast(MAX_PARENT_RECORDS),
+                workflows = keptWorkflows,
+                // A link to a workflow that was cut is cut with it, so an evicted workflow is not still read as an ancestor.
+                parents = parents.filter { it.workflowId in kept && it.parentWorkflowId in kept }.takeLast(MAX_PARENT_RECORDS),
                 expansions = expansions.takeLast(MAX_EXPANSIONS),
             )
         }
