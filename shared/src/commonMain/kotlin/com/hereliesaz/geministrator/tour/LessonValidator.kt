@@ -204,7 +204,7 @@ object LessonValidator {
     // L7 -----------------------------------------------------------------------------------------------------------
 
     /** The words the owner retired from everything the keeper reads (the same set as VocabularyInStringsTest). */
-    internal val retired = Regex("""\b(timelines?|providers?|inbox(es)?|hall[ -]monitors?|drifters?|build)\b""", RegexOption.IGNORE_CASE)
+    internal val retired = Regex("""\b(timelines?|providers?|inbox(es)?|hall[ -]monitors?|drifters?|build|hp|mood|roster|stable|azphalt store)\b""", RegexOption.IGNORE_CASE)
 
     private fun checkVocabulary(p: LessonPayload): List<Violation> = buildList {
         for (text in teaching(p) + p.checkIn) {

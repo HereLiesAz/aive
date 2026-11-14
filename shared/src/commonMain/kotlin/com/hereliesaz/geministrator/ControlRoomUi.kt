@@ -97,6 +97,15 @@ import com.hereliesaz.geministrator.resources.nav_runtime_no_project
 import com.hereliesaz.geministrator.resources.nav_runtime_no_run
 import com.hereliesaz.geministrator.resources.nav_runtime_resume_failed
 import com.hereliesaz.geministrator.resources.places_hives
+import com.hereliesaz.geministrator.resources.keeper_room
+import com.hereliesaz.geministrator.resources.keeper_compute
+import com.hereliesaz.geministrator.resources.rail_inbox
+import com.hereliesaz.geministrator.resources.rail_roster
+import com.hereliesaz.geministrator.resources.rail_stable
+import com.hereliesaz.geministrator.resources.rail_store
+import com.hereliesaz.geministrator.resources.place_overview
+import com.hereliesaz.geministrator.resources.place_swarm_library
+import com.hereliesaz.geministrator.resources.place_memory_swarm
 import com.hereliesaz.geministrator.resources.crumb_here
 import com.hereliesaz.geministrator.resources.first_hive
 import com.hereliesaz.geministrator.resources.crumb_hive
@@ -105,6 +114,22 @@ import com.hereliesaz.geministrator.resources.nav_the_aive
 import com.russhwolf.settings.Settings
 import org.jetbrains.compose.resources.stringResource
 
+/** The place's name as the keeper reads it, from the string resources (the enum's own `label` is only an English fallback). */
+@Composable
+internal fun ControlRoomDestination.displayLabel(): String = stringResource(
+    when (this) {
+        ControlRoomDestination.Overview -> Res.string.place_overview
+        ControlRoomDestination.Workflows -> Res.string.place_swarm_library
+        ControlRoomDestination.Company -> Res.string.rail_roster
+        ControlRoomDestination.Stable -> Res.string.rail_stable
+        ControlRoomDestination.Inbox -> Res.string.rail_inbox
+        ControlRoomDestination.Compute -> Res.string.keeper_compute
+        ControlRoomDestination.Memory -> Res.string.place_memory_swarm
+        ControlRoomDestination.AddOns -> Res.string.rail_store
+        ControlRoomDestination.Settings -> Res.string.keeper_room
+    },
+)
+
 internal object ControlRoomBreakpoints {
     val Wide: Dp = 820.dp
 }
@@ -112,12 +137,12 @@ internal object ControlRoomBreakpoints {
 enum class ControlRoomDestination(val label: String) {
     Overview("Overview"),
     Workflows("Swarm library"),
-    Company("Roster"),
-    Stable("Stable"),
+    Company("Breeds"),
+    Stable("Nursery"),
     Inbox("Messages"),
     Compute("Compute"),
     Memory("Memory swarm"),
-    AddOns("AZPHALT STORE"),
+    AddOns("SHOP"),
     Settings("Keeper's room"),
     ;
 
@@ -822,10 +847,10 @@ private fun shellCrumbs(
             if (creatureName != null) creatureTab?.let { add(ShellCrumb(it, "crumb-creature-tab", null)) }
         }
         destination.navigationItem == ControlRoomDestination.Settings -> {
-            add(ShellCrumb(ControlRoomDestination.Settings.label, "crumb-keeper", onCloseKeeperPart))
+            add(ShellCrumb(ControlRoomDestination.Settings.displayLabel(), "crumb-keeper", onCloseKeeperPart))
             keeperPart?.let { add(ShellCrumb(it, "crumb-keeper-part", null)) }
         }
-        else -> add(ShellCrumb(destination.label, "crumb-${destination.name}", null))
+        else -> add(ShellCrumb(destination.displayLabel(), "crumb-${destination.name}", null))
     }
 }.let { crumbs ->
     // Where you are is never a way to go: the last step reads as a place, not a button.
@@ -947,7 +972,7 @@ private fun OverviewSectionTabs(
         if (places) ControlRoomDestination.OverviewSections.forEachIndexed { index, section ->
             if (section == ControlRoomDestination.Memory) return@forEachIndexed
             AzphaltPill(
-                label = section.label,
+                label = section.displayLabel(),
                 seed = "overview-section-$index-${section.name}",
                 selected = section == destination,
                 onClick = {

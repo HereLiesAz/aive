@@ -421,6 +421,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="rail_keeper">Keeper</string>
     <string name="rail_keeper_mark">K</string>
     <string name="rail_keeper_you">You</string>
+    <string name="place_overview">Overview</string>
+    <string name="place_swarm_library">Swarm library</string>
+    <string name="place_memory_swarm">Memory swarm</string>
     <string name="rail_unread">%1$s, %2$s unread</string>
     <string name="district_your_swarm">YOUR SWARMS</string>
     <string name="district_empty">No swarms yet. Bring one in from the Shop or build a swarm.</string>
@@ -1903,7 +1906,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="swarm_the_workflow_receives_the_role_task">The workflow receives the role/task payload as JSON in the configured context input.</string>
     <string name="swarm_these_are_aive_s_semantic_orchestration">These are The Aive's semantic orchestration roles. Each role can run through an AI source, GitHub Actions, local JavaScript, or a JavaScript/Python GitHub runner while keeping the same role identity and task contract.</string>
     <string name="swarm_this_id_is_reserved_by_the">This ID is reserved by The Aive.</string>
-    <string name="swarm_this_restores_aive_s_default_role">This restores The Aive's default role definitions and default order. Custom roles are removed from the active roster but kept internally for historical swarm compatibility.</string>
+    <string name="swarm_this_restores_aive_s_default_role">This restores The Aive's default role definitions and default order. Custom roles are removed from the active roles but kept internally for historical swarm compatibility.</string>
     <string name="swarm_unnamed_surface">Unnamed surface</string>
     <string name="swarm_unsaved">Unsaved</string>
     <string name="swarm_uses_project_default_branch">Uses project default branch</string>
