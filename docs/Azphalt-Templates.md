@@ -362,6 +362,10 @@ Two weaker fits, assigned and not listed as gaps:
 - Steps that read the linked repository (a survey of the code, an audit of dependencies, a collection of CI runs) start from `write-document`. A `read-repository` template that names its tools would fit them better; today the read-from-a-connected-tool template needs one named tool and would narrow what they may use.
 - Verification steps that run tests start from `check-work`, whose wording says to judge only. A `run-and-report-checks` template would fit them better.
 
+## Starting roles
+
+The 37 starting role templates (`domain/RoleStartingTemplates.kt`) are generic roles with no domain knowledge: 29 new, and the 8 built-ins listed beside them so the set is whole (`researcher`, `planner`, `reviewer`, `antagonist`, `code-reviewer`, `code-implementer` which is the built-in `implementation-engineer`, `test-writer` which is the built-in `crash-test-dummy`, and `trainer`). They are in the same roster as every role (`haiveBuiltInRoles`), so a role in an Azphalt package may use one by id or name its own; none of the 29 new ids is used by a package role today. Each is a role template at generation 1 like every other role, and the coverage test counts it (`StepTemplateCoverageTest.everyRoleHasARoleTemplateRecordAtGenerationOne`). A role names a class of token budget (small, medium or large); the numbers are the keeper's ([Step templates](Step-Templates.md)). No starting role carries a tool ceiling.
+
 ## Packages left unchanged
 
 - The 12 role packages: they hold roles only, which have role templates without a change to their files.
