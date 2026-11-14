@@ -65,14 +65,21 @@ object WorkflowRunFactory {
             }
             val blocked = task.dependsOn.isNotEmpty() ||
                 (conditionTask != null && conditionTask != task.id)
-            val status = if (blocked) TaskRunStatus.Blocked else TaskRunStatus.Ready
+            // A step with nothing before it is still held when a required input has no value.
+            val missingInput = task.contract?.let(StepInstantiation::missingInputs).orEmpty()
+            val status = if (blocked || missingInput.isNotEmpty()) TaskRunStatus.Blocked else TaskRunStatus.Ready
             task.id to TaskRun(
                 id = taskRunIdFactory(task.id),
                 taskDefinitionId = task.id,
                 status = status,
                 assignedRoleId = task.roleId,
                 executor = task.effectiveExecutor(task.roleId?.let(rolesById::get)),
-                blockingReason = if (status == TaskRunStatus.Blocked) {
+                blockingReason = if (!blocked && missingInput.isNotEmpty()) {
+                    BlockingReason(
+                        code = CONTRACT_INPUT_MISSING,
+                        message = "This step needs its ${missingInput.joinToString(", ")} before it can start.",
+                    )
+                } else if (status == TaskRunStatus.Blocked) {
                     BlockingReason(
                         code = WAITING_FOR_DEPENDENCIES,
                         message = "Waiting for task dependencies.",
@@ -147,8 +154,9 @@ object WorkflowRunFactory {
             // taken, not a failure: an Always join after it proceeds on the branches that did run.
             val allCompletedOrSkipped = allTerminal &&
                 dependencyRuns.all { it.status == TaskRunStatus.Completed || it.isSkippedBranch() }
+            // An optional step that was set aside counts as settled for what waits on it: the join goes on without it.
             val anyCompleted = dependencyRuns.isEmpty() ||
-                dependencyRuns.any { it.status == TaskRunStatus.Completed }
+                dependencyRuns.any { it.status == TaskRunStatus.Completed || it.isSkippedOptional() }
 
             val conditionTargetRun = when (val c = task.condition) {
                 is TaskCondition.Always -> null
