@@ -13,6 +13,23 @@ plugins {
 
 val isMacHost = System.getProperty("os.name").lowercase().contains("mac")
 
+val appVersionNameProvider = providers.gradleProperty("app.versionName").orElse("dev")
+
+/** Writes AppVersion.kt (APP_VERSION_NAME) from app.versionName; the Keeper's room shows it. */
+val generateAppVersion = tasks.register("generateAppVersion") {
+    val outputDir = layout.buildDirectory.dir("generated/appVersion/kotlin")
+    val versionName = appVersionNameProvider
+    inputs.property("versionName", versionName)
+    outputs.dir(outputDir)
+    doLast {
+        val dir = outputDir.get().asFile.resolve("com/hereliesaz/geministrator")
+        dir.mkdirs()
+        dir.resolve("AppVersion.kt").writeText(
+            "package com.hereliesaz.geministrator\n\ninternal const val APP_VERSION_NAME: String = \"" + versionName.get() + "\"\n",
+        )
+    }
+}
+
 /** Browser memory database worker (SQLite in OPFS); see memory-worker/memory.worker.js. */
 val memoryWorkerPackage: File = layout.projectDirectory.dir("memory-worker").asFile
 
@@ -49,6 +66,8 @@ kotlin {
         // commonMain automatically but not commonMainResourceAccessors, leaving every
         // Res.* reference unresolved. Wire it explicitly.
         getByName("commonMain").kotlin.srcDir(tasks.named("generateResourceAccessorsForCommonMain"))
+        // The version the build was given (CI substitutes the BUILD part), so the Keeper's room can show it.
+        getByName("commonMain").kotlin.srcDir(generateAppVersion)
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)

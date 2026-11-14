@@ -62,6 +62,7 @@ import com.hereliesaz.geministrator.resources.keeper_device_lead
 import com.hereliesaz.geministrator.resources.keeper_device_lead_wide
 import com.hereliesaz.geministrator.resources.keeper_limits
 import com.hereliesaz.geministrator.resources.keeper_limits_lead
+import com.hereliesaz.geministrator.resources.keeper_app_version
 import com.hereliesaz.geministrator.resources.keeper_page_line
 import com.hereliesaz.geministrator.resources.keeper_page_title
 import com.hereliesaz.geministrator.resources.keeper_feeds_the_hive
@@ -191,6 +192,7 @@ internal fun KeeperRoom(
                 modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
+                AppVersionLine()
                 KeeperSectionList(groups, sections, selected = null, statusOf = statusOf) {
                     selectGroup(it)
                     open = true
@@ -199,6 +201,8 @@ internal fun KeeperRoom(
         }
     } else {
         Column(modifier.fillMaxSize().padding(start = 28.dp, top = 27.dp, end = 28.dp, bottom = 40.dp)) {
+            AppVersionLine()
+            Spacer(Modifier.height(6.dp))
             WidePageTitle(
                 eyebrow = stringResource(Res.string.keeper_room),
                 title = stringResource(Res.string.keeper_page_title),
@@ -224,6 +228,17 @@ internal fun KeeperRoom(
             }
         }
     }
+}
+
+/** The build's version, first thing in the room, so the keeper can tell which build they are running. */
+@Composable
+private fun AppVersionLine(modifier: Modifier = Modifier) {
+    Text(
+        stringResource(Res.string.keeper_app_version, APP_VERSION_NAME),
+        style = AzphaltType.endCap,
+        color = azphaltMutedOnSurface(),
+        modifier = modifier,
+    )
 }
 
 /** The wide room's list of parts: one Ink column, the open part filled in the strong colour. */

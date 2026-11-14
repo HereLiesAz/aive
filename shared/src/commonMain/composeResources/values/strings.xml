@@ -88,6 +88,7 @@
     <string name="keeper_limits_lead">Caps that stop the swarm when its known spend reaches them.</string>
     <string name="keeper_device_lead_wide">Models that run here, and reaching this device from another.</string>
     <string name="keeper_page_title">Make it yours</string>
+    <string name="keeper_app_version">The Aive %1$s</string>
     <string name="keeper_page_line">Sources, allowance, hosts, your data, routines and how it all looks.</string>
     <string name="keeper_ground_selected">Selected</string>
     <string name="keeper_delegations">Delegations</string>
