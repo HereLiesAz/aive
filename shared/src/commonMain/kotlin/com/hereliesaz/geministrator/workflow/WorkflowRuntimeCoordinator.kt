@@ -1660,12 +1660,16 @@ class WorkflowRuntimeCoordinator(
                 val received = definition.labelTaskOutputs(next, task, ContextProvenance.ExternalContent, update.artifacts)
                 (taskRun.artifacts + received).distinctBy { it.id }
             }
+            // What came back from the pool is held to the step's contract and compiled check before anything waits on it.
+            val rejection = if (update.status == TaskRunStatus.Completed) engine.outputRejection(task, mergedArtifacts) else null
+            val settledStatus = if (rejection != null) TaskRunStatus.Failed else update.status
+            if (settledStatus != update.status && !TaskRunTransitions.canTransition(taskRun.status, settledStatus)) continue
             next = next.copy(
                 taskRuns = next.taskRuns + (
                     id to taskRun.copy(
-                        status = update.status,
+                        status = settledStatus,
                         artifacts = mergedArtifacts,
-                        blockingReason = null,
+                        blockingReason = rejection,
                         progress = update.progress
                             ?: if (update.status == TaskRunStatus.Completed) 1f else taskRun.progress,
                         progressMessage = update.progressMessage ?: taskRun.progressMessage,

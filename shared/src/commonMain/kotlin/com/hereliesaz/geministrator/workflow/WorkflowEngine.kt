@@ -1070,6 +1070,20 @@ class WorkflowEngine(
         )
     }
 
+    /**
+     * Why [task]'s [artifacts] are turned back, or null when they stand: its contract's outputs first, then its compiled
+     * check. The same two checks a local session's output meets; a task run on another device meets them here, on
+     * the originating device, before anything waits on it. Pure.
+     */
+    fun outputRejection(task: TaskDefinition, artifacts: List<ArtifactRef>): BlockingReason? {
+        val violations = task.contract?.let { checkStepOutputs(it, artifacts) }.orEmpty()
+        if (violations.isNotEmpty()) return BlockingReason(OUTPUT_CONTRACT_VIOLATION, contractViolationMessage(violations))
+        val problems = (task.verificationPolicy as? VerificationPolicy.Deterministic)
+            ?.let { outputValidators.problems(it.validatorId, artifacts) }
+            .orEmpty()
+        return if (problems.isEmpty()) null else BlockingReason(TASK_OUTPUT_REJECTED, taskOutputRejectedMessage(problems))
+    }
+
     suspend fun handleFailure(
         definition: WorkflowDefinition,
         run: WorkflowRun,
