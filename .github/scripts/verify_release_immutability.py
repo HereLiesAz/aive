@@ -20,14 +20,24 @@ def artifact_contract_violations(name, text):
     """
     uploads = set()
     downloads = set()
-    for block in re.finditer(
-        r"uses: actions/(upload|download)-artifact@[^\n]*\n((?:[ \t]+[^\n]*\n?)*)", text
-    ):
-        found = re.search(r"^\s+name: (\S+)", block.group(2), re.MULTILINE)
+    lines = text.split("\n")
+    for index, line in enumerate(lines):
+        step = re.match(r"^(\s*)(- )?uses: actions/(upload|download)-artifact@", line)
+        if not step:
+            continue
+        # The step's own keys sit at this indent; a line indented less is the next step or the
+        # end of the steps list, so adjacent steps without a blank line are never merged.
+        key_indent = len(step.group(1)) + (2 if step.group(2) else 0)
+        body = []
+        for following in lines[index + 1:]:
+            if following.strip() and len(following) - len(following.lstrip()) < key_indent:
+                break
+            body.append(following)
+        found = re.search(r"^\s+name: (\S+)", "\n".join(body), re.MULTILINE)
         if found:
-            (uploads if block.group(1) == "upload" else downloads).add(found.group(1))
+            (uploads if step.group(3) == "upload" else downloads).add(found.group(1))
     if any("${{" in u for u in uploads):
-        uploads.update(m.group(1) for m in re.finditer(r"^\s+artifact: (\S+)", text, re.MULTILINE))
+        uploads.update(m.group(1) for m in re.finditer(r"^\s*(?:- )?artifact: (\S+)", text, re.MULTILINE))
     return [
         f"{name} downloads artifact '{d}' that no step in the workflow uploads"
         for d in sorted(downloads)
