@@ -59,5 +59,6 @@ class StepContractTest {
         assertTrue(TaskContract(ref, allowedTools = listOf("search")).requiresToolFilter())
         assertFalse(TaskContract(ref, effects = setOf(StepEffect.WritesRepositoryBranch)).requiresToolFilter())
         assertFalse(TaskContract(ref, startingPoint = true).requiresToolFilter())
+        assertFalse(TaskContract(TemplateRef("read-repository-files", 1), effects = setOf(StepEffect.None)).requiresToolFilter())
     }
 }
