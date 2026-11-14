@@ -56,6 +56,10 @@ internal object TutorialLaunch {
         roles: Collection<RoleDefinition>,
         labels: Map<String, String>,
         nowMillis: () -> Long,
+        /** How much the queen says in Messages, read each time she decides. */
+        level: () -> com.hereliesaz.geministrator.queen.QueenLevel = { com.hereliesaz.geministrator.queen.QueenLevel.Quiet },
+        /** Where her lines to the keeper go (Messages). */
+        say: (com.hereliesaz.geministrator.queen.TutorialSay) -> Unit = {},
     ): TutorialOutcome? {
         val scope = TutorialRouter.classify(goal) ?: return null
         val rows = rows(labels)
@@ -72,6 +76,8 @@ internal object TutorialLaunch {
             loadComfort = { store.load() },
             saveComfort = { store.save(it) },
             nowMillis = nowMillis,
+            level = level,
+            say = say,
         )
         // Whatever tour was showing gives way to this run's.
         TourController.stop()

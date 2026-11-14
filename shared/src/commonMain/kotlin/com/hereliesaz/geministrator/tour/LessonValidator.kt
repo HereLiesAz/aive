@@ -261,7 +261,7 @@ object LessonValidator {
 
     // L11 ----------------------------------------------------------------------------------------------------------
 
-    private val comfortCues = listOf("with me", "follow", "make sense", "clear", "okay", "slow", "lost", "ready", "comfortable", "so far")
+    private val comfortCues = listOf("with me", "follow", "make sense", "clear", "okay", "slow", "lost", "ready", "comfortable", "so far", "know what you are doing", "confident")
     private val knowledgeWords = Regex("""(?i)\b(what|which|how many|why|who|name|list|explain|define)\b""")
 
     private fun checkCheckIn(p: LessonPayload, ctx: LessonContext): List<Violation> = buildList {
@@ -275,7 +275,8 @@ object LessonValidator {
         if (comfortCues.none { c.lowercase().contains(it) }) {
             add(Violation("L11", "checkIn must only ask how the keeper feels (for example whether they are with you so far)."))
         }
-        if (knowledgeWords.containsMatchIn(c)) add(Violation("L11", "checkIn must not ask a knowledge question."))
+        // "Do you know what you are doing now" asks how the keeper feels, so its one "what" is not a knowledge question.
+        if (knowledgeWords.containsMatchIn(c.lowercase().replace("know what you are doing", ""))) add(Violation("L11", "checkIn must not ask a knowledge question."))
         if (ctx.targets.any { containsWord(c, it.label) || c.contains(it.id) } || ctx.uiWords.any { it.length > 3 && containsWord(c, it) }) {
             add(Violation("L11", "checkIn must not name a control."))
         }

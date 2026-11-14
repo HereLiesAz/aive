@@ -1,6 +1,9 @@
 package com.hereliesaz.geministrator.intro
 
+import com.hereliesaz.geministrator.queen.QueenLevel
 import com.hereliesaz.geministrator.queen.QueenModel
+import com.hereliesaz.geministrator.queen.TutorialSay
+import com.hereliesaz.geministrator.tour.TeachingLimits
 import com.hereliesaz.geministrator.tour.CheckInReply
 import com.hereliesaz.geministrator.tour.ComfortRecord
 import com.hereliesaz.geministrator.tour.ExpectKind
@@ -54,8 +57,18 @@ class TutorialDirectorTest {
         reviewers: List<TutorialVoice> = listOf(approve),
         w: QueenModel = writer,
         save: (ComfortRecord) -> Unit = {},
+        clock: () -> Long = { 0L },
+        level: () -> QueenLevel = { QueenLevel.Quiet },
+        say: (TutorialSay) -> Unit = {},
         tick: suspend () -> Unit,
-    ) = TutorialDirector(planner, reviewers, w, rows, { "somewhere" }, surface, saveComfort = save, tick = tick)
+    ) = TutorialDirector(planner, reviewers, w, rows, { "somewhere" }, surface, saveComfort = save, nowMillis = clock, level = level, say = say, tick = tick)
+
+    /** The keeper's side of a quick walk: answer any open question with [answer], else go on to the next step. */
+    private fun walk(surface: FakeSurface, answer: CheckInReply = CheckInReply.Yes) {
+        val st = surface.state!!
+        if (st.checkInLine != null) surface.sink?.invoke(answer)
+        else if (st.current != null) surface.replace(reduceTour(st, TourAction.Next))
+    }
 
     @Test
     fun aPlannedChainBecomesLessonsOneAheadOfTheKeeperAndEnds() = runTest {
@@ -64,9 +77,9 @@ class TutorialDirectorTest {
             val st = surface.state!!
             // The keeper never gets more than two lessons ahead of what is written.
             assertTrue(st.lessons.size - st.index <= 2)
-            if (st.current != null) surface.replace(reduceTour(st, TourAction.Next))
+            walk(surface)
         }.run("goal", TutorialScope.Focused, null)
-        assertEquals(TutorialOutcome.Ended(written = 3, dropped = 0, finished = true), outcome)
+        assertEquals(TutorialOutcome.Ended(written = 3, dropped = 0, finished = true, reached = true), outcome)
         assertEquals(listOf("R1", "R2", "R3"), surface.state!!.lessons.map { it.target })
     }
 
@@ -74,14 +87,11 @@ class TutorialDirectorTest {
     fun aCheckInIsAskedAtThePaceAndAnAnswerIsRecordedWithoutAModel() = runTest {
         val surface = FakeSurface()
         var saved = ComfortRecord()
-        val outcome = director(surface, QueenModel { planOf(6) }, save = { saved = it }) {
-            val st = surface.state!!
-            if (st.checkInLine != null) surface.sink?.invoke(CheckInReply.Yes)
-            else if (st.current != null) surface.replace(reduceTour(st, TourAction.Next))
-        }.run("goal", TutorialScope.Focused, null)
+        val outcome = director(surface, QueenModel { planOf(6) }, save = { saved = it }) { walk(surface) }.run("goal", TutorialScope.Focused, null)
         assertIs<TutorialOutcome.Ended>(outcome)
-        assertEquals(listOf("Are you with me so far?"), surface.lines)
-        assertEquals(listOf("R4"), saved.comfortableIds())
+        // One at the pace after step 4, and the closing one at the end.
+        assertEquals(listOf("Are you with me so far?", "Are you with me so far?"), surface.lines)
+        assertEquals(listOf("R4", "R6"), saved.comfortableIds())
     }
 
     @Test
@@ -102,12 +112,9 @@ class TutorialDirectorTest {
         }
         var reviews = 0
         val strict = TutorialVoice("Antagonist", QueenModel { reviews++; if (reviews == 1) "VERDICT: revise\n- step 3 is padding" else "VERDICT: approve" })
-        val outcome = director(surface, planner, reviewers = listOf(strict)) {
-            val st = surface.state!!
-            if (st.current != null) surface.replace(reduceTour(st, TourAction.Next))
-        }.run("goal", TutorialScope.Focused, null)
+        val outcome = director(surface, planner, reviewers = listOf(strict)) { walk(surface) }.run("goal", TutorialScope.Focused, null)
         assertEquals(2, rounds)
-        assertEquals(TutorialOutcome.Ended(2, 0, true), outcome)
+        assertEquals(TutorialOutcome.Ended(2, 0, true, reached = true), outcome)
     }
 
     @Test
@@ -139,5 +146,119 @@ class TutorialDirectorTest {
         }.run("goal", TutorialScope.Focused, null)
         assertIs<TutorialOutcome.Ended>(outcome)
         assertTrue((outcome as TutorialOutcome.Ended).written < 3)
+    }
+
+    @Test
+    fun theClosingQuestionIsTheKeepersAnswerAndNothingElseDecidesReached() = runTest {
+        val surface = FakeSurface()
+        val said = mutableListOf<TutorialSay>()
+        val outcome = director(surface, QueenModel { planOf(2) }, say = { said += it }) { walk(surface, CheckInReply.SortOf) }
+            .run("goal", TutorialScope.Focused, null)
+        assertEquals(TutorialOutcome.Ended(2, 0, true, reached = false), outcome)
+        assertEquals(1, surface.lines.size)
+        assertEquals(listOf<TutorialSay>(TutorialSay.Finished(reached = false)), said)
+    }
+
+    @Test
+    fun aYesAtTheEndReachesAndTheQueenSaysTheHiveIsTheirs() = runTest {
+        val surface = FakeSurface()
+        val said = mutableListOf<TutorialSay>()
+        val outcome = director(surface, QueenModel { planOf(2) }, say = { said += it }) { walk(surface) }.run("goal", TutorialScope.Focused, null)
+        assertEquals(TutorialOutcome.Ended(2, 0, true, reached = true), outcome)
+        assertEquals(listOf<TutorialSay>(TutorialSay.Finished(reached = true)), said)
+    }
+
+    @Test
+    fun anUnansweredClosingQuestionEndsQuietlyAndOnlyWhatTheAppSawCounts() = runTest {
+        val surface = FakeSurface()
+        var clock = 0L
+        val outcome = director(surface, QueenModel { planOf(2) }, clock = { clock }) {
+            val st = surface.state!!
+            if (st.checkInLine != null) clock += TeachingLimits.CHECKIN_QUIET_TIMEOUT_MILLIS
+            else if (st.current != null) surface.replace(reduceTour(st, TourAction.Next))
+        }.run("goal", TutorialScope.Focused, null)
+        // Both steps were only moved past, never done on the real control, so nothing says the keeper reached it.
+        assertEquals(TutorialOutcome.Ended(2, 0, true, reached = false), outcome)
+        assertNull(surface.state!!.checkInLine)
+    }
+
+    @Test
+    fun aLostAnswerIsSaidToTheKeeperAndALaterYesStillReaches() = runTest {
+        val surface = FakeSurface()
+        val said = mutableListOf<TutorialSay>()
+        var asked = 0
+        val outcome = director(surface, QueenModel { planOf(6) }, say = { said += it }) {
+            val st = surface.state!!
+            if (st.checkInLine != null) surface.sink?.invoke(if (asked++ == 0) CheckInReply.Lost else CheckInReply.Yes)
+            else if (st.current != null) surface.replace(reduceTour(st, TourAction.Next))
+        }.run("goal", TutorialScope.Focused, null)
+        assertTrue(TutorialSay.Slower in said)
+        assertEquals(TutorialSay.Finished(reached = true), said.last())
+        assertEquals(true, (outcome as TutorialOutcome.Ended).reached)
+    }
+
+    @Test
+    fun goingBackTwiceAsksAboutTheStepTheKeeperIsOn() = runTest {
+        val surface = FakeSurface()
+        var n = 0
+        var askedAt: Int? = null
+        director(surface, QueenModel { planOf(3) }) {
+            val st = surface.state!!
+            n++
+            when {
+                st.checkInLine != null -> {
+                    if (askedAt == null) askedAt = st.index
+                    surface.sink?.invoke(CheckInReply.Yes)
+                }
+                n == 1 || n == 3 -> surface.replace(reduceTour(st, TourAction.Next))
+                n == 2 || n == 4 -> surface.replace(reduceTour(st, TourAction.Back))
+                st.current != null -> surface.replace(reduceTour(st, TourAction.Next))
+            }
+        }.run("goal", TutorialScope.Focused, null)
+        assertEquals(0, askedAt)
+        // The question about the step they were stuck on, then the closing one.
+        assertEquals(2, surface.lines.size)
+    }
+
+    @Test
+    fun aLongDwellOnOneStepAsksWithoutWaitingForThePace() = runTest {
+        val surface = FakeSurface()
+        var clock = 0L
+        var askedAt: Int? = null
+        director(surface, QueenModel { planOf(3) }, clock = { clock }) {
+            val st = surface.state!!
+            if (st.checkInLine != null) {
+                if (askedAt == null) askedAt = st.index
+                surface.sink?.invoke(CheckInReply.Yes)
+            } else if (st.index == 0 && clock == 0L) clock += AttentionLimits.LONG_DWELL_MILLIS
+            else if (st.current != null) surface.replace(reduceTour(st, TourAction.Next))
+        }.run("goal", TutorialScope.Focused, null)
+        assertEquals(0, askedAt)
+    }
+
+    @Test
+    fun theQueenUpdatesAtHelpfulAndStaysQuietAtQuiet() = runTest {
+        suspend fun updates(level: QueenLevel): List<TutorialSay> {
+            val said = mutableListOf<TutorialSay>()
+            val surface = FakeSurface()
+            director(surface, QueenModel { planOf(6) }, level = { level }, say = { said += it }) { walk(surface) }
+                .run("goal", TutorialScope.Focused, null)
+            return said.filterIsInstance<TutorialSay.Progress>()
+        }
+        assertEquals(listOf(TutorialSay.Progress(3, 6)), updates(QueenLevel.Helpful))
+        assertTrue(updates(QueenLevel.Quiet).isEmpty())
+    }
+
+    @Test
+    fun noPlannedStepCostsAModelCallBeyondWritingItsLesson() = runTest {
+        // The writer is called once per lesson (here 3) and never for a question, an update or the closing line: those are strings and signals.
+        val surface = FakeSurface()
+        var writes = 0
+        val counting = QueenModel { prompt ->
+            writes++
+            writer.answer(prompt)
+        }
+        director(surface, QueenModel { planOf(3) }, w = counting, level = { QueenLevel.Helpful }) { walk(surface) }.run("goal", TutorialScope.Focused, null)
+        assertEquals(3, writes)
     }
 }

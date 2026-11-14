@@ -75,6 +75,7 @@ object TeachingPrompts {
         shakyBefore: Boolean,
         previousSentence: String?,
         problems: List<Violation>,
+        last: Boolean = false,
     ): String = buildString {
         append("Write ONE lesson step for a keeper using the real app. Reply with one JSON object and nothing else.\n")
         append("The keeper's goal: ").append(goal.trim().take(300)).append('\n')
@@ -99,6 +100,7 @@ object TeachingPrompts {
             append("This is the first step: in explain, say in your own words that you read a short summary of the keeper's setup, never their goals or keys, and that free Sources may log what they get. ")
             append("Use the words summary, goals, keys and the phrase free Sources may log.\n")
         }
+        if (last) append("This is the last step: make checkIn ask, in your own words, whether the keeper feels they know what they are doing now. Use the words \"know what you are doing\" and no other question word.\n")
         if (smaller) append("The keeper asked to go slower: keep every field as short and simple as the limits allow.\n")
         if (shakyBefore) append("The keeper found this shaky before: say it from a fresh angle.\n")
         if (problems.isNotEmpty()) append("\nYour last attempt broke these rules; fix every one:\n").append(problems.joinToString("\n") { "- ${it.rule}: ${it.message}" }).append('\n')
