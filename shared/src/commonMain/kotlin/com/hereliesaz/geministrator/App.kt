@@ -870,6 +870,7 @@ fun App(
                 store = scheduleStore,
                 now = { currentEpochMillis() },
                 runActive = { active.hasUnfinishedActiveRun() },
+                deviceUtcOffsetMinutes = { deviceUtcOffsetMinutes() },
                 start = { schedule ->
                     val definition = workflowPersistence.definitions.get(WorkflowDefinitionId(schedule.workflowId))
                         ?: error("the hive is no longer on this device")

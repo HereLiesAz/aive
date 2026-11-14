@@ -25,6 +25,12 @@ class ScheduleTicker(
      * with its reason). A hive that may never be scheduled, or one that differs from the schedule's fingerprint, is not started.
      */
     private val vet: suspend (WorkflowSchedule) -> HiveVetting? = { null },
+    /**
+     * The device's offset from UTC right now (its daylight saving included), or null where it is not known. A schedule's hour is
+     * the device's own, so each look reads its due time against this offset: a daylight-saving change or a journey moves the
+     * schedule with the clock even while Schedules is not open.
+     */
+    private val deviceUtcOffsetMinutes: () -> Int? = { null },
 ) {
     private var lastHold: String? = null
     private var saidUnreadable = false
@@ -43,7 +49,12 @@ class ScheduleTicker(
         }
         saidUnreadable = false
         val at = now()
-        val decision = decideSchedules(store.all(), at, runActive = runActive())
+        val device = deviceUtcOffsetMinutes()
+        val schedules = store.all().map {
+            if (device == null || it.cadence.kind == ScheduleCadence.Kind.EveryHours) it
+            else it.copy(utcOffsetMinutes = device.coerceIn(-14 * 60, 14 * 60), daylightSaving = DaylightSaving.None)
+        }
+        val decision = decideSchedules(schedules, at, runActive = runActive())
         when (decision) {
             ScheduleDecision.Idle -> lastHold = null
             is ScheduleDecision.Hold -> {
