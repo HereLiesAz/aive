@@ -295,14 +295,14 @@ fun rulingOutcome(ruling: NannyRuling, challenge: Challenge, answer: ChallengeAn
 
 /** The dispute for the queen: the Nanny and the Antagonist, the three safe ways out, and only listed facts (fixed words, never free text as options). */
 fun trainingDispute(disputed: RulingOutcome.Disputed, facts: Map<String, String>): Dispute = Dispute(
-    question = "The Antagonist challenged the Nanny's ruling on the specialist. Does the ruling stand?",
+    question = "The Antagonist challenged the Nanny's training report on the specialist. Does the report stand?",
     options = listOf(
-        DisputeOption("uphold", "Let the Nanny's ruling stand", safe = true),
+        DisputeOption("uphold", "Let the Nanny's training report stand", safe = true),
         DisputeOption("refine", "Train another round with the findings", safe = true),
         DisputeOption("stop", "Stop and offer nothing", safe = true),
     ),
     facts = facts + mapOf(
-        "n1" to "The Nanny's ruling is ${disputed.ruling.call.name.uppercase()}: ${queenText(disputed.ruling.reason, REASON_MAX)}",
+        "n1" to "The Nanny's training report is ${disputed.ruling.call.name.uppercase()}: ${queenText(disputed.ruling.reason, REASON_MAX)}",
         "a1" to "[untrusted reference | antagonist] ${queenText(disputed.challenge.text, REASON_MAX)} (cites ${disputed.challenge.factId})",
     ),
 )

@@ -100,7 +100,7 @@ fun trainingCarryForward(
     existing: List<com.hereliesaz.geministrator.workflow.improvement.ImprovementProposal>,
     now: Long,
 ): List<com.hereliesaz.geministrator.workflow.improvement.ImprovementProposal> {
-    val lines = (listOfNotNull(rulingReason?.takeIf { it.isNotBlank() }?.let { "Ruling: $it" }) + findings.filter { it.isNotBlank() })
+    val lines = (listOfNotNull(rulingReason?.takeIf { it.isNotBlank() }?.let { "Training report: $it" }) + findings.filter { it.isNotBlank() })
         .take(TRAINING_CARRY_MAX)
     return lines.mapIndexedNotNull { index, line ->
         val id = "nanny:training:$runId:$index"
