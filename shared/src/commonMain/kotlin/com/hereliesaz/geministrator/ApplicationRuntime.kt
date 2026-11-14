@@ -170,6 +170,9 @@ class ApplicationRuntime private constructor(
     private var queenProposals: List<com.hereliesaz.geministrator.workflow.improvement.ImprovementProposal> = emptyList()
     private var queenProposalsReadAt: Long = 0L
 
+    /** The run whose terminal transition already got an unthrottled suggestion pass (a finished run is not cycled again). */
+    private var queenTerminalReadForRun: String? = null
+
     /** What the queen consulted before planning each run launched here (memory only; the Story keeps the line). */
     private val researchRecords = LinkedHashMap<String, com.hereliesaz.geministrator.research.ResearchRecord>()
 
@@ -1285,7 +1288,11 @@ class ApplicationRuntime private constructor(
         val now = nowEpochMillis()
         carryNannyFindings(ledger, definition, run, now)
         noteProgress(ledger, definition, run, now)
-        if (now - queenProposalsReadAt < QUEEN_SUGGEST_REFRESH_MILLIS) return
+        // A run that has just ended is cycled no more, so its first terminal pass skips the refresh window:
+        // the end-of-run training offer would otherwise never be evaluated when the end came within it.
+        val terminalPass = run.status.isTerminal() && queenTerminalReadForRun != run.id.value
+        if (!terminalPass && now - queenProposalsReadAt < QUEEN_SUGGEST_REFRESH_MILLIS) return
+        if (terminalPass) queenTerminalReadForRun = run.id.value
         queenProposalsReadAt = now
         try {
             val signals = queenSignals(definition, run, roles, queenStalled[run.id.value])
