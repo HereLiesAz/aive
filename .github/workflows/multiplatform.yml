@@ -46,8 +46,8 @@ jobs:
         # HereLiesAz/workflows is owner-controlled and referenced at @main on purpose (docs/THREAT_MODEL.md, Accepted risks).
         uses: HereLiesAz/workflows/.github/actions/four-part-version@main
         with:
-          source-version-file: gradle.properties
-          source-version-key: app.versionName
+          source-version-file: version.properties
+          source-version-key: versionName
           build-number: ${{ github.run_number }}
           prerelease-major-max: "0"
 
@@ -67,8 +67,8 @@ jobs:
         # HereLiesAz/workflows is owner-controlled and referenced at @main on purpose (docs/THREAT_MODEL.md, Accepted risks).
         uses: HereLiesAz/workflows/.github/actions/four-part-version@main
         with:
-          source-version-file: gradle.properties
-          source-version-key: app.versionName
+          source-version-file: version.properties
+          source-version-key: versionName
           build-number: ${{ github.run_number }}
           prerelease-major-max: "0"
           environment-variable: AIVE_VERSION
@@ -615,8 +615,8 @@ jobs:
         # HereLiesAz/workflows is owner-controlled and referenced at @main on purpose (docs/THREAT_MODEL.md, Accepted risks).
         uses: HereLiesAz/workflows/.github/actions/four-part-version@main
         with:
-          source-version-file: gradle.properties
-          source-version-key: app.versionName
+          source-version-file: version.properties
+          source-version-key: versionName
           build-number: ${{ github.run_number }}
           prerelease-major-max: "0"
 
