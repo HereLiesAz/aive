@@ -39,8 +39,11 @@ class TemplateGroupsTest {
     @Test
     fun everyTemplateInTheCodeHasAGroupAndAppearsOnce() {
         val shown = TemplateGroups.arrange(everything).flatMap { it.shown + it.folded }
-        assertEquals(everything.map { it.id }.sorted(), shown.map { it.id }.sorted())
+        assertEquals(TemplateGroups.visible(everything).map { it.id }.sorted(), shown.map { it.id }.sorted())
         assertEquals(shown.size, shown.map { it.id }.toSet().size)
+        val all = TemplateGroups.arrange(everything, includeInternal = true).flatMap { it.shown + it.folded }
+        assertEquals(everything.map { it.id }.sorted(), all.map { it.id }.sorted())
+        assertEquals(all.size, all.map { it.id }.toSet().size)
     }
 
     @Test
