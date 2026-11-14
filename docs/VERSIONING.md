@@ -25,19 +25,26 @@ release titles, or installer names.
 
 ## Where the version is defined
 
-There is one source of truth for the product version: `app.versionName` in `gradle.properties`
-(and `app.versionCode`, Android-only, beside it). The desktop installers, the Android build and the
-release workflow all read it; CI only substitutes the BUILD component.
+There is one source of truth for the product version: `versionName` in the root `version.properties`,
+advanced on every merge to `main` by the central version contract in `HereLiesAz/workflows`
+(MAJOR is owner-managed, MINOR rises for features, PATCH for other source changes, the file's BUILD
+is a counter). Both release channels read it:
 
-Two other places carry numbers that are not the product version:
+- Google Play builds: the central `android-play-release` workflow passes it as `app.versionName`.
+- GitHub, desktop and CI builds: `multiplatform.yml` resolves the four-part version from
+  `version.properties` (`source-version-key: versionName`) and CI substitutes the BUILD component with
+  `github.run_number`.
 
-- `version.properties` in the repository root is maintained by an automation bot and is **not read
-  by the Aive build** (the build only reads `version.properties` inside the vendored Conveyance and
-  h2g2 checkouts, for their own Maven Local versions). Its number is unrelated to the release line.
-- The CHANGELOG headings name the release line (`0.9.6`, ...) a set of changes began in; they are
-  history, not a version input.
+`app.versionName` in `gradle.properties` is only the default for a local build that was given no
+version (it carries build `0`), and `app.versionCode` (Android-only) is a local default too: published
+builds are given their own. Keep the `gradle.properties` MAJOR.MINOR.PATCH near the current line so a
+local build does not look older than a release; nothing checks that automatically.
 
-`.github/scripts/verify_release_immutability.py` enforces the `gradle.properties` format in CI.
+The CHANGELOG headings name the release line a set of changes began in; they are history, not a
+version input.
+
+`.github/scripts/verify_release_immutability.py` enforces the `gradle.properties` format (four parts,
+BUILD `0`) in CI.
 
 ## Immutable build identity and patch-grouped GitHub Releases
 
