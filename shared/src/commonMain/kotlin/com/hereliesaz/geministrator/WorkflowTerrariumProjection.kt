@@ -11,6 +11,8 @@ import com.hereliesaz.conveyance.h2g2.H2g2TerrariumSubject
 import com.hereliesaz.conveyance.h2g2.H2g2WorkflowNode
 import com.hereliesaz.conveyance.h2g2.H2g2WorkflowState
 import com.hereliesaz.conveyance.h2g2.h2g2SwarmAdornment
+import com.hereliesaz.geministrator.domain.QUEEN_DISPLAY_NAME
+import com.hereliesaz.geministrator.domain.keeperName
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
@@ -111,11 +113,11 @@ internal fun projectWorkflowTerrarium(
                 H2g2TerrariumSubject(
                     node = H2g2WorkflowNode(
                         id = TERRARIUM_ORCHESTRATOR_ID,
-                        label = "Orchestrator",
+                        label = QUEEN_DISPLAY_NAME,
                         subtitle = definition.name,
                         hueSeed = "haive-orchestrator",
                         state = run.status.toTerrariumState(),
-                        detail = "The Aive orchestrator",
+                        detail = "The Aive queen",
                     ),
                     position = persistedPositions[TERRARIUM_ORCHESTRATOR_ID]
                         ?: fallbackPositions.getValue(TERRARIUM_ORCHESTRATOR_ID),
@@ -129,7 +131,7 @@ internal fun projectWorkflowTerrarium(
             val taskRun = run.taskRuns[task.id]
             val executor = taskRun?.executor ?: task.effectiveExecutor()
             val role = taskRun?.assignedRoleId?.let(rolesById::get) ?: task.roleId?.let(rolesById::get)
-            val identity = role?.name ?: executor.displayName()
+            val identity = role?.keeperName() ?: executor.displayName()
             val isOrchestrator = task.id == explicitOrchestrator?.id
             val parent = birthParentFor(task, tasksById, agentIds, orchestratorId)
             add(

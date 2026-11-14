@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.agentui.awaitsKeeperAnswer
+import com.hereliesaz.geministrator.domain.keeperName
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskRun
@@ -97,7 +98,7 @@ internal fun flowchartCardDetail(
     val id = taskId.value
     val task = definition.tasks.firstOrNull { it.id == taskId }
     val roleId = taskRun.assignedRoleId ?: task?.roleId
-    val roleName = roleId?.let { rid -> roles.firstOrNull { it.id == rid }?.name ?: rid.value }
+    val roleName = roleId?.let { rid -> roles.firstOrNull { it.id == rid }?.keeperName() ?: rid.value }
     val creature = FlowchartCardAction.OpenCreature(id, CreatureTab.Work)
     val code = taskRun.blockingReason?.code
     val message = taskRun.blockingReason?.message?.trim()?.takeIf(String::isNotEmpty)

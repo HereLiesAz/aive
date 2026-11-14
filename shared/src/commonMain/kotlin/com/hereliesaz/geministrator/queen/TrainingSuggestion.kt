@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.queen
 
+import com.hereliesaz.geministrator.domain.keeperName
 import com.hereliesaz.geministrator.domain.RoleDefinition
 
 /** One finished use of a role in a run: [domain] is the project the run belonged to (the one place the app already groups work by). */
@@ -35,7 +36,7 @@ internal fun trainingCandidates(uses: List<RoleUse>, roles: Collection<RoleDefin
             .maxOfOrNull { it.size } ?: return@mapNotNull null
         best to QueenCandidate(
             QueenAction.TrainSpecialist, roleId, QueenVoice.SuggestTrainSpecialist,
-            listOf(queenSlot(role.name), best.toString()), outside = false,
+            listOf(queenSlot(role.keeperName()), best.toString()), outside = false,
         )
     }.sortedWith(compareByDescending<Pair<Int, QueenCandidate>> { it.first }.thenBy { it.second.subject }).map { it.second }
 }

@@ -22,6 +22,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.domain.keeperName
 import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.CHECKPOINT_COMMIT_METADATA_KEY
 import com.hereliesaz.geministrator.domain.TaskCondition
@@ -255,7 +256,7 @@ internal fun TechnicalInspector(
     var openArtifact by remember(selectedTaskId) { mutableStateOf<String?>(null) }
     val role = taskRun.assignedRoleId?.let { roleId -> liveWorkflow.roles.firstOrNull { it.id == roleId } }
     val executor = taskRun.executor ?: task.effectiveExecutor()
-    val identity = role?.name ?: executor.displayName()
+    val identity = role?.keeperName() ?: executor.displayName()
     // Its job (mockup H4) is saved to the hive's workflow, the way Build saves it: the running run
     // stays as it was, so a change takes effect from its next run. Without the library (previews)
     // the job shows but does not change.

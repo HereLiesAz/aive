@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.sp
 import com.hereliesaz.conveyance.h2g2.H2g2WorkflowState
 import com.hereliesaz.geministrator.domain.RoleAuthority
 import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.keeperName
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.hive_can_approve_integration
@@ -158,8 +159,8 @@ internal fun RoleCard(
     modifier: Modifier = Modifier,
 ) {
     val purpose = role.description.ifBlank { stringResource(Res.string.hive_role_no_description) }
-    val cardDescription = stringResource(Res.string.hive_role_card, role.name, purpose)
-    val addDescription = stringResource(Res.string.hive_new_bring_in, role.name)
+    val cardDescription = stringResource(Res.string.hive_role_card, role.keeperName(), purpose)
+    val addDescription = stringResource(Res.string.hive_new_bring_in, role.keeperName())
     val shape = RoundedCornerShape(20.dp)
     AzphaltThemedSurface(Azphalt.Ink) {
         Box(modifier = modifier.width(CardWidth)) {
@@ -179,14 +180,14 @@ internal fun RoleCard(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 NodeMascotSurface(
-                    roleLabel = role.name,
+                    roleLabel = role.keeperName(),
                     hueSeed = role.id.value,
                     state = H2g2WorkflowState.Pending,
                     motionPhase = { 0f },
                     modifier = Modifier.size(64.dp),
                 )
                 Text(
-                    role.name,
+                    role.keeperName(),
                     style = AzphaltType.lead.copy(fontSize = 14.sp, fontWeight = FontWeight.ExtraBold),
                     color = azphaltOnSurface(),
                     maxLines = 2,
@@ -307,7 +308,7 @@ internal fun RolePreviewContent(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val title = stringResource(Res.string.hive_role_preview_title, role.name)
+    val title = stringResource(Res.string.hive_role_preview_title, role.keeperName())
     val from = role.usuallyReceivesFrom()
     val to = role.usuallyHandsTo()
     AzphaltThemedSurface(Azphalt.Ink) {
@@ -320,14 +321,14 @@ internal fun RolePreviewContent(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 NodeMascotSurface(
-                    roleLabel = role.name,
+                    roleLabel = role.keeperName(),
                     hueSeed = role.id.value,
                     state = H2g2WorkflowState.Pending,
                     motionPhase = { 0f },
                     modifier = Modifier.size(88.dp),
                 )
                 Text(
-                    role.name,
+                    role.keeperName(),
                     style = AzphaltType.hero.copy(fontSize = 26.sp, lineHeight = 30.sp),
                     color = azphaltOnSurface(),
                     modifier = Modifier.weight(1f).semantics {
@@ -376,7 +377,7 @@ internal fun RolePreviewContent(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)) {
                 val addLabel = stringResource(Res.string.hive_role_add)
-                RoleCapsule(addLabel, "$addLabel: ${role.name}", azphaltStrong(), onAdd)
+                RoleCapsule(addLabel, "$addLabel: ${role.keeperName()}", azphaltStrong(), onAdd)
                 val closeLabel = stringResource(Res.string.hive_role_close)
                 RoleCapsule(closeLabel, closeLabel, AzphaltLiftedInk, onClose)
             }

@@ -15,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.domain.keeperName
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
@@ -257,7 +258,7 @@ private fun TerrariumAddCreature(
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 addable.forEach { role ->
                     AzphaltPill(
-                        label = role.name,
+                        label = role.keeperName(),
                         seed = "add-role-${role.id.value}",
                         onClick = { onEdit(addTerrariumCreature(definition, TerrariumNewcomer.FromRole(role))) },
                     )

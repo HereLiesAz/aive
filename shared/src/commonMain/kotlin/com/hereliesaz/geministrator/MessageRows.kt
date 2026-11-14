@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.agentui.awaitsKeeperAnswer
+import com.hereliesaz.geministrator.domain.keeperName
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.domain.effectiveExecutor
@@ -44,7 +45,7 @@ internal fun inboxEntries(presentation: LiveWorkflowPresentation): List<InboxEnt
             taskId = task.id.value,
             kind = kind,
             title = task.name,
-            role = roleId?.let { roles[it]?.name } ?: (taskRun.executor ?: task.effectiveExecutor()).displayName(),
+            role = roleId?.let { roles[it]?.keeperName() } ?: (taskRun.executor ?: task.effectiveExecutor()).displayName(),
             attempt = taskRun.attempt,
             maxAttempts = task.retryPolicy.maxAttempts,
         )

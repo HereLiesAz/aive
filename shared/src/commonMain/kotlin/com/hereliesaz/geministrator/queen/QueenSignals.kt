@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator.queen
 
 import com.hereliesaz.geministrator.CreatureTab
 import com.hereliesaz.geministrator.creatureNeedsYou
+import com.hereliesaz.geministrator.domain.roleDisplayName
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskRun
 import com.hereliesaz.geministrator.domain.TaskRunStatus
@@ -191,7 +192,7 @@ internal fun watchRelay(definition: WorkflowDefinition, run: WorkflowRun, signal
         is QueenSignal.BudgetBurn -> QueenNote(
             queenNoteId(run.id.value, "watch", "budget", signal.roleName),
             QueenVoice.WatchBudget,
-            listOf(queenSlot(signal.roleName), signal.percent.toString()),
+            listOf(queenSlot(roleDisplayName(signal.roleName)), signal.percent.toString()),
             QueenLink.Creature(signal.taskId, CreatureTab.Mind),
         )
         is QueenSignal.RepeatedBlock -> QueenNote(
