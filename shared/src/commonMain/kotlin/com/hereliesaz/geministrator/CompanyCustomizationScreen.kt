@@ -32,6 +32,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.domain.keeperName
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.IntegrationPolicy
@@ -967,7 +968,7 @@ internal fun CustomCompanyProviderScreen(
             AzphaltRecord(
                 seed = "custom-company-role-${role.id.value}",
                 eyebrow = hives?.let { "$department · ${pluralStringResource(Res.plurals.swarm_in_hives, it, it)}" } ?: department,
-                title = role.name,
+                title = role.keeperName(),
                 body = buildString {
                     append(role.description)
                     append(stringResource(Res.string.swarm_execution))

@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.domain.roleDisplayName
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Text
@@ -50,7 +51,7 @@ internal fun DelegationOfferDialog(store: ProgressiveDelegationStore) {
     val offer = state.pendingOfferRecord ?: return
     if (setAside == offer.key) return
     AzphaltAlertDialog(
-        title = stringResource(Res.string.delegation_offer_title, offer.roleName, delegableGateLabel(offer.key.gateKind)),
+        title = stringResource(Res.string.delegation_offer_title, roleDisplayName(offer.roleName), delegableGateLabel(offer.key.gateKind)),
         text = stringResource(Res.string.delegation_offer_body, offer.consecutiveApprovals, providerLabel(offer.key.providerId)),
         confirmLabel = stringResource(Res.string.delegation_offer_accept),
         onConfirm = { store.accept(offer.key, Clock.System.now().toEpochMilliseconds()) },
@@ -72,7 +73,7 @@ internal fun DelegationsPart(store: ProgressiveDelegationStore, compact: Boolean
     }
     delegations.forEach { record ->
         ConnectionRow(
-            name = record.roleName,
+            name = roleDisplayName(record.roleName),
             detail = stringResource(
                 Res.string.delegation_row_detail,
                 delegableGateLabel(record.key.gateKind),

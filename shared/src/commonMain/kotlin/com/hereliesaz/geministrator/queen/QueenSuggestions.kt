@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.queen
 
 import com.hereliesaz.geministrator.CreatureTab
+import com.hereliesaz.geministrator.domain.roleDisplayName
 import com.hereliesaz.geministrator.domain.ApprovalPolicy
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinition
@@ -183,7 +184,7 @@ internal fun queenCandidates(
     for (signal in signals.filterIsInstance<QueenSignal.BudgetBurn>()) {
         found += QueenCandidate(
             QueenAction.RaiseBudget, signal.taskId, QueenVoice.SuggestRaiseBudget,
-            listOf(queenSlot(signal.roleName), signal.percent.toString()),
+            listOf(queenSlot(roleDisplayName(signal.roleName)), signal.percent.toString()),
             outsideFor(definition, run, signal.taskId),
         )
     }

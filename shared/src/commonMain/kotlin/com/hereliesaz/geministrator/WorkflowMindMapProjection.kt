@@ -5,6 +5,7 @@ import com.hereliesaz.conveyance.h2g2.H2g2WorkflowEdge
 import com.hereliesaz.conveyance.h2g2.H2g2WorkflowMotion
 import com.hereliesaz.conveyance.h2g2.H2g2WorkflowNode
 import com.hereliesaz.conveyance.h2g2.H2g2WorkflowState
+import com.hereliesaz.geministrator.domain.keeperName
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinition
@@ -50,7 +51,7 @@ internal fun projectWorkflowMindMap(
         val taskRun = run.taskRuns[task.id]
         val executor = taskRun?.executor ?: task.effectiveExecutor()
         val role = taskRun?.assignedRoleId?.let(rolesById::get) ?: task.roleId?.let(rolesById::get)
-        val identity = role?.name ?: executor.displayName()
+        val identity = role?.keeperName() ?: executor.displayName()
         val motion = if (role != null) roleMotion(role.name) else executorMotion(executor)
         H2g2WorkflowNode(
             id = task.id.value,

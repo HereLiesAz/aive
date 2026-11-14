@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.domain.QUEEN_DISPLAY_NAME
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -1688,7 +1689,7 @@ internal fun ProviderSectionLabel(label: String) {
 }
 
 private fun RoleDefinition.providerDepartment(): String = when (id.value) {
-    "orchestrator" -> "Executive"
+    "orchestrator" -> QUEEN_DISPLAY_NAME
     "product-manager", "researcher", "ux-designer" -> "Product"
     "architect", "epa-representative", "implementation-engineer" -> "Engineering"
     "crash-test-dummy", "qa-engineer", "adversarial-reviewer", "reviewer", "plan-reviewer", "code-reviewer", "recovery-engineer" -> "Assurance"
