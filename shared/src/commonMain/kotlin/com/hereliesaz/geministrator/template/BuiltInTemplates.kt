@@ -274,7 +274,8 @@ object RoleTemplates {
 }
 
 object StepInstantiation {
-    private const val MAX_INPUT_CHARS = 4_000
+    /** The most an input's text carries into a step's objective; a sending draft over it is refused, never cut. */
+    internal const val MAX_INPUT_CHARS = 4_000
     private const val INPUTS_MARK = "Inputs:"
 
     fun roleFor(hint: String): RoleDefinitionId = when (hint) {
@@ -349,6 +350,12 @@ object StepInstantiation {
         val template = BuiltInTemplates.byId[contract.template.id] ?: return emptyList()
         val missing = template.inputs.filter { it.required && contract.inputs[it.name].isNullOrBlank() }.map { it.name }
         // A sending step asks the keeper once per recipient, so it runs with exactly one.
-        return if (missing.isEmpty() && SendingApprovals.needsOneRecipient(contract)) listOf("one recipient") else missing
+        if (missing.isNotEmpty()) return missing
+        if (SendingApprovals.needsOneRecipient(contract)) return listOf("one recipient")
+        // The objective keeps at most MAX_INPUT_CHARS of an input, and a sending step must send the draft whole.
+        if (SendingApprovals.isSending(contract.template.id) && contract.inputs["draft"].orEmpty().length > MAX_INPUT_CHARS) {
+            return listOf("a draft of at most $MAX_INPUT_CHARS characters")
+        }
+        return missing
     }
 }
