@@ -115,6 +115,7 @@ private fun voiceResource(voice: QueenVoice): StringResource = when (voice) {
         QueenVoice.SuggestNannyTemplate -> Res.string.queen_say_suggest_nanny_template
         // A step stopped at its token allowance.
         QueenVoice.StepAllowanceStopped -> Res.string.queen_say_step_allowance_stopped
+        QueenVoice.MissingQueenAway -> Res.string.queen_say_missing_queen_away
 }
 
 @Composable
@@ -179,6 +180,7 @@ private fun linkLabel(link: QueenLink): String? = when (link) {
     is QueenLink.Run -> stringResource(Res.string.queen_link_run)
     QueenLink.Connections -> stringResource(Res.string.queen_link_connections)
     QueenLink.Roster -> stringResource(Res.string.queen_link_roster)
+    is QueenLink.Library -> stringResource(Res.string.queen_link_library)
 }
 
 /**
@@ -241,6 +243,7 @@ internal fun QueenSays(
                 is QueenLink.Run -> ({ actions.openRun(link.runId) })
                 QueenLink.Connections -> actions.openConnections
                 QueenLink.Roster -> actions.openRoster
+                is QueenLink.Library -> actions.openRoleLibrary?.let { open -> ({ open(link.roleId) }) }
                 null -> null
             }
             if (showLink && label != null && go != null) {

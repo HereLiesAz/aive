@@ -6,6 +6,9 @@ enum class MissingKind {
 
     // The reviewer was not asked (see missingForSkippedReviewer): its model has no price under a dollar cap, the hourly cap has no room, the Source has no room, or no second Source.
     ReviewerSkippedNoPrice, ReviewerSkippedOverCap, ReviewerSkippedNoRoom, ReviewerSkippedNoSecondSource,
+
+    // Her own model was needed (the tutorial's start, a dispute) and there was no usable Source for it.
+    QueenAway,
 }
 
 /** Where the keeper goes to get it: an existing place, never a new one. */
@@ -48,10 +51,11 @@ internal fun missingNotes(runId: String, missing: List<Missing>, level: QueenLev
                 MissingKind.ReviewerSkippedOverCap -> QueenVoice.MissingReviewerOverCap
                 MissingKind.ReviewerSkippedNoRoom -> QueenVoice.MissingReviewerNoRoom
                 MissingKind.ReviewerSkippedNoSecondSource -> QueenVoice.MissingReviewerNoSecondSource
+                MissingKind.QueenAway -> QueenVoice.MissingQueenAway
             }
             val args = when (thing.kind) {
                 MissingKind.NoPlanner, MissingKind.NoReviewer, MissingKind.PairBroken -> listOf(queenSlot(thing.detail.orEmpty(), 80))
-                MissingKind.NoSource, MissingKind.SameSource, MissingKind.ReviewerSkippedNoPrice, MissingKind.ReviewerSkippedOverCap,
+                MissingKind.NoSource, MissingKind.SameSource, MissingKind.QueenAway, MissingKind.ReviewerSkippedNoPrice, MissingKind.ReviewerSkippedOverCap,
                 MissingKind.ReviewerSkippedNoRoom, MissingKind.ReviewerSkippedNoSecondSource,
                 -> emptyList()
             }
@@ -62,3 +66,12 @@ internal fun missingNotes(runId: String, missing: List<Missing>, level: QueenLev
             }
             QueenNote(queenNoteId(runId, "missing", thing.kind.name, thing.detail.orEmpty()), voice, args, link)
         }
+
+/**
+ * What she adds to a run's [known] missing things when her own model is needed (the tutorial's start) and none is usable:
+ * one [MissingKind.QueenAway] line, leading to Connections. Nothing when she already said there is no Source ([MissingKind.NoSource]
+ * or [MissingKind.QueenAway]), so it is said once per run and never repeated.
+ */
+fun missingWhenQueenAway(known: List<Missing>): List<Missing> =
+    if (known.any { it.kind == MissingKind.NoSource || it.kind == MissingKind.QueenAway }) known
+    else known + Missing(MissingKind.QueenAway, null, MissingFix.ConnectSource)

@@ -4,7 +4,10 @@ import com.hereliesaz.geministrator.CreatureTab
 
 /** How much the queen tells the keeper in Messages. Neither level sends anything to a model. */
 enum class QueenLevel {
-    /** What needs the keeper, why a swarm stopped, what the Nanny and the queen noticed, and one note at the end. */
+    /**
+     * What needs the keeper, why a swarm stopped, what the Nanny and the queen noticed, her suggestions (one open at a time),
+     * her one status line, and one note at the end. Quiet is the default; it has no digest of waits and no slow notes.
+     */
     Quiet,
 
     /** Quiet, plus one living line on how far the swarm has got and a digest of what waits. */
@@ -124,6 +127,9 @@ enum class QueenVoice(val relay: QueenRelay?) {
 
     // --- A step stopped at its token allowance (queen/QueenSignals.kt). Kept apart, after every other voice. ---
     StepAllowanceStopped(QueenRelay.Watch),
+
+    // --- The queen has no Source to think with when her own model is needed (queen/Missing.kt). Kept apart, after every other voice. ---
+    MissingQueenAway(QueenRelay.Missing),
 }
 
 /** Where a note leads: an existing place, never a new one. */
@@ -148,6 +154,12 @@ sealed interface QueenLink {
 
     /** The Roster: where a role is switched on or edited. */
     data object Roster : QueenLink
+
+    /** The swarm library's entry for a role: where its "Train a specialist" control is (the Roster has none). */
+    data class Library(val roleId: String) : QueenLink {
+        /** The library entry this opens. */
+        val entryKey: String get() = com.hereliesaz.geministrator.roleLibraryKey(roleId)
+    }
 }
 
 /** What a quoted line is, so the keeper can see whose words they are. */

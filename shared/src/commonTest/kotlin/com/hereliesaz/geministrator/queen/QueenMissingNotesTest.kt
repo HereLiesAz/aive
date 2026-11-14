@@ -59,4 +59,19 @@ class QueenMissingNotesTest {
         val noPlanner = BuiltInRoles.all.map { if (it.id == BuiltInRoles.Planner.id) it.copy(enabled = false) else it }
         assertEquals(listOf(MissingKind.NoPlanner), staffingMissing(staffQueen(noPlanner), listOf("a")).map { it.kind })
     }
+
+    @Test
+    fun aQueenWithNoSourceToThinkWithSaysSoOnceAndLinksToConnections() {
+        val known = listOf(Missing(MissingKind.NoPlanner, "Planner", MissingFix.EnableRole))
+        val once = missingWhenQueenAway(known)
+        assertEquals(listOf(MissingKind.NoPlanner, MissingKind.QueenAway), once.map { it.kind })
+        // Asked again, or after the planning pass already said there is no Source, nothing more is added.
+        assertEquals(once, missingWhenQueenAway(once))
+        val none = listOf(Missing(MissingKind.NoSource, null, MissingFix.ConnectSource))
+        assertEquals(none, missingWhenQueenAway(none))
+        val note = missingNotes("run-1", listOf(once.last()), QueenLevel.Quiet).single()
+        assertEquals(QueenVoice.MissingQueenAway, note.voice)
+        assertEquals(QueenLink.Connections, note.link)
+        assertEquals(listOf(QueenVoice.MissingQueenAway), voices(missingWhenQueenAway(emptyList()), QueenLevel.Quiet))
+    }
 }

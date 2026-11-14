@@ -146,6 +146,8 @@ internal fun LiveInboxScreen(
     onOpenConnections: (() -> Unit)? = null,
     /** Opens the Roster: where a role the queen found missing is switched on or edited. */
     onOpenRoster: (() -> Unit)? = null,
+    /** Opens the swarm library on a role's entry, where "Train a specialist" is. */
+    onOpenRoleLibrary: ((roleId: String) -> Unit)? = null,
 ) {
     if (runtimeState is ApplicationRuntimeState.Live) {
         MessagesPage(
@@ -164,6 +166,7 @@ internal fun LiveInboxScreen(
                 openRun = onOpenRun,
                 openConnections = onOpenConnections,
                 openRoster = onOpenRoster,
+                openRoleLibrary = onOpenRoleLibrary,
             ),
             compact = compact,
             modifier = modifier,
@@ -214,6 +217,8 @@ internal class MessageActions(
     val openConnections: (() -> Unit)? = null,
     /** Opens the Roster, where a role is switched on or edited. */
     val openRoster: (() -> Unit)? = null,
+    /** Opens the swarm library on a role's entry (where "Train a specialist" is). */
+    val openRoleLibrary: ((roleId: String) -> Unit)? = null,
 )
 
 /** Why an escalated step stopped, in one plain line (no internal code); null when the run recorded no reason. */

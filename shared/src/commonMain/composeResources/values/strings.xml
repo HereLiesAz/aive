@@ -645,7 +645,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_say_suggest_add_check">Step %1$s (%2$s) has failed several times after earlier work finished. A check between them would catch it sooner. This swarm keeps running as it is; I can keep the idea for next time.</string>
     <string name="queen_say_suggest_split_step">Step %1$s (%2$s) keeps failing or running out of time. It may be too big for one creature. This swarm keeps running as it is; I can keep the idea of splitting it for next time.</string>
     <string name="queen_say_suggest_reorder_steps">Several steps are blocked for the same reason, starting with step %1$s (%2$s). A different order may avoid it. This swarm keeps running as it is; I can keep the idea for next time.</string>
-    <string name="queen_say_suggest_train_specialist">The %1$s role has been used %2$s times in one project. A specialist for that kind of work may do it better. Open the Roster and start training from the role's entry; nothing is adopted without your approval.</string>
+    <string name="queen_say_suggest_train_specialist">The %1$s role has been used %2$s times in one project. A specialist for that kind of work may do it better. Open its entry in the swarm library and press Train a specialist there; nothing is adopted without your approval.</string>
     <string name="queen_say_suggest_add_approval">Step %1$s (%2$s) can change things, has no approval in front of it, and has failed more than once. An approval before it would let you look first. This swarm keeps running as it is; I can keep the idea for next time.</string>
     <string name="queen_suggest_keep">Keep for next time</string>
     <string name="queen_say_suggest_reword_step">Step %1$s (%2$s) has not started. I would give it this job instead. Nothing changes until you accept.</string>
@@ -2020,10 +2020,12 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_title_missing">Something is missing</string>
     <string name="queen_title_dispute">A disagreement</string>
     <string name="queen_link_connections">Connect a Source</string>
+    <string name="queen_link_library">Open it in the swarm library</string>
     <string name="queen_link_roster">Open the Roster</string>
     <string name="queen_quote_queen_approach">My approach, quoted:</string>
     <string name="queen_quote_objection">An objection, quoted:</string>
     <string name="queen_quote_still_missing">What is still missing, quoted:</string>
+    <string name="queen_say_missing_queen_away">I have no Source to think with, so I cannot plan, teach or settle a dispute right now. Connect a Source in Connections and I will start.</string>
     <string name="queen_say_missing_no_source">I have no Source to plan or review with, so I could not ask a planner or a reviewer. Connect a Source and I will use it. Until then I check only what I can check myself.</string>
     <string name="queen_say_missing_no_planner">My planner, %1$s, is switched off, so I have no one to break the hive into steps. Switch it on in the Roster.</string>
     <string name="queen_say_missing_no_reviewer">My reviewer, %1$s, is switched off, so no one checks the plan against what you asked. Switch it on in the Roster.</string>
@@ -2068,9 +2070,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_level_title">The queen's updates</string>
     <string name="queen_level_description">How much the queen tells you in Messages. Neither level sends anything to a model: she only reports what the swarm itself shows.</string>
     <string name="queen_level_quiet">Quiet</string>
-    <string name="queen_level_quiet_line">What needs you, why a swarm stopped, what the nanny or I noticed, and one note when it finishes.</string>
+    <string name="queen_level_quiet_line">What needs you, why a swarm stopped, what the nanny or I noticed, one line on how far the swarm has got, and one note when it finishes.</string>
     <string name="queen_level_helpful">Helpful</string>
-    <string name="queen_level_helpful_line">Also one line that keeps up with how far the swarm has got, and a line on what waits for you.</string>
+    <string name="queen_level_helpful_line">Also a line on what waits for you, and a note on any step that runs slowly.</string>
     <!-- The tutorial overlay's own controls and status lines. Chrome only: lessons are never written here. -->
     <string name="tour_know_this">I know this</string>
     <string name="tour_got_it">Got it</string>
