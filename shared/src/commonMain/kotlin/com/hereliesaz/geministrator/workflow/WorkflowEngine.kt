@@ -10,6 +10,7 @@ import com.hereliesaz.geministrator.domain.BlockingReason
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProviderConstraints
 import com.hereliesaz.geministrator.domain.ProviderRunId
+import com.hereliesaz.geministrator.domain.requiresToolFilter
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.RetryReason
 import com.hereliesaz.geministrator.domain.RoleDefinition
@@ -298,7 +299,7 @@ class WorkflowEngine(
                         estimatedInputTokens = ownEstimate,
                         excludedProviderIds = taskRun.failedProviders.toSet(),
                         failoverAllowed = isProviderAuto(role, task),
-                        requiresToolFilter = task.contract?.allowedTools?.isNotEmpty() == true || role.toolCeiling.isNotEmpty(),
+                        requiresToolFilter = task.contract?.requiresToolFilter() == true || role.toolCeiling.isNotEmpty(),
                     )
                     val providerId = sessionGateway.resolveProvider(selection)
                     val providerLimit = definition.concurrencyPolicy.perProviderLimits[providerId] ?: Int.MAX_VALUE
@@ -1065,7 +1066,7 @@ class WorkflowEngine(
             repository = project.repository,
             excludedProviderIds = taskRun.failedProviders.toSet(),
             failoverAllowed = isProviderAuto(role, task),
-            requiresToolFilter = task.contract?.allowedTools?.isNotEmpty() == true || role.toolCeiling.isNotEmpty(),
+            requiresToolFilter = task.contract?.requiresToolFilter() == true || role.toolCeiling.isNotEmpty(),
         )
     }
 

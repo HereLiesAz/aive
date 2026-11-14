@@ -103,3 +103,12 @@ data class TaskContract(
      */
     val startingPoint: Boolean = false,
 )
+
+/**
+ * True when a provider must be able to limit the step to its allowed tools. A step with no tools made from a
+ * template is told "none", and a provider that brings its own tools would ignore that, so a step with no effect
+ * beyond its own output needs one that enforces the list. A step that reads or changes a connected source or a
+ * repository keeps its own providers, which work through their own access.
+ */
+fun TaskContract.requiresToolFilter(): Boolean =
+    allowedTools.isNotEmpty() || (!startingPoint && effects.all { it == StepEffect.None })

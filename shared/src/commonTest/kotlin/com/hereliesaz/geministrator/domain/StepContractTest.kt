@@ -51,4 +51,13 @@ class StepContractTest {
         assertTrue(setOf(StepEffect.DestructiveConnectedSource).mutatesConnectedSource())
         assertFalse(setOf(StepEffect.WritesRepositoryBranch).mutatesConnectedSource())
     }
+
+    @Test
+    fun aStepWithNoToolsAndNoEffectNeedsAProviderThatEnforcesTheList() {
+        val ref = TemplateRef("write-document", 1)
+        assertTrue(TaskContract(ref, effects = setOf(StepEffect.None)).requiresToolFilter())
+        assertTrue(TaskContract(ref, allowedTools = listOf("search")).requiresToolFilter())
+        assertFalse(TaskContract(ref, effects = setOf(StepEffect.WritesRepositoryBranch)).requiresToolFilter())
+        assertFalse(TaskContract(ref, startingPoint = true).requiresToolFilter())
+    }
 }
