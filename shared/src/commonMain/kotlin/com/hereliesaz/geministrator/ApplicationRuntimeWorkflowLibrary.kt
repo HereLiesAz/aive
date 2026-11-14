@@ -80,7 +80,9 @@ suspend fun ApplicationRuntime.launchSavedWorkflow(
         updatedAtEpochMillis = now,
     )
 
-    val globalLaunchRoles = com.hereliesaz.geministrator.template.LaunchRoles.resolve(activeRoles(resolveRoleCollection(persistence.roles.all())))
+    // The stored roles stay as the keeper made them; the resolved generation is only what this run uses.
+    val storedLaunchRoles = activeRoles(resolveRoleCollection(persistence.roles.all()))
+    val globalLaunchRoles = com.hereliesaz.geministrator.template.LaunchRoles.resolve(storedLaunchRoles)
     val launchRoles = (supplementalRoles + globalLaunchRoles)
         .filter(com.hereliesaz.geministrator.domain.RoleDefinition::enabled)
         .distinctBy(com.hereliesaz.geministrator.domain.RoleDefinition::id)
@@ -89,7 +91,7 @@ suspend fun ApplicationRuntime.launchSavedWorkflow(
         persistence = persistence,
         eventSink = RepositoryWorkflowEventSink(persistence.events),
         roles = launchRoles,
-        rolesToPersist = globalLaunchRoles,
+        rolesToPersist = storedLaunchRoles,
     )
     launchService.launch(
         project = project,

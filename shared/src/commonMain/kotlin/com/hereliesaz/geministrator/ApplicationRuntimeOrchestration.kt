@@ -62,7 +62,7 @@ private class PlanInputs(
     val design: WorkflowDefinition? = null,
     /** Roles a package brings with a saved hive. */
     val supplementalRoles: List<RoleDefinition> = emptyList(),
-    /** The global roles a saved-hive launch records with its run; null for an orchestrated launch. */
+    /** The global roles a launch records with its run, as the keeper stored them (never a revision's resolved generation). */
     val rolesToPersist: List<RoleDefinition>? = null,
     /** Where [objective] came from; the run made from the plan keeps it. */
     val objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
@@ -114,7 +114,9 @@ private suspend fun ApplicationRuntime.planInputs(
     require(cleanObjective.isNotEmpty()) { "Objective is required" }
     val normalizedRepository = repository?.normalized()
     reportLaunchProgress("Gathering available agent roles…")
-    val globalRoles = com.hereliesaz.geministrator.template.LaunchRoles.resolve(activeRoles(resolveRoleCollection(persistence.roles.all())))
+    // What the keeper has stored is what stays stored: an adopted revision is the generation this run uses, never written over the role.
+    val storedRoles = activeRoles(resolveRoleCollection(persistence.roles.all()))
+    val globalRoles = com.hereliesaz.geministrator.template.LaunchRoles.resolve(storedRoles)
     val launchRoles = if (design == null) {
         globalRoles
     } else {
@@ -162,7 +164,7 @@ private suspend fun ApplicationRuntime.planInputs(
         packet = packet,
         design = design?.first,
         supplementalRoles = supplementalRoles,
-        rolesToPersist = globalRoles.takeIf { design != null },
+        rolesToPersist = storedRoles,
         objectiveProvenance = objectiveProvenance,
         missing = staffingMissing(staffing, providerRegistry.linkedSourceIds()),
         staffing = staffing,
