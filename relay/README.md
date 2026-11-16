@@ -1,6 +1,6 @@
 # aive-relay
 
-Cloudflare Worker that lets IDEaz reach The Aive on another device. It forwards frames between one host (The Aive) and its paired clients (IDEaz) without reading them; the apps seal every frame end to end. The Aive connects to it only while the user has turned on Remote access. The Deploy Workers workflow deploys it. For the wire protocol, see [`docs/Remote-API.md`](../docs/Remote-API.md#relay).
+Cloudflare Worker that lets IDEaz reach The Aive on another device. It forwards frames between one host (The Aive) and its paired clients (IDEaz) without reading them; the apps seal every frame end to end. The Aive connects to it only while the user has turned on Remote access. The central `cloudflare-worker-deploy.yml` workflow deploys it. For the wire protocol, see [`docs/Remote-API.md`](../docs/Remote-API.md#relay).
 
 The Claude connector (`connector/`, [`docs/Connector.md`](../docs/Connector.md)) is another client of this relay. It holds a pairing and reads plaintext while a call is in flight, which the relay never does.
 
@@ -15,7 +15,7 @@ The tests run the worker against an in-memory fake of the Durable Object state w
 
 ## Deploy
 
-The **Deploy Workers** workflow (`.github/workflows/deploy-workers.yml`) deploys this Worker with the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets: run it from the Actions tab, or merge a change under `relay/`. By hand:
+`.github/workflows/relay-deploy.yml` is bound to the central `HereLiesAz/workflows` Cloudflare Worker Deploy workflow, which tests and deploys this Worker with the central Cloudflare keys when a change under `relay/` reaches main (or from the Actions tab). The profile that points it at `relay/` lives in `scripts/semantic_catalog.py` there. By hand:
 
 ~~~sh
 cd relay
