@@ -2,6 +2,8 @@
 
 Cloudflare Worker that lets IDEaz reach The Aive on another device. It forwards frames between one host (The Aive) and its paired clients (IDEaz) without reading them; the apps seal every frame end to end. The Aive connects to it only while the user has turned on Remote access. The Deploy Workers workflow deploys it. For the wire protocol, see [`docs/Remote-API.md`](../docs/Remote-API.md#relay).
 
+The Claude connector (`connector/`, [`docs/Connector.md`](../docs/Connector.md)) is another client of this relay. It holds a pairing and reads plaintext while a call is in flight, which the relay never does.
+
 ## Test
 
 ~~~sh

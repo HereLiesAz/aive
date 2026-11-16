@@ -25,6 +25,10 @@ uses Code Reviewer; Antagonist is available in the roster for explicit assignmen
 
 [`architecture/DISTRIBUTED_COMPUTE.md`](architecture/DISTRIBUTED_COMPUTE.md) defines `TaskExecutor.Distributed` placement, the `computeRelay/` WebSocket relay, relay tokens, delegation targets, lease claim/heartbeat/progress/requeue behavior, the executor kinds Android and Desktop nodes accept, and the `MeshCrypto` pairing/encryption primitives.
 
+### Claude connector
+
+[`Connector.md`](Connector.md) describes `connector/`, the Cloudflare Worker that lets Claude read a paired device's state (read-only tools, Google sign-in, its OAuth server), what it trusts, and how to revoke it. The wire protocol it reuses is in [`Remote-API.md`](Remote-API.md#relay).
+
 ### Role execution sources
 
 [`architecture/ROLE_EXECUTION_SOURCES.md`](architecture/ROLE_EXECUTION_SOURCES.md) defines how a role's execution source (agent/provider, GitHub Actions, JavaScript, Python) is kept separate from role identity, and the Aive task envelope supplied to system-backed roles.

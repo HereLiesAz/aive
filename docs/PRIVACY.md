@@ -159,6 +159,14 @@ Remote access lets IDEaz on another device of yours run prompts on your linked A
 - **Where your data goes.** A prompt received this way goes to the provider IDEaz names or else the one you linked for planning, exactly as for the local [companion-app](#external-providers-and-executors) path; it is never sent to an unlinked keyless gateway.
 - **Revoking.** Turn Remote access off (or press **Turn off** in the notification) to delete the room on the relay and forget the pairing at once; the old code then stops working. **Reset pairing** does the same and creates a new pairing, so IDEaz must be given the new code. If the relay cannot be reached when you revoke, the pairing is still forgotten on this device and the relay deletes the unused room after 30 days.
 
+### Claude connector (optional, separate from the app)
+
+The Aive app never talks to the Claude connector. If you add the connector in Claude, a Cloudflare Worker (`connector/`, [Claude connector](Connector.md)) lets Claude read the state of your device through the relay. Unlike the relay, **the connector holds your pairing code's contents (including the encryption key) and can read what your device sends back while Claude is asking for it.**
+
+- **What it stores.** Your Google account id and email address (you sign in with Google, scopes `openid email`; nothing else from Google is kept), your pairing encrypted with AES-GCM, and hashes of the tokens it gives Claude. It does not store your swarms, Story or anything the device sends back.
+- **What Claude gets.** Read-only: whether your device is online, the swarm it is showing, that swarm's Story (including short previews) and what is waiting for you. Claude cannot approve, reject, change or start anything.
+- **Revoking.** Turn Remote access off or use **Reset pairing** in The Aive, disconnect the connector in Claude, or call its revoke address: the stored pairing and tokens are deleted. A pairing unused for 30 days is deleted automatically.
+
 ## Updates and downloads
 
 - **Android GitHub release flavor.** The app periodically checks the public GitHub Releases API for `HereLiesAz/aive`, without authentication. When a newer version is available, it tells you and, only if you tap **Open GitHub release**, opens the release page in your browser. The app does not download or install the update itself.
