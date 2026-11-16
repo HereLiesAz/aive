@@ -372,6 +372,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inspector_plan">PLAN</string>
     <string name="inspector_plan_show_full">Show full plan</string>
     <string name="inspector_plan_show_less">Show less</string>
+    <string name="inspector_answered_by">Answered by %1$s</string>
+    <string name="inspector_answered_by_after">Answered by %1$s after %2$s failed</string>
     <string name="inspector_plan_place">%1$s of %2$s</string>
     <string name="inspector_proceed">Proceed</string>
     <string name="inspector_progress">PROGRESS</string>

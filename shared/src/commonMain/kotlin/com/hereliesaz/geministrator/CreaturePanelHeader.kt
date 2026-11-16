@@ -22,3 +22,17 @@ internal fun providerDisplayName(providerId: String): String =
  */
 internal fun creatureHeaderLine(state: String, provider: String?, place: String?): String =
     listOfNotNull(state, provider?.takeIf(String::isNotBlank), place).joinToString(" · ")
+
+/** Which Source answered a step's work and which ones it moved on from; names as the keeper knows them. */
+internal data class AnsweredBy(val source: String, val failed: List<String>)
+
+/**
+ * Who answered a step, from what the step's run recorded: the Source it is assigned to and the Sources it
+ * already failed over from ([failedProviderIds], the Source itself never counted among them, each named once,
+ * in the order they failed). Null when no Source has answered yet.
+ */
+internal fun answeredBy(providerId: String?, failedProviderIds: List<String>): AnsweredBy? {
+    val id = providerId?.takeIf(String::isNotBlank) ?: return null
+    val failed = failedProviderIds.filter { it.isNotBlank() && it != id }.distinct().map(::providerDisplayName)
+    return AnsweredBy(providerDisplayName(id), failed)
+}

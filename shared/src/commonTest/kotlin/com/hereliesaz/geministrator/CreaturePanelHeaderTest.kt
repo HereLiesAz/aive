@@ -35,4 +35,12 @@ class CreaturePanelHeaderTest {
         assertEquals("Ready · 2 of 3", creatureHeaderLine("Ready", null, "2 of 3"))
         assertEquals("Ready", creatureHeaderLine("Ready", " ", null))
     }
+
+    @Test
+    fun answeredByNamesTheSourceAndWhatItMovedOnFrom() {
+        assertNull(answeredBy(null, emptyList()))
+        assertNull(answeredBy("  ", listOf("a")))
+        assertEquals(AnsweredBy("alpha", emptyList()), answeredBy("alpha", emptyList()))
+        assertEquals(AnsweredBy("beta", listOf("alpha", "gamma")), answeredBy("beta", listOf("alpha", "alpha", "beta", "gamma", "")))
+    }
 }
