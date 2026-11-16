@@ -6,6 +6,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import com.russhwolf.settings.Settings
+import kotlin.concurrent.Volatile
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 
