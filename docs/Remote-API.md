@@ -69,7 +69,7 @@ Not part of the Android service above. The desktop app's A2A server (docs/A2A.md
 
 ## Relay
 
-`relay/` holds a Cloudflare Worker for reaching The Aive from IDEaz on another device. The Aive (the host) creates a pairing, keeps a WebSocket open to the relay while the user has **Remote access** on, and answers sealed messages from IDEaz (the client). The relay has not been deployed yet; this section is the contract both apps follow.
+`relay/` holds a Cloudflare Worker for reaching The Aive from IDEaz on another device. The Aive (the host) creates a pairing, keeps a WebSocket open to the relay while the user has **Remote access** on, and answers sealed messages from IDEaz (the client). The relay is deployed at `https://aive-relay.hereliesaz.workers.dev` by the central Cloudflare Worker Deploy workflow; this section is the contract both apps follow.
 
 ### Pairing
 
