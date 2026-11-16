@@ -7,6 +7,10 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.domain.isTerminal
+import com.hereliesaz.geministrator.workflow.schedule.ScheduleTrigger
+import com.hereliesaz.geministrator.workflow.schedule.TriggerGuard
+import com.hereliesaz.geministrator.workflow.schedule.TriggerIntake
+import com.hereliesaz.geministrator.workflow.schedule.TriggerVerdict
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -89,6 +93,10 @@ class A2aServer(
      * keeper's setting and whether the server is open to the network ([a2aDescribeProviders]).
      */
     private val describeProviders: () -> Boolean = { false },
+    /** Where a web call to `/hooks/{scheduleId}` is taken (docs/Scheduled-Workflows.md); null refuses it with 503. */
+    private val webhooks: () -> TriggerIntake? = { null },
+    /** The limit on web calls, per client; the same window as [sendLimiter]. */
+    private val hookLimiter: A2aRateLimiter = A2aRateLimiter(),
 ) {
     private class Record(
         val taskId: String,
@@ -238,7 +246,36 @@ class A2aServer(
                     A2aHttpResponse(429, """{"error":"too many requests"}""", headers = mapOf("Retry-After" to seconds.toString()))
                 }
             }
-            else -> A2aHttpResponse(404, """{"error":"not found"}""")
+            else ->
+                if (route.startsWith(HOOK_PREFIX)) hook(route.removePrefix(HOOK_PREFIX), headers, body, caller)
+                else A2aHttpResponse(404, """{"error":"not found"}""")
+        }
+    }
+
+    /**
+     * One web call to a schedule (token, LAN allowlist and Host are already checked): rate limited like `SendMessage`, then
+     * handed to the schedule's trigger rules. The body is outside text for the hive, never instructions.
+     */
+    private suspend fun hook(scheduleId: String, headers: Map<String, String>, body: String, caller: A2aCaller): A2aHttpResponse {
+        if (scheduleId.isEmpty() || scheduleId.length > 128 || '/' in scheduleId) return A2aHttpResponse(404, """{"error":"not found"}""")
+        if (body.encodeToByteArray().size > MAX_HOOK_BODY_BYTES) return A2aHttpResponse(413, """{"error":"request too large"}""")
+        mutex.withLock { hookLimiter.tryAcquire(caller.clientKey) }?.let { wait ->
+            return A2aHttpResponse(429, """{"error":"too many requests"}""", headers = mapOf("Retry-After" to ((wait + 999) / 1000).toString()))
+        }
+        val intake = webhooks() ?: return A2aHttpResponse(503, """{"error":"schedules are not running in this app"}""")
+        val key = headers.entries.firstOrNull { it.key.equals("Idempotency-Key", ignoreCase = true) }?.value
+            ?: headers.entries.firstOrNull { it.key.equals("X-Event-Id", ignoreCase = true) }?.value
+        val eventId = TriggerGuard.webhookEventId(key, body)
+        val verdict = intake.submit(scheduleId, ScheduleTrigger.Kind.Webhook, eventId, "a web call from ${caller.address}", TriggerGuard.cleanText(body))
+        fun retry(ms: Long) = mapOf("Retry-After" to ((ms + 999) / 1000).toString())
+        return when (verdict) {
+            is TriggerVerdict.Accept -> A2aHttpResponse(202, buildJsonObject { put("accepted", true); put("eventId", eventId) }.toString())
+            TriggerVerdict.Duplicate -> A2aHttpResponse(200, buildJsonObject { put("accepted", false); put("duplicate", true); put("eventId", eventId) }.toString())
+            is TriggerVerdict.TooSoon -> A2aHttpResponse(429, """{"error":"too soon after the last start"}""", headers = retry(verdict.retryAfterMillis))
+            is TriggerVerdict.CapReached -> A2aHttpResponse(429, """{"error":"daily limit reached"}""", headers = retry(verdict.retryAfterMillis))
+            is TriggerVerdict.Refused ->
+                if (verdict.unknownSchedule) A2aHttpResponse(404, """{"error":"not found"}""")
+                else A2aHttpResponse(409, buildJsonObject { put("error", verdict.reason) }.toString())
         }
     }
 
@@ -256,7 +293,8 @@ class A2aServer(
         if (loopbackOnly && !isLoopbackHost(header("Host")) && lanHost == null) {
             return A2aHttpResponse(403, """{"error":"forbidden"}""")
         }
-        if (path.substringBefore('?') != RPC_PATH) return null
+        val route = path.substringBefore('?')
+        if (route != RPC_PATH && !route.startsWith(HOOK_PREFIX)) return null
         return when {
             !method.equals("POST", ignoreCase = true) ->
                 A2aHttpResponse(405, """{"error":"method not allowed"}""", headers = mapOf("Allow" to "POST"))
@@ -456,6 +494,8 @@ class A2aServer(
 
     companion object {
         const val RPC_PATH = "/a2a"
+        const val HOOK_PREFIX = "/hooks/"
+        const val MAX_HOOK_BODY_BYTES = 64 * 1024
         const val HIVE_SKILL_ID = "hive"
         const val A2A_VERSION_HEADER = "A2A-Version"
         const val MAX_BODY_BYTES = 1_000_000

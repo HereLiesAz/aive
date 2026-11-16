@@ -84,6 +84,10 @@ data class WorkflowSchedule(
      * held and the schedule turned off. Null on a schedule saved before this existed: it is taken from the hive on first sight.
      */
     val definitionFingerprint: String? = null,
+    /** What starts it: the clock (the default, [cadence]), a web call, or new mail. Saved schedules without it are time schedules. */
+    val trigger: ScheduleTrigger = ScheduleTrigger(),
+    /** What the triggers remember: event ids taken, today's count, when it last fired. */
+    val triggerLedger: TriggerLedger = TriggerLedger(),
 ) {
     init {
         require(id.isNotBlank() && workflowId.isNotBlank()) { "A schedule needs an id and a hive" }
@@ -202,7 +206,8 @@ object ScheduleClock {
         )
 
     fun isDue(schedule: WorkflowSchedule, now: Long): Boolean =
-        schedule.runNowRequested || (schedule.enabled && now >= nextDue(schedule))
+        schedule.runNowRequested ||
+            (schedule.trigger.kind == ScheduleTrigger.Kind.Time && schedule.enabled && now >= nextDue(schedule))
 }
 
 /** What one look at the schedules decides. */

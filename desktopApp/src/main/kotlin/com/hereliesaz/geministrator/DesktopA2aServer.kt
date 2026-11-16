@@ -121,6 +121,7 @@ internal class DesktopA2aServer(
         lanBaseUrl = { host -> "http://$host:$boundPort".takeIf { openToNetwork && host in lanHosts() } },
         isAllowedClient = { address -> address in allowedClients() },
         describeProviders = { describesProviders },
+        webhooks = { com.hereliesaz.geministrator.workflow.schedule.ScheduleTriggerHub.intake },
     )
 
     /**

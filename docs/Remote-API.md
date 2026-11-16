@@ -63,6 +63,10 @@ The stream is read-only. Gates are approved or rejected only on the device: a re
 
 The Aive reads the run's timeline only while some client watches events, so it costs nothing otherwise. The constants are in `RemoteRunEvents.kt` (`RemoteRunEventFields`, `RemoteRunEventLimits`).
 
+## Webhook trigger (desktop)
+
+Not part of the Android service above. The desktop app's A2A server (docs/A2A.md) also serves `POST /hooks/{scheduleId}`, which starts a schedule set to **On a web call** (docs/Scheduled-Workflows.md, Triggers). It needs `Authorization: Bearer <A2A token>`, passes the same Host and LAN allowlist checks, and shares the A2A server's per-client rate limit (6 a minute). The body is text up to 64 KB; the hive receives at most 8,000 characters of it as untrusted content. `Idempotency-Key` or `X-Event-Id` names the event, else the body's hash does. Answers: `202`, `200` (`duplicate`), `409`, `404`, `413`, `429` (`Retry-After`), `503`. The address is shown, with a copy action, on the schedule card.
+
 ## Relay
 
 `relay/` holds a Cloudflare Worker for reaching The Aive from IDEaz on another device. The Aive (the host) creates a pairing, keeps a WebSocket open to the relay while the user has **Remote access** on, and answers sealed messages from IDEaz (the client). The relay has not been deployed yet; this section is the contract both apps follow.

@@ -31,7 +31,14 @@ class ScheduleTicker(
      * schedule with the clock even while Schedules is not open.
      */
     private val deviceUtcOffsetMinutes: () -> Int? = { null },
+    /** Where web calls and new mail are taken (docs/Scheduled-Workflows.md); null where there are none. */
+    private val triggers: TriggerIntake? = null,
+    /** Looks at the mailbox of each email schedule at its own interval and reports new mail to [triggers]. */
+    private val mail: MailPoller? = null,
+    /** Starts the schedule's hive for one [TriggerEvent]; the event's text is outside content. */
+    private val startTriggered: suspend (WorkflowSchedule, TriggerEvent) -> Unit = { schedule, _ -> start(schedule) },
 ) {
+    private var lastTriggerHold: String? = null
     private var lastHold: String? = null
     private var saidUnreadable = false
     private var recoveredInterrupted = false
@@ -55,6 +62,16 @@ class ScheduleTicker(
             recoverInterruptedStarts(at)
         }
         val device = deviceUtcOffsetMinutes()
+        mail?.let { poller ->
+            try {
+                poller.poll()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                log("Mail could not be checked: ${failure.message ?: failure::class.simpleName}")
+            }
+        }
+        triggers?.let { intake -> tickTriggers(intake, at)?.let { return it } }
         val schedules = store.all().map { readAt(it, device) }
         val decision = decideSchedules(schedules, at, runActive = runActive())
         when (decision) {
@@ -83,7 +100,9 @@ class ScheduleTicker(
      */
     private suspend fun recoverInterruptedStarts(at: Long) {
         for (schedule in store.all()) {
+            // A triggered start's event is gone with the process: it is never replayed, only marked missed.
             val action = interruptedStartAction(schedule, at, runActive = runActive())
+                .let { if (it == InterruptedStartAction.Resume && schedule.trigger.kind != ScheduleTrigger.Kind.Time) InterruptedStartAction.Missed else it }
             when (action) {
                 InterruptedStartAction.None -> Unit
                 InterruptedStartAction.Missed -> {
@@ -111,22 +130,80 @@ class ScheduleTicker(
         if (device == null || schedule.cadence.kind == ScheduleCadence.Kind.EveryHours) schedule
         else schedule.copy(utcOffsetMinutes = device.coerceIn(-14 * 60, 14 * 60), daylightSaving = DaylightSaving.None)
 
-    private suspend fun startDue(decision: ScheduleDecision.Start, at: Long, device: Int?): ScheduleDecision {
-        var schedule = decision.schedule
-        // A schedule is bound to a hive's id, not its content: check the hive is still allowed and still the one that was scheduled.
+    private class Vetted(val schedule: WorkflowSchedule, val refused: ScheduleDecision.Refused?)
+
+    /** A schedule is bound to a hive's id, not its content: check the hive is still allowed and still the one that was scheduled. */
+    private suspend fun vetBeforeStart(original: WorkflowSchedule): Vetted {
+        var schedule = original
         vet(schedule)?.let { vetting ->
             val refusal = vetting.refusal
                 ?: ScheduleVetting.CHANGED_NOTE.takeIf { schedule.definitionFingerprint != null && schedule.definitionFingerprint != vetting.fingerprint }
             if (refusal != null) {
                 store.update(schedule.id) { it.copy(enabled = false, runNowRequested = false, lastNote = refusal) }
                 log("Schedule '${schedule.name}' was not started and was turned off. $refusal")
-                return ScheduleDecision.Refused(schedule, refusal)
+                return Vetted(schedule, ScheduleDecision.Refused(schedule, refusal))
             }
             // A schedule saved before fingerprints existed takes the hive as it is on first sight.
             if (schedule.definitionFingerprint == null) {
                 store.update(schedule.id) { it.copy(definitionFingerprint = vetting.fingerprint) }?.let { schedule = it }
             }
         }
+        return Vetted(schedule, null)
+    }
+
+    /**
+     * Starts the oldest taken web call or new-mail event, if any, under every guard a timed start has: the run-active hold and the
+     * hive vetting. The event leaves the queue before its start, so it starts at most once.
+     */
+    private suspend fun tickTriggers(intake: TriggerIntake, at: Long): ScheduleDecision? {
+        while (true) {
+            val event = intake.next(at)
+            if (event == null) {
+                lastTriggerHold = null
+                return null
+            }
+            val schedule = store.all().firstOrNull { it.id == event.scheduleId }
+            if (schedule == null || !schedule.enabled || schedule.trigger.kind != event.kind) {
+                intake.done(event)
+                log("A triggered start for '${schedule?.name ?: event.scheduleId}' was dropped: the schedule is gone, off, or waits for something else now.")
+                continue
+            }
+            if (runActive()) {
+                val note = "Triggered, but a run has not finished; it starts when that run does."
+                if (lastTriggerHold != event.eventId) {
+                    log("Schedule '${schedule.name}' was triggered by ${event.cause}. $note")
+                    lastTriggerHold = event.eventId
+                }
+                store.update(schedule.id) { if (it.lastNote != note) it.copy(lastNote = note) else null }
+                return ScheduleDecision.Hold(schedule, HoldReason.RunActive)
+            }
+            val vetted = vetBeforeStart(schedule)
+            if (vetted.refused != null) {
+                intake.done(event)
+                return vetted.refused
+            }
+            val current = vetted.schedule
+            intake.done(event)
+            val claimed = store.update(current.id) { it.copy(lastStartedAtEpochMillis = at, lastNote = STARTING_NOTE) }
+            if (claimed == null) continue
+            val outcome = try {
+                startTriggered(current, event)
+                "Started by ${event.cause}."
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                "Could not start: ${failure.message ?: failure::class.simpleName}"
+            }
+            store.update(current.id) { it.copy(lastNote = outcome) }
+            log("Schedule '${current.name}': $outcome")
+            return ScheduleDecision.Start(current)
+        }
+    }
+
+    private suspend fun startDue(decision: ScheduleDecision.Start, at: Long, device: Int?): ScheduleDecision {
+        val vetted = vetBeforeStart(decision.schedule)
+        vetted.refused?.let { return it }
+        val schedule = vetted.schedule
         // Claim this slot in one step, before anything is launched: if the schedule was changed, turned off, or already started
         // (by a second look, or another window sharing this storage) since it was read, it is not started again. A failed start
         // still counts as the slot's attempt, so it is not retried every look.
