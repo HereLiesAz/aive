@@ -45,6 +45,7 @@ import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.FlowchartLanguage
 import com.hereliesaz.geministrator.domain.RoleExecutionSource
+import com.hereliesaz.geministrator.domain.KeeperInstructions
 import com.hereliesaz.geministrator.domain.RoleSurface
 import com.hereliesaz.geministrator.domain.ScriptLanguage
 import com.hereliesaz.geministrator.domain.SpreadsheetFormat
@@ -181,6 +182,8 @@ import com.hereliesaz.geministrator.resources.swarm_sqlite_database_name
 import com.hereliesaz.geministrator.resources.swarm_sqlite_document_content_uri
 import com.hereliesaz.geministrator.resources.swarm_sqlite_document_uri
 import com.hereliesaz.geministrator.resources.swarm_sqlite_query_result_available_to_scripts
+import com.hereliesaz.geministrator.resources.swarm_keeper_instructions
+import com.hereliesaz.geministrator.resources.swarm_keeper_instructions_hint
 import com.hereliesaz.geministrator.resources.swarm_standing_instructions
 import com.hereliesaz.geministrator.resources.swarm_token_budget
 import com.hereliesaz.geministrator.resources.swarm_token_budget_hint
@@ -256,6 +259,7 @@ internal fun CustomCompanyProviderScreen(
     var roleNameDraft by rememberDurableStringState(draftKey(COMPANY_ROLE_NAME_KEY))
     var roleDescDraft by rememberDurableStringState(draftKey(COMPANY_ROLE_DESCRIPTION_KEY))
     var roleInstructionsDraft by rememberDurableStringState(draftKey(COMPANY_ROLE_INSTRUCTIONS_KEY))
+    var roleKeeperInstructionsDraft by rememberDurableStringState(draftKey(COMPANY_ROLE_KEEPER_INSTRUCTIONS_KEY))
     val roleInstructionHistory = rememberPromptHistory(PromptKind.RoleInstructions)
     var roleTokenBudgetDraft by rememberDurableStringState(draftKey(COMPANY_ROLE_TOKEN_BUDGET_KEY))
     var roleProviderDraftValue by rememberDurableStringState(draftKey(COMPANY_ROLE_PROVIDER_KEY))
@@ -325,6 +329,7 @@ internal fun CustomCompanyProviderScreen(
             DurableUiState.store.remove(COMPANY_ROLE_NAME_KEY)
             DurableUiState.store.remove(COMPANY_ROLE_DESCRIPTION_KEY)
             DurableUiState.store.remove(COMPANY_ROLE_INSTRUCTIONS_KEY)
+            DurableUiState.store.remove(COMPANY_ROLE_KEEPER_INSTRUCTIONS_KEY)
             DurableUiState.store.remove(COMPANY_ROLE_PROVIDER_KEY)
             DurableUiState.store.remove(COMPANY_ROLE_EXECUTION_SOURCE_KEY)
             DurableUiState.store.remove(COMPANY_ROLE_SURFACES_KEY)
@@ -340,6 +345,7 @@ internal fun CustomCompanyProviderScreen(
         roleNameDraft = ""
         roleDescDraft = ""
         roleInstructionsDraft = ""
+        roleKeeperInstructionsDraft = ""
         roleTokenBudgetDraft = ""
         roleProviderDraftValue = ""
         roleExecutionSourceDraft = RoleExecutionSource.Agent
@@ -355,6 +361,7 @@ internal fun CustomCompanyProviderScreen(
         roleNameDraft = role.name
         roleDescDraft = role.description
         roleInstructionsDraft = role.instructions
+        roleKeeperInstructionsDraft = role.keeperInstructions
         roleTokenBudgetDraft = role.tokenBudget?.toString().orEmpty()
         roleProviderDraftValue = role.preferredProviderId?.value.orEmpty()
         roleExecutionSourceDraft = role.executionSource
@@ -559,6 +566,18 @@ internal fun CustomCompanyProviderScreen(
                     modifier = Modifier.fillMaxWidth().focusRequester(instructionsFocus).then(field.modifier),
                 )
             }
+            // The keeper's own words for this role (the queen's too): added to every step it runs, never able to relax an approval, budget or permission.
+            OutlinedTextField(
+                colors = azphaltTextFieldColors(),
+                value = roleKeeperInstructionsDraft,
+                onValueChange = { roleKeeperInstructionsDraft = it.take(KeeperInstructions.MAX_CHARS) },
+                label = { Text(stringResource(Res.string.swarm_keeper_instructions)) },
+                supportingText = {
+                    Text(stringResource(Res.string.swarm_keeper_instructions_hint) + " " + KeeperInstructions.counter(roleKeeperInstructionsDraft))
+                },
+                minLines = 2,
+                modifier = Modifier.fillMaxWidth(),
+            )
             OutlinedTextField(
                 colors = azphaltTextFieldColors(),
                 value = roleTokenBudgetDraft,
@@ -881,6 +900,7 @@ internal fun CustomCompanyProviderScreen(
                                 name = cleanName,
                                 description = roleDescDraft.trim(),
                                 instructions = roleInstructionsDraft.trim(),
+                                keeperInstructions = KeeperInstructions.bounded(roleKeeperInstructionsDraft),
                                 enabled = true,
                                 preferredProviderId = if (roleExecutionSourceDraft is RoleExecutionSource.Agent) {
                                     roleProviderDraft?.let(::AgentProviderId)
@@ -1694,6 +1714,7 @@ private const val COMPANY_ROLE_ID_KEY = "company.role.id"
 private const val COMPANY_ROLE_NAME_KEY = "company.role.name"
 private const val COMPANY_ROLE_DESCRIPTION_KEY = "company.role.description"
 private const val COMPANY_ROLE_INSTRUCTIONS_KEY = "company.role.instructions"
+private const val COMPANY_ROLE_KEEPER_INSTRUCTIONS_KEY = "company.role.keeper-instructions"
 private const val COMPANY_ROLE_TOKEN_BUDGET_KEY = "company.role.token-budget"
 private const val COMPANY_ROLE_PROVIDER_KEY = "company.role.provider"
 private const val COMPANY_ROLE_EXECUTION_SOURCE_KEY = "company.role.execution-source"

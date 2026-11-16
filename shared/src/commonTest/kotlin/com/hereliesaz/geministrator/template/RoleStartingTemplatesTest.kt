@@ -150,6 +150,16 @@ class RoleStartingTemplatesTest {
     }
 
     @Test
+    fun aSelectedRevisionKeepsTheKeepersOwnInstructions() {
+        val mine = writer.copy(keeperInstructions = "Short sentences, please.")
+        val revisions = listOf(candidate(TemplateStatus.Candidate))
+        val selected = assertNotNull(TemplateCatalog.select(revisions, TemplateKind.Role, writer.id.value, 2, evidenceSteps = 10, now = 99))
+        val resolved = RoleTemplates.resolveAll(listOf(mine), selected).single()
+        assertEquals(listOf("read_file"), resolved.toolCeiling, "the revision applied")
+        assertEquals("Short sentences, please.", resolved.keeperInstructions)
+    }
+
+    @Test
     fun aCandidateCeilingIsNotAppliedUntilTheKeeperSelectsIt() {
         val revisions = listOf(candidate(TemplateStatus.Candidate))
         assertEquals(emptyList(), RoleTemplates.resolveAll(listOf(writer), revisions).single().toolCeiling)

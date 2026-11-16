@@ -412,8 +412,8 @@ class AzphaltWorkflowPackageInstaller(
     }
 
     private fun sameReusableRole(left: RoleDefinition, right: RoleDefinition): Boolean =
-        left.copy(enabled = true, preferredProviderId = null, authorities = emptySet()) ==
-            right.copy(enabled = true, preferredProviderId = null, authorities = emptySet())
+        left.copy(enabled = true, preferredProviderId = null, authorities = emptySet(), keeperInstructions = "") ==
+            right.copy(enabled = true, preferredProviderId = null, authorities = emptySet(), keeperInstructions = "")
 
     private inline fun <reified T> decodeUtf8(bytes: ByteArray, path: String): T = try {
         json.decodeFromString(bytes.decodeToString())
@@ -458,4 +458,6 @@ internal fun clampInstalledPackageRole(role: RoleDefinition, existing: RoleDefin
         enabled = true,
         preferredProviderId = existing?.preferredProviderId ?: role.preferredProviderId,
         authorities = existing?.authorities.orEmpty(),
+        // Only the keeper writes a role's instructions to it; a package can neither set nor wipe them.
+        keeperInstructions = existing?.keeperInstructions.orEmpty(),
     )

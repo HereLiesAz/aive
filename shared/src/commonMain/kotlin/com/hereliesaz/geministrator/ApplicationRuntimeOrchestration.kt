@@ -93,6 +93,8 @@ private class PlanInputs(
         plannerRoles = plannerRoles,
         reviewer = reviewer,
         design = design,
+        queenInstructions = packet.instruction.substringAfter(com.hereliesaz.geministrator.domain.KeeperInstructions.BEGIN, "")
+            .substringBefore(com.hereliesaz.geministrator.domain.KeeperInstructions.END),
     )
 }
 
@@ -135,7 +137,9 @@ private suspend fun ApplicationRuntime.planInputs(
         )
     }
     val staffing = com.hereliesaz.geministrator.queen.staffQueen(launchRoles)
-    val packet = if (design == null) {
+    // The keeper's own instructions for the queen (her role's "Your instructions"), in one delimited block ahead of the planner prompt.
+    val queenInstructions = storedRoles.firstOrNull { it.id == com.hereliesaz.geministrator.domain.BuiltInRoles.Orchestrator.id }?.keeperInstructions.orEmpty()
+    val packet = (if (design == null) {
         OrchestrationPacket(
             objective = cleanObjective,
             currentState = "new-workflow",
@@ -152,7 +156,7 @@ private suspend fun ApplicationRuntime.planInputs(
             currentPlan = design.second.steps,
             instruction = ROUGH_DESIGN_INSTRUCTION,
         )
-    }
+    }).let { it.copy(instruction = com.hereliesaz.geministrator.domain.KeeperInstructions.prependTo(it.instruction, queenInstructions)) }
     return PlanInputs(
         projectName = cleanProjectName,
         objective = cleanObjective,
@@ -613,7 +617,10 @@ internal suspend fun ApplicationRuntime.draftSwarm(
     val staffable = swarmDraftRoles(roles)
         .filter { role -> providerRegistry.canStaff(role.capabilitiesRequired, null) }
         .ifEmpty { swarmDraftRoles(roles) }
-    val packet = swarmDraftPacket(prompt, staffable)
+    val queenInstructions = roles.firstOrNull { it.id == com.hereliesaz.geministrator.domain.BuiltInRoles.Orchestrator.id }?.keeperInstructions.orEmpty()
+    val packet = swarmDraftPacket(prompt, staffable).let {
+        it.copy(instruction = com.hereliesaz.geministrator.domain.KeeperInstructions.prependTo(it.instruction, queenInstructions))
+    }
     if (packet.objective.isEmpty()) return SwarmDraftResult.Problem(SwarmDraftProblem.NoPrompt)
     if (packet.availableAgents.isEmpty()) return SwarmDraftResult.Problem(SwarmDraftProblem.NoRoles)
     val notes = mutableListOf<String>()

@@ -1899,6 +1899,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="swarm_sqlite_document_uri">SQLite document URI</string>
     <string name="swarm_sqlite_query_result_available_to_scripts">SQLite query result available to scripts as aive.surfaces['%1$s'].</string>
     <string name="swarm_standing_instructions">Standing instructions</string>
+    <string name="swarm_keeper_instructions">Your instructions</string>
+    <string name="swarm_keeper_instructions_hint">How you like this creature's work done. It is added to every step it runs and can never turn off an approval, a budget or a permission.</string>
     <string name="swarm_surface_alias">Surface alias</string>
     <string name="swarm_surface_aliases_must_be_unique_and">Surface aliases must be unique and every attached surface needs a usable source/query/flowchart.</string>
     <string name="swarm_surfaces">\nSurfaces: </string>

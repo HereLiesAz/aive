@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.60 — from 2026-10-27
 
+- **Your instructions, per creature and for the queen.** Each creature's form in Breeds has a **Your instructions** field (2,000 characters, counter shown): added to that creature's prompt for every step it runs, and, on the Orchestrator entry, put ahead of the queen's planner prompt in a marked block that cannot override approval, budget or permission rules. Kept on the role (`keeperInstructions`, old data loads without it), in the setup file and exports; Nanny revisions and packages never overwrite it. Memory stays read-only.
 - **Approve effects, not plans.** A step that sends, changes a connected source, pushes a diff or otherwise acts outside The Aive is never approved by delegation, however many approvals came before; it always asks you with the concrete effect shown. Delegation still passes plans and effect-free steps, and the Delegations text says so (`DelegationPolicy`, `docs/THREAT_MODEL.md`, `docs/Keepers-Room.md`).
 - Memory crash journal and schedules are stored in chunks (desktop Preferences reject values over 8,192 characters); a journal that cannot be read is kept aside, an over-limit capture drops its stale entry, journal write failures are logged, captures of sessions that end as Unknown are sent and released, and sent parts are trimmed.
 - Legacy key migration copies the older value over an empty default written before the migration ran, and keeps no stale copy.

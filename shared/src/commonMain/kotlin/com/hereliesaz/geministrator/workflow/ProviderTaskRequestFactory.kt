@@ -6,6 +6,7 @@ import com.hereliesaz.geministrator.domain.ApprovalPolicy
 import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.promptInstructions
 import com.hereliesaz.geministrator.domain.effectiveAllowedTools
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskRun
@@ -57,7 +58,7 @@ internal fun buildProviderTaskRequest(
     val roleInstructions = if (redaction.redactRoleInstructions) {
         swarmInstructions
     } else {
-        "$swarmInstructions\n\n${role.instructions}"
+        "$swarmInstructions\n\n${role.promptInstructions()}"
     }
     val dependencyArtifacts = definition.releasedDependencies(task)
         .mapNotNull(run.taskRuns::get)
@@ -103,7 +104,7 @@ internal fun buildProviderTaskRequest(
                 ),
                 PromptContextBlock(
                     OnDeviceTextAgentProvider.ROLE_BLOCK_LABEL,
-                    if (redaction.redactRoleInstructions) "[redacted]" else role.instructions,
+                    if (redaction.redactRoleInstructions) "[redacted]" else role.promptInstructions(),
                     ContextProvenance.KeeperWritten,
                 ),
             ),
@@ -160,7 +161,7 @@ internal fun estimateTaskInputTokens(
         .filter { it.kind !in redaction.excludedArtifactKinds }
         .sumOf { artifact -> artifact.textContent?.let { artifact.label.length + it.length } ?: 0 }
     val chars = task.objective.length +
-        role.instructions.length +
+        role.promptInstructions().length +
         task.acceptanceCriteria.sumOf { it.description.length } +
         artifactChars
     return OnDeviceTextAgentProvider.estimateTokens(chars)
