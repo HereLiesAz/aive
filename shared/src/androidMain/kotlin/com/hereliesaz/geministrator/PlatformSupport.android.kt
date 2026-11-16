@@ -9,6 +9,6 @@ internal actual fun deviceUtcOffsetMinutes(): Int = java.util.TimeZone.getDefaul
 internal actual fun isDesktopClassDevice(): Boolean {
     val c = android.content.res.Resources.getSystem().configuration
     val desktopMode = (c.uiMode and android.content.res.Configuration.UI_MODE_TYPE_MASK) == android.content.res.Configuration.UI_MODE_TYPE_DESKTOP
-    // A tablet (the shortest side of the screen at least 600dp) is desktop-class, with or without a keyboard.
-    return desktopMode || c.smallestScreenWidthDp >= 600
+    // A tablet (the shortest side of the screen at least 720dp) is desktop-class, with or without a keyboard.
+    return desktopMode || c.smallestScreenWidthDp >= 720
 }

@@ -14,7 +14,7 @@ internal expect fun deviceUtcOffsetMinutes(): Int
 
 /**
  * True where this device is desktop-class: desktop itself, Android in desktop mode or on a tablet (the shortest side of the
- * screen at least 600dp), and the web app (PWA) on a desktop or a tablet (the shortest side of the screen at least 600 px). Such
+ * screen at least 720dp), and the web app (PWA) on a desktop or a tablet (the shortest side of the screen at least 720 px). Such
  * a device gets the wide layouts from [ControlRoomBreakpoints.DesktopWide] up; a phone, from [ControlRoomBreakpoints.PhoneWide].
  */
 internal expect fun isDesktopClassDevice(): Boolean
