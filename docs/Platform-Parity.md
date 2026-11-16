@@ -4,7 +4,7 @@ What each build of The Aive can do for **distributed compute** (a pool of the ke
 
 Legend: **yes** it works; **limit** the platform cannot do it, and the app says so under Keeper's room > This device; **decision** the owner chose to leave it out of that build (a release decision, not a platform rule); **not built** it could exist and does not yet (see "What remains").
 
-Builds: **Play** is the Android Google Play build; **GitHub** is the Android GitHub release build; **Desktop** is the JVM app; **Web** is the PWA (JS/Wasm); **CLI** is `aive serve` / `aive run`.
+Builds: **Play** is the Android Google Play build; **GitHub** is the Android GitHub release build; **Desktop** is the JVM app; **Web** is the PWA (Wasm); **CLI** is `aive serve` / `aive run`.
 
 ## Distributed compute
 
@@ -67,3 +67,7 @@ Each needs an owner decision or a larger build than a parity pass:
 6. **Web as a pool origin**: needs an asynchronous `ComputeNodeSigner` (Web Crypto ECDSA returns IEEE P1363 and the relay expects DER) and a browser store for the identity; an owner call on whether to hold a device key in page-readable storage.
 7. **A2A server on Android and CLI**: the server core is shared (`a2a/A2aServer.kt`); only desktop hosts it. Android would need a foreground service; the CLI could host it directly.
 8. **Workflows over the relay while the app is closed**: needs the runtime to run headless on Android.
+
+## Local model inference (ONNX)
+
+Android and Desktop run ONNX models through the native ONNX Runtime; Web runs them through ONNX Runtime Web (`BrowserOrt.wasmJs.kt`, WebGPU then WASM, single-threaded). The Web runtime is built and unit-tested for its wire format, but loading ORT and running a model in a real browser have not been verified, and no web model is bundled or registered with the memory layer yet. See [Memory layer](Memory-layer.md).
