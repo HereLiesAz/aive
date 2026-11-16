@@ -132,3 +132,11 @@ Android CI failed on every push because (1) an Android string had an unescaped a
 ## The owner's model is the spec, not the current code
 
 - Do not describe a layer from its current code: the owner's model is the spec. Ask what the mechanism is meant to be before documenting or extending it.
+
+## There are no other users (2026-11-16)
+
+The owner is the only user of The Aive until it is production ready. Nobody else has it installed.
+
+- Never justify a change, a shim, a migration, a warning or a "kept for compatibility" decision by the existing installs of other people. They do not exist.
+- Do not add or keep backward-compatibility code, legacy-key migrations, old-package notices or accepted-legacy-format shims for the sake of existing users. When something old is in the way, remove it.
+- The only "user" to protect is the owner's own data on their own devices, and only when the owner asks.
