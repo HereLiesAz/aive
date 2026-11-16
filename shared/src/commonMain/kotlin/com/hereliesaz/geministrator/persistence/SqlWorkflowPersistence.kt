@@ -3,6 +3,7 @@ package com.hereliesaz.geministrator.persistence
 import app.cash.sqldelight.async.coroutines.awaitAsList
 import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import app.cash.sqldelight.db.SqlDriver
+import com.hereliesaz.geministrator.log.AppLog
 import com.hereliesaz.geministrator.domain.ApprovalGateId
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactRef
@@ -252,6 +253,7 @@ class SqlWorkflowPersistence(
         keep("RoleDefinition") { queries.allRoles().awaitAsList() }
         keep("ArtifactRef") { queries.allArtifacts().awaitAsList() }
         keep("ApprovalGate") { queries.allGates().awaitAsList() }
+        pruneKeptCorruptRowsUnlocked(room = rows.size)
         val seen = mutableMapOf<String, Int>()
         rows.forEach { (kind, payload) ->
             val key = "$CORRUPT_PREFIX$kind:${stableHash64(payload)}"
@@ -262,6 +264,15 @@ class SqlWorkflowPersistence(
         return rows.size
     }
 
+    /** Drops the oldest kept-aside corrupt rows so that, with [room] more, no more than [MAX_KEPT_CORRUPT_ROWS] stay. */
+    private suspend fun pruneKeptCorruptRowsUnlocked(room: Int) {
+        val keys = queries.corruptMetaKeys().awaitAsList()
+        val excess = keys.size + room - MAX_KEPT_CORRUPT_ROWS
+        if (excess <= 0) return
+        keys.take(excess).forEach { queries.deleteMeta(it) }
+        AppLog.record("workflows", "Pruned $excess of the oldest kept-aside corrupt workflow records (the cap is $MAX_KEPT_CORRUPT_ROWS).")
+    }
+
     /**
      * Moves workflow state out of the Settings store this replaces, once. The previous store is
      * handed to [LegacySettingsMigration.backup] as an export before it is cleared, so nothing is
@@ -270,14 +281,19 @@ class SqlWorkflowPersistence(
      * committed the move is final, and failing to clear the old copy is ignored.
      */
     private suspend fun migrateUnlocked(migration: LegacySettingsMigration) {
-        if (queries.meta(MIGRATED_FROM_SETTINGS).awaitAsOneOrNull() != null) return
+        val marker = queries.meta(MIGRATED_FROM_SETTINGS).awaitAsOneOrNull()
+        val attempts = sqlUnreadableAttempts(marker)
+        // "done" is final; an unreadable copy is retried on later starts (it may have been repaired) until the cap.
+        if (marker != null && attempts == null) return
+        if (attempts != null && attempts >= SQL_MAX_UNREADABLE_ATTEMPTS) return
         val exported = try {
             migration.previous.exportJson()
         } catch (failure: PersistenceCorruptionException) {
             null
         }
         if (exported == null) {
-            queries.putMeta(MIGRATED_FROM_SETTINGS, "skipped-unreadable")
+            queries.putMeta(MIGRATED_FROM_SETTINGS, sqlUnreadableMarker((attempts ?: 0) + 1))
+            AppLog.record("workflows", "The previous workflow store could not be read, so it was not moved (attempt ${(attempts ?: 0) + 1} of $SQL_MAX_UNREADABLE_ATTEMPTS).")
             return
         }
         val snapshot = decodeImportSnapshot(exported, json)
@@ -310,7 +326,8 @@ class SqlWorkflowPersistence(
                 migrateUnlocked(migration)
             } catch (cancellation: CancellationException) {
                 throw cancellation
-            } catch (_: Exception) {
+            } catch (failure: Exception) {
+                AppLog.record("workflows", "Moving the previous workflow store failed and will be retried at the next start: ${failure.message ?: failure::class.simpleName}")
             }
             pendingMigration = null
         }
@@ -433,6 +450,7 @@ class SqlWorkflowPersistence(
         const val MIGRATED_FROM_SETTINGS = "migrated-from-settings"
         const val QUARANTINE_PREFIX = "quarantine:"
         const val CORRUPT_PREFIX = "corrupt:"
+        const val MAX_KEPT_CORRUPT_ROWS = 1000
     }
 }
 
@@ -444,3 +462,16 @@ class LegacySettingsMigration(
     val previous: SettingsWorkflowPersistence,
     val backup: suspend (exportJson: String) -> Unit,
 )
+
+internal const val SQL_UNREADABLE_MARKER = "skipped-unreadable"
+internal const val SQL_MAX_UNREADABLE_ATTEMPTS = 5
+
+internal fun sqlUnreadableMarker(attempts: Int): String = "$SQL_UNREADABLE_MARKER:$attempts"
+
+/** The attempts so far when [marker] says the old copy was unreadable, or null for any other marker (including none and "done"). */
+internal fun sqlUnreadableAttempts(marker: String?): Int? {
+    if (marker == null) return null
+    if (marker == SQL_UNREADABLE_MARKER) return 1
+    if (!marker.startsWith("$SQL_UNREADABLE_MARKER:")) return null
+    return marker.substringAfter(':').toIntOrNull() ?: 1
+}

@@ -87,4 +87,19 @@ class WorkflowScheduleStoreTest {
         assertEquals(null, read.definitionFingerprint)
         assertEquals(DaylightSaving.None, read.daylightSaving)
     }
+
+    @Test
+    fun aListOverThePreferencesValueLimitIsStoredAndReadBack() = runTest {
+        val inner = com.russhwolf.settings.MapSettings()
+        val limited = object : com.russhwolf.settings.Settings by inner {
+            override fun putString(key: String, value: String) {
+                require(value.length <= 8_192) { "value too long" }
+                inner.putString(key, value)
+            }
+        }
+        val store = SettingsWorkflowScheduleStore(limited)
+        repeat(60) { store.put(schedule("s$it", "Schedule number $it").copy(objective = "x".repeat(300))) }
+
+        assertEquals(60, SettingsWorkflowScheduleStore(limited).all().size)
+    }
 }

@@ -185,4 +185,13 @@ class MemorySessionObserverTest {
         assertEquals(listOf("m5"), newestWithinBudget(parts, budgetChars = 10).map { it.label })
         assertEquals(parts, newestWithinBudget(parts, budgetChars = 1_000))
     }
+
+    @Test
+    fun aSessionThatEndsAsUnknownIsSentAndReleased() = runBlocking {
+        val (store, observer, handle) = fixture()
+        observer.onSessionStarted(handle, request())
+        observer.onSessionEvent(handle, AgentEvent.Message(handle.providerRunId, "a finding before the provider dropped"))
+        observer.onSessionFinished(handle, ManagedSessionStatus.Unknown)
+        assertTrue("a finding before the provider dropped" in bankedText(store))
+    }
 }

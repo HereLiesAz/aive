@@ -742,6 +742,7 @@ class MainActivity : ComponentActivity() {
                     state = updateCoordinator.state,
                     onOpenGithubRelease = updateCoordinator::openGithubRelease,
                     onOpenPlayStore = updateCoordinator::openPlayStore,
+                    onOpenLegacyAppSettings = updateCoordinator::openLegacyAppSettings,
                     onDismiss = updateCoordinator::dismiss,
                 )
             }

@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.memory
 
+import com.hereliesaz.geministrator.log.AppLog
 import com.hereliesaz.geministrator.runCatchingCancellable
 import com.hereliesaz.geministrator.control.ControlRedaction
 import com.hereliesaz.geministrator.providers.AgentEvent
@@ -239,7 +240,12 @@ class QueuedMemorySessionObserver(
     }
 
     override suspend fun onSessionFinished(handle: ManagedSessionHandle, status: ManagedSessionStatus) {
-        if (status != ManagedSessionStatus.Completed && status != ManagedSessionStatus.Failed) return
+        // Unknown is an ending too (the provider dropped the session): without it the capture would stay forever.
+        if (status != ManagedSessionStatus.Completed && status != ManagedSessionStatus.Failed &&
+            status != ManagedSessionStatus.Unknown
+        ) {
+            return
+        }
         val capture = mutex.withLock { captures[handle] } ?: return
         capture.sendLock.withLock {
             sendLocked(
@@ -289,6 +295,11 @@ class QueuedMemorySessionObserver(
         queue.enqueueSession(envelopeOf(handle, capture, fresh + listOfNotNull(terminal), sequence, closedAt))
         val more = mutex.withLock {
             capture.sentParts += fresh.size
+            // The sent parts are in the queue: drop them so a long session holds only what is still unsent.
+            if (capture.sentParts > 0) {
+                capture.parts.subList(0, capture.sentParts).clear()
+                capture.sentParts = 0
+            }
             capture.sends++
             capture.closedAt = null
             capture.journaledAt = null
@@ -356,7 +367,10 @@ class QueuedMemorySessionObserver(
         }
         val (fresh, sequence, closedAt) = snapshot
         if (fresh.isEmpty()) return
-        runCatchingCancellable { target.record(handle.providerRunId.value, envelopeOf(handle, capture, newestWithinBudget(fresh), sequence, closedAt)) }
+        // A journal write that fails (a full disk, a store limit) must not be silent: the crash copy is then stale.
+        runCatchingCancellable {
+            target.record(handle.providerRunId.value, envelopeOf(handle, capture, newestWithinBudget(fresh), sequence, closedAt))
+        }.onFailure { AppLog.record("memory", "The memory crash journal could not be written: ${it.message ?: it::class.simpleName}") }
     }
 
     /** Called with the mutex held: one write after [delayMillis], so a part skipped by the interval is not left for the next one. */

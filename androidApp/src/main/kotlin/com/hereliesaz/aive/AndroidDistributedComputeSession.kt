@@ -155,10 +155,15 @@ private fun androidComputeNode(
     val battery = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
     val plugged = battery?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0
     val onExternalPower = plugged != 0
+    val powerManager = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+    val thermalStatus = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) powerManager?.currentThermalStatus else null
+    val hot = thermalHoldReason(thermalStatus, battery?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Int.MIN_VALUE))
+    noteThermalHold(hot)
     val policyAllowsWork = androidComputePolicyAllowsWork(
         configuration = configuration,
         meteredNetwork = metered,
         onExternalPower = onExternalPower,
+        thermalHold = hot != null,
     )
 
     return ComputeNodeDescriptor(
@@ -174,6 +179,7 @@ private fun androidComputeNode(
             add("android")
             if (!metered) add("unmetered-network")
             if (onExternalPower) add("external-power")
+            if (hot != null) add("thermal-hold")
         },
         supportedExecutorKinds = supportedExecutorKinds,
         maxParallelLeases = configuration.maxParallelLeases,
@@ -188,7 +194,42 @@ internal fun androidComputePolicyAllowsWork(
     configuration: DistributedComputeConfiguration,
     meteredNetwork: Boolean,
     onExternalPower: Boolean,
+    /** The phone is too hot to take new CPU-bound relay jobs (see [thermalHoldReason]). */
+    thermalHold: Boolean = false,
 ): Boolean =
-    configuration.sharingEnabled &&
+    !thermalHold &&
+        configuration.sharingEnabled &&
         (configuration.allowMeteredNetwork || !meteredNetwork) &&
         (!configuration.requireExternalPower || onExternalPower)
+
+/** PowerManager.THERMAL_STATUS_MODERATE: from here the system is already throttling. */
+internal const val THERMAL_STATUS_MODERATE_VALUE = 2
+
+/** Battery temperature, in tenths of a degree Celsius, at which new relay jobs are declined. */
+internal const val BATTERY_HOT_TENTHS_C = 420
+
+/**
+ * Why new relay jobs should be declined because the phone is hot, or null when they may be taken. [thermalStatus] is
+ * PowerManager.getCurrentThermalStatus (API 29+; null where unknown); [batteryTempTenthsC] is the battery's
+ * EXTRA_TEMPERATURE (tenths of a degree Celsius; null or out of range where unknown). Pure.
+ */
+internal fun thermalHoldReason(thermalStatus: Int?, batteryTempTenthsC: Int?): String? = when {
+    thermalStatus != null && thermalStatus >= THERMAL_STATUS_MODERATE_VALUE ->
+        "The phone is running hot (thermal status $thermalStatus), so it is not taking new relay jobs."
+    batteryTempTenthsC != null && batteryTempTenthsC in BATTERY_HOT_TENTHS_C..1000 ->
+        "The battery is hot (${batteryTempTenthsC / 10} degrees C), so the phone is not taking new relay jobs."
+    else -> null
+}
+
+@Volatile
+private var lastThermalHold: String? = null
+
+/** Says why, in the app log, when the hold starts or ends (not on every refresh). */
+private fun noteThermalHold(reason: String?) {
+    if ((reason == null) == (lastThermalHold == null)) return
+    lastThermalHold = reason
+    com.hereliesaz.geministrator.log.AppLog.record(
+        "relay",
+        reason ?: "The phone has cooled down, so it takes new relay jobs again.",
+    )
+}

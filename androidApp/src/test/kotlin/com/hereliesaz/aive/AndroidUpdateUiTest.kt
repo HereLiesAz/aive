@@ -82,4 +82,18 @@ class AndroidUpdateUiTest {
         assertEquals(UpdateChannel.Github, updateChannel(isPlayBuild = false, source = InstallSource.Other))
         assertEquals(UpdateChannel.Github, updateChannel(isPlayBuild = false, source = InstallSource.Play))
     }
+
+    @Test
+    fun aCopyPlayInstalledIsNeverOfferedTheGithubApk() {
+        assertFalse(githubApkCanReplace(InstallSource.Play))
+        assertTrue(githubApkCanReplace(InstallSource.Other))
+    }
+
+    @Test
+    fun theOlderGithubAppIsAnnouncedOnceAndOnlyOnTheGithubBuild() {
+        assertTrue(legacyAppNoticeDue(isPlayBuild = false, legacyInstalled = true, alreadyShown = false))
+        assertFalse(legacyAppNoticeDue(isPlayBuild = false, legacyInstalled = true, alreadyShown = true))
+        assertFalse(legacyAppNoticeDue(isPlayBuild = false, legacyInstalled = false, alreadyShown = false))
+        assertFalse(legacyAppNoticeDue(isPlayBuild = true, legacyInstalled = true, alreadyShown = false))
+    }
 }

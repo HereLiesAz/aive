@@ -34,6 +34,7 @@ class ScheduleTicker(
 ) {
     private var lastHold: String? = null
     private var saidUnreadable = false
+    private var recoveredInterrupted = false
 
     /**
      * One look. Returns what it decided, for the caller and for tests.
@@ -49,6 +50,10 @@ class ScheduleTicker(
         }
         saidUnreadable = false
         val at = now()
+        if (!recoveredInterrupted) {
+            recoveredInterrupted = true
+            recoverInterruptedStarts(at)
+        }
         val device = deviceUtcOffsetMinutes()
         val schedules = store.all().map { readAt(it, device) }
         val decision = decideSchedules(schedules, at, runActive = runActive())
@@ -69,6 +74,36 @@ class ScheduleTicker(
             is ScheduleDecision.Refused -> Unit
         }
         return decision
+    }
+
+    /**
+     * A slot is claimed (`lastNote` = [STARTING_NOTE]) before anything launches, so a process that died between the claim and the
+     * launch left a slot that was never started and that no later look would retry. At the first look of a new process, such a slot
+     * inside [INTERRUPTED_START_GRACE_MILLIS] is started once now (when no run is active); an older one is marked missed with a note.
+     */
+    private suspend fun recoverInterruptedStarts(at: Long) {
+        for (schedule in store.all()) {
+            val action = interruptedStartAction(schedule, at, runActive = runActive())
+            when (action) {
+                InterruptedStartAction.None -> Unit
+                InterruptedStartAction.Missed -> {
+                    store.update(schedule.id) { if (it.lastNote == STARTING_NOTE) it.copy(lastNote = MISSED_NOTE) else null }
+                    log("Schedule '${schedule.name}' was interrupted before it started. $MISSED_NOTE")
+                }
+                InterruptedStartAction.Resume -> {
+                    val outcome = try {
+                        start(schedule)
+                        "Started after the app reopened."
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        "Could not start: ${failure.message ?: failure::class.simpleName}"
+                    }
+                    store.update(schedule.id) { if (it.lastNote == STARTING_NOTE) it.copy(lastNote = outcome) else null }
+                    log("Schedule '${schedule.name}': $outcome")
+                }
+            }
+        }
     }
 
     /** A schedule's due time read at the device's own offset; an every-N-hours cadence has no hour of day, so it is left as stored. */
@@ -99,7 +134,7 @@ class ScheduleTicker(
             if (current.lastStartedAtEpochMillis != schedule.lastStartedAtEpochMillis || !ScheduleClock.isDue(readAt(current, device), at)) {
                 null
             } else {
-                current.copy(lastStartedAtEpochMillis = at, lastNote = "Starting.", runNowRequested = false)
+                current.copy(lastStartedAtEpochMillis = at, lastNote = STARTING_NOTE, runNowRequested = false)
             }
         } ?: return ScheduleDecision.Idle
         val outcome = try {
@@ -128,4 +163,24 @@ class ScheduleTicker(
             delay(everyMillis)
         }
     }
+}
+
+internal const val STARTING_NOTE = "Starting."
+internal const val MISSED_NOTE = "Missed: the app closed while this was starting, and too much time has passed to start it now."
+
+/** How long after a claimed slot a new process still starts it. */
+internal const val INTERRUPTED_START_GRACE_MILLIS: Long = 30L * 60_000L
+
+internal enum class InterruptedStartAction { None, Resume, Missed }
+
+/** What to do at launch with a schedule whose claimed slot never reached "Started". Pure. */
+internal fun interruptedStartAction(
+    schedule: WorkflowSchedule,
+    now: Long,
+    runActive: Boolean,
+    graceMillis: Long = INTERRUPTED_START_GRACE_MILLIS,
+): InterruptedStartAction {
+    if (schedule.lastNote != STARTING_NOTE || !schedule.enabled) return InterruptedStartAction.None
+    val claimedAt = schedule.lastStartedAtEpochMillis ?: return InterruptedStartAction.Missed
+    return if (!runActive && now - claimedAt in 0..graceMillis) InterruptedStartAction.Resume else InterruptedStartAction.Missed
 }

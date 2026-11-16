@@ -16,13 +16,17 @@ internal fun legacySettingsKey(key: String): String? =
 
 /**
  * One-time read-side migration of a single logical key: when the legacy spelling of [key] holds a value, the
- * value is copied to [key] unless [key] already exists, and the legacy key is removed. Safe to call on every
- * store open; it does nothing once the legacy key is gone. Unreadable legacy values are left untouched.
+ * value is copied to [key] unless [key] already holds a real value, and the legacy key is removed. A [key] that
+ * holds only an empty default (blank text, `{}`, `[]`, `null`, written by a build that opened before the migration
+ * ran) does not count as a real value: the legacy value replaces it, so the keeper's setting is not lost to a default.
+ * Safe to call on every store open; it does nothing once the legacy key is gone. Unreadable legacy values are left untouched.
  */
 internal fun Settings.migrateLegacyKey(key: String) {
     val legacy = legacySettingsKey(key) ?: return
     if (!hasKey(legacy)) return
-    if (!hasKey(key)) {
+    val existing = if (hasKey(key)) runCatching { getStringOrNull(key) }.getOrNull() else null
+    val newKeyHoldsRealValue = hasKey(key) && !(existing != null && isEmptyDefault(existing))
+    if (!newKeyHoldsRealValue) {
         val text = runCatching { getStringOrNull(legacy) }.getOrNull()
         if (text != null) {
             putString(key, text)
@@ -33,6 +37,8 @@ internal fun Settings.migrateLegacyKey(key: String) {
     }
     remove(legacy)
 }
+
+private fun isEmptyDefault(value: String): Boolean = value.trim().let { it.isEmpty() || it == "{}" || it == "[]" || it == "null" }
 
 /** [migrateLegacyKey] for [prefix] itself and every key beneath it (derived journal, bank and layout keys). */
 internal fun Settings.migrateLegacyKeysWithPrefix(prefix: String) {

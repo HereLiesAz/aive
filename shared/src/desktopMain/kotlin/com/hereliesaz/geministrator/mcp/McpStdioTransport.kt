@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.mcp
 
 import com.hereliesaz.geministrator.net.ChildProcessEnvironment
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -38,8 +39,36 @@ class McpStdioTransport private constructor(
     @Volatile
     private var stopped: McpProtocolException? = null
 
+    /** The newest stderr text (bounded), so an exit or a timeout can say what the server printed. */
+    private val stderrTail = StringBuilder()
+
     init {
         scope.launch { readLoop() }
+        scope.launch { drainStderr() }
+    }
+
+    private suspend fun drainStderr() {
+        try {
+            process.errorStream.bufferedReader(Charsets.UTF_8).use { reader ->
+                val chunk = CharArray(1024)
+                while (true) {
+                    val count = reader.read(chunk)
+                    if (count < 0) break
+                    synchronized(stderrTail) {
+                        stderrTail.append(chunk, 0, count)
+                        if (stderrTail.length > MAX_STDERR_CHARS) stderrTail.delete(0, stderrTail.length - MAX_STDERR_CHARS)
+                    }
+                }
+            }
+        } catch (_: Exception) {
+            // The stream closed with the process.
+        }
+    }
+
+    /** What the server last wrote to stderr, trimmed, as a suffix for an error message ("" when it wrote nothing). */
+    private fun stderrNote(): String {
+        val text = synchronized(stderrTail) { stderrTail.toString() }.trim()
+        return if (text.isEmpty()) "" else ". Its last output: ${text.takeLast(MAX_STDERR_NOTE_CHARS)}"
     }
 
     override suspend fun exchange(outgoing: McpOutgoing): McpIncoming {
@@ -53,9 +82,24 @@ class McpStdioTransport private constructor(
         try {
             // Checked after the call is registered: either the reader sees it when it fails the waiting calls, or this sees why it stopped.
             stopped?.let { throw it }
-            if (!process.isAlive) throw McpProtocolException("The MCP server process has exited")
+            if (!process.isAlive) throw McpProtocolException("The MCP server process has exited${stderrNote()}")
             write(outgoing.message)
             return McpIncoming(null, answer.await())
+        } catch (cancelled: CancellationException) {
+            // A timeout or a cancelled run: tell the server to stop working on it (MCP notifications/cancelled), so it does
+            // not keep going and answer into a request nobody waits for.
+            if (!answer.isCompleted && process.isAlive) {
+                val cancel = buildJsonObject {
+                    put("jsonrpc", "2.0")
+                    put("method", "notifications/cancelled")
+                    put("params", buildJsonObject {
+                        put("requestId", id)
+                        put("reason", "The Aive stopped waiting for this request")
+                    })
+                }
+                scope.launch { runCatching { write(cancel) } }
+            }
+            throw cancelled
         } finally {
             pending.remove(id)
         }
@@ -91,8 +135,12 @@ class McpStdioTransport private constructor(
         } catch (_: Exception) {
             // The stream closed; pending callers are failed below.
         } finally {
-            stopped = failure
-            pending.values.forEach { it.completeExceptionally(failure) }
+            stopped = if (failure.message == "The MCP server process stopped") {
+                McpProtocolException("The MCP server process stopped${stderrNote()}")
+            } else {
+                failure
+            }
+            pending.values.forEach { it.completeExceptionally(stopped ?: failure) }
         }
     }
 
@@ -130,6 +178,8 @@ class McpStdioTransport private constructor(
 
     companion object {
         private const val MAX_LINE_BYTES = 8_000_000
+        private const val MAX_STDERR_CHARS = 4_000
+        private const val MAX_STDERR_NOTE_CHARS = 600
 
         /** Starts [command] directly (no shell); throws when it cannot be started. */
         fun start(
@@ -140,7 +190,6 @@ class McpStdioTransport private constructor(
             McpCommandLine.requireUsable(command)
             val builder = ProcessBuilder(command)
                 .directory(workingDirectory.takeIf(File::isDirectory))
-                .redirectError(ProcessBuilder.Redirect.DISCARD)
             // The server gets the same allowlisted environment a CLI agent gets, not everything the app was started with
             // (API keys, repository tokens); a server that needs a secret takes it on its own command line or in its own config.
             builder.environment().apply {

@@ -5,7 +5,9 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import com.hereliesaz.geministrator.ProviderCatalog
+import com.hereliesaz.geministrator.log.AppLog
 import java.security.KeyStore
+import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -31,18 +33,33 @@ internal class AndroidProviderCredentialStore(context: Context) {
     fun read(providerId: String): String? {
         val encrypted = preferences.getString(ciphertextKey(providerId), null) ?: return null
         val iv = preferences.getString(ivKey(providerId), null) ?: return null
-        return runCatching {
+        // Reading never mints a key: a new key could not decrypt what the old one sealed, and would hide the loss.
+        val key = existingKey()
+        if (key == null) {
+            keyLost(providerId, "its Keystore key is gone")
+            return null
+        }
+        return try {
             val cipher = Cipher.getInstance(TRANSFORMATION)
-            cipher.init(
-                Cipher.DECRYPT_MODE,
-                getOrCreateKey(),
-                GCMParameterSpec(GCM_TAG_BITS, Base64.decode(iv, Base64.NO_WRAP)),
-            )
+            cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_BITS, Base64.decode(iv, Base64.NO_WRAP)))
             cipher.doFinal(Base64.decode(encrypted, Base64.NO_WRAP))
                 .decodeToString()
                 .trim()
                 .takeIf(String::isNotEmpty)
-        }.getOrNull()
+        } catch (failure: AEADBadTagException) {
+            keyLost(providerId, "it can no longer be decrypted")
+            null
+        } catch (failure: Exception) {
+            // Possibly temporary (Keystore busy or locked): keep the saved key and say so.
+            AppLog.record("credentials", "The saved key for $providerId could not be read just now: ${failure::class.simpleName}.")
+            null
+        }
+    }
+
+    /** The unreadable copy is removed so the Source shows as not connected, and the keeper is told to reconnect. */
+    private fun keyLost(providerId: String, reason: String) {
+        clear(providerId)
+        AppLog.record("credentials", "The saved key for $providerId was lost ($reason). Reconnect that Source in Settings and enter its key again.")
     }
 
     fun readAll(): Map<String, String> = buildMap {
@@ -93,9 +110,13 @@ internal class AndroidProviderCredentialStore(context: Context) {
     private fun ciphertextKey(providerId: String) = "$providerId.ciphertext"
     private fun ivKey(providerId: String) = "$providerId.iv"
 
-    private fun getOrCreateKey(): SecretKey {
+    private fun existingKey(): SecretKey? {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
-        (keyStore.getKey(KEY_ALIAS, null) as? SecretKey)?.let { return it }
+        return keyStore.getKey(KEY_ALIAS, null) as? SecretKey
+    }
+
+    private fun getOrCreateKey(): SecretKey {
+        existingKey()?.let { return it }
 
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
         generator.init(

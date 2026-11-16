@@ -62,4 +62,13 @@ class AndroidDistributedComputeEligibilityTest {
             ),
         )
     }
+
+    @Test
+    fun aHotPhoneDeclinesNewRelayJobs() {
+        kotlin.test.assertNull(thermalHoldReason(null, null))
+        kotlin.test.assertNull(thermalHoldReason(1, 350))
+        kotlin.test.assertNotNull(thermalHoldReason(2, 300))
+        kotlin.test.assertNotNull(thermalHoldReason(null, 430))
+        kotlin.test.assertNull(thermalHoldReason(null, Int.MIN_VALUE))
+    }
 }
