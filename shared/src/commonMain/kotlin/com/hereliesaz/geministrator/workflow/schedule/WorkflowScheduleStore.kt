@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.workflow.schedule
 
+import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -39,9 +40,12 @@ interface WorkflowScheduleStore {
  * in one short read-modify-write before it launches anything.
  */
 class SettingsWorkflowScheduleStore(
-    private val settings: Settings = Settings(),
+    settings: Settings = Settings(),
     private val storageKey: String = DEFAULT_KEY,
 ) : WorkflowScheduleStore {
+    // Desktop's Preferences reject a value over 8,192 characters, which a long schedule list passes: chunk it. A plain
+    // value an older build wrote is still read, and replaced by the next write.
+    private val settings: Settings = ChunkedStringSettings(settings, setOf(storageKey, "$storageKey.corrupt"), onlyWhenLarge = true)
     private val mutex = Mutex()
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private val serializer = ListSerializer(WorkflowSchedule.serializer())
@@ -65,7 +69,7 @@ class SettingsWorkflowScheduleStore(
     override suspend fun unreadable(): Boolean = mutex.withLock { decoded() == null }
 
     override suspend fun discardUnreadable() = mutex.withLock {
-        val raw = settings.getStringOrNull(storageKey)
+        val raw = rawOrNull()
         if (raw != null && decoded() == null) {
             settings.putString(corruptKey, raw)
             settings.remove(storageKey)
@@ -76,15 +80,25 @@ class SettingsWorkflowScheduleStore(
 
     /** The stored list, empty when there is none, or null when there is one that cannot be read. */
     private fun decoded(): List<WorkflowSchedule>? {
-        val raw = settings.getStringOrNull(storageKey) ?: return emptyList()
+        val raw = try {
+            settings.getStringOrNull(storageKey)
+        } catch (_: Exception) {
+            return null // An incomplete chunked value is as unreadable as bad JSON.
+        } ?: return emptyList()
         return runCatching { json.decodeFromString(serializer, raw) }.getOrNull()
+    }
+
+    private fun rawOrNull(): String? = try {
+        settings.getStringOrNull(storageKey)
+    } catch (_: Exception) {
+        null
     }
 
     private fun read(): List<WorkflowSchedule> {
         val list = decoded()
         if (list == null) {
             // Keep what could not be read before anything can write over it.
-            settings.getStringOrNull(storageKey)?.let { raw -> if (settings.getStringOrNull(corruptKey) != raw) settings.putString(corruptKey, raw) }
+            rawOrNull()?.let { raw -> if (settings.getStringOrNull(corruptKey) != raw) settings.putString(corruptKey, raw) }
             return emptyList()
         }
         return list.sortedWith(compareBy({ it.name.lowercase() }, { it.id }))

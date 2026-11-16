@@ -229,4 +229,35 @@ class ScheduleTickerTest {
 
         assertEquals(1, log.size)
     }
+
+    @Test
+    fun aClaimedSlotThatNeverStartedIsResumedInsideTheGraceWindow() = runTest {
+        val f = Fixture(base + 2 * hour + 60_000L)
+        f.store.put(due().copy(lastStartedAtEpochMillis = base + 2 * hour, lastNote = STARTING_NOTE))
+
+        f.ticker.tick()
+
+        assertEquals(listOf("hive-s"), f.started)
+        assertEquals("Started after the app reopened.", f.store.all().single().lastNote)
+    }
+
+    @Test
+    fun aClaimedSlotThatNeverStartedIsMarkedMissedAfterTheGraceWindow() = runTest {
+        val f = Fixture(base + 10 * hour)
+        f.store.put(due().copy(lastStartedAtEpochMillis = base + 2 * hour, lastNote = STARTING_NOTE))
+
+        f.ticker.tick()
+
+        assertTrue(f.log.any { MISSED_NOTE in it }, f.log.toString())
+    }
+
+    @Test
+    fun interruptedStartActionDecidesByGraceAndActiveRun() {
+        val at = base + hour
+        val claimed = due().copy(lastStartedAtEpochMillis = at - 60_000L, lastNote = STARTING_NOTE)
+        assertEquals(InterruptedStartAction.Resume, interruptedStartAction(claimed, at, runActive = false))
+        assertEquals(InterruptedStartAction.Missed, interruptedStartAction(claimed, at, runActive = true))
+        assertEquals(InterruptedStartAction.Missed, interruptedStartAction(claimed, at + hour, runActive = false))
+        assertEquals(InterruptedStartAction.None, interruptedStartAction(claimed.copy(lastNote = "Started."), at, runActive = false))
+    }
 }
