@@ -1584,3 +1584,16 @@ Changing a baseline changes the training labels: rebuild the corpus (`tools/orch
 An Auto task (its role pins no provider) goes to the next healthy provider that can do it, turn by turn, so a swarm uses every provider its keeper connected instead of all of it going to the first one registered (`spreadAuto`, `AgentProviderRegistry.select`). The on-device provider, where it fits, and a role's own preferred provider keep the front; a task that requires a provider by id goes to it; a benched or circuit-open provider is left out as before. The turn is a counter of this launch, not stored, so it starts over at a restart.
 
 Open decision: round-robin ignores cost and quality. It is wrong if a keeper wants the cheapest or best provider used first; pin the role to that provider (Work, Provider) and the spread leaves it alone. A weighted choice by cost, health or load can replace the counter later without changing anything else.
+
+## Sizing the plan: one creature or a swarm
+
+The queen decides how many creatures a goal needs, and the keeper approves or overrides it on the existing plan approval card. No new screen.
+
+- **The planner's rule** (`SMALLEST_PLAN_INSTRUCTION`, `orchestration/PlanSizing.kt`, added once to the instruction for a new plan by `newWorkflowInstruction`): prefer the smallest sufficient plan. One creature (a single step) when the goal is one kind of work with no need for separate permissions, models, checks or parallelism; more only when the steps differ in kind, need different permissions or checks between them, or can run in parallel. A one-step plan was always valid (`validateAgainst` only rejects an empty one); the planner is now told to choose it.
+- **The card** says "One creature will do this" or "N creatures: <one line reason>". The reason is chosen by code, not a model (`PlanSizing.reasonFor`, in this order): a step waits for the keeper's approval, the steps are different kinds of work, some steps can run at the same time, else each part is its own piece of work.
+- **The opposite choice** is a button on the same card: **Use one creature instead** or **Use a swarm instead**. It plans once more with a constraint added to the packet (`overrideInstruction`), reviews the new plan as any plan, and shows the card again without the button (the keeper may switch once). The button is not offered on a plan resumed after a restart (the planner is not in hand then).
+- **The sizing guard**: a goal under 12 words with a plan of more than 3 creatures is flagged on the card, "This is a big plan for a small goal" (`PlanSizing.bigForSmallGoal`). It flags; it never blocks or shrinks the plan: the keeper decides.
+- **The Story** records the queen's choice and any override in the planning line (`PlanningRecord.sizeLine`, `PlanSizing.storyLine`).
+- **A one-creature hive is not a lighter hive.** It is built by the same factory as any plan: its step gets the same contract, Nanny watching and check for its effect class, and a step that sends, changes a connected source or pushes a diff still asks the keeper with the concrete effect, however small the plan.
+- Tests: `PlanSizingTest`, and the instruction test in `NewWorkflowInstructionTest` (the rule is present exactly once).
+

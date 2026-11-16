@@ -740,6 +740,15 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="plan_decision_needs_approval">needs your approval</string>
     <string name="plan_decision_start">Work</string>
     <string name="plan_decision_decline">Do not start</string>
+    <string name="plan_size_one">One creature will do this</string>
+    <string name="plan_size_many">%1$d creatures: %2$s</string>
+    <string name="plan_size_big">This is a big plan for a small goal</string>
+    <string name="plan_size_reason_approval">a step waits for your approval between the others</string>
+    <string name="plan_size_reason_kinds">the steps are different kinds of work</string>
+    <string name="plan_size_reason_parallel">some steps can run at the same time</string>
+    <string name="plan_size_reason_separate">each part is its own piece of work</string>
+    <string name="plan_size_use_one">Use one creature instead</string>
+    <string name="plan_size_use_swarm">Use a swarm instead</string>
     <string name="creature_site">%1$s, a place the shared creature works at: %2$s</string>
     <string name="creature_egg_action">Egg, %1$d of %2$d feeders done</string>
     <string name="creature_egg_withered">Withered egg</string>

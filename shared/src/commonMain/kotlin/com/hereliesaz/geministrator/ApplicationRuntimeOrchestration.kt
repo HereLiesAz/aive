@@ -199,6 +199,7 @@ private val TEACHING_WORDS = Regex("\\b(teach|taught|tutor|learn|explain|walk me
  */
 internal fun newWorkflowInstruction(objective: String, repository: RepositoryRef?, availableTools: List<String> = emptyList()): String = buildString {
     append("Create the minimal executable dependency-correct workflow DAG needed to satisfy the objective.")
+    append(com.hereliesaz.geministrator.orchestration.SMALLEST_PLAN_INSTRUCTION)
     if (repository != null) {
         append(" A repository is linked (").append(repository.name).append("). A step sees only short excerpts of it, its README and docs first,")
         append(" so name the files or parts each step should read in that step's objective.")
@@ -377,81 +378,104 @@ private suspend fun ApplicationRuntime.planAndDecide(
     reportLaunchProgress("Asking the planner for a swarm (${inputs.plannerRoles.size} roles available)…")
     // Only a launch that will be reviewed has a planning field: the planner's egg, the reviewer who hatches from it.
     review?.let { (_, role) -> reportPlanningStage(planningStage(inputs, PlanningPhase.Planning, null, 0, role)) }
-    val firstPlan = orchestrationRuntime.plan(inputs.packet)
+    var packet = inputs.packet
+    var firstPlan = orchestrationRuntime.plan(packet)
     if (review == null) return ChosenPlan(firstPlan, null)
-    val (reviewer, role) = review
-    val requirementInputs = com.hereliesaz.geministrator.orchestration.RequirementInputs(
-        objective = inputs.objective,
-        objectiveExternal = inputs.objectiveProvenance.isUntrusted(),
-        roles = inputs.launchRoles,
-        availableRoleIds = inputs.plannerRoles.map { it.id.value }.toSet(),
-    )
-    val checklist = com.hereliesaz.geministrator.orchestration.Requirements.extract(requirementInputs)
-    val outcome = reviewUntilApproved(
-        packet = inputs.packet,
-        firstPlan = firstPlan,
-        planner = orchestrationRuntime,
-        reviewer = reviewer,
-        reviewerName = role.name,
-        instructions = role.instructions,
-        pinnedProviderId = role.preferredProviderId?.value,
-        onStage = { phase, current, round -> reportPlanningStage(planningStage(inputs, phase, current, round, role)) },
-        pureCheck = { candidate ->
-            com.hereliesaz.geministrator.orchestration.Requirements.checkPure(requirementInputs, candidate, checklist)
-        },
-        // The reviewer asks another Source than the planner's first, and is skipped (the checklist is the whole review) when the caps, a price or the room say so.
-        plannerSource = { orchestrationRuntime.lastSourceId },
-        reviewGate = { callsSoFar -> reviewGateFor(reviewer, callsSoFar) },
-    )
-    val plan = outcome.plan
-    val ruleResults = com.hereliesaz.geministrator.orchestration.Requirements.checkPure(requirementInputs, plan, checklist)
-    val notes = PlanningNotes(
-        record = PlanningRecord(
-            plannerRole = (inputs.staffing?.staff?.planner ?: BuiltInRoles.Planner).name,
-            plannerSource = orchestrationRuntime.lastSourceId,
-            reviewerRole = role.name,
-            reviewerSource = outcome.reviewerSource,
-            rounds = outcome.rounds.size,
-            skipped = outcome.skipped,
-            checkedByRules = ruleResults.size,
-            metByRules = ruleResults.count { it.verdict == com.hereliesaz.geministrator.orchestration.RequirementVerdict.Met },
-            suggestions = outcome.suggestions.size,
-        ),
-        suggestions = outcome.suggestions,
-    )
-    reportPlanningStage(planningStage(inputs, PlanningPhase.AwaitingKeeper, plan, outcome.rounds.size, role, outcome.verdict()))
-    reportLaunchProgress("Waiting for your decision on the plan…")
-    // Kept while the keeper decides, so a restart does not cost them the plan or the reviewer's reasons.
-    planStore?.setPending(
-        PendingPlanLaunch(
-            fingerprint = inputs.fingerprint(role),
+    val proposed = firstPlan.steps.size
+    var overrideTo: com.hereliesaz.geministrator.orchestration.PlanSizeChoice? = null
+    while (true) {
+        val (reviewer, role) = review
+        val requirementInputs = com.hereliesaz.geministrator.orchestration.RequirementInputs(
             objective = inputs.objective,
-            projectName = inputs.projectName,
-            existingProjectId = inputs.existingProject?.id?.value,
-            repository = inputs.repository,
-            parentRunIds = inputs.parentRunIds.map { it.value },
-            packet = inputs.packet,
-            plan = plan,
-            rounds = outcome.rounds.map { StoredPlanRound(it.plan, it.verdict is PlanVerdict.Approve, it.verdict.reasons) },
-            problem = outcome.problem,
-            reviewerRoleId = role.id.value,
+            objectiveExternal = inputs.objectiveProvenance.isUntrusted(),
+            roles = inputs.launchRoles,
+            availableRoleIds = inputs.plannerRoles.map { it.id.value }.toSet(),
+        )
+        val checklist = com.hereliesaz.geministrator.orchestration.Requirements.extract(requirementInputs)
+        val outcome = reviewUntilApproved(
+            packet = packet,
+            firstPlan = firstPlan,
+            planner = orchestrationRuntime,
+            reviewer = reviewer,
             reviewerName = role.name,
-            createdAtEpochMillis = Clock.System.now().toEpochMilliseconds(),
-            savedDefinitionId = inputs.design?.id?.value,
-            supplementalRoles = inputs.supplementalRoles,
-            design = inputs.design,
-            objectiveProvenance = inputs.objectiveProvenance,
-            notes = notes,
-        ),
-    )
-    val start = checkNotNull(confirmPlan)(PlanDecision(inputs.objective, role.name, outcome, inputs.packet.availableAgents.associate { it.id to it.name }))
-    planStore?.clearPending()
-    if (!start) {
-        reportLaunchProgress("The plan was not started")
-        return null
+            instructions = role.instructions,
+            pinnedProviderId = role.preferredProviderId?.value,
+            onStage = { phase, current, round -> reportPlanningStage(planningStage(inputs, phase, current, round, role)) },
+            pureCheck = { candidate ->
+                com.hereliesaz.geministrator.orchestration.Requirements.checkPure(requirementInputs, candidate, checklist)
+            },
+            // The reviewer asks another Source than the planner's first, and is skipped (the checklist is the whole review) when the caps, a price or the room say so.
+            plannerSource = { orchestrationRuntime.lastSourceId },
+            reviewGate = { callsSoFar -> reviewGateFor(reviewer, callsSoFar) },
+        )
+        val plan = outcome.plan
+        val size = com.hereliesaz.geministrator.orchestration.PlanSizing.measure(inputs.objective, plan)
+        val ruleResults = com.hereliesaz.geministrator.orchestration.Requirements.checkPure(requirementInputs, plan, checklist)
+        val notes = PlanningNotes(
+            record = PlanningRecord(
+                plannerRole = (inputs.staffing?.staff?.planner ?: BuiltInRoles.Planner).name,
+                plannerSource = orchestrationRuntime.lastSourceId,
+                reviewerRole = role.name,
+                reviewerSource = outcome.reviewerSource,
+                rounds = outcome.rounds.size,
+                skipped = outcome.skipped,
+                checkedByRules = ruleResults.size,
+                metByRules = ruleResults.count { it.verdict == com.hereliesaz.geministrator.orchestration.RequirementVerdict.Met },
+                suggestions = outcome.suggestions.size,
+                sizeLine = com.hereliesaz.geministrator.orchestration.PlanSizing.storyLine(proposed, overrideTo, plan.steps.size, size.bigForSmallGoal),
+            ),
+            suggestions = outcome.suggestions,
+        )
+        reportPlanningStage(planningStage(inputs, PlanningPhase.AwaitingKeeper, plan, outcome.rounds.size, role, outcome.verdict()))
+        reportLaunchProgress("Waiting for your decision on the plan…")
+        // Kept while the keeper decides, so a restart does not cost them the plan or the reviewer's reasons.
+        planStore?.setPending(
+            PendingPlanLaunch(
+                fingerprint = inputs.fingerprint(role),
+                objective = inputs.objective,
+                projectName = inputs.projectName,
+                existingProjectId = inputs.existingProject?.id?.value,
+                repository = inputs.repository,
+                parentRunIds = inputs.parentRunIds.map { it.value },
+                packet = inputs.packet,
+                plan = plan,
+                rounds = outcome.rounds.map { StoredPlanRound(it.plan, it.verdict is PlanVerdict.Approve, it.verdict.reasons) },
+                problem = outcome.problem,
+                reviewerRoleId = role.id.value,
+                reviewerName = role.name,
+                createdAtEpochMillis = Clock.System.now().toEpochMilliseconds(),
+                savedDefinitionId = inputs.design?.id?.value,
+                supplementalRoles = inputs.supplementalRoles,
+                design = inputs.design,
+                objectiveProvenance = inputs.objectiveProvenance,
+                notes = notes,
+            ),
+        )
+        // The keeper may ask once for the other size: the card's button sets [resize] and answers "do not start", and the plan is made again with that constraint.
+        val resize = com.hereliesaz.geministrator.orchestration.PlanResize()
+        val start = checkNotNull(confirmPlan)(
+            PlanDecision(
+                inputs.objective, role.name, outcome, inputs.packet.availableAgents.associate { it.id to it.name },
+                size = size, resize = if (overrideTo == null) resize else null,
+            ),
+        )
+        planStore?.clearPending()
+        if (!start && resize.requested && overrideTo == null) {
+            val choice = size.choice.opposite
+            overrideTo = choice
+            packet = inputs.packet.copy(instruction = inputs.packet.instruction + com.hereliesaz.geministrator.orchestration.PlanSizing.overrideInstruction(choice))
+            reportLaunchProgress("Asking the planner again for ${if (choice == com.hereliesaz.geministrator.orchestration.PlanSizeChoice.One) "one creature" else "a swarm"}…")
+            reportPlanningStage(planningStage(inputs, PlanningPhase.Planning, null, 0, role))
+            firstPlan = orchestrationRuntime.plan(packet)
+            continue
+        }
+        if (!start) {
+            reportLaunchProgress("The plan was not started")
+            return null
+        }
+        reportPlanningStage(planningStage(inputs, PlanningPhase.Started, plan, outcome.rounds.size, role))
+        return ChosenPlan(plan, notes)
     }
-    reportPlanningStage(planningStage(inputs, PlanningPhase.Started, plan, outcome.rounds.size, role))
-    return ChosenPlan(plan, notes)
 }
 
 @OptIn(ExperimentalTime::class)
@@ -591,7 +615,12 @@ suspend fun ApplicationRuntime.resumePendingPlanLaunch(
     )
     reportPlanningStage(planningStage(inputs, PlanningPhase.AwaitingKeeper, pending.plan, outcome.rounds.size, role, outcome.verdict()))
     reportLaunchProgress("Waiting for your decision on the plan…")
-    val start = confirmPlan(PlanDecision(inputs.objective, pending.reviewerName, outcome, inputs.packet.availableAgents.associate { it.id to it.name }))
+    val start = confirmPlan(
+        PlanDecision(
+            inputs.objective, pending.reviewerName, outcome, inputs.packet.availableAgents.associate { it.id to it.name },
+            size = com.hereliesaz.geministrator.orchestration.PlanSizing.measure(inputs.objective, pending.plan),
+        ),
+    )
     planStore.clearPending()
     if (!start) {
         reportLaunchProgress("The plan was not started")

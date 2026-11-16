@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.orchestration.PlanDecision
 import com.hereliesaz.geministrator.orchestration.PlanVerdict
+import com.hereliesaz.geministrator.orchestration.SwarmReason
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.plan_decision_approved_after
 import com.hereliesaz.geministrator.resources.plan_decision_approved_first
@@ -25,6 +26,15 @@ import com.hereliesaz.geministrator.resources.plan_decision_round_approved
 import com.hereliesaz.geministrator.resources.plan_decision_round_changes
 import com.hereliesaz.geministrator.resources.plan_decision_said_heading
 import com.hereliesaz.geministrator.resources.plan_decision_start
+import com.hereliesaz.geministrator.resources.plan_size_big
+import com.hereliesaz.geministrator.resources.plan_size_many
+import com.hereliesaz.geministrator.resources.plan_size_one
+import com.hereliesaz.geministrator.resources.plan_size_reason_approval
+import com.hereliesaz.geministrator.resources.plan_size_reason_kinds
+import com.hereliesaz.geministrator.resources.plan_size_reason_parallel
+import com.hereliesaz.geministrator.resources.plan_size_reason_separate
+import com.hereliesaz.geministrator.resources.plan_size_use_one
+import com.hereliesaz.geministrator.resources.plan_size_use_swarm
 import com.hereliesaz.geministrator.resources.plan_decision_step
 import com.hereliesaz.geministrator.resources.plan_decision_title
 import org.jetbrains.compose.resources.stringResource
@@ -40,6 +50,7 @@ internal fun PlanDecisionContent(
     decision: PlanDecision,
     onStart: () -> Unit,
     onDecline: () -> Unit,
+    onResize: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val outcome = decision.outcome
@@ -53,6 +64,21 @@ internal fun PlanDecisionContent(
             else -> stringResource(Res.string.plan_decision_not_approved, decision.reviewerName, rounds)
         }
         Text(status, style = AzphaltType.lead, color = azphaltOnSurface())
+        decision.size?.let { size ->
+            val reason = when (size.reason) {
+                SwarmReason.NeedsApproval -> stringResource(Res.string.plan_size_reason_approval)
+                SwarmReason.DifferentKinds -> stringResource(Res.string.plan_size_reason_kinds)
+                SwarmReason.SideBySide -> stringResource(Res.string.plan_size_reason_parallel)
+                SwarmReason.Separate -> stringResource(Res.string.plan_size_reason_separate)
+                null -> ""
+            }
+            Text(
+                if (size.single) stringResource(Res.string.plan_size_one) else stringResource(Res.string.plan_size_many, size.creatures, reason),
+                style = AzphaltType.body,
+                color = azphaltOnSurface(),
+            )
+            if (size.bigForSmallGoal) Text(stringResource(Res.string.plan_size_big), style = AzphaltType.body, color = azphaltOnSurface())
+        }
         Column(
             modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -100,6 +126,17 @@ internal fun PlanDecisionContent(
                 tone = PillTone.Primary,
                 onClick = onStart,
             )
+            val size = decision.size
+            if (size != null && decision.resize != null) {
+                AzphaltPill(
+                    label = stringResource(if (size.single) Res.string.plan_size_use_swarm else Res.string.plan_size_use_one),
+                    seed = "plan-decision-resize",
+                    onClick = {
+                        decision.resize.requested = true
+                        onResize()
+                    },
+                )
+            }
             AzphaltPill(
                 label = stringResource(Res.string.plan_decision_decline),
                 seed = "plan-decision-decline",

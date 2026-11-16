@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.RepositorySource
+import com.hereliesaz.geministrator.orchestration.SMALLEST_PLAN_INSTRUCTION
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -13,7 +14,7 @@ class NewWorkflowInstructionTest {
 
     @Test
     fun anObjectiveWithNoRepositoryAndNoLessonKeepsTheOriginalInstruction() {
-        assertEquals(base, newWorkflowInstruction("Fix the login bug", null))
+        assertEquals(base + SMALLEST_PLAN_INSTRUCTION, newWorkflowInstruction("Fix the login bug", null))
     }
 
     @Test
@@ -28,6 +29,14 @@ class NewWorkflowInstructionTest {
         for (objective in listOf("Teach me the ins and outs of this app", "Explain how the planner works", "I want to learn Kotlin")) {
             val text = newWorkflowInstruction(objective, repo)
             assertTrue("curriculum" in text && "require no approval" in text, "$objective: $text")
+        }
+    }
+
+    @Test
+    fun theSmallestSufficientPlanRuleIsInTheInstructionExactlyOnce() {
+        for (text in listOf(newWorkflowInstruction("Fix the login bug", null), newWorkflowInstruction("Teach me Kotlin", repo))) {
+            assertEquals(1, Regex("Prefer the smallest sufficient plan").findAll(text).count(), text)
+            assertTrue("ONE creature" in text && "parallel" in text, text)
         }
     }
 }
