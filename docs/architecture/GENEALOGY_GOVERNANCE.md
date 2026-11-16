@@ -71,7 +71,7 @@ Agreement still does not prove correctness. A structurally independent consensus
 Genealogy governance must never:
 
 - select a winning memory trace,
-- emit `ConflictsWith` memory relationships,
+- emit divergence memory relationships,
 - delete or supersede a memory because another memory disagrees,
 - assign truth probabilities to remembered content,
 - rewrite recalled content,

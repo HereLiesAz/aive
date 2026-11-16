@@ -14,7 +14,7 @@ Swarm nodes may be performed by AI sources such as specialized model agents, LLM
 
 ## Targets
 
-- Android — application ID `com.hereliesaz.aive`, for both the Google Play and the GitHub-release builds. GitHub-release installs made under the earlier application ID are a different package to Android and do not upgrade in place; install the current build fresh.
+- Android — application ID `com.hereliesaz.aive`, for both the Google Play and the GitHub-release builds.
 - Desktop JVM
 - Independent headless JVM (CLI and daemon)
 - Web — JavaScript and WebAssembly

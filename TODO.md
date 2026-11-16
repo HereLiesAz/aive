@@ -59,7 +59,7 @@ A checked box means implemented and covered by automated tests. It does not mean
 - [x] Commit failure-escalation gate decision, workflow transition, and audit event atomically.
 - [x] Preserve retry-attempt artifact identity and deduplicate replayed provider artifacts.
 - [x] Replace whole-snapshot event rewrites with append-only Settings event journaling.
-- [x] Preserve reconstructable workflow-created events and strict approval-gate identity with legacy compatibility.
+- [x] Preserve reconstructable workflow-created events and strict approval-gate identity.
 - [x] Build the Wasm output in CI (Wasm is the only web target). Pages currently serves the standalone puppet-rig editor.
 - [ ] Reconnect the full Aive Wasm PWA to GitHub Pages when ready.
 - [x] Add regression coverage for concurrency, approvals, escalation atomicity, persistence, transitions, artifacts, and GitHub dispatch correlation.
