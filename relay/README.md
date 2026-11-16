@@ -15,7 +15,7 @@ The tests run the worker against an in-memory fake of the Durable Object state w
 
 ## Deploy
 
-`.github/workflows/relay-deploy.yml` is bound to the central `HereLiesAz/workflows` Cloudflare Worker Deploy workflow, which tests and deploys this Worker with the central Cloudflare keys when a change under `relay/` reaches main (or from the Actions tab). The profile that points it at `relay/` lives in `scripts/semantic_catalog.py` there. By hand:
+`.github/workflows/relay-deploy.yml` is bound to the central `HereLiesAz/workflows` Cloudflare Worker Deploy workflow, which tests and deploys this Worker with the central Cloudflare keys when a change under `relay/` reaches main (or from the Actions tab). The profile that points it at `relay/` lives in `scripts/semantic_catalog.py` there. The run happens in `HereLiesAz/workflows`; its result appears on the commit as the status `.github/workflows/relay-deploy.yml`. By hand:
 
 ~~~sh
 cd relay
