@@ -8,7 +8,8 @@ internal actual fun deviceUtcOffsetMinutes(): Int = java.util.TimeZone.getDefaul
 
 internal actual fun isDesktopClassDevice(): Boolean {
     val c = android.content.res.Resources.getSystem().configuration
-    val desktopMode = (c.uiMode and android.content.res.Configuration.UI_MODE_TYPE_MASK) == android.content.res.Configuration.UI_MODE_TYPE_DESKTOP
-    // A tablet (the shortest side of the screen at least 720dp) is desktop-class, with or without a keyboard.
-    return desktopMode || c.smallestScreenWidthDp >= 720
+    // A Chromebook runs the app under ChromeOS's Android container, whatever its screen size.
+    val chromeOs = android.os.Build.DEVICE.orEmpty().let { it.endsWith("_cheets") || it.contains("cros", ignoreCase = true) }
+    // A tablet (the shortest side of the screen at least 720dp), a freeform desktop window on one included, is desktop-class.
+    return chromeOs || c.smallestScreenWidthDp >= 720
 }
