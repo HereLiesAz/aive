@@ -91,6 +91,17 @@ internal class DesktopDistributedComputeCredentialStore(
             readEnvironment = false,
         )
 
+        /** The pool owner's token, kept in-app like Android does; the environment variable still works. */
+        fun forRelayOwner() = DesktopDistributedComputeCredentialStore(
+            account = "relay-owner-token",
+            windowsFileName = "distributed-compute-relay-owner.dpapi",
+            readEnvironment = false,
+        )
+
+        /** The owner token to use: the one saved in the app, else `AIVE_RELAY_OWNER_TOKEN`; blank counts as none. */
+        fun preferredOwnerToken(stored: String?, environment: String?): String? =
+            stored?.trim()?.takeIf(String::isNotEmpty) ?: environment?.trim()?.takeIf(String::isNotEmpty)
+
         /** The keeper's explicit opt-in (environment variable) to the plaintext preferences fallback. */
         fun plaintextFallbackAllowed(): Boolean =
             System.getenv("AIVE_ALLOW_PLAINTEXT_SECRETS")?.trim() == "1"

@@ -18,6 +18,7 @@ import com.hereliesaz.geministrator.distributed.DistributedComputeExecutorIntegr
 import com.hereliesaz.geministrator.distributed.DistributedComputeWorker
 import com.hereliesaz.geministrator.distributed.RelayDistributedComputeClient
 import com.hereliesaz.geministrator.distributed.RelayDistributedComputeGateway
+import com.hereliesaz.geministrator.distributed.computeWorkDecision
 import com.hereliesaz.geministrator.distributed.SettingsComputeNodeEnrolmentLedger
 import com.hereliesaz.geministrator.distributed.SystemExecutorDistributedWorkloadRunner
 import com.hereliesaz.geministrator.domain.ComputeAccelerator
@@ -159,7 +160,7 @@ private fun androidComputeNode(
     val thermalStatus = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) powerManager?.currentThermalStatus else null
     val hot = thermalHoldReason(thermalStatus, battery?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Int.MIN_VALUE))
     noteThermalHold(hot)
-    val policyAllowsWork = androidComputePolicyAllowsWork(
+    val decision = computeWorkDecision(
         configuration = configuration,
         meteredNetwork = metered,
         onExternalPower = onExternalPower,
@@ -179,11 +180,11 @@ private fun androidComputeNode(
             add("android")
             if (!metered) add("unmetered-network")
             if (onExternalPower) add("external-power")
-            if (hot != null) add("thermal-hold")
+            decision.hold?.let { add(it.capability) }
         },
         supportedExecutorKinds = supportedExecutorKinds,
         maxParallelLeases = configuration.maxParallelLeases,
-        acceptsWork = policyAllowsWork,
+        acceptsWork = decision.accepts,
         meteredNetwork = metered,
         onExternalPower = onExternalPower,
     )
@@ -196,11 +197,7 @@ internal fun androidComputePolicyAllowsWork(
     onExternalPower: Boolean,
     /** The phone is too hot to take new CPU-bound relay jobs (see [thermalHoldReason]). */
     thermalHold: Boolean = false,
-): Boolean =
-    !thermalHold &&
-        configuration.sharingEnabled &&
-        (configuration.allowMeteredNetwork || !meteredNetwork) &&
-        (!configuration.requireExternalPower || onExternalPower)
+): Boolean = computeWorkDecision(configuration, meteredNetwork, onExternalPower, thermalHold).accepts
 
 /** PowerManager.THERMAL_STATUS_MODERATE: from here the system is already throttling. */
 internal const val THERMAL_STATUS_MODERATE_VALUE = 2

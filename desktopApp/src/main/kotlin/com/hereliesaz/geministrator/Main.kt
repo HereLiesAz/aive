@@ -110,6 +110,11 @@ fun main() {
         computeConfigurationStore.write(initialComputeConfiguration)
     }
     val initialComputeToken = computeCredentialStore.readToken()
+    val relayOwnerStore = DesktopDistributedComputeCredentialStore.forRelayOwner()
+    fun readRelayOwnerToken(): String? = DesktopDistributedComputeCredentialStore.preferredOwnerToken(
+        relayOwnerStore.readToken(),
+        System.getenv("AIVE_RELAY_OWNER_TOKEN"),
+    )
     // The compute node's signing key, read from (or created in) the OS credential store once.
     val nodeIdentityStore = DesktopDistributedComputeCredentialStore.forNodeIdentity()
     var computeNodeSignerCache: DesktopComputeNodeSigner? = null
@@ -226,6 +231,7 @@ fun main() {
                 var configuringRepositoryServiceId by remember { mutableStateOf<String?>(null) }
                 var computeConfiguration by remember { mutableStateOf(initialComputeConfiguration) }
                 var computeToken by remember { mutableStateOf(initialComputeToken) }
+                var relayOwnerToken by remember { mutableStateOf(readRelayOwnerToken()) }
                 var onDeviceSmallTasksEnabled by remember { mutableStateOf(onDeviceSmallTaskPreference.enabled) }
                 // The vendor CLIs the keeper turned on (Keeper's room › Local agents); a switch rebuilds the list.
                 var cliAgentsGeneration by remember { mutableStateOf(0) }
@@ -252,7 +258,7 @@ fun main() {
                             )
                     } ?: configured
                 }
-                val computeSession = remember(computeConfiguration, computeToken, baseExecutorIntegrations) {
+                val computeSession = remember(computeConfiguration, computeToken, relayOwnerToken, baseExecutorIntegrations) {
                     val token = computeToken
                     val signer = if (computeConfiguration.configured && token != null) {
                         computeNodeSigner()
@@ -266,6 +272,7 @@ fun main() {
                             baseIntegrations = baseExecutorIntegrations,
                             supportedExecutorKinds = desktopDistributedExecutorKinds(repositoryCredentials),
                             signer = signer,
+                            ownerToken = relayOwnerToken,
                         )
                     } else {
                         null
@@ -583,11 +590,17 @@ fun main() {
                             lastError = computeError,
                             enrolledNodes = computeEnrolledNodes,
                             revoked = computeRevoked,
+                            ownerTokenSettable = true,
+                            ownerTokenConfigured = relayOwnerToken != null,
+                            onSaveOwnerToken = { owner ->
+                                relayOwnerStore.writeToken(owner)
+                                relayOwnerToken = readRelayOwnerToken()
+                            },
                         ),
                         onRevokeComputeNode = { nodeId ->
                             computeSession?.let { session ->
                                 uiScope.launch {
-                                    runCatching { session.client.revokeNode(nodeId, System.getenv("AIVE_RELAY_OWNER_TOKEN")?.takeIf(String::isNotBlank)) }
+                                    runCatching { session.client.revokeNode(nodeId, relayOwnerToken) }
                                         .onFailure { computeError = it.message }
                                 }
                             }

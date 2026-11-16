@@ -35,3 +35,21 @@ class DesktopDistributedComputeCredentialStoreTest {
         assertTrue("\$env:${DesktopDistributedComputeCredentialStore.WINDOWS_TOKEN_FILE_ENV}" in read)
     }
 }
+
+class DesktopRelayOwnerTokenTest {
+    @Test
+    fun theTokenSavedInTheAppWinsOverTheEnvironment() {
+        assertEquals("saved", DesktopDistributedComputeCredentialStore.preferredOwnerToken(" saved ", "env"))
+    }
+
+    @Test
+    fun theEnvironmentIsUsedWhenNothingIsSaved() {
+        assertEquals("env", DesktopDistributedComputeCredentialStore.preferredOwnerToken(null, "env"))
+        assertEquals("env", DesktopDistributedComputeCredentialStore.preferredOwnerToken("  ", " env "))
+    }
+
+    @Test
+    fun blankEverywhereMeansNoOwnerToken() {
+        assertEquals(null, DesktopDistributedComputeCredentialStore.preferredOwnerToken(null, " "))
+    }
+}
