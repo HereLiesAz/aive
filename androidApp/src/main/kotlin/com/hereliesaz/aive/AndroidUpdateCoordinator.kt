@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.net.Uri
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,7 +30,18 @@ internal class AndroidUpdateCoordinator(
         private set
 
     suspend fun checkForUpdates(force: Boolean = false) {
-        val channel = updateChannel(isPlayBuild = playCheck != null, source = installSource(context))
+        // The older GitHub build is a different app to Android, so it is told about once, before any update check.
+        if (legacyAppNoticeDue(
+                isPlayBuild = playCheck != null,
+                legacyInstalled = isPackageInstalled(context, LEGACY_GITHUB_PACKAGE),
+                alreadyShown = preferences.getBoolean(KEY_LEGACY_NOTICE_SHOWN, false),
+            )
+        ) {
+            state = AndroidUpdateState.LegacyAppInstalled
+            return
+        }
+        val source = installSource(context)
+        val channel = updateChannel(isPlayBuild = playCheck != null, source = source)
         if (channel == UpdateChannel.None) return
         // A debug build is installed over adb, so it has no channel to compare against.
         if (channel == UpdateChannel.Github && (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) return
@@ -45,7 +57,11 @@ internal class AndroidUpdateCoordinator(
                     UpdateChannel.Play ->
                         if (playCheck!!.isUpdateAvailable()) AndroidUpdateState.PlayUpdateAvailable
                         else AndroidUpdateState.Idle
-                    else -> {
+                    // The GitHub APK is signed with a different key than the Play build, so Android would refuse it over a
+                    // Play-installed copy: say so plainly instead of sending the keeper to a failed install.
+                    else -> if (!githubApkCanReplace(source)) {
+                        AndroidUpdateState.GithubBlockedByPlay
+                    } else {
                         val release = withContext(Dispatchers.IO) { GithubReleaseFeed.latestAndroidRelease() }
                         if (release != null && isNewerVersion(release.version, currentVersion())) {
                             AndroidUpdateState.GithubUpdateAvailable(release.version, release.pageUrl)
@@ -92,8 +108,25 @@ internal class AndroidUpdateCoordinator(
         )
     }
 
-    fun dismiss() {
+    /** Opens the older app's settings page, where it can be uninstalled; its data does not move to this app. */
+    fun openLegacyAppSettings() {
+        markLegacyNoticeShown()
         state = AndroidUpdateState.Idle
+        runCatching {
+            activity.startActivity(
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$LEGACY_GITHUB_PACKAGE"))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }
+    }
+
+    fun dismiss() {
+        if (state == AndroidUpdateState.LegacyAppInstalled) markLegacyNoticeShown()
+        state = AndroidUpdateState.Idle
+    }
+
+    private fun markLegacyNoticeShown() {
+        preferences.edit().putBoolean(KEY_LEGACY_NOTICE_SHOWN, true).apply()
     }
 
     private fun currentVersion(): String =
@@ -102,6 +135,7 @@ internal class AndroidUpdateCoordinator(
     private companion object {
         const val PREFERENCES_NAME = "aive.updater.v2"
         const val KEY_LAST_CHECK = "last-check"
+        const val KEY_LEGACY_NOTICE_SHOWN = "legacy-app-notice-shown"
         const val CHECK_INTERVAL_MILLIS = 6L * 60L * 60L * 1000L
     }
 }

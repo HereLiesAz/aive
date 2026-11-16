@@ -9,6 +9,10 @@ internal sealed interface AndroidUpdateState {
     data object Checking : AndroidUpdateState
     data object PlayUpdateAvailable : AndroidUpdateState
     data class GithubUpdateAvailable(val version: String, val pageUrl: String) : AndroidUpdateState
+    /** A copy Play installed cannot take the GitHub APK (different signing key); update through Play. */
+    data object GithubBlockedByPlay : AndroidUpdateState
+    /** The older GitHub build (the earlier application id) is still installed beside this one; shown once. */
+    data object LegacyAppInstalled : AndroidUpdateState
     data class Error(val message: String) : AndroidUpdateState
 }
 
@@ -17,6 +21,7 @@ internal fun AndroidUpdatePrompt(
     state: AndroidUpdateState,
     onOpenGithubRelease: () -> Unit,
     onOpenPlayStore: () -> Unit,
+    onOpenLegacyAppSettings: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     when (state) {
@@ -34,6 +39,24 @@ internal fun AndroidUpdatePrompt(
             text = stringResource(R.string.update_play_body),
             confirmLabel = stringResource(R.string.update_open_play_store),
             onConfirm = onOpenPlayStore,
+            onDismissRequest = onDismiss,
+            dismissLabel = stringResource(R.string.update_later),
+        )
+
+        AndroidUpdateState.GithubBlockedByPlay -> AzphaltAlertDialog(
+            title = stringResource(R.string.update_blocked_title),
+            text = stringResource(R.string.update_blocked_body),
+            confirmLabel = stringResource(R.string.update_open_play_store),
+            onConfirm = onOpenPlayStore,
+            onDismissRequest = onDismiss,
+            dismissLabel = stringResource(R.string.update_dismiss),
+        )
+
+        AndroidUpdateState.LegacyAppInstalled -> AzphaltAlertDialog(
+            title = stringResource(R.string.legacy_app_title),
+            text = stringResource(R.string.legacy_app_body),
+            confirmLabel = stringResource(R.string.legacy_app_open_settings),
+            onConfirm = onOpenLegacyAppSettings,
             onDismissRequest = onDismiss,
             dismissLabel = stringResource(R.string.update_later),
         )
