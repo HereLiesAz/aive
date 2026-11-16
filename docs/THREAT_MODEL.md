@@ -565,6 +565,38 @@ The Aive can be driven from IDEaz on another device through a relay Worker (`rel
 - A relay operator can drop or delay frames (denial of service) and sees connection metadata.
 - The relay's shared client-token model means a leaked code cannot be told apart from its owner.
 
+### Claude connector (`connector/`, opt-in by the keeper)
+
+A Cloudflare Worker that is a remote MCP server for Claude's connectors, in front of one paired device through the relay. Protocol and tools: `docs/Connector.md`. It exposes read-only tools only (`ping` and `watch` on the device); no tool approves, rejects, edits, prompts or launches.
+
+**Assets**
+- The pairing (room, client token, end-to-end key) stored by the connector: whoever holds it can read the shown run and its Story, and, with the code, do everything the code allows (it is the same bearer value as in Remote access).
+- The Google account id (`sub`) and email address of each person, and the OAuth tokens the connector issues.
+- Plaintext device replies while a call is in flight (objectives, reasons, plan and artifact previews).
+- The Worker's two stored secrets: the key-encryption key `CONNECTOR_KEK` and the Google client secret.
+
+**Threats**
+- The connector is a trusted party, unlike the relay: its operator, or an attacker who compromises the Worker or obtains `CONNECTOR_KEK` together with its storage, can read device state and reach the device as a client.
+- Prompt injection: swarm content returned to Claude carries instructions.
+- Token theft or replay (authorization code, refresh token), open redirect, login CSRF, session fixation on the consent page, clickjacking.
+- A fake or replayed Google sign-in; one person's pairing used for another account.
+- The pairing code guessed or brute-forced through the consent form; the connector used as a proxy to an arbitrary address or to flood the relay or the device.
+
+**Mitigations in place**
+- The pairing is encrypted at rest (AES-256-GCM, `CONNECTOR_KEK`, bound to its account) and decrypted only inside its Durable Object for a valid token; never logged, never in a URL, never returned to Claude. Tokens, codes and nonces are random 256-bit values stored as SHA-256 hashes only.
+- Google sign-in uses authorization code with PKCE, `state` and `nonce`, scopes `openid email`; the ID token's RS256 signature (Google's JWKS), `iss`, `aud`, `exp`, `nonce` and `email_verified` are checked. One pairing per Google account.
+- Toward Claude the Worker is its own OAuth 2.1 server: PKCE S256 required, exact-match redirect URIs (Claude's two callbacks and loopback only), single-use authorization codes (10 minutes; a replay revokes what the first use minted), access tokens 1 hour, refresh tokens 30 days rotated on use with reuse detection, `/revoke`.
+- The consent page has no script, a strict CSP, `frame-ancestors 'none'`, a per-request nonce stored hashed, and a cookie bound to the starting browser; `state` is single use.
+- A pairing code is validated against the relay (token and a sealed ping) before it is stored; only the configured relay (plus operator-listed ones) is contacted; rate limits per client address, per pairing code and per account; 20-second call timeout; results capped at 100 KB.
+- Every result marks device content as untrusted data. Revoking, a device Reset pairing, or turning Remote access off deletes the stored pairing and all tokens; an unused pairing expires with its last refresh token.
+
+**Residual risks**
+- The operator of the connector, or whoever compromises it while holding `CONNECTOR_KEK`, is trusted with what a pairing allows. Run your own copy to avoid trusting the maintainer's.
+- The connector sees plaintext replies while a call is in flight and hands them to Claude; the prompt-injection marking reduces but cannot remove that risk.
+- A keeper who pastes a code into the consent page gives the connector access until the pairing is reset; there is still no per-client revocation on the device.
+- Each call registers a watcher on the device (up to 16, oldest dropped); a burst of calls can push out the keeper's other watching client until it watches again.
+- The device is not told when the connector's token is revoked; it only learns when the keeper resets the pairing.
+
 ### Trace export (OpenTelemetry)
 
 **Threats**

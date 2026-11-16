@@ -1,0 +1,32 @@
+# The Aive connector: a remote MCP server (Claude connectors) in front of a paired Aive device,
+# reached through the existing relay. Docs: docs/Connector.md.
+name = "aive-connector"
+main = "src/worker.js"
+compatibility_date = "2026-09-01"
+
+[vars]
+RELAY_URL = "https://aive-relay.hereliesaz.workers.dev"
+PUBLIC_BASE_URL = "https://aive-connector.hereliesaz.workers.dev"
+# Google OAuth client id (type Web application). Not a secret. Set your own before deploying.
+GOOGLE_CLIENT_ID = ""
+# The two Worker secrets are set with wrangler, never in this file (see README.md).
+
+[[durable_objects.bindings]]
+name = "ACCOUNTS"
+class_name = "Account"
+
+[[durable_objects.bindings]]
+name = "TXNS"
+class_name = "Txn"
+
+[[durable_objects.bindings]]
+name = "REGISTRY"
+class_name = "Registry"
+
+[[durable_objects.bindings]]
+name = "LIMITER"
+class_name = "Limiter"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Account", "Txn", "Registry", "Limiter"]

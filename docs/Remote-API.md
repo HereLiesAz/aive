@@ -151,6 +151,10 @@ A receiver silently drops (no reply) a frame whose tag or associated data does n
 
 The messages mean the same as the Messenger ones above, and run through the same code (`AiveRemoteHandler`, `AiveRemoteBridge`), so a prompt is never sent to an unlinked keyless provider on this path either. Relay-specific limits: a prompt over 500,000 UTF-8 bytes gets an `error`; at most 4 prompts run at once per host (more get an `error`); a reply that cannot fit in 600,000 bytes becomes an `error`. `watch` subscriptions last until the client's connection ends (the host keeps at most 16 watching clients). Run events are batched, as many as fit in about 256,000 bytes per `run_events` message, so a backlog does not trip the relay's frame-rate limit; a later `watch` without `events` stops them.
 
+### The Claude connector
+
+`connector/` is a second client of this protocol: a Worker that fronts a pairing for Claude's connectors (docs/Connector.md). It sends only `ping` and `watch`, so Claude can read the shown run and its Story but cannot launch, prompt or decide anything. Unlike the relay, **the connector holds the pairing (key included) encrypted at rest and reads plaintext while a call is in flight**, so a keeper who connects it trusts its operator with what a pairing code allows. Reset pairing or turning Remote access off ends its access, as for any client.
+
 ### Opt-in and the foreground service
 
 > **Availability.** The Android GitHub build has it: `REMOTE_ACCESS_AVAILABLE` is `true` in `androidApp/src/github`, whose manifest declares `AiveRelayHostService`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE` and `POST_NOTIFICATIONS`. The Google Play build has it off (`false` in `androidApp/src/play`), declares none of those, and shows a plain note under Keeper's room > This device instead of the setting; it needs the Play Console declaration below first. The default relay (`https://aive-relay.hereliesaz.workers.dev`) only works once the Worker in `relay/` is deployed; until then a keeper can enter their own relay under Advanced. See [Platform parity](Platform-Parity.md).
