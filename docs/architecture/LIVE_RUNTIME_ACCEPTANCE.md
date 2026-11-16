@@ -60,7 +60,7 @@ so publish it first, as CI does:
 
 AIVE_LIVE_RUNTIME_VERIFICATION=1 AIVE_LIVE_PROVIDER=llm7 AIVE_LIVE_HOSTED_MODEL=default \
   ./gradlew -Paive.useLocalH2g2=false -Paive.useMavenLocalH2g2=true \
-  :providers:llm:jsBrowserTest :providers:llm:wasmJsBrowserTest \
+  :providers:llm:wasmJsBrowserTest \
   --tests 'com.hereliesaz.geministrator.providers.llm.ProviderNeutralLiveRuntimeVerificationTest'
 ~~~
 
@@ -171,9 +171,9 @@ Build a development bundle (web builds resolve h2g2 from Maven Local, published 
 distribution together with the webpack output, and run:
 
 ~~~
-./gradlew :webApp:jsBrowserDevelopmentWebpack      # or :webApp:wasmJsBrowserDevelopmentWebpack
-mkdir site && cp -r webApp/build/processedResources/js/main/. site/ \
-  && cp -r webApp/build/kotlin-webpack/js/developmentExecutable/. site/
+./gradlew :webApp:wasmJsBrowserDevelopmentWebpack
+mkdir site && cp -r webApp/build/processedResources/wasmJs/main/. site/ \
+  && cp -r webApp/build/kotlin-webpack/wasmJs/developmentExecutable/. site/
 NODE_PATH=$(npm root -g) node tools/web_memory_banks/verify.mjs site
 ~~~
 

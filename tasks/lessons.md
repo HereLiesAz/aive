@@ -43,7 +43,7 @@ I listed five items as blocked ("waits on a model using it", "waits on hundreds 
 
 I wrote `toSortedMap()` in commonMain, twice, in two PRs. It compiles on the JVM and does not exist in Kotlin common, so the web build (`:shared:compileKotlinJs`) failed, and the first one was already merged into main. Desktop tests passing says nothing about JS or Wasm. I had even written "JS and Wasm compilation not checked locally" in a PR body and left it at that.
 
-- Before pushing any change under `commonMain`, run `./gradlew :shared:compileKotlinJs :shared:compileKotlinWasmJs` (without `--offline`: the web dependencies are not cached; the network allows them).
+- Before pushing any change under `commonMain`, run `./gradlew :shared:compileKotlinWasmJs` (without `--offline`: the web dependencies are not cached; the network allows them).
 - JVM-only calls to avoid in common code: `toSortedMap`, `toSortedSet`, `String.format`, anything under `java.`. Sort entries and rebuild an ordered map with `associate`.
 - A "not checked locally" line in a PR body is a task still to do, not a disclosure that finishes it.
 

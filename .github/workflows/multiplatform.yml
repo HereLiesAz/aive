@@ -677,7 +677,7 @@ jobs:
           migrate-legacy-build-releases: "true"
 
   # Standalone puppet-rig PWA until the full Aive browser app is connected.
-  # Deliberately independent of Android/Desktop/JS/Wasm build success.
+  # Deliberately independent of Android/Desktop/Wasm build success.
   deploy-pages:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest

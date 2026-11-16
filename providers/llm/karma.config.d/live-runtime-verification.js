@@ -1,4 +1,4 @@
-// Opt-in live acceptance for JS and Wasm browser tests (ProviderNeutralLiveRuntimeVerificationTest).
+// Opt-in live acceptance for Wasm browser tests (ProviderNeutralLiveRuntimeVerificationTest).
 //
 // A browser has no process environment, so the live-verification settings are copied from the
 // Gradle/Node environment into the Karma client configuration, where the test reads them from

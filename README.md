@@ -26,7 +26,7 @@ Swarm nodes may be performed by AI sources such as specialized model agents, LLM
 - `androidApp/` — Android launcher
 - `desktopApp/` — Desktop launcher
 - `cliApp/` — independent The Aive headless engine and command-line interface (no desktop process)
-- `webApp/` — browser launcher (includes `mesh-crypto.js`, the Web Crypto AES-GCM backend for `MeshCrypto` on JS/Wasm)
+- `webApp/` — browser launcher (includes `mesh-crypto.js`, the Web Crypto AES-GCM backend for `MeshCrypto` on Wasm)
 - `computeRelay/` — Ktor WebSocket relay server for [distributed compute](docs/architecture/DISTRIBUTED_COMPUTE.md)
 - `buildSrc/` — Gradle build logic for generating and verifying brand assets
 - `native/` — Rust native code: `bitcos/` (BITCOS ternary-weight runtime) and `djl-tokenizer/` (16 KB-aligned Android build of DJL's tokenizer JNI library)

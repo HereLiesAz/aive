@@ -8,7 +8,7 @@ Tracking issue: #35
 
 Decided 2026-10-12. Items outside this scope stay on this list as post-1.0 work; they do not block the release.
 
-- **Platform:** Android first. Desktop, JS and Wasm keep shipping preview builds and reach 1.0 in a later release.
+- **Platform:** Android first. Desktop and Wasm keep shipping preview builds and reach 1.0 in a later release.
 - **Local models:** 1.0 ships on the built-in rule-based orchestration and memory clerks plus the released Agent Router and Handoff Composer. The remaining orchestration roles, the trained memory clerks, BitNet and the optimization pipeline are post-1.0.
 - **Distributed compute:** not in the Google Play 1.0 build (the Compute destination is hidden there and This device says so). The Android GitHub build and desktop ship it; the web app cannot join a pool (browser limit). See [`docs/Platform-Parity.md`](docs/Platform-Parity.md).
 
@@ -60,8 +60,8 @@ A checked box means implemented and covered by automated tests. It does not mean
 - [x] Preserve retry-attempt artifact identity and deduplicate replayed provider artifacts.
 - [x] Replace whole-snapshot event rewrites with append-only Settings event journaling.
 - [x] Preserve reconstructable workflow-created events and strict approval-gate identity with legacy compatibility.
-- [x] Build JS and Wasm outputs in CI. Pages currently serves the standalone puppet-rig editor.
-- [ ] Reconnect the full Aive JS/Wasm PWA to GitHub Pages when ready.
+- [x] Build the Wasm output in CI (Wasm is the only web target). Pages currently serves the standalone puppet-rig editor.
+- [ ] Reconnect the full Aive Wasm PWA to GitHub Pages when ready.
 - [x] Add regression coverage for concurrency, approvals, escalation atomicity, persistence, transitions, artifacts, and GitHub dispatch correlation.
 - [x] Complete explicit on-device/on-runtime verification of launch → provider approval → execution → failure escalation → restart/resume → terminal outcome using real integrations.
   - Centralized run [36508417915](https://github.com/HereLiesAz/workflows/actions/runs/36508417915) passed against Kilo Gateway (no key) on 2026-09-29; JS and Wasm passed locally against LLM7 (see [`LIVE_RUNTIME_ACCEPTANCE.md`](docs/architecture/LIVE_RUNTIME_ACCEPTANCE.md)). No Android run is recorded yet.

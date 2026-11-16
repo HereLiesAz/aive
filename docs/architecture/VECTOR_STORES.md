@@ -1,6 +1,6 @@
 # Mobile vector stores
 
-On-device similarity search for the memory layer and the workflow agents. Pure Kotlin in `shared/src/commonMain/kotlin/com/hereliesaz/geministrator/vector/`, so Android, desktop, JS and Wasm run the same code with no native libraries.
+On-device similarity search for the memory layer and the workflow agents. Pure Kotlin in `shared/src/commonMain/kotlin/com/hereliesaz/geministrator/vector/`, so Android, desktop and Wasm run the same code with no native libraries.
 
 ## Indexes
 

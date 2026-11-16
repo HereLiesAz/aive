@@ -33,10 +33,6 @@ kotlin {
         }
     }
 
-    js {
-        browser()
-    }
-
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
         browser()
@@ -77,12 +73,6 @@ kotlin {
             }
         }
 
-        named("jsMain") {
-            dependencies {
-                implementation(libs.ktor.client.js)
-            }
-        }
-
         named("wasmJsMain") {
             dependencies {
                 implementation(libs.ktor.client.js)
@@ -93,13 +83,13 @@ kotlin {
 
 // :shared brings in Compose, whose Skiko JS module imports its runtime (skiko.mjs, skiko.wasm) when
 // the test bundle loads. The Compose plugin ships that runtime only for modules that apply it, so the
-// JS and Wasm browser tests here copy it next to their bundles, at the Skiko version :shared resolves.
+// Wasm browser tests here copy it next to their bundles, at the Skiko version :shared resolves.
 val skikoWasmRuntime = configurations.create("skikoWasmRuntime") {
     isCanBeConsumed = false
     isTransitive = false
 }
 skikoWasmRuntime.dependencies.addLater(
-    configurations.named("jsTestRuntimeClasspath").map { classpath ->
+    configurations.named("wasmJsTestRuntimeClasspath").map { classpath ->
         val skiko = classpath.incoming.resolutionResult.allComponents
             .mapNotNull { it.moduleVersion }
             .first { it.group == "org.jetbrains.skiko" && it.name.startsWith("skiko") }
@@ -111,9 +101,7 @@ val unpackSkikoRuntimeForBrowserTests = tasks.register<Sync>("unpackSkikoRuntime
     exclude("META-INF/**")
     into(layout.buildDirectory.dir("skiko-runtime-for-browser-tests"))
 }
-listOf("jsTestProcessResources", "wasmJsTestProcessResources").forEach { name ->
-    tasks.named<ProcessResources>(name) { from(unpackSkikoRuntimeForBrowserTests) }
-}
+tasks.named<ProcessResources>("wasmJsTestProcessResources") { from(unpackSkikoRuntimeForBrowserTests) }
 
 // The opt-in live acceptance test reads its settings from the environment, which Gradle does not
 // track. A live run must really run: never reuse an up-to-date or cached result for it.
