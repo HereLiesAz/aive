@@ -149,7 +149,7 @@ The messages mean the same as the Messenger ones above, and run through the same
 
 ### Opt-in and the foreground service
 
-> **Stubbed out.** Until IDEaz is released, `RemoteAccessController.AVAILABLE` is `false`: the setting is hidden, and the manifest omits `AiveRelayHostService`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE` and `POST_NOTIFICATIONS`, so no Play Console foreground-service declaration is needed. Re-enabling means flipping the flag and restoring those entries.
+> **Availability.** The Android GitHub build has it: `REMOTE_ACCESS_AVAILABLE` is `true` in `androidApp/src/github`, whose manifest declares `AiveRelayHostService`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE` and `POST_NOTIFICATIONS`. The Google Play build has it off (`false` in `androidApp/src/play`), declares none of those, and shows a plain note under Keeper's room > This device instead of the setting; it needs the Play Console declaration below first. The default relay (`https://aive-relay.hereliesaz.workers.dev`) only works once the Worker in `relay/` is deployed; until then a keeper can enter their own relay under Advanced. See [Platform parity](Platform-Parity.md).
 
 Remote access is off by default, in both Android flavors. **Settings → Remote Access** turns it on, with a relay URL field (HTTPS only; plain HTTP is accepted only for loopback) that can be edited while it is off. Turning it on creates the pairing, stores it (host token included) encrypted under the Android Keystore (`aive.remote-relay.pairing`, excluded from backup), shows the pairing code with Copy and Share buttons and a warning that anyone holding it can run prompts on the user's linked AI providers and start workflows, and starts `AiveRelayHostService`.
 
@@ -161,7 +161,7 @@ Android 13 and later ask for the notification permission when Remote access is t
 
 ### Release steps
 
-These apply only when relay access is re-enabled (`AVAILABLE` is `false` today, so the Play foreground-service declaration and the notification prompt below are not needed now).
+The Play foreground-service declaration applies only if `REMOTE_ACCESS_AVAILABLE` is turned on in the Play build (it is off there today). The GitHub build needs no Play step.
 
 - **Google Play Console.** The service uses the `specialUse` foreground service type, which needs a declaration under App content → Foreground service permissions: choose "Other" (special use), paste the subtype text from the manifest property `android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE`, describe the feature as above (opt-in, user-visible notification, encrypted link to the user's own app), and attach a short video of turning Remote access on. Without it a Play release that targets Android 14 or later is rejected.
 - **Cloudflare.** Deploy `relay/` (`cd relay && npx wrangler@4 deploy`) under the account whose workers.dev subdomain matches the default relay URL, or change `RelayProtocol.DEFAULT_RELAY_URL` to match.
