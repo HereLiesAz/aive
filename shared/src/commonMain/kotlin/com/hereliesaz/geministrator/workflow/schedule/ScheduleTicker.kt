@@ -50,10 +50,7 @@ class ScheduleTicker(
         saidUnreadable = false
         val at = now()
         val device = deviceUtcOffsetMinutes()
-        val schedules = store.all().map {
-            if (device == null || it.cadence.kind == ScheduleCadence.Kind.EveryHours) it
-            else it.copy(utcOffsetMinutes = device.coerceIn(-14 * 60, 14 * 60), daylightSaving = DaylightSaving.None)
-        }
+        val schedules = store.all().map { readAt(it, device) }
         val decision = decideSchedules(schedules, at, runActive = runActive())
         when (decision) {
             ScheduleDecision.Idle -> lastHold = null
@@ -67,14 +64,19 @@ class ScheduleTicker(
             }
             is ScheduleDecision.Start -> {
                 lastHold = null
-                return startDue(decision, at)
+                return startDue(decision, at, device)
             }
             is ScheduleDecision.Refused -> Unit
         }
         return decision
     }
 
-    private suspend fun startDue(decision: ScheduleDecision.Start, at: Long): ScheduleDecision {
+    /** A schedule's due time read at the device's own offset; an every-N-hours cadence has no hour of day, so it is left as stored. */
+    private fun readAt(schedule: WorkflowSchedule, device: Int?): WorkflowSchedule =
+        if (device == null || schedule.cadence.kind == ScheduleCadence.Kind.EveryHours) schedule
+        else schedule.copy(utcOffsetMinutes = device.coerceIn(-14 * 60, 14 * 60), daylightSaving = DaylightSaving.None)
+
+    private suspend fun startDue(decision: ScheduleDecision.Start, at: Long, device: Int?): ScheduleDecision {
         var schedule = decision.schedule
         // A schedule is bound to a hive's id, not its content: check the hive is still allowed and still the one that was scheduled.
         vet(schedule)?.let { vetting ->
@@ -94,7 +96,7 @@ class ScheduleTicker(
         // (by a second look, or another window sharing this storage) since it was read, it is not started again. A failed start
         // still counts as the slot's attempt, so it is not retried every look.
         val claimed = store.update(schedule.id) { current ->
-            if (current.lastStartedAtEpochMillis != schedule.lastStartedAtEpochMillis || !ScheduleClock.isDue(current, at)) {
+            if (current.lastStartedAtEpochMillis != schedule.lastStartedAtEpochMillis || !ScheduleClock.isDue(readAt(current, device), at)) {
                 null
             } else {
                 current.copy(lastStartedAtEpochMillis = at, lastNote = "Starting.", runNowRequested = false)
