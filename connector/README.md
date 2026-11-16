@@ -16,16 +16,14 @@ Plain Node (20 or later), no dependencies. The tests run the Worker against in-m
 ## Deploy
 
 1. Create a Google OAuth client (below) and put its id in `wrangler.toml` as `GOOGLE_CLIENT_ID`. Set `PUBLIC_BASE_URL` to the address the Worker is served at, with no trailing slash. `RELAY_URL` defaults to the standard relay; a pairing code that names a different relay is refused unless you list it in a comma-separated `EXTRA_RELAYS` variable.
-2. Set the two Worker secrets:
+2. Add the two Worker secrets to the central `HereLiesAz/workflows` repository (Settings > Secrets and variables > Actions): `CONNECTOR_KEK` and `GOOGLE_CLIENT_SECRET`. The central deploy sets them on the Worker after each deploy (the connector's `worker_secrets` profile). Make the key with:
 
    ~~~sh
-   cd connector
-   openssl rand -base64 32 | tr '+/' '-_' | tr -d '=' | npx wrangler@4 secret put CONNECTOR_KEK
-   npx wrangler@4 secret put GOOGLE_CLIENT_SECRET
+   openssl rand -base64 32 | tr '+/' '-_' | tr -d '='
    ~~~
 
    `CONNECTOR_KEK` is 32 random bytes, base64url; it encrypts every stored pairing. Losing or changing it makes stored pairings unreadable, and people have to connect again. Do not put either value in the repository.
-3. Deploy with `npx wrangler@4 deploy` (not `versions upload`, so the Durable Object migration is applied). A Workers Builds project for this repository must use `connector` as its root directory.
+3. A change under `connector/` that reaches main deploys it: `.github/workflows/connector-deploy.yml` is bound to the central Cloudflare Worker Deploy workflow, which runs the tests, then `wrangler deploy` (not `versions upload`, so the Durable Object migration is applied), then sets the two secrets. By hand, from `connector/`: `npx wrangler@4 deploy`, then `npx wrangler@4 secret put CONNECTOR_KEK` and `npx wrangler@4 secret put GOOGLE_CLIENT_SECRET`.
 
 ## Google Cloud Console
 

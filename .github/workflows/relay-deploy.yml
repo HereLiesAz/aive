@@ -1,0 +1,25 @@
+# Deploys the Aive remote relay (relay/) to Cloudflare. Bound centrally to
+# HereLiesAz/workflows' cloudflare-worker-deploy.yml, whose purpose profile points it at
+# relay/; the controller replaces this file with its tracker once registered.
+name: Deploy Aive Relay
+on:
+  push:
+    branches: [main]
+    paths:
+      - "relay/**"
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm test
+        working-directory: relay
+      - uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: relay
