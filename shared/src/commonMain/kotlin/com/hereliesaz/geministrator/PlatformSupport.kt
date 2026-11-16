@@ -13,7 +13,7 @@ internal expect fun normalizeNfc(text: String): String
 internal expect fun deviceUtcOffsetMinutes(): Int
 
 /**
- * True where this device is desktop-class: desktop itself, Android in desktop mode or on a tablet (the shortest side of the
+ * True where this device is desktop-class: desktop itself, Android on a tablet or a Chromebook (the shortest side of the
  * screen at least 720dp), and the web app (PWA) on a desktop or a tablet (the shortest side of the screen at least 720 px). Such
  * a device gets the wide layouts from [ControlRoomBreakpoints.DesktopWide] up; a phone, from [ControlRoomBreakpoints.PhoneWide].
  */
