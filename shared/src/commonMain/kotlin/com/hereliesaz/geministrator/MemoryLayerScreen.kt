@@ -177,10 +177,6 @@ import org.jetbrains.compose.resources.getString
 import com.hereliesaz.geministrator.resources.memory_check_values
 import com.hereliesaz.geministrator.resources.memory_default_provider
 import com.hereliesaz.geministrator.resources.memory_give_reason
-import com.hereliesaz.geministrator.resources.memory_legacy_backup_delete
-import com.hereliesaz.geministrator.resources.memory_legacy_backup_note
-import com.hereliesaz.geministrator.resources.memory_legacy_deleted
-import com.hereliesaz.geministrator.resources.memory_legacy_not_deleted
 import com.hereliesaz.geministrator.resources.memory_not_applied
 import com.hereliesaz.geministrator.resources.memory_not_deleted
 import com.hereliesaz.geministrator.resources.memory_not_expanded
@@ -777,24 +773,6 @@ private fun DataSection(controller: MemoryLayerController) {
             }
             AzphaltPill(stringResource(Res.string.common_cancel), "memory-import-cancel", onClick = { importDraft = null })
         }
-    }
-
-    val legacyOffered by controller.legacyBackupOffered.collectAsState()
-    if (legacyOffered) {
-        Text(
-            stringResource(Res.string.memory_legacy_backup_note),
-            style = AzphaltType.body,
-            color = azphaltOnSurface(),
-        )
-        AzphaltPill(stringResource(Res.string.memory_legacy_backup_delete), "memory-legacy-delete", onClick = {
-            scope.launch {
-                message = runCatching { controller.deleteLegacyBackup() }
-                    .fold(
-                        { getString(if (it) Res.string.memory_legacy_deleted else Res.string.memory_legacy_not_deleted) },
-                        { getString(Res.string.memory_not_deleted, it.message ?: getString(Res.string.memory_unknown_error)) },
-                    )
-            }
-        }, tone = PillTone.Danger, modifier = Modifier.fillMaxWidth())
     }
 
     if (!clearConfirm) {

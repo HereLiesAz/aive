@@ -40,13 +40,8 @@ import org.jetbrains.compose.resources.stringResource
 
 private const val HALL_MONITOR_TRIAL_DESCRIPTION_PREFIX = "Isolated Nanny counterfactual"
 
-/** Trials saved before the Nanny rename carry the old words in their stored description; they still match. */
-private const val LEGACY_HALL_MONITOR_TRIAL_DESCRIPTION_PREFIX = "Isolated Hall Monitor counterfactual"
-
 internal fun isHallMonitorTrial(presentation: LiveWorkflowPresentation): Boolean =
-    presentation.definition.description?.let {
-        it.startsWith(HALL_MONITOR_TRIAL_DESCRIPTION_PREFIX) || it.startsWith(LEGACY_HALL_MONITOR_TRIAL_DESCRIPTION_PREFIX)
-    } == true
+    presentation.definition.description?.startsWith(HALL_MONITOR_TRIAL_DESCRIPTION_PREFIX) == true
 
 /** The detail of Messages' freeze row: the Nanny's report, its solutions, and the keeper's review. */
 @Composable

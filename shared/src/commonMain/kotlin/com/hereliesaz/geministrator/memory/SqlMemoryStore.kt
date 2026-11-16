@@ -108,20 +108,6 @@ class SqlMemoryStore(
 
     suspend fun clear() = replace(MemorySnapshot())
 
-    /**
-     * Moves an older [SettingsMemoryStore] into this database once: only when this database has never
-     * been written and the legacy store holds something. The legacy keys are cleared afterwards.
-     */
-    suspend fun importLegacy(legacy: SettingsMemoryStore): Boolean {
-        val empty = mutex.withLock { queries.revision().awaitAsOneOrNull() == null }
-        if (!empty) return false
-        val snapshot = legacy.read()
-        if (snapshot.revision == 0L && snapshot.episodes.isEmpty()) return false
-        replace(snapshot)
-        legacy.clear()
-        return true
-    }
-
     private suspend fun loadUnlocked(): MemorySnapshot {
         cached?.let { return it }
         val snapshot = try {

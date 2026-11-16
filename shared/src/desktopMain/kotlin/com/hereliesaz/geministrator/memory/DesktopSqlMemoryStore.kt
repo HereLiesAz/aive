@@ -6,7 +6,7 @@ import com.hereliesaz.geministrator.memory.db.MemoryDatabase
 import java.io.File
 import java.util.Properties
 
-/** Opens (creating or migrating) the desktop memory database; `null` [file] means in-memory. */
+/** Opens (creating or upgrading) the desktop memory database; `null` [file] means in-memory. */
 fun desktopSqlMemoryStore(
     file: File? = File(System.getProperty("user.home"), ".aive/memory/memory.db"),
     allowExternalReferences: Boolean = false,
@@ -16,40 +16,13 @@ fun desktopSqlMemoryStore(
     return SqlMemoryStore(JdbcSqliteDriver(url, Properties(), MemoryDatabase.Schema.synchronous()), allowExternalReferences = allowExternalReferences)
 }
 
-/** The old shared database and its SQLite sidecar files, for deletion once the split into banks is verified. */
-class DesktopLegacyMemoryBackup(private val legacyFile: File) : LegacyMemoryBackup {
-    override suspend fun present(): Boolean = legacyFile.exists()
-
-    override suspend fun delete() {
-        listOf("", "-wal", "-shm", "-journal").forEach { suffix ->
-            val file = File(legacyFile.path + suffix)
-            if (file.exists() && !file.delete()) error("Could not delete ${file.name}")
-        }
-    }
-}
-
-/**
- * Every workflow's memory bank on desktop: one SQLite database per workflow run under
- * [directory]/banks. The old shared database ([legacyFile]) is split into workflow banks once
- * ([migrateSharedMemoryToBanks]) and then left untouched as the backup.
- */
-suspend fun desktopSqlMemoryBanks(
-    lineage: MemoryLineage,
+/** Every workflow's memory bank on desktop: one SQLite database per workflow run under [directory]/banks. */
+fun desktopSqlMemoryBanks(
     directory: File = File(System.getProperty("user.home"), ".aive/memory"),
-    legacyFile: File = File(directory, "memory.db"),
     settings: com.russhwolf.settings.Settings = com.russhwolf.settings.Settings(),
-): MemoryBanks {
-    val banks = MemoryBanks(
-        openBank = { workflowId ->
-            desktopSqlMemoryStore(File(directory, "banks/${memoryBankFileStem(workflowId)}.db"), allowExternalReferences = true)
-        },
-        registry = SettingsMemoryBankRegistry(settings),
-    )
-    if (legacyFile.exists()) {
-        val report = migrateSharedMemoryToBanks(desktopSqlMemoryStore(legacyFile), banks, lineage)
-        if (report != null && report.excluded.isNotEmpty()) {
-            println("Aive memory: ${report.excluded.size} records drawn from several workflows kept only in ${legacyFile.name} (see the migration report)")
-        }
-    }
-    return banks
-}
+): MemoryBanks = MemoryBanks(
+    openBank = { workflowId ->
+        desktopSqlMemoryStore(File(directory, "banks/${memoryBankFileStem(workflowId)}.db"), allowExternalReferences = true)
+    },
+    registry = SettingsMemoryBankRegistry(settings),
+)

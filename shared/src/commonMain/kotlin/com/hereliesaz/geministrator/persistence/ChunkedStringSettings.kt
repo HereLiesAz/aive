@@ -53,7 +53,7 @@ internal class ChunkedStringSettings(
             delegate.putString(chunkKey(key, generation, index), chunk)
         }
         delegate.putString(manifestKey(key), "$generation:${chunks.size}")
-        delegate.remove(key) // Remove a legacy single-value snapshot after successful migration.
+        delegate.remove(key) // A plain value left from when this key was small is superseded by the chunks.
 
         previous?.let { old ->
             repeat(old.chunkCount) { index ->

@@ -75,11 +75,5 @@ internal object CredentialTool {
      */
     fun isSafeAccountId(id: String): Boolean = SAFE_ACCOUNT_ID.matches(id)
 
-    /** Deletes a legacy Windows Credential Manager entry: `cmdkey` itself, with the target as one argument. */
-    fun windowsCredentialDeleteCommand(service: String, account: String): List<String> {
-        require(isSafeAccountId(account)) { "Unsupported credential account id" }
-        return listOf("cmdkey", "/delete:$service/$account")
-    }
-
     private val SAFE_ACCOUNT_ID = Regex("[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
 }

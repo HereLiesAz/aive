@@ -1,6 +1,5 @@
 package com.hereliesaz.geministrator
 
-import com.hereliesaz.geministrator.inference.resolveReleaseAssetUrl
 import io.ktor.client.HttpClient
 import io.ktor.client.request.prepareGet
 import io.ktor.client.request.header
@@ -87,8 +86,6 @@ internal class DesktopResumableFileDownloader(
             partial.delete()
         }
 
-        // The catalog names assets with the current prefix; an asset still published under its old name is found here.
-        val sourceUrl = resolveReleaseAssetUrl(httpClient, url)
         var lastFailure: Throwable? = null
         var knownTotal = expectedSize
 
@@ -98,7 +95,7 @@ internal class DesktopResumableFileDownloader(
                 // prepareGet/execute streams the body; a plain get() would buffer the whole
                 // asset (hundreds of MB) in memory before the first byte reaches the file.
                 var alreadyComplete = false
-                httpClient.prepareGet(sourceUrl) {
+                httpClient.prepareGet(url) {
                     if (requestedOffset > 0L) {
                         header(HttpHeaders.Range, "bytes=$requestedOffset-")
                     }

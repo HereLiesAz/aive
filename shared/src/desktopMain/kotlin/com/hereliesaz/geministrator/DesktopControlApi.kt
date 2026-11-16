@@ -33,7 +33,7 @@ class DesktopControlApi(
     val dir: File = defaultDir(),
     /** The configured port; 0 picks a free one (tests). */
     val port: Int = configuredPort(),
-    preferencesNode: () -> Preferences = { LegacyDesktopNames.currentPreferencesNode(PREFERENCES_NODE) },
+    preferencesNode: () -> Preferences = { Preferences.userRoot().node(PREFERENCES_NODE) },
 ) {
     private val preferences by lazy(preferencesNode)
     private val hostRef = AtomicReference<ControlHost?>(null)

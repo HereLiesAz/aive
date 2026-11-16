@@ -32,7 +32,7 @@ class A2aServerSettingTest {
 
     @Test
     fun anExistingInstallThatTurnedItOffStaysOff() {
-        // Older builds wrote the key only when the keeper pressed the switch.
+        // The key is written only when the keeper pressed the switch.
         assertFalse(a2aServerEnabled(parseA2aServerChoice("false")))
     }
 

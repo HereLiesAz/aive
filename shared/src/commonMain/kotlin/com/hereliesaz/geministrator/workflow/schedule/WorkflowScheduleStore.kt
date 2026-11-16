@@ -43,8 +43,8 @@ class SettingsWorkflowScheduleStore(
     settings: Settings = Settings(),
     private val storageKey: String = DEFAULT_KEY,
 ) : WorkflowScheduleStore {
-    // Desktop's Preferences reject a value over 8,192 characters, which a long schedule list passes: chunk it. A plain
-    // value an older build wrote is still read, and replaced by the next write.
+    // Desktop's Preferences reject a value over 8,192 characters, which a long schedule list passes: chunk it. A value
+    // short enough to stay plain is read as it is.
     private val settings: Settings = ChunkedStringSettings(settings, setOf(storageKey, "$storageKey.corrupt"), onlyWhenLarge = true)
     private val mutex = Mutex()
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }

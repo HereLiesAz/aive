@@ -69,15 +69,6 @@ internal class PromptHistoryStore(
         const val ENABLED_KEY: String = "prompts.v1.enabled"
 
         fun keyOf(kind: PromptKind): String = "prompts.v1.${kind.key}"
-
-        /** Moves remembered text kept with the other interface drafts into [target], once; [legacy] is emptied of it. */
-        internal fun moveLegacyInto(target: DurableUiStateStore, legacy: DurableUiStateStore) {
-            (listOf(ENABLED_KEY) + PromptKind.entries.map { keyOf(it) }).forEach { key ->
-                val old = legacy.getString(key) ?: return@forEach
-                if (target.getString(key) == null) target.putString(key, old)
-                legacy.remove(key)
-            }
-        }
     }
 }
 
@@ -85,13 +76,7 @@ internal class PromptHistoryStore(
 internal object PromptHistory {
     val store: PromptHistoryStore by lazy {
         val own = RememberedTextSettings.separate
-        if (own == null) {
-            PromptHistoryStore()
-        } else {
-            val target = DurableUiStateStore(own)
-            PromptHistoryStore.moveLegacyInto(target, DurableUiState.store)
-            PromptHistoryStore(target)
-        }
+        if (own == null) PromptHistoryStore() else PromptHistoryStore(DurableUiStateStore(own))
     }
 }
 

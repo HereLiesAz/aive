@@ -1,6 +1,5 @@
 package com.hereliesaz.geministrator
 
-import com.hereliesaz.geministrator.inference.publishedReleaseAssetName
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import com.hereliesaz.geministrator.net.boundedBodyText
@@ -33,8 +32,6 @@ internal object DesktopPlannerModel {
     const val RELEASE_API_URL = "https://api.github.com/repos/HereLiesAz/aive/releases/tags/orchestration-layer-epoch8"
     const val ARCHIVE_NAME = "aive-orch_planner-int8-epoch8.tar.gz"
 
-    /** Legacy input name: the archive is still published on the release under its previous name until republished. */
-    val PUBLISHED_ARCHIVE_NAME: String = requireNotNull(publishedReleaseAssetName(ARCHIVE_NAME))
     const val RUNTIME_ARTIFACT_ID = "orchestration:epoch8:planner:int8"
     const val QUANTIZATION = "int8"
 
@@ -84,12 +81,8 @@ internal class DesktopPlannerModelInstaller(
             val assets = loadReleaseAssets()
             // Only "<archive>.part001"-style assets; the release also carries "<archive>.parts.json"
             // and per-part ".sha256" files, which must not be joined into the archive.
-            fun partPatternFor(archiveName: String) = Regex(Regex.escape(archiveName) + """\.part\d+""")
-            // Prefer the current asset name; fall back to the name the release was first published under.
-            val archiveName = listOf(DesktopPlannerModel.ARCHIVE_NAME, DesktopPlannerModel.PUBLISHED_ARCHIVE_NAME)
-                .firstOrNull { candidate -> assets.any { partPatternFor(candidate).matches(it.name) } }
-                ?: DesktopPlannerModel.ARCHIVE_NAME
-            val partPattern = partPatternFor(archiveName)
+            val archiveName = DesktopPlannerModel.ARCHIVE_NAME
+            val partPattern = Regex(Regex.escape(archiveName) + """\.part\d+""")
             val parts = assets
                 .filter { partPattern.matches(it.name) }
                 .sortedBy(ReleaseAsset::name)

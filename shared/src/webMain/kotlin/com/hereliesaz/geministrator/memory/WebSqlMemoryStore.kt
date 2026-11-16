@@ -16,8 +16,8 @@ private const val OPFS_UNAVAILABLE = "OPFS_UNAVAILABLE"
 private const val OPEN_TIMEOUT_MILLIS = 20_000L
 
 /**
- * Opens the browser memory database: SQLite persisted in OPFS, created or migrated through
- * `PRAGMA user_version`, with the old Settings log imported once.
+ * Opens the browser memory database: SQLite persisted in OPFS, created or upgraded through
+ * `PRAGMA user_version`.
  *
  * Without OPFS the Settings store is kept. Any other failure (typically another tab holding the
  * database) gives session-only memory rather than a second, diverging persistent copy. [onFallback]
@@ -29,7 +29,7 @@ suspend fun openWebMemoryStore(onFallback: (String) -> Unit = {}, workerName: St
     return try {
         withTimeout(OPEN_TIMEOUT_MILLIS) {
             migrate(driver)
-            SqlMemoryStore(driver, allowExternalReferences = bank).also { if (!bank) it.importLegacy(SettingsMemoryStore.createDefault()) }
+            SqlMemoryStore(driver, allowExternalReferences = bank)
         }
     } catch (failure: Exception) {
         if (failure is CancellationException && failure !is TimeoutCancellationException) throw failure
@@ -46,19 +46,12 @@ suspend fun openWebMemoryStore(onFallback: (String) -> Unit = {}, workerName: St
 
 /**
  * Every workflow's memory bank in the browser: each workflow's bank is its own OPFS database on its
- * own worker (Settings keys of its own without OPFS). The old shared database is split into workflow
- * banks once and then left untouched as the backup.
+ * own worker (Settings keys of its own without OPFS).
  */
-suspend fun openWebMemoryBanks(lineage: MemoryLineage, onFallback: (String) -> Unit = {}): MemoryBanks {
-    val banks = MemoryBanks(
-        openBank = { workflowId -> openWebMemoryStore(onFallback, "bank-${memoryBankFileStem(workflowId)}") },
-        registry = SettingsMemoryBankRegistry(Settings()),
-    )
-    if (banks.migrationState.migrationReport() == null) {
-        migrateSharedMemoryToBanks(openWebMemoryStore(onFallback), banks, lineage)
-    }
-    return banks
-}
+fun openWebMemoryBanks(onFallback: (String) -> Unit = {}): MemoryBanks = MemoryBanks(
+    openBank = { workflowId -> openWebMemoryStore(onFallback, "bank-${memoryBankFileStem(workflowId)}") },
+    registry = SettingsMemoryBankRegistry(Settings()),
+)
 
 private suspend fun migrate(driver: SqlDriver) {
     val schema = MemoryDatabase.Schema

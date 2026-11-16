@@ -1154,7 +1154,7 @@ private fun MemorySnapshot.condensationClusters(
         .filter { it.relation == MemoryRelationKind.CondensedFrom }
         .mapTo(hashSetOf()) { it.to }
     val divergent = edges
-        .filter { it.relation == MemoryRelationKind.Diverges || it.relation == MemoryRelationKind.ConflictsWith }
+        .filter { it.relation == MemoryRelationKind.Diverges }
         .flatMap { listOf(it.from to it.to, it.to to it.from) }
         .groupBy({ it.first }, { it.second })
         .mapValues { (_, partners) -> partners.toHashSet() }

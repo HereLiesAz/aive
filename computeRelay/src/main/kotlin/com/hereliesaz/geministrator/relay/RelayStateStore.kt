@@ -107,14 +107,6 @@ class EncryptedFileRelayStateStore(
         "AES",
     )
 
-    /** The pre-salt key: files written by earlier versions still load, and are rewritten under [key]. */
-    private val legacyKey = SecretKeySpec(
-        MessageDigest.getInstance("SHA-256").digest(
-            ("aive-compute-relay-state-v1\u0000" + relayToken).toByteArray(StandardCharsets.UTF_8),
-        ),
-        "AES",
-    )
-
     private fun loadOrCreateSalt(): ByteArray {
         val path = directory.resolve(SALT_FILE)
         if (Files.exists(path)) {
@@ -168,15 +160,7 @@ class EncryptedFileRelayStateStore(
         }
         val nonce = bytes.copyOfRange(MAGIC.size, MAGIC.size + NONCE_BYTES)
         val ciphertext = bytes.copyOfRange(MAGIC.size + NONCE_BYTES, bytes.size)
-        return try {
-            cipher(Cipher.DECRYPT_MODE, nonce, associatedData, key).doFinal(ciphertext)
-        } catch (current: javax.crypto.AEADBadTagException) {
-            try {
-                cipher(Cipher.DECRYPT_MODE, nonce, associatedData, legacyKey).doFinal(ciphertext)
-            } catch (_: javax.crypto.AEADBadTagException) {
-                throw current
-            }
-        }
+        return cipher(Cipher.DECRYPT_MODE, nonce, associatedData, key).doFinal(ciphertext)
     }
 
     override fun save(poolId: String, leases: List<PersistedRelayLease>) {

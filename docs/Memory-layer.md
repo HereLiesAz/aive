@@ -67,13 +67,11 @@ If source material explicitly contains such a judgment, a clerk may preserve tha
 
 There is no memory-layer `ConflictResolver` role.
 
-`AssociationLinker` may emit only semantic relatedness such as `SimilarTo` and `AssociatedWith`. It must never infer or emit `ConflictsWith`.
+`AssociationLinker` may emit only semantic relatedness such as `SimilarTo` and `AssociatedWith`. It must never infer or emit a divergence.
 
-No model-backed clerk may write `Supersedes`, `ResolvesConflict` or `ConflictsWith`: they are not in
-the relation list any model prompt offers (`MODEL_WRITABLE_RELATIONS`), and both model decoders
-(`StructuredMemoryMicroAgent`, `TextGenerationMemoryManagerAgent`) reject an answer that uses them, or
-the engine-owned kinds below. `ConflictsWith` and `ResolvesConflict` remain only so older stored
-graphs still load; nothing writes them.
+No model-backed clerk may write `Supersedes`: it is not in the relation list any model prompt offers
+(`MODEL_WRITABLE_RELATIONS`), and both model decoders (`StructuredMemoryMicroAgent`,
+`TextGenerationMemoryManagerAgent`) reject an answer that uses it, or the engine-owned kinds below.
 
 The engine enforces the boundary; it does not trust a clerk to keep it. Whatever runs a stage
 (programmatic, local model, hosted provider), `MemoryConsolidator` validates the answer in code:
@@ -143,7 +141,7 @@ the same for every clerk engine, and none of it judges which memory is right.
   episodes. It is add-only and keyed by content, so writing it twice is a no-op. Read it with
   `MemorySnapshot.variantRegister()`. Nothing in it is ranked as correct.
 - **Recall unit**: every recall result with an unresolved divergence carries its divergent partners
-  (`MemoryRecallHit.conflicts`, from `Diverges` and legacy `ConflictsWith`) and any deliberations about
+  (`MemoryRecallHit.conflicts`, from `Diverges`) and any deliberations about
   them, including partners that are superseded, out of the query's scope or did not match. Ranking, the result budget, the
   attention dial and prompt rendering all handle a hit and its partners as one item; rendering adds
   whole units only and never cuts one in two. Surfacing is on by default (`includeConflicts = true`).
@@ -433,17 +431,6 @@ the episode keeps a tombstone (`MemoryEpisode.purged`: what, when, why, and whos
 still waiting for consolidation are never purged. Consolidated and current memories, their time
 ranges and occurrence counts never depend on raw history surviving and are never touched.
 
-### The one-time split of the old shared store
-
-Earlier versions kept one shared store. On first start the platform splits it into workflow banks
-(`migrateSharedMemoryToBanks`): each episode goes to its workflow run's bank (a session outside any
-run becomes its own root workflow), each memory with its source episodes and tagged with that
-workflow, each edge only where both ends are. The old store records no continuation or merge, so every
-migrated workflow starts as a root; project membership comes from the episodes' project ids. Anything
-drawn from several workflows is placed in no bank and listed in the migration report. The split is
-deterministic, idempotent and crash-safe (each bank is written whole, then verified, and only then is
-the report recorded), and the old store is left untouched as the backup.
-
 ### Hardening of the memory layer (F9)
 
 - **Condensation is checked after it is fitted.** A condensed memory is cut to its size limit by weight;
@@ -462,9 +449,6 @@ the report recorded), and the old store is left untouched as the backup.
   "Memory timeline", "Recalled on request") and the memory protocol say the text is untrusted data, not instructions.
 - **The memory marker is not an opt-out.** Only the exact text memory sent into a session (`noteIssued`) is
   skipped when echoed; an agent message that merely starts with the marker is banked.
-- **The old shared store can be deleted once it is split.** After the split is verified and its report
-  recorded, the Memory screen offers **Delete the old memory backup** (`LegacyMemoryBackup`); the file is
-  outside retention, Forget and Forget everything, and records listed as excluded exist only in it.
 - **Bounded reads at task start.** The lineage log is decoded when its stored text changes, recall reads the
   newest 12 sibling banks (`MemoryLineage.MAX_READ_ONLY_NEIGHBOURS`), and habit formation reads each bank's
   newest 1000 receipts. The stored lineage and receipts are still add-only.
@@ -539,7 +523,7 @@ hit shows its tree levels ([GRIP](architecture/GRIP.md#summary-tree-levels-and-p
 ### Pair summaries (one per link)
 
 Every link created between two memories — semantic and mechanical associations (`SimilarTo`,
-`AssociatedWith`, co-recall links included), divergence (`Diverges`, legacy `ConflictsWith`) and
+`AssociatedWith`, co-recall links included), divergence (`Diverges`) and
 `CondensedFrom` — gets a summary of the two memories together (`MemoryPairSummaries`): a
 `MemoryNodeKind.PairSummary` node with id `pair:<edge id>` and `pairOf` = the edge id (edges are
 immutable, so the summary is attached by id rather than written into the edge). Tree, ladder

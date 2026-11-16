@@ -225,7 +225,7 @@ class MemoryContrastRegisterTest {
             ),
             instruction = "associate",
         )
-        listOf("Supersedes", "ResolvesConflict", "ConflictsWith", "Diverges").forEach { relation ->
+        listOf("Supersedes", "Diverges").forEach { relation ->
             val agent = StructuredMemoryMicroAgent(
                 role = MemoryMicroAgentRole.CondensationRewriter,
                 model = MemoryMicroAgentModelSpec("portable-memory"),
@@ -235,7 +235,6 @@ class MemoryContrastRegisterTest {
             assertFailsWith<IllegalArgumentException>(relation) { agent.process(packet) }
         }
         assertFalse(MemoryRelationKind.Supersedes in MODEL_WRITABLE_RELATIONS)
-        assertFalse(MemoryRelationKind.ResolvesConflict in MODEL_WRITABLE_RELATIONS)
     }
 
     @Test

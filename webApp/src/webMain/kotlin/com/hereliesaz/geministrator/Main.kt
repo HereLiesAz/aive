@@ -64,7 +64,7 @@ private fun prefersReducedMotion(): Boolean =
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
     AzphaltMotion.platformReduceMotion = shouldReduceMotion(animatorDurationScale = null, systemPrefersReduced = prefersReducedMotion())
-    // Memory in SQLite persisted in OPFS (opened in a worker; the old Settings log is imported once).
+    // Memory in SQLite persisted in OPFS (opened in a worker).
     // Programmatic stages by default; attached before App builds the runtime.
     val memoryEngines = HostedMemoryEngineProvider(MemoryMicroAgentPlatform.Web)
     val memoryScope = MainScope()
@@ -73,8 +73,7 @@ fun main() {
     // Dev-only: null unless on localhost with ?aiveMemoryDebug=… (see WebMemoryDebugHook).
     val memoryDebug = WebMemoryDebugHook.fromLocation(window.location.hostname, window.location.search)
     val memoryBanks = memoryScope.async {
-        memoryDebug?.beforeBanksOpen()
-        openWebMemoryBanks(memoryLineage) { reason -> println("Aive memory: SQLite unavailable ($reason)") }
+        openWebMemoryBanks { reason -> println("Aive memory: SQLite unavailable ($reason)") }
             .also { banks -> memoryDebug?.afterBanksOpen(banks) }
     }
     val memoryLayer = MemoryLayerController(
@@ -350,16 +349,14 @@ internal fun configuredWebRepositoryDiscovery(
 }
 
 private suspend fun readWebProviderCredentials(): Map<String, String> = buildMap {
-    // Providers the app no longer supports leave no credential behind ("aive.julesApiKey" included).
-    ProviderCatalog.RETIRED_PROVIDER_IDS.forEach { WebCredentialStore.remove(providerStorageKey(it)) }
     ProviderCatalog.entries.forEach { entry ->
-        WebCredentialStore.readMigrating(providerStorageKey(entry.id))?.let { put(entry.id, it) }
+        WebCredentialStore.read(providerStorageKey(entry.id))?.let { put(entry.id, it) }
     }
 }
 
 private suspend fun readWebRepositoryCredentials(): Map<String, String> = buildMap {
     RepositoryServiceCatalog.entries.forEach { entry ->
-        WebCredentialStore.readMigrating(repositoryStorageKey(entry.id))?.let { put(entry.id, it) }
+        WebCredentialStore.read(repositoryStorageKey(entry.id))?.let { put(entry.id, it) }
     }
 }
 

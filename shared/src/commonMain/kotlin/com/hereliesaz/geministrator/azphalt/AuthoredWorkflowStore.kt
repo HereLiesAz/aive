@@ -1,6 +1,5 @@
 package com.hereliesaz.geministrator.azphalt
 
-import com.hereliesaz.geministrator.persistence.migrateLegacyKey
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.sync.Mutex
@@ -17,10 +16,6 @@ class SettingsAuthoredWorkflowStore(
     private val storageKey: String = DEFAULT_STORAGE_KEY,
 ) : AuthoredWorkflowStore {
     private val mutex = Mutex()
-
-    init {
-        settings.migrateLegacyKey(storageKey)
-    }
 
     override suspend fun all(): Set<WorkflowDefinitionId> = mutex.withLock {
         settings.getStringOrNull(storageKey)

@@ -8,7 +8,7 @@ The engine therefore treats durable workflow state as a first-class product requ
 
 ## Current backend
 
-`SqlWorkflowPersistence` is the workflow store on Android (`aive-workflows.db`) and desktop (`~/.aive/workflows.db`): one SQLite row per project, definition, run, event, role, artifact and approval gate (`shared/src/commonMain/sqldelight-workflow`), so a write touches only the rows it changes. Rows hold the same JSON as the Settings snapshot below, so whole-store export/import and `.ive` project files are identical across backends (`PersistenceSnapshots.kt`). On first use it moves any Settings-stored state in once, writes a JSON backup of it beside the database, and clears the Settings copy (`LegacySettingsMigration`). `WorkflowPersistenceFactory.durable` is the one instance per process; on Android, `AndroidWorkflowPersistence.install(context)` must run first (MainActivity does). A row that cannot be decoded is quarantined rather than reported as store-wide corruption: reads skip it, its payload is kept in the `meta` table under a `quarantine:` key, and `SqlWorkflowPersistence.quarantinedRecords` lists it, so one bad row never leads to `recoverFromCorruption()` clearing every record.
+`SqlWorkflowPersistence` is the workflow store on Android (`aive-workflows.db`) and desktop (`~/.aive/workflows.db`): one SQLite row per project, definition, run, event, role, artifact and approval gate (`shared/src/commonMain/sqldelight-workflow`), so a write touches only the rows it changes. Rows hold the same JSON as the Settings snapshot below, so whole-store export/import and `.ive` project files are identical across backends (`PersistenceSnapshots.kt`). `WorkflowPersistenceFactory.durable` is the one instance per process; on Android, `AndroidWorkflowPersistence.install(context)` must run first (MainActivity does). A row that cannot be decoded is quarantined rather than reported as store-wide corruption: reads skip it, its payload is kept in the `meta` table under a `quarantine:` key, and `SqlWorkflowPersistence.quarantinedRecords` lists it, so one bad row never leads to `recoverFromCorruption()` clearing every record.
 
 `SettingsWorkflowPersistence` remains the web (JS/Wasm) store, which is a preview for 1.0. It stores a versioned serialized workflow snapshot through Multiplatform Settings. Snapshot values are generation-chunked so JVM Java Preferences never receives an oversized value. Workflow events appended during normal operation use a per-run settings journal so event growth does not force the entire snapshot to be deserialized and rewritten for every event. Journal run namespaces use bounded deterministic tokens, and individual event payloads use the same generation-chunked storage.
 
@@ -83,10 +83,8 @@ This feature supplies account authorization, not a new Pollinations inference ba
 It does not authorize other providers, and it does not convert consumer Google sign-in
 into an external provider API token.
 
-A rename of a persistence key ships with a read-old/write-new migration. Settings keys that older builds
-wrote with the earlier `haive.` prefix are moved to the matching `aive.` key, once, when their store is
-first opened (`persistence/LegacySettingsKeyMigration.kt`); setup files exported by older builds are
-still accepted on import. `geministrator.*` keys remain valid storage names.
+Settings keys use the `aive.` prefix; `geministrator.*` keys remain valid storage names. Only the current
+key names are read.
 
 ## Portable `.ive` project files
 
@@ -112,8 +110,7 @@ project is reopened.
 Android application IDs define the application sandbox. Changing the application ID is not a
 rename; Android installs a different application with different preferences and Keystore access.
 
-Both flavors use `com.hereliesaz.aive`, the Play package identity. GitHub-release installs made under
-the earlier application ID are a different application and do not upgrade in place or share its data.
+Both flavors use `com.hereliesaz.aive`, the Play package identity.
 
 Future branding work must not change this ID. The GitHub flavor may update itself from GitHub
 Releases and therefore requests package-install permission only in the GitHub manifest. The Play
@@ -190,7 +187,7 @@ Schema `3` makes retained artifact identity retry-safe. Legacy provider and GitH
 
 A successful migration is written back immediately at the current schema version instead of existing only in memory until some unrelated later write. Readers reject snapshots created by a newer unsupported schema and leave the stored bytes untouched. Any future incompatible schema change likewise requires an explicit migration path rather than silent reinterpretation or replacement with an empty snapshot.
 
-The current storage key is `geministrator.workflow.persistence.v2`. The previous `geministrator.workflow.persistence.v1` key remains a read fallback: when legacy data is found there, it is migrated, written to the current key, and the legacy key is retired.
+The current storage key is `geministrator.workflow.persistence.v2`.
 
 ## Scale boundary
 
@@ -210,4 +207,4 @@ See [`../PRIVACY.md`](../PRIVACY.md).
 
 Memory is persisted outside the workflow schema, one store per workflow run: every run's memory bank is its own SQLite database (desktop `~/.aive/memory/banks/`, Android `aive-memory-w-*.db`, web one OPFS database per bank, each on its own worker), with browser storage keys per bank where OPFS is unavailable. A workflow's lineage bank reads its ancestors' banks by reference; nothing is copied. The lineage DAG (`WorkflowRun.parentWorkflowRunIds` as recorded by memory), project membership and expansions, and the list of banks are add-only records in Settings (`MemoryLineage`, `SettingsMemoryBankRegistry`). Storage is add-only; the single exception is the user's raw-history retention setting (default: keep everything), whose purges leave a tombstone on each episode.
 
-The earlier single shared memory store is split into workflow banks once on first start and then left untouched as the backup; anything drawn from several workflows is listed in the migration report and placed in no bank. See [`docs/Memory-layer.md`](../Memory-layer.md#workflow-banks-and-lineage).
+See [`docs/Memory-layer.md`](../Memory-layer.md#workflow-banks-and-lineage).

@@ -1,6 +1,5 @@
 package com.hereliesaz.geministrator.azphalt
 
-import com.hereliesaz.geministrator.persistence.migrateLegacyKey
 import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
@@ -84,10 +83,6 @@ class SettingsAzphaltInstallStore(
 ) : AzphaltInstallStore {
     private val mutex = Mutex()
 
-    init {
-        settings.migrateLegacyKey(storageKey)
-    }
-
     override suspend fun get(packageId: String): InstalledAzphaltWorkflowPackage? =
         mutex.withLock { readUnlocked().firstOrNull { it.packageId == packageId } }
 
@@ -135,7 +130,7 @@ class AzphaltWorkflowPackageInstaller(
         require(manifest.kind == "workflow" || manifest.kind == "role") {
             "Azphalt package ${manifest.id} is kind ${manifest.kind}; Aive installs workflow and role packages"
         }
-        require(manifest.targetApps.isEmpty() || manifest.targetApps.any(ACCEPTED_AZPHALT_HOST_IDS::contains)) {
+        require(manifest.targetApps.isEmpty() || AIVE_AZPHALT_HOST_ID in manifest.targetApps) {
             "Azphalt package ${manifest.id} targets ${manifest.targetApps.joinToString()}, not $AIVE_AZPHALT_HOST_ID"
         }
 
@@ -154,7 +149,7 @@ class AzphaltWorkflowPackageInstaller(
             val workflow = requireNotNull(manifest.workflow) {
                 "Workflow package ${manifest.id} does not contain a workflow manifest"
             }
-            require(workflow.format in ACCEPTED_WORKFLOW_FORMATS) {
+            require(workflow.format == AIVE_WORKFLOW_FORMAT) {
                 "Unsupported workflow format ${workflow.format}; expected $AIVE_WORKFLOW_FORMAT"
             }
             require(workflow.definitions.isNotEmpty()) { "Workflow package must contain at least one definition" }
@@ -211,7 +206,7 @@ class AzphaltWorkflowPackageInstaller(
             val roleManifest = requireNotNull(manifest.role) {
                 "Role package ${manifest.id} does not contain a role manifest"
             }
-            require(roleManifest.format in ACCEPTED_ROLE_FORMATS) {
+            require(roleManifest.format == AIVE_ROLE_FORMAT) {
                 "Unsupported role format ${roleManifest.format}; expected $AIVE_ROLE_FORMAT"
             }
             require(roleManifest.roles.isNotEmpty()) { "Role package must contain at least one role" }
@@ -313,25 +308,6 @@ class AzphaltWorkflowPackageInstaller(
                 installReusableRoles(plan, previous)
             } else {
                 validateWorkflowLocalRoles(plan)
-                // Migrate packages installed by older builds: embedded workflow roles no longer
-                // belong in the user's global company roster.
-                val removableRoleIds = previous
-                    ?.takeIf { it.kind == "workflow" }
-                    ?.roles
-                    .orEmpty()
-                    .mapNotNull { previousRole ->
-                        val existing = persistence.roles.get(previousRole.id)
-                        previousRole.id.takeIf {
-                            existing != null && sameReusableRole(existing, previousRole)
-                        }
-                    }
-                    .toSet()
-                if (removableRoleIds.isNotEmpty()) {
-                    persistence.replaceCatalog(
-                        definitions = persistence.definitions.all(),
-                        roles = persistence.roles.all().filterNot { it.id in removableRoleIds },
-                    )
-                }
             }
 
             val installed = InstalledAzphaltWorkflowPackage(

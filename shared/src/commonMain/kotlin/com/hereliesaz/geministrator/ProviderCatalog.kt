@@ -44,12 +44,6 @@ object ProviderCatalog {
     const val LLM7_ID = "llm7"
     const val OVHCLOUD_ID = "ovhcloud"
 
-    /**
-     * Providers the app no longer supports. Credential stores delete what they still hold for these
-     * so a removed integration leaves no key behind.
-     */
-    val RETIRED_PROVIDER_IDS: Set<String> = setOf("jules")
-
     /** Stored for a [ProviderCatalogEntry.keyOptional] provider linked without a key. */
     const val ANONYMOUS_CREDENTIAL = "anonymous"
 

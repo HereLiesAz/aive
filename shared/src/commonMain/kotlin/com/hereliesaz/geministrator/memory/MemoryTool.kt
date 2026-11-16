@@ -373,7 +373,7 @@ private class MemoryRecallIndex(
     private val conflicts: Map<MemoryNodeId, List<MemoryNodeId>> by lazy {
         buildMap<MemoryNodeId, MutableList<MemoryNodeId>> {
             snapshot.edges
-                .filter { it.relation == MemoryRelationKind.Diverges || it.relation == MemoryRelationKind.ConflictsWith }
+                .filter { it.relation == MemoryRelationKind.Diverges }
                 .forEach { edge ->
                     getOrPut(edge.from) { mutableListOf() } += edge.to
                     getOrPut(edge.to) { mutableListOf() } += edge.from
@@ -882,8 +882,6 @@ private fun MemoryRelationKind.isRecallTraversable(): Boolean = when (this) {
     MemoryRelationKind.Categorizes,
     MemoryRelationKind.SimilarTo,
     MemoryRelationKind.AssociatedWith,
-    MemoryRelationKind.ConflictsWith,
-    MemoryRelationKind.ResolvesConflict,
     MemoryRelationKind.CondensedFrom,
     -> true
 

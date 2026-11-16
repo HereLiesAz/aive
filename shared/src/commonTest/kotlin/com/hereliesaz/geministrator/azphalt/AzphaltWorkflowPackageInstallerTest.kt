@@ -51,29 +51,6 @@ class AzphaltWorkflowPackageInstallerTest {
     }
 
     @Test
-    fun packageWrittenByAnOlderBuildWithTheLegacyHostIdAndFormatStillInstalls() = runBlocking {
-        val persistence = InMemoryWorkflowPersistence()
-        val installer = installer(persistence, SettingsAzphaltInstallStore(MapSettings()))
-        // Legacy input ids: an older app published packages targeting its previous host id and format.
-        val legacyPackage = packageFor(
-            targetApps = listOf(LEGACY_AZPHALT_HOST_ID),
-            workflowFormat = LEGACY_WORKFLOW_FORMAT,
-        )
-
-        val plan = installer.inspect(verification(legacyPackage))
-        installer.install(
-            plan = plan,
-            repositoryUrl = AZPHALT_STORE_URL,
-            approvedHostPermissions = setOf("WorkflowRegister"),
-            nowEpochMillis = 50L,
-        )
-
-        assertNotNull(persistence.definitions.get(WorkflowDefinitionId("release")))
-        assertEquals("aive.workflow.v1", AIVE_WORKFLOW_FORMAT)
-        assertEquals("haive.workflow.v1", LEGACY_WORKFLOW_FORMAT)
-    }
-
-    @Test
     fun unknownWorkflowFormatIsStillRejected() = runBlocking {
         val installer = installer(InMemoryWorkflowPersistence(), SettingsAzphaltInstallStore(MapSettings()))
 

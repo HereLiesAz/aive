@@ -24,7 +24,5 @@ fun deferredMemoryBanks(banks: Deferred<MemoryBanks>): MemoryBanks = MemoryBanks
     registry = object : MemoryBankRegistry {
         override suspend fun known(): Set<String> = banks.await().known().toSet()
         override suspend fun add(projectId: String) { banks.await().store(projectId) }
-        override suspend fun migrationReport(): MemoryBankMigrationReport? = banks.await().migrationState.migrationReport()
-        override suspend fun recordMigration(report: MemoryBankMigrationReport) = banks.await().migrationState.recordMigration(report)
     },
 )

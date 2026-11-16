@@ -46,8 +46,7 @@ each recorded packet is fitted exactly as the runtime fits it for a model:
 - `copy` is the copy shortcut for the row: the label's shape with each text copied verbatim from
   its first source (null when the label writes nothing). The gates use it.
 
-Labels follow today's engine contract. No label writes `Supersedes`, `ResolvesConflict` or
-`ConflictsWith` (the generator test checks every row against `MODEL_WRITABLE_RELATIONS`): the
+Labels follow today's engine contract. No label writes `Supersedes` (the generator test checks every row against `MODEL_WRITABLE_RELATIONS`): the
 programmatic Condensation Rewriter writes `CondensedFrom` only, and the engine adds `Supersedes`
 when it commits. Contrasting or value-changing clusters are never offered to the clerk, and the
 condensed text is fitted to its sources' S-curve size budget by the engine (`fitCondensation`)

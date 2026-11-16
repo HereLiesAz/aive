@@ -192,12 +192,6 @@ enum class MemoryRelationKind {
     SimilarTo,
     AssociatedWith,
 
-    /** Legacy: kept readable for stored graphs and surfaced like [Diverges]. No clerk may write it. */
-    ConflictsWith,
-
-    /** Legacy: kept readable for stored graphs. No clerk may write it; nothing writes it. */
-    ResolvesConflict,
-
     /**
      * Derived -> source: the derived memory contains every sentence of the source (genuine coverage,
      * including identical repeats), so the source is hidden from ranking and stays in the store.
@@ -235,9 +229,8 @@ enum class MemoryRelationKind {
 }
 
 /**
- * Relations a model-backed clerk may propose. `Supersedes`, `ResolvesConflict` and `ConflictsWith`
- * are not offered to models and are rejected if a model emits them; nor are the engine-owned
- * register, divergence and deliberation relations.
+ * Relations a model-backed clerk may propose. `Supersedes` is not offered to models and is rejected if a
+ * model emits it; nor are the engine-owned register, divergence and deliberation relations.
  */
 val MODEL_WRITABLE_RELATIONS: Set<MemoryRelationKind> = setOf(
     MemoryRelationKind.Indexes,
@@ -505,7 +498,7 @@ data class MemoryTagQuery(
 
 /**
  * One recall unit. [conflicts] are the hit's divergent partners (memories sharing its frame with a
- * different filler, via `Diverges` or legacy `ConflictsWith`), returned whether or not they matched,
+ * different filler, via `Diverges`), returned whether or not they matched,
  * ranked, or are otherwise hidden; [deliberations] are agents' recorded conclusions about them. The
  * unit is ranked, budgeted and gated as one item, so nothing downstream can show one side alone.
  * Partners and deliberations always come from the bank the hit was read from.

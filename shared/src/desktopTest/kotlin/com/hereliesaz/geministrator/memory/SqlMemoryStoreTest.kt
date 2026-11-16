@@ -66,18 +66,4 @@ class SqlMemoryStoreTest {
         runCatching { store.commit(1, MemoryStoreMutation(episodesToAdd = listOf(episode))) }
         assertEquals(listOf("e"), desktopSqlMemoryStore(file).read().episodes.map { it.id.value })
     }
-
-    @Test
-    fun legacySettingsStoreIsImportedOnce() = runBlocking {
-        val settings = MapSettings()
-        val legacy = SettingsMemoryStore(settings)
-        val episode = MemoryEpisode(MemoryEpisodeId("old"), "s", userPrompt = "p", chunks = emptyList(), createdAtEpochMillis = 1)
-        legacy.commit(0, MemoryStoreMutation(episodesToAdd = listOf(episode)))
-
-        val store = desktopSqlMemoryStore(null)
-        assertTrue(store.importLegacy(legacy))
-        assertEquals(listOf("old"), store.read().episodes.map { it.id.value })
-        assertEquals(0, SettingsMemoryStore(settings).read().episodes.size)
-        assertFalse(store.importLegacy(legacy))
-    }
 }

@@ -117,35 +117,6 @@ class SetupFileTest {
     }
 
     @Test
-    fun aFileExportedByAnOlderBuildWithLegacyKeyNamesStillImportsUnderTheCurrentNames() = runBlocking {
-        // Legacy input names: setup files written by older builds used the retired `haive.` prefix.
-        val legacyPins = "haive.azphalt.publisher-pins.v1"
-        val legacyTerrarium = "haive.terrarium.layout.v1.0061.0062"
-        val targetSettings = InMemorySettings()
-
-        SetupFileTransfer(InMemoryWorkflowPersistence(), targetSettings).apply(
-            SetupFileContents(settings = mapOf(legacyPins to """{"pkg.b":"new"}""", legacyTerrarium to "1.0,2.0")),
-            SetupSecrets(),
-        )
-
-        val pins = Json.parseToJsonElement(requireNotNull(targetSettings.getStringOrNull(PINS_KEY))).jsonObject
-        assertEquals("new", (pins.getValue("pkg.b") as JsonPrimitive).content)
-        assertEquals("1.0,2.0", targetSettings.getStringOrNull(TERRARIUM_KEY))
-        assertNull(targetSettings.getStringOrNull(legacyPins))
-        assertNull(targetSettings.getStringOrNull(legacyTerrarium))
-    }
-
-    @Test
-    fun exportMigratesSettingsStillStoredUnderLegacyKeysAndNamesThemWithTheCurrentKeys() = runBlocking {
-        val settings = InMemorySettings().apply { putString("haive.azphalt.publisher-pins.v1", """{"pkg.a":"key-a"}""") }
-
-        val contents = SetupFileTransfer(InMemoryWorkflowPersistence(), settings).collect(crashReportingEnabled = null)
-
-        assertEquals("""{"pkg.a":"key-a"}""", contents.settings[PINS_KEY])
-        assertFalse(contents.settings.keys.any { it.startsWith("haive.") })
-    }
-
-    @Test
     fun modelsRegisteredWithAnotherDevicesFilePathAreNotImported() = runBlocking {
         val target = InMemoryWorkflowPersistence()
         SetupFileTransfer(target, InMemorySettings()).apply(

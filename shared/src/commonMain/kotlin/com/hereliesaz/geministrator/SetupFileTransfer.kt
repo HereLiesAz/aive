@@ -6,8 +6,6 @@ import com.hereliesaz.geministrator.persistence.PersistenceSnapshot
 import com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
 import com.hereliesaz.geministrator.persistence.migrate
-import com.hereliesaz.geministrator.persistence.migrateLegacyKey
-import com.hereliesaz.geministrator.persistence.migrateLegacyKeysWithPrefix
 import com.russhwolf.settings.Settings
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
@@ -84,7 +82,6 @@ class SetupFileTransfer(
     private val inferenceSettings: Settings = persistence.inferenceSettings,
 ) {
     suspend fun collect(crashReportingEnabled: Boolean?): SetupFileContents {
-        migratingLegacyKeys()
         return SetupFileContents(
             projects = persistence.projects.all(),
             definitions = persistence.definitions.all(),
@@ -99,13 +96,6 @@ class SetupFileTransfer(
                 ?.toString(),
             crashReportingEnabled = crashReportingEnabled,
         )
-    }
-
-    /** Moves any setup setting still stored under its legacy (retired-name) key to the current key before it is read. */
-    private fun migratingLegacyKeys() {
-        SETUP_SETTINGS_KEYS.forEach(settings::migrateLegacyKey)
-        settings.migrateLegacyKeysWithPrefix(TERRARIUM_LAYOUT_PREFIX)
-        inferenceSettings.migrateLegacyKey(INFERENCE_STATE_KEY)
     }
 
     /**
@@ -133,9 +123,7 @@ class SetupFileTransfer(
         val skipped = mutableListOf<String>()
         val destinationChanges = mutableListOf<String>()
         val importedSettings = linkedMapOf<String, String>()
-        migratingLegacyKeys()
-        // Files exported by older builds name settings with the legacy prefix; accept those names on import.
-        contents.settings.mapKeys { (key, _) -> key.toCurrentSettingsKey() }.filterKeys(::isSetupSettingsKey).forEach { (key, value) ->
+        contents.settings.filterKeys(::isSetupSettingsKey).forEach { (key, value) ->
             val vetted = vetSetting(key, value, secrets, skipped, destinationChanges)
             if (vetted != null) importedSettings[key] = vetted
         }
@@ -325,12 +313,6 @@ class SetupFileTransfer(
         }
     }
 }
-
-// Legacy input prefix: setup files written by older builds use it for every setting key. Accepted on import only.
-private const val LEGACY_SETTINGS_PREFIX = "haive."
-
-private fun String.toCurrentSettingsKey(): String =
-    if (startsWith(LEGACY_SETTINGS_PREFIX)) "aive." + removePrefix(LEGACY_SETTINGS_PREFIX) else this
 
 private const val GROUND_KEY = "aive.appearance.ground.v1"
 private const val PINS_KEY = "aive.azphalt.publisher-pins.v1"

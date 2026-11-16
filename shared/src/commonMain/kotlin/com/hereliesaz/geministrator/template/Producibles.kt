@@ -25,11 +25,6 @@ data class Producible(
 data class ProducibleGroup(val id: String, val title: String, val members: List<String>)
 
 object Producibles {
-    /** Ids that were renamed: the old one still reads as the new. The Nanny's training ruling is the Nanny's training report. */
-    val aliases: Map<String, String> = mapOf("training-ruling" to "training-report")
-
-    fun canonicalId(id: String): String = aliases[id] ?: id
-
     val groups: List<ProducibleGroup> = listOf(
         ProducibleGroup("documents", "Documents and briefs", listOf("brief", "report", "summary", "one-page-explainer", "faq", "glossary", "translation")),
         ProducibleGroup("plans-and-records", "Plans and records", listOf("plan", "timeline", "meeting-notes", "decision-memo", "risk-register")),
@@ -499,7 +494,7 @@ object Producibles {
     private val byTemplate: Map<String, Producible> by lazy { all.associateBy { it.templateId } }
 
     /** The producible with [id] (an old id reads as its new one), or null. */
-    fun byId(id: String): Producible? = index[canonicalId(id)]
+    fun byId(id: String): Producible? = index[id]
 
     /** The producible a template makes, or null for a template that makes none of them. */
     fun forTemplate(templateId: String): Producible? = byTemplate[templateId]

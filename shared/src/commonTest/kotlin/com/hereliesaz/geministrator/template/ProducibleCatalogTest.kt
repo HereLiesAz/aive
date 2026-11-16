@@ -65,10 +65,8 @@ class ProducibleCatalogTest {
     }
 
     @Test
-    fun theTrainingRulingIsTheTrainingReportAndTheOldIdStillReads() {
+    fun theTrainingRulingIsTheTrainingReport() {
         assertEquals("Nanny's training report", Producibles.byId("training-report")?.name)
-        assertEquals("training-report", Producibles.byId("training-ruling")?.id)
-        assertEquals("training-report", Producibles.canonicalId("training-ruling"))
     }
 
     @Test

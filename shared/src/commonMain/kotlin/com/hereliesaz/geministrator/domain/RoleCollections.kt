@@ -2,12 +2,8 @@ package com.hereliesaz.geministrator.domain
 
 const val ROLE_COLLECTION_MARKER_ID: String = "__aive-role-collection__"
 
-/** Legacy input id: the marker id written by older builds; still recognised when reading stored roles. */
-private const val LEGACY_ROLE_COLLECTION_MARKER_ID: String = "__haive-role-collection__"
-
-/** Whether [id] is the internal role-collection marker (current id, or the legacy id found in older stored roles). */
-fun isRoleCollectionMarkerId(id: String): Boolean =
-    id == ROLE_COLLECTION_MARKER_ID || id == LEGACY_ROLE_COLLECTION_MARKER_ID
+/** Whether [id] is the internal role-collection marker. */
+fun isRoleCollectionMarkerId(id: String): Boolean = id == ROLE_COLLECTION_MARKER_ID
 
 /**
  * Built-in roster exposed by the app, including governance roles defined outside [BuiltInRoles] and the 29 new starting

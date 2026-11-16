@@ -149,9 +149,6 @@ internal fun GeministratorWorkflowTerrarium(
     // Who shares a creature: ordered tasks of one role. Build and the Swarm view keep one creature per task.
     val roaming = remember(stagedDefinition, run) { projectRoaming(stagedDefinition, run) }
     val swarmView = rememberDurableBooleanState("hive.view.swarm")
-    // The retired Flowchart view (a stored "hive.view.flow") is Edit now: it lands there once, and is cleared.
-    val retiredFlowchart = remember { DurableUiState.store.getBoolean("hive.view.flow") == true }
-    LaunchedEffect(Unit) { if (retiredFlowchart) DurableUiState.store.remove("hive.view.flow") }
     var hiveMenu by remember { mutableStateOf(false) }
     var hiveDeleting by remember { mutableStateOf(false) }
     val animatedRelationships = remember(projection.relationships, run) {
@@ -198,7 +195,7 @@ internal fun GeministratorWorkflowTerrarium(
     }
 
     // Live watches the run; Build holds the field still and opens the wiring to edits.
-    var building by remember(definition.id) { mutableStateOf(migratedToEdit(retiredFlowchart && !readOnly, startInBuild)) }
+    var building by remember(definition.id) { mutableStateOf(startInBuild) }
     // A link elsewhere (a creature's job) asks for the editor: open it, the creature stays selected.
     LaunchedEffect(SwarmEditRequests.pending) {
         if (SwarmEditRequests.take() && !readOnly) {

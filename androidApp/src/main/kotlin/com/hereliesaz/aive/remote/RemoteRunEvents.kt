@@ -385,7 +385,7 @@ internal fun WorkflowEvent.toRemoteRunEvent(
                 eventSeq = eventSeq,
                 atMillis = at,
                 need = "approval",
-                gateId = if (hasGateId) gateId.value else null,
+                gateId = gateId.value,
                 taskId = taskDefinitionId.value,
                 taskName = name(taskDefinitionId),
                 reason = capReason(reason),

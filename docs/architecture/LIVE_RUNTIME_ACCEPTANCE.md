@@ -158,14 +158,12 @@ Other checked P0 items record implementation with automated test coverage, not l
 
 `tools/web_memory_banks/verify.mjs` checks, in headless Chromium and with no provider or key, that
 each workflow's memory bank in the browser is its own worker (`shared/memory-worker/memory.worker.js`
-named `bank-<stem>`) with its own OPFS pool, that banks do not see each other's data, and that the old
-shared store is split into banks once and not again. It drives the app through a dev-only hook
-(`WebMemoryDebugHook`): active only on `localhost`/`127.0.0.1` with `?aiveMemoryDebug=<commands>`
-(`seed-legacy:<tag>` writes two episodes for workflows `wf-a` and `wf-b` into the old Settings memory
-log before startup, which startup imports into the old shared database and then splits;
-`write:<workflow>:<episode>` commits to one bank; `dump` logs every bank's episodes and the split
-report). The script wraps `Worker` to record worker names and lists the OPFS root. Steps: (1) first
-start with a seeded old store; (2) reload with more old-store data and a write to `wf-a`; (3) reload.
+named `bank-<stem>`) with its own OPFS pool, and that banks do not see each other's data. It drives
+the app through a dev-only hook (`WebMemoryDebugHook`): active only on `localhost`/`127.0.0.1` with
+`?aiveMemoryDebug=<commands>` (`write:<workflow>:<episode>` commits to one bank; `dump` logs every
+bank's episodes). The script wraps `Worker` to record worker names and lists the OPFS root. Steps:
+(1) first start with a write to each of `wf-a` and `wf-b`; (2) reload with another write to `wf-a`;
+(3) reload.
 
 Build a development bundle (web builds resolve h2g2 from Maven Local, published as above), serve the
 distribution together with the webpack output, and run:

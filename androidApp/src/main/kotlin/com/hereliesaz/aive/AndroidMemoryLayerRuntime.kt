@@ -77,8 +77,7 @@ internal class AndroidMemoryModelInstaller(
     context: Context,
     private val httpClient: HttpClient,
 ) {
-    // Models downloaded by older builds sit under the legacy directory name; they are moved, not fetched again.
-    private val installRoot = LegacyFiles.adopt(context.filesDir, "aive/memory", "haive/memory")
+    private val installRoot = File(context.filesDir, "aive/memory")
     private val installedByArtifactId = ConcurrentHashMap<String, InstalledMemoryModel>()
     private val downloader = AndroidResumableFileDownloader(httpClient)
     private val mutex = Mutex()
@@ -655,7 +654,7 @@ internal class AndroidMemoryLayerRuntime(
      * One SQLite database per workflow run's memory bank. Built on the IO dispatcher (see
      * MainActivity), so the one-time split of the older shared store runs before anything can bank.
      */
-    private val banks = runBlocking { androidSqlMemoryBanks(context, memoryLineage) }
+    private val banks = androidSqlMemoryBanks(context)
 
     /** The memory layer the Memory screen controls. */
     val controller = MemoryLayerController(
@@ -666,7 +665,6 @@ internal class AndroidMemoryLayerRuntime(
         engineProvider = engineProvider,
         scope = scope,
         localModels = AndroidMemoryLocalModels(installer, scope),
-        legacyBackup = com.hereliesaz.geministrator.memory.AndroidLegacyMemoryBackup(context),
     )
 
     fun attach() = controller.attach()

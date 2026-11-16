@@ -31,8 +31,7 @@ internal fun accumulateAssociationStrength(weights: Iterable<Float>): Float {
  * Most edges are independent observations and therefore participate directly in the saturating
  * accumulation curve. Correlated families (see [correlatedFamily]) contribute their strongest edge. Edges that declare an `evidenceFamily` with `evidencePolicy=latest` are
  * alternate time-varying representations of one fact. Only the newest edge in each such family
- * contributes to recall. Legacy temporal edges are also recognized as the `temporal-co-bucket`
- * family so persisted graphs created before the metadata was introduced remain correct.
+ * contributes to recall.
  */
 internal fun accumulateAssociationEvidence(edges: Iterable<MemoryEdge>): Float {
     val independent = mutableListOf<Float>()
@@ -50,18 +49,8 @@ internal fun accumulateAssociationEvidence(edges: Iterable<MemoryEdge>): Float {
         require(edge.weight in 0f..1f) { "Association evidence weight must be normalized" }
         val explicitFamily = edge.metadata["evidenceFamily"]?.takeIf(String::isNotBlank)
         val isLatestFamily = edge.metadata["evidencePolicy"] == "latest"
-        val legacyTemporalFamily = edge.metadata["basis"]
-            ?.takeIf {
-                it.startsWith("temporal:") &&
-                    (
-                        edge.metadata["deterministic"] == "true" ||
-                            edge.id.value.startsWith("programmatic:temporal:")
-                    )
-            }
-            ?.let { "temporal-co-bucket" }
         val family = when {
             explicitFamily != null && isLatestFamily -> explicitFamily
-            legacyTemporalFamily != null -> legacyTemporalFamily
             else -> null
         }
 

@@ -3,7 +3,6 @@ package com.hereliesaz.geministrator
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -56,22 +55,11 @@ class CredentialToolTest {
             "a/b",
             "a\nb",
         ).forEach { assertFalse(CredentialTool.isSafeAccountId(it), it) }
-        assertFailsWith<IllegalArgumentException> {
-            CredentialTool.windowsCredentialDeleteCommand("com.hereliesaz.aive", "x'; calc; '")
-        }
     }
 
     @Test
     fun everyIdTheAppStoresIsAccepted() {
-        (ProviderCatalog.entries.map { it.id } + ProviderCatalog.RETIRED_PROVIDER_IDS + RepositoryServiceCatalog.entries.map { it.id })
+        (ProviderCatalog.entries.map { it.id } + RepositoryServiceCatalog.entries.map { it.id })
             .forEach { assertTrue(CredentialTool.isSafeAccountId(it), it) }
-    }
-
-    @Test
-    fun theWindowsCredentialManagerCleanupRunsCmdkeyDirectly() {
-        assertEquals(
-            listOf("cmdkey", "/delete:com.hereliesaz.aive/openai"),
-            CredentialTool.windowsCredentialDeleteCommand("com.hereliesaz.aive", "openai"),
-        )
     }
 }

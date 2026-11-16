@@ -207,7 +207,7 @@ internal object MemorySummaryTree {
  * Pair summaries: every link between two memories gets a summary of the two together, written by
  * the engine during consolidation, in the sequential queue, so it exists before the link is first
  * recalled. Links covered: semantic and mechanical associations (`SimilarTo`, `AssociatedWith`,
- * co-recall links included), divergence (`Diverges`, legacy `ConflictsWith`) and `CondensedFrom`.
+ * co-recall links included), divergence (`Diverges`) and `CondensedFrom`.
  * Hierarchy and bookkeeping edges (tree, ladder, supersession, register, deliberation, access) are
  * not links between two memories' content and get none.
  *
@@ -230,7 +230,6 @@ internal object MemoryPairSummaries {
         MemoryRelationKind.SimilarTo,
         MemoryRelationKind.AssociatedWith,
         MemoryRelationKind.Diverges,
-        MemoryRelationKind.ConflictsWith,
         MemoryRelationKind.CondensedFrom,
     )
 

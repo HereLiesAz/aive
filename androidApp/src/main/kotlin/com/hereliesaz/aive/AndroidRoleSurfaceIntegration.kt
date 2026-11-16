@@ -441,13 +441,12 @@ internal class AndroidRoleSurfaceIntegration(
 }
 
 /**
- * The app's own databases (workflows, memory banks, procedures) all start with `aive-`; the legacy
- * `haive` prefix (databases written by older builds) and Android/Room bookkeeping files are reserved too. A role surface may only open
- * databases it owns, never the stores that hold approvals, run state and roles.
+ * The app's own databases (workflows, memory banks, procedures) all start with `aive-`; Android/Room bookkeeping
+ * files are reserved too. A role surface may only open databases it owns, never the stores that hold approvals,
+ * run state and roles.
  */
 internal fun isReservedAppDatabaseName(name: String): Boolean {
     val lower = name.trim().lowercase()
-    // "haive" is a legacy input prefix: stores created by older builds must stay off limits to role surfaces.
-    return lower.startsWith("aive") || lower.startsWith("haive") ||
+    return lower.startsWith("aive") ||
         lower.startsWith("androidx") || lower.startsWith("room_") || lower.startsWith("google_app_measurement")
 }

@@ -104,7 +104,6 @@ class AzphaltRepositoryClientTest {
                 )
             } else {
                 respond(
-                    // The first package targets only the legacy host id (legacy input): it must still be listed.
                     content = """
                         {
                           "packages":[
@@ -113,7 +112,7 @@ class AzphaltRepositoryClientTest {
                               "name":"Feature Delivery",
                               "version":"1.0.0",
                               "kind":"workflow",
-                              "targetApps":["com.hereliesaz.haive"]
+                              "targetApps":["com.hereliesaz.aive"]
                             },
                             {
                               "id":"com.other.host.workflow",

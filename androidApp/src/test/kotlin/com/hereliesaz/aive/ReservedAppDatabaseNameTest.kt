@@ -10,8 +10,6 @@ class ReservedAppDatabaseNameTest {
         assertTrue(isReservedAppDatabaseName("aive-workflows.db"))
         assertTrue(isReservedAppDatabaseName("AIVE-memory.db"))
         assertTrue(isReservedAppDatabaseName("aive-procedure-x.db"))
-        // Legacy input name: a database an older build created under the previous prefix is still reserved.
-        assertTrue(isReservedAppDatabaseName("haive-old.db"))
     }
 
     @Test

@@ -66,5 +66,3 @@ internal fun reduceCardFlip(state: CardFlip, event: CardFlipEvent): CardFlip = w
  */
 internal fun creatureSheetAllowed(editing: Boolean, flipped: Boolean): Boolean = !editing || flipped
 
-/** The Flowchart view was merged into Edit: a stored Flowchart view lands on Edit, anything else is unchanged. */
-internal fun migratedToEdit(storedFlowchartView: Boolean, startInEdit: Boolean): Boolean = startInEdit || storedFlowchartView

@@ -137,7 +137,6 @@ class WorkflowGovernanceTest {
 
         assertEquals(ApprovalGateStatus.Approved, repository.get(gateId)?.status)
         val approvalRequired = events.snapshot().filterIsInstance<ApprovalRequired>().single()
-        assertTrue(approvalRequired.hasGateId)
         assertEquals(gateId, approvalRequired.gateId)
         assertTrue(
             events.snapshot().any {

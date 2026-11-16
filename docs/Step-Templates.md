@@ -112,7 +112,7 @@ The starting-templates catalog (`template/Producibles.kt`, data only) lists **66
 | The swarm's plan and the tutorial | swarm-plan, tutorial-lesson, tutorial-check-in, queen-reworded-step |
 | Training and improvement | practice-result, training-report, specialist-lessons, nanny-finding, revision-proposal |
 
-The catalog's "training ruling" is the **Nanny's training report** (`training-report`). The old id `training-ruling` still reads as the new one (`Producibles.canonicalId`), and the stored task id `train-ruling` and the `RULING: PASS|REFINE|STOP` line the parsers read are unchanged.
+The catalog's "training ruling" is the **Nanny's training report** (`training-report`). The stored task id `train-ruling` and the `RULING: PASS|REFINE|STOP` line the parsers read are unchanged.
 
 **Who may make them.** The queen may make every template and preset that changes nothing outside its own output. There is no list of keeper-only templates: the permissions and trust policy in settings is the one place that decides, and a step that changes something keeps its approval and its single attempt.
 

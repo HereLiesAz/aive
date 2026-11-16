@@ -211,7 +211,6 @@ internal fun RunTimeline(
     val shown = when {
         view == TIMELINE_MEMORY && memoryContent == null -> TIMELINE_WATERFALL
         view == TIMELINE_LOG && logSources == null -> TIMELINE_WATERFALL
-        view == "flowchart" -> TIMELINE_WATERFALL // Retired Timeline tab: preserve old saved preferences safely.
         else -> view
     }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
