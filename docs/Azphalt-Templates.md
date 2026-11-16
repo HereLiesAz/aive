@@ -15,12 +15,12 @@ Every Azphalt package, built-in swarm and role starts from a template, or is lis
 
 | | Before | After |
 |---|---|---|
-| Role template records | every installed role (built-in, Nanny, node-character, package), by construction; the default catalog left out the Nanny | all of them; the default catalog adds the Nanny; tested for 128 role ids |
+| Role template records | every installed role (built-in, Nanny, node-character, package), by construction; the default catalog left out the Nanny | all of them; the default catalog adds the Nanny; tested for every installed role id |
 | Package steps with a starting template | 0 of 101 | 101 of 101 (the 11 gaps closed by `change-code`, the media, `localize-content` and `make-slides` templates) |
 | Built-in swarm steps with a starting template | 0 of 68 (10 more are approval steps) | 68 of 68 (the 15 gaps closed by `change-code`, `render-image`, `render-video` and the fixed-format templates) |
-| Swarms | 20 built-in (18 in the coding suite, the short film, the starter) and 66 workflow packages | the same |
+| Swarms | 20 built-in (18 in the coding suite, the short film, the starter) and 63 workflow packages | the same |
 
-Built-in roles: 18 in the built-in list and the Nanny, and 6 node-character roles installed when a swarm needs them. Packages: 78 in all, 66 workflow packages (66 swarms, 101 steps) and 12 role packages, which carry 111 role files for 104 role ids.
+Built-in roles: 18 in the built-in list and the Nanny, and 6 node-character roles installed when a swarm needs them. Packages: 74 in all, 63 workflow packages (63 swarms, 98 steps) and 11 role packages, which carry 107 role files for 100 role ids.
 
 ## Roles
 
@@ -28,7 +28,7 @@ Built-in role ids: `orchestrator`, `product-manager`, `researcher`, `architect`,
 
 Node-character role ids: `node-character-pipeline-orchestrator`, `node-character-designer`, `node-character-rigging-anatomist`, `node-character-image-operator`, `node-character-quality-inspector`, `node-character-asset-registrar`. Each has a role template once installed; the swarm that needs them installs them first.
 
-Package role ids (104 ids from 111 role files). Every one has a role template once its package is installed.
+Package role ids (100 ids from 107 role files). Every one has a role template once its package is installed.
 
 | Role id | Shipped by | Role template |
 |---|---|---|
@@ -54,12 +54,10 @@ Package role ids (104 ids from 111 role files). Every one has a role template on
 | `data-story-editor` | `data-storytelling` | yes |
 | `decision-analyst` | `decision-analysis` | yes |
 | `deep-research-lead` | `deep-research-report` | yes |
-| `deep-researcher` | `deep-researcher` | yes |
 | `documentary-producer` | `documentary-production` | yes |
 | `event-producer` | `event-production` | yes |
 | `evidence-skeptic` | `deep-research-report`, `evidence-skeptic` | yes |
 | `evidence-synthesis-lead` | `evidence-synthesis` | yes |
-| `execution-secretary` | `meeting-to-execution` | yes |
 | `exhibition-producer` | `exhibition-production` | yes |
 | `experimental-methodologist` | `experimental-design` | yes |
 | `failure-diagnostician` | `failure-diagnostician`, `root-cause-repair` | yes |
@@ -85,7 +83,6 @@ Package role ids (104 ids from 111 role files). Every one has a role template on
 | `knowledge-system-evaluator` | `rag-knowledge-evaluation` | yes |
 | `launch-strategist` | `product-launch` | yes |
 | `learning-coach` | `adaptive-tutoring` | yes |
-| `localization-lead` | `localization-release` | yes |
 | `manuscript-continuity-editor` | `long-form-book-production` | yes |
 | `methods-reviewer` | `evidence-synthesis` | yes |
 | `negotiation-planner` | `negotiation-preparation` | yes |
@@ -115,7 +112,6 @@ Package role ids (104 ids from 111 role files). Every one has a role template on
 | `playtest-analyst` | `game-vertical-slice` | yes |
 | `podcast-fact-editor` | `podcast-production` | yes |
 | `podcast-producer` | `podcast-production` | yes |
-| `presentation-editor` | `presentation-production` | yes |
 | `pricing-researcher` | `pricing-packaging-research` | yes |
 | `privacy-risk-analyst` | `privacy-impact-assessment` | yes |
 | `process-engineer` | `sop-process-engineering` | yes |
@@ -233,7 +229,7 @@ Not listed per step, with the reason:
 
 ## Azphalt packages
 
-All 66 workflow packages. A role package carries no steps; its roles are in the table above and its files were not changed.
+All 63 workflow packages. A role package carries no steps; its roles are in the table above and its files were not changed.
 
 | Package | Step | Role | Starting template |
 |---|---|---|---|
@@ -284,10 +280,8 @@ All 66 workflow packages. A role package carries no steps; its roles are in the 
 | `idea-to-storyboard-to-video` | 4. Production Final Reviewer | `production-final-reviewer` | check-work |
 | `interview-synthesis` | 1. Qualitative Synthesist | `qualitative-synthesist` | write-document |
 | `investigative-journalism` | 1. Investigative Reporter | `investigative-reporter` | write-document |
-| `localization-release` | 1. Localization Lead | `localization-lead` | localize-content |
 | `long-form-book-production` | 1. Book Editor | `book-editor` | write-document |
 | `long-form-book-production` | 2. Manuscript Continuity Editor | `manuscript-continuity-editor` | check-work |
-| `meeting-to-execution` | 1. Execution Secretary | `execution-secretary` | text-to-table |
 | `music-release` | 1. Release Producer | `release-producer` | write-document |
 | `negotiation-preparation` | 1. Negotiation Planner | `negotiation-planner` | write-document |
 | `osint-corporate-ownership` | 1. OSINT Corporate Investigator | `osint-corporate-investigator` | write-document |
@@ -313,7 +307,6 @@ All 66 workflow packages. A role package carries no steps; its roles are in the 
 | `paperplanes-stratified-reconstruction` | 5. PaperPlanes Visual QC | `paperplanes-visual-qc` | check-work |
 | `podcast-production` | 1. Podcast Producer | `podcast-producer` | edit-audio |
 | `podcast-production` | 2. Podcast Fact Editor | `podcast-fact-editor` | check-work |
-| `presentation-production` | 1. Presentation Editor | `presentation-editor` | make-slides |
 | `pricing-packaging-research` | 1. Pricing Researcher | `pricing-researcher` | write-document |
 | `privacy-impact-assessment` | 1. Privacy Risk Analyst | `privacy-risk-analyst` | write-document |
 | `process-redesign` | 1. Operations Designer | `operations-designer` | write-document |
@@ -345,7 +338,7 @@ The 66 starting templates ([Step templates](Step-Templates.md), "The starting te
 
 ## Gaps closed
 
-The audit listed 26 steps that fit none of the six starting templates. Each now has a preset (`template/StepPresets.kt`), made from a built-in template by changing data only: generic role, typed inputs, one tool or none, typed output with a compiled check, declared effects, a token allowance (carried, not yet enforced) and a single attempt where it changes something. Each step carries a `startingPoint` contract naming its preset. `StepTemplateAssignments.gaps` is empty and `StepTemplateCoverageTest` (`theTwentySixFormerGapsAreCoveredAndGuarded`) fails if any of the 26 loses its contract.
+The audit listed 26 steps that fit none of the six starting templates. Each now has a preset (`template/StepPresets.kt`), made from a built-in template by changing data only: generic role, typed inputs, one tool or none, typed output with a compiled check, declared effects, a token allowance (carried, not yet enforced) and a single attempt where it changes something. Each step carries a `startingPoint` contract naming its preset. `StepTemplateAssignments.gaps` is empty and `StepTemplateCoverageTest` (`theTwentyFourFormerGapsAreCoveredAndGuarded`) fails if any of the 26 loses its contract.
 
 | Template | Made from | Effect and approval | Hands back | Steps |
 |---|---|---|---|---|
@@ -354,8 +347,8 @@ The audit listed 26 steps that fit none of the six starting templates. Each now 
 | `render-video` | change something in a connected tool | as above, a video tool | `TARGET:` and `CHANGED:` | 2: `short-film/assemble`, `idea-to-storyboard-to-video/idea-to-storyboard-to-video-task-3` |
 | `compose-media` | change something in a connected tool | as above; works on a copy | `TARGET:` and `CHANGED:` | 3: `paperplanes-stratified-reconstruction/paperplanes-stratified-reconstruction-task-2`, `-task-3`, `-task-4` |
 | `edit-audio` | change something in a connected tool | as above; works on a copy, never the original | `TARGET:` and `CHANGED:` | 1: `podcast-production/podcast-production-task-1` |
-| `make-slides` | change something in a connected tool | as above, a slides tool | `TARGET:` and `CHANGED:` | 1: `presentation-production/presentation-production-task-1` |
-| `localize-content` | turn text into a table | changes nothing | a table `key,source,translation`, every column named | 1: `localization-release/localization-release-task-1` |
+| `make-slides` | change something in a connected tool | as above, a slides tool | `TARGET:` and `CHANGED:` | none now (its one package was removed as a duplicate of it) |
+| `localize-content` | turn text into a table | changes nothing | a table `key,source,translation`, every column named | none now (its one package was removed as a duplicate of it) |
 | `fixed-format-result` | write a document | changes nothing | one JSON object | 2: `short-film/storyboard`, `short-film/frame-review` |
 | `capped-text-result` | write a document | changes nothing | one block of plain text, at most 20,000 characters | 1: `short-film/style-sheet` |
 

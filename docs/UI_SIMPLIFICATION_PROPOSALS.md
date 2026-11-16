@@ -1,6 +1,20 @@
 # UI simplification proposals
 
-Status: proposal. An item marked **Done** is implemented; the rest are not.
+Status: proposal, partly shipped. An item marked **Done** is implemented; the rest are planned or unchecked.
+
+Checked against the code (the destination list `ControlRoomDestination`, and a search for each symbol a proposal names):
+
+| # | Status | Evidence |
+|---|---|---|
+| 1 | Status: planned | The Store tab is still mounted inside the swarm library (`LiveWorkflowLibraryScreen.kt`) as well as the Shop destination |
+| 2 | Done, differently | There is no pill row; one header on every width and the breadcrumb (`docs/Keepers-Room.md`, "The shell") |
+| 3 | Done, differently | There are no separate Runs and Artifacts destinations; `ControlRoomDestination` lists Overview, Swarm library, Breeds, Nursery, Messages, Compute, Memory swarm, Shop and Keeper's room |
+| 4 | Status: planned | No `RuntimeStateNotice` exists |
+| 5 | Done | `CompanyScreen`, `WorkflowTemplateScreen` and `ArtifactFileManagerScreen` no longer exist |
+| 13 | Done | There is no Repositories destination; sources are connected in the Keeper's room |
+| 15 | Status: planned | Compute is still its own destination |
+| 18 | Done | `MemorySimpleScreen.kt` is the memory swarm's simple view |
+| 6-12, 14, 16, 17, 19 | Not checked | Treat as proposals until each is checked against the code |
 
 Scope: every destination in `shared/src/commonMain` as of this branch: Overview, Runs, Workflows (all tabs),
 Swarm, Artifacts, Inbox, Repositories, Compute, Memory, Azphalt Store, Settings, the header and navigation,

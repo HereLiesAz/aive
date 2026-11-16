@@ -116,6 +116,8 @@ import com.hereliesaz.geministrator.resources.inspector_plan_show_full
 import com.hereliesaz.geministrator.resources.inspector_plan_show_less
 import com.hereliesaz.geministrator.resources.inspector_approve_task
 import com.hereliesaz.geministrator.resources.inspector_artifact
+import com.hereliesaz.geministrator.resources.inspector_answered_by
+import com.hereliesaz.geministrator.resources.inspector_answered_by_after
 import com.hereliesaz.geministrator.resources.inspector_artifacts
 import com.hereliesaz.geministrator.resources.inspector_attempt
 import com.hereliesaz.geministrator.resources.inspector_blocked
@@ -562,7 +564,13 @@ internal fun TechnicalInspector(
                 // The source that answered links to that source's own screen; with none yet, to Connections.
                 LiveInspectorLine(
                     stringResource(Res.string.inspector_provider),
-                    taskRun.assignedProviderId?.value ?: "—",
+                    answeredBy(taskRun.assignedProviderId?.value, taskRun.failedProviders.map { it.value })?.let { by ->
+                        if (by.failed.isEmpty()) {
+                            stringResource(Res.string.inspector_answered_by, by.source)
+                        } else {
+                            stringResource(Res.string.inspector_answered_by_after, by.source, by.failed.joinToString(", "))
+                        }
+                    } ?: "—",
                     onClick = sourceLink(taskRun.assignedProviderId?.value) ?: onOpenConnections,
                 )
                 LiveInspectorLine(stringResource(Res.string.inspector_attempt), taskRun.attempt.toString())
