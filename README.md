@@ -14,7 +14,7 @@ Swarm nodes may be performed by AI sources such as specialized model agents, LLM
 
 ## Targets
 
-- Android — application ID `com.hereliesaz.aive` (Google Play); GitHub-release builds keep `com.hereliesaz.haive` permanently so existing installs upgrade in place
+- Android — application ID `com.hereliesaz.aive` (Google Play); GitHub-release builds keep the older application ID `com.hereliesaz.haive` for good, because Android upgrades an install in place only when the ID matches. It is a frozen identifier, not a name: the app is called The Aive
 - Desktop JVM
 - Independent headless JVM (CLI and daemon)
 - Web — JavaScript and WebAssembly
@@ -53,7 +53,7 @@ node tools/puppet-rig/test/rig-core.mjs     # puppet-rig editor tests
 
 ### Release signing
 
-The sideloaded GitHub-flavor APK is built and signed by `multiplatform.yml` on every non-PR run: the `./.github/actions/android-keystore` action rebuilds and verifies the keystore from the repository's signing settings, exports `HAIVE_KEYSTORE_PATH` and `HAIVE_KEYSTORE_TYPE`, and the `release` job publishes the APK as `TheAive-<version>-android.apk` in the grouped GitHub release (the in-app update feed looks for that name). It also builds the signed Play bundle and uploads it, with the R8 mapping, as workflow artifacts. Publishing to Google Play tracks is done only by the central `HereLiesAz/workflows` `android-play-release` run (the repo's `android-play-release.yml` is a hand-off stub), which writes its key to `app/keystore.jks` and exports `KEYSTORE_FILE`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD`. `androidApp/build.gradle.kts` signs the release build with whichever keystore it finds (`HAIVE_KEYSTORE_PATH`, `KEYSTORE_FILE` or `app/keystore.jks`) and leaves it unsigned when none exists (local builds, pull requests).
+The sideloaded GitHub-flavor APK is built and signed by `multiplatform.yml` on every non-PR run: the `./.github/actions/android-keystore` action rebuilds and verifies the keystore from the repository's signing settings, exports `AIVE_KEYSTORE_PATH` and `AIVE_KEYSTORE_TYPE`, and the `release` job publishes the APK as `TheAive-<version>-android.apk` in the grouped GitHub release (the in-app update feed looks for that name). It also builds the signed Play bundle and uploads it, with the R8 mapping, as workflow artifacts. Publishing to Google Play tracks is done only by the central `HereLiesAz/workflows` `android-play-release` run (the repo's `android-play-release.yml` is a hand-off stub), which writes its key to `app/keystore.jks` and exports `KEYSTORE_FILE`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD`. `androidApp/build.gradle.kts` signs the release build with whichever keystore it finds (`AIVE_KEYSTORE_PATH`, `KEYSTORE_FILE` or `app/keystore.jks`) and leaves it unsigned when none exists (local builds, pull requests).
 
 ### Bumping the vendor pins
 

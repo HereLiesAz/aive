@@ -77,11 +77,11 @@ val buildAndroidDjlTokenizerNative = registerAndroidRustLibrary(
     outputDir = generatedAndroidDjlTokenizerJniDir,
 )
 
-// Keystore file for release signing: HAIVE_KEYSTORE_PATH, else the central workflow's KEYSTORE_FILE,
+// Keystore file for release signing: AIVE_KEYSTORE_PATH, else the central workflow's KEYSTORE_FILE,
 // else app/keystore.jks at the repository root. Null (unsigned release) when none exists.
 fun releaseKeystorePath(): String? {
     val candidates = listOf(
-        System.getenv("HAIVE_KEYSTORE_PATH"),
+        System.getenv("AIVE_KEYSTORE_PATH"),
         System.getenv("KEYSTORE_FILE"),
         rootProject.file("app/keystore.jks").path,
     )
@@ -124,8 +124,8 @@ android {
     }
 
     // Release signing (GitHub APK in multiplatform.yml, Play bundle in the central android-play-release
-    // run). multiplatform.yml's android-keystore action exports HAIVE_KEYSTORE_PATH and
-    // HAIVE_KEYSTORE_TYPE; the central run writes app/keystore.jks and exports KEYSTORE_FILE. Both
+    // run). multiplatform.yml's android-keystore action exports AIVE_KEYSTORE_PATH and
+    // AIVE_KEYSTORE_TYPE; the central run writes app/keystore.jks and exports KEYSTORE_FILE. Both
     // supply KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD. Without a keystore (local builds, PRs) the
     // release build stays unsigned instead of failing.
     signingConfigs {
@@ -133,14 +133,14 @@ android {
             val keyStorePath = releaseKeystorePath()
             if (keyStorePath != null) {
                 storeFile = file(keyStorePath)
-                storeType = System.getenv("HAIVE_KEYSTORE_TYPE")?.takeUnless { it.isBlank() }
+                storeType = System.getenv("AIVE_KEYSTORE_TYPE")?.takeUnless { it.isBlank() }
                     ?: if (keyStorePath.endsWith(".jks", ignoreCase = true)) "JKS" else "PKCS12"
                 storePassword = System.getenv("KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("KEY_ALIAS")
                 // The android-keystore action rebuilds a PKCS12 keystore, and PKCS12 cannot hold a key
                 // password different from the store password (keytool ignores -destkeypass), so for
                 // that keystore the key is recovered with the store password.
-                val rebuiltPkcs12 = System.getenv("HAIVE_KEYSTORE_TYPE").equals("PKCS12", ignoreCase = true)
+                val rebuiltPkcs12 = System.getenv("AIVE_KEYSTORE_TYPE").equals("PKCS12", ignoreCase = true)
                 keyPassword = if (rebuiltPkcs12) {
                     System.getenv("KEYSTORE_PASSWORD")
                 } else {

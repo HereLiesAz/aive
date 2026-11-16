@@ -153,8 +153,8 @@ jobs:
       - name: Export Android signing path
         if: github.event_name != 'pull_request'
         run: |
-          echo "HAIVE_KEYSTORE_PATH=${{ steps.signing.outputs.keystore-path }}" >> "$GITHUB_ENV"
-          echo "HAIVE_KEYSTORE_TYPE=${{ steps.signing.outputs.store-type }}" >> "$GITHUB_ENV"
+          echo "AIVE_KEYSTORE_PATH=${{ steps.signing.outputs.keystore-path }}" >> "$GITHUB_ENV"
+          echo "AIVE_KEYSTORE_TYPE=${{ steps.signing.outputs.store-type }}" >> "$GITHUB_ENV"
 
       - name: Select Android release versionCode
         if: github.event_name != 'pull_request'
@@ -167,7 +167,7 @@ jobs:
             echo "::error::Generated Android versionCode $VERSION_CODE is outside the Play-supported range"
             exit 1
           fi
-          echo "HAIVE_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "AIVE_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
           echo "Android release versionCode: $VERSION_CODE"
 
       - name: Verify release immutability policy
@@ -233,7 +233,7 @@ jobs:
               :androidApp:assemblePlayDebug :androidApp:assembleGithubDebug \
               :androidApp:minifyPlayReleaseWithR8 :androidApp:minifyGithubReleaseWithR8
           else
-            ./gradlew -Papp.versionCode="$HAIVE_VERSION_CODE" \
+            ./gradlew -Papp.versionCode="$AIVE_VERSION_CODE" \
               -Papp.versionName="$AIVE_VERSION" \
               :androidApp:bundlePlayRelease \
               :androidApp:assembleGithubRelease
