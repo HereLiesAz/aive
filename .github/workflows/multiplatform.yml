@@ -304,9 +304,6 @@ jobs:
           ./gradlew --stop
           pkill -f KotlinCompileDaemon || true
 
-      - name: Build Web JS
-        run: ./gradlew :webApp:jsBrowserProductionWebpack
-
       - name: Build Web Wasm
         run: ./gradlew :webApp:wasmJsBrowserProductionWebpack
 
