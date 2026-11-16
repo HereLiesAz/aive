@@ -243,7 +243,7 @@ class MainActivity : ComponentActivity() {
             }
 
             if (!startupReady) {
-                HaiveSplashScreen()
+                AiveSplashScreen()
             } else {
                 var credentials by remember { mutableStateOf(initialCredentials) }
                 var repositoryCredentials by remember { mutableStateOf(initialRepositoryCredentials) }
@@ -812,6 +812,7 @@ class MainActivity : ComponentActivity() {
      * reclaim whatever of it (complete or partial) is still on disk.
      */
     private fun removeRetiredOnDevicePlannerFiles() {
+        // Legacy input path: the retired planner lived under the app's previous directory name.
         val retired = java.io.File(filesDir, "haive/orchestration")
         if (!retired.exists()) return
         Thread({ retired.deleteRecursively() }, "retired-planner-cleanup").start()
@@ -835,15 +836,15 @@ class MainActivity : ComponentActivity() {
 
 /** The static logo shown until startup is ready. */
 @Composable
-fun HaiveSplashScreen() {
+fun AiveSplashScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(colorResource(R.color.haive_icon_background)), // Azphalt Ink (colors.xml)
+            .background(colorResource(R.color.aive_icon_background)), // Azphalt Ink (colors.xml)
         contentAlignment = Alignment.Center,
     ) {
         Image(
-            painter = painterResource(R.drawable.haive_splash_logo),
+            painter = painterResource(R.drawable.aive_splash_logo),
             contentDescription = stringResource(R.string.splash_logo_description),
             modifier = Modifier.size(280.dp),
             contentScale = ContentScale.Fit,

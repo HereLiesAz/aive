@@ -21,14 +21,14 @@ class RepositoryDiscoveryTest {
                 "/user" -> """{"login":"az"}"""
                 "/user/repos" -> """
                     [
-                      {"id":1,"name":"haive","owner":{"login":"az"},"default_branch":"main","html_url":"https://github.com/az/haive","description":"Company OS"},
+                      {"id":1,"name":"aive","owner":{"login":"az"},"default_branch":"main","html_url":"https://github.com/az/aive","description":"Company OS"},
                       {"id":2,"name":"unrelated","owner":{"login":"az"},"default_branch":"main","html_url":"https://github.com/az/unrelated","description":null}
                     ]
                 """.trimIndent()
                 "/search/repositories" -> """
                     {"items":[
-                      {"id":1,"name":"haive","owner":{"login":"az"},"default_branch":"main","html_url":"https://github.com/az/haive","description":"duplicate owned result"},
-                      {"id":9,"name":"haive-tools","owner":{"login":"someone-else"},"default_branch":"trunk","html_url":"https://github.com/someone-else/haive-tools","description":"External helpers"}
+                      {"id":1,"name":"aive","owner":{"login":"az"},"default_branch":"main","html_url":"https://github.com/az/aive","description":"duplicate owned result"},
+                      {"id":9,"name":"aive-tools","owner":{"login":"someone-else"},"default_branch":"trunk","html_url":"https://github.com/someone-else/aive-tools","description":"External helpers"}
                     ]}
                 """.trimIndent()
                 else -> error("Unexpected request ${request.url}")
@@ -41,9 +41,9 @@ class RepositoryDiscoveryTest {
             githubTokenProvider = RepositoryServiceTokenProvider { "token" },
         )
 
-        val results = discovery.search(RepositorySource.GitHub, "haive")
+        val results = discovery.search(RepositorySource.GitHub, "aive")
 
-        assertEquals(listOf("az/haive", "someone-else/haive-tools"), results.map { it.fullName })
+        assertEquals(listOf("az/aive", "someone-else/aive-tools"), results.map { it.fullName })
         assertTrue(results.first().ownedByCurrentUser)
         assertFalse(results.last().ownedByCurrentUser)
         assertEquals("trunk", results.last().defaultBranch)
@@ -83,11 +83,11 @@ class RepositoryDiscoveryTest {
         val engine = MockEngine { request ->
             val owned = request.url.parameters["owned"] == "true"
             val body = if (owned) {
-                """[{"id":4,"name":"Haive","path_with_namespace":"az/haive","default_branch":"main","web_url":"https://gitlab.com/az/haive","description":"Mine"}]"""
+                """[{"id":4,"name":"Aive","path_with_namespace":"az/aive","default_branch":"main","web_url":"https://gitlab.com/az/aive","description":"Mine"}]"""
             } else {
                 """[
-                    {"id":4,"name":"Haive","path_with_namespace":"az/haive","default_branch":"main","web_url":"https://gitlab.com/az/haive","description":"Mine"},
-                    {"id":7,"name":"Haive Examples","path_with_namespace":"community/haive-examples","default_branch":"develop","web_url":"https://gitlab.com/community/haive-examples","description":"Examples"}
+                    {"id":4,"name":"Aive","path_with_namespace":"az/aive","default_branch":"main","web_url":"https://gitlab.com/az/aive","description":"Mine"},
+                    {"id":7,"name":"Aive Examples","path_with_namespace":"community/aive-examples","default_branch":"develop","web_url":"https://gitlab.com/community/aive-examples","description":"Examples"}
                 ]"""
             }
             respond(body, headers = headersOf(HttpHeaders.ContentType, "application/json"))
@@ -98,9 +98,9 @@ class RepositoryDiscoveryTest {
             gitlabTokenProvider = RepositoryServiceTokenProvider { "token" },
         )
 
-        val results = discovery.search(RepositorySource.GitLab, "haive")
+        val results = discovery.search(RepositorySource.GitLab, "aive")
 
-        assertEquals(listOf("az/haive", "community/haive-examples"), results.map { it.fullName })
+        assertEquals(listOf("az/aive", "community/aive-examples"), results.map { it.fullName })
         assertTrue(results.first().ownedByCurrentUser)
         assertFalse(results.last().ownedByCurrentUser)
         client.close()

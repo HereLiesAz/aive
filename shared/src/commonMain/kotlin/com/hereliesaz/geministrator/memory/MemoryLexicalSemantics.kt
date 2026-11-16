@@ -64,10 +64,10 @@ data class MemoryLexicalAnalysis(
 }
 
 /**
- * Small built-in resolver used until the generated lexical resource is shipped with Haive.
+ * Small built-in resolver used until the generated lexical resource is shipped with Aive.
  *
  * Unlike a blind stemmer it only declares a verb when the normalized form belongs to the bounded
- * action vocabulary Haive already treats as meaningful. Noun normalization is deliberately light;
+ * action vocabulary Aive already treats as meaningful. Noun normalization is deliberately light;
  * proper names and unknown concepts remain untouched so a model/WordNet backend can handle them.
  */
 object RuleBasedMemoryLexicon : MemoryLexicon {

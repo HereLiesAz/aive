@@ -59,7 +59,7 @@ sealed interface TaskExecutor {
     ) : TaskExecutor
 
     /**
-     * Execute [delegate] on another authenticated Haive compute node.
+     * Execute [delegate] on another authenticated Aive compute node.
      *
      * Distribution changes placement only; the delegated executor remains the semantic source of
      * what the task actually does.

@@ -3,7 +3,7 @@ package com.hereliesaz.geministrator
 import com.hereliesaz.geministrator.domain.HallMonitorReport
 import kotlinx.serialization.json.Json
 
-private const val HALL_MONITOR_TRIAL_LAUNCH_PREFIX = "__HAIVE_HALL_MONITOR_TEST_SOLUTION__"
+private const val HALL_MONITOR_TRIAL_LAUNCH_PREFIX = "__AIVE_HALL_MONITOR_TEST_SOLUTION__"
 private const val HALL_MONITOR_TRIAL_LAUNCH_SEPARATOR = "::"
 
 /** The keeper's two explicit steps out of a Nanny freeze. */

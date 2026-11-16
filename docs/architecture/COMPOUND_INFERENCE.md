@@ -200,8 +200,8 @@ The production-safe form has these rules:
 - proposers are isolated siblings and never depend on another proposer's output
 - proposer roles may not have implementation authority or require repository-write capability
 - proposers emit bounded `TaskPlan` candidate artifacts and do not mutate the repository
-- each provider artifact is tagged with `haive.inferenceInvocationId`, allowing downstream genealogy to name the exact producing invocation
-- a deterministic `haive.genealogy-governance` system-executor node runs after all proposers and before aggregation
+- each provider artifact is tagged with `aive.inferenceInvocationId`, allowing downstream genealogy to name the exact producing invocation
+- a deterministic `aive.genealogy-governance` system-executor node runs after all proposers and before aggregation
 - the governance gate requires at least two candidate invocation records and blocks missing genealogy or circular derivation
 - shared input/evidence is recorded as common ancestry; it makes candidate agreement ineligible to count as independent consensus but does not block synthesis of the candidates
 - the original task ID becomes the aggregator task, preserving its durable workflow identity and original required outputs

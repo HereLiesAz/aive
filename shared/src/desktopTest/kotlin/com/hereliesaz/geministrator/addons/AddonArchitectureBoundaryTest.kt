@@ -72,8 +72,8 @@ class AddonArchitectureBoundaryTest {
     @Test
     fun addonApiObjectGraphDoesNotExposeMemory() {
         visited.clear()
-        checkClassForMemory(HaiveAddonApi::class.java)
-        checkClassForMemory(HaiveAddonMediator::class.java)
+        checkClassForMemory(AiveAddonApi::class.java)
+        checkClassForMemory(AiveAddonMediator::class.java)
         checkClassForMemory(AddonInstallation::class.java)
         checkClassForMemory(AzphaltPackageManifest::class.java)
     }

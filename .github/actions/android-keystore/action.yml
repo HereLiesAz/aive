@@ -71,7 +71,7 @@ runs:
       run: |
         set -euo pipefail
 
-        work="$RUNNER_TEMP/haive-signing"
+        work="$RUNNER_TEMP/aive-signing"
         mkdir -p "$work"
         chmod 700 "$work"
 
@@ -106,7 +106,7 @@ runs:
         key_pem="$work/key.pem"
         cert_pem="$work/cert.pem"
         chain_pem="$work/chain.pem"
-        keystore="$work/haive-release.p12"
+        keystore="$work/aive-release.p12"
 
         if ! materialise "${KEYSTORE_PRIVATE:-}" "$key_pem"; then
           materialise "${KEYSTORE_RSA:-}" "$key_pem" || true

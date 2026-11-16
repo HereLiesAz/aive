@@ -39,19 +39,19 @@ private class JvmBitcosRuntime private constructor(
 
 private fun loadBitcosNativeLibrary() {
     runCatching {
-        System.loadLibrary("haive_bitcos")
+        System.loadLibrary("aive_bitcos")
     }.onSuccess {
         return
     }
 
-    val mappedName = System.mapLibraryName("haive_bitcos")
+    val mappedName = System.mapLibraryName("aive_bitcos")
     val resourcePath = "bitcos/$mappedName"
     val stream = BitcosNativeBridge::class.java.classLoader
         .getResourceAsStream(resourcePath)
         ?: error("Bundled Rust BITCOS library $resourcePath was not found.")
 
     stream.use { input ->
-        val directory = Files.createTempDirectory("haive-bitcos-")
+        val directory = Files.createTempDirectory("aive-bitcos-")
         val library = directory.resolve(mappedName)
         Files.copy(input, library, StandardCopyOption.REPLACE_EXISTING)
         library.toFile().deleteOnExit()

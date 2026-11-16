@@ -45,10 +45,10 @@ import kotlinx.coroutines.runInterruptible
  * Desktop-only coding provider for linked Local Git projects.
  *
  * The model never receives shell access. It receives a bounded repository snapshot and returns a
- * unified diff. Haive checks every path Git would touch, validates the diff with `git apply --check`,
+ * unified diff. Aive checks every path Git would touch, validates the diff with `git apply --check`,
  * applies it inside an isolated Git worktree, and commits the result as this task's checkpoint, on the
- * workflow run's `haive/run-...` branch when that branch can fast-forward to it. Every Git command
- * runs with repository hooks and the fsmonitor disabled, so Haive itself never runs repository code;
+ * workflow run's `aive/run-...` branch when that branch can fast-forward to it. Every Git command
+ * runs with repository hooks and the fsmonitor disabled, so Aive itself never runs repository code;
  * Git still honours the user's own configured filters (for example LFS) when it checks files out.
  * Verification must use a genuinely sandboxed test-capable provider.
  */
@@ -460,11 +460,11 @@ internal class LocalWorkspaceAgentProvider(
         val branch = workspaceBranch(request)
         val runBranch = runBranch(request)
         val workspace = withContext(Dispatchers.IO) {
-            Files.createTempDirectory("haive-${safeSegment(request.taskRunId.value)}-").toFile()
+            Files.createTempDirectory("aive-${safeSegment(request.taskRunId.value)}-").toFile()
         }
         // Hooks run on `worktree add` (post-checkout) and `commit`; an empty hooks directory disables them.
         val hooksDir = withContext(Dispatchers.IO) {
-            Files.createTempDirectory("haive-empty-hooks-").toFile()
+            Files.createTempDirectory("aive-empty-hooks-").toFile()
         }
         val noHooks = arrayOf("-c", "core.hooksPath=${hooksDir.absolutePath}")
         // Set before `worktree add` starts: a cancellation mid-command can leave its branch behind.
@@ -531,16 +531,16 @@ internal class LocalWorkspaceAgentProvider(
             }
 
             val firstObjectiveLine = request.objective.trim().lineSequence().firstOrNull().orEmpty()
-            val commitMessage = "Haive: ${firstObjectiveLine.take(68)}".trimEnd()
+            val commitMessage = "Aive: ${firstObjectiveLine.take(68)}".trimEnd()
 
             git(workspace, "add", "--all").requireSuccess("stage workspace changes")
             val commit = git(
                 workspace,
                 *noHooks,
                 "-c",
-                "user.name=Haive",
+                "user.name=Aive",
                 "-c",
-                "user.email=haive@local.invalid",
+                "user.email=aive@local.invalid",
                 "commit",
                 "-m",
                 commitMessage,
@@ -935,12 +935,12 @@ internal class LocalWorkspaceAgentProvider(
     }
 
     private fun workspaceBranch(request: AgentTaskRequest): String =
-        "haive/${safeSegment(request.taskRunId.value).take(40)}-${UUID.randomUUID().toString().take(12)}"
+        "aive/${safeSegment(request.taskRunId.value).take(40)}-${UUID.randomUUID().toString().take(12)}"
 
     /** The workflow run's branch, which each of its tasks' checkpoints extends; null outside a run. */
     private fun runBranch(request: AgentTaskRequest): String? =
         request.orchestrationContext.workflowRunId?.value?.let { runId ->
-            "haive/run-" + safeSegment(runId).take(48).trimEnd('-', '.', '_').removeSuffix(".lock").ifBlank { "run" }
+            "aive/run-" + safeSegment(runId).take(48).trimEnd('-', '.', '_').removeSuffix(".lock").ifBlank { "run" }
         }
 
     /**
@@ -955,13 +955,13 @@ internal class LocalWorkspaceAgentProvider(
         val definition = line(context.taskDefinitionId?.value)
         return buildList {
             when {
-                name != null && definition != null && name != definition -> add("Haive-Task: $name ($definition)")
-                name != null -> add("Haive-Task: $name")
-                definition != null -> add("Haive-Task: $definition")
+                name != null && definition != null && name != definition -> add("Aive-Task: $name ($definition)")
+                name != null -> add("Aive-Task: $name")
+                definition != null -> add("Aive-Task: $definition")
             }
-            line(context.workflowRunId?.value)?.let { add("Haive-Run: $it") }
-            line(request.taskRunId.value)?.let { add("Haive-Task-Run: $it") }
-        }.joinToString("\n").ifEmpty { "Haive-Task-Run: unknown" }
+            line(context.workflowRunId?.value)?.let { add("Aive-Run: $it") }
+            line(request.taskRunId.value)?.let { add("Aive-Task-Run: $it") }
+        }.joinToString("\n").ifEmpty { "Aive-Task-Run: unknown" }
     }
 
     /**
@@ -995,7 +995,7 @@ internal class LocalWorkspaceAgentProvider(
         }
         onMove(RunBranchMove(ref = ref, previous = previous, head = headCommit))
         // The expected old value makes this a compare-and-swap; empty means "must not exist yet".
-        val moved = git(root, *noHooks, "update-ref", "-m", "Haive checkpoint", ref, headCommit, previous.orEmpty())
+        val moved = git(root, *noHooks, "update-ref", "-m", "Aive checkpoint", ref, headCommit, previous.orEmpty())
         return moved.exitCode == 0 && !moved.timedOut
     }
 

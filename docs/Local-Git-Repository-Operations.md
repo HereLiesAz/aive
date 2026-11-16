@@ -34,15 +34,15 @@ Each operation emits a `CommandOutput` artifact carrying repository metadata use
 Coding tasks run by the Local Git workspace agent (Desktop) each commit their own changes, so a workflow run leaves one Git checkpoint per DAG node that touched the repository:
 
 - Each task works in its own temporary worktree, starting from the newest `headCommit` among its dependencies' artifacts (else the repository's HEAD).
-- Its commit's subject is `Haive: <objective>`; the body names the task and the run as trailers:
+- Its commit's subject is `Aive: <objective>`; the body names the task and the run as trailers:
 
 ~~~
-Haive-Task: <task name> (<task id>)
-Haive-Run: <workflow run id>
-Haive-Task-Run: <task run id>
+Aive-Task: <task name> (<task id>)
+Aive-Run: <workflow run id>
+Aive-Task-Run: <task run id>
 ~~~
 
-- The commit then lands on the run's branch, `haive/run-<run id>`: the first task's commit creates it, and each later task whose base is still that branch's tip fast-forwards it. A task that started elsewhere (a parallel sibling got there first), or a run branch checked out in some worktree, keeps the commit on the task's own `haive/<task run>-<id>` branch instead. Branches only ever move by compare-and-swap, with hooks disabled.
+- The commit then lands on the run's branch, `aive/run-<run id>`: the first task's commit creates it, and each later task whose base is still that branch's tip fast-forwards it. A task that started elsewhere (a parallel sibling got there first), or a run branch checked out in some worktree, keeps the commit on the task's own `aive/<task run>-<id>` branch instead. Branches only ever move by compare-and-swap, with hooks disabled.
 - A task whose patch leaves the repository unchanged makes no commit and no checkpoint; its `CommandOutput` artifact carries the unchanged `headCommit`, so later tasks continue from it.
 - The task's `CodeChange` artifact records `checkpointCommit` (the commit's sha), `headCommit`, `branch`, and, inside a workflow run, `workflowRunId` and `taskName`. The creature's **Work** tab shows it as **Checkpoint**: the short sha and its branch.
 - With Entire recording on, each task's commit is attached as its own Entire checkpoint (`Entire.md`).
@@ -72,7 +72,7 @@ The command:
 Where it runs, from the newest upstream artifact that names one:
 
 - the `worktreePath` of a `worktree-branch` operation, if it lies under `<repo>-worktrees/`;
-- else its `headCommit` (for example the commit a Local Git agent made on its `haive/...` branch), checked out in a temporary detached worktree with hooks disabled and removed afterwards;
+- else its `headCommit` (for example the commit a Local Git agent made on its `aive/...` branch), checked out in a temporary detached worktree with hooks disabled and removed afterwards;
 - else, when nothing upstream names one, the linked folder itself.
 
 The process gets only an allowlisted environment (`PATH`, `HOME`, locale, temp folders, `JAVA_HOME`, Gradle and Android SDK locations, the Windows system variables) plus `CI=true`; provider keys and tokens are not passed. It is stopped after 20 minutes, when the app closes, or when its workflow stops polling it for two minutes (the run was cancelled or replaced); stopping ends the whole process tree.

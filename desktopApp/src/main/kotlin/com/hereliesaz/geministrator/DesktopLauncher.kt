@@ -18,7 +18,7 @@ fun main(args: Array<String>) {
         kotlin.system.exitProcess(runEntireAgentPlugin(args.drop(1)))
     }
     val splash = createDesktopSplash()
-    val icon = loadImage("haive-icon-color.png")
+    val icon = loadImage("aive-icon-color.png")
     val windowWatcher = Timer(40, null)
     windowWatcher.addActionListener {
         val appWindow = Window.getWindows().firstOrNull { window ->
@@ -46,7 +46,7 @@ fun main(args: Array<String>) {
 
 private fun createDesktopSplash(): JWindow? {
     if (GraphicsEnvironment.isHeadless()) return null
-    val logo = loadImage("haive_splash_logo.png") ?: return null
+    val logo = loadImage("aive_splash_logo.png") ?: return null
     val label = JLabel(logo)
     var result: JWindow? = null
     SwingUtilities.invokeAndWait {

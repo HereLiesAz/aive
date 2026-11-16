@@ -59,7 +59,7 @@ class GitLabWorkspaceAgentProviderTest {
                 request.method == HttpMethod.Get && request.url.encodedPath.endsWith("/repository/files/README.md/raw") ->
                     respondText("initial\n")
                 request.method == HttpMethod.Post && request.url.encodedPath.endsWith("/repository/branches") ->
-                    respondJson("""{"name":"haive/task-1-1"}""", HttpStatusCode.Created)
+                    respondJson("""{"name":"aive/task-1-1"}""", HttpStatusCode.Created)
                 request.method == HttpMethod.Post && request.url.encodedPath.endsWith("/repository/commits") ->
                     respondJson(
                         """{"id":"abc123def456","web_url":"https://gitlab.com/group/sub/repo/-/commit/abc123def456"}""",
@@ -104,7 +104,7 @@ class GitLabWorkspaceAgentProviderTest {
             it.method == HttpMethod.Post && it.url.encodedPath.endsWith("/repository/branches")
         }
         assertEquals("main", branchRequest.url.parameters["ref"])
-        assertTrue(branchRequest.url.parameters["branch"]?.startsWith("haive/task-1-") == true)
+        assertTrue(branchRequest.url.parameters["branch"]?.startsWith("aive/task-1-") == true)
 
         val commitRequest = requests.single {
             it.method == HttpMethod.Post && it.url.encodedPath.endsWith("/repository/commits")
@@ -123,7 +123,7 @@ class GitLabWorkspaceAgentProviderTest {
         assertEquals("abc123def456", artifact.metadata["headCommit"])
         assertEquals("main", artifact.metadata["baseBranch"])
         assertEquals("https://gitlab.com/group/sub/repo", artifact.metadata["repositoryUrl"])
-        assertTrue(artifact.metadata.getValue("compareUrl").contains("/-/compare/main...haive/"))
+        assertTrue(artifact.metadata.getValue("compareUrl").contains("/-/compare/main...aive/"))
         assertTrue(artifact.textContent.orEmpty().contains("+changed"))
         assertTrue(events.any { event ->
             event is AgentEvent.UsageReported && event.inputTokens == 18L && event.outputTokens == 8L
@@ -162,7 +162,7 @@ class GitLabWorkspaceAgentProviderTest {
                 request.method == HttpMethod.Get && request.url.encodedPath.endsWith("/repository/files/README.md/raw") ->
                     respondText("initial\n")
                 request.method == HttpMethod.Post && request.url.encodedPath.endsWith("/repository/branches") ->
-                    respondJson("""{"name":"haive/approval-task-1"}""", HttpStatusCode.Created)
+                    respondJson("""{"name":"aive/approval-task-1"}""", HttpStatusCode.Created)
                 request.method == HttpMethod.Post && request.url.encodedPath.endsWith("/repository/commits") ->
                     respondJson("""{"id":"approved123","web_url":"https://gitlab.com/group/sub/repo/-/commit/approved123"}""", HttpStatusCode.Created)
                 request.method == HttpMethod.Get && request.url.encodedPath.endsWith("/repository/commits/approved123/diff") ->

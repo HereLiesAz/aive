@@ -8,21 +8,21 @@ class AzphaltStoreMascotCoverageBatch5Test {
     @Test
     fun currentStoreWorkflowAndRolePersonasHaveCharacters() {
         val packages = mapOf(
-        "com.hereliesaz.haive.role.geolocation-analyst" to listOf("Geolocation Analyst"),
-        "com.hereliesaz.haive.role.incident-commander" to listOf("Incident Commander"),
-        "com.hereliesaz.haive.role.osint-verifier" to listOf("OSINT Verifier"),
-        "com.hereliesaz.haive.role.ux-researcher" to listOf("UX Researcher"),
-        "com.hereliesaz.haive.root-cause-repair" to listOf("Failure Diagnostician", "Repair Verifier"),
-        "com.hereliesaz.haive.scenario-planning" to listOf("Scenario Planner"),
-        "com.hereliesaz.haive.scientific-literature-review" to listOf("Review Scientist"),
-        "com.hereliesaz.haive.search-visibility" to listOf("Search Strategist"),
-        "com.hereliesaz.haive.sop-process-engineering" to listOf("Process Engineer"),
-        "com.hereliesaz.haive.structured-hiring" to listOf("Selection Designer"),
-        "com.hereliesaz.haive.supplier-due-diligence" to listOf("Supplier Analyst"),
-        "com.hereliesaz.haive.survey-research" to listOf("Survey Methodologist"),
-        "com.hereliesaz.haive.technical-documentation" to listOf("Technical Writer"),
-        "com.hereliesaz.haive.ux-research-to-design" to listOf("UX Researcher", "Interaction Designer"),
-        "com.hereliesaz.haive.vendor-evaluation" to listOf("Vendor Evaluator"),
+        "com.hereliesaz.aive.role.geolocation-analyst" to listOf("Geolocation Analyst"),
+        "com.hereliesaz.aive.role.incident-commander" to listOf("Incident Commander"),
+        "com.hereliesaz.aive.role.osint-verifier" to listOf("OSINT Verifier"),
+        "com.hereliesaz.aive.role.ux-researcher" to listOf("UX Researcher"),
+        "com.hereliesaz.aive.root-cause-repair" to listOf("Failure Diagnostician", "Repair Verifier"),
+        "com.hereliesaz.aive.scenario-planning" to listOf("Scenario Planner"),
+        "com.hereliesaz.aive.scientific-literature-review" to listOf("Review Scientist"),
+        "com.hereliesaz.aive.search-visibility" to listOf("Search Strategist"),
+        "com.hereliesaz.aive.sop-process-engineering" to listOf("Process Engineer"),
+        "com.hereliesaz.aive.structured-hiring" to listOf("Selection Designer"),
+        "com.hereliesaz.aive.supplier-due-diligence" to listOf("Supplier Analyst"),
+        "com.hereliesaz.aive.survey-research" to listOf("Survey Methodologist"),
+        "com.hereliesaz.aive.technical-documentation" to listOf("Technical Writer"),
+        "com.hereliesaz.aive.ux-research-to-design" to listOf("UX Researcher", "Interaction Designer"),
+        "com.hereliesaz.aive.vendor-evaluation" to listOf("Vendor Evaluator"),
         )
         packages.forEach { (packageId, roleNames) ->
             assertTrue(roleNames.isNotEmpty(), "$packageId exposes no role/persona")

@@ -59,7 +59,7 @@ so publish it first, as CI does:
 ./gradlew -p vendor/conveyance-h2g2 publishToMavenLocal
 
 AIVE_LIVE_RUNTIME_VERIFICATION=1 AIVE_LIVE_PROVIDER=llm7 AIVE_LIVE_HOSTED_MODEL=default \
-  ./gradlew -Phaive.useLocalH2g2=false -Phaive.useMavenLocalH2g2=true \
+  ./gradlew -Paive.useLocalH2g2=false -Paive.useMavenLocalH2g2=true \
   :providers:llm:jsBrowserTest :providers:llm:wasmJsBrowserTest \
   --tests 'com.hereliesaz.geministrator.providers.llm.ProviderNeutralLiveRuntimeVerificationTest'
 ~~~

@@ -18,7 +18,7 @@ import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TemplateRef
 import com.hereliesaz.geministrator.domain.anyEffectful
 import com.hereliesaz.geministrator.domain.effectiveTokenBudget
-import com.hereliesaz.geministrator.domain.haiveBuiltInRoles
+import com.hereliesaz.geministrator.domain.aiveBuiltInRoles
 import com.hereliesaz.geministrator.workflow.ArtifactVerdicts
 import com.hereliesaz.geministrator.workflow.StepOutputValidators
 
@@ -225,7 +225,7 @@ object BuiltInTemplates {
             "Give a step a role of its own only when no template fits its output."
 
     /** Every built-in as a catalog base. */
-    fun bases(roles: Collection<RoleDefinition> = haiveBuiltInRoles): List<TemplateBase> =
+    fun bases(roles: Collection<RoleDefinition> = aiveBuiltInRoles): List<TemplateBase> =
         (all + StepPresets.all).map(StepTemplate::base) + roles.map(RoleTemplates::base)
 }
 

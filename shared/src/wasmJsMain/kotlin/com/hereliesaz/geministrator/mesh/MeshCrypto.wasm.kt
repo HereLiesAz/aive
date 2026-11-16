@@ -8,7 +8,7 @@ import kotlin.js.JsString
 import kotlin.js.Promise
 import kotlinx.coroutines.await
 
-private external object HaiveMeshCrypto : JsAny {
+private external object AiveMeshCrypto : JsAny {
     val ready: Boolean
 
     fun randomBase64(size: Int): String
@@ -29,13 +29,13 @@ private external object HaiveMeshCrypto : JsAny {
 
 @OptIn(ExperimentalEncodingApi::class, ExperimentalWasmJsInterop::class)
 internal actual fun platformMeshCipherOrNull(key: ByteArray): MeshCipher? =
-    if (HaiveMeshCrypto.ready) BrowserMeshCipher(Base64.UrlSafe.encode(key)) else null
+    if (AiveMeshCrypto.ready) BrowserMeshCipher(Base64.UrlSafe.encode(key)) else null
 
 @OptIn(ExperimentalEncodingApi::class, ExperimentalWasmJsInterop::class)
 internal actual fun platformSecureRandomBytesOrNull(size: Int): ByteArray? =
     runCatching {
         require(size > 0)
-        Base64.UrlSafe.decode(HaiveMeshCrypto.randomBase64(size))
+        Base64.UrlSafe.decode(AiveMeshCrypto.randomBase64(size))
     }.getOrNull()
 
 @OptIn(ExperimentalEncodingApi::class, ExperimentalWasmJsInterop::class)
@@ -46,7 +46,7 @@ private class BrowserMeshCipher(
         plaintext: ByteArray,
         associatedData: ByteArray,
     ): MeshSealedPayload {
-        val encoded = HaiveMeshCrypto.sealBase64(
+        val encoded = AiveMeshCrypto.sealBase64(
             keyBase64 = keyBase64,
             plaintextBase64 = Base64.UrlSafe.encode(plaintext),
             associatedDataBase64 = Base64.UrlSafe.encode(associatedData),
@@ -64,7 +64,7 @@ private class BrowserMeshCipher(
         associatedData: ByteArray,
     ): ByteArray =
         Base64.UrlSafe.decode(
-            HaiveMeshCrypto.openBase64(
+            AiveMeshCrypto.openBase64(
                 keyBase64 = keyBase64,
                 nonceBase64 = Base64.UrlSafe.encode(payload.nonce),
                 ciphertextBase64 = Base64.UrlSafe.encode(payload.ciphertext),

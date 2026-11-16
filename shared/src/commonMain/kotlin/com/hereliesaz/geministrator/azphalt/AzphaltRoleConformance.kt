@@ -1,6 +1,6 @@
 package com.hereliesaz.geministrator.azphalt
 
-/** Normative structural checks for kind:"role" packages consumed by Haive. */
+/** Normative structural checks for kind:"role" packages consumed by Aive. */
 internal object AzphaltRoleConformance {
     private val executableSuffix = Regex(
         "\\.(?:js|mjs|cjs|jsx|ts|tsx|wasm|class|jar|dex|so|dll|dylib|exe|com|bat|cmd|sh|bash|zsh|fish|ps1|py|pyc|rb|php|pl|swift|kt|kts)$",

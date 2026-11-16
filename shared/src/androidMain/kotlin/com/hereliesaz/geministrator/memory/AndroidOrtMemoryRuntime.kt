@@ -232,7 +232,7 @@ class AndroidOrtMemorySessionManager(
         if (profilingEnabled) {
             val prefix = File(
                 profileDirectory,
-                "haive-ort-${model.modelId.hashCode().toUInt().toString(16)}-${System.nanoTime()}",
+                "aive-ort-${model.modelId.hashCode().toUInt().toString(16)}-${System.nanoTime()}",
             ).absolutePath
             options.enableProfiling(prefix)
         }

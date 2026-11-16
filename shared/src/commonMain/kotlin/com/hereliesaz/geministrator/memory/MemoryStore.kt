@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.memory
 
+import com.hereliesaz.geministrator.persistence.migrateLegacyKeysWithPrefix
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -104,6 +105,7 @@ class SettingsMemoryStore(
 
     init {
         require(compactEvery > 0)
+        settings.migrateLegacyKeysWithPrefix(storageKey)
     }
 
     override suspend fun read(): MemorySnapshot = mutex.withLock { loadUnlocked() }
@@ -227,7 +229,7 @@ class SettingsMemoryStore(
     private fun logKey(index: Int) = "$storageKey.log.$index"
 
     companion object {
-        const val DEFAULT_STORAGE_KEY: String = "haive.memory.persistence.v1"
+        const val DEFAULT_STORAGE_KEY: String = "aive.memory.persistence.v1"
         const val DEFAULT_COMPACT_EVERY: Int = 256
 
         val defaultJson: Json = Json {

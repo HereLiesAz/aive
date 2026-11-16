@@ -1,7 +1,7 @@
 package com.hereliesaz.geministrator.workflow.improvement
 
 import com.hereliesaz.geministrator.domain.BuiltInRoles
-import com.hereliesaz.geministrator.domain.haiveBuiltInRoles
+import com.hereliesaz.geministrator.domain.aiveBuiltInRoles
 import com.hereliesaz.geministrator.workflow.CodingWorkflowSuite
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -23,7 +23,7 @@ class ImprovementApplierTest {
     @Test
     fun m9_aHiveStepProposalShowsTheObjectiveItReplacesNextToTheTextThatReplacesIt() {
         val step = bugFix.tasks.first()
-        val preview = assertNotNull(ImprovementApplier.preview(proposal(ImprovementKind.HiveStep, "suite-bug-fix/${step.id.value}", "A shorter objective."), haiveBuiltInRoles, hives))
+        val preview = assertNotNull(ImprovementApplier.preview(proposal(ImprovementKind.HiveStep, "suite-bug-fix/${step.id.value}", "A shorter objective."), aiveBuiltInRoles, hives))
 
         assertEquals(step.objective, preview.before, "the whole objective that would be dropped, not only the new text")
         assertEquals("A shorter objective.", preview.after)
@@ -32,19 +32,19 @@ class ImprovementApplierTest {
 
     @Test
     fun m9_aProposalThatIsNotAReplacementHasNoPreviewAndOneThatCannotApplyHasNone() {
-        assertNull(ImprovementApplier.preview(proposal(ImprovementKind.RoleInstruction, "qa-engineer", "t"), haiveBuiltInRoles, hives))
-        assertNull(ImprovementApplier.preview(proposal(ImprovementKind.HiveStep, "suite-bug-fix/nope", "t"), haiveBuiltInRoles, hives))
-        assertNull(ImprovementApplier.preview(proposal(ImprovementKind.Other, "x", "t"), haiveBuiltInRoles, hives))
+        assertNull(ImprovementApplier.preview(proposal(ImprovementKind.RoleInstruction, "qa-engineer", "t"), aiveBuiltInRoles, hives))
+        assertNull(ImprovementApplier.preview(proposal(ImprovementKind.HiveStep, "suite-bug-fix/nope", "t"), aiveBuiltInRoles, hives))
+        assertNull(ImprovementApplier.preview(proposal(ImprovementKind.Other, "x", "t"), aiveBuiltInRoles, hives))
     }
 
     @Test
     fun s4_theCardWarnsWhenAProposalWouldDropTheRequirementThatTheLoopExamineItselfAndAllowsOneThatKeepsIt() {
         val propose = loop.tasks.single { it.id.value == "propose" }
-        val dropsMeta = assertNotNull(ImprovementApplier.preview(proposal(ImprovementKind.HiveStep, "${SelfImprovementLoop.HIVE_ID}/propose", "Write proposals about the swarm."), haiveBuiltInRoles, hives))
+        val dropsMeta = assertNotNull(ImprovementApplier.preview(proposal(ImprovementKind.HiveStep, "${SelfImprovementLoop.HIVE_ID}/propose", "Write proposals about the swarm."), aiveBuiltInRoles, hives))
         assertTrue(dropsMeta.loopViolations.any { "about the loop" in it }, dropsMeta.loopViolations.toString())
         assertEquals(propose.objective, dropsMeta.before)
 
-        val keeps = assertNotNull(ImprovementApplier.preview(proposal(ImprovementKind.HiveStep, "${SelfImprovementLoop.HIVE_ID}/propose", propose.objective + " Prefer fewer, sharper proposals."), haiveBuiltInRoles, hives))
+        val keeps = assertNotNull(ImprovementApplier.preview(proposal(ImprovementKind.HiveStep, "${SelfImprovementLoop.HIVE_ID}/propose", propose.objective + " Prefer fewer, sharper proposals."), aiveBuiltInRoles, hives))
         assertEquals(emptyList(), keeps.loopViolations, "the loop stays improvable: a change that keeps its rules is allowed")
     }
 

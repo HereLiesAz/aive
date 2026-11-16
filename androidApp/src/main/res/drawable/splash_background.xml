@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@color/haive_icon_background" />
+    <item android:drawable="@color/aive_icon_background" />
 </layer-list>

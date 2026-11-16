@@ -93,7 +93,7 @@ interface AddonUiApi {
     fun dispatchAction(namespace: String, actionId: String): Boolean
 }
 
-interface HaiveAddonApi {
+interface AiveAddonApi {
     val app: AddonAppApi
     val project: AddonProjectApi
     val repository: AddonRepositoryApi

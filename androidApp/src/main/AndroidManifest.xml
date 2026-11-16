@@ -27,7 +27,7 @@
         android:label="The Aive"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Haive">
+        android:theme="@style/Theme.Aive">
 
         <meta-data
             android:name="android.content.APP_PRIVACY_POLICY"
@@ -37,7 +37,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:theme="@style/Theme.Haive.Splash">
+            android:theme="@style/Theme.Aive.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

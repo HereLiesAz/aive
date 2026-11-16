@@ -57,7 +57,7 @@ class CredentialToolTest {
             "a\nb",
         ).forEach { assertFalse(CredentialTool.isSafeAccountId(it), it) }
         assertFailsWith<IllegalArgumentException> {
-            CredentialTool.windowsCredentialDeleteCommand("com.hereliesaz.haive", "x'; calc; '")
+            CredentialTool.windowsCredentialDeleteCommand("com.hereliesaz.aive", "x'; calc; '")
         }
     }
 
@@ -70,8 +70,8 @@ class CredentialToolTest {
     @Test
     fun theWindowsCredentialManagerCleanupRunsCmdkeyDirectly() {
         assertEquals(
-            listOf("cmdkey", "/delete:com.hereliesaz.haive/openai"),
-            CredentialTool.windowsCredentialDeleteCommand("com.hereliesaz.haive", "openai"),
+            listOf("cmdkey", "/delete:com.hereliesaz.aive/openai"),
+            CredentialTool.windowsCredentialDeleteCommand("com.hereliesaz.aive", "openai"),
         )
     }
 }

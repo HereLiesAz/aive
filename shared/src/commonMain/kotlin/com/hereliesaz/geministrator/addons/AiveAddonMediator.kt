@@ -7,7 +7,7 @@ import com.hereliesaz.geministrator.policy.PolicyResource
 import com.hereliesaz.geministrator.policy.PolicySubject
 import com.hereliesaz.geministrator.policy.isAllowed
 
-// Host interfaces injected by Haive core to fulfill Add-on requests securely
+// Host interfaces injected by Aive core to fulfill Add-on requests securely
 interface HostAppBridge { val version: String }
 interface HostProjectBridge { val currentProjectId: String? }
 interface HostRepositoryBridge {
@@ -45,7 +45,7 @@ interface HostUiBridge {
     fun dispatchAction(namespace: String, actionId: String): Boolean
 }
 
-class HaiveAddonMediator(
+class AiveAddonMediator(
     private val addonId: String,
     private val grantedPermissions: Set<HostPermission>,
     private val appBridge: HostAppBridge,
@@ -62,7 +62,7 @@ class HaiveAddonMediator(
     private val packageBridge: HostPackageBridge,
     private val settingsBridge: HostSettingsBridge,
     private val uiBridge: HostUiBridge
-) : HaiveAddonApi {
+) : AiveAddonApi {
 
     private val policySubject = PolicySubject.Addon(addonId, grantedPermissions)
 

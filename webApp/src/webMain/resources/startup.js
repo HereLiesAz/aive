@@ -1,11 +1,11 @@
 (() => {
     const failStartup = (message, error) => {
         console.error(message, error || "");
-        globalThis.__haiveStartupError = error ? `${message} ${error}` : message;
-        const splash = document.getElementById("haiveSplash");
+        globalThis.__aiveStartupError = error ? `${message} ${error}` : message;
+        const splash = document.getElementById("aiveSplash");
         if (splash) {
             splash.setAttribute("aria-label", "The Aive failed to start");
-            splash.dataset.startupError = globalThis.__haiveStartupError;
+            splash.dataset.startupError = globalThis.__aiveStartupError;
         }
     };
 
@@ -45,22 +45,22 @@
             // Some browsers expose non-configurable Navigator properties. The document
             // language remains a valid fallback for Compose in that case.
         }
-        globalThis.__haiveBrowserLocale = locale;
+        globalThis.__aiveBrowserLocale = locale;
         return locale;
     };
 
-    const loadHaive = () => new Promise((resolve, reject) => {
+    const loadAive = () => new Promise((resolve, reject) => {
         const script = document.createElement("script");
-        script.src = "haive.js";
+        script.src = "aive.js";
         script.onload = resolve;
-        script.onerror = () => reject(new Error("Could not load haive.js."));
+        script.onerror = () => reject(new Error("Could not load aive.js."));
         document.body.appendChild(script);
     });
 
     normalizeBrowserLocale();
-    loadHaive()
+    loadAive()
         .then(() => {
-            globalThis.__haiveAppScriptLoaded = true;
+            globalThis.__aiveAppScriptLoaded = true;
         })
         .catch((error) => {
             failStartup("The Aive could not load.", error);

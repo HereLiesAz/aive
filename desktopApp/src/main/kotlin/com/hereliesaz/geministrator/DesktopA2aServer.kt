@@ -46,7 +46,7 @@ internal class DesktopA2aServer(
     private val tokenStore: DesktopA2aServerTokenStore = DesktopA2aServerTokenStore(),
     /** The configured port; 0 picks a free one (tests). */
     val port: Int = configuredPort(),
-    preferencesNode: () -> Preferences = { Preferences.userRoot().node(PREFERENCES_NODE) },
+    preferencesNode: () -> Preferences = { LegacyDesktopNames.currentPreferencesNode(PREFERENCES_NODE) },
     /** This computer's IPv4 network addresses (not loopback, not link-local); replaced in tests. */
     private val networkAddresses: () -> List<String> = ::localNetworkAddresses,
 ) {
@@ -338,7 +338,7 @@ internal class DesktopA2aServer(
 
     companion object {
         const val DEFAULT_PORT = 41241
-        private const val PREFERENCES_NODE = "com/hereliesaz/haive/a2a-server"
+        private const val PREFERENCES_NODE = "com/hereliesaz/aive/a2a-server"
         private const val ENABLED_KEY = "enabled"
         private const val LAN_KEY = "lan"
         private const val ALLOWED_KEY = "lan-allowed"
@@ -393,6 +393,8 @@ internal open class DesktopA2aServerTokenStore {
             else -> null
         }
         result?.takeIf { it.ok }?.output?.trim()?.takeIf(String::isNotEmpty)
+            // A token saved under the pre-rename keychain service moves to the current service, then the old entry goes.
+            ?: LegacyKeychain.migrate(SERVICE, ACCOUNT) { write(it) }
     }.getOrNull()
 
     /** True when the OS store holds [token] afterwards. */
@@ -425,7 +427,7 @@ internal open class DesktopA2aServerTokenStore {
         File(DesktopDistributedComputeCredentialStore.windowsTokenFile().parentFile, "a2a-server-token.dpapi")
 
     private companion object {
-        const val SERVICE = "com.hereliesaz.haive.a2a-server"
+        const val SERVICE = "com.hereliesaz.aive.a2a-server"
         const val ACCOUNT = "a2a-token"
     }
 }

@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 
 class AzphaltRepositoryClientTest {
     @Test
-    fun searchIsScopedToHaiveAndWorkflowPackages() = runBlocking {
+    fun searchIsScopedToAiveAndWorkflowPackages() = runBlocking {
         var app: String? = null
         var kind: String? = null
         var query: String? = null
@@ -48,7 +48,7 @@ class AzphaltRepositoryClientTest {
 
         val result = client.search(query = "release")
 
-        assertEquals(HAIVE_AZPHALT_HOST_ID, app)
+        assertEquals(AIVE_AZPHALT_HOST_ID, app)
         assertEquals("workflow", kind)
         assertEquals("release", query)
         assertEquals("com.example.release", result.packages.single().id)
@@ -104,15 +104,16 @@ class AzphaltRepositoryClientTest {
                 )
             } else {
                 respond(
+                    // The first package targets only the legacy host id (legacy input): it must still be listed.
                     content = """
                         {
                           "packages":[
                             {
-                              "id":"com.hereliesaz.haive.feature-delivery",
+                              "id":"com.hereliesaz.aive.feature-delivery",
                               "name":"Feature Delivery",
                               "version":"1.0.0",
                               "kind":"workflow",
-                              "targetApps":["com.hereliesaz.aive","com.hereliesaz.haive"]
+                              "targetApps":["com.hereliesaz.haive"]
                             },
                             {
                               "id":"com.other.host.workflow",
@@ -142,9 +143,9 @@ class AzphaltRepositoryClientTest {
 
         val result = client.search(kinds = setOf("workflow", "role"))
 
-        assertEquals(listOf(HAIVE_AZPHALT_HOST_ID, null), apps)
+        assertEquals(listOf(AIVE_AZPHALT_HOST_ID, null), apps)
         assertEquals(
-            listOf("com.hereliesaz.haive.feature-delivery", "com.example.global.role"),
+            listOf("com.hereliesaz.aive.feature-delivery", "com.example.global.role"),
             result.packages.map { it.id },
         )
         assertEquals(2, result.total)
@@ -152,7 +153,7 @@ class AzphaltRepositoryClientTest {
     }
 
     @Test
-    fun detailDecodesHaiveWorkflowManifestWithoutNeedingUnknownManifestFields() = runBlocking {
+    fun detailDecodesAiveWorkflowManifestWithoutNeedingUnknownManifestFields() = runBlocking {
         val http = HttpClient(MockEngine { request ->
             assertEquals("/packages/com.example.release", request.url.encodedPath)
             respond(
@@ -177,7 +178,7 @@ class AzphaltRepositoryClientTest {
                         "files":{"LICENSE":"sha256-a","workflows/release.json":"sha256-b"},
                         "someFutureField":{"ignored":true},
                         "workflow":{
-                          "format":"haive.workflow.v1",
+                          "format":"aive.workflow.v1",
                           "definitions":[{"id":"release","name":"Release","path":"workflows/release.json"}],
                           "hostPermissions":["WorkflowRegister","WorkflowLaunch"]
                         }
@@ -193,7 +194,7 @@ class AzphaltRepositoryClientTest {
         val detail = client.detail("com.example.release")
 
         assertEquals("workflow", detail.kind)
-        assertEquals(HAIVE_WORKFLOW_FORMAT, detail.manifest?.workflow?.format)
+        assertEquals(AIVE_WORKFLOW_FORMAT, detail.manifest?.workflow?.format)
         assertEquals("workflows/release.json", detail.manifest?.workflow?.definitions?.single()?.path)
         assertEquals(listOf("WorkflowRegister", "WorkflowLaunch"), detail.manifest?.workflow?.hostPermissions)
         http.close()

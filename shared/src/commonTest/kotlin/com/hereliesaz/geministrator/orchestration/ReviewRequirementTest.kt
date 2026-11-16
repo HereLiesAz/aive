@@ -1,6 +1,6 @@
 package com.hereliesaz.geministrator.orchestration
 
-import com.hereliesaz.geministrator.domain.haiveBuiltInRoles
+import com.hereliesaz.geministrator.domain.aiveBuiltInRoles
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 
 class ReviewRequirementTest {
     private fun inputs(goal: String, review: Boolean = false, external: Boolean = false) =
-        RequirementInputs(goal, external, haiveBuiltInRoles, haiveBuiltInRoles.map { it.id.value }.toSet(), review)
+        RequirementInputs(goal, external, aiveBuiltInRoles, aiveBuiltInRoles.map { it.id.value }.toSet(), review)
 
     private fun step(id: String, template: String?, deps: List<String> = emptyList()) =
         OrchestrationPlanStep(id, id, "o", "", deps, templateId = template, templateInputs = emptyMap())

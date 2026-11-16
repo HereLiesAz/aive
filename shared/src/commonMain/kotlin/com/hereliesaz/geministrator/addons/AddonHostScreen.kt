@@ -28,7 +28,7 @@ import com.hereliesaz.geministrator.resources.addons_add_on_could_not_be_removed
 import com.hereliesaz.geministrator.resources.addons_add_on_state_could_not_be
 import com.hereliesaz.geministrator.resources.addons_add_on_storage_could_not_be
 import com.hereliesaz.geministrator.resources.addons_add_ons
-import com.hereliesaz.geministrator.resources.addons_azphalt_workflow_packages_installed_in_haive
+import com.hereliesaz.geministrator.resources.addons_azphalt_workflow_packages_installed_in_aive
 import com.hereliesaz.geministrator.resources.addons_disable
 import com.hereliesaz.geministrator.resources.addons_disabled
 import com.hereliesaz.geministrator.resources.addons_enable
@@ -76,7 +76,7 @@ fun AddonHostScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(stringResource(Res.string.addons_add_ons))
-        Text(stringResource(Res.string.addons_azphalt_workflow_packages_installed_in_haive))
+        Text(stringResource(Res.string.addons_azphalt_workflow_packages_installed_in_aive))
 
         storageFailure?.let { Text(stringResource(Res.string.addons_storage_error, it)) }
 

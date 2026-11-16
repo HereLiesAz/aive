@@ -324,7 +324,7 @@ def decision(qwen: RunnerResult, bitnet: RunnerResult) -> dict[str, Any]:
     runtime_ready = False
     return {
         "qualityParity": quality_parity,
-        "haiveRuntimeReady": runtime_ready,
+        "aiveRuntimeReady": runtime_ready,
         "adoptBitNet": quality_parity and runtime_ready,
         "reason": (
             "Do not adopt: Aive BITCOS currently provides ternary storage/decode primitives, "

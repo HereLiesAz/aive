@@ -1,4 +1,4 @@
-import haive.build.BrandAssets
+import aive.build.BrandAssets
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
@@ -7,7 +7,7 @@ plugins {
     alias(libs.plugins.composeCompiler)
 }
 
-val brandSourceLogo = rootProject.layout.projectDirectory.file("branding/haive_logo.png")
+val brandSourceLogo = rootProject.layout.projectDirectory.file("branding/aive_logo.png")
 val generatedWebBrandDir = layout.buildDirectory.dir("generated/brand/web")
 val generateWebBrandAssets = tasks.register("generateWebBrandAssets") {
     inputs.files(brandSourceLogo)
@@ -32,7 +32,7 @@ kotlin {
     js {
         browser {
             commonWebpackConfig {
-                outputFileName = "haive.js"
+                outputFileName = "aive.js"
             }
         }
         binaries.executable()
@@ -42,7 +42,7 @@ kotlin {
     wasmJs {
         browser {
             commonWebpackConfig {
-                outputFileName = "haive.js"
+                outputFileName = "aive.js"
             }
         }
         binaries.executable()
@@ -96,7 +96,7 @@ tasks.matching { task ->
                 "developmentExecutable"
             }
             val bundle = layout.buildDirectory.asFileTree.matching {
-                include("**/$targetDirectory/$executableDirectory/haive.js")
+                include("**/$targetDirectory/$executableDirectory/aive.js")
             }.files.firstOrNull()
                 ?: error("Could not locate $targetDirectory $executableDirectory web bundle after $name")
 

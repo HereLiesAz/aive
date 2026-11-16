@@ -25,7 +25,7 @@ The Aive is not an IDE. Source editing, terminals, and generic filesystem toolin
 
 ## Targets
 
-- Android — namespace `com.hereliesaz.aive`; application ID `com.hereliesaz.aive` for the `play` flavor and `com.hereliesaz.haive` for the `github` release flavor, kept permanently so GitHub-release installs upgrade in place
+- Android — namespace `com.hereliesaz.aive`; application ID `com.hereliesaz.aive` for both the `play` and `github` flavors (GitHub installs made under the earlier ID do not upgrade in place)
 - Desktop JVM
 - Independent headless JVM runtime (`cliApp/`), sharing the same engine and policy boundary
 - Web JavaScript
@@ -245,7 +245,7 @@ The composite build runs on JDK 21, and every module (Android included) targets 
 
 Web packaging uses isolated Maven publications because Kotlin/JS package generation cannot
 resolve the nested H2G2 composite build from within itself. CI publishes the pinned source
-checkouts with their native coordinates and enables `haive.useMavenLocalH2g2` to substitute
+checkouts with their native coordinates and enables `aive.useMavenLocalH2g2` to substitute
 the exact pinned dependencies with those local publications. Publication files are not
 renamed or rewritten: Maven and embedded JS package versions must stay consistent, or
 Yarn can try to download a local library from the npm registry. Rebuild the pinned

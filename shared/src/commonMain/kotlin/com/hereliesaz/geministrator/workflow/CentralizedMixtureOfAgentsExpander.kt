@@ -21,7 +21,14 @@ import com.hereliesaz.geministrator.policy.PolicyCodes
 import com.hereliesaz.geministrator.policy.decideRole
 import com.hereliesaz.geministrator.policy.isAllowed
 
-const val GENEALOGY_GOVERNANCE_SERVICE: String = "haive.genealogy-governance"
+const val GENEALOGY_GOVERNANCE_SERVICE: String = "aive.genealogy-governance"
+
+/** Legacy input id: persisted workflows from older builds name the service this way; read-side only. */
+private const val LEGACY_GENEALOGY_GOVERNANCE_SERVICE: String = "haive.genealogy-governance"
+
+/** Whether [service] names the genealogy-governance system executor (current id or the legacy id). */
+fun isGenealogyGovernanceService(service: String): Boolean =
+    service == GENEALOGY_GOVERNANCE_SERVICE || service == LEGACY_GENEALOGY_GOVERNANCE_SERVICE
 
 /**
  * Materializes centralized Mixture-of-Agents policy into ordinary workflow DAG nodes.

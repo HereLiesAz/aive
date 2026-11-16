@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.distributed
 
+import com.hereliesaz.geministrator.persistence.migrateLegacyKey
 import com.hereliesaz.geministrator.net.boundedBodyText
 import com.russhwolf.settings.Settings
 import io.ktor.client.HttpClient
@@ -286,11 +287,15 @@ class SettingsComputeNodeEnrolmentLedger(
     private val settings: Settings = Settings(),
     private val storageKey: String = DEFAULT_STORAGE_KEY,
 ) : ComputeNodeEnrolmentLedger {
+    init {
+        settings.migrateLegacyKey(storageKey)
+    }
+
     override fun isEnrolled(fingerprint: String): Boolean = settings.getStringOrNull(storageKey) == fingerprint
     override fun recordEnrolled(fingerprint: String) = settings.putString(storageKey, fingerprint)
     override fun forget() = settings.remove(storageKey)
 
     companion object {
-        const val DEFAULT_STORAGE_KEY: String = "haive.distributed-compute.enrolment.v1"
+        const val DEFAULT_STORAGE_KEY: String = "aive.distributed-compute.enrolment.v1"
     }
 }

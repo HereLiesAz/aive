@@ -196,7 +196,7 @@ class PolicyDecisionPointTest {
         }
     }
 
-    // --- Add-on host permissions (HaiveAddonMediator) -------------------------------------------
+    // --- Add-on host permissions (AiveAddonMediator) -------------------------------------------
 
     @Test
     fun hostPermissionsMatchFormerGrantCheck() {

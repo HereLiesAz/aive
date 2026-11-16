@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.inference.publishedReleaseAssetName
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import com.hereliesaz.geministrator.net.boundedBodyText
@@ -30,7 +31,10 @@ internal object DesktopPlannerModel {
     const val ENABLED = false
 
     const val RELEASE_API_URL = "https://api.github.com/repos/HereLiesAz/aive/releases/tags/orchestration-layer-epoch8"
-    const val ARCHIVE_NAME = "haive-orch_planner-int8-epoch8.tar.gz"
+    const val ARCHIVE_NAME = "aive-orch_planner-int8-epoch8.tar.gz"
+
+    /** Legacy input name: the archive is still published on the release under its previous name until republished. */
+    val PUBLISHED_ARCHIVE_NAME: String = requireNotNull(publishedReleaseAssetName(ARCHIVE_NAME))
     const val RUNTIME_ARTIFACT_ID = "orchestration:epoch8:planner:int8"
     const val QUANTIZATION = "int8"
 
@@ -80,11 +84,16 @@ internal class DesktopPlannerModelInstaller(
             val assets = loadReleaseAssets()
             // Only "<archive>.part001"-style assets; the release also carries "<archive>.parts.json"
             // and per-part ".sha256" files, which must not be joined into the archive.
-            val partPattern = Regex(Regex.escape(DesktopPlannerModel.ARCHIVE_NAME) + """\.part\d+""")
+            fun partPatternFor(archiveName: String) = Regex(Regex.escape(archiveName) + """\.part\d+""")
+            // Prefer the current asset name; fall back to the name the release was first published under.
+            val archiveName = listOf(DesktopPlannerModel.ARCHIVE_NAME, DesktopPlannerModel.PUBLISHED_ARCHIVE_NAME)
+                .firstOrNull { candidate -> assets.any { partPatternFor(candidate).matches(it.name) } }
+                ?: DesktopPlannerModel.ARCHIVE_NAME
+            val partPattern = partPatternFor(archiveName)
             val parts = assets
                 .filter { partPattern.matches(it.name) }
                 .sortedBy(ReleaseAsset::name)
-            check(parts.isNotEmpty()) { "No release parts found for ${DesktopPlannerModel.ARCHIVE_NAME}" }
+            check(parts.isNotEmpty()) { "No release parts found for $archiveName" }
 
             val partFiles = parts.mapIndexed { index, asset ->
                 val label = "part ${index + 1} of ${parts.size}"
@@ -97,14 +106,14 @@ internal class DesktopPlannerModelInstaller(
                 }
             }
 
-            val archive = File(staging, DesktopPlannerModel.ARCHIVE_NAME)
+            val archive = File(staging, archiveName)
             progress("Joining ${parts.size} parts…")
             BufferedOutputStream(FileOutputStream(archive)).use { output ->
                 partFiles.forEach { part -> BufferedInputStream(FileInputStream(part)).use { it.copyTo(output) } }
             }
 
-            val checksumAsset = assets.singleOrNull { it.name == "${DesktopPlannerModel.ARCHIVE_NAME}.sha256" }
-                ?: error("Missing archive checksum for ${DesktopPlannerModel.ARCHIVE_NAME}")
+            val checksumAsset = assets.singleOrNull { it.name == "$archiveName.sha256" }
+                ?: error("Missing archive checksum for $archiveName")
             val expectedSha = downloadText(checksumAsset.downloadUrl).trim().substringBefore(' ').lowercase()
             check(expectedSha.matches(SHA256_REGEX)) { "Invalid archive checksum" }
             progress("Verifying archive…")

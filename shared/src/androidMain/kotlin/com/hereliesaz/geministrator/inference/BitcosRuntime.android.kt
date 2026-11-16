@@ -17,7 +17,7 @@ private class JvmBitcosRuntime private constructor(
 
     companion object {
         fun create(): BitcosRuntime? = runCatching {
-            System.loadLibrary("haive_bitcos")
+            System.loadLibrary("aive_bitcos")
             val version = BitcosNativeBridge.abiVersion()
             check(version == BITCOS_ABI_VERSION) {
                 "Native BITCOS ABI $version does not match shared ABI $BITCOS_ABI_VERSION."

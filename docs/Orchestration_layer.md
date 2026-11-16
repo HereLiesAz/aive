@@ -1442,7 +1442,7 @@ Prompt 18 — Package the Aive Orchestration Model Family
 
 Produce:
 
-"haive-orchestration-models-manifest.json"
+"aive-orchestration-models-manifest.json"
 
 For each model include:
 

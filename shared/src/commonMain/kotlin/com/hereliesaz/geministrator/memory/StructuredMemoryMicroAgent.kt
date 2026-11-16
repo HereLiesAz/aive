@@ -270,7 +270,7 @@ internal fun MemoryMutationBatch.toMicroAgentProposalJson(packet: MemoryWorkPack
 private val PROPOSAL_JSON = Json { encodeDefaults = true }
 
 private fun MemoryWorkPacket.renderMicroAgentPrompt(role: MemoryMicroAgentRole): String = buildString {
-    appendLine("You are a local Haive memory micro-agent.")
+    appendLine("You are a local Aive memory micro-agent.")
     appendLine("ROLE: ${role.name}")
     appendLine("STAGE: ${stage.name}")
     appendLine("PACKET: $packetKey")

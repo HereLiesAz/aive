@@ -1,22 +1,29 @@
 package com.hereliesaz.geministrator.domain
 
-const val ROLE_COLLECTION_MARKER_ID: String = "__haive-role-collection__"
+const val ROLE_COLLECTION_MARKER_ID: String = "__aive-role-collection__"
+
+/** Legacy input id: the marker id written by older builds; still recognised when reading stored roles. */
+private const val LEGACY_ROLE_COLLECTION_MARKER_ID: String = "__haive-role-collection__"
+
+/** Whether [id] is the internal role-collection marker (current id, or the legacy id found in older stored roles). */
+fun isRoleCollectionMarkerId(id: String): Boolean =
+    id == ROLE_COLLECTION_MARKER_ID || id == LEGACY_ROLE_COLLECTION_MARKER_ID
 
 /**
  * Built-in roster exposed by the app, including governance roles defined outside [BuiltInRoles] and the 29 new starting
  * role templates ([RoleStartingTemplates]), so Breeds, the tray and Add creature list them with no screen of their own.
  */
-val haiveBuiltInRoles: List<RoleDefinition>
+val aiveBuiltInRoles: List<RoleDefinition>
     get() = BuiltInRoles.all + HallMonitorRole.definition + RoleStartingTemplates.roles
 
 fun resolveRoleCollection(stored: List<RoleDefinition>): List<RoleDefinition> {
-    val marker = stored.firstOrNull { it.id.value == ROLE_COLLECTION_MARKER_ID }
-    val persisted = stored.filterNot { it.id.value == ROLE_COLLECTION_MARKER_ID }
+    val marker = stored.firstOrNull { isRoleCollectionMarkerId(it.id.value) }
+    val persisted = stored.filterNot { isRoleCollectionMarkerId(it.id.value) }
     val overrides = persisted.associateBy(RoleDefinition::id)
-    val builtInIds = haiveBuiltInRoles.mapTo(linkedSetOf(), RoleDefinition::id)
+    val builtInIds = aiveBuiltInRoles.mapTo(linkedSetOf(), RoleDefinition::id)
 
     val resolvedById = linkedMapOf<RoleDefinitionId, RoleDefinition>()
-    haiveBuiltInRoles.forEach { builtIn ->
+    aiveBuiltInRoles.forEach { builtIn ->
         resolvedById[builtIn.id] = overrides[builtIn.id] ?: builtIn
     }
     persisted.filter { it.id !in builtInIds }.forEach { custom ->
@@ -52,12 +59,12 @@ fun roleCollectionEntries(
     existingStored: List<RoleDefinition>,
 ): List<RoleDefinition> {
     val active = activeRoles
-        .filterNot { it.id.value == ROLE_COLLECTION_MARKER_ID }
+        .filterNot { isRoleCollectionMarkerId(it.id.value) }
         .distinctBy(RoleDefinition::id)
         .map { it.copy(enabled = true) }
     val activeIds = active.mapTo(mutableSetOf(), RoleDefinition::id)
-    val historical = (existingStored + haiveBuiltInRoles)
-        .filterNot { it.id.value == ROLE_COLLECTION_MARKER_ID }
+    val historical = (existingStored + aiveBuiltInRoles)
+        .filterNot { isRoleCollectionMarkerId(it.id.value) }
         .distinctBy(RoleDefinition::id)
         .filter { it.id !in activeIds }
         .map { it.copy(enabled = false) }
@@ -66,21 +73,21 @@ fun roleCollectionEntries(
 }
 
 fun defaultRoleCollectionEntries(existingStored: List<RoleDefinition>): List<RoleDefinition> {
-    val defaults = haiveBuiltInRoles.map { it.copy(enabled = true, preferredProviderId = null) }
+    val defaults = aiveBuiltInRoles.map { it.copy(enabled = true, preferredProviderId = null) }
     val builtInIds = defaults.mapTo(mutableSetOf(), RoleDefinition::id)
     val historicalCustom = existingStored
-        .filterNot { it.id.value == ROLE_COLLECTION_MARKER_ID || it.id in builtInIds }
+        .filterNot { isRoleCollectionMarkerId(it.id.value) || it.id in builtInIds }
         .distinctBy(RoleDefinition::id)
         .map { it.copy(enabled = false) }
     return listOf(roleCollectionMarker(defaults.map(RoleDefinition::id))) + defaults + historicalCustom
 }
 
 fun activeRoles(roles: Collection<RoleDefinition>): List<RoleDefinition> =
-    roles.filter { it.enabled && it.id.value != ROLE_COLLECTION_MARKER_ID }
+    roles.filter { it.enabled && !isRoleCollectionMarkerId(it.id.value) }
 
 private fun roleCollectionMarker(order: List<RoleDefinitionId>): RoleDefinition = RoleDefinition(
     id = RoleDefinitionId(ROLE_COLLECTION_MARKER_ID),
-    name = "Haive role collection",
+    name = "Aive role collection",
     description = "Internal role collection ordering record.",
     instructions = order.joinToString("\n") { it.value },
     enabled = false,

@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.inference
 
+import com.hereliesaz.geministrator.persistence.migrateLegacyKey
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ArtifactId
@@ -55,6 +56,10 @@ class SettingsInferenceStateStore(
     /** How much of each growing list is kept; the oldest entries go first. A test gives small ones. */
     private val limits: InferenceStateLimits = InferenceStateLimits(),
 ) {
+    init {
+        settings.migrateLegacyKey(storageKey)
+    }
+
     suspend fun registerModel(model: InferenceModelDescriptor) = update { snapshot ->
         snapshot.copy(
             models = snapshot.models.upsert(PersistedInferenceModel.fromDomain(model)) {
@@ -220,7 +225,7 @@ class SettingsInferenceStateStore(
 
     companion object {
         const val CURRENT_SCHEMA_VERSION: Int = 1
-        const val DEFAULT_STORAGE_KEY: String = "haive.inference.fabric.v1"
+        const val DEFAULT_STORAGE_KEY: String = "aive.inference.fabric.v1"
 
         val defaultJson: Json = Json {
             encodeDefaults = true
@@ -233,7 +238,7 @@ class SettingsInferenceStateStore(
         fun createDurable(): SettingsInferenceStateStore = SettingsInferenceStateStore(
             com.hereliesaz.geministrator.persistence.ChunkedStringSettings(
                 delegate = Settings(),
-                chunkedKeys = setOf(DEFAULT_STORAGE_KEY),
+                chunkedKeys = com.hereliesaz.geministrator.persistence.chunkedKeysWithLegacy(DEFAULT_STORAGE_KEY),
             ),
         )
     }

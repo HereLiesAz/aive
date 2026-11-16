@@ -52,7 +52,7 @@ class OpenAiCompatibleChatApiTest {
                 apiKeyProvider = LlmApiKeyProvider { "provider-key" },
                 model = "example/model",
                 baseUrl = "https://example.test/v1/",
-                extraHeaders = mapOf("X-Title" to "Haive"),
+                extraHeaders = mapOf("X-Title" to "Aive"),
                 client = client,
             ).generate("Do the work")
 

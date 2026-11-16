@@ -1,4 +1,4 @@
-import haive.build.BrandAssets
+import aive.build.BrandAssets
 import org.gradle.api.tasks.Exec
 
 plugins {
@@ -7,7 +7,7 @@ plugins {
     alias(libs.plugins.composeCompiler)
 }
 
-val brandSourceLogo = rootProject.layout.projectDirectory.file("branding/haive_logo.png")
+val brandSourceLogo = rootProject.layout.projectDirectory.file("branding/aive_logo.png")
 val generatedAndroidBrandResDir = layout.buildDirectory.dir("generated/brand/android/res")
 val generateAndroidBrandAssets = tasks.register("generateAndroidBrandAssets") {
     inputs.files(brandSourceLogo)
@@ -175,11 +175,10 @@ android {
         }
         create("github") {
             dimension = "distribution"
-            // CRITICAL DATA-COMPATIBILITY INVARIANT:
-            // GitHub releases existed as com.hereliesaz.haive before the product rename.
-            // Keep this applicationId forever so Android performs an in-place update and preserves
-            // SharedPreferences, Keystore entries, workflow state, settings, roles, and tokens.
-            applicationId = "com.hereliesaz.haive"
+            // The GitHub-release flavor shares the product application ID with Play. Installs made
+            // under the previous (pre-rename) ID are a different package to Android and do not
+            // upgrade in place; keepers must install this build fresh.
+            applicationId = "com.hereliesaz.aive"
         }
     }
 

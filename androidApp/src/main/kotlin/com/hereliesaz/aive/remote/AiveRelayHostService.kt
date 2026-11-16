@@ -118,7 +118,7 @@ class AiveRelayHostService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.haive_monochrome)
+            .setSmallIcon(R.drawable.aive_monochrome)
             .setContentTitle(getString(R.string.remote_access_notification_title))
             .setContentText(text)
             .setContentIntent(open)

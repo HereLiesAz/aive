@@ -4,7 +4,7 @@ import com.hereliesaz.geministrator.domain.BudgetClass
 import com.hereliesaz.geministrator.domain.RoleStartingTemplates
 import com.hereliesaz.geministrator.domain.effectiveAllowedTools
 import com.hereliesaz.geministrator.domain.effectiveBudgetClass
-import com.hereliesaz.geministrator.domain.haiveBuiltInRoles
+import com.hereliesaz.geministrator.domain.aiveBuiltInRoles
 import com.hereliesaz.geministrator.queen.splitToolCeiling
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,7 +24,7 @@ class RoleStartingTemplatesTest {
         "code-implementer", "test-writer", "trainer",
     )
 
-    private val byRoleId get() = haiveBuiltInRoles.associateBy { it.id.value }
+    private val byRoleId get() = aiveBuiltInRoles.associateBy { it.id.value }
 
     @Test
     fun allThirtySevenIdsArePresentAndUnique() {
@@ -50,7 +50,7 @@ class RoleStartingTemplatesTest {
     @Test
     fun everyOneIsARoleInTheRosterWithInstructionsAndABudgetClass() {
         val roles = byRoleId
-        assertEquals(haiveBuiltInRoles.size, roles.size, "role ids in the roster are unique")
+        assertEquals(aiveBuiltInRoles.size, roles.size, "role ids in the roster are unique")
         for (entry in RoleStartingTemplates.catalog) {
             val role = assertNotNull(roles[entry.roleId], "no role ${entry.roleId} in the roster")
             assertTrue(role.instructions.isNotBlank(), "${entry.roleId} has no instructions")

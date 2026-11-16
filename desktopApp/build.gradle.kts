@@ -1,4 +1,4 @@
-import haive.build.BrandAssets
+import aive.build.BrandAssets
 import org.gradle.api.tasks.Exec
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
@@ -30,7 +30,7 @@ kotlin {
     jvmToolchain(21)
 }
 
-val brandSourceLogo = rootProject.layout.projectDirectory.file("branding/haive_logo.png")
+val brandSourceLogo = rootProject.layout.projectDirectory.file("branding/aive_logo.png")
 val generatedDesktopBrandDir = layout.buildDirectory.dir("generated/brand/desktop")
 val generateDesktopBrandAssets = tasks.register("generateDesktopBrandAssets") {
     inputs.files(brandSourceLogo)
@@ -52,7 +52,7 @@ val generateDesktopBrandAssets = tasks.register("generateDesktopBrandAssets") {
 
 val bitcosManifest = rootProject.layout.projectDirectory.file("native/bitcos/Cargo.toml")
 val bitcosSources = rootProject.layout.projectDirectory.dir("native/bitcos/src")
-val bitcosNativeLibraryName = System.mapLibraryName("haive_bitcos")
+val bitcosNativeLibraryName = System.mapLibraryName("aive_bitcos")
 val generatedDesktopBitcosNativeDir = layout.buildDirectory.dir("generated/bitcos/desktop")
 val buildDesktopBitcosNative = tasks.register<Exec>("buildDesktopBitcosNative") {
     group = "build"
@@ -134,13 +134,13 @@ compose.desktop {
             includeAllModules = true
 
             linux {
-                iconFile.set(generatedDesktopBrandDir.get().file("haive-icon-color.png").asFile)
+                iconFile.set(generatedDesktopBrandDir.get().file("aive-icon-color.png").asFile)
             }
             macOS {
-                iconFile.set(generatedDesktopBrandDir.get().file("haive-icon.icns").asFile)
+                iconFile.set(generatedDesktopBrandDir.get().file("aive-icon.icns").asFile)
             }
             windows {
-                iconFile.set(generatedDesktopBrandDir.get().file("haive-icon.ico").asFile)
+                iconFile.set(generatedDesktopBrandDir.get().file("aive-icon.ico").asFile)
                 menuGroup = "The Aive"
                 upgradeUuid = "e1d4b3c2-5f6a-4b8e-9d7c-0a1b2c3d4e5f"
             }

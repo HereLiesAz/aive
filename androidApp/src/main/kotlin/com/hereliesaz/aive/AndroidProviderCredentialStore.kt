@@ -17,6 +17,17 @@ internal class AndroidProviderCredentialStore(context: Context) {
         Context.MODE_PRIVATE,
     )
 
+    init {
+        // Keys saved before the rename live in a file and Keystore key under the old names; move them across.
+        LegacyKeystoreSecrets.migrate(
+            context = context,
+            legacyPreferencesName = LEGACY_PREFERENCES_NAME,
+            legacyKeyAlias = LEGACY_KEY_ALIAS,
+            hasCurrent = { preferences.contains(ciphertextKey(it)) },
+            storeCurrent = { name, plaintext -> seal(name, plaintext) },
+        )
+    }
+
     fun read(providerId: String): String? {
         val encrypted = preferences.getString(ciphertextKey(providerId), null) ?: return null
         val iv = preferences.getString(ivKey(providerId), null) ?: return null
@@ -45,7 +56,10 @@ internal class AndroidProviderCredentialStore(context: Context) {
         require(ProviderCatalog.entry(providerId) != null) { "Unknown provider $providerId" }
         val clean = apiKey.trim()
         require(clean.isNotEmpty()) { "API key is required" }
+        seal(providerId, clean)
+    }
 
+    private fun seal(providerId: String, clean: String) {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
         val encrypted = cipher.doFinal(clean.encodeToByteArray())
@@ -99,10 +113,14 @@ internal class AndroidProviderCredentialStore(context: Context) {
 
     private companion object {
         const val ANDROID_KEYSTORE = "AndroidKeyStore"
-        const val KEY_ALIAS = "haive.provider.api-key"
-        /** Keystore key of the removed Jules-only credential store. */
+        const val KEY_ALIAS = "aive.provider.api-key"
+        /** Keystore key of the removed Jules-only store (legacy input name: it is only ever deleted). */
         const val RETIRED_JULES_KEY_ALIAS = "haive.jules.api-key"
-        const val PREFERENCES_NAME = "haive.credentials"
+        const val PREFERENCES_NAME = "aive.credentials"
+
+        // Legacy input names: older builds saved keys under these. Read once to migrate, then retired.
+        const val LEGACY_PREFERENCES_NAME = "haive.credentials"
+        const val LEGACY_KEY_ALIAS = "haive.provider.api-key"
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val GCM_TAG_BITS = 128
     }

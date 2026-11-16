@@ -43,7 +43,7 @@ class AddonSystemTest {
         override fun dispatchAction(namespace: String, actionId: String) = true
     }
 
-    private fun mediator(permissions: Set<HostPermission>) = HaiveAddonMediator(
+    private fun mediator(permissions: Set<HostPermission>) = AiveAddonMediator(
         "testAddon",
         permissions,
         dummyBridge,

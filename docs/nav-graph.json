@@ -1982,7 +1982,7 @@
     "MainActivity.kt"
    ],
    "symbols": [
-    "HaiveSplashScreen"
+    "AiveSplashScreen"
    ],
    "edits": [],
    "canonical_for": [],
@@ -2088,7 +2088,7 @@
    "from": "android.splash",
    "to": "hive.live",
    "trigger": "startup ready",
-   "callback": "HaiveSplashScreen",
+   "callback": "AiveSplashScreen",
    "source": "MainActivity.kt:231",
    "kind": "system",
    "status": "present",

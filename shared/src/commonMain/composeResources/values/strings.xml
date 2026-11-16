@@ -5,7 +5,7 @@
     <string name="addons_add_on_state_could_not_be">Add-on state could not be saved.</string>
     <string name="addons_add_on_storage_could_not_be">Add-on storage could not be read.</string>
     <string name="addons_add_ons">ADD-ONS</string>
-    <string name="addons_azphalt_workflow_packages_installed_in_haive">Add-ons installed in The Aive. Find more in the Shop.</string>
+    <string name="addons_azphalt_workflow_packages_installed_in_aive">Add-ons installed in The Aive. Find more in the Shop.</string>
     <string name="addons_disable">Disable</string>
     <string name="addons_disabled">Disabled</string>
     <string name="addons_enable">Enable</string>

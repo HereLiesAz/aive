@@ -21,7 +21,7 @@ This layout is lossless for already-ternary weights. The Aive does not convert o
 verified ternary checkpoint
         |
         v
-haive-bitcos pack
+aive-bitcos pack
         |
         v
 HBCS v1 container
@@ -78,7 +78,7 @@ Scales are currently absent or raw little-endian IEEE binary16. Architecture/tok
 
 ## Converter
 
-The `haive-bitcos` CLI takes a JSON manifest pointing to already-ternary signed-i8 tensor files and optional raw fp16 scale files.
+The `aive-bitcos` CLI takes a JSON manifest pointing to already-ternary signed-i8 tensor files and optional raw fp16 scale files.
 
 It supports:
 

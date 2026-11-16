@@ -22,14 +22,14 @@ import kotlinx.serialization.json.Json
 /**
  * Standards-only client for azphalt.store or any conforming Azphalt Repository API.
  *
- * The app id is always sent on catalog searches so app-scoped Haive workflows are visible while
+ * The app id is always sent on catalog searches so app-scoped Aive workflows are visible while
  * packages scoped to unrelated hosts stay out of the UI. Exact-id detail/download remains available
  * as required by the Repository API; the installer performs the authoritative targetApps check.
  */
 class AzphaltRepositoryClient(
     private val httpClient: HttpClient,
     repositoryUrl: String = AZPHALT_STORE_URL,
-    private val hostAppId: String = HAIVE_AZPHALT_HOST_ID,
+    private val hostAppId: String = AIVE_AZPHALT_HOST_ID,
     private val json: Json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
@@ -79,7 +79,7 @@ class AzphaltRepositoryClient(
             sort = sort,
             appId = null,
         )
-        val acceptedHostIds = setOf(hostAppId, LEGACY_HAIVE_AZPHALT_HOST_ID)
+        val acceptedHostIds = setOf(hostAppId, LEGACY_AZPHALT_HOST_ID)
         val compatible = unscoped.packages.filter { summary ->
             summary.targetApps.isEmpty() || summary.targetApps.any(acceptedHostIds::contains)
         }

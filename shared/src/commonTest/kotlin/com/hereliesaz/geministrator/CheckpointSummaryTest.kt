@@ -17,12 +17,12 @@ class CheckpointSummaryTest {
                 artifact("plan", emptyMap()),
                 artifact(
                     "change",
-                    mapOf(CHECKPOINT_COMMIT_METADATA_KEY to "0123456789abcdef0123", "branch" to "haive/run-r1"),
+                    mapOf(CHECKPOINT_COMMIT_METADATA_KEY to "0123456789abcdef0123", "branch" to "aive/run-r1"),
                 ),
             ),
         )
 
-        assertEquals("0123456789ab · haive/run-r1", summary)
+        assertEquals("0123456789ab · aive/run-r1", summary)
     }
 
     @Test
@@ -33,7 +33,7 @@ class CheckpointSummaryTest {
     @Test
     fun aTaskThatMadeNoCheckpointShowsNone() {
         assertNull(checkpointSummary(emptyList()))
-        assertNull(checkpointSummary(listOf(artifact("unchanged", mapOf("headCommit" to "abc", "branch" to "haive/x")))))
+        assertNull(checkpointSummary(listOf(artifact("unchanged", mapOf("headCommit" to "abc", "branch" to "aive/x")))))
     }
 
     private fun artifact(id: String, metadata: Map<String, String>) = ArtifactRef(

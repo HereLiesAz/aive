@@ -4,7 +4,7 @@ Other apps can run prompts on The Aive's providers and launch workflows through 
 
 ## Access
 
-- Bind with action `com.hereliesaz.aive.action.REMOTE`, setting the target package to either `com.hereliesaz.aive` (Play) or `com.hereliesaz.haive` (GitHub).
+- Bind with action `com.hereliesaz.aive.action.REMOTE`, setting the target package to `com.hereliesaz.aive` (Play and GitHub builds).
 - The service requires `com.hereliesaz.aive.permission.REMOTE`, which has `signature` protection. Only apps signed with The Aive's release key can bind.
   - Clients only request it with `<uses-permission>`. They must not declare it: a second definition under a different signing key makes installation fail.
   - On Android 11 and later, clients also need a `<queries>` entry for both packages.

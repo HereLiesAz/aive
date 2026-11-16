@@ -722,12 +722,12 @@ fn write_u64(target: &mut Vec<u8>, value: u64) {
 }
 
 #[no_mangle]
-pub extern "C" fn haive_bitcos_abi_version() -> u32 {
+pub extern "C" fn aive_bitcos_abi_version() -> u32 {
     BITCOS_VERSION as u32
 }
 
 #[no_mangle]
-pub extern "C" fn haive_bitcos_best_decode_backend() -> u32 {
+pub extern "C" fn aive_bitcos_best_decode_backend() -> u32 {
     best_decode_backend() as u32
 }
 
@@ -739,7 +739,7 @@ pub extern "C" fn haive_bitcos_best_decode_backend() -> u32 {
 /// bytes for the duration of this call. Null pointers are accepted only when the corresponding
 /// length is zero.
 #[no_mangle]
-pub unsafe extern "C" fn haive_bitcos_decode_payload(
+pub unsafe extern "C" fn aive_bitcos_decode_payload(
     element_count: u64,
     presence_ptr: *const u8,
     presence_len: usize,

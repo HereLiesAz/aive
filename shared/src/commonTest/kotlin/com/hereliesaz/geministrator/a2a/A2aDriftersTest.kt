@@ -2,7 +2,7 @@ package com.hereliesaz.geministrator.a2a
 
 import com.hereliesaz.geministrator.CreatureRigMapping
 import com.hereliesaz.geministrator.domain.AgentCapability
-import com.hereliesaz.geministrator.domain.haiveBuiltInRoles
+import com.hereliesaz.geministrator.domain.aiveBuiltInRoles
 import com.hereliesaz.geministrator.domain.requireStarterRoleCoverage
 import com.russhwolf.settings.MapSettings
 import io.ktor.client.HttpClient
@@ -145,7 +145,7 @@ class A2aDriftersTest {
         assertFalse(role.description.contains('\n'))
         assertTrue("Convert currency" in role.description)
 
-        val swarm = A2aDrifters.swarmWith(haiveBuiltInRoles, role)
+        val swarm = A2aDrifters.swarmWith(aiveBuiltInRoles, role)
         requireStarterRoleCoverage(swarm)
         assertEquals(1, swarm.count { it.id == role.id })
         assertEquals(swarm, A2aDrifters.swarmWith(swarm, role), "letting it in twice keeps one")

@@ -14,7 +14,7 @@ import kotlin.time.ExperimentalTime
  * Agent-facing memory surface. Agents bank experience and query this service; they do not read
  * persistence directly.
  *
- * GRIP means Global Regular IMpression Print: Haive's memory-specific direct-recall operation.
+ * GRIP means Global Regular IMpression Print: Aive's memory-specific direct-recall operation.
  * Normal associative recall is cue-first. An agent that already carries semantic tags in its CoTR
  * can pass those tags directly to [grip] and request a deeper resolution only when the tags
  * themselves are not enough to recollect what it needs. Semantic cue tags include noun/entity,

@@ -179,7 +179,7 @@ private fun MemoryManagerProposal.toMutationBatch(
 }
 
 private fun MemoryWorkPacket.toManagerPrompt(): String = buildString {
-    appendLine("You are Haive's Memory Manager. Perform exactly one bounded memory-maintenance task.")
+    appendLine("You are Aive's Memory Manager. Perform exactly one bounded memory-maintenance task.")
     appendLine("You are not solving the user's task. You may only curate the supplied memory packet.")
     appendLine("STAGE: ${stage.name}")
     appendLine("PACKET: $packetKey")

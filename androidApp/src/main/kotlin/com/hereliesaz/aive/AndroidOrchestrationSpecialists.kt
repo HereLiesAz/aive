@@ -78,7 +78,8 @@ internal class AndroidOrchestrationSpecialistInstaller(
     context: Context,
     httpClient: HttpClient,
 ) {
-    private val installRoot = File(context.filesDir, "haive/orchestration-specialists")
+    // Models downloaded by older builds sit under the legacy directory name; they are moved, not fetched again.
+    private val installRoot = LegacyFiles.adopt(context.filesDir, "aive/orchestration-specialists", "haive/orchestration-specialists")
     private val downloader = AndroidResumableFileDownloader(httpClient)
     private val mutex = Mutex()
 

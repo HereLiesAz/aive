@@ -117,10 +117,10 @@ class CrashReportCoreTest {
     fun relayJsonEscapesAndMarksAnr() {
         val json = CrashReport(
             CrashReport.Kind.ANR, "0123456789abcdef", "ApplicationNotResponding: \"x\"\n\tat a.B(C)",
-            "1.0", 3, "com.hereliesaz.haive", "14 (API 34)", "g", "p", "2026-01-01T00:00:00Z",
+            "1.0", 3, "com.hereliesaz.aive", "14 (API 34)", "g", "p", "2026-01-01T00:00:00Z",
         ).toRelayJson()
         assertTrue(json.contains("\"STACK_TRACE\":\"ApplicationNotResponding: \\\"x\\\"\\n\\tat a.B(C)\""))
-        assertTrue(json.contains("\"PACKAGE_NAME\":\"com.hereliesaz.haive\""))
+        assertTrue(json.contains("\"PACKAGE_NAME\":\"com.hereliesaz.aive\""))
         assertEquals("\"\\u0001\"", CrashReport.jsonString("\u0001"))
     }
 }

@@ -61,7 +61,7 @@ if (loaded != null) RiggedCreatureSurface(loaded, state, { motionPhase }, Modifi
 |---|---|
 | `index.html`, `style.css`, `app.js` | Editor UI |
 | `rig-core.js` | Format constants, evaluator and validator. It mirrors the Kotlin `PuppetRigEvaluator` and has no DOM access. |
-| `sw.js`, `manifest.webmanifest`, `icons/` | PWA shell. Icons come from `branding/haive_monochrome.png`. Bump `VERSION` in `sw.js` whenever a shell file changes. |
+| `sw.js`, `manifest.webmanifest`, `icons/` | PWA shell. Icons come from `branding/aive_monochrome.png`. Bump `VERSION` in `sw.js` whenever a shell file changes. |
 | `validate-rig.mjs` | `node tools/puppet-rig/validate-rig.mjs file.rig.json` validates a rig and checks the atlas size. |
 | `test/smoke.cjs` | Headless Playwright smoke test (see below). |
 | `slice/` | Builds starter rigs from the character art: parts sheets (`slice_parts.py`, `build_rigs.py`). See `slice/README.md`. |

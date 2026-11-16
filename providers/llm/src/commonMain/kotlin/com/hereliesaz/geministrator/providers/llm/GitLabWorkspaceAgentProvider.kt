@@ -50,7 +50,7 @@ fun interface GitLabWorkspaceTokenProvider {
  * Governed coding provider for linked GitLab repositories.
  *
  * The model receives a bounded tree and selected file contents, then returns structured full-file
- * actions. Haive validates those actions and commits them atomically to a dedicated GitLab branch.
+ * actions. Aive validates those actions and commits them atomically to a dedicated GitLab branch.
  * No shell or test capability is claimed because this provider does not execute repository code.
  */
 class GitLabWorkspaceAgentProvider(
@@ -647,7 +647,7 @@ class GitLabWorkspaceAgentProvider(
                 appendLine("===== FILE: $path =====")
                 appendLine(content)
                 if (!complete) {
-                    appendLine("[TRUNCATED BY HAIVE — THIS FILE IS READ-ONLY IN THIS TASK]")
+                    appendLine("[TRUNCATED BY AIVE — THIS FILE IS READ-ONLY IN THIS TASK]")
                 } else {
                     completePaths += path
                 }
@@ -664,7 +664,7 @@ class GitLabWorkspaceAgentProvider(
         context: RepositoryContext,
         snapshot: String,
     ): String = buildString {
-        appendLine("You are editing a real GitLab repository through Haive's validated commit API.")
+        appendLine("You are editing a real GitLab repository through Aive's validated commit API.")
         appendLine("Return ONLY one JSON object. Do not use Markdown fences or commentary.")
         appendLine("Schema:")
         appendLine("{\"commitMessage\":\"concise message\",\"actions\":[{\"action\":\"create|update|delete\",\"filePath\":\"relative/path\",\"content\":\"full file content for create/update; omit or empty for delete\"}]}")
@@ -875,7 +875,7 @@ class GitLabWorkspaceAgentProvider(
     private fun workspaceBranch(request: AgentTaskRequest, runId: ProviderRunId): String {
         val task = safeSegment(request.taskRunId.value).take(40)
         val suffix = safeSegment(runId.value.substringAfterLast('/')).takeLast(12)
-        return "haive/$task-$suffix"
+        return "aive/$task-$suffix"
     }
 
     private fun safeSegment(value: String): String = value

@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.azphalt
 
+import com.hereliesaz.geministrator.persistence.migrateLegacyKey
 import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
@@ -83,6 +84,10 @@ class SettingsAzphaltInstallStore(
 ) : AzphaltInstallStore {
     private val mutex = Mutex()
 
+    init {
+        settings.migrateLegacyKey(storageKey)
+    }
+
     override suspend fun get(packageId: String): InstalledAzphaltWorkflowPackage? =
         mutex.withLock { readUnlocked().firstOrNull { it.packageId == packageId } }
 
@@ -110,7 +115,7 @@ class SettingsAzphaltInstallStore(
 
     companion object {
         // Kept for on-device compatibility; this store now records both workflow and role packages.
-        const val DEFAULT_STORAGE_KEY = "haive.azphalt.installed-workflows.v1"
+        const val DEFAULT_STORAGE_KEY = "aive.azphalt.installed-workflows.v1"
         private val ListSerializer = kotlinx.serialization.builtins.ListSerializer(
             InstalledAzphaltWorkflowPackage.serializer(),
         )
@@ -123,15 +128,15 @@ class AzphaltWorkflowPackageInstaller(
     private val publisherPins: AzphaltPublisherPinStore = SettingsAzphaltPublisherPinStore(),
     private val json: Json = SettingsWorkflowPersistence.defaultJson,
 ) {
-    /** Validate all Haive-facing semantics and decode every referenced payload before mutation. */
+    /** Validate all Aive-facing semantics and decode every referenced payload before mutation. */
     fun inspect(verification: AzphaltPackageVerification): AzphaltWorkflowInstallPlan {
         val pkg = verification.packageContents
         val manifest = pkg.manifest
         require(manifest.kind == "workflow" || manifest.kind == "role") {
-            "Azphalt package ${manifest.id} is kind ${manifest.kind}; Haive installs workflow and role packages"
+            "Azphalt package ${manifest.id} is kind ${manifest.kind}; Aive installs workflow and role packages"
         }
-        require(manifest.targetApps.isEmpty() || HAIVE_AZPHALT_HOST_ID in manifest.targetApps) {
-            "Azphalt package ${manifest.id} targets ${manifest.targetApps.joinToString()}, not $HAIVE_AZPHALT_HOST_ID"
+        require(manifest.targetApps.isEmpty() || manifest.targetApps.any(ACCEPTED_AZPHALT_HOST_IDS::contains)) {
+            "Azphalt package ${manifest.id} targets ${manifest.targetApps.joinToString()}, not $AIVE_AZPHALT_HOST_ID"
         }
 
         val definitions: List<WorkflowDefinition>
@@ -149,8 +154,8 @@ class AzphaltWorkflowPackageInstaller(
             val workflow = requireNotNull(manifest.workflow) {
                 "Workflow package ${manifest.id} does not contain a workflow manifest"
             }
-            require(workflow.format == HAIVE_WORKFLOW_FORMAT) {
-                "Unsupported workflow format ${workflow.format}; expected $HAIVE_WORKFLOW_FORMAT"
+            require(workflow.format in ACCEPTED_WORKFLOW_FORMATS) {
+                "Unsupported workflow format ${workflow.format}; expected $AIVE_WORKFLOW_FORMAT"
             }
             require(workflow.definitions.isNotEmpty()) { "Workflow package must contain at least one definition" }
             validateEntries(workflow.definitions.map { it.id to it.path }, "workflow definition", manifest.files, pkg.payload)
@@ -206,8 +211,8 @@ class AzphaltWorkflowPackageInstaller(
             val roleManifest = requireNotNull(manifest.role) {
                 "Role package ${manifest.id} does not contain a role manifest"
             }
-            require(roleManifest.format == HAIVE_ROLE_FORMAT) {
-                "Unsupported role format ${roleManifest.format}; expected $HAIVE_ROLE_FORMAT"
+            require(roleManifest.format in ACCEPTED_ROLE_FORMATS) {
+                "Unsupported role format ${roleManifest.format}; expected $AIVE_ROLE_FORMAT"
             }
             require(roleManifest.roles.isNotEmpty()) { "Role package must contain at least one role" }
             validateEntries(roleManifest.roles.map { it.id to it.path }, "swarm role", manifest.files, pkg.payload)
@@ -367,7 +372,7 @@ class AzphaltWorkflowPackageInstaller(
         plan.roles.forEach { role ->
             val builtIn = builtInsById[role.id]
             require(builtIn == null || sameReusableRole(builtIn, role)) {
-                "Workflow-package role id ${role.id.value} collides with a different built-in Haive role"
+                "Workflow-package role id ${role.id.value} collides with a different built-in Aive role"
             }
             val global = persistence.roles.get(role.id)
             require(global == null || sameReusableRole(global, role)) {
@@ -387,7 +392,7 @@ class AzphaltWorkflowPackageInstaller(
         plan.roles.forEach { role ->
             val builtIn = builtInsById[role.id]
             require(builtIn == null || sameReusableRole(builtIn, role)) {
-                "Role id ${role.id.value} collides with a different built-in Haive role"
+                "Role id ${role.id.value} collides with a different built-in Aive role"
             }
             val existing = persistence.roles.get(role.id)
             val previousRole = previouslyOwned[role.id]
@@ -413,7 +418,7 @@ class AzphaltWorkflowPackageInstaller(
     private inline fun <reified T> decodeUtf8(bytes: ByteArray, path: String): T = try {
         json.decodeFromString(bytes.decodeToString())
     } catch (failure: Exception) {
-        throw IllegalArgumentException("Invalid Haive JSON payload $path: ${failure.message}", failure)
+        throw IllegalArgumentException("Invalid Aive JSON payload $path: ${failure.message}", failure)
     }
 
     private fun validateEntries(

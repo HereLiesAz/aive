@@ -59,7 +59,7 @@ internal class DesktopOrchestrationAgentRuntime(
         val schema = """{"steps":[{"id":"step-id","name":"short name","objective":"bounded worker objective","roleId":"available-role-id","dependsOn":["prior-step-id"],"requiresHumanApproval":false}]}"""
         return buildString {
             append("<|im_start|>system\n")
-            append("You are Haive's bounded orchestration control model. ")
+            append("You are Aive's bounded orchestration control model. ")
             append("Create an executable dependency-correct DAG for the objective. Use only availableAgents role ids.")
             append(" Return exactly one JSON object and no markdown or prose. Output schema: ")
             append(schema)

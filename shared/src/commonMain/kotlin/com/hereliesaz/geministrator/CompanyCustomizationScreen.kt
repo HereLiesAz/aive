@@ -38,6 +38,7 @@ import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.IntegrationPolicy
 import com.hereliesaz.geministrator.domain.PromptReusePolicy
 import com.hereliesaz.geministrator.domain.ROLE_COLLECTION_MARKER_ID
+import com.hereliesaz.geministrator.domain.isRoleCollectionMarkerId
 import com.hereliesaz.geministrator.domain.RoleAuthority
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RoleDefinition
@@ -503,7 +504,7 @@ internal fun CustomCompanyProviderScreen(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            val reservedRoleId = roleIdDraft.trim() == ROLE_COLLECTION_MARKER_ID
+            val reservedRoleId = isRoleCollectionMarkerId(roleIdDraft.trim())
             // A creature's mind keeps its id: its creature, its breeds and its tasks hang on it.
             if (focusRole == null) OutlinedTextField(
                 colors = azphaltTextFieldColors(),
@@ -871,7 +872,7 @@ internal fun CustomCompanyProviderScreen(
                         if (
                             cleanId.isNotBlank() &&
                             cleanName.isNotBlank() &&
-                            cleanId != ROLE_COLLECTION_MARKER_ID &&
+                            !isRoleCollectionMarkerId(cleanId) &&
                             roleExecutionSourceDraft.isConfiguredExecutionSource() &&
                             roleSurfacesDraft.isConfiguredRoleSurfaces()
                         ) {

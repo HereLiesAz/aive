@@ -33,7 +33,7 @@
         if (imported) return imported;
         const bytes = fromBase64Url(keyBase64);
         if (bytes.length !== 32) {
-            throw new Error("Haive mesh room key must be exactly 256 bits.");
+            throw new Error("Aive mesh room key must be exactly 256 bits.");
         }
         imported = await crypto.subtle.importKey(
             "raw",
@@ -79,7 +79,7 @@
     ) {
         if (!ready) throw new Error("Web Crypto is unavailable.");
         const nonce = fromBase64Url(nonceBase64);
-        if (nonce.length !== 12) throw new Error("Invalid Haive mesh AES-GCM nonce.");
+        if (nonce.length !== 12) throw new Error("Invalid Aive mesh AES-GCM nonce.");
         const plaintext = await crypto.subtle.decrypt(
             {
                 name: "AES-GCM",
@@ -93,7 +93,7 @@
         return toBase64Url(new Uint8Array(plaintext));
     }
 
-    global.HaiveMeshCrypto = Object.freeze({
+    global.AiveMeshCrypto = Object.freeze({
         ready,
         randomBase64,
         sealBase64,

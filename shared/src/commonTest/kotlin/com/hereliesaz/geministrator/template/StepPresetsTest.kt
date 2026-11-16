@@ -35,7 +35,7 @@ class StepPresetsTest {
             assertEquals(preset.outputs.associate { it.name to it.validatorId }, preset.body.validators, preset.id)
             assertTrue(preset.inputs.any { it.required }, preset.id)
         }
-        assertEquals(everything.size, BuiltInTemplates.bases().size - com.hereliesaz.geministrator.domain.haiveBuiltInRoles.size)
+        assertEquals(everything.size, BuiltInTemplates.bases().size - com.hereliesaz.geministrator.domain.aiveBuiltInRoles.size)
     }
 
     @Test

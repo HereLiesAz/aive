@@ -242,7 +242,7 @@ class DesktopOrtMemorySessionManager(
         }
         val profilePrefix = File(
             System.getProperty("java.io.tmpdir"),
-            "haive-ort-${model.modelId.hashCode().toUInt().toString(16)}-${System.nanoTime()}",
+            "aive-ort-${model.modelId.hashCode().toUInt().toString(16)}-${System.nanoTime()}",
         ).absolutePath
         options.enableProfiling(profilePrefix)
 
