@@ -4,12 +4,9 @@ import android.content.Context
 import app.cash.sqldelight.async.coroutines.synchronous
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import com.hereliesaz.geministrator.persistence.db.WorkflowDatabase
-import com.hereliesaz.geministrator.UiStateMigration
 import com.hereliesaz.geministrator.UiStateSettings
 import com.hereliesaz.geministrator.prompts.RememberedTextSettings
-import com.russhwolf.settings.Settings
 import com.russhwolf.settings.SharedPreferencesSettings
-import java.io.File
 import kotlinx.coroutines.Dispatchers
 
 /**
@@ -33,8 +30,6 @@ object AndroidWorkflowPersistence {
             UiStateSettings.separate = SharedPreferencesSettings(
                 this.context!!.getSharedPreferences(UI_STATE_PREFERENCES, Context.MODE_PRIVATE),
             )
-            // Builds before the separate file kept this state in the default preferences: carry it over once.
-            runCatching { UiStateMigration.migrate(Settings(), UiStateSettings.separate!!) }
         }
         if (RememberedTextSettings.separate == null) {
             RememberedTextSettings.separate = SharedPreferencesSettings(
@@ -49,10 +44,6 @@ object AndroidWorkflowPersistence {
         }
         return SqlWorkflowPersistence(
             driver = AndroidSqliteDriver(WorkflowDatabase.Schema.synchronous(), appContext, DATABASE_NAME),
-            migrateFrom = LegacySettingsMigration(SettingsWorkflowPersistence.createDefault()) { exported ->
-                // App-private; the user's own data, kept until they clear app data or uninstall.
-                File(appContext.filesDir, "workflows-settings-backup-${System.currentTimeMillis()}.json").writeText(exported)
-            },
             // The driver is synchronous: keep its disk work off the main thread.
             dispatcher = Dispatchers.IO,
         )
@@ -67,5 +58,5 @@ object AndroidWorkflowPersistence {
     const val PRIVATE_PREFERENCES: String = "aive_private_settings"
 }
 
-/** Workflow state in the app's aive-workflows.db; the earlier SharedPreferences store moves in on first use. */
+/** Workflow state in the app's aive-workflows.db. */
 internal actual fun openDurableWorkflowPersistence(): DurableWorkflowPersistence = AndroidWorkflowPersistence.open()

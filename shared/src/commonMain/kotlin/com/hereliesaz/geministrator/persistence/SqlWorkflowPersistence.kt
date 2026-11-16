@@ -46,7 +46,6 @@ import kotlinx.serialization.json.Json
 class SqlWorkflowPersistence(
     driver: SqlDriver,
     private val json: Json = SettingsWorkflowPersistence.defaultJson,
-    migrateFrom: LegacySettingsMigration? = null,
     /**
      * Where the blocking SQLite calls run. The platforms' drivers are synchronous, so on the UI thread each read or
      * write stalls a frame; the apps pass an IO dispatcher. Null runs on the caller, which a test's scheduler needs.
@@ -56,9 +55,6 @@ class SqlWorkflowPersistence(
     private val database = WorkflowDatabase(driver)
     private val queries = database.workflowQueries
     private val mutex = Mutex()
-
-    /** Runs once, inside the first locked operation, so nothing reads before the move is complete. */
-    private var pendingMigration: LegacySettingsMigration? = migrateFrom
 
     override var lastCorruptionError: Throwable? = null
         private set
@@ -273,66 +269,11 @@ class SqlWorkflowPersistence(
         AppLog.record("workflows", "Pruned $excess of the oldest kept-aside corrupt workflow records (the cap is $MAX_KEPT_CORRUPT_ROWS).")
     }
 
-    /**
-     * Moves workflow state out of the Settings store this replaces, once. The previous store is
-     * handed to [LegacySettingsMigration.backup] as an export before it is cleared, so nothing is
-     * lost if the move is ever questioned. Unreadable Settings state is left where it is. A failure
-     * before the data commits leaves the move to be retried on the next start; once it has
-     * committed the move is final, and failing to clear the old copy is ignored.
-     */
-    private suspend fun migrateUnlocked(migration: LegacySettingsMigration) {
-        val marker = queries.meta(MIGRATED_FROM_SETTINGS).awaitAsOneOrNull()
-        val attempts = sqlUnreadableAttempts(marker)
-        // "done" is final; an unreadable copy is retried on later starts (it may have been repaired) until the cap.
-        if (marker != null && attempts == null) return
-        if (attempts != null && attempts >= SQL_MAX_UNREADABLE_ATTEMPTS) return
-        val exported = try {
-            migration.previous.exportJson()
-        } catch (failure: PersistenceCorruptionException) {
-            null
-        }
-        if (exported == null) {
-            queries.putMeta(MIGRATED_FROM_SETTINGS, sqlUnreadableMarker((attempts ?: 0) + 1))
-            AppLog.record("workflows", "The previous workflow store could not be read, so it was not moved (attempt ${(attempts ?: 0) + 1} of $SQL_MAX_UNREADABLE_ATTEMPTS).")
-            return
-        }
-        val snapshot = decodeImportSnapshot(exported, json)
-        if (snapshot.hasContent()) migration.backup(exported)
-        // The marker commits with the data, so a later failure can never make the next start import
-        // the stale Settings copy over newer rows and duplicate its events.
-        database.transaction {
-            if (snapshot.hasContent()) writeSnapshot(snapshot)
-            queries.putMeta(MIGRATED_FROM_SETTINGS, "done")
-        }
-        try {
-            migration.previous.clearWorkflowData()
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (_: Exception) {
-            // The data has moved and is marked as moved; a leftover Settings copy is never read again.
-        }
-    }
-
     private suspend fun <T> locked(block: suspend () -> T): T = mutex.withLock {
         if (dispatcher == null) lockedUnconfined(block) else withContext(dispatcher) { lockedUnconfined(block) }
     }
 
-    private suspend fun <T> lockedUnconfined(block: suspend () -> T): T = run {
-        pendingMigration?.let { migration ->
-            // Attempted once per process. A failure (backup I/O, a newer Settings schema) leaves
-            // the Settings state and the migration marker untouched, so a later start retries it;
-            // it must not make every repository call throw until then.
-            try {
-                migrateUnlocked(migration)
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (failure: Exception) {
-                AppLog.record("workflows", "Moving the previous workflow store failed and will be retried at the next start: ${failure.message ?: failure::class.simpleName}")
-            }
-            pendingMigration = null
-        }
-        block()
-    }
+    private suspend fun <T> lockedUnconfined(block: suspend () -> T): T = block()
 
     private suspend fun snapshotUnlocked(): PersistenceSnapshot = PersistenceSnapshot(
         version = SettingsWorkflowPersistence.CURRENT_SCHEMA_VERSION,
@@ -447,7 +388,6 @@ class SqlWorkflowPersistence(
             return hash.toULong().toString(16).padStart(16, '0')
         }
 
-        const val MIGRATED_FROM_SETTINGS = "migrated-from-settings"
         const val QUARANTINE_PREFIX = "quarantine:"
         const val CORRUPT_PREFIX = "corrupt:"
         const val MAX_KEPT_CORRUPT_ROWS = 1000
@@ -456,22 +396,3 @@ class SqlWorkflowPersistence(
 
 /** An unreadable row: [key] holds its payload in the `meta` table; [kind] is the record type. */
 data class QuarantinedRecord(val key: String, val kind: String, val reason: String)
-
-/** The Settings store a [SqlWorkflowPersistence] replaces, and where its pre-move export is kept. */
-class LegacySettingsMigration(
-    val previous: SettingsWorkflowPersistence,
-    val backup: suspend (exportJson: String) -> Unit,
-)
-
-internal const val SQL_UNREADABLE_MARKER = "skipped-unreadable"
-internal const val SQL_MAX_UNREADABLE_ATTEMPTS = 5
-
-internal fun sqlUnreadableMarker(attempts: Int): String = "$SQL_UNREADABLE_MARKER:$attempts"
-
-/** The attempts so far when [marker] says the old copy was unreadable, or null for any other marker (including none and "done"). */
-internal fun sqlUnreadableAttempts(marker: String?): Int? {
-    if (marker == null) return null
-    if (marker == SQL_UNREADABLE_MARKER) return 1
-    if (!marker.startsWith("$SQL_UNREADABLE_MARKER:")) return null
-    return marker.substringAfter(':').toIntOrNull() ?: 1
-}

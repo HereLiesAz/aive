@@ -180,58 +180,6 @@ class SettingsWorkflowPersistenceTest {
     }
 
     @Test
-    fun legacyStorageKeyIsPromotedAndRetiredOnRead() = runBlocking {
-        val settings = MapSettings()
-        val persistence = SettingsWorkflowPersistence(settings)
-        val project = Project(
-            id = ProjectId("legacy-project"),
-            name = "Legacy Project",
-            createdAtEpochMillis = 1L,
-            updatedAtEpochMillis = 1L,
-        )
-        persistence.projects.put(project)
-        val encoded = assertNotNull(snapshotSettings(settings).getStringOrNull(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY))
-        snapshotSettings(settings).remove(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY)
-        settings.putString(SettingsWorkflowPersistence.LEGACY_STORAGE_KEY_V1, encoded)
-
-        val restored = SettingsWorkflowPersistence(settings)
-
-        assertEquals(project, restored.projects.get(project.id))
-        assertNotNull(snapshotSettings(settings).getStringOrNull(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY))
-        assertFalse(settings.hasKey(SettingsWorkflowPersistence.LEGACY_STORAGE_KEY_V1))
-    }
-
-    @Test
-    fun customStorageNamespaceDoesNotConsumeDefaultLegacyData() = runBlocking {
-        val settings = MapSettings()
-        val defaultPersistence = SettingsWorkflowPersistence(settings)
-        val project = Project(
-            id = ProjectId("legacy-default-project"),
-            name = "Default Legacy Project",
-            createdAtEpochMillis = 1L,
-            updatedAtEpochMillis = 1L,
-        )
-        defaultPersistence.projects.put(project)
-        val encoded = assertNotNull(snapshotSettings(settings).getStringOrNull(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY))
-        snapshotSettings(settings).remove(SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY)
-        settings.putString(SettingsWorkflowPersistence.LEGACY_STORAGE_KEY_V1, encoded)
-
-        val customKey = "test.workflow.persistence"
-        val custom = SettingsWorkflowPersistence(settings, storageKey = customKey)
-
-        assertTrue(custom.projects.all().isEmpty())
-        assertFalse(settings.hasKey(customKey))
-        assertEquals(encoded, settings.getStringOrNull(SettingsWorkflowPersistence.LEGACY_STORAGE_KEY_V1))
-
-        custom.clearWorkflowData()
-        assertEquals(encoded, settings.getStringOrNull(SettingsWorkflowPersistence.LEGACY_STORAGE_KEY_V1))
-
-        val restoredDefault = SettingsWorkflowPersistence(settings)
-        assertEquals(project, restoredDefault.projects.get(project.id))
-        assertFalse(settings.hasKey(SettingsWorkflowPersistence.LEGACY_STORAGE_KEY_V1))
-    }
-
-    @Test
     fun futureSchemaIsRejectedWithoutOverwritingStoredData() = runBlocking {
         val settings = MapSettings()
         val persistence = SettingsWorkflowPersistence(settings)
@@ -314,30 +262,6 @@ class SettingsWorkflowPersistenceTest {
         restored.clearWorkflowData()
         assertTrue(restored.events.forRun(runId).isEmpty())
         assertTrue(settings.keys.none { it.startsWith("${SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY}.events.") })
-    }
-
-    @Test
-    fun legacyJournalAtJavaKeyLimitRemainsReadable() = runBlocking {
-        val settings = JavaPreferencesLimitSettings()
-        val persistence = SettingsWorkflowPersistence(settings)
-        val runId = WorkflowRunId("1234567")
-        val event = TaskStarted(
-            workflowRunId = runId,
-            taskDefinitionId = TaskDefinitionId("task"),
-            attempt = 1,
-            occurredAtEpochMillis = 1L,
-        )
-        val legacyPrefix =
-            "${SettingsWorkflowPersistence.DEFAULT_STORAGE_KEY}.events.0031003200330034003500360037"
-
-        settings.putString(
-            "$legacyPrefix.0",
-            SettingsWorkflowPersistence.defaultJson.encodeToString(WorkflowEvent.serializer(), event),
-        )
-        settings.putString("$legacyPrefix.count", "1")
-
-        assertEquals(listOf(event), persistence.events.forRun(runId))
-        assertTrue(settings.maxObservedKeyLength <= 80)
     }
 
     @Test
