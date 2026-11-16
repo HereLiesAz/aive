@@ -10,7 +10,7 @@ Decided 2026-10-12. Items outside this scope stay on this list as post-1.0 work;
 
 - **Platform:** Android first. Desktop, JS and Wasm keep shipping preview builds and reach 1.0 in a later release.
 - **Local models:** 1.0 ships on the built-in rule-based orchestration and memory clerks plus the released Agent Router and Handoff Composer. The remaining orchestration roles, the trained memory clerks, BitNet and the optimization pipeline are post-1.0.
-- **Distributed compute:** held back. `computeRelay` and the Compute screen are not part of 1.0.
+- **Distributed compute:** not in the Google Play 1.0 build (the Compute destination is hidden there and This device says so). The Android GitHub build and desktop ship it; the web app cannot join a pool (browser limit). See [`docs/Platform-Parity.md`](docs/Platform-Parity.md).
 
 Release blockers, in order:
 
@@ -18,8 +18,8 @@ Release blockers, in order:
 2. Live GitHub dispatch through the app (P1 — Provider system).
 3. Memory store split verified on Android (P1 — Persistence and recovery).
 4. Themed Android icon validated (P2 — Brand and release polish).
-5. Distributed compute hidden from the 1.0 Android build.
-6. Remote access relay Worker deployed (`relay/`, `cd relay && npx wrangler@4 deploy`), or the Remote access screen hidden: the default relay URL has no Worker behind it yet.
+5. Distributed compute hidden from the 1.0 Google Play build (done: `DISTRIBUTED_COMPUTE_AVAILABLE` is `false` in `androidApp/src/play`).
+6. Remote access relay Worker deployed (`relay/`, `cd relay && npx wrangler@4 deploy`): the Android GitHub build now shows Remote access, and its default relay URL has no Worker behind it until that is done (a keeper can enter their own relay). The Google Play build hides it behind a platform note.
 
 Crash/ANR reporting is opt-in (off by default) and disclosed in `docs/PRIVACY.md`; that item is done.
 

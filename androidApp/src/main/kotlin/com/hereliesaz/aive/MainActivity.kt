@@ -662,6 +662,10 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                         distributedComputeAvailable = DISTRIBUTED_COMPUTE_AVAILABLE,
+                        platformLimits = com.hereliesaz.geministrator.PlatformLimits(
+                            compute = com.hereliesaz.geministrator.PlatformLimit.PlayStore.takeUnless { DISTRIBUTED_COMPUTE_AVAILABLE },
+                            remote = com.hereliesaz.geministrator.PlatformLimit.PlayStore.takeUnless { REMOTE_ACCESS_AVAILABLE },
+                        ),
                         onDisconnectDistributedCompute = {
                             computeCredentialStore.clear()
                             computeToken = null
@@ -688,7 +692,7 @@ class MainActivity : ComponentActivity() {
                         } else {
                             null
                         },
-                        // Hidden until IDEaz ships; see RemoteAccessController.AVAILABLE.
+                        // Only the GitHub build has it; see REMOTE_ACCESS_AVAILABLE.
                         remoteAccessSetting = if (!RemoteAccessController.AVAILABLE) null else RemoteAccessSetting(
                             enabled = remoteAccess.enabled,
                             relayUrl = remoteRelayUrl,

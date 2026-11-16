@@ -6,7 +6,11 @@ Code: `shared/src/commonMain/kotlin/com/hereliesaz/geministrator/distributed/` (
 
 ## Availability
 
-The Android Play build does not offer distributed compute for 1.0: the Compute screen is hidden and no relay session starts (`DISTRIBUTED_COMPUTE_AVAILABLE` in `androidApp/src/play`). The Android GitHub release build, desktop and web keep it. This is a store-policy choice, not a security gap: per-node identity (below) did not change it.
+The Android Play build does not offer distributed compute for 1.0: the Compute destination is hidden, no relay session starts (`DISTRIBUTED_COMPUTE_AVAILABLE` in `androidApp/src/play`) and Keeper's room > This device says so. This is a 1.0 release decision by the owner, not a rule of the platform and not a security gap: per-node identity (below) did not change it. The Android GitHub release build and desktop have it. The web app cannot join a pool: a browser tab cannot stay connected once it sleeps and has no executors that use the keeper's stored tokens, so This device says that as a platform limit. (The browser could in principle publish work to a pool as an origin; that needs an asynchronous signer for Web Crypto and is not built.) The command-line daemon does not join a pool yet. See [Platform parity](../Platform-Parity.md).
+
+## Gating
+
+One pure rule, `computeWorkDecision` (`distributed/ComputeWorkGate.kt`), decides whether a device takes new work, for every platform: sharing off, then too hot (Android), then metered network (unless allowed), then external power (when required). A platform that cannot tell passes `null`: an unknown network counts as unmetered, an unknown power state counts as not plugged in when external power is required. The reason is published as a node capability (`ComputeWorkHold.capability`, for example `hold:metered-network`; the heat hold keeps its older name `thermal-hold`), and the Compute part lists it under each node that is not taking work. Android reads the system's network, battery and thermal state and refreshes on change. Desktop reads its power source (`DesktopPowerSource`: Linux `/sys/class/power_supply`, macOS `pmset -g batt`, Windows `Win32_Battery`) once a minute when "Require external power" is on; a computer with no battery counts as plugged in; it cannot see whether its network is metered. A claimed lease is never cancelled by a later hold.
 
 ## Topology
 
@@ -112,7 +116,7 @@ Workers run leases through `SystemExecutorDistributedWorkloadRunner`, which acce
 - Android — `script`; `github-action` and `repository-operation` with a GitHub token; `repository-operation` with a GitLab token.
 - Desktop — `repository-operation`; `github-action` with a GitHub token.
 
-Android accepts new work only when sharing is enabled and its current metered-network and external-power policy is satisfied. The Android session watches default-network and battery/power broadcasts, updates its relay descriptor when those conditions change, and the local worker evaluates each incoming offer against that same live descriptor. An already-claimed lease is not cancelled merely because power/network policy later becomes ineligible; ownership loss/cancellation remains the authority for stopping side-effecting work. Desktop cannot observe power state, so enabling "require external power" stops it accepting work.
+Android accepts new work only when sharing is enabled and its current heat, metered-network and external-power policy is satisfied. The Android session watches default-network and battery/power broadcasts, updates its relay descriptor when those conditions change, and the local worker evaluates each incoming offer against that same live descriptor. An already-claimed lease is not cancelled merely because power/network policy later becomes ineligible; ownership loss/cancellation remains the authority for stopping side-effecting work. Desktop checks its power source (see Gating), so "require external power" works there too instead of stopping it accepting work for good.
 
 ## Encrypted compute mesh primitives
 

@@ -43,6 +43,8 @@ aive runs stop <run-id> --yes
 
 When the *daemon itself* has a real terminal, its in-process keeper console supports `status`, `approvals`, `approve <task-id>`, `quit`. Human approval requires an exact second confirmation after showing the task details. No approval decision can be sent via the HTTP control API, MCP, or remote commands. A service without a terminal leaves gates pending; stop it and use `aive resume` in a keeper terminal.
 
+`aive serve` does not host or join a compute pool, run the A2A server or hold a Remote access link: those live in the desktop app and the Android GitHub build. See [Platform parity](Platform-Parity.md).
+
 ## State, secrets, and isolation
 
 The headless engine defaults to `~/.aive/headless/` (override with `AIVE_HEADLESS_HOME`). It stores `workflows.db` (SQLite workflow history and events), `engine.lock` (one live engine per state directory) and `control/control-token` plus `control/control.json` (token file and nonsecret discovery). The desktop database `~/.aive/workflows.db` and desktop control port 41242 remain separate. Only `serve` exposes a local HTTP listener; `run` and `resume` work without one. Two engine processes may not run against the same database simultaneously.

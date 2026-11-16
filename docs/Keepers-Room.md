@@ -19,7 +19,7 @@ The room lists **six parts**, each with one sentence on the phone list (and as i
 
 Sources and tools and Hosts are listed under "Feeds the hive", the rest under "The keeper". The names are the owner's recommended defaults (decision D12; Compute is renamed Hosts per D31). The room remembers the open part by its first section (`keeper.section`); the breadcrumb names the part (`KeeperGroup`).
 
-Compute shows only where the build offers distributed compute.
+Compute shows only where the build offers distributed compute. Where a build cannot have a device feature, This device says so in a plain line instead of leaving it out: the web app for compute pools and Remote access (a browser cannot stay connected or listen), the Google Play build for both (`PlatformLimits`, `PlatformLimit`). In Compute, a device that is not taking work says why under its row (sharing off, too hot, metered network, waiting for power: `ComputeWorkHold`), and desktop honours "Require external power" by reading its power source. See [Platform parity](Platform-Parity.md).
 
 ## Remembered text
 

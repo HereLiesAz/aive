@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      Remote access (opt-in, off by default): AiveRelayHostService keeps an encrypted link to the user's own
+      IDEaz open as a foreground service, only while Remote access is on. Only this build declares it; the Play
+      build does not (REMOTE_ACCESS_AVAILABLE), so Play needs no foreground-service declaration. docs/Remote-API.md.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <queries>
         <package android:name="com.hereliesaz.haive" />
         <package android:name="com.google.android.apps.bard" />
@@ -7,6 +16,15 @@
     </queries>
 
     <application>
+        <service
+            android:name=".remote.AiveRelayHostService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps an end-to-end encrypted link to the user's own IDEaz app open through a relay, only while the user has turned on Remote access in Settings, so IDEaz on another device can run prompts and start workflows on this device." />
+        </service>
+
         <service
             android:name=".InstalledGeminiAccessibilityService"
             android:exported="false"

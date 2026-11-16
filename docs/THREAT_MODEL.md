@@ -535,7 +535,7 @@ External agents (Claude Desktop, Claude Code, any MCP client) can read and steer
 
 ### Remote access and relay (Android)
 
-Status: remote access over the relay is not available in this version (`RemoteAccessController.AVAILABLE = false`; the setting is hidden and the foreground service and notification permission are not in the manifest). The controls below describe the design for when it is re-enabled. IDEaz on the same device can still use the bound service.
+Status: remote access over the relay is in the Android GitHub build (off by default; its manifest declares the foreground service and notification permission). The Google Play build does not include it (`REMOTE_ACCESS_AVAILABLE = false`; its manifest declares neither). IDEaz on the same device can use the bound service in both builds.
 
 The Aive can be driven from IDEaz on another device through a relay Worker (`relay/`), or by IDEaz on the same device through the bound service. Protocol: `docs/Remote-API.md`.
 
