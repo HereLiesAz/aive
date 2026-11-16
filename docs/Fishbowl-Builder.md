@@ -1,6 +1,6 @@
 # Fish Bowl Builder (design draft)
 
-Status: approved design; its decisions carry into `Swarm-OS.md`, which replaces the bowl framing.
+Status: design record, not a description of the app. Its decisions carry into `Swarm-OS.md`, which replaces the bowl framing. Status: planned or replaced, not built under these names: the species tray, the care panel, layout memory and the dry run (checked: none of these names exists in the code); what is built is in `Swarm-OS.md` and `Keepers-Room.md`.
 
 ## The idea
 

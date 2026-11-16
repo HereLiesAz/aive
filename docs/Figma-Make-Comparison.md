@@ -4,10 +4,12 @@ The mock is "Agentic Workflow Companion Game", a one-file React prototype in Fig
 
 What follows takes only what is new. Paths are under `shared/src/commonMain/kotlin/com/hereliesaz/geministrator/` unless they start with `docs/` or `shared/`.
 
+Status: all eleven ports below are built (each checked against the code: the panel header line `creatureHeaderLine`, the Feeds list, `inspector_open_trace`, `GroundSwatches` and the Reduce motion switch in `KeeperAppearance.kt`, `creatureWearsLabel` with the always-show switch, `build_add_creature`, `swarm_in_hives` with the producer/reviewer filter, `MemorySimpleScreen.kt` with Consolidate now, `capillaryName`, `overview_doing_now_feeds`). The "App today" column describes the app at the time of the audit; the **Built** verdicts replace the old **New — port**. Items under "Redesigns to look into" and the **Mock-only** rows are not built.
+
 Verdicts:
 
 - **Same**: the app already does it.
-- **New — port**: a capability or signal the app lacks that fits the current design with no layout change, backed by data the app already has.
+- **New — port** (now **Built**): a capability or signal the app lacks that fits the current design with no layout change, backed by data the app already has.
 - **Redesign — look into**: changes layout, navigation or structure, or conflicts with a documented decision. Listed for later, not ported.
 - **Mock-only**: fake data or decoration with nothing real behind it. The real signal it would need is named.
 
@@ -29,16 +31,16 @@ Verdicts:
 | Title "HIVE 03 · PRODUCT WORK" / "Ship the living workflow" | The breadcrumb names the hive; under it, what it was fed (`MindMapRunScreen.kt:707-708`) | **Same** (the "03" numbering is mock-only) |
 | "RUN 18 · 3/5 creatures active" | "STATUS · completed/total" as a live region (`MindMapRunScreen.kt:703-714`) | **Same** (a run ordinal "18" has no backing: runs have ids, not numbers) |
 | LIVE / BUILD tabs | `TerrariumModeToggle` (`TerrariumConnections.kt:40-61`, `WorkflowTerrarium.kt:143-149`) | **Same** |
-| Status line "Architecture is firing. Its next output will feed the engineer." | "<name> · DOING NOW" with its newest thought or step (`MindMapRunScreen.kt:792-806`, `:848-858`). It does not say who the output feeds | **New — port** (port 2) |
+| Status line "Architecture is firing. Its next output will feed the engineer." | "<name> · DOING NOW" with its newest thought or step (`MindMapRunScreen.kt:792-806`, `:848-858`). It does not say who the output feeds | **Built** (port 2) |
 | Undo / redo (build only) | The tide, Undo and Redo (`WorkflowTerrariumAuthoring.kt:76-97`, `TerrariumConnections.kt:100-101`) | **Same** |
 | Centre, zoom out, zoom in | Zoom in, zoom out, and a percent button that resets zoom and focus; zooming out past the widest view surfaces to the district (`MascotNodeTerrarium.kt:693-705`, `:717-765`) | **Same** |
 | Tissue ground: dark radial gradient with grain | Tissue ground and vasculature (`TissueRendering.kt:18-56`, `Vasculature.kt:17`) | **Same** |
 | Creatures with "task / role · state" label cards | Each creature wears its task on its state colour. Past 12 creatures, only the selected one keeps its label (`MascotNodeTerrarium.kt:643-659`, `:824`). The full state is always in the semantics (`:465-472`) | **Same** (the "always show" switch is port 8) |
 | Running bobs, waiting dims, reviewing wobbles, action pulse ring, selected halo | Per-state posture and motion, and a selection ring (`MascotNodeTerrarium.kt:181-207`, `:600-620`; `docs/Node-Creatures.md:32`) | **Same** |
 | Synapses drawn as axons: green glow when complete, yellow dashes when active, grey dots when waiting, a red "gated" receptor, travelling vesicles | Tendrils that meet in clasps. A pulse shows waiting or crossing; a clasp glows green on success and red on failure or block (`TendrilTethers.kt:90-140`, `MascotNodeTerrarium.kt:316-342`, `:662-680`) | **Same**: the tethers are now drawn as axons with these states and vesicles, under the tendrils and clasps (`MascotNodeTerrarium.kt` `drawAxon`, docs/Bowl-OS.md) |
-| Two capillaries labelled CLAUDE / GEMINI | Providers are capillaries (`TissueRendering.kt:36-55`, `TissueProjection.kt:38-42`), but none is named on the field or in the semantics | **New — port** (port 1) |
+| Two capillaries labelled CLAUDE / GEMINI | Providers are capillaries (`TissueRendering.kt:36-55`, `TissueProjection.kt:38-42`), but none is named on the field or in the semantics | **Built** (port 1) |
 | Run egg "RUN 18 · 62% gestated" | The egg hangs on the working creature's tail and grows with completed tasks (`TissueRendering.kt:59-80`, `MascotNodeTerrarium.kt:683-690`). The percent is the header's completed/total | **Same** |
-| Build: "ADD CREATURE" (from the Stable, or a deterministic tool as a neuron) | Build can Duplicate, Detach, Hold output, Cluster and wire (`TerrariumConnections.kt:85-161`, `WorkflowTerrariumAuthoring.kt:173-184`). It has no way to add a new creature, though `docs/Swarm-OS.md:19` lists "add and release creatures" | **New — port** (port 9) |
+| Build: "ADD CREATURE" (from the Stable, or a deterministic tool as a neuron) | Build can Duplicate, Detach, Hold output, Cluster and wire (`TerrariumConnections.kt:85-161`, `WorkflowTerrariumAuthoring.kt:173-184`). It has no way to add a new creature, though `docs/Swarm-OS.md:19` lists "add and release creatures" | **Built** (port 9) |
 | Legend (Working / Complete / Waiting) and "Moving bodies never edits the workflow" | No legend. The state is on each label and in the semantics | **Redesign — look into** |
 
 ## Feed bar
@@ -52,14 +54,14 @@ Verdicts:
 | Mock | App today | Verdict |
 |---|---|---|
 | A 310px panel docked on the right | `ModalBottomSheet` on every width (`ControlRoomUi.kt:413-443`) | **Redesign — look into** |
-| Header: "CREATURE · 3 OF 5", task, close, image, state chip, role, provider | Header shows the role (or executor) and the objective (`LiveTechnicalInspector.kt:200-201`). State and provider are only lines inside Work (`:346-352`). There is no place in plan order | **New — port** (port 3) |
+| Header: "CREATURE · 3 OF 5", task, close, image, state chip, role, provider | Header shows the role (or executor) and the objective (`LiveTechnicalInspector.kt:200-201`). State and provider are only lines inside Work (`:346-352`). There is no place in plan order | **Built** (port 3) |
 | Tabs NEEDS / WORK / MIND | `CreatureTab`, opening on Needs when the creature waits on you (`LiveTechnicalInspector.kt:608-645`; `ControlRoomUi.kt:239-249`) | **Same** |
 | "These are runtime signals, not game stats." | Enforced in code: a need with no data is "not reported", never estimated (`CreatureNeeds.kt:10-14`, `CreatureNeedsPanel.kt:60-73`) | **Same** |
 | ECHO, INTEGRITY, BUDGET, OUTPUT USED meters | The same four from run data, plus near-clone and self-review lines (`CreatureNeeds.kt:18-127`, `CreatureNeedsPanel.kt:48-82`). The mock shows Echo inverted ("x% self-similar") | **Same** |
 | REVIEW ITS WORK (Echo falls) | Not built. Echo is computed only from wiring: its own config's share of its inputs and reviewers (`CreatureNeeds.kt:86-93`). No keeper review is recorded anywhere | **Mock-only**: needs a recorded keeper review per task run that Echo counts as an outside voice. Designed in `docs/Swarm-OS.md:56`, not yet backed |
-| WORK: description, INPUT and OUTPUT handoff cards | Inputs with provenance (`LiveTechnicalInspector.kt:379-388`) and artifacts that open (`:389-414`). Who its output feeds, and whether they took it, is not shown; outside Build that Connections list does not exist (`docs/Swarm-OS.md:74`) | **New — port** (port 4) |
+| WORK: description, INPUT and OUTPUT handoff cards | Inputs with provenance (`LiveTechnicalInspector.kt:379-388`) and artifacts that open (`:389-414`). Who its output feeds, and whether they took it, is not shown; outside Build that Connections list does not exist (`docs/Swarm-OS.md:74`) | **Built** (port 4) |
 | LIVE TRACE list | Live activity: thinking and steps, latest six, older ones collapsed (`LiveTechnicalInspector.kt:517-560`) | **Same** |
-| OPEN FULL TRACE | The run's timeline and waterfall exist at hive level and can select a creature (`ControlRoomUi.kt:794-802`, `HiveScreens.kt:118`), but nothing in the panel leads there | **New — port** (port 5) |
+| OPEN FULL TRACE | The run's timeline and waterfall exist at hive level and can select a creature (`ControlRoomUi.kt:794-802`, `HiveScreens.kt:118`), but nothing in the panel leads there | **Built** (port 5) |
 | MIND: ROLE / PROVIDER / TOOLS / MEMORY list, EDIT TEMPERAMENT | Its creature picker, pending instruction proposals and the role's full form, open from the start (`LiveTechnicalInspector.kt:465-486`) | **Same** (the app shows the editable fields, not a summary) |
 
 ## Inbox
@@ -77,8 +79,8 @@ Verdicts:
 | Mock | App today | Verdict |
 |---|---|---|
 | "Stable": a page of role lineages with CREATE ROLE | Three things in two places: creature bodies in the district (`StableScreens.kt:83-130`, `Breeds.kt:84-96`), the lineage of hatched configs (`DistrictScreen.kt:243-263`), and roles in the Swarm (`CompanyCustomizationScreen.kt:807-831`, Add role) | **Redesign — look into** |
-| Filters All / Producers / Reviewers / At risk | No filter on roles. Reviewer kinds are already classified (`CreatureNeeds.kt:46-54`) | **New — port** (port 10; "At risk" excluded, see below) |
-| Card: "GEN n", kind, name, "N hives · Integrity x%", health bar, THRIVING / LOW ECHO | Body tiles show generation, rarity and count (`StableScreens.kt:113-128`). A role row shows department, execution, authority and Working/Available (`CompanyCustomizationScreen.kt:810-831`). How many hives use a role is not shown | "N hives": **New — port** (port 10). Integrity, health and THRIVING: **Mock-only**: Integrity is defined per task in one run (`CreatureNeeds.kt:95-98`); a role score across runs would need its own definition over run history |
+| Filters All / Producers / Reviewers / At risk | No filter on roles. Reviewer kinds are already classified (`CreatureNeeds.kt:46-54`) | **Built** (port 10; "At risk" excluded, see below) |
+| Card: "GEN n", kind, name, "N hives · Integrity x%", health bar, THRIVING / LOW ECHO | Body tiles show generation, rarity and count (`StableScreens.kt:113-128`). A role row shows department, execution, authority and Working/Available (`CompanyCustomizationScreen.kt:810-831`). How many hives use a role is not shown | "N hives": **Built** (port 10). Integrity, health and THRIVING: **Mock-only**: Integrity is defined per task in one run (`CreatureNeeds.kt:95-98`); a role score across runs would need its own definition over run history |
 | "Bring in a drifter: add a different model lineage" | Retired duplicate district edge. External A2A agents are connected from Keeper's room › Connections (`ProviderManagementScreens.kt`); Azphalt packages remain in the Store. | **Simplified** — no separate adoption shelf |
 
 ## Memory
@@ -88,7 +90,7 @@ Verdicts:
 | SIMPLE / TECHNICAL toggle | One technical page: switches, the memory terrarium, stage engines, queue, tuning, models, data, summaries, projects (`MemoryLayerScreen.kt:152-280`, `:393-716`) | **Redesign — look into** (it is `docs/UI_SIMPLIFICATION_PROPOSALS.md` #18) |
 | MEMORY TONE "Clear: balanced across 4 lineages" | None. Episodes carry the role and task run, not a model (`memory/MemoryModels.kt:51-73`) | **Mock-only**: needs the model family per episode. Same gap as the Inbox lineage finding |
 | Four stages: Observe 142 / Section 18 / Consolidate 6 / Recall 91% useful | The memory terrarium shows eight real stages, from Sectioning to Condensation (`MemoryTerrariumProjection.kt:37-48`). Episode, section and node counts exist (`memory/MemoryModels.kt:320-333`) | Stage counts: **Same**. "91% useful": **Mock-only**: only recall counts exist (`Recalled` edges, `memory/MemoryLayerController.kt:186-206`), with no measure of usefulness |
-| SLEEP STATUS "last consolidated 2h ago", PROCEDURAL PROPOSALS "3 waiting", CONSOLIDATE NOW | A consolidation running/paused switch (`MemoryLayerScreen.kt:246-251`). No last-consolidated line, no total of waiting proposals (only per role, on Mind), and no way to consolidate now, though `drainSoon()` exists (`memory/MemoryLayerController.kt:312-341`) | **New — port** (port 11) |
+| SLEEP STATUS "last consolidated 2h ago", PROCEDURAL PROPOSALS "3 waiting", CONSOLIDATE NOW | A consolidation running/paused switch (`MemoryLayerScreen.kt:246-251`). No last-consolidated line, no total of waiting proposals (only per role, on Mind), and no way to consolidate now, though `drainSoon()` exists (`memory/MemoryLayerController.kt:312-341`) | **Built** (port 11) |
 | DOMINANT VOICE "Mixed · healthy" | None | **Mock-only** (needs model family per episode) |
 | RECENT ENGRAM and KEEPER NOTE cards | Summaries and the summary tree (`MemoryLayerScreen.kt:633-716`) | **Same** (the copy is mock text) |
 
@@ -106,9 +108,9 @@ Verdicts:
 | Mock | App today | Verdict |
 |---|---|---|
 | Side list: Appearance / Connections / Limits / This device / Privacy | Connections, Compute, Projects and data, Delegations, This device (spend caps live here), Appearance, About and privacy, in two groups (`KeeperRoom.kt:67-88`; `docs/Keepers-Room.md:5-17`) | **Same** (the app has more parts; "Limits" as its own part is a regrouping, **Redesign — look into**) |
-| "Choose your ground": six swatches | The same six grounds (`AzphaltUi.kt:83-90`), chosen by one pill that cycles to the next (`ProviderManagementScreens.kt:720-735`, `AzphaltUi.kt:102-106`) | **New — port** (port 6) |
-| Reduce motion switch | The platform signal only (`AzphaltReduceMotion.kt:7-25`); no switch in the app | **New — port** (port 7) |
-| "Creature labels: always show task, role and state" | Labels hide past 12 creatures (`MascotNodeTerrarium.kt:646`, `:824`) | **New — port** (port 8) |
+| "Choose your ground": six swatches | The same six grounds (`AzphaltUi.kt:83-90`), chosen by one pill that cycles to the next (`ProviderManagementScreens.kt:720-735`, `AzphaltUi.kt:102-106`) | **Built** (port 6) |
+| Reduce motion switch | The platform signal only (`AzphaltReduceMotion.kt:7-25`); no switch in the app | **Built** (port 7) |
+| "Creature labels: always show task, role and state" | Labels hide past 12 creatures (`MascotNodeTerrarium.kt:646`, `:824`) | **Built** (port 8) |
 
 ## Motion and accessibility
 
@@ -116,7 +118,7 @@ Verdicts:
 |---|---|---|
 | `prefers-reduced-motion` stops animation | The same signal on web, the animator scale on Android, an env var or property on desktop; looping clocks freeze (`AzphaltReduceMotion.kt:7-25`, `MascotNodeTerrarium.kt:201-207`) | **Same** |
 | Buttons have aria-labels; creatures read "task, role, state" | Creatures are buttons with label, activity and task in their semantics, nudge actions in Build (`MascotNodeTerrarium.kt:465-490`); zoom buttons are 48dp and labelled (`:752-765`); the breadcrumb names where you are (`ControlRoomUi.kt:534-570`) | **Same** |
-| Capillaries carry visible names | Capillaries have no label and no semantics node | **New — port** (port 1) |
+| Capillaries carry visible names | Capillaries have no label and no semantics node | **Built** (port 1) |
 
 ## Visual tokens
 
