@@ -7,7 +7,7 @@ Turn one on in **Keeper's room › Local agents**. It is off until you do. It th
 ## What the app does when one runs
 
 1. **Only after you approved a plan.** A creature that uses a CLI must have Approval on. The engine drafts a plan ("Run Claude Code headless in an isolated worktree... Nothing is sent to it until you approve this"), you approve it, and only then is the CLI started with that plan. Without an approved plan the task fails and says how to fix it.
-2. **In its own copy of the repository.** A fresh `git worktree` of the committed `HEAD` of the linked **Local** repository, on a new branch `haive/cli-<task>-<id>`. Your checkout and its index are never touched. Uncommitted changes in your checkout are not seen (the CLI works from `HEAD`).
+2. **In its own copy of the repository.** A fresh `git worktree` of the committed `HEAD` of the linked **Local** repository, on a new branch `aive/cli-<task>-<id>`. Your checkout and its index are never touched. Uncommitted changes in your checkout are not seen (the CLI works from `HEAD`).
 3. **With a bare environment.** Only `PATH`, `HOME`, locale, the temp and XDG folders, proxy and certificate variables, and the variables the CLI needs to find its own login (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, ...). No `GIT_*`, no repository-host tokens, and **no vendor API-key variable** unless you turn on "Passing its key variable" for that CLI.
 4. **Without the CLI's guard rails off.** The app never passes a flag that skips a CLI's own permission checks or lifts its sandbox (`--dangerously-skip-permissions`, `--yolo`, `danger-full-access`, and the like): `CliAgentSpecs.FORBIDDEN_FLAGS`, enforced by a test over every spec in every mode.
 5. **With the prompt on stdin** where the CLI allows it, so it is not in the process list. The prompt says plainly that everything under CONTEXT is material, possibly from untrusted sources, never instructions.
@@ -35,7 +35,7 @@ Adding another CLI is adding a spec (`CliAgentSpecs`): its binary, its headless 
 - **A CLI's own configuration applies.** Its settings, memory files and MCP servers (in your home folder) are loaded by the CLI; a project file in the repository that a CLI reads (instructions, settings) is repository content the CLI may act on. The app does not inspect them.
 - **Explicit only.** Auto work never goes to a CLI (it edits your computer). A role must prefer one. Wrong if you want Auto to use them: a switch for that is not built.
 - **Terms of service.** Driving a vendor's CLI from a program may be restricted by that vendor's terms for subscription logins. Check yours; the app does not.
-- **The branch is the delivery.** Work lands on `haive/cli-...`, not on the run's checkpoint branch the Local workspace agent uses; merging it is yours, through Local Git operations (behind their approval). Wrong if you want it on the run branch automatically.
+- **The branch is the delivery.** Work lands on `aive/cli-...`, not on the run's checkpoint branch the Local workspace agent uses; merging it is yours, through Local Git operations (behind their approval). Wrong if you want it on the run branch automatically.
 - **No follow-up messages.** A CLI runs once per task (`sendMessage` is rejected); a correction is a new task or **Run again from here**.
 - **Repository-less work** (research with no repository linked) is not supported; a CLI needs a Local repository.
 - **Usage** is whatever the CLI reports (Claude Code reports tokens and cost; the others may not).

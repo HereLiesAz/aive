@@ -1,6 +1,6 @@
-# Haive BITCOS runtime
+# Aive BITCOS runtime
 
-This directory contains Haive's experimental BITCOS support for ternary model weights.
+This directory contains Aive's experimental BITCOS support for ternary model weights.
 
 BITCOS ("BITmap + COmpacted Signs") stores:
 
@@ -17,11 +17,11 @@ Implemented here:
 - direct dot products against packed BITCOS payloads without materializing a persistent 2-bit tensor;
 - a versioned multi-tensor `HBCS` container;
 - fp16 scale side-channel storage;
-- scalar fallback valid on every Rust target used by Haive;
+- scalar fallback valid on every Rust target used by Aive;
 - x86 BMI2 `PDEP` sign placement, selected automatically when available;
 - runtime capability tiers for scalar, AArch64 NEON-capable, BMI2, AVX2+BMI2, and AVX-512+BMI2 hosts;
 - caller-owned C ABI for native host integration;
-- `haive-bitcos` pack / inspect / unpack CLI.
+- `aive-bitcos` pack / inspect / unpack CLI.
 
 Not yet claimed by this crate:
 
@@ -31,7 +31,7 @@ Not yet claimed by this crate:
 - a released BitNet/Bonsai/CAT-Q/TriLM/Maple model artifact;
 - tokenizer / transformer execution.
 
-Those remain separate runtime work. Haive will not relabel ordinary Qwen ONNX weights as ternary or BITCOS.
+Those remain separate runtime work. Aive will not relabel ordinary Qwen ONNX weights as ternary or BITCOS.
 
 ## HBCS v1 container
 

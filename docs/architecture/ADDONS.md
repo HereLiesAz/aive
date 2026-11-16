@@ -9,15 +9,15 @@ Store** below).
 
 ## Host identity and catalog discovery
 
-The current Azphalt host ID is `com.hereliesaz.aive`. Packages published for the historical
-`com.hereliesaz.haive` host ID remain compatible so old catalog entries do not disappear merely
-because the product name changed.
+The current Azphalt host ID is `com.hereliesaz.aive`. Packages published for the earlier host ID
+`com.hereliesaz.haive`, and with the earlier `haive.workflow.v1` / `haive.role.v1` manifest formats, are still accepted
+when read so old catalog entries do not disappear; the app itself emits only the current ids.
 
 The Store requests workflow and role packages plus model-domain asset packages from the Repository API using the current Aive host ID.
 If an app-scoped search incorrectly returns an empty first page while the unscoped repository catalog
 is healthy, the client performs one defensive unscoped retry and filters the returned summaries
 locally using `targetApps`. Only packages that are global, target `com.hereliesaz.aive`, or target
-the legacy `com.hereliesaz.haive` identity survive that fallback.
+the earlier `com.hereliesaz.haive` identity survive that fallback.
 
 This fallback is a resilience mechanism, not a replacement for correct repository indexing. The
 centralized Azphalt deployment workflow verifies both the generated catalog and the live

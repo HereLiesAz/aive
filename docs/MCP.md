@@ -12,7 +12,7 @@ This is separate from [A2A](A2A.md), which lets agents hand The Aive a workflow 
 1. Start The Aive with the control API on. It is off unless asked:
 
 ~~~bash
-AIVE_CONTROL_API=on ./the-aive        # or set the preference com/hereliesaz/haive/control-api enabled=true
+AIVE_CONTROL_API=on ./the-aive        # or set the preference com/hereliesaz/aive/control-api enabled=true
 ~~~
 
    `AIVE_CONTROL_PORT` picks another port (1024 to 65535; default 41242). With the API on, the app writes two files in `~/.aive/control/` (folder mode 0700, files 0600):

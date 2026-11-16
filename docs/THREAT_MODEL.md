@@ -30,7 +30,7 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 | MCP host ↔ script sandbox (desktop, opt-in) | A model-written script in; bridged tool calls and their results; the script's final value out | Both (in-process WebAssembly guest) |
 | Device ↔ Update and package sources | GitHub Releases APKs and models, Play in-app updates, Azphalt packages | Inbound |
 | Device ↔ Persistence | Workflow state, settings, credentials | Both (local) |
-| Haive ↔ User | Workflow definitions, task approval decisions, escalation responses | Both |
+| Aive ↔ User | Workflow definitions, task approval decisions, escalation responses | Both |
 
 ## Threat Actors
 
@@ -151,7 +151,7 @@ A linked LLM provider receives a bounded tree (up to 700 paths) and selected fil
 - No shell or test capability is claimed, and repository code is never executed.
 - Paths must be relative. Absolute paths, `.git/`, `..` segments, NUL, and newline characters are rejected. Creates must target new files. Updates and deletes must target tracked files whose complete contents were in the model's snapshot.
 - Change sets are capped: 24 actions, 120,000 characters per file, and 500,000 characters in total.
-- All actions are committed atomically to a new `haive/...` branch, never to the default branch. The commit diff, branch, and compare URL are emitted as evidence. The plan can be approval-gated.
+- All actions are committed atomically to a new `aive/...` branch, never to the default branch. The commit diff, branch, and compare URL are emitted as evidence. The plan can be approval-gated.
 - The credential is scoped to `gitlab.com`.
 
 **Remaining gaps**
@@ -167,10 +167,10 @@ A linked LLM provider receives a bounded tree (up to 700 paths) and selected fil
 **Mitigations in place**
 - The model never gets shell access. It receives a bounded snapshot (up to 28 files and 180,000 characters) and returns a unified diff.
 - Diff paths are validated as Git parses them: `git apply --numstat -z` on the patch and on its reverse lists both sides of every file, including rename/copy targets, quoted (octal-escaped) names and traditional `---`/`+++` sections. Absolute paths, `.git/` and `..` segments, and `.gitattributes`/`.gitmodules` (compared case-insensitively) are rejected, as is any patch Git cannot parse. The diff must then pass `git apply --check` before it is applied.
-- The patch is applied in an isolated `git worktree` on a new `haive/...` branch. The user's checkout is untouched, and the working tree must be clean before the agent starts. If the run fails or is cancelled, the worktree, its `haive/...` branch and the temporary directories are removed even though the coroutine is cancelled.
-- Each task's commit (its checkpoint) then moves the workflow run's `haive/run-...` branch only by compare-and-swap (`git update-ref` with the expected old value): only when that branch does not exist yet or still points at the commit the task started from, and never while it is checked out in any worktree. Otherwise the commit stays on the task's own `haive/...` branch. A task that fails after the move puts the branch back, again by compare-and-swap.
-- `git worktree add` (post-checkout), `git commit` and the `update-ref`/`branch -D` that move or remove Haive's branches (which can run the `reference-transaction` hook) run with `core.hooksPath` set to an empty temporary directory, and every Git command runs with `core.fsmonitor=false`, so repository hooks and the fsmonitor command do not execute. Git child processes get no inherited `GIT_*` variables (such as `GIT_DIR` or `GIT_INDEX_FILE`) and cannot prompt.
-- Haive runs no repository code itself: it never builds or tests the change. The agent records a "Host execution withheld" artifact, and nothing is pushed. Only a separate `TestRunner` task runs the change's tests, and only after a person approves it (see the next section).
+- The patch is applied in an isolated `git worktree` on a new `aive/...` branch. The user's checkout is untouched, and the working tree must be clean before the agent starts. If the run fails or is cancelled, the worktree, its `aive/...` branch and the temporary directories are removed even though the coroutine is cancelled.
+- Each task's commit (its checkpoint) then moves the workflow run's `aive/run-...` branch only by compare-and-swap (`git update-ref` with the expected old value): only when that branch does not exist yet or still points at the commit the task started from, and never while it is checked out in any worktree. Otherwise the commit stays on the task's own `aive/...` branch. A task that fails after the move puts the branch back, again by compare-and-swap.
+- `git worktree add` (post-checkout), `git commit` and the `update-ref`/`branch -D` that move or remove Aive's branches (which can run the `reference-transaction` hook) run with `core.hooksPath` set to an empty temporary directory, and every Git command runs with `core.fsmonitor=false`, so repository hooks and the fsmonitor command do not execute. Git child processes get no inherited `GIT_*` variables (such as `GIT_DIR` or `GIT_INDEX_FILE`) and cannot prompt.
+- Aive runs no repository code itself: it never builds or tests the change. The agent records a "Host execution withheld" artifact, and nothing is pushed. Only a separate `TestRunner` task runs the change's tests, and only after a person approves it (see the next section).
 
 **Residual risks**
 - Git still honours the user's own Git configuration while checking out and committing. A clean/smudge filter or other driver that the user configured (for example Git LFS, or a filter that runs a tracked script) runs for paths the repository's existing `.gitattributes` select.

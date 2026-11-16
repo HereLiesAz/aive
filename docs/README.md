@@ -157,7 +157,7 @@ Memory is organised per workflow run: every run has its own memory bank, continu
 
 ## Naming
 
-The product name is **The Aive**. Technical artifact names may use `haive`. The Google Play Android application ID is `com.hereliesaz.aive`; GitHub-release Android builds keep `com.hereliesaz.haive` permanently so existing installs upgrade in place.
+The product name is **The Aive**. The Android application ID is `com.hereliesaz.aive` for both the Google Play and GitHub-release builds.
 
 ### Agent-to-agent communication
 

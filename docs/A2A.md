@@ -75,7 +75,7 @@ If the agent answers `SendMessage` with a message instead of a task, that messag
 
 It runs on desktop unless the keeper turns it off in **Keeper's room › This device › A2A server**. That row shows the address it listens on, and has **Copy token** and **New token**.
 
-- **On by default, and the choice is kept.** The switch is stored only when the keeper presses it (Java preferences node `com/hereliesaz/haive/a2a-server`, key `enabled`). A device that never pressed it, including one installed while the default was off, gets the server on. A keeper who turned it off keeps it off. The default lives in `a2aServerEnabled` (`A2aServerSetting.kt`).
+- **On by default, and the choice is kept.** The switch is stored only when the keeper presses it (Java preferences node `com/hereliesaz/aive/a2a-server`, key `enabled`). A device that never pressed it, including one installed while the default was off, gets the server on. A keeper who turned it off keeps it off. The default lives in `a2aServerEnabled` (`A2aServerSetting.kt`).
 - **Address.** It listens on loopback only, `http://127.0.0.1:41241`. Set `AIVE_A2A_PORT` to use a different port (1024 to 65535).
 - **Port in use.** If another program holds the port, the server stays off for this session and the row says so in plain words. The rest of The Aive works as usual. It starts off the UI thread, so a slow keychain does not hold up the window.
 - **Requests from browsers.** Requests whose `Host` header is not `127.0.0.1`, `localhost` or `[::1]` are refused, against DNS rebinding. No CORS headers are sent.

@@ -84,9 +84,10 @@ This feature supplies account authorization, not a new Pollinations inference ba
 It does not authorize other providers, and it does not convert consumer Google sign-in
 into an external provider API token.
 
-A product rename must never rename a persistence key merely for cosmetic consistency. Existing
-`haive.*` and `geministrator.*` keys are compatibility identifiers and remain valid storage
-names unless an explicit read-old/write-new migration is shipped.
+A rename of a persistence key ships with a read-old/write-new migration. Settings keys that older builds
+wrote with the earlier `haive.` prefix are moved to the matching `aive.` key, once, when their store is
+first opened (`persistence/LegacySettingsKeyMigration.kt`); setup files exported by older builds are
+still accepted on import. `geministrator.*` keys remain valid storage names.
 
 ## Portable `.ive` project files
 
@@ -112,13 +113,10 @@ project is reopened.
 Android application IDs define the application sandbox. Changing the application ID is not a
 rename; Android installs a different application with different preferences and Keystore access.
 
-The release identities are therefore fixed:
+Both flavors use `com.hereliesaz.aive`, the Play package identity. GitHub-release installs made under
+the earlier application ID are a different application and do not upgrade in place or share its data.
 
-- **GitHub flavor:** `com.hereliesaz.haive` — retained for in-place compatibility with the
-  original GitHub APK lineage and its existing data.
-- **Play flavor:** `com.hereliesaz.aive` — the Play package identity.
-
-Future branding work must not change either ID. The GitHub flavor may update itself from GitHub
+Future branding work must not change this ID. The GitHub flavor may update itself from GitHub
 Releases and therefore requests package-install permission only in the GitHub manifest. The Play
 flavor never requests that permission; it only informs the user and links to Google Play.
 

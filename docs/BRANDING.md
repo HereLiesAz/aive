@@ -4,12 +4,12 @@ The current Aive mark is defined by the source assets in `branding/`.
 
 ## Canonical assets
 
-- `branding/haive_logo.png` — current color logo, icon and splash source
-- `branding/haive_monochrome.png` — monochrome logo source
+- `branding/aive_logo.png` — current color logo, icon and splash source
+- `branding/aive_monochrome.png` — monochrome logo source
 
-Desktop `.png`, `.ico`, and `.icns` package icons and Web favicon/PWA sizes are generated deterministically from `haive_logo.png` during the build. Stale checked-in Desktop/Web icon derivatives are not retained.
+Desktop `.png`, `.ico`, and `.icns` package icons and Web favicon/PWA sizes are generated deterministically from `aive_logo.png` during the build. Stale checked-in Desktop/Web icon derivatives are not retained.
 
-The build also generates `haive_splash_logo.png` from `haive_logo.png`: the static logo Android, Desktop and Web show while the app starts. There is no loading animation.
+The build also generates `aive_splash_logo.png` from `aive_logo.png`: the static logo Android, Desktop and Web show while the app starts. There is no loading animation.
 
 Android's platform-owned launch splash stays a neutral brand-color surface until the app owns its window; the app's splash then shows the logo until startup is ready.
 
@@ -19,7 +19,7 @@ User-facing product name: **The Aive**
 
 Technical/project shorthand: **Aive** / `aive`
 
-Android application ID and namespace: `com.hereliesaz.aive` (Google Play). The GitHub-release flavor keeps the application ID `com.hereliesaz.haive` permanently so existing installs upgrade in place; the namespace is `com.hereliesaz.aive` for both.
+Android application ID and namespace: `com.hereliesaz.aive` (Google Play). The GitHub-release flavor uses the same application ID and namespace. GitHub-release installs made under the earlier application ID do not upgrade in place.
 
 ## Colour rule: content colour is derived from its surface
 

@@ -16,14 +16,14 @@ The Android Play build does not offer distributed compute for 1.0: the Compute s
 
 ## Tokens, node identity and configuration
 
-The relay reads a shared pool token from `AIVE_RELAY_TOKEN` (`HAIVE_RELAY_TOKEN` is accepted for compatibility) and its port from `PORT`, `AIVE_RELAY_PORT`, or `HAIVE_RELAY_PORT` (default `8080`). The pool token is used **only to enrol** a node; it no longer opens a session.
+The relay reads a shared pool token from `AIVE_RELAY_TOKEN` and its port from `PORT` or `AIVE_RELAY_PORT` (default `8080`). The pool token is used **only to enrol** a node; it no longer opens a session.
 
 Each node has its own key pair (ECDSA P-256 / SHA-256, `ES256`; `ComputeNodeSigner`, protocol in `ComputeNodeIdentity.kt`):
 
 - Android — generated inside the Android Keystore (alias `aive.distributed-compute.node-identity`), not exportable.
 - Desktop — generated with JCA and kept in the OS credential store (account `node-signing-key`, Windows file `distributed-compute-node-key.dpapi`), with the same plaintext-preferences fallback as the token when no store works.
 
-Enrolment, once per relay, pool, node ID and key (remembered under `haive.distributed-compute.enrolment.v1`):
+Enrolment, once per relay, pool, node ID and key (remembered under `aive.distributed-compute.enrolment.v1`):
 
 ~~~
 POST /v1/compute/{poolId}/enrol
@@ -38,10 +38,10 @@ Every session then opens with a short-lived signed request. The WebSocket upgrad
 
 Any enrolled node can list the pool's nodes (`list_enrolled_nodes`; the relay also sends `enrolled_nodes` on register and on every change) and revoke another node (`revoke_node`; not itself). Revocation closes that node's live session, cancels the leases it published, requeues the leases it held, and stops its key and node ID for good. The Keeper's room Compute part lists the enrolled devices with key fingerprint and work counts, and offers Revoke for each other device while this one is connected. A revoked client stops reconnecting. Revocation does not take the pool token from the device, so a device that may still know it could enrol afresh under a new ID: change the relay token too.
 
-Clients store relay URL, pool ID, node ID, display name, sharing flag, max parallel leases, and metered/external-power policy under `haive.distributed-compute.configuration.v1`. The pool token is stored separately:
+Clients store relay URL, pool ID, node ID, display name, sharing flag, max parallel leases, and metered/external-power policy under `aive.distributed-compute.configuration.v1`. The pool token is stored separately:
 
 - Android — encrypted with an Android Keystore AES-GCM key in private SharedPreferences.
-- Desktop — `AIVE_RELAY_TOKEN`/`HAIVE_RELAY_TOKEN` if set, otherwise the OS credential store: macOS `security`, Linux `secret-tool`, and on Windows a per-user file under `%LOCALAPPDATA%\Aive` encrypted with DPAPI (`ConvertFrom-SecureString`), written and read through PowerShell with the token on stdin/stdout, never on a command line. When no store works (for example, no `secret-tool`), or the stored token does not read back, the token falls back to **plaintext** Java user preferences (`com/hereliesaz/haive/distributed-compute`).
+- Desktop — `AIVE_RELAY_TOKEN` if set, otherwise the OS credential store: macOS `security`, Linux `secret-tool`, and on Windows a per-user file under `%LOCALAPPDATA%\Aive` encrypted with DPAPI (`ConvertFrom-SecureString`), written and read through PowerShell with the token on stdin/stdout, never on a command line. When no store works (for example, no `secret-tool`), or the stored token does not read back, the token falls back to **plaintext** Java user preferences (`com/hereliesaz/aive/distributed-compute`).
 
 ## Delegation targets
 
@@ -82,8 +82,7 @@ its completed and failed leases, and the origin's task run ends with "(ran on <n
 
 ## Relay process-restart persistence
 
-By default the relay keeps lease state only in memory. Set `AIVE_RELAY_STATE_DIR` (legacy
-`HAIVE_RELAY_STATE_DIR` is accepted) to make lease state survive relay-process restarts. Each pool is
+By default the relay keeps lease state only in memory. Set `AIVE_RELAY_STATE_DIR` to make lease state survive relay-process restarts. Each pool is
 stored in its own opaque hashed filename. The file payload is AES-256-GCM encrypted; the encryption key
 is domain-separated and derived from the relay bearer token, and the pool ID is authenticated as GCM
 associated data. Enrolled node identities, their revocations and work counts are kept in a second file per
@@ -117,4 +116,4 @@ Android accepts new work only when sharing is enabled and its current metered-ne
 
 ## Encrypted compute mesh primitives
 
-`shared/.../mesh/` holds a separate compute-mesh layer used by `RemoteComputeCoordinator`. `MeshCrypto.kt` defines pairing invitations (relay URL, room ID, random 256-bit room key, random relay auth token) and an AES-GCM `MeshCipher` with associated data; Android/Desktop use JCA, and JS/Wasm use `webApp/src/webMain/resources/mesh-crypto.js`, which exposes a `HaiveMeshCrypto` Web Crypto wrapper.
+`shared/.../mesh/` holds a separate compute-mesh layer used by `RemoteComputeCoordinator`. `MeshCrypto.kt` defines pairing invitations (relay URL, room ID, random 256-bit room key, random relay auth token) and an AES-GCM `MeshCipher` with associated data; Android/Desktop use JCA, and JS/Wasm use `webApp/src/webMain/resources/mesh-crypto.js`, which exposes a `AiveMeshCrypto` Web Crypto wrapper.
