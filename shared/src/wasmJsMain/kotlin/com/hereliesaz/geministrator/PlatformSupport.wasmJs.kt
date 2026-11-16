@@ -11,6 +11,6 @@ private fun jsDeviceOffsetMinutes(): Int = js("-new Date().getTimezoneOffset()")
 internal actual fun deviceUtcOffsetMinutes(): Int = jsDeviceOffsetMinutes()
 
 private fun jsIsDesktopClass(): Boolean =
-    js("(typeof window !== 'undefined') && window.matchMedia('(pointer: fine)').matches && !/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)")
+    js("(typeof window !== 'undefined') && Math.min(screen.width, screen.height) >= 600")
 
 internal actual fun isDesktopClassDevice(): Boolean = jsIsDesktopClass()
