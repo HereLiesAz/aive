@@ -639,8 +639,8 @@ private fun ModelsSection(controller: MemoryLayerController) {
     )
     models.forEach { model ->
         AzphaltRecord(
-            seed = "memory-model-${model.role.name}",
-            eyebrow = model.role.name,
+            seed = "memory-model-${model.id}",
+            eyebrow = model.eyebrow,
             title = model.name,
             body = model.error ?: if (model.installed) stringResource(Res.string.memory_installed) else stringResource(Res.string.memory_not_installed),
             endCap = when {
@@ -652,9 +652,9 @@ private fun ModelsSection(controller: MemoryLayerController) {
                 if (!model.installing) {
                     AzphaltPill(
                         if (model.installed) stringResource(Res.string.common_remove) else stringResource(Res.string.memory_install),
-                        "memory-model-action-${model.role.name}",
+                        "memory-model-action-${model.id}",
                         onClick = {
-                            scope.launch { if (model.installed) manager.remove(model.role) else manager.install(model.role) }
+                            scope.launch { if (model.installed) manager.remove(model.id) else manager.install(model.id) }
                         },
                     )
                 }

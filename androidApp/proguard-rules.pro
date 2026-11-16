@@ -12,6 +12,10 @@
 # ONNX Runtime: JNI code creates and reads Java objects by name.
 -keep class ai.onnxruntime.** { *; }
 
+# LiteRT-LM: JNI creates and reads its Kotlin classes (configs, callbacks, messages) by name; the AAR ships no consumer rules.
+-keep class com.google.ai.edge.litertlm.** { *; }
+-dontwarn com.google.ai.edge.litertlm.**
+
 # DJL's desktop-only helpers (image drawing, audio files, runtime compilation, JMX stats) reference
 # JDK classes Android lacks. Aive only uses DJL's tokenizer, which never reaches them.
 -dontwarn java.awt.**

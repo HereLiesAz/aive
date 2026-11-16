@@ -68,6 +68,10 @@ Each needs an owner decision or a larger build than a parity pass:
 7. **A2A server on Android and CLI**: the server core is shared (`a2a/A2aServer.kt`); only desktop hosts it. Android would need a foreground service; the CLI could host it directly.
 8. **Workflows over the relay while the app is closed**: needs the runtime to run headless on Android.
 
+| Feature | Android | Desktop | Web |
+|---|---|---|---|
+| LiteRT-LM generative runtime (small tasks, Qwen2.5-0.5B) | Yes (arm64-v8a, x86_64; CPU) | Yes (Windows x64, macOS arm64, Linux x64/arm64; CPU) | No: its JavaScript API is an early preview, and ORT Web has not been run in a browser |
+
 ## Local model inference (ONNX)
 
 Android and Desktop run ONNX models through the native ONNX Runtime; Web runs them through ONNX Runtime Web (`BrowserOrt.wasmJs.kt`, WebGPU then WASM, single-threaded). The Web runtime is built and unit-tested for its wire format, but loading ORT and running a model in a real browser have not been verified, and no web model is bundled or registered with the memory layer yet. See [Memory layer](Memory-layer.md).

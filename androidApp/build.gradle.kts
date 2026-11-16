@@ -223,6 +223,8 @@ dependencies {
     implementation(libs.kotlinx.coroutines.guava)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.onnxruntime.android)
+    // LiteRT-LM small-task runtime; in both flavors, like ONNX Runtime.
+    implementation(libs.litertlm.android)
     implementation(libs.commons.compress)
     implementation(libs.djl.huggingface.tokenizers)
     testImplementation(kotlin("test-junit"))

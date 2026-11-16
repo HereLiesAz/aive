@@ -41,10 +41,16 @@ interface OnDeviceTextGenerator {
  */
 class OnDeviceTextAgentProvider(
     private val generator: OnDeviceTextGenerator,
-    val maxInputTokens: Int = DEFAULT_MAX_INPUT_TOKENS,
+    private val maxInputTokensOverride: Int? = null,
     private val maxNewTokens: Int = DEFAULT_MAX_NEW_TOKENS,
 ) : AgentProvider {
     override val id: AgentProviderId = ID
+
+    /** Task text routed here: the override, else the active runtime's own limit (LiteRT-LM has a smaller context). */
+    val maxInputTokens: Int
+        get() = maxInputTokensOverride
+            ?: (generator as? OnDeviceTextRuntimeSource)?.activeRuntime()?.maxInputTokens
+            ?: DEFAULT_MAX_INPUT_TOKENS
     override val workKind: com.hereliesaz.geministrator.workflow.WorkKind get() = com.hereliesaz.geministrator.workflow.WorkKind.OnDeviceModel
 
     private enum class Phase { AwaitingApproval, Ready, Cancelled }

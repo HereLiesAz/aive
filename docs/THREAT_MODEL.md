@@ -455,6 +455,7 @@ Every platform runs `NestedWorkflow` nodes through `WorkflowRunNestedWorkflowCli
 - The app never downloads or installs an APK itself. The GitHub-flavor check reads the public GitHub releases feed and, on request, opens the release page in the browser; Android's own installer then enforces that an update is signed with the same key. The GitHub build declares neither `REQUEST_INSTALL_PACKAGES` nor an update `FileProvider`, and CI fails if either appears in a manifest.
 - Each build updates only from its own channel (the Play build and the GitHub build are different packages). A Play build asks Play's in-app update API, and only when Play installed it; a Play build installed any other way makes no update check.
 - The release page URL comes from the feed but is opened only if it is on `https://github.com/`; anything else falls back to the releases list.
+- The LiteRT-LM small-task model is downloaded from Hugging Face (`litert-community`, a third party) at a pinned commit and refused unless its SHA-256 and size match the catalog (`LiteRtLmModelCatalog`); there is no trust-on-first-use. The Hub is trusted only to serve bytes; the pin decides.
 - Azphalt packages require HTTPS repositories, Ed25519 signatures against repository signing keys, SHA-256 checksums for model assets, and a revocation check. If revocation status is unavailable, installation requires explicit offline/untrusted approval.
 
 **Remaining gaps**

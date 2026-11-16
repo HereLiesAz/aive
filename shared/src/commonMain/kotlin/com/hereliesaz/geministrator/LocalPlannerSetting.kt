@@ -47,6 +47,8 @@ sealed interface LocalOrchestrationSpecialistStatus {
 data class OnDeviceSmallTaskSetting(
     val enabled: Boolean,
     val modelInstalled: Boolean,
+    /** The runtime the next small task would run on (for example LiteRT-LM); null with no model. */
+    val runtimeLabel: String? = null,
     val onEnabledChange: (Boolean) -> Unit,
 )
 
