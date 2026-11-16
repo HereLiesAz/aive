@@ -16,9 +16,35 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.log.formatLogTime
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.schedule_trigger_time
+import com.hereliesaz.geministrator.resources.schedule_trigger_webhook
+import com.hereliesaz.geministrator.resources.schedule_trigger_mail
+import com.hereliesaz.geministrator.resources.schedule_eyebrow_webhook
+import com.hereliesaz.geministrator.resources.schedule_eyebrow_mail
+import com.hereliesaz.geministrator.resources.schedule_waits_webhook
+import com.hereliesaz.geministrator.resources.schedule_waits_mail
+import com.hereliesaz.geministrator.resources.schedule_limits
+import com.hereliesaz.geministrator.resources.schedule_fired_last
+import com.hereliesaz.geministrator.resources.schedule_fired_never
+import com.hereliesaz.geministrator.resources.schedule_webhook_address
+import com.hereliesaz.geministrator.resources.schedule_webhook_copy
+import com.hereliesaz.geministrator.resources.schedule_webhook_how
+import com.hereliesaz.geministrator.resources.schedule_webhook_token_link
+import com.hereliesaz.geministrator.resources.schedule_webhook_unsupported
+import com.hereliesaz.geministrator.resources.schedule_webhook_off
+import com.hereliesaz.geministrator.resources.schedule_mail_connect
+import com.hereliesaz.geministrator.resources.schedule_mail_filter_label
+import com.hereliesaz.geministrator.resources.schedule_cap_less
+import com.hereliesaz.geministrator.resources.schedule_cap_more
+import com.hereliesaz.geministrator.resources.schedule_gap_less
+import com.hereliesaz.geministrator.resources.schedule_gap_more
+import com.hereliesaz.geministrator.resources.schedule_poll_less
+import com.hereliesaz.geministrator.resources.schedule_poll_more
 import com.hereliesaz.geministrator.resources.schedule_add_film
 import com.hereliesaz.geministrator.resources.schedule_add_suite
 import com.hereliesaz.geministrator.resources.schedule_cadence_daily
@@ -68,6 +94,7 @@ import com.hereliesaz.geministrator.resources.schedule_suite_present
 import com.hereliesaz.geministrator.workflow.schedule.DaylightSaving
 import com.hereliesaz.geministrator.workflow.schedule.ScheduleCadence
 import com.hereliesaz.geministrator.workflow.schedule.ScheduleClock
+import com.hereliesaz.geministrator.workflow.schedule.ScheduleTrigger
 import com.hereliesaz.geministrator.workflow.schedule.WorkflowSchedule
 import com.hereliesaz.geministrator.workflow.schedule.WorkflowScheduleStore
 import kotlinx.coroutines.delay
@@ -79,6 +106,29 @@ import kotlin.time.ExperimentalTime
 
 /** The keeper's schedules, for the Keeper's room; null where nothing is kept. */
 internal val LocalWorkflowScheduleStore = compositionLocalOf<WorkflowScheduleStore?> { null }
+
+/**
+ * Where web calls reach this app: [supported] is false where there is no HTTP server (Android, the web app); [baseUrl] is the
+ * A2A server's address, or null while it is off.
+ */
+internal data class ScheduleWebhookEndpoint(val supported: Boolean, val baseUrl: String?)
+
+internal val LocalScheduleWebhookEndpoint = compositionLocalOf { ScheduleWebhookEndpoint(supported = false, baseUrl = null) }
+
+/** The scheme, host and port of the A2A server from its Agent Card address, or null while there is none. */
+internal fun webhookBaseUrl(agentCardUrl: String?): String? {
+    val url = agentCardUrl?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    val schemeEnd = url.indexOf("://")
+    if (schemeEnd < 0) return null
+    val pathStart = url.indexOf('/', schemeEnd + 3)
+    return if (pathStart < 0) url else url.substring(0, pathStart)
+}
+
+/** The address a web call to [scheduleId] is sent to. */
+internal fun webhookUrl(baseUrl: String, scheduleId: String): String = baseUrl.trimEnd('/') + "/hooks/" + scheduleId
+
+private fun steppedCap(value: Int, up: Boolean) = (if (up) value + 5 else value - 5).coerceIn(1, ScheduleTrigger.MAX_DAILY_CAP)
+private fun steppedMinutes(value: Int, up: Boolean, min: Int) = (if (up) value + 5 else value - 5).coerceIn(min, ScheduleTrigger.MAX_MINUTES)
 
 @OptIn(ExperimentalTime::class)
 internal fun currentEpochMillis(): Long = Clock.System.now().toEpochMilliseconds()
@@ -265,11 +315,17 @@ private fun ScheduleCard(
     onToggle: () -> Unit,
     onRemove: () -> Unit,
 ) {
-    val next = if (schedule.enabled) {
-        stringResource(Res.string.schedule_next, formatLogTime(ScheduleClock.nextDue(schedule)))
-    } else {
-        stringResource(Res.string.schedule_next_off)
+    val kind = schedule.trigger.kind
+    val next = when {
+        !schedule.enabled -> stringResource(Res.string.schedule_next_off)
+        kind == ScheduleTrigger.Kind.Webhook -> stringResource(Res.string.schedule_waits_webhook)
+        kind == ScheduleTrigger.Kind.EmailArrival -> stringResource(Res.string.schedule_waits_mail, schedule.trigger.mailPollMinutes)
+        else -> stringResource(Res.string.schedule_next, formatLogTime(ScheduleClock.nextDue(schedule)))
     }
+    val fired = if (kind == ScheduleTrigger.Kind.Time) null else schedule.triggerLedger.lastFiredAtEpochMillis?.let { at ->
+        stringResource(Res.string.schedule_fired_last, formatLogTime(at), schedule.triggerLedger.lastCause.orEmpty())
+    } ?: stringResource(Res.string.schedule_fired_never)
+    val limits = if (kind == ScheduleTrigger.Kind.Time) null else stringResource(Res.string.schedule_limits, schedule.trigger.dailyCap, schedule.trigger.minIntervalMinutes)
     val last = schedule.lastStartedAtEpochMillis?.let { at ->
         stringResource(Res.string.schedule_last, formatLogTime(at) + (schedule.lastNote?.let { " · $it" } ?: ""))
     } ?: (schedule.lastNote ?: stringResource(Res.string.schedule_last_never))
@@ -284,9 +340,13 @@ private fun ScheduleCard(
     var confirmingRemove by remember(schedule.id) { mutableStateOf(false) }
     AzphaltRecord(
         seed = "schedule-${schedule.id}",
-        eyebrow = cadenceText(schedule.cadence, schedule.utcOffsetMinutes),
+        eyebrow = when (kind) {
+            ScheduleTrigger.Kind.Webhook -> stringResource(Res.string.schedule_eyebrow_webhook)
+            ScheduleTrigger.Kind.EmailArrival -> stringResource(Res.string.schedule_eyebrow_mail)
+            ScheduleTrigger.Kind.Time -> cadenceText(schedule.cadence, schedule.utcOffsetMinutes)
+        },
         title = schedule.name,
-        body = listOf(next, last).joinToString("\n"),
+        body = listOfNotNull(next, fired, limits, last).joinToString("\n"),
         endCap = stringResource(if (schedule.enabled) Res.string.schedule_on else Res.string.schedule_off),
         well = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -324,7 +384,8 @@ private fun ScheduleCard(
                         )
                     }
                 }
-                CadenceEditor(schedule.cadence) { cadence -> onEdit { it.copy(cadence = cadence, createdAtEpochMillis = currentEpochMillis(), lastStartedAtEpochMillis = null) } }
+                TriggerEditor(schedule, onEdit)
+                if (kind == ScheduleTrigger.Kind.Time) CadenceEditor(schedule.cadence) { cadence -> onEdit { it.copy(cadence = cadence, createdAtEpochMillis = currentEpochMillis(), lastStartedAtEpochMillis = null) } }
             }
         },
     )
@@ -372,6 +433,83 @@ private fun CadenceEditor(cadence: ScheduleCadence, onChange: (ScheduleCadence) 
                         AzphaltPill(stringResource(Res.string.schedule_day_earlier), "cadence-day-earlier", onClick = { onChange(cadence.copy(dayOfWeek = (cadence.dayOfWeek + 5) % 7 + 1)) })
                         AzphaltPill(stringResource(Res.string.schedule_day_later), "cadence-day-later", onClick = { onChange(cadence.copy(dayOfWeek = cadence.dayOfWeek % 7 + 1)) })
                     }
+                }
+            }
+        }
+    }
+}
+
+/** What starts the schedule, then for a web call its address to copy and for new mail its filter; every change is made to the stored schedule. */
+@Composable
+private fun TriggerEditor(schedule: WorkflowSchedule, onEdit: ((WorkflowSchedule) -> WorkflowSchedule?) -> Unit) {
+    val links = LocalPlaceLinks.current
+    val endpoint = LocalScheduleWebhookEndpoint.current
+    val clipboard = LocalClipboardManager.current
+    val trigger = schedule.trigger
+    fun setKind(kind: ScheduleTrigger.Kind) = onEdit {
+        if (it.trigger.kind == kind) {
+            null
+        } else {
+            // Back to the clock starts counting from now; new mail starts with a fresh look (what is there is not "new").
+            val base = it.copy(trigger = it.trigger.copy(kind = kind), triggerLedger = it.triggerLedger.copy(lastMailCheckAtEpochMillis = null))
+            if (kind == ScheduleTrigger.Kind.Time) base.copy(createdAtEpochMillis = currentEpochMillis(), lastStartedAtEpochMillis = null) else base
+        }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(
+                ScheduleTrigger.Kind.Time to Res.string.schedule_trigger_time,
+                ScheduleTrigger.Kind.Webhook to Res.string.schedule_trigger_webhook,
+                ScheduleTrigger.Kind.EmailArrival to Res.string.schedule_trigger_mail,
+            ).forEach { (kind, label) ->
+                AzphaltPill(
+                    label = stringResource(label),
+                    seed = "trigger-kind-${schedule.id}-$kind",
+                    selected = trigger.kind == kind,
+                    // A web call needs an HTTP server, which only the desktop app has; the note below says so.
+                    onClick = { if (kind != ScheduleTrigger.Kind.Webhook || endpoint.supported) setKind(kind) },
+                )
+            }
+        }
+        if (!endpoint.supported) Text(stringResource(Res.string.schedule_webhook_unsupported), style = AzphaltType.body, color = azphaltOnSurface())
+        if (trigger.kind == ScheduleTrigger.Kind.Webhook && endpoint.supported) {
+            val base = endpoint.baseUrl
+            if (base == null) {
+                LinkText(stringResource(Res.string.schedule_webhook_off), onClick = links.openConnections?.let { open -> { open(null) } })
+            } else {
+                val address = webhookUrl(base, schedule.id)
+                Text(stringResource(Res.string.schedule_webhook_address, address), style = AzphaltType.body, color = azphaltOnSurface())
+                AzphaltPill(
+                    label = stringResource(Res.string.schedule_webhook_copy),
+                    seed = "trigger-copy-${schedule.id}",
+                    onClick = { clipboard.setText(AnnotatedString(address)) },
+                )
+                Text(stringResource(Res.string.schedule_webhook_how), style = AzphaltType.body, color = azphaltOnSurface())
+                LinkText(stringResource(Res.string.schedule_webhook_token_link), onClick = links.openConnections?.let { open -> { open(null) } })
+            }
+        }
+        if (trigger.kind == ScheduleTrigger.Kind.EmailArrival) {
+            LinkText(stringResource(Res.string.schedule_mail_connect), onClick = links.openConnections?.let { open -> { open(null) } })
+            var filter by remember(schedule.id) { mutableStateOf(trigger.mailFilter) }
+            AzphaltTextField(
+                value = filter,
+                onValueChange = { text ->
+                    filter = text.take(200)
+                    // A new filter is a new mailbox view: what it already matches is not "new".
+                    onEdit { it.copy(trigger = it.trigger.copy(mailFilter = filter), triggerLedger = it.triggerLedger.copy(lastMailCheckAtEpochMillis = null)) }
+                },
+                label = stringResource(Res.string.schedule_mail_filter_label),
+            )
+        }
+        if (trigger.kind != ScheduleTrigger.Kind.Time) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                AzphaltPill(stringResource(Res.string.schedule_cap_less), "trigger-cap-less-${schedule.id}", onClick = { onEdit { it.copy(trigger = it.trigger.copy(dailyCap = steppedCap(it.trigger.dailyCap, false))) } })
+                AzphaltPill(stringResource(Res.string.schedule_cap_more), "trigger-cap-more-${schedule.id}", onClick = { onEdit { it.copy(trigger = it.trigger.copy(dailyCap = steppedCap(it.trigger.dailyCap, true))) } })
+                AzphaltPill(stringResource(Res.string.schedule_gap_less), "trigger-gap-less-${schedule.id}", onClick = { onEdit { it.copy(trigger = it.trigger.copy(minIntervalMinutes = steppedMinutes(it.trigger.minIntervalMinutes, false, 1))) } })
+                AzphaltPill(stringResource(Res.string.schedule_gap_more), "trigger-gap-more-${schedule.id}", onClick = { onEdit { it.copy(trigger = it.trigger.copy(minIntervalMinutes = steppedMinutes(it.trigger.minIntervalMinutes, true, 1))) } })
+                if (trigger.kind == ScheduleTrigger.Kind.EmailArrival) {
+                    AzphaltPill(stringResource(Res.string.schedule_poll_less), "trigger-poll-less-${schedule.id}", onClick = { onEdit { it.copy(trigger = it.trigger.copy(mailPollMinutes = steppedMinutes(it.trigger.mailPollMinutes, false, ScheduleTrigger.MIN_MAIL_POLL_MINUTES))) } })
+                    AzphaltPill(stringResource(Res.string.schedule_poll_more), "trigger-poll-more-${schedule.id}", onClick = { onEdit { it.copy(trigger = it.trigger.copy(mailPollMinutes = steppedMinutes(it.trigger.mailPollMinutes, true, ScheduleTrigger.MIN_MAIL_POLL_MINUTES))) } })
                 }
             }
         }

@@ -867,49 +867,92 @@ fun App(
         }
         LaunchedEffect(runtime, workflowPersistence) {
             val active = runtime ?: return@LaunchedEffect
-            ScheduleTicker(
-                store = scheduleStore,
-                now = { currentEpochMillis() },
-                runActive = { active.hasUnfinishedActiveRun() },
-                deviceUtcOffsetMinutes = { deviceUtcOffsetMinutes() },
-                start = { schedule ->
-                    val definition = workflowPersistence.definitions.get(WorkflowDefinitionId(schedule.workflowId))
-                        ?: error("the hive is no longer on this device")
-                    // The loop runs unattended on the promise that it only reads and reports and never waits on anyone: a hive
-                    // that no longer keeps that is not started on a schedule (the keeper can still run it by hand).
-                    if (definition.id.value == SelfImprovementLoop.HIVE_ID) {
-                        LoopIntegrity.startRefusal(definition, resolveRoleCollection(workflowPersistence.roles.all()))?.let { error(it) }
-                    }
-                    // An evidence-fed schedule (the self-improvement cycle) starts with the swarm's own numbers and the loop as it is now.
-                    val objective = if (schedule.withEvidence) {
-                        val roles = resolveRoleCollection(workflowPersistence.roles.all())
-                        schedule.objective + "\n\n" + SwarmEvidence.of(
-                            runs = active.loadRunHistory().flatMap { it.second },
-                            roles = roles,
-                            state = improvementStore.state(),
-                            nowEpochMillis = currentEpochMillis(),
-                            loopDescription = SelfImprovementLoop.describe(
-                                definition = definition,
-                                hallMonitor = roles.firstOrNull { it.id == com.hereliesaz.geministrator.domain.HallMonitorRole.id } ?: com.hereliesaz.geministrator.domain.HallMonitorRole.definition,
-                            ),
-                        )
-                    } else {
-                        schedule.objective
-                    }
-                    val started = guardedSavedWorkflowLaunch { activeRuntime, existingProject ->
-                        activeRuntime.launchSavedWorkflow(
+            // Starts a schedule's hive as drawn. [event] is a web call or new mail that started it: its text is outside content.
+            suspend fun launchScheduled(schedule: com.hereliesaz.geministrator.workflow.schedule.WorkflowSchedule, event: com.hereliesaz.geministrator.workflow.schedule.TriggerEvent?) {
+                val definition = workflowPersistence.definitions.get(WorkflowDefinitionId(schedule.workflowId))
+                    ?: error("the hive is no longer on this device")
+                // The loop runs unattended on the promise that it only reads and reports and never waits on anyone: a hive
+                // that no longer keeps that is not started on a schedule (the keeper can still run it by hand).
+                if (definition.id.value == SelfImprovementLoop.HIVE_ID) {
+                    LoopIntegrity.startRefusal(definition, resolveRoleCollection(workflowPersistence.roles.all()))?.let { error(it) }
+                }
+                // An evidence-fed schedule (the self-improvement cycle) starts with the swarm's own numbers and the loop as it is now.
+                val baseObjective = if (schedule.withEvidence) {
+                    val roles = resolveRoleCollection(workflowPersistence.roles.all())
+                    schedule.objective + "\n\n" + SwarmEvidence.of(
+                        runs = active.loadRunHistory().flatMap { it.second },
+                        roles = roles,
+                        state = improvementStore.state(),
+                        nowEpochMillis = currentEpochMillis(),
+                        loopDescription = SelfImprovementLoop.describe(
                             definition = definition,
-                            existingProject = existingProject,
-                            objective = objective,
-                            repository = existingProject?.repository,
-                            objectiveProvenance = schedule.objectiveProvenance(),
-                        )
+                            hallMonitor = roles.firstOrNull { it.id == com.hereliesaz.geministrator.domain.HallMonitorRole.id } ?: com.hereliesaz.geministrator.domain.HallMonitorRole.definition,
+                        ),
+                    )
+                } else {
+                    schedule.objective
+                }
+                val objective = if (event != null) com.hereliesaz.geministrator.workflow.schedule.TriggerObjective.compose(baseObjective, event) else baseObjective
+                val started = guardedSavedWorkflowLaunch { activeRuntime, existingProject ->
+                    activeRuntime.launchSavedWorkflow(
+                        definition = definition,
+                        existingProject = existingProject,
+                        objective = objective,
+                        repository = existingProject?.repository,
+                        // Outside text never counts as the keeper's: a step that can change something waits at the context-taint gate.
+                        objectiveProvenance = if (event != null) com.hereliesaz.geministrator.domain.ContextProvenance.ExternalContent else schedule.objectiveProvenance(),
+                    )
+                }
+                if (!started) error(getString(Res.string.app_launch_already_in_progress))
+                // The cause goes on the run's Story as one line.
+                if (event != null) {
+                    runCatchingCancellable {
+                        val latest = active.persistence.projects.all().flatMap { active.persistence.runs.byProject(it.id) }.maxByOrNull { it.updatedAtEpochMillis }
+                        if (latest != null) {
+                            com.hereliesaz.geministrator.persistence.RepositoryWorkflowEventSink(active.persistence.events).append(
+                                com.hereliesaz.geministrator.events.PolicyDecisionRecorded(
+                                    workflowRunId = latest.id,
+                                    effect = com.hereliesaz.geministrator.policy.PolicyEffect.Allow,
+                                    code = "schedule.trigger",
+                                    action = "start",
+                                    subjectType = "schedule",
+                                    subjectId = schedule.id,
+                                    resourceType = "trigger",
+                                    resourceId = event.eventId.take(64),
+                                    reason = "Started by ${event.cause}",
+                                    occurredAtEpochMillis = currentEpochMillis(),
+                                ),
+                            )
+                        }
                     }
-                    if (!started) error(getString(Res.string.app_launch_already_in_progress))
-                },
-                log = { line -> appLog("Schedule", line) },
-                vet = { schedule -> workflowLibraryHost.scheduleVetting(schedule.workflowId) },
-            ).run()
+                }
+            }
+            val intake = com.hereliesaz.geministrator.workflow.schedule.TriggerIntake(scheduleStore) { currentEpochMillis() }
+            com.hereliesaz.geministrator.workflow.schedule.ScheduleTriggerHub.intake = intake
+            try {
+                ScheduleTicker(
+                    store = scheduleStore,
+                    now = { currentEpochMillis() },
+                    runActive = { active.hasUnfinishedActiveRun() },
+                    deviceUtcOffsetMinutes = { deviceUtcOffsetMinutes() },
+                    start = { schedule -> launchScheduled(schedule, null) },
+                    startTriggered = { schedule, event -> launchScheduled(schedule, event) },
+                    triggers = intake,
+                    mail = mcpHost?.let { host ->
+                        com.hereliesaz.geministrator.workflow.schedule.MailPoller(
+                            scheduleStore,
+                            com.hereliesaz.geministrator.workflow.schedule.McpMailArrivalSource(host),
+                            intake,
+                            { currentEpochMillis() },
+                            { line -> appLog("Schedule", line) },
+                        )
+                    },
+                    log = { line -> appLog("Schedule", line) },
+                    vet = { schedule -> workflowLibraryHost.scheduleVetting(schedule.workflowId) },
+                ).run()
+            } finally {
+                com.hereliesaz.geministrator.workflow.schedule.ScheduleTriggerHub.intake = null
+            }
         }
 
         // The mascots are labelled with the keeper-facing name (the orchestrator reads Queen), so the rig lookup
@@ -924,6 +967,7 @@ fun App(
         CompositionLocalProvider(
             LocalWorkflowLibraryHost provides workflowLibraryHost,
             LocalWorkflowScheduleStore provides scheduleStore,
+            LocalScheduleWebhookEndpoint provides ScheduleWebhookEndpoint(supported = a2aServerSetting != null, baseUrl = webhookBaseUrl(a2aServerSetting?.agentCardUrl)),
             LocalImprovementStore provides improvementStore,
             LocalStableHost provides stableHost,
             LocalBreedPurchases provides breedPurchases,
