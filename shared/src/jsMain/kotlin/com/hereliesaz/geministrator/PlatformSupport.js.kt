@@ -7,4 +7,4 @@ internal actual fun normalizeNfc(text: String): String = text.asDynamic().normal
 internal actual fun deviceUtcOffsetMinutes(): Int = (-kotlin.js.Date().getTimezoneOffset()).toInt()
 
 internal actual fun isDesktopClassDevice(): Boolean =
-    js("(typeof window !== 'undefined') && Math.min(screen.width, screen.height) >= 600") as Boolean
+    js("(typeof window !== 'undefined') && Math.min(screen.width, screen.height) >= 720") as Boolean
