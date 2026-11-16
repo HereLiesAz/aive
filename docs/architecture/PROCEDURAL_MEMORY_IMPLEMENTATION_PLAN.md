@@ -12,7 +12,7 @@ Status: **Foundation, opt-in execution receipts, and durable procedural sidecars
 4. **Safety defaults:** Capture is configurable; suggestions are opt-in, invocation requires explicit selection; automatic low-risk reflex activation is a later separately gated capability. Mutating steps always retain existing permission and approval requirements.
 5. **Remote peers:** Full-duplex MCP provides symmetrical coordination and reports; not a remote shell, second task scheduler, source of truth, or permission system.
 6. **Persistence:** Use a dedicated per-workflow `ProcedureStore` interface (in-memory test backend, durable SQLDelight-backed platform adapters). Do not add executable free text to `MemorySnapshot` or put large script bodies in general Settings.
-7. **Compatibility:** Android, Desktop, JS and Wasm retain the common data model; platform-specific executor coverage is explicit rather than assumed.
+7. **Compatibility:** Android, Desktop and Wasm retain the common data model; platform-specific executor coverage is explicit rather than assumed.
 
 ## Dependency graph
 

@@ -232,18 +232,18 @@ Pushes to `main`:
 - test and compile provider targets
 - build Android release artifacts
 - build a Desktop distribution
-- build JS and Wasm web targets
+- build the Wasm web target
 - upload Android and Desktop artifacts
 - derive the four-part public build version through the centralized `HereLiesAz/workflows` version action
 - publish exact-build assets into the patch-grouped GitHub Release through the centralized release action
-- publish the standalone puppet-rig editor to the Pages root independently of Android/Desktop/JS/Wasm build completion; keep `/aive/privacy/` available
+- publish the standalone puppet-rig editor to the Pages root independently of Android/Desktop/Wasm build completion; keep `/aive/privacy/` available
 
-The full Aive JS/Wasm browser app remains a CI build target, not a deployed Pages artifact;
+The full Aive Wasm browser app remains a CI build target, not a deployed Pages artifact;
 its integration is deferred. See [Puppet rig deployment](../../tools/puppet-rig/README.md#deployment).
 
 The composite build runs on JDK 21, and every module (Android included) targets JVM 21 bytecode. The Aive and the pinned H2G2 renderer also use the same Android Gradle Plugin version because Gradle does not permit incompatible AGP versions inside one composite Android build.
 
-Web packaging uses isolated Maven publications because Kotlin/JS package generation cannot
+Web packaging uses isolated Maven publications because Kotlin/Wasm package generation cannot
 resolve the nested H2G2 composite build from within itself. CI publishes the pinned source
 checkouts with their native coordinates and enables `aive.useMavenLocalH2g2` to substitute
 the exact pinned dependencies with those local publications. Publication files are not

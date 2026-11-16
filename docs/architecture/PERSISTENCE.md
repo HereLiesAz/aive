@@ -16,8 +16,7 @@ Current platform backing stores are:
 
 - Android: SharedPreferences (before the SQL store)
 - Desktop/JVM: Java Preferences (before the SQL store)
-- Web JS: browser localStorage
-- Web Wasm: browser localStorage
+- Web (Wasm): browser localStorage
 
 The persisted model includes:
 
