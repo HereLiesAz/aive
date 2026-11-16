@@ -14,10 +14,29 @@ protocol fields do not follow it.
 | **Host** | where an agent runs (`TaskExecutor`, the Hosts part of the Keeper's room, an orphan's endpoint host) | A creature's **Runs on** row and an orphan's **Host:** line: your device, a paired machine, or the orphan's own server. Different from its **Source** (what it thinks with). |
 | **Swarm** | workflow (`WorkflowDefinition`, `WorkflowRun` for one execution; `workflow` in code, files and persisted keys) | The saved, editable plan: the queen, her creatures and the strands between them. The swarm library (the Workflows destination), **New swarm**, **Delete swarm**, **Swarm options**, **Share swarm card**, the Store's **Swarms** tab, Schedules. |
 | **Hive** | the goal (today `Project` and the objective; D17: the project becomes the hive and gains a goal) | What the keeper wants done: **Your first hive**, **Feed the hive**, the **Hive** place and the **Hives** rail chip (the district, which still lists swarms grouped by the hive they last served). A hive can have many runs, and a swarm can serve many hives. |
-| **Run** | `WorkflowRun` (one execution of a swarm for a hive) | **Work**, **Stop run**, **Run log**, **RUN n**, Past runs. D3 (Run or another word) is open; Run stays. |
+| **Run** | `WorkflowRun` (one execution of a swarm for a hive) | **Work**, **Stop run**, **Run log**, **RUN n**, Past runs. D3 is settled (below): "run" is only a secondary word for the verb form of swarm; these existing labels keep it as the name of one execution until the owner says otherwise. |
 | **Orphan** | drifter (`A2aDrifters`, `DrifterTrouble`, `drifter-` role ids) | A remote A2A agent you can bring in and connect. |
 
 Kept as they are: **Memory**, **Breed**.
+
+## The settled ruling on swarm, hive, breeding and run (resolves D3)
+
+The owner's words: "swarm is both a noun and verb and to use it for more than one thing. Hive an overall swarm's goal,
+where breeding are the goals within a swarm. Run is acceptable as a secondary word for the swarm verb form." And, on
+breeding: "Where there are eggs hatching, that is breeding."
+
+- **Swarm** is the workflow as a noun and the act of running it as a verb. It is one word for both, on purpose.
+- **Hive** is the overall goal of a swarm. Never the workflow.
+- **Breeding** is the goals within a swarm: the part where eggs are hatching into creatures. It is the hatching phase
+  inside a swarm, not the swarm and not the hive.
+- **Run** is allowed as a secondary word for the verb form only ("run the swarm"). It is not a noun for the workflow.
+  D3 (Run or another word) is closed by this.
+
+What the UI strings do today (audited, `values/*.xml`): no string says "breeding" (the hatching strings say hatched,
+hatches, Nursery); no string uses "hive" for the workflow or "swarm" for the goal in a way that is plainly wrong. "Run"
+is still used as a noun for one execution of a swarm ("Stop run", "Past runs", "Run log", "The run could not start"),
+which is a different thing from the workflow; whether that noun should also give way to the verb form is left to the
+owner (see below) and nothing was changed.
 
 Settled earlier: the **keeper** is you; the **queen** is the planner that drafts a swarm for your approval. Settled
 now: a **swarm** is the workflow (the saved definition and its plan), a **hive** is the goal the keeper wants achieved
