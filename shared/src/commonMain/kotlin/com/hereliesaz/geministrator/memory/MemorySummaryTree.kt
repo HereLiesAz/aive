@@ -265,7 +265,7 @@ internal object MemoryPairSummaries {
         val joint = MemorySizeState(states.sumOf { it.size }, states.sumOf { it.original }, jointPass)
         val limit = memoryRewriteLimit(listOf(joint)).coerceAtLeast(1)
         val (original, pass) = memoryRewriteState(listOf(joint))
-        val divergence = edge.relation == MemoryRelationKind.Diverges || edge.relation == MemoryRelationKind.ConflictsWith
+        val divergence = edge.relation == MemoryRelationKind.Diverges
         fun paragraphs(node: MemoryNode) = node.text.typedBlocks().map { it.text.trim() }.filter(String::isNotBlank).ifEmpty { listOf(node.text.trim()) }
         val engines = mutableListOf<String>()
         var millis = 0L
