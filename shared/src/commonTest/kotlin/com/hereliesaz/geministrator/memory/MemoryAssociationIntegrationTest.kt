@@ -139,7 +139,12 @@ class MemoryAssociationIntegrationTest {
                         to = sharedTarget.id,
                         weight = 0.88f,
                         createdAt = 3L,
-                        metadata = mapOf("basis" to "temporal:FifteenMinutes", "deterministic" to "true"),
+                        metadata = mapOf(
+                            "basis" to "temporal:FifteenMinutes",
+                            "deterministic" to "true",
+                            "evidenceFamily" to "temporal-co-bucket",
+                            "evidencePolicy" to "latest",
+                        ),
                     ),
                     association(
                         id = "a-current-temporal",
@@ -147,7 +152,12 @@ class MemoryAssociationIntegrationTest {
                         to = sharedTarget.id,
                         weight = 0.50f,
                         createdAt = 4L,
-                        metadata = mapOf("basis" to "temporal:Week", "deterministic" to "true"),
+                        metadata = mapOf(
+                            "basis" to "temporal:Week",
+                            "deterministic" to "true",
+                            "evidenceFamily" to "temporal-co-bucket",
+                            "evidencePolicy" to "latest",
+                        ),
                     ),
                     association("b-shared", sourceB.id, sharedTarget.id, 0.50f),
                     association("a-unique", sourceA.id, uniqueTarget.id, 0.50f),
