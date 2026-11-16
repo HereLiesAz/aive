@@ -1509,6 +1509,15 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_node"> node</string>
     <string name="settings_not_configured">Not configured</string>
     <string name="settings_not_connected">Not connected</string>
+    <string name="platform_limit_compute_browser">Compute pools: a browser tab cannot join a pool or take work for other devices, because it cannot stay connected once the tab sleeps. Use the desktop app or the Android app for that.</string>
+    <string name="platform_limit_compute_store">Compute pools: the Google Play version of The Aive does not include them. The GitHub version of the Android app and the desktop app do.</string>
+    <string name="platform_limit_remote_browser">Remote access: a browser cannot listen for another device, so this web app cannot be reached remotely. Open the web app on the other device instead.</string>
+    <string name="platform_limit_remote_store">Remote access: the Google Play version of The Aive does not include it, because it needs a background connection the Play listing does not declare. The GitHub version of the Android app has it.</string>
+    <string name="compute_hold_sharing_off">Not taking work: sharing is off on that device.</string>
+    <string name="compute_hold_too_hot">Not taking work: the device is too hot and is waiting to cool down.</string>
+    <string name="compute_hold_metered_network">Not taking work: it is on a metered network and you have not allowed that.</string>
+    <string name="compute_hold_needs_external_power">Not taking work: it is waiting to be plugged in.</string>
+    <string name="compute_hold_power_unknown">Not taking work: it needs to be plugged in and cannot tell whether it is.</string>
     <string name="settings_observe_only">Observe only</string>
     <string name="settings_ok">OK</string>
     <string name="settings_on_device_small_tasks">Small tasks on this device</string>

@@ -210,6 +210,10 @@ import com.hereliesaz.geministrator.resources.settings_node
 import com.hereliesaz.geministrator.resources.settings_not_configured
 import com.hereliesaz.geministrator.resources.settings_not_connected
 import com.hereliesaz.geministrator.resources.settings_observe_only
+import com.hereliesaz.geministrator.resources.platform_limit_compute_browser
+import com.hereliesaz.geministrator.resources.platform_limit_compute_store
+import com.hereliesaz.geministrator.resources.platform_limit_remote_browser
+import com.hereliesaz.geministrator.resources.platform_limit_remote_store
 import com.hereliesaz.geministrator.resources.settings_ok
 import com.hereliesaz.geministrator.resources.settings_online
 import com.hereliesaz.geministrator.resources.settings_online_2
@@ -299,6 +303,7 @@ internal fun ProviderSettingsScreen(
     onRevokeComputeNode: (String) -> Unit = {},
     crashReportingSetting: CrashReportingSetting? = null,
     remoteAccessSetting: RemoteAccessSetting? = null,
+    platformLimits: PlatformLimits = PlatformLimits(),
     a2aServerSetting: A2aServerSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
     localOrchestrationSpecialistSetting: LocalOrchestrationSpecialistSetting? = null,
@@ -811,6 +816,15 @@ internal fun ProviderSettingsScreen(
       }
 
       if (KeeperSection.Device in sections) {
+        // A feature this build cannot have says so, plainly, instead of vanishing.
+        if (remoteAccessSetting == null) {
+            platformLimits.remote?.let { limit ->
+                Text(platformLimitText(limit, remote = true), style = AzphaltType.body, color = azphaltOnSurface())
+            }
+        }
+        platformLimits.compute?.let { limit ->
+            Text(platformLimitText(limit, remote = false), style = AzphaltType.body, color = azphaltOnSurface())
+        }
         remoteAccessSetting?.let { setting ->
             ProviderSectionLabel(stringResource(Res.string.settings_remote_access))
             Text(
@@ -1318,6 +1332,12 @@ internal fun ProviderSettingsScreen(
                             append(" · ")
                             append(node.installedModelIds.size)
                             append(stringResource(Res.string.settings_local_model_s))
+                        }
+                        if (!node.acceptsWork) {
+                            com.hereliesaz.geministrator.distributed.ComputeWorkHold.of(node.capabilities)?.let {
+                                append("\n")
+                                append(computeWorkHoldText(it))
+                            }
                         }
                     },
                     endCap = if (node.acceptsWork) stringResource(Res.string.settings_available) else stringResource(Res.string.settings_observe_only),

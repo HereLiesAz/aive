@@ -145,6 +145,7 @@ fun App(
     distributedComputeAvailable: Boolean = true,
     crashReportingSetting: CrashReportingSetting? = null,
     remoteAccessSetting: RemoteAccessSetting? = null,
+    platformLimits: PlatformLimits = PlatformLimits(),
     /** The desktop's A2A server switch (docs/A2A.md); null where there is none. */
     a2aServerSetting: A2aServerSetting? = null,
     localPlannerSetting: LocalPlannerSetting? = null,
@@ -1364,6 +1365,7 @@ fun App(
                         onRevokeComputeNode = onRevokeComputeNode,
                         crashReportingSetting = crashReportingSetting,
                         remoteAccessSetting = remoteAccessSetting,
+                        platformLimits = platformLimits,
                         a2aServerSetting = a2aServerSetting,
                         localPlannerSetting = localPlannerSetting,
                         localOrchestrationSpecialistSetting = localOrchestrationSpecialistSetting,

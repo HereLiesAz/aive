@@ -222,6 +222,7 @@ fun main() {
                 // The browser has no way to pair or run a compute node: hide the Compute part rather than
                 // show a Save & connect that does nothing.
                 distributedComputeAvailable = false,
+                platformLimits = PlatformLimits(compute = PlatformLimit.Browser, remote = PlatformLimit.Browser),
             )
         }
     }
