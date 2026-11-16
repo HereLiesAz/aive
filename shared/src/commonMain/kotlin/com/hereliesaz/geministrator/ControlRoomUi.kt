@@ -131,7 +131,14 @@ internal fun ControlRoomDestination.displayLabel(): String = stringResource(
 )
 
 internal object ControlRoomBreakpoints {
-    val Wide: Dp = 820.dp
+    /** The width from which a phone, or any device that is not desktop-class, shows the wide layouts. */
+    val PhoneWide: Dp = 820.dp
+
+    /** The width from which a desktop-class device (desktop, Android desktop mode, a browser with a mouse) shows them. */
+    val DesktopWide: Dp = 600.dp
+
+    /** The width from which this device shows the wide layouts: lower on a desktop-class device, so a small desktop window still gets them. */
+    val Wide: Dp = if (isDesktopClassDevice()) DesktopWide else PhoneWide
 }
 
 enum class ControlRoomDestination(val label: String) {
