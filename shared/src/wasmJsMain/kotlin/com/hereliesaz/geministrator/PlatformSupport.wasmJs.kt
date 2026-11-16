@@ -9,3 +9,8 @@ internal actual fun normalizeNfc(text: String): String = jsNormalizeNfc(text)
 private fun jsDeviceOffsetMinutes(): Int = js("-new Date().getTimezoneOffset()")
 
 internal actual fun deviceUtcOffsetMinutes(): Int = jsDeviceOffsetMinutes()
+
+private fun jsIsDesktopClass(): Boolean =
+    js("(typeof window !== 'undefined') && window.matchMedia('(pointer: fine)').matches && !/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)")
+
+internal actual fun isDesktopClassDevice(): Boolean = jsIsDesktopClass()

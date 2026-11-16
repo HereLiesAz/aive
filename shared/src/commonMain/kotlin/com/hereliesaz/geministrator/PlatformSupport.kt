@@ -11,3 +11,10 @@ internal expect fun normalizeNfc(text: String): String
 
 /** This device's current offset from UTC in minutes (east is positive), read from its own clock settings. */
 internal expect fun deviceUtcOffsetMinutes(): Int
+
+/**
+ * True where this device is a desktop-class machine: desktop itself; Android in desktop mode or with a tablet-size screen and a
+ * keyboard attached; a browser with a fine pointer that is not a phone. Such a device gets the wide layouts from
+ * [ControlRoomBreakpoints.DesktopWide] up, a phone-size window on any other device from [ControlRoomBreakpoints.PhoneWide].
+ */
+internal expect fun isDesktopClassDevice(): Boolean
