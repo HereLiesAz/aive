@@ -8,17 +8,28 @@ package com.hereliesaz.geministrator
 internal object LegacyKeychain {
     private val os: String get() = System.getProperty("os.name", "").lowercase()
 
-    /** The secret held under [legacyService] for [account], or null when there is none or no store. */
+    // Entries found absent this session. A legacy entry is never created while the app runs, so asking again would only
+    // spawn another subprocess per absent provider on every read.
+    private val knownAbsent: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
+    /**
+     * The secret held under [legacyService] for [account], or null when there is none or no store. Windows has no legacy
+     * entries to read (its secrets were never named after the old product), so it always answers null without a lookup.
+     */
     fun read(legacyService: String, account: String): String? {
+        val cacheKey = "$legacyService|$account"
+        if (cacheKey in knownAbsent) return null
         val command = when {
             os.contains("mac") -> listOf("security", "find-generic-password", "-s", legacyService, "-a", account, "-w")
             os.contains("nux") || os.contains("nix") || os.contains("bsd") ->
                 listOf("secret-tool", "lookup", "service", legacyService, "account", account)
             else -> return null
         }
-        return runCatching {
+        val found = runCatching {
             CredentialTool.run(command)?.takeIf { it.ok }?.output?.trim()?.takeIf(String::isNotEmpty)
         }.getOrNull()
+        if (found == null) knownAbsent += cacheKey
+        return found
     }
 
     /** Removes the legacy entry once its value has been stored under the current service name. */
@@ -30,6 +41,7 @@ internal object LegacyKeychain {
             else -> return
         }
         runCatching { CredentialTool.run(command) }
+        knownAbsent += "$legacyService|$account"
     }
 
     /**
