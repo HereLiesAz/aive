@@ -19,6 +19,8 @@ dependencies {
     } else {
         implementation(libs.onnxruntime.gpu)
     }
+    // LiteRT-LM small-task runtime; the jar bundles natives for Windows x64, macOS arm64, Linux x64 and arm64.
+    implementation(libs.litertlm.jvm)
     implementation(libs.djl.huggingface.tokenizers)
     implementation(libs.commons.compress)
     implementation(libs.kotlinx.serialization.json)

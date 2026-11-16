@@ -153,10 +153,11 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 | Model | Used for | License |
 |---|---|---|
 | Qwen/Qwen2.5-0.5B-Instruct and the memory / orchestration LoRA adapters trained on it | Local memory clerks and orchestration utilities | Apache License 2.0 (base model) |
+| Qwen2.5-0.5B-Instruct as a LiteRT-LM `.task` bundle (litert-community, pinned by SHA-256) | Small tasks on this device | Apache License 2.0 |
 | MiniLM sentence-embedding model (Association Linker) | Memory associations and summary embeddings | Apache License 2.0 — verify against the exact upstream model before release |
 
 ## Libraries
 
-Gradle dependencies (Kotlin and kotlinx libraries, Compose Multiplatform, Ktor, SQLDelight, ONNX Runtime,
+Gradle dependencies (Kotlin and kotlinx libraries, Compose Multiplatform, Ktor, SQLDelight, ONNX Runtime, LiteRT-LM (Apache-2.0),
 DJL Hugging Face tokenizers, Apache Commons Compress, Bouncy Castle, multiplatform-settings, cryptography-kotlin,
 kmp-zip, AndroidX) are used under their own licenses, as published with each artifact.

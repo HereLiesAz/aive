@@ -193,6 +193,7 @@ import com.hereliesaz.geministrator.resources.settings_local_orchestration_2
 import com.hereliesaz.geministrator.resources.settings_on_device_small_tasks
 import com.hereliesaz.geministrator.resources.settings_on_device_small_tasks_description
 import com.hereliesaz.geministrator.resources.settings_on_device_small_tasks_no_model
+import com.hereliesaz.geministrator.resources.settings_on_device_small_tasks_runtime
 import com.hereliesaz.geministrator.resources.settings_on_device_small_tasks_off
 import com.hereliesaz.geministrator.resources.settings_on_device_small_tasks_on
 import com.hereliesaz.geministrator.resources.settings_local_planner
@@ -1130,6 +1131,13 @@ internal fun ProviderSettingsScreen(
             if (!setting.modelInstalled) {
                 Text(
                     stringResource(Res.string.settings_on_device_small_tasks_no_model),
+                    style = AzphaltType.body,
+                    color = azphaltOnSurface(),
+                )
+            }
+            setting.runtimeLabel?.let { label ->
+                Text(
+                    stringResource(Res.string.settings_on_device_small_tasks_runtime, label),
                     style = AzphaltType.body,
                     color = azphaltOnSurface(),
                 )

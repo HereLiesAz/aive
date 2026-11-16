@@ -46,9 +46,12 @@ data class MemoryActivity(
     val banked: Int = 0,
 )
 
-/** One downloadable on-device clerk. */
+/** One downloadable on-device model: a memory clerk, or the LiteRT-LM small-task model. */
 data class MemoryLocalModelStatus(
-    val role: MemoryMicroAgentRole,
+    /** Stable key: a clerk's role name, or a runtime model's catalog id. */
+    val id: String,
+    /** The small label above the name: the clerk's role, or the runtime that runs the model. */
+    val eyebrow: String,
     val name: String,
     val installed: Boolean,
     val installing: Boolean = false,
@@ -59,9 +62,9 @@ data class MemoryLocalModelStatus(
 interface MemoryLocalModelManager {
     val models: StateFlow<List<MemoryLocalModelStatus>>
 
-    suspend fun install(role: MemoryMicroAgentRole)
+    suspend fun install(id: String)
 
-    suspend fun remove(role: MemoryMicroAgentRole)
+    suspend fun remove(id: String)
 }
 
 /**

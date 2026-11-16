@@ -33,6 +33,10 @@ import com.hereliesaz.geministrator.memory.MemoryMicroAgentPrompts
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentRole
 import com.hereliesaz.geministrator.memory.MemoryModelReleaseBundle
 import com.hereliesaz.geministrator.memory.StructuredMemoryMicroAgent
+import com.hereliesaz.geministrator.inference.LiteRtLmModelCatalog
+import com.hereliesaz.geministrator.providers.LiteRtLmTextGenerator
+import com.hereliesaz.geministrator.providers.OnDeviceTextRuntime
+import com.hereliesaz.geministrator.providers.SelectingOnDeviceTextGenerator
 import io.ktor.client.HttpClient
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
@@ -551,10 +555,13 @@ internal class AndroidEpoch8EmbeddingAdapter(
         OnnxTensor.createTensor(environment, LongBuffer.wrap(values), shape)
 }
 
-/** Epoch-8 on-device clerks: what is installed, and downloads/removals on request. */
+/** On-device models: the epoch-8 clerks and the LiteRT-LM small-task model; what is installed, and installs/removals on request. */
 private class AndroidMemoryLocalModels(
     private val installer: AndroidMemoryModelInstaller,
-    private val scope: CoroutineScope,
+    private val liteRtInstaller: AndroidLiteRtLmModelInstaller,
+    /** Called after the LiteRT-LM model is installed or removed, so a loaded engine is dropped. */
+    private val onLiteRtLmChanged: suspend () -> Unit,
+    scope: CoroutineScope,
 ) : MemoryLocalModelManager {
     private val mutableModels = MutableStateFlow(emptyList<MemoryLocalModelStatus>())
     override val models: StateFlow<List<MemoryLocalModelStatus>> = mutableModels.asStateFlow()
@@ -563,30 +570,49 @@ private class AndroidMemoryLocalModels(
         scope.launch { refresh() }
     }
 
-    override suspend fun install(role: MemoryMicroAgentRole) {
-        mark(role) { it.copy(installing = true, error = null) }
-        val failure = runCatching { installer.ensureInstalled(role) }.exceptionOrNull()
+    override suspend fun install(id: String) {
+        mark(id) { it.copy(installing = true, error = null) }
+        val failure = runCatching {
+            if (id == liteRtInstaller.artifact.id) {
+                liteRtInstaller.install()
+                onLiteRtLmChanged()
+            } else {
+                installer.ensureInstalled(MemoryMicroAgentRole.valueOf(id))
+            }
+        }.exceptionOrNull()
+        if (failure is kotlinx.coroutines.CancellationException) throw failure
         refresh()
-        failure?.let { error -> mark(role) { it.copy(error = error.message ?: error::class.simpleName) } }
+        failure?.let { error -> mark(id) { it.copy(error = error.message ?: error::class.simpleName) } }
     }
 
-    override suspend fun remove(role: MemoryMicroAgentRole) {
-        installer.remove(role)
+    override suspend fun remove(id: String) {
+        if (id == liteRtInstaller.artifact.id) {
+            onLiteRtLmChanged()
+            liteRtInstaller.remove()
+        } else {
+            installer.remove(MemoryMicroAgentRole.valueOf(id))
+        }
         refresh()
     }
 
     private fun refresh() {
         mutableModels.value = MemoryEpoch8ModelCatalog.all.map { bundle ->
             MemoryLocalModelStatus(
-                role = bundle.role,
+                id = bundle.role.name,
+                eyebrow = bundle.role.name,
                 name = bundle.adapter?.assetName ?: bundle.releaseAssetName,
                 installed = installer.isInstalled(bundle.role),
             )
-        }
+        } + MemoryLocalModelStatus(
+            id = liteRtInstaller.artifact.id,
+            eyebrow = "LiteRT-LM",
+            name = liteRtInstaller.artifact.displayName,
+            installed = liteRtInstaller.modelFile() != null,
+        )
     }
 
-    private fun mark(role: MemoryMicroAgentRole, change: (MemoryLocalModelStatus) -> MemoryLocalModelStatus) {
-        mutableModels.value = mutableModels.value.map { if (it.role == role) change(it) else it }
+    private fun mark(id: String, change: (MemoryLocalModelStatus) -> MemoryLocalModelStatus) {
+        mutableModels.value = mutableModels.value.map { if (it.id == id) change(it) else it }
     }
 }
 
@@ -618,8 +644,26 @@ internal class AndroidMemoryLayerRuntime(
     )
 
     /** Small text tasks on the memory clerks' installed instruct model (see AndroidOnDeviceTextGenerator). */
-    val onDeviceTextGenerator: com.hereliesaz.geministrator.providers.OnDeviceTextGenerator =
-        AndroidOnDeviceTextGenerator(installer, sessionManager)
+    private val liteRtInstaller = AndroidLiteRtLmModelInstaller(context, httpClient, LiteRtLmModelCatalog.qwen25Instruct05b)
+    private val resourceProbe = AndroidOnDeviceResourceProbe(context)
+    private val liteRtGenerator = LiteRtLmTextGenerator(
+        modelPath = { if (liteRtLmAbiSupported()) liteRtInstaller.modelFile()?.absolutePath else null },
+        loader = AndroidLiteRtLmEngineLoader(File(cacheDirectory, "litertlm")),
+        resources = resourceProbe,
+        scope = scope,
+    )
+
+    /** LiteRT-LM first, the ONNX instruct model second; a hot phone declines both. */
+    val onDeviceTextGenerator: SelectingOnDeviceTextGenerator = SelectingOnDeviceTextGenerator(
+        candidates = listOf(
+            SelectingOnDeviceTextGenerator.Candidate(OnDeviceTextRuntime.LiteRtLm, liteRtGenerator),
+            SelectingOnDeviceTextGenerator.Candidate(
+                OnDeviceTextRuntime.OnnxRuntime,
+                AndroidOnDeviceTextGenerator(installer, sessionManager),
+            ),
+        ),
+        resources = resourceProbe,
+    )
 
     /**
      * Answers hosted memory stages: (providerId or null for the default, model or null, prompt) to
@@ -664,7 +708,7 @@ internal class AndroidMemoryLayerRuntime(
         procedureCatalog = com.hereliesaz.geministrator.memory.procedural.androidSqlProcedureCatalog(context, memoryLineage),
         engineProvider = engineProvider,
         scope = scope,
-        localModels = AndroidMemoryLocalModels(installer, scope),
+        localModels = AndroidMemoryLocalModels(installer, liteRtInstaller, { liteRtGenerator.release() }, scope),
     )
 
     fun attach() = controller.attach()

@@ -162,7 +162,28 @@ fun main() {
     val memoryModelInstaller = DesktopMemoryModelInstaller(httpClient)
     val memorySessions = DesktopOrtMemorySessionManager()
     // Small text tasks on the memory clerks' installed instruct model, when the keeper turns it on.
-    val onDeviceTextGenerator = DesktopOnDeviceTextGenerator(memoryModelInstaller, memorySessions)
+    val liteRtLmInstaller = DesktopLiteRtLmModelInstaller(httpClient, com.hereliesaz.geministrator.inference.LiteRtLmModelCatalog.qwen25Instruct05b)
+    val onDeviceResourceProbe = DesktopOnDeviceResourceProbe()
+    val liteRtLmGenerator = com.hereliesaz.geministrator.providers.LiteRtLmTextGenerator(
+        modelPath = { liteRtLmInstaller.modelFile()?.absolutePath },
+        loader = DesktopLiteRtLmEngineLoader(java.io.File(System.getProperty("java.io.tmpdir"), "aive-litertlm-cache")),
+        resources = onDeviceResourceProbe,
+        scope = memoryScope,
+    )
+    // LiteRT-LM first, the ONNX instruct model second.
+    val onDeviceTextGenerator = com.hereliesaz.geministrator.providers.SelectingOnDeviceTextGenerator(
+        candidates = listOf(
+            com.hereliesaz.geministrator.providers.SelectingOnDeviceTextGenerator.Candidate(
+                com.hereliesaz.geministrator.providers.OnDeviceTextRuntime.LiteRtLm,
+                liteRtLmGenerator,
+            ),
+            com.hereliesaz.geministrator.providers.SelectingOnDeviceTextGenerator.Candidate(
+                com.hereliesaz.geministrator.providers.OnDeviceTextRuntime.OnnxRuntime,
+                DesktopOnDeviceTextGenerator(memoryModelInstaller, memorySessions),
+            ),
+        ),
+        resources = onDeviceResourceProbe,
+    )
     val onDeviceSmallTaskPreference = OnDeviceSmallTaskPreference()
     val memoryLineage = com.hereliesaz.geministrator.memory.MemoryLineage.createDefault()
     val memoryLayer = MemoryLayerController(
@@ -173,7 +194,7 @@ fun main() {
         procedureCatalog = com.hereliesaz.geministrator.memory.procedural.desktopSqlProcedureCatalog(memoryLineage),
         engineProvider = DesktopMemoryEngineProvider(memoryEngines, memoryModelInstaller, memorySessions),
         scope = memoryScope,
-        localModels = DesktopMemoryLocalModels(memoryModelInstaller, memoryScope),
+        localModels = DesktopMemoryLocalModels(memoryModelInstaller, liteRtLmInstaller, { liteRtLmGenerator.release() }, memoryScope),
     ).also { it.attach() }
     val entireRecorder = EntireRecorder()
     val desktopEntire = DesktopEntire()
@@ -639,6 +660,7 @@ fun main() {
                         onDeviceSmallTaskSetting = OnDeviceSmallTaskSetting(
                             enabled = onDeviceSmallTasksEnabled,
                             modelInstalled = onDeviceTextGenerator.isReady(),
+                            runtimeLabel = onDeviceTextGenerator.activeRuntime()?.label,
                             onEnabledChange = { enabled ->
                                 onDeviceSmallTaskPreference.enabled = enabled
                                 onDeviceSmallTasksEnabled = enabled

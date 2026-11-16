@@ -674,6 +674,7 @@ class MainActivity : ComponentActivity() {
                         onDeviceSmallTaskSetting = OnDeviceSmallTaskSetting(
                             enabled = onDeviceSmallTasksEnabled,
                             modelInstalled = memoryRuntime.onDeviceTextGenerator.isReady(),
+                            runtimeLabel = memoryRuntime.onDeviceTextGenerator.activeRuntime()?.label,
                             onEnabledChange = { enabled ->
                                 onDeviceSmallTaskPreference.enabled = enabled
                                 onDeviceSmallTasksEnabled = enabled

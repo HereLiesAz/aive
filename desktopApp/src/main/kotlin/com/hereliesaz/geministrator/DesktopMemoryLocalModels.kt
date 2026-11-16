@@ -321,9 +321,12 @@ private class DesktopEpoch8EmbeddingAdapter(
         OnnxTensor.createTensor(environment, LongBuffer.wrap(values), shape)
 }
 
-/** What is installed, and installs/removals on request from the Memory screen. */
+/** What is installed (the epoch-8 clerks and the LiteRT-LM small-task model), and installs/removals on request from the Memory screen. */
 internal class DesktopMemoryLocalModels(
     private val installer: DesktopMemoryModelInstaller,
+    private val liteRtInstaller: DesktopLiteRtLmModelInstaller,
+    /** Called after the LiteRT-LM model is installed or removed, so a loaded engine is dropped. */
+    private val onLiteRtLmChanged: suspend () -> Unit,
     scope: CoroutineScope,
 ) : MemoryLocalModelManager {
     private val mutableModels = MutableStateFlow(emptyList<MemoryLocalModelStatus>())
@@ -333,31 +336,49 @@ internal class DesktopMemoryLocalModels(
         scope.launch(Dispatchers.IO) { refresh() }
     }
 
-    override suspend fun install(role: MemoryMicroAgentRole) {
-        mark(role) { it.copy(installing = true, error = null) }
-        val failure = runCatching { installer.install(role) }.exceptionOrNull()
+    override suspend fun install(id: String) {
+        mark(id) { it.copy(installing = true, error = null) }
+        val failure = runCatching {
+            if (id == liteRtInstaller.artifact.id) {
+                liteRtInstaller.install()
+                onLiteRtLmChanged()
+            } else {
+                installer.install(MemoryMicroAgentRole.valueOf(id))
+            }
+        }.exceptionOrNull()
         if (failure is kotlinx.coroutines.CancellationException) throw failure
         refresh()
-        failure?.let { error -> mark(role) { it.copy(error = error.message ?: error::class.simpleName) } }
+        failure?.let { error -> mark(id) { it.copy(error = error.message ?: error::class.simpleName) } }
     }
 
-    override suspend fun remove(role: MemoryMicroAgentRole) {
-        installer.remove(role)
+    override suspend fun remove(id: String) {
+        if (id == liteRtInstaller.artifact.id) {
+            onLiteRtLmChanged()
+            liteRtInstaller.remove()
+        } else {
+            installer.remove(MemoryMicroAgentRole.valueOf(id))
+        }
         refresh()
     }
 
     private fun refresh() {
         mutableModels.value = MemoryEpoch8ModelCatalog.all.map { bundle ->
             MemoryLocalModelStatus(
-                role = bundle.role,
+                id = bundle.role.name,
+                eyebrow = bundle.role.name,
                 name = bundle.adapter?.assetName ?: bundle.releaseAssetName,
                 installed = installer.installed(bundle.role) != null,
             )
-        }
+        } + MemoryLocalModelStatus(
+            id = liteRtInstaller.artifact.id,
+            eyebrow = "LiteRT-LM",
+            name = liteRtInstaller.artifact.displayName,
+            installed = liteRtInstaller.modelFile() != null,
+        )
     }
 
-    private fun mark(role: MemoryMicroAgentRole, change: (MemoryLocalModelStatus) -> MemoryLocalModelStatus) {
-        mutableModels.value = mutableModels.value.map { if (it.role == role) change(it) else it }
+    private fun mark(id: String, change: (MemoryLocalModelStatus) -> MemoryLocalModelStatus) {
+        mutableModels.value = mutableModels.value.map { if (it.id == id) change(it) else it }
     }
 }
 

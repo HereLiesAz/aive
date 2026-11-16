@@ -278,6 +278,14 @@ jobs:
           WORK=$(mktemp -d)
           unzip -q "$AAB" 'base/lib/*' -d "$WORK"
           bad=0
+          # LiteRT-LM's native library (from the litertlm-android AAR) must be in the bundle for both 64-bit ABIs;
+          # the loop below then checks its alignment with every other library.
+          for abi in arm64-v8a x86_64; do
+            if [ ! -f "$WORK/base/lib/$abi/liblitertlm_jni.so" ]; then
+              echo "::error::liblitertlm_jni.so is missing from the bundle for $abi"
+              bad=1
+            fi
+          done
           for so in $(find "$WORK/base/lib/arm64-v8a" "$WORK/base/lib/x86_64" -name '*.so' 2>/dev/null); do
             align=$(readelf -lW "$so" | awk '/LOAD/ {print $NF}' | sort -u | head -1)
             name=$(basename "$so")
@@ -547,6 +555,10 @@ jobs:
           set -euo pipefail
           find desktopApp/build/generated/bitcos/desktop/bitcos -type f -maxdepth 1 -print
           test "$(find desktopApp/build/generated/bitcos/desktop/bitcos -type f -maxdepth 1 | wc -l | tr -d ' ')" -ge 1
+          # LiteRT-LM's JVM jar carries its natives (windows-x86_64, darwin-aarch64, linux-x86_64, linux-aarch64)
+          # and extracts the one for the machine at first use; it must be on the packaged runtime classpath.
+          ./gradlew -q :desktopApp:dependencies --configuration runtimeClasspath > "$RUNNER_TEMP/desktop-deps.txt"
+          grep -q 'com.google.ai.edge.litertlm:litertlm-jvm' "$RUNNER_TEMP/desktop-deps.txt"
 
       - name: Upload native installer
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
