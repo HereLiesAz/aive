@@ -8,15 +8,6 @@
     <exclude domain="sharedpref" path="aive.relay-owner.credentials.xml" />
     <exclude domain="sharedpref" path="aive.mcp.credentials.xml" />
     <exclude domain="sharedpref" path="aive.remote-relay.settings.xml" />
-    <exclude domain="sharedpref" path="haive.credentials.xml" />
-    <exclude domain="sharedpref" path="haive.repository.credentials.xml" />
-    <exclude domain="sharedpref" path="haive.distributed-compute.credentials.xml" />
-    <exclude domain="sharedpref" path="haive.remote-relay.credentials.xml" />
-    <exclude domain="sharedpref" path="haive.relay-owner.credentials.xml" />
-    <exclude domain="sharedpref" path="haive.mcp.credentials.xml" />
-    <exclude domain="sharedpref" path="haive.remote-relay.settings.xml" />
-    <exclude domain="file" path="haive/memory" />
-    <exclude domain="file" path="haive/orchestration-specialists" />
     <exclude domain="file" path="aive/memory" />
     <exclude domain="file" path="aive/orchestration-specialists" />
     <exclude domain="sharedpref" path="aive_azphalt_models.xml" />

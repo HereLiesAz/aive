@@ -41,8 +41,6 @@ internal object CrashReporting {
     private const val RELAY_URL = "https://workflows.hereliesaz.workers.dev/crash-report/aive"
     private const val RELAY_KEY = "aive-crash-reports-v1"
     private const val PREFERENCES = "aive.crash-reporting"
-    // Legacy input name: older builds kept the setting in this file; it is migrated on first open.
-    private const val LEGACY_PREFERENCES = "haive.crash-reporting"
     private const val PENDING_DIR = "crash-reports-pending"
 
     @Volatile private var installed = false
@@ -202,7 +200,7 @@ internal object CrashReporting {
     private fun pendingDir(context: Context) = File(context.applicationContext.filesDir, PENDING_DIR)
 
     private fun policy(context: Context) = CrashReportPolicy(
-        SharedPreferencesStore(LegacyPreferences.open(context, PREFERENCES, LEGACY_PREFERENCES)),
+        SharedPreferencesStore(context.applicationContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)),
     )
 
     private class SharedPreferencesStore(private val prefs: SharedPreferences) : CrashReportKeyValueStore {

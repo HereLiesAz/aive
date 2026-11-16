@@ -24,19 +24,6 @@ internal class AndroidDistributedComputeCredentialStore(
         Context.MODE_PRIVATE,
     )
 
-    init {
-        // The relay token saved before the rename lives in a file and Keystore key under the old names.
-        if (keyAlias == KEY_ALIAS && preferencesName == PREFERENCES_NAME) {
-            LegacyKeystoreSecrets.migrate(
-                context = context,
-                legacyPreferencesName = LEGACY_PREFERENCES_NAME,
-                legacyKeyAlias = LEGACY_KEY_ALIAS,
-                hasCurrent = { preferences.contains(KEY_CIPHERTEXT) },
-                storeCurrent = { _, plaintext -> seal(plaintext) },
-            )
-        }
-    }
-
     fun readToken(): String? {
         val encrypted = preferences.getString(KEY_CIPHERTEXT, null) ?: return null
         val iv = preferences.getString(KEY_IV, null) ?: return null
@@ -115,10 +102,6 @@ internal class AndroidDistributedComputeCredentialStore(
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
         private const val KEY_ALIAS = "aive.distributed-compute.relay-token"
         private const val PREFERENCES_NAME = "aive.distributed-compute.credentials"
-
-        // Legacy input names: older builds saved the relay token under these. Read once to migrate, then retired.
-        private const val LEGACY_PREFERENCES_NAME = "haive.distributed-compute.credentials"
-        private const val LEGACY_KEY_ALIAS = "haive.distributed-compute.relay-token"
         private const val KEY_CIPHERTEXT = "relay-token.ciphertext"
         private const val KEY_IV = "relay-token.iv"
         private const val TRANSFORMATION = "AES/GCM/NoPadding"

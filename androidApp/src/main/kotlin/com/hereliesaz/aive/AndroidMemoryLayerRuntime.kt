@@ -77,8 +77,7 @@ internal class AndroidMemoryModelInstaller(
     context: Context,
     private val httpClient: HttpClient,
 ) {
-    // Models downloaded by older builds sit under the legacy directory name; they are moved, not fetched again.
-    private val installRoot = LegacyFiles.adopt(context.filesDir, "aive/memory", "haive/memory")
+    private val installRoot = File(context.filesDir, "aive/memory")
     private val installedByArtifactId = ConcurrentHashMap<String, InstalledMemoryModel>()
     private val downloader = AndroidResumableFileDownloader(httpClient)
     private val mutex = Mutex()

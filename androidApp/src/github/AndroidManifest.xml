@@ -10,7 +10,6 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <queries>
-        <package android:name="com.hereliesaz.haive" />
         <package android:name="com.google.android.apps.bard" />
         <package android:name="com.google.android.googlequicksearchbox" />
     </queries>

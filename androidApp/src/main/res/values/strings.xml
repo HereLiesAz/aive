@@ -24,9 +24,6 @@
     <string name="update_open_github">Open GitHub release</string>
     <string name="update_blocked_title">Update through Google Play</string>
     <string name="update_blocked_body">This copy was installed from Google Play. The GitHub download is signed with a different key, so Android would refuse to install it over this copy. Update through Google Play instead.</string>
-    <string name="legacy_app_title">An older copy of The Aive is still installed</string>
-    <string name="legacy_app_body">This copy is a separate app from the earlier GitHub version (com.hereliesaz.haive). Android does not let one app read another app\'s private data, so nothing moved across on its own. To bring your setup over: open the older app, go to Settings, Setup file, and Export setup file, then import that file here. Then remove the older app.</string>
-    <string name="legacy_app_open_settings">Open the older app\'s settings</string>
     <string name="update_later">Later</string>
     <string name="update_play_title">An update for The Aive is available</string>
     <string name="update_play_body">An update is available through Google Play.</string>

@@ -17,17 +17,6 @@ internal class AndroidRepositoryCredentialStore(context: Context) {
         Context.MODE_PRIVATE,
     )
 
-    init {
-        // Tokens saved before the rename live in a file and Keystore key under the old names; move them across.
-        LegacyKeystoreSecrets.migrate(
-            context = context,
-            legacyPreferencesName = LEGACY_PREFERENCES_NAME,
-            legacyKeyAlias = LEGACY_KEY_ALIAS,
-            hasCurrent = { preferences.contains(ciphertextKey(it)) },
-            storeCurrent = { name, plaintext -> seal(name, plaintext) },
-        )
-    }
-
     fun read(serviceId: String): String? {
         val encrypted = preferences.getString(ciphertextKey(serviceId), null) ?: return null
         val iv = preferences.getString(ivKey(serviceId), null) ?: return null
@@ -103,10 +92,6 @@ internal class AndroidRepositoryCredentialStore(context: Context) {
         const val ANDROID_KEYSTORE = "AndroidKeyStore"
         const val KEY_ALIAS = "aive.repository.credentials"
         const val PREFERENCES_NAME = "aive.repository.credentials"
-
-        // Legacy input names: older builds saved tokens under these. Read once to migrate, then retired.
-        const val LEGACY_PREFERENCES_NAME = "haive.repository.credentials"
-        const val LEGACY_KEY_ALIAS = "haive.repository.credentials"
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val GCM_TAG_BITS = 128
     }

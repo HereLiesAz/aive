@@ -218,7 +218,6 @@ class MainActivity : ComponentActivity() {
         }
         val initialComputeToken = computeCredentialStore.readToken()
         azphaltHost.handleIntent(intent)
-        removeRetiredOnDevicePlannerFiles()
 
         refreshReducedMotion()
         setContent {
@@ -746,7 +745,6 @@ class MainActivity : ComponentActivity() {
                     state = updateCoordinator.state,
                     onOpenGithubRelease = updateCoordinator::openGithubRelease,
                     onOpenPlayStore = updateCoordinator::openPlayStore,
-                    onOpenLegacyAppSettings = updateCoordinator::openLegacyAppSettings,
                     onDismiss = updateCoordinator::dismiss,
                 )
             }
@@ -810,17 +808,6 @@ class MainActivity : ComponentActivity() {
             )
         }.getOrNull()
         AzphaltMotion.platformReduceMotion = shouldReduceMotion(animatorDurationScale = scale, systemPrefersReduced = false)
-    }
-
-    /**
-     * Earlier builds downloaded a multi-gigabyte on-device planner. Planning is cloud-only now, so
-     * reclaim whatever of it (complete or partial) is still on disk.
-     */
-    private fun removeRetiredOnDevicePlannerFiles() {
-        // Legacy input path: the retired planner lived under the app's previous directory name.
-        val retired = java.io.File(filesDir, "haive/orchestration")
-        if (!retired.exists()) return
-        Thread({ retired.deleteRecursively() }, "retired-planner-cleanup").start()
     }
 
     override fun onDestroy() {

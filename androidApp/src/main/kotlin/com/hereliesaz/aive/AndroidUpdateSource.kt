@@ -50,19 +50,3 @@ internal fun githubApkCanReplace(source: InstallSource): Boolean = source != Ins
 internal interface PlayUpdateCheck {
     suspend fun isUpdateAvailable(): Boolean
 }
-
-/** The application id GitHub-release builds used before the rename; a copy under it is a separate app from this one. */
-internal const val LEGACY_GITHUB_PACKAGE = "com.hereliesaz.haive"
-
-/**
- * Whether to tell the keeper, once, that an older copy under [LEGACY_GITHUB_PACKAGE] is still installed beside this
- * GitHub build. Android treats it as a different app: it does not upgrade in place and its private data cannot be read from here.
- */
-internal fun legacyAppNoticeDue(isPlayBuild: Boolean, legacyInstalled: Boolean, alreadyShown: Boolean): Boolean =
-    !isPlayBuild && legacyInstalled && !alreadyShown
-
-internal fun isPackageInstalled(context: Context, packageName: String): Boolean = runCatching {
-    @Suppress("DEPRECATION")
-    context.packageManager.getPackageInfo(packageName, 0)
-    true
-}.getOrDefault(false)

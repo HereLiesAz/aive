@@ -9,16 +9,14 @@ internal object InstalledGeminiPreference {
     const val isSupported: Boolean = true
 
     private const val PREFERENCES = "aive.external-ai"
-    // Legacy input name: older builds kept the setting in this file; it is migrated on first open.
-    private const val LEGACY_PREFERENCES = "haive.external-ai"
     private const val KEY_ENABLED = "installed-gemini-enabled"
 
     fun isEnabled(context: Context): Boolean =
-        LegacyPreferences.open(context, PREFERENCES, LEGACY_PREFERENCES)
+        context.applicationContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
             .getBoolean(KEY_ENABLED, false)
 
     fun setEnabled(context: Context, enabled: Boolean) {
-        LegacyPreferences.open(context, PREFERENCES, LEGACY_PREFERENCES)
+        context.applicationContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(KEY_ENABLED, enabled)
             .apply()
