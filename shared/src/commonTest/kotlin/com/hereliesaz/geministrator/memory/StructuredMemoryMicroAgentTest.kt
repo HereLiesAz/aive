@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 
 class StructuredMemoryMicroAgentTest {
     @Test
-    fun selectsLocalArtifactOnEveryHaivePlatform() = runBlocking {
+    fun selectsLocalArtifactOnEveryAivePlatform() = runBlocking {
         MemoryMicroAgentPlatform.entries.forEach { platform ->
             val runtime = FakeRuntime(platform)
             val agent = StructuredMemoryMicroAgent(

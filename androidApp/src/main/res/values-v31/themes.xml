@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- API 31+ system splash: intentionally neutral; the app's own splash shows the logo. -->
-    <style name="Theme.Haive.Splash" parent="Theme.Haive">
-        <item name="android:windowSplashScreenBackground">@color/haive_icon_background</item>
+    <style name="Theme.Aive.Splash" parent="Theme.Aive">
+        <item name="android:windowSplashScreenBackground">@color/aive_icon_background</item>
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_blank</item>
-        <item name="android:windowSplashScreenIconBackgroundColor">@color/haive_icon_background</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/aive_icon_background</item>
         <item name="android:windowSplashScreenAnimationDuration">0</item>
     </style>
 </resources>

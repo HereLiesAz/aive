@@ -15,7 +15,7 @@ import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
-import com.hereliesaz.geministrator.domain.haiveBuiltInRoles
+import com.hereliesaz.geministrator.domain.aiveBuiltInRoles
 import com.hereliesaz.geministrator.persistence.InMemorySettings
 import com.hereliesaz.geministrator.persistence.InMemoryWorkflowPersistence
 import com.hereliesaz.geministrator.workflow.CodingWorkflowSuite
@@ -82,7 +82,7 @@ class SelfImprovementClauseTest {
 
     @Test
     fun point4_theApplierTreatsTheLoopsOwnPartsExactlyLikeAnyOthers() {
-        val roles = haiveBuiltInRoles
+        val roles = aiveBuiltInRoles
         val hives = listOf(loop) + CodingWorkflowSuite.definitions().filter { it.id.value == "suite-bug-fix" }
         fun proposal(kind: ImprovementKind, target: String) = ImprovementProposal(
             id = "p", cycleRunId = "r", kind = kind, target = target, summary = "s", newText = "new text",
@@ -193,7 +193,7 @@ class SelfImprovementClauseTest {
 
     @Test
     fun s4_aStepRunByARoleThatCanWriteOrRunCommandsIsNamedEvenAtProposePlanAuthority() {
-        val roles = haiveBuiltInRoles
+        val roles = aiveBuiltInRoles
         assertEquals(emptyList(), LoopIntegrity.violations(loop, roles), "the shipped loop uses roles that only read")
 
         val shellRole = BuiltInRoles.ProductManager.copy(capabilitiesRequired = setOf(AgentCapability.ShellExecution))
@@ -235,9 +235,9 @@ class SelfImprovementClauseTest {
 
     @Test
     fun s4_aScheduleDoesNotStartALoopThatNoLongerKeepsItsRulesAndSaysWhyButTheKeeperMayStillEditItFreely() {
-        assertEquals(null, LoopIntegrity.startRefusal(loop, haiveBuiltInRoles))
+        assertEquals(null, LoopIntegrity.startRefusal(loop, aiveBuiltInRoles))
         val broken = withTask("propose") { it.copy(escalationPolicy = EscalationPolicy.RequireHumanDecision) }
-        val why = LoopIntegrity.startRefusal(broken, haiveBuiltInRoles)
+        val why = LoopIntegrity.startRefusal(broken, aiveBuiltInRoles)
         assertNotNull(why)
         assertTrue("was not started" in why && "'propose'" in why, why)
     }

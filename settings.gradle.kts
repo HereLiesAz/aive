@@ -22,11 +22,11 @@ val isolatedWebBuild = gradle.startParameter.taskNames.any { task ->
             task.contains("wasmJsBrowser", ignoreCase = true)
         )
 }
-val useLocalH2g2 = providers.gradleProperty("haive.useLocalH2g2")
+val useLocalH2g2 = providers.gradleProperty("aive.useLocalH2g2")
     .orNull
     ?.toBooleanStrictOrNull()
     ?: !isolatedWebBuild
-val useMavenLocalH2g2 = providers.gradleProperty("haive.useMavenLocalH2g2")
+val useMavenLocalH2g2 = providers.gradleProperty("aive.useMavenLocalH2g2")
     .orNull
     ?.toBooleanStrictOrNull()
     ?: isolatedWebBuild

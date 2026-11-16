@@ -233,7 +233,7 @@ class GitHubActionsExecutorIntegrationTest {
         val foreignProject = base.project.copy(
             repository = base.project.repository!!.copy(
                 source = RepositorySource.GitLab,
-                remoteUrl = "https://gitlab.com/team/haive",
+                remoteUrl = "https://gitlab.com/team/aive",
             ),
         )
 
@@ -398,12 +398,12 @@ class GitHubActionsExecutorIntegrationTest {
         integration.cancel(running)
 
         assertEquals(listOf("42"), client.cancelledRunIds)
-        assertEquals("haive", client.lastRepository?.name)
+        assertEquals("aive", client.lastRepository?.name)
     }
 
     private fun context(executor: TaskExecutor): TaskExecutorContext {
         val taskId = TaskDefinitionId("ci")
-        val repository = RepositoryRef("HereLiesAz", "haive", defaultBranch = "main")
+        val repository = RepositoryRef("HereLiesAz", "aive", defaultBranch = "main")
         val project = Project(
             id = ProjectId("project"),
             name = "Project",

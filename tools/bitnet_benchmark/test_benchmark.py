@@ -37,7 +37,7 @@ class BenchmarkScoringTest(unittest.TestCase):
         bitnet = benchmark.RunnerResult("b", "bitnet", 1, 1.0, 1, [case])
         result = benchmark.decision(qwen, bitnet)
         self.assertTrue(result["qualityParity"])
-        self.assertFalse(result["haiveRuntimeReady"])
+        self.assertFalse(result["aiveRuntimeReady"])
         self.assertFalse(result["adoptBitNet"])
 
 

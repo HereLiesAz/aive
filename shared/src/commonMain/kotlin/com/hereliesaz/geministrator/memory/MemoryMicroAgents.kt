@@ -39,7 +39,7 @@ data class MemoryMicroAgentModelSpec(
         require(maxMutations > 0)
         require(promptOverheadReserveChars >= 0)
         require(promptOverheadReserveChars < maxInputChars)
-        require(!localOnly || deployment.supportsAllHaivePlatforms()) {
+        require(!localOnly || deployment.supportsAllAivePlatforms()) {
             "Local memory model $modelId must support Android, Windows, macOS, Linux, and Web"
         }
     }
@@ -144,7 +144,7 @@ class MemoryMicroAgentRouter(
             require(role in agentsByRole) { "Missing memory micro-agent for $role" }
         }
         agentsByRole.values.forEach { agent ->
-            require(!agent.model.localOnly || agent.model.deployment.supportsAllHaivePlatforms()) {
+            require(!agent.model.localOnly || agent.model.deployment.supportsAllAivePlatforms()) {
                 "${agent.role} has an incomplete local deployment manifest"
             }
             val expectedWorkload = if (agent.role == MemoryMicroAgentRole.AssociationLinker) {

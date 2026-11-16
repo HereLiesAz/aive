@@ -38,13 +38,13 @@ class EntireEndToEndTest {
         runCatching { git(root, "commit", "-qm", "entire", "--no-verify") }
 
         val workspace = Files.createTempDirectory("aive-entire-worktree").toFile().also { it.delete() }
-        git(root, "worktree", "add", "-q", "-b", "haive/test", workspace.absolutePath)
+        git(root, "worktree", "add", "-q", "-b", "aive/test", workspace.absolutePath)
         val id = "aive-test-${System.nanoTime()}"
         sessions.begin(id, root.absolutePath, "test")
         sessions.prompt(id, "Make a.txt say two")
         File(workspace, "a.txt").writeText("two\n")
         git(workspace, "add", "-A")
-        git(workspace, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "Haive: two")
+        git(workspace, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "Aive: two")
         sessions.response(id, "diff --git a/a.txt b/a.txt")
         sessions.files(id, listOf("a.txt"), emptyList(), emptyList())
         sessions.usage(id, 10, 5)

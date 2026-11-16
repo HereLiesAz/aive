@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.persistence.migrateLegacyKeysWithPrefix
 import com.hereliesaz.conveyance.h2g2.H2g2TerrariumPosition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.russhwolf.settings.Settings
@@ -19,6 +20,9 @@ internal class SettingsTerrariumLayoutStore(
     private val settings: Settings,
     private val rootKey: String = DEFAULT_ROOT_KEY,
 ) : TerrariumLayoutStore {
+    init {
+        settings.migrateLegacyKeysWithPrefix(rootKey)
+    }
 
     override fun load(definitionId: WorkflowDefinitionId): Map<String, H2g2TerrariumPosition> {
         val result = linkedMapOf<String, H2g2TerrariumPosition>()
@@ -93,7 +97,7 @@ internal class SettingsTerrariumLayoutStore(
 
     companion object {
         private const val HASH_CHARS = 24
-        const val DEFAULT_ROOT_KEY: String = "haive.terrarium.layout.v1"
+        const val DEFAULT_ROOT_KEY: String = "aive.terrarium.layout.v1"
         fun createDefault(): SettingsTerrariumLayoutStore = SettingsTerrariumLayoutStore(Settings())
     }
 }

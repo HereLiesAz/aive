@@ -59,7 +59,7 @@ class LocalModelLibraryTest {
         val merged = assertIs<LocalModelLoadPlan.MergedModel>(plan)
         assertEquals("epoch8:03-noun-indexer:int8", merged.model.logicalArtifactId)
         assertEquals(
-            "haive-specialist_03_noun_indexer-int8-epoch8.tar.gz",
+            "aive-specialist_03_noun_indexer-int8-epoch8.tar.gz",
             merged.model.assetName,
         )
     }

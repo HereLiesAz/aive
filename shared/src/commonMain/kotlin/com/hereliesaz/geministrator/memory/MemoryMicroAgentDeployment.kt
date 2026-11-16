@@ -1,6 +1,6 @@
 package com.hereliesaz.geministrator.memory
 
-/** Every production memory model must have a local deployment path on every Haive client. */
+/** Every production memory model must have a local deployment path on every Aive client. */
 enum class MemoryMicroAgentPlatform {
     Android,
     Windows,
@@ -49,7 +49,7 @@ data class MemoryMicroAgentDeploymentManifest(
     val platforms: Set<MemoryMicroAgentPlatform>
         get() = artifacts.mapTo(linkedSetOf()) { it.platform }
 
-    fun supportsAllHaivePlatforms(): Boolean = REQUIRED_PLATFORMS.all { it in platforms }
+    fun supportsAllAivePlatforms(): Boolean = REQUIRED_PLATFORMS.all { it in platforms }
 
     fun artifactsFor(platform: MemoryMicroAgentPlatform): List<MemoryMicroAgentArtifact> =
         artifacts.filter { it.platform == platform }

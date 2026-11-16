@@ -124,7 +124,7 @@ class CryptographyAzphaltEd25519Verifier(
 
 /**
  * Platform-selected verifier. Android deliberately uses BouncyCastle so Ed25519 remains available
- * on Haive's API-26 minimum; desktop uses JDK and browser targets use WebCrypto.
+ * on Aive's API-26 minimum; desktop uses JDK and browser targets use WebCrypto.
  */
 fun defaultAzphaltEd25519Verifier(): AzphaltEd25519Verifier =
     CryptographyAzphaltEd25519Verifier(platformAzphaltCryptographyProvider())

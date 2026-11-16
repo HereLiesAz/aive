@@ -2,5 +2,5 @@
 <resources>
     <!-- Azphalt Ink (#1E1A17) is the single dark background token; keep in step with Azphalt.Ink
          in AzphaltUi.kt, styles.css, privacy/index.html and tools/puppet-rig/style.css. -->
-    <color name="haive_icon_background">#1E1A17</color>
+    <color name="aive_icon_background">#1E1A17</color>
 </resources>

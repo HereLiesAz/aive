@@ -9,12 +9,12 @@ class RepositoryRefSerializationTest {
     @Test
     fun legacySerializedRepositoryDefaultsToGitHub() {
         val repository = Json.decodeFromString<RepositoryRef>(
-            """{"owner":"HereLiesAz","name":"haive","defaultBranch":"main"}""",
+            """{"owner":"HereLiesAz","name":"aive","defaultBranch":"main"}""",
         )
 
         assertEquals(RepositorySource.GitHub, repository.source)
         assertEquals("HereLiesAz", repository.owner)
-        assertEquals("haive", repository.name)
+        assertEquals("aive", repository.name)
         assertEquals("main", repository.defaultBranch)
         assertNull(repository.remoteUrl)
         assertNull(repository.localPath)

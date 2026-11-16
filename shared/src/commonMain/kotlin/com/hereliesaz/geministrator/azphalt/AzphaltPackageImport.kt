@@ -1,7 +1,7 @@
 package com.hereliesaz.geministrator.azphalt
 
 /**
- * Host-neutral handoff for a package opened or shared into Haive.
+ * Host-neutral handoff for a package opened or shared into Aive.
  * [requestId] is host-generated so opening the same URI twice still produces two review requests.
  */
 data class AzphaltPackageImportRequest(

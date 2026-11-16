@@ -9,7 +9,7 @@ class PlannerAssetTrustTest {
 
     @Test
     fun onlyPlainNamesInThisProjectsReleasesAreTrusted() {
-        assertTrue(isTrustedPlannerAsset("haive-orch_planner-int8-epoch8.tar.gz.part001", base + "x.part001"))
+        assertTrue(isTrustedPlannerAsset("aive-orch_planner-int8-epoch8.tar.gz.part001", base + "x.part001"))
         assertFalse(isTrustedPlannerAsset("../x", base + "x"))
         assertFalse(isTrustedPlannerAsset("a/b", base + "x"))
         assertFalse(isTrustedPlannerAsset("x", "https://example.com/x"))

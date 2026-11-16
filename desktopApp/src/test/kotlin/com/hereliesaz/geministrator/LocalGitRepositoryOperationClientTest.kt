@@ -141,11 +141,11 @@ class LocalGitRepositoryOperationClientTest {
     }
 
     private fun withGitRepository(block: (Path) -> Unit) {
-        val root = createTempDirectory("haive-local-git-test-")
+        val root = createTempDirectory("aive-local-git-test-")
         try {
             git(root, "init")
-            git(root, "config", "user.email", "haive-test@example.invalid")
-            git(root, "config", "user.name", "Haive Test")
+            git(root, "config", "user.email", "aive-test@example.invalid")
+            git(root, "config", "user.name", "Aive Test")
             root.resolve("README.md").writeText("initial\n")
             git(root, "add", "README.md")
             git(root, "commit", "-m", "Initial commit")

@@ -77,8 +77,8 @@ data class AzphaltPreparedInstall(
 }
 
 /**
- * Stateful Haive host for the public Azphalt Repository API. Package acquisition, integrity/trust,
- * Haive semantic inspection and persistence remain distinct phases so UI confirmation can sit between
+ * Stateful Aive host for the public Azphalt Repository API. Package acquisition, integrity/trust,
+ * Aive semantic inspection and persistence remain distinct phases so UI confirmation can sit between
  * them without weakening any check.
  */
 class AzphaltStoreService(
@@ -209,7 +209,7 @@ class AzphaltStoreService(
         requireTargetsAive(manifest.id, manifest.targetApps)
         val compat = azphaltCompatSatisfies(manifest.compat)
         require(compat != null) { "Package ${manifest.id} has invalid Azphalt compat expression ${manifest.compat}" }
-        require(compat) { "Package ${manifest.id} requires Azphalt host ${manifest.compat}; Aive implements $HAIVE_AZPHALT_API_VERSION" }
+        require(compat) { "Package ${manifest.id} requires Azphalt host ${manifest.compat}; Aive implements $AIVE_AZPHALT_API_VERSION" }
 
         val assets = manifest.assets.orEmpty().filter(AzphaltAssetEntry::isModelAsset)
         require(assets.isNotEmpty()) { "Package ${manifest.id} contains no model assets" }
@@ -257,7 +257,7 @@ class AzphaltStoreService(
 
         val compat = azphaltCompatSatisfies(manifest.compat)
         require(compat != null) { "Package ${manifest.id} has invalid Azphalt compat expression ${manifest.compat}" }
-        require(compat) { "Package ${manifest.id} requires Azphalt host ${manifest.compat}; Aive implements $HAIVE_AZPHALT_API_VERSION" }
+        require(compat) { "Package ${manifest.id} requires Azphalt host ${manifest.compat}; Aive implements $AIVE_AZPHALT_API_VERSION" }
         val assets = manifest.assets.orEmpty().filter(AzphaltAssetEntry::isModelAsset)
         require(assets.isNotEmpty()) { "Package ${manifest.id} contains no model assets" }
         val host = requireNotNull(modelInstaller) { "Model installation is unavailable on this host" }
@@ -350,7 +350,7 @@ class AzphaltStoreService(
         requireTargetsAive(manifest.id, manifest.targetApps)
         val compat = azphaltCompatSatisfies(manifest.compat)
         require(compat != null) { "Package ${manifest.id} has invalid Azphalt compat expression ${manifest.compat}" }
-        require(compat) { "Package ${manifest.id} requires Azphalt host ${manifest.compat}; Aive implements $HAIVE_AZPHALT_API_VERSION" }
+        require(compat) { "Package ${manifest.id} requires Azphalt host ${manifest.compat}; Aive implements $AIVE_AZPHALT_API_VERSION" }
         require(listOf(manifest.entry, manifest.runtime, manifest.capabilities, manifest.app, manifest.mcp).all { it == null } &&
             manifest.assets.isNullOrEmpty()) { "Language model package ${manifest.id} carries blocks an llm package must not" }
         // The signed manifest decides, not the repository's summary of it.
@@ -454,7 +454,7 @@ class AzphaltStoreService(
     ): AzphaltPreparedInstall {
         val detail = repository.detail(packageId)
         require(detail.kind == "workflow" || detail.kind == "role") {
-            "Haive Store installs workflow and role packages; ${detail.id} is kind ${detail.kind}"
+            "Aive Store installs workflow and role packages; ${detail.id} is kind ${detail.kind}"
         }
         requireTargetsAive(detail.id, detail.targetApps)
         val version = requestedVersion?.let(AzphaltRepositoryClient::requireVersion)
@@ -476,7 +476,7 @@ class AzphaltStoreService(
         val compat = azphaltCompatSatisfies(manifest.compat)
         require(compat != null) { "Package ${manifest.id} has invalid Azphalt compat expression ${manifest.compat}" }
         require(compat) {
-            "Package ${manifest.id} requires Azphalt host ${manifest.compat}; Haive implements $HAIVE_AZPHALT_API_VERSION"
+            "Package ${manifest.id} requires Azphalt host ${manifest.compat}; Aive implements $AIVE_AZPHALT_API_VERSION"
         }
         if (!allowDowngrade) requireNotDowngrade(manifest.id, installStore.get(manifest.id)?.version, manifest.version)
         val plan = installer.inspect(verification)
@@ -515,13 +515,13 @@ class AzphaltStoreService(
             )
         }
         require(manifest.kind == "workflow" || manifest.kind == "role") {
-            "Haive Store installs workflow and role packages; ${manifest.id} is kind ${manifest.kind}"
+            "Aive Store installs workflow and role packages; ${manifest.id} is kind ${manifest.kind}"
         }
         requireTargetsAive(manifest.id, manifest.targetApps)
         val compat = azphaltCompatSatisfies(manifest.compat)
         require(compat != null) { "Package ${manifest.id} has invalid Azphalt compat expression ${manifest.compat}" }
         require(compat) {
-            "Package ${manifest.id} requires Azphalt host ${manifest.compat}; Haive implements $HAIVE_AZPHALT_API_VERSION"
+            "Package ${manifest.id} requires Azphalt host ${manifest.compat}; Aive implements $AIVE_AZPHALT_API_VERSION"
         }
         val plan = installer.inspect(verification)
         val dependencies = resolveDependencies(plan.dependencies)
@@ -645,7 +645,7 @@ class AzphaltStoreService(
     }
 
     private fun requireTargetsAive(packageId: String, targetApps: List<String>) {
-        val accepted = setOf(HAIVE_AZPHALT_HOST_ID, LEGACY_HAIVE_AZPHALT_HOST_ID)
+        val accepted = ACCEPTED_AZPHALT_HOST_IDS
         require(targetApps.isEmpty() || targetApps.any(accepted::contains)) {
             "Package $packageId does not target The Aive"
         }

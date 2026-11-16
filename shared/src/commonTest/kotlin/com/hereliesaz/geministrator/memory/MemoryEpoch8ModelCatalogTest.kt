@@ -19,7 +19,7 @@ class MemoryEpoch8ModelCatalogTest {
         )
         assertTrue(bundles.all { it.releaseAssetSha256.matches(Regex("[0-9a-f]{64}")) })
         assertEquals(
-            "haive-specialist_08_association_linker-onnx-epoch8.tar.gz",
+            "aive-specialist_08_association_linker-onnx-epoch8.tar.gz",
             MemoryEpoch8ModelCatalog.bundleFor(MemoryMicroAgentRole.AssociationLinker)?.releaseAssetName,
         )
     }
@@ -34,7 +34,7 @@ class MemoryEpoch8ModelCatalogTest {
                 MemoryInferenceWorkload.AutoregressiveGeneration
             }
             assertEquals(expected, spec.requirements.workload)
-            assertTrue(spec.deployment.supportsAllHaivePlatforms())
+            assertTrue(spec.deployment.supportsAllAivePlatforms())
             assertEquals(MemoryEpoch8ModelCatalog.LOCAL_MAX_INPUT_ITEMS, spec.maxInputItems)
         }
     }

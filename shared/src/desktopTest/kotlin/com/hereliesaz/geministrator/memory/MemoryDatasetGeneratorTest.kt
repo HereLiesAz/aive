@@ -80,7 +80,7 @@ class MemoryDatasetGeneratorTest {
     @Test
     fun inputsArePromptsTheRuntimeRenders() {
         rows.values.flatten().forEach { row ->
-            assertTrue(row.input.startsWith("You are a local Haive memory micro-agent."), row.id)
+            assertTrue(row.input.startsWith("You are a local Aive memory micro-agent."), row.id)
             assertTrue(row.expected.startsWith("{"), row.id)
         }
     }

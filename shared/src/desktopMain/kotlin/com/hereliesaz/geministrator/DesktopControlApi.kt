@@ -22,7 +22,7 @@ import kotlinx.coroutines.runBlocking
  * Shared JVM control server for The Aive desktop and independent headless engine (docs/MCP.md): [ControlApi] over HTTP on loopback only
  * (127.0.0.1), for the standalone MCP bridge. Off unless the keeper turns it on, with the
  * `AIVE_CONTROL_API=on` environment variable or the preference `enabled` in the node
- * `com/hereliesaz/haive/control-api`.
+ * `com/hereliesaz/aive/control-api`.
  *
  * The bearer token is made once per install (32 random bytes, base64url) and kept in a file in
  * [dir] that only this user can read (mode 0600 in a 0700 folder; the user's own profile folder on
@@ -33,7 +33,7 @@ class DesktopControlApi(
     val dir: File = defaultDir(),
     /** The configured port; 0 picks a free one (tests). */
     val port: Int = configuredPort(),
-    preferencesNode: () -> Preferences = { Preferences.userRoot().node(PREFERENCES_NODE) },
+    preferencesNode: () -> Preferences = { LegacyDesktopNames.currentPreferencesNode(PREFERENCES_NODE) },
 ) {
     private val preferences by lazy(preferencesNode)
     private val hostRef = AtomicReference<ControlHost?>(null)
@@ -180,7 +180,7 @@ class DesktopControlApi(
         const val DEFAULT_PORT = 41242
         const val TOKEN_FILE = "control-token"
         const val DISCOVERY_FILE = "control.json"
-        private const val PREFERENCES_NODE = "com/hereliesaz/haive/control-api"
+        private const val PREFERENCES_NODE = "com/hereliesaz/aive/control-api"
         private const val ENABLED_KEY = "enabled"
 
         fun defaultDir(): File = File(System.getProperty("user.home"), ".aive/control")

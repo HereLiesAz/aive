@@ -10,7 +10,7 @@ import com.hereliesaz.geministrator.inference.GenealogyGovernanceFindingKind
 import com.hereliesaz.geministrator.inference.GenealogyGovernancePolicy
 import com.hereliesaz.geministrator.inference.GenealogyGovernanceRequest
 import com.hereliesaz.geministrator.inference.GenealogyGovernanceReport
-import com.hereliesaz.geministrator.inference.INFERENCE_INVOCATION_ID_METADATA_KEY
+import com.hereliesaz.geministrator.inference.inferenceInvocationIdOf
 import com.hereliesaz.geministrator.inference.InferenceGenealogyGovernanceRuntime
 
 /**
@@ -25,7 +25,7 @@ class GenealogyGovernanceExecutorIntegration(
     private val governance: InferenceGenealogyGovernanceRuntime,
 ) : TaskExecutorIntegration {
     override fun supports(executor: TaskExecutor): Boolean =
-        executor is TaskExecutor.ExternalService && executor.service == GENEALOGY_GOVERNANCE_SERVICE
+        executor is TaskExecutor.ExternalService && isGenealogyGovernanceService(executor.service)
 
     override suspend fun dispatch(context: TaskExecutorContext): TaskExecutorExecution = evaluate(context)
 
@@ -50,7 +50,7 @@ class GenealogyGovernanceExecutorIntegration(
         val invocationByProposer = candidateArtifactsByProposer.mapValues { (_, artifacts) ->
             artifacts.asSequence()
                 .mapNotNull { artifact ->
-                    artifact.metadata[INFERENCE_INVOCATION_ID_METADATA_KEY]?.takeIf(String::isNotBlank)
+                    inferenceInvocationIdOf(artifact.metadata)
                 }
                 .firstOrNull()
         }

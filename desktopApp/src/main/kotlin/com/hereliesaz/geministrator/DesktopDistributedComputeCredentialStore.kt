@@ -22,7 +22,7 @@ internal class DesktopDistributedComputeCredentialStore(
     /** Whether the keeper has allowed the plaintext preferences file when no OS store works. Off by default. */
     private val allowPlaintextFallback: () -> Boolean = { plaintextFallbackAllowed() },
 ) {
-    private val fallback = Preferences.userRoot().node(PREFERENCES_NODE)
+    private val fallback = LegacyDesktopNames.currentPreferencesNode(PREFERENCES_NODE)
 
     /** The secret held only for this session when it could not be persisted. */
     @Volatile
@@ -41,11 +41,15 @@ internal class DesktopDistributedComputeCredentialStore(
         sessionSecret?.let { return StoredSecret.Found(it) }
         when (val stored = readFromKeychainState(account, windowsTokenFile(windowsFileName))) {
             is StoredSecret.Found, StoredSecret.Unreadable -> return stored
-            StoredSecret.Absent -> Unit
+            StoredSecret.Absent -> migrateLegacyKeychain()?.let { return StoredSecret.Found(it) }
         }
         return fallback.get(account, null)?.trim()?.takeIf(String::isNotEmpty)
             ?.let { StoredSecret.Found(it) } ?: StoredSecret.Absent
     }
+
+    /** A secret saved under the pre-rename keychain service moves to the current service, then the old entry goes. */
+    private fun migrateLegacyKeychain(): String? =
+        LegacyKeychain.migrate(KEYCHAIN_SERVICE, account) { writeToKeychain(it, account, windowsTokenFile(windowsFileName)) }
 
     fun writeToken(token: String) {
         val clean = token.trim()
@@ -76,8 +80,8 @@ internal class DesktopDistributedComputeCredentialStore(
     }
 
     internal companion object {
-        const val PREFERENCES_NODE = "com/hereliesaz/haive/distributed-compute"
-        const val KEYCHAIN_SERVICE = "com.hereliesaz.haive.distributed-compute"
+        const val PREFERENCES_NODE = "com/hereliesaz/aive/distributed-compute"
+        const val KEYCHAIN_SERVICE = "com.hereliesaz.aive.distributed-compute"
         const val ACCOUNT = "relay-token"
         const val WINDOWS_TOKEN_FILE_NAME = "distributed-compute-relay-token.dpapi"
 
@@ -130,7 +134,6 @@ internal class DesktopDistributedComputeCredentialStore(
 
         fun environmentToken(): String? =
             System.getenv("AIVE_RELAY_TOKEN")?.trim()?.takeIf(String::isNotEmpty)
-                ?: System.getenv("HAIVE_RELAY_TOKEN")?.trim()?.takeIf(String::isNotEmpty)
 
         /** Environment variable through which the Windows scripts receive the token file path. */
         const val WINDOWS_TOKEN_FILE_ENV = "AIVE_RELAY_TOKEN_FILE"

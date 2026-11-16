@@ -447,7 +447,7 @@ enum class MemoryResolution {
 
 /**
  * Free-text associative lookup. Its default resolution is Tag because semantic noun/entity,
- * verb/action, and category/subject tags are Haive's normal ambient memory cues; deeper content is
+ * verb/action, and category/subject tags are Aive's normal ambient memory cues; deeper content is
  * requested deliberately.
  */
 @Serializable

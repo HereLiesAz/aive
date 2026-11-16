@@ -76,13 +76,13 @@ class MemoryTemporalProgrammaticTest {
         val firstEpisode = episode(
             id = "first",
             timestamp = 1_000L,
-            projectId = "haive",
+            projectId = "aive",
             taskRunId = "task-run-42",
         )
         val secondEpisode = episode(
             id = "second",
             timestamp = 2_000L,
-            projectId = "haive",
+            projectId = "aive",
             taskRunId = "task-run-42",
         )
         val firstAnchor = MemoryNode(

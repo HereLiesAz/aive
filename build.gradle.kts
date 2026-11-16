@@ -8,7 +8,7 @@ plugins {
     alias(libs.plugins.composeCompiler) apply false
 }
 
-// Kotlin/JS/Wasm cannot safely walk the nested composite Haive -> H2G2 -> Conveyance package graph.
+// Kotlin/JS/Wasm cannot safely walk the nested composite Aive -> H2G2 -> Conveyance package graph.
 // Isolated web builds therefore publish the exact checked-in/pinned source revisions to Maven Local
 // and substitute only those exact Git coordinates. Android/Desktop continue compiling source directly.
 val isolatedWebBuild = gradle.startParameter.taskNames.any { task ->
@@ -17,7 +17,7 @@ val isolatedWebBuild = gradle.startParameter.taskNames.any { task ->
             task.contains("wasmJsBrowser", ignoreCase = true)
         )
 }
-val useMavenLocalH2g2 = providers.gradleProperty("haive.useMavenLocalH2g2")
+val useMavenLocalH2g2 = providers.gradleProperty("aive.useMavenLocalH2g2")
     .orNull
     ?.toBooleanStrictOrNull()
     ?: isolatedWebBuild

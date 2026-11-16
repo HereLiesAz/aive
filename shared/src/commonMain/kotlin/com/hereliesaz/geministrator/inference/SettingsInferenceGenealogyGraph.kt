@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.inference
 
+import com.hereliesaz.geministrator.persistence.migrateLegacyKey
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.TaskRunId
 import com.hereliesaz.geministrator.persistence.PersistenceCorruptionException
@@ -23,6 +24,9 @@ class SettingsInferenceGenealogyGraph(
     private val storageKey: String = DEFAULT_STORAGE_KEY,
     private val json: Json = defaultJson,
 ) : InferenceGenealogyGraph {
+    init {
+        settings.migrateLegacyKey(storageKey)
+    }
 
     override suspend fun register(node: InferenceGenealogyNode) {
         settingsInferenceGenealogyMutex.withLock {
@@ -76,7 +80,7 @@ class SettingsInferenceGenealogyGraph(
 
     companion object {
         const val CURRENT_SCHEMA_VERSION: Int = 1
-        const val DEFAULT_STORAGE_KEY: String = "haive.inference.genealogy.v1"
+        const val DEFAULT_STORAGE_KEY: String = "aive.inference.genealogy.v1"
 
         val defaultJson: Json = Json {
             encodeDefaults = true

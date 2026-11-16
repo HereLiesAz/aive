@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Android 11 and earlier: same scope as data_extraction_rules.xml. -->
 <full-backup-content>
-    <exclude domain="sharedpref" path="haive.credentials.xml" />
-    <exclude domain="sharedpref" path="haive.repository.credentials.xml" />
-    <exclude domain="sharedpref" path="haive.distributed-compute.credentials.xml" />
+    <exclude domain="sharedpref" path="aive.credentials.xml" />
+    <exclude domain="sharedpref" path="aive.repository.credentials.xml" />
+    <exclude domain="sharedpref" path="aive.distributed-compute.credentials.xml" />
     <exclude domain="sharedpref" path="aive.remote-relay.credentials.xml" />
     <exclude domain="sharedpref" path="aive.relay-owner.credentials.xml" />
     <exclude domain="sharedpref" path="aive.mcp.credentials.xml" />
     <exclude domain="sharedpref" path="aive.remote-relay.settings.xml" />
-    <exclude domain="file" path="haive/memory" />
-    <exclude domain="file" path="haive/orchestration-specialists" />
+    <exclude domain="file" path="aive/memory" />
+    <exclude domain="file" path="aive/orchestration-specialists" />
     <exclude domain="sharedpref" path="aive_azphalt_models.xml" />
     <exclude domain="sharedpref" path="aive_remembered_text.xml" />
     <exclude domain="sharedpref" path="aive_private_settings.xml" />

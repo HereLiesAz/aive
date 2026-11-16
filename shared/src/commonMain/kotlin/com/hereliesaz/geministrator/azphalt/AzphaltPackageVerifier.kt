@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.azphalt
 
+import com.hereliesaz.geministrator.persistence.migrateLegacyKey
 import com.hereliesaz.geministrator.Sha256
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.sync.Mutex
@@ -54,6 +55,10 @@ class SettingsAzphaltPublisherPinStore(
 ) : AzphaltPublisherPinStore {
     private val mutex = Mutex()
 
+    init {
+        settings.migrateLegacyKey(storageKey)
+    }
+
     override suspend fun keyFor(packageId: String): String? = mutex.withLock { readUnlocked()[packageId] }
 
     override suspend fun pin(packageId: String, publicKey: String) {
@@ -67,7 +72,7 @@ class SettingsAzphaltPublisherPinStore(
         .orEmpty()
 
     companion object {
-        const val DEFAULT_STORAGE_KEY = "haive.azphalt.publisher-pins.v1"
+        const val DEFAULT_STORAGE_KEY = "aive.azphalt.publisher-pins.v1"
         private val MapSerializer = kotlinx.serialization.builtins.MapSerializer(
             kotlinx.serialization.serializer<String>(),
             kotlinx.serialization.serializer<String>(),

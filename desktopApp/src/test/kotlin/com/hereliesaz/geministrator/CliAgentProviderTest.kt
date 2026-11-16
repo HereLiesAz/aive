@@ -158,7 +158,7 @@ class CliAgentProviderTest {
         assertEquals("", git(root, "status", "--porcelain"), "and so is the keeper's index")
         val change = result.filterIsInstance<AgentEvent.ArtifactProduced>().map { it.artifact }.single { it.kind == ArtifactKind.CodeChange }
         val branch = change.metadata.getValue("branch")
-        assertTrue(branch.startsWith("haive/cli-"))
+        assertTrue(branch.startsWith("aive/cli-"))
         assertTrue("+goodbye" in change.textContent!! && "new.txt" in change.textContent!!)
         assertEquals(git(root, "rev-parse", branch), change.metadata.getValue("headCommit"), "the branch holds the commit")
         assertFalse(cli.directory!!.exists(), "the worktree is removed")
@@ -170,7 +170,7 @@ class CliAgentProviderTest {
     fun withNothingChangedNoBranchIsLeftBehind() = withRepo { root, tmp ->
         val result = events(provider(FakeCli(), tmp = tmp), request(root))
         assertIs<AgentEvent.Completed>(result.last())
-        assertEquals("", git(root, "branch", "--list", "haive/cli-*"))
+        assertEquals("", git(root, "branch", "--list", "aive/cli-*"))
         val others = git(root, "worktree", "list", "--porcelain").lines().filter { it.startsWith("worktree ") }.drop(1)
         assertEquals(emptyList(), others)
     }
@@ -182,7 +182,7 @@ class CliAgentProviderTest {
         assertIs<AgentEvent.Completed>(result.last())
         assertEquals("plan", cli.command[cli.command.indexOf("--permission-mode") + 1])
         assertTrue(result.filterIsInstance<AgentEvent.ArtifactProduced>().none { it.artifact.kind == ArtifactKind.CodeChange })
-        assertEquals("", git(root, "branch", "--list", "haive/cli-*"))
+        assertEquals("", git(root, "branch", "--list", "aive/cli-*"))
     }
 
     @Test
@@ -221,7 +221,7 @@ class CliAgentProviderTest {
         val result = events(provider(cli, tmp = tmp), request(root))
         val failed = assertIs<AgentEvent.Failed>(result.last())
         assertTrue(".gitattributes" in failed.reason, failed.reason)
-        assertEquals("", git(root, "branch", "--list", "haive/cli-*"))
+        assertEquals("", git(root, "branch", "--list", "aive/cli-*"))
     }
 
     @Test
@@ -247,7 +247,7 @@ class CliAgentProviderTest {
             job.cancelAndJoin()
         }
         assertFalse(cli.directory!!.exists(), "the worktree is gone")
-        assertEquals("", git(root, "branch", "--list", "haive/cli-*"))
+        assertEquals("", git(root, "branch", "--list", "aive/cli-*"))
     }
 
     @Test
@@ -257,7 +257,7 @@ class CliAgentProviderTest {
         val failed = assertIs<AgentEvent.Failed>(events(provider(refused, tmp = tmp), request(root)).last())
         assertTrue(".claude/settings.json" in failed.reason && "project settings" in failed.reason, failed.reason)
         assertEquals(emptyList(), refused.command, "the CLI was never started")
-        assertEquals("", git(root, "branch", "--list", "haive/cli-*"), "and no branch is left")
+        assertEquals("", git(root, "branch", "--list", "aive/cli-*"), "and no branch is left")
 
         val allowed = FakeCli()
         assertIs<AgentEvent.Completed>(events(provider(allowed, settings(allowProjectConfig = true), tmp = tmp), request(root)).last())
@@ -300,7 +300,7 @@ class CliAgentProviderTest {
         val cli = FakeCli(edit = { dir -> java.nio.file.Files.createSymbolicLink(File(dir, "leak").toPath(), java.nio.file.Paths.get("/etc/hostname")) })
         val failed = assertIs<AgentEvent.Failed>(events(provider(cli, tmp = tmp), request(root)).last())
         assertTrue("leak" in failed.reason, failed.reason)
-        assertEquals("", git(root, "branch", "--list", "haive/cli-*"))
+        assertEquals("", git(root, "branch", "--list", "aive/cli-*"))
     }
 
     @Test
@@ -315,7 +315,7 @@ class CliAgentProviderTest {
         val cli = FakeCli(edit = { dir -> File(dir, ".GitAttributes").writeText("* filter=evil\n") })
         val failed = assertIs<AgentEvent.Failed>(events(provider(cli, tmp = tmp), request(root)).last())
         assertTrue(".GitAttributes" in failed.reason, failed.reason)
-        assertEquals("", git(root, "branch", "--list", "haive/cli-*"))
+        assertEquals("", git(root, "branch", "--list", "aive/cli-*"))
     }
 
     @Test

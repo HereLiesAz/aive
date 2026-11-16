@@ -5,11 +5,12 @@ import java.util.prefs.Preferences
 internal class DesktopRepositoryCredentialStore {
     // Preferences are used only for Windows DPAPI ciphertext and one-time migration of legacy
     // plaintext values written by older builds.
-    private val fallback = Preferences.userRoot().node(PREFERENCES_NODE)
+    private val fallback = LegacyDesktopNames.currentPreferencesNode(PREFERENCES_NODE)
 
     fun read(serviceId: String): String? {
         if (!CredentialTool.isSafeAccountId(serviceId)) return null
         val secure = readFromKeychain(serviceId)
+            ?: migrateLegacyKeychain(serviceId)
             ?: readWindowsDpapi(serviceId)
         if (secure != null) return secure
 
@@ -48,11 +49,15 @@ internal class DesktopRepositoryCredentialStore {
     }
 
     private companion object {
-        const val PREFERENCES_NODE = "com/hereliesaz/haive/repository-credentials"
-        const val KEYCHAIN_SERVICE = "com.hereliesaz.haive.repository"
+        const val PREFERENCES_NODE = "com/hereliesaz/aive/repository-credentials"
+        const val KEYCHAIN_SERVICE = "com.hereliesaz.aive.repository"
         const val DPAPI_PREFIX = "__dpapi__:"
 
         val os: String get() = System.getProperty("os.name", "").lowercase()
+
+        /** A secret saved under the pre-rename keychain service moves to the current service, then the old entry goes. */
+        fun migrateLegacyKeychain(serviceId: String): String? =
+            LegacyKeychain.migrate(KEYCHAIN_SERVICE, serviceId) { writeToKeychain(serviceId, it) }
 
         fun readFromKeychain(serviceId: String): String? {
             val command = when {
@@ -89,7 +94,7 @@ internal class DesktopRepositoryCredentialStore {
                 os.contains("nux") || os.contains("nix") || os.contains("bsd") -> CredentialTool.run(
                     listOf(
                         "secret-tool", "store",
-                        "--label", "Haive repository credential ($serviceId)",
+                        "--label", "Aive repository credential ($serviceId)",
                         "service", KEYCHAIN_SERVICE,
                         "account", serviceId,
                     ),

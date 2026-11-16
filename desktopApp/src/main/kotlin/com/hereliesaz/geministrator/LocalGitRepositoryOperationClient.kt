@@ -253,7 +253,7 @@ internal class LocalGitRepositoryOperationClient(
             .also { require(it.exitCode == 0) { "Unable to locate Git metadata directory: ${it.output}" } }
             .output
             .trim()
-        return File(File(gitDir), "haive-operations/$runId.properties")
+        return File(File(gitDir), "aive-operations/$runId.properties")
     }
 
     /** Creates the "started" record only if no record exists yet; false when one already does. */

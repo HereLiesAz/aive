@@ -59,7 +59,7 @@ class AzphaltWorkflowConformanceTest {
             "workflows/release.json" to "sha256-workflow",
         ),
         workflow = AzphaltWorkflowManifest(
-            format = HAIVE_WORKFLOW_FORMAT,
+            format = AIVE_WORKFLOW_FORMAT,
             definitions = listOf(
                 AzphaltWorkflowPayloadEntry("release", path = "workflows/release.json"),
             ),

@@ -44,7 +44,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  * task upstream of the test task was approved in this run. The command is split into an argument
  * list without a shell ([parseTestCommand]); shell syntax is refused, never interpreted. It runs in
  * the run's work: a `worktree-branch` worktree beside the repository, else a temporary detached
- * worktree at the newest upstream `headCommit` (a Local Git agent's `haive/...` commit), else the
+ * worktree at the newest upstream `headCommit` (a Local Git agent's `aive/...` commit), else the
  * linked folder. The child gets an allowlisted environment (no provider keys, no `GIT_*`), a
  * timeout, and has its whole process tree ended on timeout, cancellation or abandonment. Its output
  * is kept to the last [maxStreamChars] characters per stream and returned as a
@@ -251,8 +251,8 @@ internal class LocalTestRunnerClient(
         val commit = requireNotNull(upstream.headCommit) {
             "Upstream work names ${upstream.worktreePath}, which is not a worktree beside this repository; refusing to run there"
         }
-        val directory = withContext(Dispatchers.IO) { Files.createTempDirectory("haive-test-").toFile() }
-        val hooks = withContext(Dispatchers.IO) { Files.createTempDirectory("haive-test-hooks-").toFile() }
+        val directory = withContext(Dispatchers.IO) { Files.createTempDirectory("aive-test-").toFile() }
+        val hooks = withContext(Dispatchers.IO) { Files.createTempDirectory("aive-test-hooks-").toFile() }
         val removeDirectories: suspend () -> Unit = {
             withContext(Dispatchers.IO) {
                 runCatching { directory.deleteRecursively() }

@@ -6,7 +6,7 @@ import com.hereliesaz.geministrator.domain.BlockingReason
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.RoleDefinition
-import com.hereliesaz.geministrator.domain.haiveBuiltInRoles
+import com.hereliesaz.geministrator.domain.aiveBuiltInRoles
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
@@ -187,7 +187,7 @@ internal fun quarantineImportedRoles(
     localRoles: List<RoleDefinition>,
     imported: List<RoleDefinition>,
 ): List<RoleDefinition> {
-    val taken = localRoles.mapTo(hashSetOf()) { it.id } + haiveBuiltInRoles.map { it.id }
+    val taken = localRoles.mapTo(hashSetOf()) { it.id } + aiveBuiltInRoles.map { it.id }
     return imported.filter { it.id !in taken }.map { it.copy(enabled = false) }
 }
 

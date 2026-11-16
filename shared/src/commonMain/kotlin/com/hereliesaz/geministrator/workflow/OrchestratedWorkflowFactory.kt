@@ -30,7 +30,7 @@ object OrchestratedWorkflowFactory {
         return WorkflowDefinition(
             id = id,
             name = objective.take(80),
-            description = "Workflow planned by Haive's local orchestration planner.",
+            description = "Workflow planned by Aive's local orchestration planner.",
             tasks = validated.steps.map { step ->
                 val templateId = step.templateId
                 if (templateId != null) {

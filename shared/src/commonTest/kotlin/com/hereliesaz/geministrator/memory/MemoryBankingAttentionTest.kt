@@ -48,7 +48,7 @@ class MemoryBankingAttentionTest {
                 sourceSessionId = "agent",
                 text = "Keep the exact-head CI check in mind.",
                 sourceKind = MemorySourceKind.AgentNote,
-                scope = MemoryBankScope(projectId = "haive", workflowRunId = "run"),
+                scope = MemoryBankScope(projectId = "aive", workflowRunId = "run"),
                 bankedAtEpochMillis = 10L,
             ),
         )
@@ -56,7 +56,7 @@ class MemoryBankingAttentionTest {
         assertEquals(MemoryQueuePriority.Next, entry.priority)
         val snapshot = store.read()
         val episode = snapshot.episodes.single { it.id == entry.episodeId }
-        assertEquals("haive", episode.projectId)
+        assertEquals("aive", episode.projectId)
         assertEquals("run", episode.workflowRunId)
         assertEquals(MemorySourceKind.AgentNote, episode.chunks.single().kind)
         assertEquals("Keep the exact-head CI check in mind.", episode.chunks.single().text)

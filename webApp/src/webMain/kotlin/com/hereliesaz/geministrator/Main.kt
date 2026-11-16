@@ -50,12 +50,12 @@ import com.hereliesaz.geministrator.memory.openWebMemoryBanks
 import com.hereliesaz.geministrator.memory.WebMemoryDebugHook
 import com.hereliesaz.geministrator.providers.llm.memoryTextApi
 
-private const val OPENAI_API_KEY_STORAGE_KEY = "haive.openaiApiKey"
-private const val ANTHROPIC_API_KEY_STORAGE_KEY = "haive.anthropicApiKey"
-private const val GEMINI_API_KEY_STORAGE_KEY = "haive.geminiApiKey"
-private const val XAI_API_KEY_STORAGE_KEY = "haive.xaiApiKey"
-private const val GITHUB_TOKEN_STORAGE_KEY = "haive.githubToken"
-private const val GITLAB_TOKEN_STORAGE_KEY = "haive.gitlabToken"
+private const val OPENAI_API_KEY_STORAGE_KEY = "aive.openaiApiKey"
+private const val ANTHROPIC_API_KEY_STORAGE_KEY = "aive.anthropicApiKey"
+private const val GEMINI_API_KEY_STORAGE_KEY = "aive.geminiApiKey"
+private const val XAI_API_KEY_STORAGE_KEY = "aive.xaiApiKey"
+private const val GITHUB_TOKEN_STORAGE_KEY = "aive.githubToken"
+private const val GITLAB_TOKEN_STORAGE_KEY = "aive.gitlabToken"
 
 /** True when the browser reports `prefers-reduced-motion: reduce`. */
 private fun prefersReducedMotion(): Boolean =
@@ -349,16 +349,16 @@ internal fun configuredWebRepositoryDiscovery(
 }
 
 private suspend fun readWebProviderCredentials(): Map<String, String> = buildMap {
-    // Providers the app no longer supports leave no credential behind ("haive.julesApiKey" included).
+    // Providers the app no longer supports leave no credential behind ("aive.julesApiKey" included).
     ProviderCatalog.RETIRED_PROVIDER_IDS.forEach { WebCredentialStore.remove(providerStorageKey(it)) }
     ProviderCatalog.entries.forEach { entry ->
-        WebCredentialStore.read(providerStorageKey(entry.id))?.let { put(entry.id, it) }
+        WebCredentialStore.readMigrating(providerStorageKey(entry.id))?.let { put(entry.id, it) }
     }
 }
 
 private suspend fun readWebRepositoryCredentials(): Map<String, String> = buildMap {
     RepositoryServiceCatalog.entries.forEach { entry ->
-        WebCredentialStore.read(repositoryStorageKey(entry.id))?.let { put(entry.id, it) }
+        WebCredentialStore.readMigrating(repositoryStorageKey(entry.id))?.let { put(entry.id, it) }
     }
 }
 
@@ -367,13 +367,13 @@ private fun providerStorageKey(providerId: String): String = when (providerId) {
     ProviderCatalog.ANTHROPIC_ID -> ANTHROPIC_API_KEY_STORAGE_KEY
     ProviderCatalog.GEMINI_ID -> GEMINI_API_KEY_STORAGE_KEY
     ProviderCatalog.XAI_ID -> XAI_API_KEY_STORAGE_KEY
-    else -> "haive.${providerId}ApiKey"
+    else -> "aive.${providerId}ApiKey"
 }
 
 private fun repositoryStorageKey(serviceId: String): String = when (serviceId) {
     RepositoryServiceCatalog.GITHUB_ID -> GITHUB_TOKEN_STORAGE_KEY
     RepositoryServiceCatalog.GITLAB_ID -> GITLAB_TOKEN_STORAGE_KEY
-    else -> "haive.${serviceId}Token"
+    else -> "aive.${serviceId}Token"
 }
 
 private fun Map<String, String>.cleanKey(id: String): String? =

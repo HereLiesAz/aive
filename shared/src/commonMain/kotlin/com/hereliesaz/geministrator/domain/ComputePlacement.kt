@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
  * Where a task is allowed to execute.
  *
  * Placement is deliberately separate from [TaskExecutor]: executor describes what performs the
- * work, while placement describes which trusted Haive device may host that execution.
+ * work, while placement describes which trusted Aive device may host that execution.
  */
 @Serializable
 sealed interface ComputePlacementPolicy {

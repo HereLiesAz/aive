@@ -1,16 +1,16 @@
 [package]
-name = "haive-bitcos"
+name = "aive-bitcos"
 version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
-description = "BITCOS ternary weight codec, container, converter, and runtime primitives for Haive"
+description = "BITCOS ternary weight codec, container, converter, and runtime primitives for Aive"
 
 [lib]
 crate-type = ["rlib", "cdylib", "staticlib"]
 
 [[bin]]
-name = "haive-bitcos"
-path = "src/bin/haive-bitcos.rs"
+name = "aive-bitcos"
+path = "src/bin/aive-bitcos.rs"
 
 [dependencies]
 jni = { version = "0.21.1", default-features = false }

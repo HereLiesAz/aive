@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.memory
 
+import com.hereliesaz.geministrator.persistence.migrateLegacyKeysWithPrefix
 import com.hereliesaz.geministrator.persistence.refuseIfUnreadable
 import com.hereliesaz.geministrator.persistence.readQuarantining
 import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
@@ -228,6 +229,10 @@ class SettingsMemoryBankRegistry(
     private val settings: Settings = ChunkedStringSettings.unbounded(settings)
     private val mutex = Mutex()
     private val serializer = ListSerializer(String.serializer())
+
+    init {
+        this.settings.migrateLegacyKeysWithPrefix(key)
+    }
 
     override suspend fun known(): Set<String> = mutex.withLock { load() }
 

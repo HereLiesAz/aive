@@ -187,7 +187,7 @@ class LocalWorkspaceAgentProviderTest {
                     val failure = events.filterIsInstance<AgentEvent.Failed>().singleOrNull()
                     assertTrue(failure != null, "patch $index was not rejected: $events")
                     assertTrue(events.none { it is AgentEvent.ArtifactProduced }, "patch $index produced a change")
-                    assertEquals("", git(root, "branch", "--list", "haive/*").trim(), "patch $index left its branch")
+                    assertEquals("", git(root, "branch", "--list", "aive/*").trim(), "patch $index left its branch")
                 }
             }
     }
@@ -212,7 +212,7 @@ class LocalWorkspaceAgentProviderTest {
 
         assertTrue(events.filterIsInstance<AgentEvent.Failed>().isNotEmpty(), "the patch was not rejected: $events")
         assertTrue(events.none { it is AgentEvent.ArtifactProduced })
-        assertEquals("", git(root, "branch", "--list", "haive/*").trim())
+        assertEquals("", git(root, "branch", "--list", "aive/*").trim())
     }
 
     @Test
@@ -250,23 +250,23 @@ class LocalWorkspaceAgentProviderTest {
         }
         val provider = LocalWorkspaceAgentProvider(AgentProviderId("cancel-test"), "Cancel test", api)
         val tempRoot = Path.of(System.getProperty("java.io.tmpdir"))
-        fun haiveTempDirs() = Files.list(tempRoot).use { paths ->
-            paths.filter { it.fileName.toString().startsWith("haive-") && it.fileName.toString().contains("cancel") ||
-                it.fileName.toString().startsWith("haive-empty-hooks-") }.toList().toSet()
+        fun aiveTempDirs() = Files.list(tempRoot).use { paths ->
+            paths.filter { it.fileName.toString().startsWith("aive-") && it.fileName.toString().contains("cancel") ||
+                it.fileName.toString().startsWith("aive-empty-hooks-") }.toList().toSet()
         }
-        val before = haiveTempDirs()
+        val before = aiveTempDirs()
 
         runBlocking {
             val handle = provider.start(request(root, TaskRunId("cancel-me")))
             val observation = launch(Dispatchers.Default) { provider.observe(handle.providerRunId).toList() }
             withTimeout(60_000) { generating.await() }
-            assertTrue(git(root, "branch", "--list", "haive/*").isNotBlank(), "worktree branch was not created")
+            assertTrue(git(root, "branch", "--list", "aive/*").isNotBlank(), "worktree branch was not created")
             observation.cancelAndJoin()
         }
 
-        assertEquals("", git(root, "branch", "--list", "haive/*").trim())
+        assertEquals("", git(root, "branch", "--list", "aive/*").trim())
         assertEquals(1, git(root, "worktree", "list", "--porcelain").lines().count { it.startsWith("worktree ") })
-        assertEquals(before, haiveTempDirs())
+        assertEquals(before, aiveTempDirs())
     }
 
     @Test
@@ -299,7 +299,7 @@ class LocalWorkspaceAgentProviderTest {
         assertCompleted(second)
         val secondChange = second.codeChange()
 
-        val runBranch = "haive/run-run-7"
+        val runBranch = "aive/run-run-7"
         assertEquals(runBranch, firstChange.metadata.getValue("branch"))
         assertEquals(runBranch, secondChange.metadata.getValue("branch"))
         // Two tasks, two commits, one after the other on the run's branch; each sha recorded on its task.
@@ -314,13 +314,13 @@ class LocalWorkspaceAgentProviderTest {
         // Each commit names its task and the run.
         val firstMessage = git(root, "log", "-1", "--format=%B", firstSha)
         val secondMessage = git(root, "log", "-1", "--format=%B", secondSha)
-        assertTrue(firstMessage.contains("Haive-Task: Write README (write)"), firstMessage)
-        assertTrue(firstMessage.contains("Haive-Run: run-7"), firstMessage)
-        assertTrue(secondMessage.contains("Haive-Task: Polish README (polish)"), secondMessage)
-        assertTrue(secondMessage.contains("Haive-Run: run-7"), secondMessage)
+        assertTrue(firstMessage.contains("Aive-Task: Write README (write)"), firstMessage)
+        assertTrue(firstMessage.contains("Aive-Run: run-7"), firstMessage)
+        assertTrue(secondMessage.contains("Aive-Task: Polish README (polish)"), secondMessage)
+        assertTrue(secondMessage.contains("Aive-Run: run-7"), secondMessage)
         assertEquals("polished", git(root, "show", "$runBranch:README.md").trim())
         // The task branches are gone once their commits live on the run's branch; the checkout is untouched.
-        assertEquals(runBranch, git(root, "branch", "--list", "haive/*").trim().removePrefix("* ").trim())
+        assertEquals(runBranch, git(root, "branch", "--list", "aive/*").trim().removePrefix("* ").trim())
         assertEquals("initial\n", root.resolve("README.md").readText())
         assertTrue(git(root, "status", "--porcelain").isBlank())
     }
@@ -346,7 +346,7 @@ class LocalWorkspaceAgentProviderTest {
         // Later tasks continue from where this one started.
         assertEquals(head, artifacts.single().metadata.getValue("headCommit"))
         assertEquals(head, git(root, "rev-parse", "HEAD").trim())
-        assertEquals("", git(root, "branch", "--list", "haive/*").trim())
+        assertEquals("", git(root, "branch", "--list", "aive/*").trim())
     }
 
     @Test
@@ -360,10 +360,10 @@ class LocalWorkspaceAgentProviderTest {
         )
         assertCompleted(second)
 
-        val runBranch = "haive/run-run-7"
+        val runBranch = "aive/run-run-7"
         assertEquals(runBranch, first.codeChange().metadata.getValue("branch"))
         val ownBranch = second.codeChange().metadata.getValue("branch")
-        assertTrue(ownBranch.startsWith("haive/right-1-"), ownBranch)
+        assertTrue(ownBranch.startsWith("aive/right-1-"), ownBranch)
         assertEquals("changed", git(root, "show", "$runBranch:README.md").trim())
         assertEquals("other", git(root, "show", "$ownBranch:README.md").trim())
         assertEquals(second.codeChange().metadata.getValue(CHECKPOINT_COMMIT_METADATA_KEY), git(root, "rev-parse", ownBranch).trim())
@@ -457,11 +457,11 @@ class LocalWorkspaceAgentProviderTest {
     )
 
     private fun withGitRepository(block: (Path) -> Unit) {
-        val root = createTempDirectory("haive-local-workspace-test-")
+        val root = createTempDirectory("aive-local-workspace-test-")
         try {
             git(root, "init")
-            git(root, "config", "user.email", "haive-test@example.invalid")
-            git(root, "config", "user.name", "Haive Test")
+            git(root, "config", "user.email", "aive-test@example.invalid")
+            git(root, "config", "user.name", "Aive Test")
             root.resolve("README.md").writeText("initial\n")
             git(root, "add", "README.md")
             git(root, "commit", "-m", "Initial commit")

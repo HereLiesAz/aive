@@ -1,4 +1,4 @@
-use haive_bitcos::{encode_container, BitcosContainer, BitcosTensorInput};
+use aive_bitcos::{encode_container, BitcosContainer, BitcosTensorInput};
 use serde::Deserialize;
 use std::env;
 use std::fs;
@@ -21,7 +21,7 @@ struct ManifestTensor {
 
 fn main() {
     if let Err(error) = run() {
-        eprintln!("haive-bitcos: {error}");
+        eprintln!("aive-bitcos: {error}");
         std::process::exit(2);
     }
 }
@@ -54,9 +54,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
         _ => {
             eprintln!(
-                "Usage:\n  haive-bitcos pack <manifest.json> <output.bitcos>\n  \
-                 haive-bitcos inspect <model.bitcos>\n  \
-                 haive-bitcos unpack <model.bitcos> <output-directory>"
+                "Usage:\n  aive-bitcos pack <manifest.json> <output.bitcos>\n  \
+                 aive-bitcos inspect <model.bitcos>\n  \
+                 aive-bitcos unpack <model.bitcos> <output-directory>"
             );
             Err("missing or unknown command".into())
         }

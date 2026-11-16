@@ -1,7 +1,7 @@
 package com.hereliesaz.geministrator.azphalt
 
 /** Azphalt 0.1 host API version implemented by this integration. */
-const val HAIVE_AZPHALT_API_VERSION: String = "0.1.0"
+const val AIVE_AZPHALT_API_VERSION: String = "0.1.0"
 
 internal data class AzphaltApiVersion(
     val major: Int,
@@ -34,7 +34,7 @@ internal data class AzphaltApiVersion(
  */
 fun azphaltCompatSatisfies(
     compat: String,
-    hostVersion: String = HAIVE_AZPHALT_API_VERSION,
+    hostVersion: String = AIVE_AZPHALT_API_VERSION,
 ): Boolean? {
     val expression = compat.trim()
     if (expression.isEmpty()) return null

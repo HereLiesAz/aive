@@ -5,7 +5,7 @@ import com.hereliesaz.geministrator.domain.TaskContract
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
-import com.hereliesaz.geministrator.domain.haiveBuiltInRoles
+import com.hereliesaz.geministrator.domain.aiveBuiltInRoles
 import com.hereliesaz.geministrator.domain.isEffectful
 import com.hereliesaz.geministrator.workflow.CodingWorkflowSuite
 import com.hereliesaz.geministrator.workflow.NodeCharacterGenerationWorkflowFactory
@@ -61,7 +61,7 @@ class StepTemplateCoverageTest {
 
     @Test
     fun everyRoleHasARoleTemplateRecordAtGenerationOne() {
-        val roles = (haiveBuiltInRoles + NodeCharacterGenerationWorkflowFactory.roles + packageRoles()).distinctBy { it.id }
+        val roles = (aiveBuiltInRoles + NodeCharacterGenerationWorkflowFactory.roles + packageRoles()).distinctBy { it.id }
         val catalog = TemplateCatalog(BuiltInTemplates.bases(roles))
         assertTrue(roles.size > 100, "the built-ins and the packages' roles are all counted")
         for (role in roles) {

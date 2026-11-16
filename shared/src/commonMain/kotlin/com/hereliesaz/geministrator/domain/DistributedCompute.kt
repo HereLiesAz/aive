@@ -11,7 +11,7 @@ enum class ComputePlatform {
 }
 
 /**
- * Placement requirements for work that may execute on another Haive node.
+ * Placement requirements for work that may execute on another Aive node.
  *
  * These are eligibility constraints, not scheduling promises. A worker may advertise additional
  * dynamic limits (battery/network/thermal policy) and simply decline work it does not want.

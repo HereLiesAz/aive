@@ -4,10 +4,24 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
 const val AZPHALT_STORE_URL: String = "https://azphalt.store"
-const val HAIVE_AZPHALT_HOST_ID: String = "com.hereliesaz.aive"
-const val LEGACY_HAIVE_AZPHALT_HOST_ID: String = "com.hereliesaz.haive"
-const val HAIVE_WORKFLOW_FORMAT: String = "haive.workflow.v1"
-const val HAIVE_ROLE_FORMAT: String = "haive.role.v1"
+const val AIVE_AZPHALT_HOST_ID: String = "com.hereliesaz.aive"
+const val AIVE_WORKFLOW_FORMAT: String = "aive.workflow.v1"
+const val AIVE_ROLE_FORMAT: String = "aive.role.v1"
+
+// Legacy input ids: packages published by older builds name the host and formats this way. Accepted on read only;
+// the app writes and emits the AIVE_* ids above.
+const val LEGACY_AZPHALT_HOST_ID: String = "com.hereliesaz.haive"
+const val LEGACY_WORKFLOW_FORMAT: String = "haive.workflow.v1"
+const val LEGACY_ROLE_FORMAT: String = "haive.role.v1"
+
+/** Host ids a package may target and still install here: the current id and the legacy id. */
+val ACCEPTED_AZPHALT_HOST_IDS: Set<String> = setOf(AIVE_AZPHALT_HOST_ID, LEGACY_AZPHALT_HOST_ID)
+
+/** Workflow manifest formats this build reads: the current format and the legacy format. */
+val ACCEPTED_WORKFLOW_FORMATS: Set<String> = setOf(AIVE_WORKFLOW_FORMAT, LEGACY_WORKFLOW_FORMAT)
+
+/** Role manifest formats this build reads: the current format and the legacy format. */
+val ACCEPTED_ROLE_FORMATS: Set<String> = setOf(AIVE_ROLE_FORMAT, LEGACY_ROLE_FORMAT)
 const val AZPHALT_PACKAGE_MEDIA_TYPE: String = "application/vnd.azphalt.package"
 const val AZPHALT_PACKAGE_MEDIA_TYPE_DEPRECATED: String = "application/x-azphalt"
 
@@ -194,9 +208,9 @@ data class AzphaltPackageVersion(
 )
 
 /**
- * Manifest surface required by Haive's Azphalt host. Mutually-exclusive editor/executable blocks are
+ * Manifest surface required by Aive's Azphalt host. Mutually-exclusive editor/executable blocks are
  * retained as JsonElement values solely so declarative workflow/role packages can be rejected when
- * any are present; Haive never interprets or executes those blocks.
+ * any are present; Aive never interprets or executes those blocks.
  */
 @Serializable
 data class AzphaltManifest(

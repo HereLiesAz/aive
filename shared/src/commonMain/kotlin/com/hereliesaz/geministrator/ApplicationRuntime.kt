@@ -1985,7 +1985,7 @@ class ApplicationRuntime private constructor(
 
         return buildString {
             appendLine("{")
-            appendLine("  \"schema\": \"haive-diagnostic-v1\",")
+            appendLine("  \"schema\": \"aive-diagnostic-v1\",")
             appendLine("  \"runId\": ${jsonStr(run?.id?.value)},")
             appendLine("  \"objective\": ${jsonStr(run?.objective)},")
             appendLine("  \"status\": ${jsonStr(run?.status?.name)},")

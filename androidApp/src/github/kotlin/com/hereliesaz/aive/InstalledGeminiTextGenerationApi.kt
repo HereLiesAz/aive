@@ -19,9 +19,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 
 /**
- * Uses the signed-in consumer Gemini app as a Haive text-generation transport.
+ * Uses the signed-in consumer Gemini app as a Aive text-generation transport.
  *
- * Haive launches the real Gemini activity in a bounded window when Android supports it. The
+ * Aive launches the real Gemini activity in a bounded window when Android supports it. The
  * accessibility service only participates while [InstalledGeminiBridge.waiting] is true and only
  * for the resolved Gemini package. If [fallback] exists, transport/setup failures fall back to the
  * ordinary Gemini API rather than failing the governed task.
@@ -44,7 +44,7 @@ internal class InstalledGeminiTextGenerationApi(
         require(prompt.isNotBlank()) { "Gemini prompt must not be blank" }
         check(InstalledGeminiPreference.isEnabled(context)) { "The installed-Gemini bridge is turned off in The Aive" }
         check(isAccessibilityServiceEnabled(context)) {
-            "Haive's installed-Gemini accessibility service is not enabled"
+            "Aive's installed-Gemini accessibility service is not enabled"
         }
 
         val share = Intent(Intent.ACTION_SEND).apply {
@@ -70,7 +70,7 @@ internal class InstalledGeminiTextGenerationApi(
             InstalledGeminiBridge.waiting = false
             InstalledGeminiBridge.phase = InstalledGeminiBridge.Phase.Idle
             withContext(NonCancellable + Dispatchers.Main) {
-                InstalledGeminiWindowHost.returnToHaive(context)
+                InstalledGeminiWindowHost.returnToAive(context)
             }
             InstalledGeminiBridge.reset()
         }
@@ -105,7 +105,7 @@ internal class InstalledGeminiTextGenerationApi(
         fun isGeminiInstalled(context: Context): Boolean {
             val probe = Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, "Haive availability check")
+                putExtra(Intent.EXTRA_TEXT, "Aive availability check")
             }
             return resolveGeminiPackage(context, probe) != null
         }
@@ -131,7 +131,7 @@ private object InstalledGeminiWindowHost {
             .getOrElse { context.startActivity(intent) }
     }
 
-    fun returnToHaive(context: Context) {
+    fun returnToAive(context: Context) {
         runCatching {
             context.startActivity(
                 Intent(context, MainActivity::class.java).addFlags(

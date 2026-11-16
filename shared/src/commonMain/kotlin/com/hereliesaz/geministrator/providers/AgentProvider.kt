@@ -16,7 +16,7 @@ import com.hereliesaz.geministrator.domain.TaskRunId
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.inference.CompoundInferenceContext
-import com.hereliesaz.geministrator.inference.INFERENCE_INVOCATION_ID_METADATA_KEY
+import com.hereliesaz.geministrator.inference.inferenceInvocationIdOf
 import kotlinx.coroutines.flow.Flow
 
 enum class PromptCacheMode {
@@ -96,7 +96,7 @@ data class AgentTaskRequest(
         taskRunId = taskRunId,
         workflowRunId = orchestrationContext.workflowRunId,
         upstreamInvocationIds = contextArtifacts.mapNotNullTo(linkedSetOf()) {
-            it.metadata[INFERENCE_INVOCATION_ID_METADATA_KEY]?.takeIf(String::isNotBlank)
+            inferenceInvocationIdOf(it.metadata)
         },
         upstreamTaskRunIds = contextArtifacts.mapTo(linkedSetOf()) { it.taskRunId },
         upstreamArtifactIds = contextArtifacts.mapTo(linkedSetOf()) { it.id },

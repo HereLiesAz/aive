@@ -249,7 +249,7 @@ jobs:
           bad=0
           for abi in arm64-v8a armeabi-v7a x86_64; do
             for lib in \
-              "androidApp/build/generated/bitcos/jniLibs/${abi}/libhaive_bitcos.so" \
+              "androidApp/build/generated/bitcos/jniLibs/${abi}/libaive_bitcos.so" \
               "androidApp/build/generated/djl-tokenizer/jniLibs/${abi}/libdjl_tokenizer.so"; do
               if [ ! -f "$lib" ]; then
                 echo "::error::Expected native runtime library was not found: $lib"
@@ -505,9 +505,9 @@ jobs:
           set -euo pipefail
           ./gradlew :desktopApp:generateDesktopBrandAssets
           for icon in \
-            desktopApp/build/generated/brand/desktop/haive-icon-color.png \
-            desktopApp/build/generated/brand/desktop/haive-icon.ico \
-            desktopApp/build/generated/brand/desktop/haive-icon.icns; do
+            desktopApp/build/generated/brand/desktop/aive-icon-color.png \
+            desktopApp/build/generated/brand/desktop/aive-icon.ico \
+            desktopApp/build/generated/brand/desktop/aive-icon.icns; do
             if [ ! -f "$icon" ]; then
               echo "::error::Expected generated desktop brand asset was not found: $icon"
               exit 1

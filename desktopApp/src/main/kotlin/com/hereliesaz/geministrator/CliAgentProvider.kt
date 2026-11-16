@@ -149,7 +149,7 @@ internal class CliAgentProvider(
         val mode = if (AgentCapability.RepositoryWrite in request.requiredCapabilities) CliRunMode.EditFiles else CliRunMode.ReadOnly
         val base = git(root, "rev-parse", "--verify", "HEAD").takeIf { it.exitCode == 0 }?.stdout?.text?.trim()
             ?: return@channelFlow fail("The repository has no commits to work from.")
-        val branch = "haive/cli-${request.taskRunId.value.filter { it.isLetterOrDigit() || it == '-' }.take(40)}-${UUID.randomUUID().toString().take(8)}"
+        val branch = "aive/cli-${request.taskRunId.value.filter { it.isLetterOrDigit() || it == '-' }.take(40)}-${UUID.randomUUID().toString().take(8)}"
         val worktree = File(Files.createTempDirectory(tempRoot.toPath(), "aive-cli-").toFile(), "tree")
         var committed = false
         try {
@@ -215,9 +215,9 @@ internal class CliAgentProvider(
                 if (changed.isNotEmpty()) {
                     git(worktree, "add", "-A")
                     val commit = git(
-                        worktree, "-c", "user.name=Haive", "-c", "user.email=haive@localhost", "-c", "commit.gpgsign=false",
+                        worktree, "-c", "user.name=Aive", "-c", "user.email=aive@localhost", "-c", "commit.gpgsign=false",
                         "commit", "--no-verify", "-m", "${spec.displayName}: ${request.objective.trim().lines().first().take(72)}",
-                        "-m", "Haive-Provider: ${id.value}\nHaive-Task-Run: ${request.taskRunId.value}",
+                        "-m", "Aive-Provider: ${id.value}\nAive-Task-Run: ${request.taskRunId.value}",
                     )
                     if (commit.exitCode != 0) return@channelFlow fail("Could not commit ${spec.displayName}'s changes: ${commit.stderr.text.take(300)}")
                     committed = true

@@ -47,7 +47,7 @@ class SetupFileTest {
 
         val target = InMemoryWorkflowPersistence()
         val targetSettings = InMemorySettings().apply {
-            putString("haive.workflows.authored.v1", "stale")
+            putString("aive.workflows.authored.v1", "stale")
             putString("unrelated.key", "kept")
         }
         val targetStore = FakeSecretStore()
@@ -114,6 +114,35 @@ class SetupFileTest {
         assertEquals("new", (pins.getValue("pkg.b") as JsonPrimitive).content)
         assertTrue("https://mine.test/v1" in requireNotNull(targetSettings.getStringOrNull(LLMS_KEY)))
         assertTrue(summary.skipped.any { "evil.test" in it })
+    }
+
+    @Test
+    fun aFileExportedByAnOlderBuildWithLegacyKeyNamesStillImportsUnderTheCurrentNames() = runBlocking {
+        // Legacy input names: setup files written by older builds used the retired `haive.` prefix.
+        val legacyPins = "haive.azphalt.publisher-pins.v1"
+        val legacyTerrarium = "haive.terrarium.layout.v1.0061.0062"
+        val targetSettings = InMemorySettings()
+
+        SetupFileTransfer(InMemoryWorkflowPersistence(), targetSettings).apply(
+            SetupFileContents(settings = mapOf(legacyPins to """{"pkg.b":"new"}""", legacyTerrarium to "1.0,2.0")),
+            SetupSecrets(),
+        )
+
+        val pins = Json.parseToJsonElement(requireNotNull(targetSettings.getStringOrNull(PINS_KEY))).jsonObject
+        assertEquals("new", (pins.getValue("pkg.b") as JsonPrimitive).content)
+        assertEquals("1.0,2.0", targetSettings.getStringOrNull(TERRARIUM_KEY))
+        assertNull(targetSettings.getStringOrNull(legacyPins))
+        assertNull(targetSettings.getStringOrNull(legacyTerrarium))
+    }
+
+    @Test
+    fun exportMigratesSettingsStillStoredUnderLegacyKeysAndNamesThemWithTheCurrentKeys() = runBlocking {
+        val settings = InMemorySettings().apply { putString("haive.azphalt.publisher-pins.v1", """{"pkg.a":"key-a"}""") }
+
+        val contents = SetupFileTransfer(InMemoryWorkflowPersistence(), settings).collect(crashReportingEnabled = null)
+
+        assertEquals("""{"pkg.a":"key-a"}""", contents.settings[PINS_KEY])
+        assertFalse(contents.settings.keys.any { it.startsWith("haive.") })
     }
 
     @Test
@@ -314,14 +343,14 @@ class SetupFileTest {
 
     private companion object {
         const val COMPUTE_JSON = """{"relayUrl":"https://relay.example.test","poolId":"p","nodeId":"n"}"""
-        const val COMPUTE_KEY = "haive.distributed-compute.configuration.v1"
-        const val PINS_KEY = "haive.azphalt.publisher-pins.v1"
+        const val COMPUTE_KEY = "aive.distributed-compute.configuration.v1"
+        const val PINS_KEY = "aive.azphalt.publisher-pins.v1"
         const val LLMS_KEY = "aive.azphalt.installed-llms.v1"
         const val PASSPHRASE = "correct horse battery staple"
         const val RUN_OBJECTIVE = "run objective that is history"
-        const val INFERENCE_KEY = "haive.inference.fabric.v1"
+        const val INFERENCE_KEY = "aive.inference.fabric.v1"
         const val INFERENCE_RECORD_MARKER = "inference-record-marker"
-        const val TERRARIUM_KEY = "haive.terrarium.layout.v1.0061.0062"
+        const val TERRARIUM_KEY = "aive.terrarium.layout.v1.0061.0062"
         const val UI_DRAFT_KEY = "aive.ui-state.v1"
         const val UI_DRAFT_VALUE = "half-typed draft"
     }

@@ -1,10 +1,10 @@
 (() => {
     const app = document.getElementById("webApp");
-    const splash = document.getElementById("haiveSplash");
+    const splash = document.getElementById("aiveSplash");
     if (!app || !splash) return;
 
     const dismissSplash = () => {
-        splash.classList.add("haive-splash-ready");
+        splash.classList.add("aive-splash-ready");
         window.setTimeout(() => splash.remove(), 220);
     };
 

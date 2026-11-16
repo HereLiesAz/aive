@@ -26,7 +26,7 @@ class AzphaltWorkflowPackageInstallerTest {
         val persistence = InMemoryWorkflowPersistence()
         val store = SettingsAzphaltInstallStore(MapSettings())
         val installer = installer(persistence, store)
-        val packageVerification = verification(packageFor(targetApps = listOf(HAIVE_AZPHALT_HOST_ID)))
+        val packageVerification = verification(packageFor(targetApps = listOf(AIVE_AZPHALT_HOST_ID)))
 
         val plan = installer.inspect(packageVerification)
 
@@ -48,6 +48,39 @@ class AzphaltWorkflowPackageInstallerTest {
         assertEquals(listOf("builder"), installed.roles.map { it.id.value })
         assertEquals(listOf("WorkflowRegister"), installed.approvedHostPermissions)
         assertEquals(installed, store.get("com.example.release"))
+    }
+
+    @Test
+    fun packageWrittenByAnOlderBuildWithTheLegacyHostIdAndFormatStillInstalls() = runBlocking {
+        val persistence = InMemoryWorkflowPersistence()
+        val installer = installer(persistence, SettingsAzphaltInstallStore(MapSettings()))
+        // Legacy input ids: an older app published packages targeting its previous host id and format.
+        val legacyPackage = packageFor(
+            targetApps = listOf(LEGACY_AZPHALT_HOST_ID),
+            workflowFormat = LEGACY_WORKFLOW_FORMAT,
+        )
+
+        val plan = installer.inspect(verification(legacyPackage))
+        installer.install(
+            plan = plan,
+            repositoryUrl = AZPHALT_STORE_URL,
+            approvedHostPermissions = setOf("WorkflowRegister"),
+            nowEpochMillis = 50L,
+        )
+
+        assertNotNull(persistence.definitions.get(WorkflowDefinitionId("release")))
+        assertEquals("aive.workflow.v1", AIVE_WORKFLOW_FORMAT)
+        assertEquals("haive.workflow.v1", LEGACY_WORKFLOW_FORMAT)
+    }
+
+    @Test
+    fun unknownWorkflowFormatIsStillRejected() = runBlocking {
+        val installer = installer(InMemoryWorkflowPersistence(), SettingsAzphaltInstallStore(MapSettings()))
+
+        assertFailsWith<IllegalArgumentException> {
+            installer.inspect(verification(packageFor(workflowFormat = "other.workflow.v9")))
+        }
+        Unit
     }
 
     @Test
@@ -243,6 +276,7 @@ class AzphaltWorkflowPackageInstallerTest {
         roleDefinition: RoleDefinition = role(),
         packageId: String = "com.example.release",
         definitionId: String = workflowDefinition.id.value,
+        workflowFormat: String = AIVE_WORKFLOW_FORMAT,
     ): VerifiedAzphaltPackage {
         val definition = if (workflowDefinition.id.value == definitionId) {
             workflowDefinition
@@ -266,7 +300,7 @@ class AzphaltWorkflowPackageInstallerTest {
                     rolePath to "sha256-role",
                 ),
                 workflow = AzphaltWorkflowManifest(
-                    format = HAIVE_WORKFLOW_FORMAT,
+                    format = workflowFormat,
                     definitions = listOf(AzphaltWorkflowPayloadEntry(definitionId, "Release", path = definitionPath)),
                     agents = listOf(AzphaltWorkflowAgentEntry("builder", "Builder", path = rolePath)),
                     hostPermissions = listOf("WorkflowRegister", "WorkflowLaunch"),

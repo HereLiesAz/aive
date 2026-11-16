@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.distributed
 
+import com.hereliesaz.geministrator.persistence.migrateLegacyKey
 import com.russhwolf.settings.Settings
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -40,6 +41,10 @@ class SettingsDistributedComputeConfigurationStore(
         ignoreUnknownKeys = true
     },
 ) : DistributedComputeConfigurationStore {
+    init {
+        settings.migrateLegacyKey(storageKey)
+    }
+
     override fun read(): DistributedComputeConfiguration {
         val encoded = settings.getStringOrNull(storageKey) ?: return DistributedComputeConfiguration()
         return runCatching {
@@ -59,7 +64,7 @@ class SettingsDistributedComputeConfigurationStore(
     }
 
     companion object {
-        const val DEFAULT_STORAGE_KEY: String = "haive.distributed-compute.configuration.v1"
+        const val DEFAULT_STORAGE_KEY: String = "aive.distributed-compute.configuration.v1"
     }
 }
 

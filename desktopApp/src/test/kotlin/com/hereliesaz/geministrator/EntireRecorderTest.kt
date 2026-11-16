@@ -38,7 +38,7 @@ class EntireRecorderTest {
             |    echo "attached" ;;
             |  "checkpoint explain")
             |    if [ "${'$'}3" = "--json" ]; then
-            |      printf '%s\n' '[{"checkpoint_id":"abc123def4567890","agent":"The Aive","date":"2026-10-01","message":"Haive: two\nbody"},{"checkpoint_id":"ffff0000","agent":"Claude Code","message":"m"}]'
+            |      printf '%s\n' '[{"checkpoint_id":"abc123def4567890","agent":"The Aive","date":"2026-10-01","message":"Aive: two\nbody"},{"checkpoint_id":"ffff0000","agent":"Claude Code","message":"m"}]'
             |    elif [ "${'$'}3" = "ffff0000" ]; then
             |      printf '# Checkpoint\n\n## Summary\n*Not generated yet*\n'
             |    else
@@ -131,7 +131,7 @@ class EntireRecorderTest {
         assertNull(checkpoints[1].summary, "an ungenerated summary is dropped")
         val context = assertNotNull(EntireRecorder(locate = { cli }, sessions = AiveEntireSessions(tmp)).checkpointContext(tmp))
         assertEquals(
-            "- abc123def456 (The Aive) Haive: two | asked: Make a.txt say two | did: Changed a.txt.\n- ffff0000 (Claude Code) m",
+            "- abc123def456 (The Aive) Aive: two | asked: Make a.txt say two | did: Changed a.txt.\n- ffff0000 (Claude Code) m",
             context,
         )
     }

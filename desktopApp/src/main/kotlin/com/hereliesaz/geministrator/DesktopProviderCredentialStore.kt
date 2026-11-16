@@ -5,11 +5,12 @@ import java.util.prefs.Preferences
 internal class DesktopProviderCredentialStore {
     // Preferences are used only for Windows DPAPI ciphertext and one-time migration of legacy
     // plaintext values written by older builds.
-    private val fallback = Preferences.userRoot().node(PREFERENCES_NODE)
+    private val fallback = LegacyDesktopNames.currentPreferencesNode(PREFERENCES_NODE)
 
     fun read(providerId: String): String? {
         if (!CredentialTool.isSafeAccountId(providerId)) return null
         val secure = readFromKeychain(providerId)
+            ?: migrateLegacyKeychain(providerId)
             ?: readWindowsDpapi(providerId)
         if (secure != null) return secure
         // A keyless link holds no secret, so it needs no keychain: it works where none exists.
@@ -62,11 +63,15 @@ internal class DesktopProviderCredentialStore {
     private companion object {
         fun keylessKey(providerId: String): String = "__keyless__:$providerId"
 
-        const val PREFERENCES_NODE = "com/hereliesaz/haive/provider-credentials"
-        const val KEYCHAIN_SERVICE = "com.hereliesaz.haive"
+        const val PREFERENCES_NODE = "com/hereliesaz/aive/provider-credentials"
+        const val KEYCHAIN_SERVICE = "com.hereliesaz.aive"
         const val DPAPI_PREFIX = "__dpapi__:"
 
         val os: String get() = System.getProperty("os.name", "").lowercase()
+
+        /** A key saved under the pre-rename keychain service moves to the current service, then the old entry goes. */
+        fun migrateLegacyKeychain(providerId: String): String? =
+            LegacyKeychain.migrate(KEYCHAIN_SERVICE, providerId) { writeToKeychain(providerId, it) }
 
         fun readFromKeychain(providerId: String): String? {
             val command = when {
@@ -103,7 +108,7 @@ internal class DesktopProviderCredentialStore {
                 os.contains("nux") || os.contains("nix") || os.contains("bsd") -> CredentialTool.run(
                     listOf(
                         "secret-tool", "store",
-                        "--label", "Haive API key ($providerId)",
+                        "--label", "Aive API key ($providerId)",
                         "service", KEYCHAIN_SERVICE,
                         "account", providerId,
                     ),

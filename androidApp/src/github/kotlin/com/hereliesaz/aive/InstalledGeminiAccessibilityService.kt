@@ -14,7 +14,7 @@ import android.view.accessibility.AccessibilityWindowInfo
 /**
  * Drives only the currently active installed-Gemini handoff.
  *
- * The service ignores every other package and every event while Haive has no pending bridge run.
+ * The service ignores every other package and every event while Aive has no pending bridge run.
  */
 class InstalledGeminiAccessibilityService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
@@ -219,7 +219,7 @@ class InstalledGeminiAccessibilityService : AccessibilityService() {
         field.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
         return runCatching {
             val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            clipboard.setPrimaryClip(ClipData.newPlainText("Haive Gemini prompt", text))
+            clipboard.setPrimaryClip(ClipData.newPlainText("Aive Gemini prompt", text))
             field.performAction(AccessibilityNodeInfo.ACTION_PASTE)
         }.getOrDefault(false)
     }

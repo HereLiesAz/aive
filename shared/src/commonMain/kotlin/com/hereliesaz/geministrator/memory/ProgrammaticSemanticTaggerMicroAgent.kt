@@ -7,7 +7,7 @@ import kotlin.time.ExperimentalTime
  * Deterministic fast path for the noun/entity and verb/action tagging stages.
  *
  * The epoch-8 specialist remains the fallback. We bypass it only when every item in the bounded
- * packet has strong technical evidence that Haive can extract mechanically. Natural language,
+ * packet has strong technical evidence that Aive can extract mechanically. Natural language,
  * proper names, ambiguous morphology, and mixed/partial packets continue through the trained
  * specialist rather than being guessed at by rules.
  */

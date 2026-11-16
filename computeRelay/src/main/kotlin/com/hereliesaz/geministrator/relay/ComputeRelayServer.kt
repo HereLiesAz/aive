@@ -420,13 +420,10 @@ fun Application.computeRelayModule(
 fun main() {
     val token = System.getenv("AIVE_RELAY_TOKEN")
         ?.takeIf(String::isNotBlank)
-        ?: System.getenv("HAIVE_RELAY_TOKEN")
-            ?.takeIf(String::isNotBlank)
-        ?: error("AIVE_RELAY_TOKEN is required (HAIVE_RELAY_TOKEN is accepted for compatibility)")
+        ?: error("AIVE_RELAY_TOKEN is required")
     val port = (
         System.getenv("PORT")
             ?: System.getenv("AIVE_RELAY_PORT")
-            ?: System.getenv("HAIVE_RELAY_PORT")
             ?: "8080"
         ).toInt()
     // Binds all interfaces by default because the relay normally runs in a container behind a
@@ -435,8 +432,6 @@ fun main() {
     val host = System.getenv("AIVE_RELAY_HOST")?.takeIf(String::isNotBlank) ?: "0.0.0.0"
     val stateDirectory = System.getenv("AIVE_RELAY_STATE_DIR")
         ?.takeIf(String::isNotBlank)
-        ?: System.getenv("HAIVE_RELAY_STATE_DIR")
-            ?.takeIf(String::isNotBlank)
     val stateStore = stateDirectory
         ?.let { EncryptedFileRelayStateStore(Path.of(it), token) }
         ?: NoopRelayStateStore

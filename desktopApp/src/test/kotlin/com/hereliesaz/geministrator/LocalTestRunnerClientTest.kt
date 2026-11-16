@@ -261,8 +261,8 @@ class LocalTestRunnerClientTest {
     @Test
     fun runsTheUpstreamCommitInAnIsolatedWorktree() = withFolder { folder ->
         git(folder, "init")
-        git(folder, "config", "user.email", "haive-test@example.invalid")
-        git(folder, "config", "user.name", "Haive Test")
+        git(folder, "config", "user.email", "aive-test@example.invalid")
+        git(folder, "config", "user.name", "Aive Test")
         script(folder, "check.sh", "exit 0\n")
         git(folder, "add", "check.sh")
         git(folder, "commit", "-m", "Passing check")
@@ -276,9 +276,9 @@ class LocalTestRunnerClientTest {
                 id = ArtifactId("code-change"),
                 kind = ArtifactKind.CodeChange,
                 taskRunId = TaskRunId("code-run"),
-                label = "Haive: change",
+                label = "Aive: change",
                 textContent = "diff",
-                metadata = mapOf("branch" to "haive/x", "headCommit" to commit),
+                metadata = mapOf("branch" to "aive/x", "headCommit" to commit),
                 createdAtEpochMillis = 1L,
             )
             val context = context(folder, upstreamArtifacts = listOf(upstream))
@@ -399,7 +399,7 @@ class LocalTestRunnerClientTest {
 
     private fun withFolder(block: (File) -> Unit) {
         if (windows) return
-        val folder = Files.createTempDirectory("haive-test-runner-test-").toFile()
+        val folder = Files.createTempDirectory("aive-test-runner-test-").toFile()
         try {
             block(folder)
         } finally {

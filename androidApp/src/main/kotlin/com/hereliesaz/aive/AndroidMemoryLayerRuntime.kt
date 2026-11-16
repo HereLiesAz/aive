@@ -69,7 +69,7 @@ internal data class InstalledMemoryModel(
 )
 
 /**
- * Memory models under files/haive/memory. An adapter clerk installs its family's shared base once
+ * Memory models under files/aive/memory. An adapter clerk installs its family's shared base once
  * (under `shared/`, verified by SHA-256) plus its own verified LoRA file (under `adapters/`); the base
  * is removed with the last adapter that runs on it.
  */
@@ -77,7 +77,8 @@ internal class AndroidMemoryModelInstaller(
     context: Context,
     private val httpClient: HttpClient,
 ) {
-    private val installRoot = File(context.filesDir, "haive/memory")
+    // Models downloaded by older builds sit under the legacy directory name; they are moved, not fetched again.
+    private val installRoot = LegacyFiles.adopt(context.filesDir, "aive/memory", "haive/memory")
     private val installedByArtifactId = ConcurrentHashMap<String, InstalledMemoryModel>()
     private val downloader = AndroidResumableFileDownloader(httpClient)
     private val mutex = Mutex()

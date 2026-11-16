@@ -55,7 +55,26 @@ internal object WebCredentialStore {
         window.localStorage.setItem(storageKey, stored)
     }
 
+    /**
+     * [read] for a key that older builds stored under the legacy `haive.` spelling: a value found only under the
+     * legacy key is opened with that key, re-sealed under [storageKey], and the legacy entry is removed.
+     */
+    suspend fun readMigrating(storageKey: String): String? {
+        read(storageKey)?.let { return it }
+        val legacyKey = legacyStorageKey(storageKey) ?: return null
+        val legacy = read(legacyKey) ?: return null
+        write(storageKey, legacy)
+        window.localStorage.removeItem(legacyKey)
+        return legacy
+    }
+
+    /** Removes the value under [storageKey], and under its legacy spelling so a cleared secret cannot return. */
     fun remove(storageKey: String) {
         window.localStorage.removeItem(storageKey)
+        legacyStorageKey(storageKey)?.let { window.localStorage.removeItem(it) }
     }
+
+    // Legacy input spelling: keys older builds used began with `haive.`; the current ones begin with `aive.`.
+    private fun legacyStorageKey(storageKey: String): String? =
+        if (storageKey.startsWith("aive.")) "haive." + storageKey.removePrefix("aive.") else null
 }
