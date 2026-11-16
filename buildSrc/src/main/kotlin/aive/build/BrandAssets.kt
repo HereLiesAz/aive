@@ -26,16 +26,16 @@ object BrandAssets {
     fun generateDesktop(source: File, outputDir: File) {
         val image = readSource(source)
         outputDir.mkdirs()
-        writePng(resize(image, 512), outputDir.resolve("haive-icon-color.png"))
-        writeIco(image, outputDir.resolve("haive-icon.ico"))
-        writeIcns(image, outputDir.resolve("haive-icon.icns"))
+        writePng(resize(image, 512), outputDir.resolve("aive-icon-color.png"))
+        writeIco(image, outputDir.resolve("aive-icon.ico"))
+        writeIcns(image, outputDir.resolve("aive-icon.icns"))
     }
 
     fun generateWeb(source: File, outputDir: File) {
         val image = readSource(source)
         outputDir.mkdirs()
         listOf(64, 192, 512).forEach { size ->
-            writePng(resize(image, size), outputDir.resolve("haive-icon-$size.png"))
+            writePng(resize(image, size), outputDir.resolve("aive-icon-$size.png"))
         }
     }
 
@@ -54,7 +54,7 @@ object BrandAssets {
         writePng(fitIntoCanvas(logo, width, height), outputDir.resolve(SPLASH_LOGO_FILE))
     }
 
-    const val SPLASH_LOGO_FILE: String = "haive_splash_logo.png"
+    const val SPLASH_LOGO_FILE: String = "aive_splash_logo.png"
 
     private fun readSource(source: File): BufferedImage {
         require(source.isFile) { "Brand source does not exist: ${source.absolutePath}" }
