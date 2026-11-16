@@ -967,6 +967,7 @@ class ApplicationRuntime private constructor(
                 requiredRoleAuthority = task.requiredRoleAuthority,
                 providerId = providerId,
                 providerCapabilities = capabilities,
+                stepEffects = task.contract?.effects.orEmpty(),
             ),
         )
         return when (eligibility) {

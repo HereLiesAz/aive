@@ -9,6 +9,7 @@ import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.RoleExecutionSource
 import com.hereliesaz.geministrator.domain.RoleSurface
 import com.hereliesaz.geministrator.domain.SpreadsheetSource
+import com.hereliesaz.geministrator.domain.StepEffect
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.persistence.InMemorySettings
@@ -31,6 +32,7 @@ class ProgressiveDelegationTest {
         requiredRoleAuthority: RoleAuthority? = null,
         capabilities: Set<AgentCapability>? = readOnly,
         tainted: Boolean = false,
+        stepEffects: Set<StepEffect> = emptySet(),
     ) = GateDelegationContext(
         gateKind = gateKind,
         executor = executor,
@@ -39,6 +41,7 @@ class ProgressiveDelegationTest {
         providerId = textProvider,
         providerCapabilities = capabilities,
         raisedByContextTaint = tainted,
+        stepEffects = stepEffects,
     )
 
     private fun key(): DelegationKey =
@@ -50,6 +53,44 @@ class ProgressiveDelegationTest {
         assertEquals(researcher.id.value, key.roleId)
         assertEquals(DelegableGateKind.PlanApproval, key.gateKind)
         assertEquals(textProvider.value, key.providerId)
+    }
+
+    @Test
+    fun aStepWithAnEffectOutsideTheAppIsNeverEligible() {
+        val effects = listOf(
+            setOf(StepEffect.LeavesDevice),
+            setOf(StepEffect.MutatesConnectedSource),
+            setOf(StepEffect.DestructiveConnectedSource),
+            setOf(StepEffect.WritesRepositoryBranch),
+            setOf(StepEffect.ReadsConnectedSource, StepEffect.LeavesDevice, StepEffect.MutatesConnectedSource),
+        )
+        effects.forEach { declared ->
+            assertIs<DelegationEligibility.Ineligible>(
+                DelegationPolicy.eligibility(context(stepEffects = declared)),
+                "$declared must always ask",
+            )
+        }
+    }
+
+    @Test
+    fun aStepWithNoEffectOrOnlyAReadStillMayBeDelegated() {
+        assertIs<DelegationEligibility.Eligible>(DelegationPolicy.eligibility(context(stepEffects = emptySet())))
+        assertIs<DelegationEligibility.Eligible>(DelegationPolicy.eligibility(context(stepEffects = setOf(StepEffect.None))))
+        assertIs<DelegationEligibility.Eligible>(
+            DelegationPolicy.eligibility(context(stepEffects = setOf(StepEffect.ReadsConnectedSource))),
+        )
+    }
+
+    @Test
+    fun anEffectfulStepNeverYieldsAKeyNoMatterHowManyApprovalsPrecededIt() {
+        // The same role and provider, delegated for plans, still gets no key for a sending step.
+        val planKey = key()
+        var state = ProgressiveDelegationState(threshold = 2)
+        repeat(50) { state = state.afterApproval(planKey, "Researcher") }
+        state = state.accept(planKey, 1L)
+        assertTrue(state.isDelegated(planKey))
+        val sending = DelegationPolicy.eligibility(context(stepEffects = setOf(StepEffect.LeavesDevice, StepEffect.MutatesConnectedSource)))
+        assertIs<DelegationEligibility.Ineligible>(sending)
     }
 
     @Test
