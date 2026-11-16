@@ -907,6 +907,8 @@ Use portable ONNX artifacts where supported by the current deployment manifests.
 
 Web requires WASM fallback. WebGPU is an optimization.
 
+The web app (Kotlin/Wasm, the only web target) has a browser ONNX runtime: `BrowserOrt.wasmJs.kt` (`BrowserOrtRuntime`, `BrowserOrtSession`, `BrowserOrtMemorySessionManager`, and the generative and embedding runtimes with the same adapter shape as desktop) over `webApp/src/webMain/resources/aive-ort.js`, which loads `onnxruntime-web/webgpu` on first use. A session asks ORT for `webgpu` then `wasm`; the model comes from a URL or from bytes. Tensors (float32, float64, int32, int64, uint8, int8, bool) cross the boundary as base64 inside JSON, so large outputs cost a copy; use the `fetches` list to bring back only the outputs a step needs. ORT Web does not say which provider ran, so a GPU session reports `SessionConfigured` and only a WASM-only run reports `ProfiledRun`. Single-threaded WASM only (multi-threading needs cross-origin isolation the page does not set). Nothing registers these runtimes with the memory layer yet and no web model artifact is bundled: a web model needs a `BrowserOrtArtifactResolver` entry and a model adapter. The wire format, provider order, error mapping and reports are unit-tested (`OrtWebTest`); loading ORT, WebGPU and running a real model in a browser have not been verified.
+
 Hardware selection is a runtime concern, not an artifact-family label. An ONNX model is not a CUDA, CoreML, QNN, or WebGPU model merely because one of those providers may execute it.
 
 ## Hardware execution policy

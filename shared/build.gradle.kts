@@ -109,6 +109,8 @@ kotlin {
         }
 
         getByName("wasmJsMain").dependencies {
+            // ONNX Runtime Web; webApp copies its dist files next to the bundle (generateWebOrtRuntime).
+            implementation(npm("onnxruntime-web", libs.versions.onnxruntime.web.get()))
             implementation(libs.sqldelight.web.worker.driver)
             implementation(npm("aive-memory-worker", memoryWorkerPackage))
         }

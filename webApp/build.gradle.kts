@@ -28,6 +28,35 @@ val generateWebBrandAssets = tasks.register("generateWebBrandAssets") {
     }
 }
 
+// ONNX Runtime Web is not bundled by webpack: its WebGPU build and the jsep .mjs/.wasm pair are copied
+// from the npm package into ort/ and loaded by aive-ort.js with a dynamic import. The package comes
+// from :shared's npm dependency, installed under the root project's build/wasm/node_modules.
+val generatedOrtWebDir = layout.buildDirectory.dir("generated/ort/web")
+val ortWebDistDir = rootProject.layout.buildDirectory.dir("wasm/node_modules/onnxruntime-web/dist")
+val ortWebFiles = listOf(
+    "ort.webgpu.min.mjs",
+    "ort-wasm-simd-threaded.jsep.mjs",
+    "ort-wasm-simd-threaded.jsep.wasm",
+)
+val generateWebOrtRuntime = tasks.register("generateWebOrtRuntime") {
+    inputs.property("onnxruntimeWebVersion", libs.versions.onnxruntime.web.get())
+    outputs.dir(generatedOrtWebDir)
+    dependsOn(rootProject.tasks.matching { it.name == "kotlinWasmNpmInstall" })
+    doLast {
+        val distDirectory = ortWebDistDir.get().asFile
+        val outputDirectory = generatedOrtWebDir.get().asFile.resolve("ort")
+        outputDirectory.deleteRecursively()
+        outputDirectory.mkdirs()
+        if (distDirectory.isDirectory) {
+            ortWebFiles.forEach { fileName ->
+                distDirectory.resolve(fileName).copyTo(outputDirectory.resolve(fileName), overwrite = true)
+            }
+        } else {
+            logger.warn("onnxruntime-web was not found at $distDirectory; the web app will ship without the ONNX runtime.")
+        }
+    }
+}
+
 kotlin {
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
@@ -51,6 +80,7 @@ kotlin {
         val webMain by creating {
             dependsOn(commonMain.get())
             resources.srcDir(generatedWebBrandDir.get().asFile)
+            resources.srcDir(generatedOrtWebDir.get().asFile)
         }
         wasmJsMain.get().apply {
             dependsOn(webMain)
@@ -66,7 +96,7 @@ tasks.matching { task ->
         task.name.contains("BrowserProductionWebpack") ||
         task.name.contains("BrowserDevelopmentWebpack")
 }.configureEach {
-    dependsOn(generateWebBrandAssets)
+    dependsOn(generateWebBrandAssets, generateWebOrtRuntime)
 
     if (name.contains("BrowserProductionWebpack") || name.contains("BrowserDevelopmentWebpack")) {
         doLast {
@@ -86,6 +116,7 @@ tasks.matching { task ->
 
             copy {
                 from(generatedWebBrandDir)
+                from(generatedOrtWebDir)
                 into(bundle.parentFile)
             }
 
