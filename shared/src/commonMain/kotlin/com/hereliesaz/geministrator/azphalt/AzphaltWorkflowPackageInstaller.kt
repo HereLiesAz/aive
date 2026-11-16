@@ -308,25 +308,6 @@ class AzphaltWorkflowPackageInstaller(
                 installReusableRoles(plan, previous)
             } else {
                 validateWorkflowLocalRoles(plan)
-                // Migrate packages installed by older builds: embedded workflow roles no longer
-                // belong in the user's global company roster.
-                val removableRoleIds = previous
-                    ?.takeIf { it.kind == "workflow" }
-                    ?.roles
-                    .orEmpty()
-                    .mapNotNull { previousRole ->
-                        val existing = persistence.roles.get(previousRole.id)
-                        previousRole.id.takeIf {
-                            existing != null && sameReusableRole(existing, previousRole)
-                        }
-                    }
-                    .toSet()
-                if (removableRoleIds.isNotEmpty()) {
-                    persistence.replaceCatalog(
-                        definitions = persistence.definitions.all(),
-                        roles = persistence.roles.all().filterNot { it.id in removableRoleIds },
-                    )
-                }
             }
 
             val installed = InstalledAzphaltWorkflowPackage(
