@@ -6,6 +6,8 @@ import com.hereliesaz.geministrator.domain.RoleAuthority
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.RoleExecutionSource
 import com.hereliesaz.geministrator.domain.RoleSurface
+import com.hereliesaz.geministrator.domain.StepEffect
+import com.hereliesaz.geministrator.domain.anyEffectful
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,7 +23,9 @@ import kotlinx.serialization.json.Json
  * once, to stop asking. Accepted, those gates approve themselves and say so in the run's events.
  *
  * Only [DelegationPolicy.eligibility] decides what may be delegated, and only a gate it calls
- * eligible ever yields a [DelegationKey]. Mutating gates (invariant 4: HumanApproval tasks,
+ * eligible ever yields a [DelegationKey]. Steps that declare an effect outside the app (sending,
+ * changing a connected source, pushing a diff) always ask the keeper, whatever the counter says.
+ * Mutating gates (invariant 4: HumanApproval tasks,
  * repository mutations, deployments, external writes, and gates raised by context taint) never do.
  */
 
@@ -57,6 +61,11 @@ data class GateDelegationContext(
     val providerCapabilities: Set<AgentCapability>?,
     /** The gate was raised because untrusted context reached the task. */
     val raisedByContextTaint: Boolean = false,
+    /**
+     * The effects the step declares (its contract's effects). Any effect that leaves the app (sends,
+     * changes a connected source, writes a branch, removes something) is never delegated.
+     */
+    val stepEffects: Set<StepEffect> = emptySet(),
 )
 
 sealed interface DelegationEligibility {
@@ -72,6 +81,9 @@ object DelegationPolicy {
      */
     fun eligibility(context: GateDelegationContext): DelegationEligibility {
         if (context.raisedByContextTaint) return DelegationEligibility.Ineligible("Raised by context taint")
+        if (context.stepEffects.anyEffectful()) {
+            return DelegationEligibility.Ineligible("Steps with an effect outside The Aive always ask the keeper")
+        }
         val kind = delegableKind(context.gateKind)
             ?: return DelegationEligibility.Ineligible("${context.gateKind} gates are never delegated")
         val roleId = when (val executor = context.executor) {

@@ -121,6 +121,8 @@ fun planInputsFingerprint(
     reviewer: RoleDefinition,
     /** The saved hive's rough design, when the plan is made from one: any change to it is a change to the inputs. */
     design: WorkflowDefinition? = null,
+    /** The keeper's instructions for the queen: a change to them is a change to the inputs. Left out when blank. */
+    queenInstructions: String = "",
 ): String {
     val element = buildJsonObject {
         put("version", PLAN_FINGERPRINT_VERSION)
@@ -135,6 +137,7 @@ fun planInputsFingerprint(
         )
         put("reviewer", canonical(fingerprintJson.encodeToJsonElement(RoleDefinition.serializer(), reviewer)))
         // Written in the order it was drawn: a design with a map keyed by a class encodes it as a flat array, whose pairs sorting would scramble.
+        if (queenInstructions.isNotBlank()) put("queenInstructions", queenInstructions.trim())
         put("design", design?.let { designJson.encodeToJsonElement(WorkflowDefinition.serializer(), it) } ?: JsonPrimitive(null as String?))
     }
     return Sha256.hex(element.toString().encodeToByteArray())

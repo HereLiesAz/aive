@@ -4,6 +4,7 @@ import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.releasedDependencies
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.promptInstructions
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRun
@@ -183,7 +184,7 @@ fun TaskExecutorContext.toAiveTaskEnvelope(
                 id = role.id.value,
                 name = role.name,
                 description = role.description,
-                instructions = if (redaction.redactRoleInstructions) "[REDACTED]" else role.instructions,
+                instructions = if (redaction.redactRoleInstructions) "[REDACTED]" else role.promptInstructions(),
                 requiredCapabilities = role.capabilitiesRequired.map { it.name }.sorted(),
                 authorities = role.authorities.map { it.name }.sorted(),
             )

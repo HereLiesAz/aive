@@ -92,7 +92,7 @@
     <string name="keeper_page_line">Sources, allowance, hosts, your data, routines and how it all looks.</string>
     <string name="keeper_ground_selected">Selected</string>
     <string name="keeper_delegations">Delegations</string>
-    <string name="keeper_delegations_lead">Gates you let a creature pass without asking you. Only gates that can't write, deploy or reach outside The Aive are ever offered.</string>
+    <string name="keeper_delegations_lead">Gates you let a creature pass without asking you. Only plans that can't write, deploy or reach outside The Aive are ever offered. Anything that sends, changes a source or acts outside The Aive always asks you, with what it would do in front of you.</string>
     <string name="delegation_offer_title">Let %1$s proceed without asking for %2$s?</string>
     <string name="delegation_offer_body">You approved it %1$d times in a row on %2$s, with no rejection. It can't write to a repository, deploy or write anywhere else, so these gates can pass on their own. Each one is still recorded as approved by delegation, and you can revoke this in the Keeper's room under Delegations.</string>
     <string name="delegation_offer_accept">Let it proceed</string>
@@ -1899,6 +1899,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="swarm_sqlite_document_uri">SQLite document URI</string>
     <string name="swarm_sqlite_query_result_available_to_scripts">SQLite query result available to scripts as aive.surfaces['%1$s'].</string>
     <string name="swarm_standing_instructions">Standing instructions</string>
+    <string name="swarm_keeper_instructions">Your instructions</string>
+    <string name="swarm_keeper_instructions_hint">How you like this creature's work done. It is added to every step it runs and can never turn off an approval, a budget or a permission.</string>
     <string name="swarm_surface_alias">Surface alias</string>
     <string name="swarm_surface_aliases_must_be_unique_and">Surface aliases must be unique and every attached surface needs a usable source/query/flowchart.</string>
     <string name="swarm_surfaces">\nSurfaces: </string>
