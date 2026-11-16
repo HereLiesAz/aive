@@ -171,7 +171,7 @@ Registered agent providers are built from the configured credentials:
 
 A provider may declare itself explicit-only (`AgentProvider.explicitOnly`): the registry then never selects it automatically, and it runs only as a role's preferred provider or when a task requires it by ID. Every selection asks `supportsRepository(repository)`, also when the run has no repository, so an agent that works only inside one (OpenCode on GitHub Actions) never gets repository-less work. `canStaff(required, repository)` answers the same question for planning: the planner's role list holds only roles some agent can take for that repository (all of them when none can, so the failure names the gap), and `WorkflowDefinitionPreparer` adds test-design steps only when some test-authoring role can be staffed. Provider-specific identifiers, payloads, credentials, and event schemas stay inside each adapter.
 
-Jules was removed in 0.9.6. Credential stores delete any Jules key they still hold (`ProviderCatalog.RETIRED_PROVIDER_IDS`).
+Jules was removed in 0.9.6.
 
 Remote A2A providers are discoverable in the read-only [Agent Directory](AGENT_DIRECTORY.md) on explicit user search. The public registry supplies *leads*, not authenticated identities or auto-routable providers; the keeper must separately connect and assign one. Agent Cards are re-read at invocation with same-origin restrictions and explicit-only provider routing. New providers implement the same neutral contracts without changing workflow semantics. Provider selection is only relevant to role-agent executors; system executors do not pass through the agent-provider registry.
 
