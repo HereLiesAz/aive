@@ -4,8 +4,15 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.60 — from 2026-10-27
 
+- Memory crash journal and schedules are stored in chunks (desktop Preferences reject values over 8,192 characters); a journal that cannot be read is kept aside, an over-limit capture drops its stale entry, journal write failures are logged, captures of sessions that end as Unknown are sent and released, and sent parts are trimmed.
+- Legacy key migration copies the older value over an empty default written before the migration ran, and keeps no stale copy.
+- Workflow store: a legacy Settings copy that was unreadable is retried on later starts (up to 5), migration failures are logged, and kept-aside corrupt rows are capped at 1,000.
+- Android: a copy installed from Google Play is told to update through Play instead of being offered the GitHub APK; the GitHub build tells you once if the older `com.hereliesaz.haive` app is installed (its data does not move; export a setup file from it first); legacy `haive.*` files are excluded from backup; a lost provider key asks you to reconnect instead of silently minting a new key.
+- Desktop: absent legacy keychain reads are cached for the session; workflow-store backups in `~/.aive` keep the newest 3 and are owner-only.
+- Relay: a phone that is thermally throttled (moderate or worse) or has a hot battery declines new relay jobs and logs why.
+- MCP stdio servers are sent `notifications/cancelled` when a request times out, and their last stderr output is added to exit errors; a schedule slot claimed but not started when the app closed is started once at the next launch within 30 minutes, or marked missed.
 - **The old name is gone from the code.** Identifiers, files, application IDs, build properties, the native library, environment variables and stored keys that carried the retired name now use "Aive". Nothing a keeper saved is lost: settings, stored keys and tokens, terrarium layouts, downloaded models and setup files written by older builds are moved or read under the new names, and packages published under the old host ID and formats still install. The GitHub-release Android build now uses `com.hereliesaz.aive`; installs made under the earlier application ID do not upgrade in place and must be installed fresh. The relay no longer reads the old `*_RELAY_*` environment variables.
-- README: Haive is no longer presented as a name for the app. The GitHub-build application ID `com.hereliesaz.haive` is described as the frozen identifier it is, and the build's signing variables are `AIVE_KEYSTORE_PATH`, `AIVE_KEYSTORE_TYPE` and `AIVE_VERSION_CODE`. Stored settings keys and file formats that begin `haive.` stay as they are, so saved data and packages keep working.
+- README: Haive is no longer presented as a name for the app. The GitHub-release and Google Play Android builds both use `com.hereliesaz.aive`, and the build's signing variables are `AIVE_KEYSTORE_PATH`, `AIVE_KEYSTORE_TYPE` and `AIVE_VERSION_CODE`. Stored settings keys that began `haive.` are read once under their new `aive.` names and then removed; setup files written by older builds still import.
 - Messages: the queen's links to a step (Open that step, and the other links that name a creature) now open it. The shell never handed Messages the way to open a creature, so they did nothing; that parameter is now required.
 - Android and the web app (PWA) use the desktop layouts on a desktop-class device: Android on a tablet or a Chromebook, and the web app (PWA) on a desktop or a tablet. They get the wide layouts from 600dp wide instead of 820dp; a phone keeps the phone layouts.
 - **Review follow-ups for the starting templates, memory capture, the queen's blockers and schedules.** A provider's generic text label now fits any text output; a step with no tools runs only on a provider that enforces that; bound input ports are named in a step's objective; a root step missing an input is held; memory captures move on only after they are queued and a keeper's message or answer is banked once the agent has it; a finished step answers one blocker; optional steps that time out are set aside; remote results are checked like local ones; schedules follow the device's own time offset; Clear all and import work on a bank that cannot be read. Nothing here adds a screen.
@@ -255,7 +262,7 @@ All notable changes to **The Aive** are documented here from the current product
 - Memory stages default to deterministic on-device clerks (no download) and can each be switched to a local model or a configured hosted provider; memory can be turned off or its consolidation paused.
 - Moved agent memory to SQLite (SQLDelight) with a one-time import of the older graph, and made memory commits, recall and association refresh substantially faster.
 - Added composable role execution/data surfaces: AI providers, GitHub Actions, isolated JavaScript, and GitHub-backed JavaScript/Python can share attached CSV/TSV/XLSX/public Google Sheets, SQLite query surfaces, and native Mermaid flowcharts; writable local spreadsheet/SQLite surfaces accept replay-safe script mutations.
-- Fixed Android upgrade continuity by restoring the GitHub APK lineage to its original `com.hereliesaz.haive` application ID while keeping Google Play on `com.hereliesaz.aive`.
+- Android upgrade continuity: the GitHub-release APK now uses `com.hereliesaz.aive`, the same application ID as Google Play. Installs made under the earlier `com.hereliesaz.haive` ID are a separate app to Android and do not upgrade in place; the new build says so once and points to the older app's settings.
 - Added durable write-through persistence for user drafts, navigation, appearance, workflow composition, company-role editing, project setup, artifact browsing, agent messages, compute settings, and add-on navigation.
 - Added portable `.ive` project save/load with detected-file lists and manual file selection on Android and Desktop.
 - Made saved Android provider keys, repository tokens, and compute relay tokens synchronously durable.
@@ -308,7 +315,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 - Product renamed from Geministrator to **The Aive**.
 - Repository renamed to `aive`.
-- Android namespace and Google Play application ID changed to `com.hereliesaz.aive`; GitHub releases keep `com.hereliesaz.haive` so existing installs upgrade in place.
+- Android namespace and the application ID of both the Google Play and the GitHub-release builds changed to `com.hereliesaz.aive`; GitHub installs made under `com.hereliesaz.haive` do not upgrade in place (see 0.60).
 - Progress is modeled as task-run execution data rather than agent-specific state.
 - `main` is the canonical product branch.
 
