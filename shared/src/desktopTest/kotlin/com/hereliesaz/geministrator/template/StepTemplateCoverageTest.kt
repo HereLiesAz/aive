@@ -118,7 +118,7 @@ class StepTemplateCoverageTest {
         val gates = steps.count { it.executor is TaskExecutor.HumanApproval }
         val withTemplate = steps.count { it.contract != null }
         assertEquals(steps.size - gates, withTemplate + StepTemplateAssignments.gaps.size)
-        assertTrue(packageWorkflows().size >= 66 && packageWorkflows().sumOf { it.tasks.size } >= 101)
+        assertTrue(packageWorkflows().size >= 63 && packageWorkflows().sumOf { it.tasks.size } >= 98)
     }
 
     @Test
@@ -147,8 +147,8 @@ class StepTemplateCoverageTest {
     }
 
     /**
-     * The 26 steps the Azphalt audit listed as gaps (change-code 10, render-image 5, fixed-format-result 3, render-video 2,
-     * compose-media 3, edit-audio 1, make-slides 1, localize-content 1; the style sheet's capped block has a template of
+     * The 24 steps the Azphalt audit listed as gaps (two more were packages since removed as duplicates of the built-in make-slides and localize-content templates) (change-code 10, render-image 5, fixed-format-result 3, render-video 2,
+     * compose-media 3, edit-audio 1; the style sheet's capped block has a template of
      * its own), each with the template it now starts from. A step that loses its contract fails here.
      */
     private val formerGaps: Map<String, String> = mapOf(
@@ -176,13 +176,11 @@ class StepTemplateCoverageTest {
         "paperplanes-stratified-reconstruction/paperplanes-stratified-reconstruction-task-3" to "compose-media",
         "paperplanes-stratified-reconstruction/paperplanes-stratified-reconstruction-task-4" to "compose-media",
         "podcast-production/podcast-production-task-1" to "edit-audio",
-        "presentation-production/presentation-production-task-1" to "make-slides",
-        "localization-release/localization-release-task-1" to "localize-content",
     )
 
     @Test
-    fun theTwentySixFormerGapsAreCoveredAndGuarded() {
-        assertEquals(26, formerGaps.size)
+    fun theTwentyFourFormerGapsAreCoveredAndGuarded() {
+        assertEquals(24, formerGaps.size)
         assertEquals(emptyMap<String, StepGap>(), StepTemplateAssignments.gaps)
         val tasks = allSwarms().flatMap { (key, definition) -> definition.tasks.map { "$key/${it.id.value}" to it } }.toMap()
         for ((step, templateId) in formerGaps) {
@@ -213,7 +211,7 @@ class StepTemplateCoverageTest {
 
     @Test
     fun everyPackageManifestMatchesItsFiles() {
-        assertTrue(packageDirs.size >= 78)
+        assertTrue(packageDirs.size >= 74)
         for (dir in packageDirs) {
             val manifest = json.parseToJsonElement(File(dir, "manifest.json").readText()).jsonObject
             assertTrue(Regex("""\d+\.\d+\.\d+""").matches(manifest.getValue("version").jsonPrimitive.content), dir.name)
