@@ -27,14 +27,14 @@ class MemoryCaptureJournalTest {
     )
 
     @Test
-    fun aJournalLargerThanThePreferencesLimitIsWrittenAndReadBack() = runBlocking {
+    fun aJournalLargerThanThePreferencesLimitIsWrittenAndReadBack() = runBlocking<Unit> {
         val journal = SettingsMemoryCaptureJournal(LimitedSettings())
         journal.record("a", envelope("a", "x".repeat(30_000)))
         assertEquals(30_000, journal.pending().getValue("a").parts.single().text.length)
     }
 
     @Test
-    fun aPlainValueAnOlderBuildWroteIsStillRead() = runBlocking {
+    fun aPlainValueAnOlderBuildWroteIsStillRead() = runBlocking<Unit> {
         val settings = MapSettings()
         val raw = MapSettings()
         val writer = SettingsMemoryCaptureJournal(raw, "aive.memory.capture-journal.v1")
@@ -45,7 +45,7 @@ class MemoryCaptureJournalTest {
     }
 
     @Test
-    fun aCorruptJournalIsKeptAsideAndDoesNotWipeTheNextWrite() = runBlocking {
+    fun aCorruptJournalIsKeptAsideAndDoesNotWipeTheNextWrite() = runBlocking<Unit> {
         val settings = MapSettings()
         settings.putString(SettingsMemoryCaptureJournal.DEFAULT_KEY, "{not json")
         val journal = SettingsMemoryCaptureJournal(settings)
@@ -58,7 +58,7 @@ class MemoryCaptureJournalTest {
     }
 
     @Test
-    fun anOverLimitWriteRemovesThatSessionsStaleEnvelopeButKeepsOthers() = runBlocking {
+    fun anOverLimitWriteRemovesThatSessionsStaleEnvelopeButKeepsOthers() = runBlocking<Unit> {
         val journal = SettingsMemoryCaptureJournal(MapSettings(), maxChars = 2_000)
         journal.record("a", envelope("a", "small"))
         journal.record("b", envelope("b", "other"))
