@@ -673,6 +673,7 @@ fun ControlRoom(
                 selectedTaskId = selectedTaskId,
                 onTaskSelected = selectCreature,
                 onOpenCreature = openCreature,
+                onOpenCreatureOn = openCreatureOn,
                 onLaunchWorkflow = onLaunchWorkflow,
                 onLoadLaunchableRuns = onLoadLaunchableRuns,
                 onApproveTask = onApproveTask,
@@ -1004,7 +1005,7 @@ private fun MainDestination(
     /** Opens a creature from a link: reopens a set-aside panel, never closes an open one. */
     onOpenCreature: (String) -> Unit,
     /** Opens a creature's panel on a given tab: where a question or a spent budget is resolved. */
-    onOpenCreatureOn: (String, CreatureTab) -> Unit = { _, _ -> },
+    onOpenCreatureOn: (String, CreatureTab) -> Unit,
     onLaunchWorkflow: (String, String, RepositoryRef?, List<WorkflowRunId>) -> Unit,
     onLoadLaunchableRuns: suspend () -> List<LaunchableRun> = { emptyList() },
     onApproveTask: (String) -> Unit,
