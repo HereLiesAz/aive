@@ -201,37 +201,6 @@ class WorkflowTerrariumTest {
         executor = TaskExecutor.RoleAgent(roleId),
     )
 
-    @Test
-    fun aQueenPositionSavedUnderTheLegacySubjectIdIsStillUsed() {
-        val task = agentTask(id = "implement", roleId = BuiltInRoles.ImplementationEngineer.id)
-        val definition = workflow(task)
-        // Legacy input id: layouts saved by older builds keyed the queen by this subject id.
-        val saved = H2g2TerrariumPosition(.31f, .27f)
-
-        val projection = projectWorkflowTerrarium(
-            definition = definition,
-            run = runFor(definition),
-            roles = listOf(BuiltInRoles.ImplementationEngineer),
-            persistedPositions = mapOf("__haive_orchestrator__" to saved),
-        )
-
-        assertEquals(saved, projection.subjects.single { it.node.id == TERRARIUM_ORCHESTRATOR_ID }.position)
-    }
-
-    @Test
-    fun terrariumLayoutSavedUnderLegacySettingsKeysIsMigratedWhenTheStoreOpens() {
-        val settings = MapSettings()
-        val definitionId = WorkflowDefinitionId("layout-migration")
-        val legacy = SettingsTerrariumLayoutStore(settings, "haive.terrarium.layout.v1")
-        legacy.put(definitionId, "task-a", H2g2TerrariumPosition(.2f, .4f))
-        assertTrue(settings.keys.all { it.startsWith("haive.") })
-
-        val current = SettingsTerrariumLayoutStore(settings)
-
-        assertEquals(H2g2TerrariumPosition(.2f, .4f), current.load(definitionId).getValue("task-a"))
-        assertTrue(settings.keys.none { it.startsWith("haive.") })
-    }
-
     private fun workflow(vararg tasks: TaskDefinition): WorkflowDefinition = WorkflowDefinition(
         id = WorkflowDefinitionId("terrarium-test"),
         name = "Terrarium test",

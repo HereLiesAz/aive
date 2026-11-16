@@ -46,7 +46,7 @@ internal class DesktopA2aServer(
     private val tokenStore: DesktopA2aServerTokenStore = DesktopA2aServerTokenStore(),
     /** The configured port; 0 picks a free one (tests). */
     val port: Int = configuredPort(),
-    preferencesNode: () -> Preferences = { LegacyDesktopNames.currentPreferencesNode(PREFERENCES_NODE) },
+    preferencesNode: () -> Preferences = { Preferences.userRoot().node(PREFERENCES_NODE) },
     /** This computer's IPv4 network addresses (not loopback, not link-local); replaced in tests. */
     private val networkAddresses: () -> List<String> = ::localNetworkAddresses,
 ) {
@@ -394,8 +394,6 @@ internal open class DesktopA2aServerTokenStore {
             else -> null
         }
         result?.takeIf { it.ok }?.output?.trim()?.takeIf(String::isNotEmpty)
-            // A token saved under the pre-rename keychain service moves to the current service, then the old entry goes.
-            ?: LegacyKeychain.migrate(SERVICE, ACCOUNT) { write(it) }
     }.getOrNull()
 
     /** True when the OS store holds [token] afterwards. */

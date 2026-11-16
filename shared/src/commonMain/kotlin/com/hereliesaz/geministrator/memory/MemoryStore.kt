@@ -1,6 +1,5 @@
 package com.hereliesaz.geministrator.memory
 
-import com.hereliesaz.geministrator.persistence.migrateLegacyKeysWithPrefix
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -105,7 +104,6 @@ class SettingsMemoryStore(
 
     init {
         require(compactEvery > 0)
-        settings.migrateLegacyKeysWithPrefix(storageKey)
     }
 
     override suspend fun read(): MemorySnapshot = mutex.withLock { loadUnlocked() }

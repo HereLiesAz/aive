@@ -22,7 +22,7 @@ internal class DesktopDistributedComputeCredentialStore(
     /** Whether the keeper has allowed the plaintext preferences file when no OS store works. Off by default. */
     private val allowPlaintextFallback: () -> Boolean = { plaintextFallbackAllowed() },
 ) {
-    private val fallback = LegacyDesktopNames.currentPreferencesNode(PREFERENCES_NODE)
+    private val fallback = Preferences.userRoot().node(PREFERENCES_NODE)
 
     /** The secret held only for this session when it could not be persisted. */
     @Volatile
@@ -41,15 +41,11 @@ internal class DesktopDistributedComputeCredentialStore(
         sessionSecret?.let { return StoredSecret.Found(it) }
         when (val stored = readFromKeychainState(account, windowsTokenFile(windowsFileName))) {
             is StoredSecret.Found, StoredSecret.Unreadable -> return stored
-            StoredSecret.Absent -> migrateLegacyKeychain()?.let { return StoredSecret.Found(it) }
+            StoredSecret.Absent -> Unit
         }
         return fallback.get(account, null)?.trim()?.takeIf(String::isNotEmpty)
             ?.let { StoredSecret.Found(it) } ?: StoredSecret.Absent
     }
-
-    /** A secret saved under the pre-rename keychain service moves to the current service, then the old entry goes. */
-    private fun migrateLegacyKeychain(): String? =
-        LegacyKeychain.migrate(KEYCHAIN_SERVICE, account) { writeToKeychain(it, account, windowsTokenFile(windowsFileName)) }
 
     fun writeToken(token: String) {
         val clean = token.trim()
@@ -243,11 +239,7 @@ internal class DesktopDistributedComputeCredentialStore(
                         "-a", account,
                     ),
                 )
-                os.contains("win") -> {
-                    tokenFile.delete()
-                    // Earlier builds wrote a Credential Manager entry that could never be read back.
-                    CredentialTool.run(CredentialTool.windowsCredentialDeleteCommand(KEYCHAIN_SERVICE, account))
-                }
+                os.contains("win") -> tokenFile.delete()
                 os.contains("nux") || os.contains("nix") || os.contains("bsd") -> CredentialTool.run(
                     listOf(
                         "secret-tool", "clear",

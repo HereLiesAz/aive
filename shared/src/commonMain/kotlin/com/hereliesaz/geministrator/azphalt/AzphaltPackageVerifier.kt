@@ -1,6 +1,5 @@
 package com.hereliesaz.geministrator.azphalt
 
-import com.hereliesaz.geministrator.persistence.migrateLegacyKey
 import com.hereliesaz.geministrator.Sha256
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.sync.Mutex
@@ -54,10 +53,6 @@ class SettingsAzphaltPublisherPinStore(
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) : AzphaltPublisherPinStore {
     private val mutex = Mutex()
-
-    init {
-        settings.migrateLegacyKey(storageKey)
-    }
 
     override suspend fun keyFor(packageId: String): String? = mutex.withLock { readUnlocked()[packageId] }
 

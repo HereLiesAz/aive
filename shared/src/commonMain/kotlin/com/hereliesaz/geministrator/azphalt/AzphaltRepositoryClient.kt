@@ -79,9 +79,8 @@ class AzphaltRepositoryClient(
             sort = sort,
             appId = null,
         )
-        val acceptedHostIds = setOf(hostAppId, LEGACY_AZPHALT_HOST_ID)
         val compatible = unscoped.packages.filter { summary ->
-            summary.targetApps.isEmpty() || summary.targetApps.any(acceptedHostIds::contains)
+            summary.targetApps.isEmpty() || hostAppId in summary.targetApps
         }
         return unscoped.copy(
             packages = compatible,

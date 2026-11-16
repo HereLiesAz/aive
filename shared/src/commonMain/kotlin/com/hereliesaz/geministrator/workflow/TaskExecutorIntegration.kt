@@ -369,7 +369,7 @@ private fun TaskExecutor.orchestrationOperationClass(): String = when (this) {
 private fun durableExecutorEvidenceRegistry(): InferenceDataRegistry {
     val settings = ChunkedStringSettings(
         delegate = Settings(),
-        chunkedKeys = com.hereliesaz.geministrator.persistence.chunkedKeysWithLegacy(
+        chunkedKeys = setOf(
             SettingsInferenceStateStore.DEFAULT_STORAGE_KEY,
             SettingsInferenceGenealogyGraph.DEFAULT_STORAGE_KEY,
         ),

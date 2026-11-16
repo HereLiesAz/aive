@@ -3,23 +3,14 @@ package com.hereliesaz.geministrator
 import java.util.prefs.Preferences
 
 internal class DesktopRepositoryCredentialStore {
-    // Preferences are used only for Windows DPAPI ciphertext and one-time migration of legacy
-    // plaintext values written by older builds.
-    private val fallback = LegacyDesktopNames.currentPreferencesNode(PREFERENCES_NODE)
+    // Preferences hold only Windows DPAPI ciphertext.
+    private val fallback = Preferences.userRoot().node(PREFERENCES_NODE)
 
     fun read(serviceId: String): String? {
         if (!CredentialTool.isSafeAccountId(serviceId)) return null
         val secure = readFromKeychain(serviceId)
-            ?: migrateLegacyKeychain(serviceId)
             ?: readWindowsDpapi(serviceId)
-        if (secure != null) return secure
-
-        val legacy = fallback.get(serviceId, null)?.trim()?.takeIf(String::isNotEmpty) ?: return null
-        fallback.remove(serviceId)
-        fallback.flush()
-        // Migrate plaintext only when a protected backend is available; otherwise force the user
-        // to reconnect rather than continuing to retain a bearer token in ordinary preferences.
-        return if (writeSecure(serviceId, legacy)) legacy else null
+        return secure
     }
 
     fun readAll(): Map<String, String> = buildMap {
@@ -54,10 +45,6 @@ internal class DesktopRepositoryCredentialStore {
         const val DPAPI_PREFIX = "__dpapi__:"
 
         val os: String get() = System.getProperty("os.name", "").lowercase()
-
-        /** A secret saved under the pre-rename keychain service moves to the current service, then the old entry goes. */
-        fun migrateLegacyKeychain(serviceId: String): String? =
-            LegacyKeychain.migrate(KEYCHAIN_SERVICE, serviceId) { writeToKeychain(serviceId, it) }
 
         fun readFromKeychain(serviceId: String): String? {
             val command = when {
@@ -164,10 +151,6 @@ internal class DesktopRepositoryCredentialStore {
                         "-s", KEYCHAIN_SERVICE,
                         "-a", serviceId,
                     ),
-                )
-                // Earlier builds wrote a Credential Manager entry; `cmdkey` runs directly, never through a shell.
-                os.contains("win") -> CredentialTool.run(
-                    CredentialTool.windowsCredentialDeleteCommand(KEYCHAIN_SERVICE, serviceId),
                 )
                 os.contains("nux") || os.contains("nix") || os.contains("bsd") -> CredentialTool.run(
                     listOf(

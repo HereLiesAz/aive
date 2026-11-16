@@ -27,9 +27,6 @@ import kotlin.math.max
 
 internal const val TERRARIUM_ORCHESTRATOR_ID: String = "__aive_orchestrator__"
 
-// Legacy input id: saved terrarium layouts from older builds recorded the queen's position under this subject id.
-private const val LEGACY_TERRARIUM_ORCHESTRATOR_ID: String = "__haive_orchestrator__"
-
 internal data class WorkflowTerrariumProjection(
     val subjects: List<H2g2TerrariumSubject>,
     val relationships: List<H2g2TerrariumRelationship>,
@@ -123,7 +120,6 @@ internal fun projectWorkflowTerrarium(
                         detail = "The Aive queen",
                     ),
                     position = persistedPositions[TERRARIUM_ORCHESTRATOR_ID]
-                        ?: persistedPositions[LEGACY_TERRARIUM_ORCHESTRATOR_ID]
                         ?: fallbackPositions.getValue(TERRARIUM_ORCHESTRATOR_ID),
                     identitySeed = "aive-orchestrator",
                     identityKind = H2g2SwarmIdentityKind.Orchestrator,

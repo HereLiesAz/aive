@@ -1,6 +1,5 @@
 package com.hereliesaz.geministrator.memory
 
-import com.hereliesaz.geministrator.persistence.migrateLegacyKeysWithPrefix
 import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.sync.Mutex
@@ -93,10 +92,6 @@ class MemoryLineage(
     private val key: String = "${SettingsMemoryStore.DEFAULT_STORAGE_KEY}.lineage",
 ) {
     private val settings: Settings? = settings?.let { ChunkedStringSettings.unbounded(it) }
-
-    init {
-        this.settings?.migrateLegacyKeysWithPrefix(key)
-    }
 
     private val mutex = Mutex()
     private var memoryOnly = MemoryLineageLog()

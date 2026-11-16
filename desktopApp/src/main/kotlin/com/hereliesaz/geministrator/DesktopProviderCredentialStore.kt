@@ -3,25 +3,17 @@ package com.hereliesaz.geministrator
 import java.util.prefs.Preferences
 
 internal class DesktopProviderCredentialStore {
-    // Preferences are used only for Windows DPAPI ciphertext and one-time migration of legacy
-    // plaintext values written by older builds.
-    private val fallback = LegacyDesktopNames.currentPreferencesNode(PREFERENCES_NODE)
+    // Preferences hold only Windows DPAPI ciphertext and the keyless marker.
+    private val fallback = Preferences.userRoot().node(PREFERENCES_NODE)
 
     fun read(providerId: String): String? {
         if (!CredentialTool.isSafeAccountId(providerId)) return null
         val secure = readFromKeychain(providerId)
-            ?: migrateLegacyKeychain(providerId)
             ?: readWindowsDpapi(providerId)
         if (secure != null) return secure
         // A keyless link holds no secret, so it needs no keychain: it works where none exists.
         if (fallback.get(keylessKey(providerId), null) != null) return ProviderCatalog.ANONYMOUS_CREDENTIAL
-
-        val legacy = fallback.get(providerId, null)?.trim()?.takeIf(String::isNotEmpty) ?: return null
-        fallback.remove(providerId)
-        fallback.flush()
-        // Migrate plaintext only when a protected backend is available; otherwise force the user
-        // to reconnect rather than continuing to retain a bearer token in ordinary preferences.
-        return if (writeSecure(providerId, legacy)) legacy else null
+        return null
     }
 
     fun readAll(): Map<String, String> = buildMap {
@@ -68,10 +60,6 @@ internal class DesktopProviderCredentialStore {
         const val DPAPI_PREFIX = "__dpapi__:"
 
         val os: String get() = System.getProperty("os.name", "").lowercase()
-
-        /** A key saved under the pre-rename keychain service moves to the current service, then the old entry goes. */
-        fun migrateLegacyKeychain(providerId: String): String? =
-            LegacyKeychain.migrate(KEYCHAIN_SERVICE, providerId) { writeToKeychain(providerId, it) }
 
         fun readFromKeychain(providerId: String): String? {
             val command = when {
@@ -178,10 +166,6 @@ internal class DesktopProviderCredentialStore {
                         "-s", KEYCHAIN_SERVICE,
                         "-a", providerId,
                     ),
-                )
-                // Earlier builds wrote a Credential Manager entry; `cmdkey` runs directly, never through a shell.
-                os.contains("win") -> CredentialTool.run(
-                    CredentialTool.windowsCredentialDeleteCommand(KEYCHAIN_SERVICE, providerId),
                 )
                 os.contains("nux") || os.contains("nix") || os.contains("bsd") -> CredentialTool.run(
                     listOf(

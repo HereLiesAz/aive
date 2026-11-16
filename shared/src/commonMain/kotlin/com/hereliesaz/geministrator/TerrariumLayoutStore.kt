@@ -1,6 +1,5 @@
 package com.hereliesaz.geministrator
 
-import com.hereliesaz.geministrator.persistence.migrateLegacyKeysWithPrefix
 import com.hereliesaz.conveyance.h2g2.H2g2TerrariumPosition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.russhwolf.settings.Settings
@@ -20,18 +19,8 @@ internal class SettingsTerrariumLayoutStore(
     private val settings: Settings,
     private val rootKey: String = DEFAULT_ROOT_KEY,
 ) : TerrariumLayoutStore {
-    init {
-        settings.migrateLegacyKeysWithPrefix(rootKey)
-    }
-
     override fun load(definitionId: WorkflowDefinitionId): Map<String, H2g2TerrariumPosition> {
         val result = linkedMapOf<String, H2g2TerrariumPosition>()
-        // Legacy keys encoded every character as four hex digits, which overflows Preferences' 80-char key limit.
-        val legacyPrefix = legacyDefinitionPrefix(definitionId)
-        settings.keys.filter { it.startsWith(legacyPrefix) }.forEach { key ->
-            val subjectId = key.removePrefix(legacyPrefix).fromSettingsKeyToken() ?: return@forEach
-            parse(settings.getStringOrNull(key))?.let { result[subjectId] = it }
-        }
         val prefix = definitionPrefix(definitionId)
         settings.keys.filter { it.startsWith(prefix) }.forEach { key ->
             // Value is "x,y,subjectId"; the key only carries a hash of the subject.
@@ -57,17 +46,13 @@ internal class SettingsTerrariumLayoutStore(
         position: H2g2TerrariumPosition,
     ) {
         val clamped = position.clamped()
-        settings.remove("${legacyDefinitionPrefix(definitionId)}${subjectId.toSettingsKeyToken()}")
         settings.putString(key(definitionId, subjectId), "${clamped.x},${clamped.y},$subjectId")
     }
 
     override fun clear(definitionId: WorkflowDefinitionId) {
-        val prefixes = listOf(definitionPrefix(definitionId), legacyDefinitionPrefix(definitionId))
-        settings.keys.filter { key -> prefixes.any(key::startsWith) }.forEach(settings::remove)
+        val prefix = definitionPrefix(definitionId)
+        settings.keys.filter { it.startsWith(prefix) }.forEach(settings::remove)
     }
-
-    private fun legacyDefinitionPrefix(definitionId: WorkflowDefinitionId): String =
-        "$rootKey.${definitionId.value.toSettingsKeyToken()}."
 
     private fun definitionPrefix(definitionId: WorkflowDefinitionId): String =
         "$rootKey.h.${hash(definitionId.value)}."
@@ -76,24 +61,6 @@ internal class SettingsTerrariumLayoutStore(
         "${definitionPrefix(definitionId)}${hash(subjectId)}"
 
     private fun hash(value: String): String = Sha256.hex(value.encodeToByteArray()).take(HASH_CHARS)
-
-    private fun String.toSettingsKeyToken(): String = buildString(length * 4) {
-        for (character in this@toSettingsKeyToken) {
-            append(character.code.toString(16).padStart(4, '0'))
-        }
-    }
-
-    private fun String.fromSettingsKeyToken(): String? {
-        if (length % 4 != 0) return null
-        return buildString(length / 4) {
-            var index = 0
-            while (index < this@fromSettingsKeyToken.length) {
-                val code = this@fromSettingsKeyToken.substring(index, index + 4).toIntOrNull(16) ?: return null
-                append(code.toChar())
-                index += 4
-            }
-        }
-    }
 
     companion object {
         private const val HASH_CHARS = 24

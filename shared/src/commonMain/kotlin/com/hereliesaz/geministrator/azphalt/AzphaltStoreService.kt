@@ -645,8 +645,7 @@ class AzphaltStoreService(
     }
 
     private fun requireTargetsAive(packageId: String, targetApps: List<String>) {
-        val accepted = ACCEPTED_AZPHALT_HOST_IDS
-        require(targetApps.isEmpty() || targetApps.any(accepted::contains)) {
+        require(targetApps.isEmpty() || AIVE_AZPHALT_HOST_ID in targetApps) {
             "Package $packageId does not target The Aive"
         }
     }

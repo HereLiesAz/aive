@@ -380,7 +380,7 @@ internal fun durableInferenceSettings(): Settings = chunkedInferenceSettings(Set
 
 internal fun chunkedInferenceSettings(delegate: Settings): Settings = ChunkedStringSettings(
     delegate = delegate,
-    chunkedKeys = com.hereliesaz.geministrator.persistence.chunkedKeysWithLegacy(
+    chunkedKeys = setOf(
         SettingsInferenceStateStore.DEFAULT_STORAGE_KEY,
         SettingsInferenceGenealogyGraph.DEFAULT_STORAGE_KEY,
     ),
