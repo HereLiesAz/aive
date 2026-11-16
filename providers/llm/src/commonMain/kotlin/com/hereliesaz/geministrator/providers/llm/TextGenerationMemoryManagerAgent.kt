@@ -158,7 +158,7 @@ private fun MemoryManagerProposal.toMutationBatch(
         }
         val relation = runCatching { MemoryRelationKind.valueOf(link.relation) }
             .getOrElse { error("Unknown memory relation ${link.relation}") }
-        // Supersedes, ResolvesConflict, ConflictsWith and the engine-owned relations are not the model's to write.
+        // Supersedes and the engine-owned relations are not the model's to write.
         require(relation in MODEL_WRITABLE_RELATIONS) { "The memory manager may not write ${relation.name}" }
         MemoryEdge(
             id = MemoryEdgeId("${packet.queueId.value}:${packet.stage.name}:${packet.packetKey}:edge:$index"),

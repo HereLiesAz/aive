@@ -12,7 +12,7 @@ const val MEMORY_VALID_UNTIL: String = "validUntil"
  * of its valid time is read from the deterministic `Supersedes` edges into it, at the superseding
  * version's valid-from (recorded on the edge as [MEMORY_VALID_UNTIL]).
  *
- * Only coverage supersession (condensation, and legacy edges without a basis) ends validity. A
+ * Only coverage supersession (condensation, and any edge without a basis) ends validity. A
  * deliberation's choice ([MemoryDeliberationAbsorber], basis `deliberation`) judges which version is
  * right, not when a fact stopped holding, so it ends nothing; nothing here decides truth.
  */

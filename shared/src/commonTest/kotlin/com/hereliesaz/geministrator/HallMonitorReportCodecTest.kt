@@ -13,7 +13,7 @@ import kotlin.test.assertEquals
 
 class HallMonitorReportCodecTest {
     @Test
-    fun acceptsRawAndLegacyFencedJson() {
+    fun acceptsRawAndFencedJson() {
         val report = sampleReport()
         val encoded = Json.encodeToString(HallMonitorReport.serializer(), report)
 

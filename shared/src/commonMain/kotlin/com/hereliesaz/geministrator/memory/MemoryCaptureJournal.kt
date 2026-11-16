@@ -28,7 +28,7 @@ interface MemoryCaptureJournal {
  * The journal in a platform [Settings], as one JSON map under [key]. A write that would take the whole
  * journal past [maxChars] drops that session's older entry rather than leaving it to be replayed stale, so the
  * journal cannot grow without bound. The value is chunked (desktop's Preferences reject a value over 8,192
- * characters) and a plain value an older build wrote under [key] is still read and then replaced.
+ * characters) and a plain value under [key] is still read and then replaced.
  */
 class SettingsMemoryCaptureJournal(
     settings: Settings,

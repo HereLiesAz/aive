@@ -153,10 +153,10 @@ internal class PlaceLinks(
  */
 internal fun PlaceLinks.openRoleAt(roleId: String, field: RoleField?): Boolean {
     val route = open
-    val legacy = openRole
+    val roleLink = openRole
     return when {
         route != null -> { route(Destination.Role(roleId, field)); true }
-        legacy != null -> { legacy(roleId); true }
+        roleLink != null -> { roleLink(roleId); true }
         else -> false
     }
 }

@@ -95,11 +95,4 @@ class CardFlipTest {
         assertFalse(creatureSheetAllowed(editing = true, flipped = false))
         assertTrue(creatureSheetAllowed(editing = true, flipped = true))
     }
-
-    @Test
-    fun aStoredFlowchartViewLandsOnEdit() {
-        assertTrue(migratedToEdit(storedFlowchartView = true, startInEdit = false))
-        assertFalse(migratedToEdit(storedFlowchartView = false, startInEdit = false))
-        assertTrue(migratedToEdit(storedFlowchartView = false, startInEdit = true))
-    }
 }

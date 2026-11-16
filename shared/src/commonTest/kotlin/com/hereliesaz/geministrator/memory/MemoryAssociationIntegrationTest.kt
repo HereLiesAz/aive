@@ -36,9 +36,12 @@ class MemoryAssociationIntegrationTest {
             relation = MemoryRelationKind.AssociatedWith,
             weight = weight,
             createdAtEpochMillis = createdAt,
-            // Deliberately omit evidenceFamily/evidencePolicy. The legacy-basis fallback must keep
-            // already-persisted temporal edges correct after this backend upgrade.
-            metadata = mapOf("basis" to basis, "deterministic" to "true"),
+            metadata = mapOf(
+                "basis" to basis,
+                "deterministic" to "true",
+                "evidenceFamily" to "temporal-co-bucket",
+                "evidencePolicy" to "latest",
+            ),
         )
 
         val rebucketedStore = InMemoryMemoryStore(

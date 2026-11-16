@@ -34,7 +34,7 @@ class MemoryCaptureJournalTest {
     }
 
     @Test
-    fun aPlainValueAnOlderBuildWroteIsStillRead() = runBlocking<Unit> {
+    fun aPlainValueUnderTheKeyIsStillRead() = runBlocking<Unit> {
         val settings = MapSettings()
         val raw = MapSettings()
         val writer = SettingsMemoryCaptureJournal(raw, "aive.memory.capture-journal.v1")

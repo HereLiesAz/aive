@@ -267,7 +267,7 @@ class MemoryBackendHardeningTest {
                         id = MemoryEdgeId("forbidden-conflict"),
                         from = nodes[0].id,
                         to = nodes[1].id,
-                        relation = MemoryRelationKind.ConflictsWith,
+                        relation = MemoryRelationKind.Diverges,
                         createdAtEpochMillis = 3L,
                     ),
                 ),

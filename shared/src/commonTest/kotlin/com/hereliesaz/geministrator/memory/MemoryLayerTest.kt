@@ -136,7 +136,7 @@ class MemoryLayerTest {
             MemoryEdge(MemoryEdgeId("e1"), phrase.id, context.id, MemoryRelationKind.Composes, createdAtEpochMillis = 2),
             MemoryEdge(MemoryEdgeId("e2"), summary.id, phrase.id, MemoryRelationKind.Summarizes, createdAtEpochMillis = 3),
             MemoryEdge(MemoryEdgeId("e3"), category.id, summary.id, MemoryRelationKind.Categorizes, createdAtEpochMillis = 5),
-            MemoryEdge(MemoryEdgeId("e4"), summary.id, conflicting.id, MemoryRelationKind.ConflictsWith, createdAtEpochMillis = 6),
+            MemoryEdge(MemoryEdgeId("e4"), summary.id, conflicting.id, MemoryRelationKind.Diverges, createdAtEpochMillis = 6),
         )
         val store = InMemoryMemoryStore()
         assertTrue(
