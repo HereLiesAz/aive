@@ -349,16 +349,14 @@ internal fun configuredWebRepositoryDiscovery(
 }
 
 private suspend fun readWebProviderCredentials(): Map<String, String> = buildMap {
-    // Providers the app no longer supports leave no credential behind ("aive.julesApiKey" included).
-    ProviderCatalog.RETIRED_PROVIDER_IDS.forEach { WebCredentialStore.remove(providerStorageKey(it)) }
     ProviderCatalog.entries.forEach { entry ->
-        WebCredentialStore.readMigrating(providerStorageKey(entry.id))?.let { put(entry.id, it) }
+        WebCredentialStore.read(providerStorageKey(entry.id))?.let { put(entry.id, it) }
     }
 }
 
 private suspend fun readWebRepositoryCredentials(): Map<String, String> = buildMap {
     RepositoryServiceCatalog.entries.forEach { entry ->
-        WebCredentialStore.readMigrating(repositoryStorageKey(entry.id))?.let { put(entry.id, it) }
+        WebCredentialStore.read(repositoryStorageKey(entry.id))?.let { put(entry.id, it) }
     }
 }
 

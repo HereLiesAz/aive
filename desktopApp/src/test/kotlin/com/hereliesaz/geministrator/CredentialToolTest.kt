@@ -59,7 +59,7 @@ class CredentialToolTest {
 
     @Test
     fun everyIdTheAppStoresIsAccepted() {
-        (ProviderCatalog.entries.map { it.id } + ProviderCatalog.RETIRED_PROVIDER_IDS + RepositoryServiceCatalog.entries.map { it.id })
+        (ProviderCatalog.entries.map { it.id } + RepositoryServiceCatalog.entries.map { it.id })
             .forEach { assertTrue(CredentialTool.isSafeAccountId(it), it) }
     }
 }

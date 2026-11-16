@@ -20,13 +20,6 @@ class ConfiguredAndroidProvidersTest {
     }
 
     @Test
-    fun retiredProviderCredentialConfiguresNothing() {
-        ProviderCatalog.RETIRED_PROVIDER_IDS.forEach { retired ->
-            assertTrue(configuredAndroidProviders(credentials = mapOf(retired to "key")).isEmpty())
-        }
-    }
-
-    @Test
     fun everyHostedCredentialConfiguresItsProvider() {
         HostedLlmProviders.entries.forEach { spec ->
             val providers = configuredAndroidProviders(

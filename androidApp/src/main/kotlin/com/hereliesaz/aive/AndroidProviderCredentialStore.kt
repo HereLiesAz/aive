@@ -52,7 +52,6 @@ internal class AndroidProviderCredentialStore(context: Context) {
     }
 
     fun readAll(): Map<String, String> = buildMap {
-        purgeRetired()
         ProviderCatalog.entries.forEach { entry ->
             read(entry.id)?.let { put(entry.id, it) }
         }
@@ -83,13 +82,6 @@ internal class AndroidProviderCredentialStore(context: Context) {
             .remove(ciphertextKey(providerId))
             .remove(ivKey(providerId))
             .commit()
-    }
-
-    /** Deletes credentials of providers the app no longer supports. */
-    private fun purgeRetired() {
-        ProviderCatalog.RETIRED_PROVIDER_IDS
-            .filter { preferences.contains(ciphertextKey(it)) || preferences.contains(ivKey(it)) }
-            .forEach(::clear)
     }
 
     private fun ciphertextKey(providerId: String) = "$providerId.ciphertext"
