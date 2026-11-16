@@ -275,7 +275,7 @@ Every workflow in `.github/workflows/` follows the `HereLiesAz/workflows` policy
   (Build and Deploy), `android-ci.yml`, `bitcos-engine.yml` and `dependency-submission.yml` run
   in this repository and declare themselves with the central `ci-report` action. Release
   semantics inside `multiplatform.yml` come only from the central `four-part-version` and
-  `patch-grouped-release` actions; the desktop installers take their version from the same
+  `minor-grouped-release` actions; the desktop installers take their version from the same
   central action through the `version` job. The signed GitHub APK is built here, but Google Play track publication is not in this repository:
   the central `android-play-release.yml` builds the `playRelease` bundle and publishes it to the
   internal track on every push to `main`.

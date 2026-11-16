@@ -72,8 +72,8 @@ build tags are also never moved.
 
 Version derivation and GitHub Release policy are owned by `HereLiesAz/workflows`, not by Aive-local
 shell logic. The shared `four-part-version` action replaces only BUILD with the GitHub Actions run
-number and exports the resulting version to build steps. The shared `patch-grouped-release` action
-owns exact-build tags, patch grouping, legacy release migration, collision checks, prerelease state,
+number and exports the resulting version to build steps. The shared `minor-grouped-release` action
+owns exact-build tags (best effort: GitHub refuses an Actions token creating a tag when workflow files changed since the last tag, which warns and does not block publishing), minor grouping (one GitHub Release per `MAJOR.MINOR`, e.g. `0.60`, holding every build's uniquely named assets without overwriting), legacy release migration, collision checks, prerelease state,
 and idempotent asset publication.
 
 Aive's workflow is responsible for producing and naming Aive-specific artifacts; it delegates

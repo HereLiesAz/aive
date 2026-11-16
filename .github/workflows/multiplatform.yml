@@ -3,7 +3,7 @@ name: Build and Deploy
 # Target-local CI under HereLiesAz/workflows policy: the build and installer jobs end with
 # the central ci-report action, which registers this workflow `local`, `ci: true`.
 # Version and tag/grouping policy come from the central actions (four-part-version,
-# patch-grouped-release); this file keeps only aive-specific build, verification and
+# minor-grouped-release); this file keeps only aive-specific build, verification and
 # packaging steps. The sideloaded GitHub APK is built and signed here (android-keystore action);
 # Google Play track publication runs centrally in HereLiesAz/workflows
 # (android-play-release.yml; tracker: .github/workflows/android-play-release.yml).
@@ -675,7 +675,7 @@ jobs:
 
       - name: Publish grouped patch release
         # HereLiesAz/workflows is owner-controlled and referenced at @main on purpose (docs/THREAT_MODEL.md, Accepted risks).
-        uses: HereLiesAz/workflows/.github/actions/patch-grouped-release@main
+        uses: HereLiesAz/workflows/.github/actions/minor-grouped-release@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           target-repository: ${{ github.repository }}
