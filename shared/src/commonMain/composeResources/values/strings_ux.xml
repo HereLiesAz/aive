@@ -124,10 +124,6 @@
     <string name="memory_default_provider">default source</string>
     <string name="memory_not_applied">Not applied: %1$s</string>
     <string name="memory_check_values">check the values</string>
-    <string name="memory_legacy_backup_note">The memory kept before per-swarm banks is still on this device as a backup. It holds every swarm’s history in one place that Forget, retention and Forget everything do not reach. Records listed in the migration report as drawn from several swarms exist only there.</string>
-    <string name="memory_legacy_backup_delete">Delete the old memory backup</string>
-    <string name="memory_legacy_deleted">The old memory backup was deleted.</string>
-    <string name="memory_legacy_not_deleted">The old memory backup was not deleted.</string>
     <string name="memory_not_deleted">Not deleted: %1$s</string>
     <string name="memory_unknown_error">unknown error</string>
     <string name="memory_give_reason">Give a reason first.</string>

@@ -167,16 +167,13 @@ fun main() {
     val memoryLineage = com.hereliesaz.geministrator.memory.MemoryLineage.createDefault()
     val memoryLayer = MemoryLayerController(
         // One SQLite database per workflow run's memory bank; lineage and projects in Settings.
-        banks = kotlinx.coroutines.runBlocking { desktopSqlMemoryBanks(memoryLineage) },
+        banks = desktopSqlMemoryBanks(),
         settingsStore = MemoryLayerSettingsStore.createDefault(),
         lineage = memoryLineage,
         procedureCatalog = com.hereliesaz.geministrator.memory.procedural.desktopSqlProcedureCatalog(memoryLineage),
         engineProvider = DesktopMemoryEngineProvider(memoryEngines, memoryModelInstaller, memorySessions),
         scope = memoryScope,
         localModels = DesktopMemoryLocalModels(memoryModelInstaller, memoryScope),
-        legacyBackup = com.hereliesaz.geministrator.memory.DesktopLegacyMemoryBackup(
-            java.io.File(java.io.File(System.getProperty("user.home"), ".aive/memory"), "memory.db"),
-        ),
     ).also { it.attach() }
     val entireRecorder = EntireRecorder()
     val desktopEntire = DesktopEntire()

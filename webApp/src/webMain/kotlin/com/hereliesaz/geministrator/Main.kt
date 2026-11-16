@@ -64,7 +64,7 @@ private fun prefersReducedMotion(): Boolean =
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
     AzphaltMotion.platformReduceMotion = shouldReduceMotion(animatorDurationScale = null, systemPrefersReduced = prefersReducedMotion())
-    // Memory in SQLite persisted in OPFS (opened in a worker; the old Settings log is imported once).
+    // Memory in SQLite persisted in OPFS (opened in a worker).
     // Programmatic stages by default; attached before App builds the runtime.
     val memoryEngines = HostedMemoryEngineProvider(MemoryMicroAgentPlatform.Web)
     val memoryScope = MainScope()
@@ -73,8 +73,7 @@ fun main() {
     // Dev-only: null unless on localhost with ?aiveMemoryDebug=… (see WebMemoryDebugHook).
     val memoryDebug = WebMemoryDebugHook.fromLocation(window.location.hostname, window.location.search)
     val memoryBanks = memoryScope.async {
-        memoryDebug?.beforeBanksOpen()
-        openWebMemoryBanks(memoryLineage) { reason -> println("Aive memory: SQLite unavailable ($reason)") }
+        openWebMemoryBanks { reason -> println("Aive memory: SQLite unavailable ($reason)") }
             .also { banks -> memoryDebug?.afterBanksOpen(banks) }
     }
     val memoryLayer = MemoryLayerController(

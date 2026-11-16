@@ -1,4 +1,4 @@
-// Browser check of per-bank memory workers and the one-time split of the old shared store.
+// Browser check of per-bank memory workers: one worker and one OPFS pool per bank, banks isolated and persistent.
 //
 // Serves a built web distribution on localhost and drives it in headless Chromium through the
 // dev-only `?aiveMemoryDebug=` hook (shared/src/webMain/.../memory/WebMemoryDebugHook.kt). No
@@ -75,7 +75,7 @@ async function visit(commands) {
     if (line) dump = JSON.parse(line.slice("AIVE_MEMORY_DEBUG ".length));
     else await page.waitForTimeout(250);
   }
-  const workers = await page.evaluate(() => self.__aiveWorkers.filter((w) => w.name === "" || w.name.startsWith("bank-")));
+  const workers = await page.evaluate(() => self.__aiveWorkers.filter((w) => w.name.startsWith("bank-")));
   const opfs = await page.evaluate(async () => {
     const names = [];
     for await (const name of (await navigator.storage.getDirectory()).keys()) names.push(name);
@@ -89,37 +89,31 @@ async function visit(commands) {
 const ids = (dump, workflow) => (dump?.banks?.[workflow]?.episodes ?? []).slice().sort();
 
 try {
-  // 1. First start with an old shared store: split once into two banks, each on its own worker.
-  const first = await visit("seed-legacy:one,dump");
+  // 1. First start: write one episode to each of two banks, each opened on its own worker.
+  const first = await visit("write:wf-a:one-a,write:wf-b:one-b,dump");
   check(first.dump !== null, `first start dumped memory (${first.logs.filter((l) => l.startsWith("AIVE")).join(" | ")})`);
   check(first.fallbacks.length === 0, `first start opened SQLite in OPFS without fallback ${JSON.stringify(first.fallbacks)}`);
   const stemA = first.dump?.banks?.["wf-a"]?.stem;
   const stemB = first.dump?.banks?.["wf-b"]?.stem;
   const names = first.workers.map((w) => w.name);
-  check(names.includes(""), "the old shared store was opened (unnamed worker) for the split");
   check(names.includes(`bank-${stemA}`) && names.includes(`bank-${stemB}`) && stemA !== stemB,
     `two bank workers bank-${stemA} and bank-${stemB} (workers: ${JSON.stringify(names)})`);
   check(first.opfs.some((n) => n.includes(stemA)) && first.opfs.some((n) => n.includes(stemB)),
     `one OPFS pool per bank (OPFS root: ${JSON.stringify(first.opfs)})`);
-  check(JSON.stringify(ids(first.dump, "wf-a")) === JSON.stringify(["legacy-one-a"]), `bank wf-a holds only its split episode ${JSON.stringify(ids(first.dump, "wf-a"))}`);
-  check(JSON.stringify(ids(first.dump, "wf-b")) === JSON.stringify(["legacy-one-b"]), `bank wf-b holds only its split episode ${JSON.stringify(ids(first.dump, "wf-b"))}`);
-  check(first.dump?.migration?.episodesPerWorkflow?.["wf-a"] === 1 && first.dump?.migration?.episodesPerWorkflow?.["wf-b"] === 1,
-    `split report recorded ${JSON.stringify(first.dump?.migration)}`);
+  check(JSON.stringify(ids(first.dump, "wf-a")) === JSON.stringify(["one-a"]), `bank wf-a holds only its own episode ${JSON.stringify(ids(first.dump, "wf-a"))}`);
+  check(JSON.stringify(ids(first.dump, "wf-b")) === JSON.stringify(["one-b"]), `bank wf-b holds only its own episode ${JSON.stringify(ids(first.dump, "wf-b"))}`);
 
-  // 2. Reload with more old-store data and a write to one bank: no second split, banks isolated.
-  const second = await visit("seed-legacy:two,write:wf-a:fresh-a,dump");
+  // 2. Reload with a write to one bank: banks stay isolated.
+  const second = await visit("write:wf-a:fresh-a,dump");
   check(second.dump !== null, "second start dumped memory");
   check(second.fallbacks.length === 0, `second start opened SQLite in OPFS without fallback ${JSON.stringify(second.fallbacks)}`);
-  check(!second.workers.some((w) => w.name === ""), `the old shared store was not opened again (workers: ${JSON.stringify(second.workers.map((w) => w.name))})`);
-  check(JSON.stringify(second.dump?.migration) === JSON.stringify(first.dump?.migration), "split report unchanged on reload");
-  check(JSON.stringify(ids(second.dump, "wf-a")) === JSON.stringify(["fresh-a", "legacy-one-a"]), `wf-a persisted its split episode and the new write ${JSON.stringify(ids(second.dump, "wf-a"))}`);
-  check(JSON.stringify(ids(second.dump, "wf-b")) === JSON.stringify(["legacy-one-b"]), `wf-b does not see wf-a's write ${JSON.stringify(ids(second.dump, "wf-b"))}`);
-  check(!JSON.stringify(second.dump).includes("legacy-two"), "old-store data added after the split was not re-split into banks");
+  check(JSON.stringify(ids(second.dump, "wf-a")) === JSON.stringify(["fresh-a", "one-a"]), `wf-a persisted its episode and the new write ${JSON.stringify(ids(second.dump, "wf-a"))}`);
+  check(JSON.stringify(ids(second.dump, "wf-b")) === JSON.stringify(["one-b"]), `wf-b does not see wf-a's write ${JSON.stringify(ids(second.dump, "wf-b"))}`);
 
   // 3. One more reload: the write survives, still only in its own bank.
   const third = await visit("dump");
-  check(JSON.stringify(ids(third.dump, "wf-a")) === JSON.stringify(["fresh-a", "legacy-one-a"]) &&
-    JSON.stringify(ids(third.dump, "wf-b")) === JSON.stringify(["legacy-one-b"]), "banks persist across a further reload");
+  check(JSON.stringify(ids(third.dump, "wf-a")) === JSON.stringify(["fresh-a", "one-a"]) &&
+    JSON.stringify(ids(third.dump, "wf-b")) === JSON.stringify(["one-b"]), "banks persist across a further reload");
 } finally {
   await context.close();
   server.close();
