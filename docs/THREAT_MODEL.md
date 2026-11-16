@@ -643,7 +643,7 @@ Invariant 4, together with the gate-decider, approval-policy and add-on permissi
 
 ### Accepted risks
 
-- The workflows under `.github/workflows/` consume the shared `HereLiesAz/workflows` actions (four-part-version, ci-report, patch-grouped-release) at `@main`. The owner made this deliberate decision because both repositories share one owner, so repinning them is the owner's call; it is recorded here as accepted, not as an item to fix. Third-party actions and the two vendored checkouts are pinned to full commit SHAs (see the README).
+- The workflows under `.github/workflows/` consume the shared `HereLiesAz/workflows` actions (four-part-version, ci-report, minor-grouped-release) at `@main`. The owner made this deliberate decision because both repositories share one owner, so repinning them is the owner's call; it is recorded here as accepted, not as an item to fix. Third-party actions and the two vendored checkouts are pinned to full commit SHAs (see the README).
 - The crash relay key ships in the APK. It is a spam filter, not an authentication secret.
 
 ## Scheduled launches
