@@ -23,7 +23,7 @@ private const val PUBLISHED_BRAND_PREFIX = "haive"
 
 /** The asset file name as already published remotely for a current catalog asset [name], or null when [name] has no alias. */
 fun publishedReleaseAssetName(name: String): String? =
-    if (RENAMED_ASSET_PREFIXES.any(name::startsWith)) PUBLISHED_BRAND_PREFIX + name.removePrefix("aive") else null
+    if (RENAMED_ASSET_PREFIXES.any { prefix -> name.startsWith(prefix) }) PUBLISHED_BRAND_PREFIX + name.removePrefix("aive") else null
 
 /** [url] with its asset name replaced by the already-published name, or null when the asset has no alias. */
 fun publishedReleaseAssetUrl(url: String): String? {
