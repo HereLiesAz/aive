@@ -28,6 +28,8 @@ data class PlanningRecord(
     val metByRules: Int = 0,
     /** Ideas beyond the requirements held for the next run. */
     val suggestions: Int = 0,
+    /** How many creatures the queen chose and any override by the keeper, as one Story sentence ([com.hereliesaz.geministrator.orchestration.PlanSizing.storyLine]); null in an older record. */
+    val sizeLine: String? = null,
 ) {
     /** One plain line for the Story. */
     fun storyLine(): String = buildString {
@@ -40,6 +42,7 @@ data class PlanningRecord(
         }
         append("; the rules met ").append(metByRules).append(" of ").append(checkedByRules)
         if (suggestions > 0) append("; ").append(suggestions).append(if (suggestions == 1) " idea" else " ideas").append(" kept for next time")
+        if (sizeLine != null) append(". ").append(sizeLine)
     }
 
     private fun sourceName(id: String?): String = id?.let { ProviderCatalog.entry(it)?.displayName ?: it } ?: "a Source the app chose"

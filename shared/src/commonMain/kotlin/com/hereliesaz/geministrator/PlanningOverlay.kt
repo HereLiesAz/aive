@@ -44,6 +44,7 @@ internal fun PlanningOverlay(
     decision: PlanDecision?,
     onStart: () -> Unit,
     onDecline: () -> Unit,
+    onResize: () -> Unit = {},
     stepRows: List<LiveStepRow>,
     maxRows: Int,
     modifier: Modifier = Modifier,
@@ -90,6 +91,7 @@ internal fun PlanningOverlay(
                         decision = decision,
                         onStart = onStart,
                         onDecline = onDecline,
+                        onResize = onResize,
                         modifier = Modifier.heightIn(max = 340.dp),
                     )
                 } else {

@@ -265,6 +265,10 @@ data class PlanDecision(
     val outcome: PlanReviewOutcome,
     /** Role id to the role's name, for the plan's steps. */
     val roleNames: Map<String, String> = emptyMap(),
+    /** How many creatures the plan has and why (shown on the card); null shows no size line. */
+    val size: PlanSize? = null,
+    /** Set by the card's "instead" button; read by the launch after the keeper's answer. Null when the card offers no such button. */
+    val resize: PlanResize? = null,
 )
 
 /** The review as short lines for a place with no room for the whole of it (the Draft box's notes). */

@@ -1456,6 +1456,7 @@ fun App(
                             decision = pending?.decision,
                             onStart = { pending?.answer?.complete(true) },
                             onDecline = { pending?.answer?.complete(false) },
+                            onResize = { pending?.answer?.complete(false) },
                             stepRows = launchStepRows,
                             maxRows = launchSteps.maxRows,
                         )
