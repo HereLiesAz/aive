@@ -140,3 +140,12 @@ The owner is the only user of The Aive until it is production ready. Nobody else
 - Never justify a change, a shim, a migration, a warning or a "kept for compatibility" decision by the existing installs of other people. They do not exist.
 - Do not add or keep backward-compatibility code, legacy-key migrations, old-package notices or accepted-legacy-format shims for the sake of existing users. When something old is in the way, remove it.
 - The only "user" to protect is the owner's own data on their own devices, and only when the owner asks.
+
+## Read the central workflows repo before touching CI, deploys or releases (2026-11-16)
+
+HereLiesAz/workflows owns every workflow family, every stored secret and every release rule. Owner correction, verbatim: "You need to read the workflows repo and follow the fucking rules."
+
+- Before adding or changing anything under `.github/workflows/`, or deploying or releasing anything, read `README.md`, `docs/WORKFLOW_POLICY.md` and the relevant central workflow header in HereLiesAz/workflows. Do not invent a local workflow.
+- A new target-repository workflow is rejected by sync unless it is admitted centrally (source SHA-256 in `scripts/semantic_catalog.py`, with a purpose profile where the central workflow takes one). Cloudflare, Play and signing keys live in the central repository, never in this one.
+- A pinned central action reference must be at or after the last change to the action (`test_play_publish_resilience.py`). Changing the action means repinning every central workflow that uses it in the same change.
+- When a sync has been failing, fix the sync first: a long-blocked sync regenerates stale registry sources when it finally runs.
