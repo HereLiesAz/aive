@@ -94,7 +94,7 @@ object TemplateGroups {
 
     private val placement: Map<String, Pair<TemplateGroup, Int>> by lazy {
         buildMap {
-            groups.forEach { g -> g.members.forEachIndexed { index, id -> putIfAbsent(id, g to index) } }
+            groups.forEach { g -> g.members.forEachIndexed { index, id -> if (id !in this) put(id, g to index) } }
         }
     }
 
