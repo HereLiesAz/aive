@@ -142,6 +142,10 @@ meta:
 SELECT value FROM meta WHERE key = ?;
 putMeta:
 INSERT OR REPLACE INTO meta(key, value) VALUES (?, ?);
+corruptMetaKeys:
+SELECT key FROM meta WHERE key LIKE 'corrupt:%' ORDER BY rowid;
+deleteMeta:
+DELETE FROM meta WHERE key = ?;
 
 -- Whole store
 clearProjects:
