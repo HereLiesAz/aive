@@ -61,7 +61,7 @@
     <string name="step_template_p_nanny_finding">Nanny finding</string>
     <string name="step_template_p_revision_proposal">Template or role revision</string>
     <string name="step_template_p_checklist">Checklist</string>
-    <string name="step_template_p_patch_draft">Patch draft</string>
+    <string name="step_template_p_patch_draft">Patch to review</string>
     <string name="step_template_p_image_brief">Image brief</string>
     <string name="step_template_p_audio_brief">Audio brief</string>
     <string name="step_template_p_video_brief">Video brief</string>

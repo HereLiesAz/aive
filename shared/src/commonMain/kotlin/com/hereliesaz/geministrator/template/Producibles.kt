@@ -468,7 +468,7 @@ object Producibles {
             "Whether it says what was asked and nothing else.",
         ),
         Producible(
-            "patch-draft", "Patch draft", "output-kinds", "patch-draft", "worker", true,
+            "patch-draft", "Patch to review", "output-kinds", "patch-draft", "worker", true,
             listOf("The diff makes the change described and no other.", "Every hunk matches the files given.", "No unrelated line is touched.", "It could be applied by a person who reads it."),
             "its compiled check on the output",
             "Whether it says what was asked and nothing else.",
