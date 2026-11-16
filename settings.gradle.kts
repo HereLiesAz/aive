@@ -13,13 +13,12 @@ plugins {
 // Dependency security floors (Guava, Jackson, BouncyCastle, ...) for every project: one script.
 apply(from = "gradle/security-floors.settings.gradle.kts")
 
-// Kotlin/JS/Wasm package tasks cannot safely traverse the nested composite
+// Kotlin/Wasm package tasks cannot safely traverse the nested composite
 // Aive -> H2G2 -> Conveyance. Production web tasks therefore resolve the exact Maven-local
 // publications prepared by CI. Android/Desktop and ordinary development keep compiling H2G2 source.
 val isolatedWebBuild = gradle.startParameter.taskNames.any { task ->
     task.startsWith(":webApp:") && (
-        task.contains("jsBrowser", ignoreCase = true) ||
-            task.contains("wasmJsBrowser", ignoreCase = true)
+        task.contains("wasmJsBrowser", ignoreCase = true)
         )
 }
 val useLocalH2g2 = providers.gradleProperty("aive.useLocalH2g2")

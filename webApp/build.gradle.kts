@@ -29,15 +29,6 @@ val generateWebBrandAssets = tasks.register("generateWebBrandAssets") {
 }
 
 kotlin {
-    js {
-        browser {
-            commonWebpackConfig {
-                outputFileName = "aive.js"
-            }
-        }
-        binaries.executable()
-    }
-
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
         browser {
@@ -61,12 +52,6 @@ kotlin {
             dependsOn(commonMain.get())
             resources.srcDir(generatedWebBrandDir.get().asFile)
         }
-        jsMain.get().apply {
-            dependsOn(webMain)
-            dependencies {
-                implementation(libs.ktor.client.js)
-            }
-        }
         wasmJsMain.get().apply {
             dependsOn(webMain)
             dependencies {
@@ -87,7 +72,6 @@ tasks.matching { task ->
         doLast {
             val targetDirectory = when {
                 name.startsWith("wasmJs") -> "wasmJs"
-                name.startsWith("js") -> "js"
                 else -> error("Unsupported web target: $name")
             }
             val executableDirectory = if (name.contains("Production")) {

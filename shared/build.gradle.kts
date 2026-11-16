@@ -52,10 +52,6 @@ kotlin {
         }
     }
 
-    js {
-        browser()
-    }
-
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
         browser()
@@ -110,12 +106,6 @@ kotlin {
             } else {
                 implementation(libs.onnxruntime.gpu)
             }
-        }
-
-        getByName("jsMain").dependencies {
-            implementation(npm("onnxruntime-web", libs.versions.onnxruntime.web.get()))
-            implementation(libs.sqldelight.web.worker.driver)
-            implementation(npm("aive-memory-worker", memoryWorkerPackage))
         }
 
         getByName("wasmJsMain").dependencies {
