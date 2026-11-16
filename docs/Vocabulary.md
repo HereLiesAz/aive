@@ -36,7 +36,7 @@ What the UI strings do today (audited, `values/*.xml`): no string says "breeding
 hatches, Nursery); no string uses "hive" for the workflow or "swarm" for the goal in a way that is plainly wrong. "Run"
 is still used as a noun for one execution of a swarm ("Stop run", "Past runs", "Run log", "The run could not start"),
 which is a different thing from the workflow; whether that noun should also give way to the verb form is left to the
-owner (see below) and nothing was changed.
+owner and nothing was changed.
 
 Settled earlier: the **keeper** is you; the **queen** is the planner that drafts a swarm for your approval. Settled
 now: a **swarm** is the workflow (the saved definition and its plan), a **hive** is the goal the keeper wants achieved
