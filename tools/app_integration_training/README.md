@@ -284,8 +284,12 @@ checked.
 
 1. Add a `GITHUB_TOKEN` secret (contents write on `HereLiesAz/aive`) under Add-ons, Secrets, with notebook
    access on. Only needed for `UPLOAD = True`.
-2. Check that the shared ONNX base `orchestration-base-v4` is published. If it is not, run
-   `tools/orchestration_training/notebooks/base.ipynb` once with `UPLOAD = True`.
+2. The shared ONNX base `orchestration-base-v4` is imported by the notebook, in this order: an attached Kaggle model;
+   the `hereliesaz/aive-orchestration-specialists` Kaggle model (needs `KAGGLE_KEY`, plus `KAGGLE_USERNAME` for a
+   legacy key, or `KAGGLE_API_TOKEN`); a Hugging Face repo, once you set `BASE_HF_REPO` (needs `HF_TOKEN`); then the
+   public GitHub release. The keys are read from the Colab or Kaggle secrets or the environment and are never
+   printed. A source that is missing a key, fails, or fails SHA-256 verification is reported and the next one is
+   tried. Only if none has it, run `tools/orchestration_training/notebooks/base.ipynb` once with `UPLOAD = True`.
 
 There is no corpus to build or upload by hand: the notebook builds it (stage 1 below).
 

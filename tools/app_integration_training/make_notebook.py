@@ -84,8 +84,10 @@ follows the corpus's contract. It does not prove the app benefits on a device.
    LiteRT-LM file, `catalog.json`, `results.json`).
 3. **Register**: the last cell prints the exact commands.
 
-The ONNX shared base (`orchestration-base-v4`) must already be published; if it is not, run
-`tools/orchestration_training/notebooks/base.ipynb` once with `UPLOAD = True`.
+The ONNX shared base (`orchestration-base-v4`) is imported, not built: the notebook tries an attached Kaggle model,
+then the `hereliesaz/aive-orchestration-specialists` Kaggle model (with `KAGGLE_KEY`, or `KAGGLE_API_TOKEN`, from your
+Colab or Kaggle secrets), then a Hugging Face repo if `BASE_HF_REPO` is set (with `HF_TOKEN`), then the public GitHub
+release. It verifies the SHA-256 against `base.json` and moves to the next source if one fails.
 
 ## Honest limits
 Nothing here has been measured on a phone. The corpus defines "works inside The Aive"; a model can pass
@@ -103,7 +105,7 @@ code("""
 # (litert-torch is installed later into its own virtual environment: it pulls its own torch and
 # would fight these pins.)
 %pip uninstall -y -q torchao diffusers
-%pip install -q "transformers>=4.45,<4.58" "peft>=0.13" "optimum[onnxruntime]>=1.23" onnx onnx_ir "onnxruntime>=1.22" requests
+%pip install -q "transformers>=4.45,<4.58" "peft>=0.13" "optimum[onnxruntime]>=1.23" onnx onnx_ir "onnxruntime>=1.22" "kagglehub>=1.0" requests
 """)
 
 code(r'''
@@ -136,6 +138,15 @@ CORPUS_DATASET = "hereliesaz/aive-app-integration-corpus"
 BASE_FAMILY, BASE_VERSION = "orchestration", "v4"
 BASE_RELEASE_TAG = f"{BASE_FAMILY}-base-{BASE_VERSION}"
 BASE_ARTIFACT_ID = f"{BASE_FAMILY}:base:{BASE_VERSION}:int8"
+# Where the base is imported from, tried in this order (each source needs its own key, read from the Colab or
+# Kaggle secrets or the environment; the GitHub release needs none and is the last resort):
+#   1. a Kaggle model attached to this notebook (/kaggle/input),
+#   2. the Kaggle model below, with KAGGLE_KEY (and KAGGLE_USERNAME for a legacy key) or KAGGLE_API_TOKEN,
+#   3. a Hugging Face repo, with HF_TOKEN or HUGGING_FACE_HUB_TOKEN (BASE_HF_REPO is None until you set one:
+#      the files are base.json and the archive it names),
+#   4. the public GitHub release BASE_RELEASE_TAG.
+KAGGLE_BASE_HANDLE = "hereliesaz/aive-orchestration-specialists/onnx/base"   # the orchestration base notebook mirrors here
+BASE_HF_REPO = None                  # e.g. "HereLiesAz/aive-orchestration-base"; None skips Hugging Face
 ADAPTER_FILE = f"aive-app-integration-lora-{VERSION}.safetensors"
 LITERTLM_FILE = f"Qwen2.5-0.5B-Instruct-aive-app-integration_multi-prefill-seq_q8_ekv1280-{VERSION}"  # + extension
 
@@ -885,23 +896,84 @@ def check_base(raw, archive):
     assert sha256(archive) == base["sha256"], f"{archive} does not match its base.json"
     return data, raw, archive
 
-def published_base(into):
-    # The published base as (base.json, its exact bytes, verified archive): from an attached Kaggle model
-    # when there is one, else downloaded from the GitHub release into [into]. None when not published.
-    import urllib.request
-    attached = Path("/kaggle/input")
-    for manifest in attached.rglob("base.json") if attached.exists() else []:
+def secret(name):
+    """A key from the environment, Kaggle secrets or Colab secrets, whichever this runs on. Never printed."""
+    value = (os.environ.get(name) or "").strip()
+    if value:
+        return value
+    if on_kaggle():
+        try:
+            from kaggle_secrets import UserSecretsClient
+            return (UserSecretsClient().get_secret(name) or "").strip() or None
+        except Exception:
+            return None
+    if on_colab():
+        try:
+            from google.colab import userdata
+            return (userdata.get(name) or "").strip() or None
+        except Exception:
+            return None
+    return None
+
+def base_in(directory):
+    """(base.json, its exact bytes, verified archive) when [directory] holds the base this adapter needs, else None."""
+    for manifest in sorted(Path(directory).rglob("base.json")):
         raw = manifest.read_bytes()
         base = json.loads(raw).get("base", {})
         archive = manifest.parent / base.get("assetName", "")
         if base.get("logicalArtifactId") == BASE_ARTIFACT_ID and archive.is_file():
-            print("base from attached Kaggle model:", manifest.parent)
             return check_base(raw, archive)
+    return None
+
+def base_from_kaggle():
+    """The base from the Kaggle model mirror, with the Kaggle key. None without a key or on any failure (printed, no key shown)."""
+    key = secret("KAGGLE_KEY") or secret("KAGGLE_API_TOKEN")
+    if not key:
+        print("Kaggle: no KAGGLE_KEY or KAGGLE_API_TOKEN secret; skipping the Kaggle model")
+        return None
+    try:
+        import kagglehub
+        from kagglehub import config
+        if re.fullmatch(r"[0-9a-f]{32}", key):
+            config.set_kaggle_credentials(secret("KAGGLE_USERNAME") or KAGGLE_BASE_HANDLE.split("/")[0], key)
+        else:
+            config.set_kaggle_api_token(key)
+        directory = Path(kagglehub.model_download(KAGGLE_BASE_HANDLE))
+        found = base_in(directory)
+        if found:
+            print("base from Kaggle model", KAGGLE_BASE_HANDLE)
+        else:
+            print(f"Kaggle model {KAGGLE_BASE_HANDLE} downloaded but holds no base.json for {BASE_ARTIFACT_ID}")
+        return found
+    except Exception as failure:
+        print(f"Kaggle model {KAGGLE_BASE_HANDLE} unavailable: {type(failure).__name__}: {str(failure)[:200]}")
+        return None
+
+def base_from_huggingface():
+    """The base from BASE_HF_REPO, with HF_TOKEN. None when no repo is set or on any failure."""
+    if not BASE_HF_REPO:
+        return None
+    try:
+        from huggingface_hub import snapshot_download
+        token = secret("HF_TOKEN") or secret("HUGGING_FACE_HUB_TOKEN")
+        directory = snapshot_download(repo_id=BASE_HF_REPO, token=token, allow_patterns=["base.json", "*.tar.gz"])
+        found = base_in(directory)
+        if found:
+            print("base from Hugging Face", BASE_HF_REPO)
+        else:
+            print(f"Hugging Face {BASE_HF_REPO} downloaded but holds no base.json for {BASE_ARTIFACT_ID}")
+        return found
+    except Exception as failure:
+        print(f"Hugging Face {BASE_HF_REPO} unavailable: {type(failure).__name__}: {str(failure)[:200]}")
+        return None
+
+def base_from_github(into):
+    import urllib.request
     url = f"https://github.com/{RELEASE_REPOSITORY}/releases/download/{BASE_RELEASE_TAG}"
     try:
         raw = urllib.request.urlopen(f"{url}/base.json", timeout=60).read()
     except Exception as failure:
-        print(f"{BASE_RELEASE_TAG}/base.json is not available: {failure}")
+        print(f"{BASE_RELEASE_TAG}/base.json is not available from GitHub: {failure}")
         return None
     base = json.loads(raw)["base"]
     into.mkdir(parents=True, exist_ok=True)
@@ -911,6 +983,25 @@ def published_base(into):
             shutil.copyfileobj(response, out, 8 << 20)
     print("base from GitHub release", BASE_RELEASE_TAG)
     return check_base(raw, archive)
+
+def published_base(into):
+    # The published base as (base.json, its exact bytes, verified archive), from the first source that has it:
+    # an attached Kaggle model, the Kaggle model mirror, Hugging Face (when BASE_HF_REPO is set), the GitHub
+    # release. A source that fails or fails verification is reported and the next one is tried. None when no
+    # source has it.
+    attached = Path("/kaggle/input")
+    sources = ([("attached Kaggle model", lambda: base_in(attached))] if attached.exists() else []) + [
+        ("Kaggle model", base_from_kaggle), ("Hugging Face", base_from_huggingface),
+        ("GitHub release", lambda: base_from_github(into))]
+    for name, source in sources:
+        try:
+            found = source()
+        except AssertionError as failure:
+            print(f"{name} has a base that fails verification, trying the next source: {failure}")
+            continue
+        if found:
+            return found
+    return None
 
 def fetch_base():
     """The published shared base this adapter runs on: verified and unpacked once."""
@@ -924,8 +1015,10 @@ def fetch_base():
     found = published_base(root)
     if found is None:
         raise RuntimeError(
-            f"{BASE_RELEASE_TAG} is not published. Run tools/orchestration_training/notebooks/base.ipynb with "
-            "UPLOAD = True first, or attach its Kaggle model. (Or set EXPORT_ONNX = False to skip this export.)")
+            f"No source had the ONNX base {BASE_ARTIFACT_ID} (the lines above say why for each: attached Kaggle model, "
+            f"Kaggle model {KAGGLE_BASE_HANDLE}, Hugging Face {BASE_HF_REPO}, GitHub release {BASE_RELEASE_TAG}). Check the "
+            "KAGGLE_KEY / HF_TOKEN secrets have notebook access, or run tools/orchestration_training/notebooks/base.ipynb "
+            "with UPLOAD = True. (Or set EXPORT_ONNX = False to skip this export.)")
     data, raw, archive = found
     shutil.rmtree(int8, ignore_errors=True)
     with tarfile.open(archive) as tar:
