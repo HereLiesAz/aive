@@ -129,24 +129,91 @@ class RegisterCatalogTest(unittest.TestCase):
             ids,
         )
 
+    def _write_kotlin(self, root, existing):
+        kotlin = root / "OrchestrationSpecialistCatalog.kt"
+        kotlin.write_text(
+            'object OrchestrationSpecialistCatalog {\n'
+            + register_catalog.BEGIN
+            + '    const val RELEASED: String = """'
+            + json.dumps(existing, separators=(",", ":"))
+            + '"""\n'
+            + register_catalog.END
+            + '}\n'
+        )
+        return kotlin
+
+    def _app_entry(self, tag="app-integration-v1", sha_letter="a"):
+        base = descriptor("orchestration:base:v4:int8", tag, kind="SharedBase")
+        adapter = descriptor("app-integration:assistant:lora", tag, kind="Adapter", fmt="safetensors", adapter_id="app-integration-v1")
+        adapter["sha256"] = sha_letter * 64
+        adapter["sizeBytes"] = 18874368
+        return {
+            "specialistId": "app-integration:assistant",
+            "scores": {"gate1": {"F1": 0.97}, "gate2": {"F1": 0.95}},
+            "sharedBaseVariants": [base],
+            "adapter": adapter,
+        }
+
     def test_refuses_a_specialist_the_app_catalog_cannot_read(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            kotlin = root / "OrchestrationSpecialistCatalog.kt"
-            original = (
-                'object OrchestrationSpecialistCatalog {\n'
-                + register_catalog.BEGIN
-                + '    const val RELEASED: String = """{"specialists":[]}"""\n'
-                + register_catalog.END
-                + '}\n'
-            )
-            kotlin.write_text(original)
+            kotlin = self._write_kotlin(root, {"specialists": []})
+            original = kotlin.read_text()
             incoming = root / "catalog.json"
-            incoming.write_text(json.dumps({"specialists": [{"specialistId": "app-integration:assistant"}]}))
+            # An unknown id is refused even next to the app-integration one; nothing is written.
+            incoming.write_text(json.dumps({"specialists": [
+                self._app_entry(),
+                {"specialistId": "memory:noun-tagger"},
+            ]}))
             with self.assertRaises(SystemExit) as raised:
                 register_catalog.register(incoming, kotlin)
-            self.assertIn("app-integration:assistant", str(raised.exception))
+            self.assertIn("memory:noun-tagger", str(raised.exception))
             self.assertEqual(original, kotlin.read_text())
+
+    def test_registers_the_app_integration_adapter_in_its_own_field(self):
+        existing = {"specialists": [{"specialistId": "orchestration:agent-router", "mergedVariants": [descriptor("orchestration:utilities:v1:int8", "orchestration-utilities-v1")]}]}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            kotlin = self._write_kotlin(root, existing)
+            incoming = root / "catalog.json"
+            # The shape the notebook writes: the entry sits in `specialists`, with scores and the adapter's size.
+            incoming.write_text(json.dumps({"releaseRepository": "HereLiesAz/aive", "releaseTag": "app-integration-v1", "specialists": [self._app_entry()]}))
+            merged = register_catalog.register(incoming, kotlin)
+
+            self.assertEqual(["orchestration:agent-router"], [e["specialistId"] for e in merged["specialists"]])
+            app = merged["appIntegration"]
+            self.assertEqual("app-integration:assistant", app["specialistId"])
+            self.assertEqual(18874368, app["adapter"]["sizeBytes"])
+            self.assertEqual({"F1": 0.97}, app["scores"]["gate1"])
+            self.assertEqual("orchestration:base:v4:int8", app["sharedBaseVariants"][0]["logicalArtifactId"])
+            # What was written into the Kotlin constant is the merged catalog, readable again.
+            self.assertEqual(merged, register_catalog.current_catalog(kotlin.read_text()))
+
+            # An orchestration-only release keeps the adapter; a newer adapter release replaces it whole.
+            incoming.write_text(json.dumps({"specialists": [{"specialistId": "orchestration:tool-router", "mergedVariants": [descriptor("orchestration:tool:v3:int8", "orchestration-utilities-v3")]}]}))
+            kept = register_catalog.register(incoming, kotlin)
+            self.assertEqual("a" * 64, kept["appIntegration"]["adapter"]["sha256"])
+            incoming.write_text(json.dumps({"specialists": [self._app_entry(tag="app-integration-v2", sha_letter="b")]}))
+            replaced = register_catalog.register(incoming, kotlin)
+            self.assertEqual("b" * 64, replaced["appIntegration"]["adapter"]["sha256"])
+            self.assertEqual(2, len(replaced["specialists"]))
+
+    def test_refuses_an_app_integration_entry_without_an_adapter_or_with_a_bad_digest(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            kotlin = self._write_kotlin(root, {"specialists": []})
+            original = kotlin.read_text()
+            incoming = root / "catalog.json"
+            entry = self._app_entry()
+            no_adapter = dict(entry)
+            del no_adapter["adapter"]
+            bad = self._app_entry()
+            bad["adapter"]["sha256"] = "XYZ"
+            for value in (no_adapter, bad):
+                incoming.write_text(json.dumps({"specialists": [value]}))
+                with self.assertRaises(SystemExit):
+                    register_catalog.register(incoming, kotlin)
+                self.assertEqual(original, kotlin.read_text())
 
 
 if __name__ == "__main__":

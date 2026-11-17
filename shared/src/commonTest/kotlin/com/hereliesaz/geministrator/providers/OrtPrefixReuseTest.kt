@@ -141,4 +141,35 @@ class OrtPrefixReuseTest {
         assertEquals(1, backend.closed)
         assertEquals(0, reuse.stats().prefixTokensEstimate)
     }
+
+    /** The adapter id the ONNX generators pass is the adapter's id plus SHA-256: a new release re-primes the head. */
+    @Test
+    fun aNewAppIntegrationAdapterReleaseRePrimesTheHead() = runTest {
+        val backend = FakeBackend()
+        fun descriptor(sha: String) = com.hereliesaz.geministrator.inference.LocalModelArtifactDescriptor(
+            logicalArtifactId = "app-integration:assistant:lora",
+            foundationModelId = "Qwen/Qwen2.5-0.5B-Instruct",
+            releaseRepository = "HereLiesAz/aive",
+            releaseTag = "app-integration-v1",
+            assetName = "adapter.safetensors",
+            sha256 = sha,
+            format = "safetensors",
+            precision = "fp16",
+            kind = com.hereliesaz.geministrator.inference.LocalModelArtifactKind.Adapter,
+            adapterId = "app-integration-v1",
+        )
+        val first = AppIntegrationAdapterSelector.cacheKey(descriptor("a".repeat(64)), "/base/model.onnx")
+        val second = AppIntegrationAdapterSelector.cacheKey(descriptor("b".repeat(64)), "/base/model.onnx")
+        assertTrue(first != second)
+        assertTrue("app-integration-v1@" + "a".repeat(64) in first)
+        var key: String? = first
+        val reuse = OrtPrefixReuse(backend, adapterId = { key })
+        reuse.generate(bigHead, "x", 8)
+        reuse.generate(bigHead, "y", 8)
+        assertEquals(1, backend.primed.size)
+        key = second
+        reuse.generate(bigHead, "z", 8)
+        assertEquals(2, backend.primed.size)
+        assertEquals(1, backend.closed)
+    }
 }

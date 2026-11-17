@@ -8,6 +8,8 @@ import com.hereliesaz.geministrator.inference.LocalModelLoadPlan
 import com.hereliesaz.geministrator.inference.LocalModelRuntimeCapabilities
 import com.hereliesaz.geministrator.memory.DesktopOrtMemorySessionManager
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentModelSpec
+import com.hereliesaz.geministrator.orchestration.AppIntegrationInstallState
+import com.hereliesaz.geministrator.orchestration.AppIntegrationRelease
 import com.hereliesaz.geministrator.orchestration.CatalogBackedLocalOrchestrationSpecialistRuntime
 import com.hereliesaz.geministrator.orchestration.DecisionInformedOrchestrationUtilities
 import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities
@@ -75,6 +77,8 @@ internal object DesktopOrchestrationSpecialists {
 internal class DesktopOrchestrationSpecialistInstaller(
     httpClient: HttpClient,
     private val installRoot: File = File(System.getProperty("user.home"), ".aive/models/orchestration-utilities"),
+    /** The released app-integration adapter; tests pass a fixture. */
+    private val appIntegration: () -> AppIntegrationRelease? = OrchestrationSpecialistCatalog::appIntegration,
     /** The released catalog; tests pass a fixture. */
     val library: () -> LocalModelLibrary = OrchestrationSpecialistCatalog::released,
 ) {
@@ -95,6 +99,18 @@ internal class DesktopOrchestrationSpecialistInstaller(
         }.distinctBy(LocalModelArtifactDescriptor::logicalArtifactId)
     }
 
+    /** The released app-integration adapter and its shared base for desktop (base first), or none. */
+    fun appIntegrationArtifacts(): List<LocalModelArtifactDescriptor> =
+        appIntegration()?.artifacts(DesktopOrchestrationSpecialists.runtimeCapabilities).orEmpty()
+
+    /** The released adapter's release (size, gate line), or null; the same value the generators read. */
+    fun appIntegrationRelease(): AppIntegrationRelease? = appIntegration()
+
+    fun appIntegrationState(): AppIntegrationInstallState = AppIntegrationInstallState.of(
+        appIntegration(),
+        DesktopOrchestrationSpecialists.runtimeCapabilities,
+    ) { installed(it) != null }
+
     /** The installed decision model's directory, or null when it is not released or not installed. */
     fun decisionModelRoot(): File? {
         val plan = runCatching {
@@ -106,13 +122,15 @@ internal class DesktopOrchestrationSpecialistInstaller(
     fun hasAnyInstalledReleasedArtifact(): Boolean = releasedArtifacts().any { installed(it) != null }
 
     fun allReleasedInstalled(): Boolean {
-        val artifacts = releasedArtifacts()
+        val artifacts = releasedArtifacts() + appIntegrationArtifacts()
         return artifacts.isNotEmpty() && artifacts.all { installed(it) != null }
     }
 
     /** Installs every released artifact; [onProgress] receives human-readable status lines. */
     suspend fun installReleased(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
-        val artifacts = releasedArtifacts()
+        // The app-integration adapter and its base install with the specialists: one action, as for the decision model.
+        val artifacts = (releasedArtifacts() + appIntegrationArtifacts())
+            .distinctBy(LocalModelArtifactDescriptor::logicalArtifactId)
         require(artifacts.isNotEmpty()) { "No released orchestration specialists are compatible with desktop" }
         artifacts.forEachIndexed { index, artifact ->
             val label = "${index + 1}/${artifacts.size} ${artifact.assetName}"
@@ -134,7 +152,7 @@ internal class DesktopOrchestrationSpecialistInstaller(
     }
 
     private fun removeAll() {
-        library().allArtifacts().forEach { artifact ->
+        (library().allArtifacts() + appIntegration()?.let { it.sharedBaseVariants + it.adapter }.orEmpty()).forEach { artifact ->
             if (artifact.kind == LocalModelArtifactKind.Adapter) {
                 val file = adapterFile(artifact)
                 file.delete()
@@ -170,6 +188,7 @@ internal class DesktopOrchestrationSpecialistInstaller(
                     url = artifact.downloadUrl,
                     output = File(staging, artifact.assetName),
                     expectedSha256 = artifact.sha256,
+                    expectedSize = appIntegration()?.takeIf { it.adapter.logicalArtifactId == artifact.logicalArtifactId }?.adapterSizeBytes,
                     onProgress = onProgress,
                 )
                 val destination = adapterFile(artifact)

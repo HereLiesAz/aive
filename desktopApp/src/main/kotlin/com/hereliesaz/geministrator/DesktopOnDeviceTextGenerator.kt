@@ -8,8 +8,11 @@ import ai.onnxruntime.OrtSession
 import ai.onnxruntime.TensorInfo
 import com.hereliesaz.geministrator.memory.DesktopOrtMemorySessionManager
 import com.hereliesaz.geministrator.memory.MemoryEpoch8ModelCatalog
+import com.hereliesaz.geministrator.memory.MemoryMicroAgentModelSpec
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentRole
 import com.hereliesaz.geministrator.memory.MemoryModelReleaseBundle
+import com.hereliesaz.geministrator.providers.AppIntegrationAdapterSelector
+import com.hereliesaz.geministrator.providers.OnDeviceAdapterNoteSource
 import com.hereliesaz.geministrator.providers.OnDeviceTextGeneration
 import com.hereliesaz.geministrator.providers.OrtPrefixBackend
 import com.hereliesaz.geministrator.providers.OrtPrefixReuse
@@ -21,6 +24,7 @@ import com.hereliesaz.geministrator.providers.OnDeviceTextGenerator
 import java.io.File
 import java.nio.FloatBuffer
 import kotlin.concurrent.Volatile
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -31,6 +35,11 @@ import kotlinx.coroutines.withContext
  * adapter clerk installed from the Memory swarm, run with zero LoRA inputs so it answers as the plain
  * base. Nothing is downloaded here; with no such base installed the generator is not ready.
  *
+ * When the released app-integration adapter and the shared base it was trained on are both installed (from
+ * Settings, Local orchestration), it runs on that base with the adapter's real LoRA tensors, read by the same
+ * loader the orchestration specialists use ([DesktopLoraAdapter]). If the adapter is missing, unreadable, built
+ * for another base or lacks inputs the graph needs, it runs as above and [adapterNote] says why.
+ *
  * It uses the memory layer's session manager, so the base is loaded once for both.
  */
 internal class DesktopOnDeviceTextGenerator(
@@ -38,7 +47,9 @@ internal class DesktopOnDeviceTextGenerator(
     private val sessions: DesktopOrtMemorySessionManager,
     private val generator: DesktopOrtCausalGenerator = DesktopOrtCausalGenerator(),
     private val environment: OrtEnvironment = OrtEnvironment.getEnvironment(),
-) : OnDeviceTextGenerator {
+    /** The released app-integration adapter's selection; null (the default) always runs the plain base. */
+    private val appIntegration: AppIntegrationAdapterSelector<File, DesktopLoraAdapter>? = null,
+) : OnDeviceTextGenerator, OnDeviceAdapterNoteSource {
     private class InstalledBase(val bundle: MemoryModelReleaseBundle, val root: File)
 
     /** The first installed shared base (an adapter clerk's); merged clerks are task-specific and skipped. */
@@ -50,7 +61,61 @@ internal class DesktopOnDeviceTextGenerator(
         }
     }
 
-    override fun isReady(): Boolean = installedBase() != null
+    override fun isReady(): Boolean = installedBase() != null || appIntegration?.available() == true
+
+    override fun adapterNote(): String? = appIntegration?.adapterNote()
+
+    /** Where one generation runs: the session, the tokenizer directory, and the adapter tensors if any. */
+    private class Target(
+        val session: OrtSession,
+        val tokenizerRoot: File,
+        val modelKey: String,
+        /** The released adapter's tensors, owned by the selector; null runs zero tensors made for the call. */
+        val adapterTensors: Map<String, OnnxTensor>?,
+    )
+
+    /** The released adapter on its shared base, or null to run the plain base (the reason is in [adapterNote]). */
+    private suspend fun adapterTarget(): Target? {
+        val selector = appIntegration ?: return null
+        val chosen = selector.select()
+        if (chosen !is AppIntegrationAdapterSelector.Selection.Adapter) return null
+        val model = File(chosen.baseRoot, "model.onnx")
+        val base = chosen.plan.base
+        val prepared = try {
+            sessions.sessionFor(
+                model.absolutePath,
+                MemoryMicroAgentModelSpec(modelId = base.logicalArtifactId, quantization = base.precision),
+            )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            selector.reject(
+                chosen.plan.adapter,
+                "The app-integration adapter's base model did not load (${failure.message ?: failure::class.simpleName}), " +
+                    "so small tasks run on the plain model.",
+            )
+            return null
+        }
+        val missing = adapterInputNames(prepared.session) - chosen.adapter.tensors.keys
+        if (missing.isNotEmpty()) {
+            selector.reject(
+                chosen.plan.adapter,
+                "The app-integration adapter lacks ${missing.size} input(s) the base model needs, so small tasks run on the plain model.",
+            )
+            return null
+        }
+        return Target(prepared.session, chosen.baseRoot, chosen.cacheKey(model.absolutePath), chosen.adapter.tensors)
+    }
+
+    /** The first installed memory-clerk base, run as the plain model. */
+    private suspend fun plainTarget(): Target {
+        val base = installedBase() ?: error("No local instruct model is installed")
+        val modelFile = installer.modelFile(base.root) ?: error("The installed local model has no ONNX file")
+        val tokenizerRoot = installer.tokenizerRoot(base.root) ?: error("The installed local model has no tokenizer.json")
+        // The memory layer's own spec for this clerk, so its cached session is reused.
+        val prepared = sessions.sessionFor(modelFile.absolutePath, MemoryEpoch8ModelCatalog.modelSpec(base.bundle.role))
+        return Target(prepared.session, tokenizerRoot, modelFile.absolutePath, null)
+    }
 
     /** What one generation works on; the held head outlives it, so the backend reads it only during a call. */
     private class Call(
@@ -129,17 +194,19 @@ internal class DesktopOnDeviceTextGenerator(
         dynamic: String,
         maxNewTokens: Int,
     ): OnDeviceTextGeneration = withContext(Dispatchers.Default) {
-        val base = installedBase() ?: error("No local instruct model is installed")
-        val modelFile = installer.modelFile(base.root) ?: error("The installed local model has no ONNX file")
-        val tokenizerRoot = installer.tokenizerRoot(base.root) ?: error("The installed local model has no tokenizer.json")
-        // The memory layer's own spec for this clerk, so its cached session is reused.
-        val prepared = sessions.sessionFor(modelFile.absolutePath, MemoryEpoch8ModelCatalog.modelSpec(base.bundle.role))
         val split = QwenChatPrompt.formatSplit(system, stablePrefix, dynamic)
         callLock.withLock {
-            HuggingFaceTokenizer.newInstance(tokenizerRoot.toPath()).use { tokenizer ->
-                val zeroAdapter = zeroAdapterInputs(prepared.session)
+            val target = adapterTarget() ?: plainTarget()
+            HuggingFaceTokenizer.newInstance(target.tokenizerRoot.toPath()).use { tokenizer ->
+                val zeroAdapter = if (target.adapterTensors == null) zeroAdapterInputs(target.session) else null
                 try {
-                    call = Call(prepared.session, tokenizer, tokenizerRoot, zeroAdapter, modelFile.absolutePath)
+                    call = Call(
+                        target.session,
+                        tokenizer,
+                        target.tokenizerRoot,
+                        target.adapterTensors ?: requireNotNull(zeroAdapter),
+                        target.modelKey,
+                    )
                     if (stablePrefix.isEmpty()) {
                         backend.generateWhole(split.head + split.tail, maxNewTokens)
                     } else {
@@ -147,11 +214,18 @@ internal class DesktopOnDeviceTextGenerator(
                     }
                 } finally {
                     call = null
-                    zeroAdapter.values.forEach(OnnxTensor::close)
+                    zeroAdapter?.values?.forEach(OnnxTensor::close)
                 }
             }
         }
     }
+
+    /** The base graph's LoRA inputs: every float input the generation loop does not feed itself. */
+    private fun adapterInputNames(session: OrtSession): Set<String> =
+        session.inputInfo.filter { (name, node) ->
+            name !in GENERATOR_INPUTS && !name.startsWith("past_key_values.") &&
+                (node.info as? TensorInfo)?.type == OnnxJavaType.FLOAT
+        }.keys
 
     /**
      * Zero-valued tensors for the base graph's LoRA inputs (every float input the generation loop

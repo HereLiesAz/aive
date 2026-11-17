@@ -3,7 +3,7 @@ package com.hereliesaz.geministrator.adapter
 import com.hereliesaz.geministrator.providers.OnDeviceTextAgentProvider
 
 /**
- * Prompt layout for context caching. The app orders a prompt as a stable prefix (the role) and then a
+ * Prompt layout for context caching. The app orders a prompt as a stable prefix (the role, then the memory protocol when memory is on) and then a
  * dynamic suffix (task, criteria, recall, habits, artifacts). [check] holds every corpus row to that:
  * the stable part comes first and carries nothing volatile. `score.py` carries the same check.
  */
@@ -26,8 +26,12 @@ object AppIntegrationLayout {
         if (!user.startsWith("ROLE\n")) return Verdict.fail("the stable role block is not first")
         if (!user.contains(TASK_MARK)) return Verdict.fail("no task block")
         val prefix = prefixOf(user)
-        if (labels(prefix) != listOf("ROLE")) return Verdict.fail("the stable prefix holds more than the role block")
-        VOLATILE.firstOrNull { it.containsMatchIn(prefix) }?.let { return Verdict.fail("volatile content in the stable prefix: ${it.pattern}") }
+        if (labels(prefix) != listOf("ROLE") && labels(prefix) != listOf("ROLE", "MEMORY PROTOCOL")) {
+            return Verdict.fail("the stable prefix holds more than the role block and the memory protocol")
+        }
+        // The protocol is constant rules text and names the memory marker by design: not volatile content.
+        val checked = prefix.replace(Regex("\n\nMEMORY PROTOCOL\n[^\n]*"), "")
+        VOLATILE.firstOrNull { it.containsMatchIn(checked) }?.let { return Verdict.fail("volatile content in the stable prefix: ${it.pattern}") }
         val suffix = labels(user.substringAfter(TASK_MARK))
         if ("ROLE" in suffix) return Verdict.fail("a role block after the task")
         val criteria = suffix.indexOf("ACCEPTANCE CRITERIA")

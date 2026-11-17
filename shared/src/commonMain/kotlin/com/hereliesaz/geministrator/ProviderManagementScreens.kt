@@ -188,6 +188,9 @@ import com.hereliesaz.geministrator.resources.settings_load
 import com.hereliesaz.geministrator.resources.settings_load_project
 import com.hereliesaz.geministrator.resources.settings_loaded
 import com.hereliesaz.geministrator.resources.settings_local_model_s
+import com.hereliesaz.geministrator.resources.settings_app_integration_adapter
+import com.hereliesaz.geministrator.resources.settings_app_integration_adapter_gates
+import com.hereliesaz.geministrator.resources.settings_app_integration_adapter_installed
 import com.hereliesaz.geministrator.resources.settings_local_orchestration
 import com.hereliesaz.geministrator.resources.settings_local_orchestration_2
 import com.hereliesaz.geministrator.resources.settings_on_device_small_tasks
@@ -1083,6 +1086,15 @@ internal fun ProviderSettingsScreen(
                 style = AzphaltType.body,
                 color = azphaltOnSurface(),
             )
+            setting.appIntegration?.let { adapter ->
+                Text(
+                    stringResource(Res.string.settings_app_integration_adapter) +
+                        (if (adapter.installed) " " + stringResource(Res.string.settings_app_integration_adapter_installed) else "") +
+                        (adapter.gateSummary?.let { " " + stringResource(Res.string.settings_app_integration_adapter_gates, it) } ?: ""),
+                    style = AzphaltType.body,
+                    color = azphaltOnSurface(),
+                )
+            }
             when (val status = setting.status) {
                 LocalOrchestrationSpecialistStatus.NotInstalled -> AzphaltPill(
                     stringResource(Res.string.settings_install_released_specialists),
@@ -1142,6 +1154,7 @@ internal fun ProviderSettingsScreen(
                 val reuse = setting.promptReuse
                 Text(
                     stringResource(Res.string.settings_on_device_small_tasks_runtime, label) +
+                        (setting.adapterNote?.let { " $it" } ?: "") +
                         when {
                             reuse == null -> ""
                             reuse.switchedOff -> " " + stringResource(Res.string.settings_on_device_small_tasks_reuse_off)

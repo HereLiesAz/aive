@@ -158,3 +158,20 @@ Owner correction: "How did I say no to new interfaces? I said we needed to conso
 - New information belongs inside a surface that already exists (a line in the Keeper's room's This device status, a field in an existing panel) before it gets a surface of its own. Adding text to an existing surface is not a new interface.
 - A standalone screen, tab, dialog or panel needs a stated reason it cannot live inside an existing one.
 - Do not cite a rule the owner did not state, and do not skip useful work (such as showing cache statistics) by invoking one.
+
+## Read the owner's words as written; do not widen them (2026-11-17)
+
+Owner correction, verbatim: "It'd be super helpful if you actually listen to what I fucking say. I pick my words carefully, meaning you should listen to them carefully."
+
+What went wrong, so it is not repeated:
+
+- "There's no reason to not let the agent execute habits" was turned into default-on, no text-only limit and no approval. None of that was said. The owner meant approved habits, and meant that the agent (not only programmatic matching) may fire them when matching misses.
+- "Perhaps the habits should be programmatic" is a hedge. It was an invitation to give a recommendation and ask, not to build a full design.
+- "No new interfaces" was quoted back as a rule the owner never stated (the real rule is in the interface entry above).
+
+Rules:
+
+- Before acting on a sentence, restate to yourself its exact claims. Do the smallest thing those words support. If a word is doing work (approved, perhaps, only, all, immediately), keep it.
+- Where the words leave a real gap, ask one narrow question. Do not fill the gap with the broadest reading, and do not narrow it silently either.
+- Never attribute a rule or a decision to the owner that is not in his words. Quote them when relying on them.
+- When correcting, undo only what the correction undoes.
