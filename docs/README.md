@@ -135,6 +135,8 @@ Memory is organised per workflow run: every run has its own memory bank, continu
 
 [`Orchestration_layer.md`](Orchestration_layer.md) is the Kaggle training sequence for the orchestration model family.
 
+[`../tools/app_integration_training/README.md`](../tools/app_integration_training/README.md) (section "Kaggle") covers the notebook that trains, gates, exports and releases the app-integration LoRA adapter.
+
 ### Research background
 
 [`Agentic Memory System Research.md`](Agentic%20Memory%20System%20Research.md) and [`Composite Frontier Model Architectures.md`](Composite%20Frontier%20Model%20Architectures.md) are background research reports on hierarchical agent memory and compound AI systems. They are not product specifications.

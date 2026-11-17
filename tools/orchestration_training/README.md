@@ -23,6 +23,8 @@ for any model answer that is malformed or less conservative than the baseline.
 | `make_notebook.py` | Source of every notebook here and in `tools/memory_training/notebooks`; edit this, then regenerate |
 | `register_catalog.py` | Registers a released `catalog.json` in the app |
 
+The app-integration adapter notebook (`tools/app_integration_training/`) reuses this pipeline's LoRA shape and shared ONNX base; see its README, section "Kaggle".
+
 ## 1. Dataset
 
 ~~~
