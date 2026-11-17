@@ -188,12 +188,21 @@ object AppIntegrationDatasetGenerator {
 
     private class Fact(val component: String, val defect: String, val fix: String, val reporter: String)
 
+    /**
+     * Labels the app delivers as [PromptContext.dynamicContext] blocks (MemoryLayerController.recallForPrompt), so the
+     * generator supplies them the same way and the real renderTask decides what the model sees. The protocol block is
+     * dynamic in the app too and renderTask leaves it out. `Habits` is still an artifact here (F6).
+     * TODO: F6 rows move off artifacts when habits are redesigned as programmatic replay (owner's pending redesign);
+     * the on-device model does not receive the `Habits` block from dynamicContext today.
+     */
+    private val DYNAMIC_MEMORY_LABELS = setOf("Memory protocol", "Memory", "Relevant memory", "Memory timeline")
+
     private fun request(d: Draft, seq: Int): AgentTaskRequest = AgentTaskRequest(
         taskRunId = TaskRunId("run-$seq"),
         objective = d.objective,
         roleInstructions = "$PREAMBLE_OF_THE_SWARM\n\n${d.role}",
         acceptanceCriteria = d.criteria.map { AcceptanceCriterion(it) },
-        contextArtifacts = d.artifacts.mapIndexed { i, pair ->
+        contextArtifacts = d.artifacts.filter { it.first !in DYNAMIC_MEMORY_LABELS }.mapIndexed { i, pair ->
             ArtifactRef(
                 id = ArtifactId("art-$seq-$i"),
                 kind = ArtifactKind.Research,
@@ -206,6 +215,7 @@ object AppIntegrationDatasetGenerator {
         requirePlanApproval = d.planOnly,
         promptContext = PromptContext(
             stablePrefix = listOf(PromptContextBlock(OnDeviceTextAgentProvider.ROLE_BLOCK_LABEL, d.role)),
+            dynamicContext = d.artifacts.filter { it.first in DYNAMIC_MEMORY_LABELS }.map { PromptContextBlock(it.first, it.second) },
         ),
     )
 
