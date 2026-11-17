@@ -197,6 +197,79 @@ class MakeNotebookTest(unittest.TestCase):
         self.assertFalse(ok)   # the other families have no rows here, so their gates cannot pass
         self.assertNotIn("F1 on test >= 0.90", failed)
 
+    def test_every_long_stage_saves_its_progress(self):
+        text = "\n".join(code_cells(json.loads(NOTEBOOK.read_text())))
+        # training: a checkpoint every SAVE_STEPS steps, not once per epoch
+        self.assertIn('save_strategy="steps", save_steps=SAVE_STEPS', text)
+        self.assertNotIn('save_strategy="epoch"', text)
+        self.assertIn("SAVE_STEPS = 50", text)
+        # both generation gates keep each answer on disk as it is produced
+        self.assertIn("store=store", text)
+        self.assertEqual(2, text.count("AnswerStore(WORK /"))
+
+    def test_the_answer_store_resumes_and_never_trusts_a_half_written_file(self):
+        import hashlib
+        import tempfile
+        notebook = json.loads(NOTEBOOK.read_text())
+        source = next(s for s in code_cells(notebook) if "class AnswerStore" in s)
+        node = next(n for n in ast.parse(source).body if isinstance(n, ast.ClassDef) and n.name == "AnswerStore")
+        namespace = {"Path": Path, "json": json, "hashlib": hashlib}
+        exec(compile(ast.Module([node], []), "answer_store", "exec"), namespace)
+        AnswerStore = namespace["AnswerStore"]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "answers.json"
+            first = AnswerStore(path)
+            self.assertIsNone(first.get("prompt a"))
+            first.put("prompt a", "answer a")
+            first.put("prompt b", "answer b")
+            first.save()
+            second = AnswerStore(path)             # a new session after a disconnect
+            self.assertEqual("answer a", second.get("prompt a"))
+            self.assertEqual("answer b", second.get("prompt b"))
+            self.assertIsNone(second.get("prompt c"))
+            self.assertFalse(Path(str(path) + ".tmp").exists())
+            path.write_text('{"half": "writ')      # a save cut short
+            self.assertEqual({}, AnswerStore(path).answers)
+
+    def test_cells_after_the_state_cell_say_what_to_do_when_run_alone(self):
+        cells = code_cells(json.loads(NOTEBOOK.read_text()))
+        index = next(i for i, c in enumerate(cells) if "state = json.loads(STATE_FILE" in c)
+        for i, cell in enumerate(cells):
+            if i <= index:
+                self.assertFalse(cell.startswith('if "state" not in globals()'), f"cell {i} is guarded but runs before state exists")
+            else:
+                self.assertTrue(cell.startswith('if "state" not in globals()'), f"cell {i} lacks the guard")
+        guard = cells[index + 1].split("\n")[:2]
+        with self.assertRaisesRegex(RuntimeError, "Run all"):
+            exec("\n".join(guard) + "\n", {"__builtins__": __builtins__})
+
+    def test_a_rerun_with_nothing_changed_skips_the_toolchain(self):
+        import tempfile
+        notebook = json.loads(NOTEBOOK.read_text())
+        source = next(s for s in code_cells(notebook) if "def build_corpus" in s)
+        node = next(n for n in ast.parse(source).body if isinstance(n, ast.FunctionDef) and n.name == "build_corpus")
+        sha = "a" * 40
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            out = work / "corpus-build" / "aive-app-integration-corpus"
+            out.mkdir(parents=True)
+            for name in ("manifest.json", "score.py"):
+                (out / name).write_text("x")
+
+            def forbidden(*args, **kwargs):
+                raise AssertionError("the toolchain must not be touched when the corpus is already built")
+
+            namespace = {"WORK": work, "state": {"corpusBuild": {"commit": sha, "rows": None}}, "RESULTS": {},
+                         "remote_commit": lambda: sha, "CORPUS_ROWS": None, "SOURCE_REPOSITORY": "r", "SOURCE_REF": "main",
+                         "ensure_jdk": forbidden, "resolve_source": forbidden, "ensure_vendor": forbidden, "run_gradle": forbidden}
+            exec(compile(ast.Module([node], []), "build_corpus", "exec"), namespace)
+            self.assertEqual((out, sha), namespace["build_corpus"]())
+            self.assertTrue(namespace["RESULTS"]["corpusBuild"]["reused"])
+            # a newer commit must NOT reuse the old build
+            namespace["remote_commit"] = lambda: "b" * 40
+            with self.assertRaisesRegex(AssertionError, "toolchain"):
+                namespace["build_corpus"]()
+
     def test_manifest_entries_reads_the_shape_the_kotlin_writer_produces(self):
         """The first real Colab run failed with 'manifest.json lists train, which the generator did not write':
         the writer keys files by split and names the file inside the entry."""
