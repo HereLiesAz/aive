@@ -393,6 +393,22 @@ been tried on a device; until then it is `null` and the stock model runs.
   answers before training. Per-family values may be numbers or objects with a `score` field.
 - That a model passing these gates is better than the unadapted model inside the app.
 
+## What is saved while it runs
+
+Every long stage keeps its progress on Drive (or `/kaggle/working`), so a disconnect costs minutes, not hours. After a
+restart choose Runtime > Run all: finished stages are skipped and a running one resumes.
+
+| Stage | Saved | Lost at worst |
+|---|---|---|
+| Corpus build | the corpus, its manifest and `score.py`; a rerun with the same commit and row count skips the JDK, the clones and Gradle | nothing |
+| Training | a checkpoint every `SAVE_STEPS` (50) optimiser steps, about 3 minutes on a T4 (`state.json` holds the epoch scores) | about 3 minutes |
+| Gate 1 (GPU generation) | every finished batch of answers, in `gate1-answers-<adapter hash>-<length>.json` | one batch |
+| Gate 2 (ONNX on CPU) | every 10th answer, in `gate2-answers-<adapter hash>-<length>.json` | 10 rows |
+| LiteRT-LM export | the merged model, the virtual environment and the converted file; the conversion itself is one command and cannot be saved midway | the running conversion |
+
+The answer files are named after the adapter file's hash, so answers from another adapter are never reused. A cell run
+on its own in a fresh runtime stops with a message saying to Run all, instead of a bare `NameError`.
+
 ## Colab
 
 The notebook also runs on Google Colab. Open it with this link, which always loads the current file from `main`: [Open in Colab](https://colab.research.google.com/github/HereLiesAz/aive/blob/main/tools/app_integration_training/app_integration_adapter.ipynb). Do not reopen an older copy from Drive, and do not use "Save a copy in GitHub" on it (that overwrites the generated notebook on `main`; "Save a copy in Drive" is safe).

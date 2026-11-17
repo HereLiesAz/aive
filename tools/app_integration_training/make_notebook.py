@@ -14,13 +14,28 @@ def md(text):
     CELLS.append({"cell_type": "markdown", "metadata": {}, "source": text.strip("\n").splitlines(keepends=True)})
 
 
+GUARD_FROM_NOW = False
+GUARD = (
+    'if "state" not in globals():\n'
+    '    raise RuntimeError("The runtime was restarted, or this cell was run on its own, so the earlier cells have not run '
+    'in this session. Choose Runtime > Run all: finished stages are skipped and a running one resumes from its last '
+    'saved checkpoint (progress is kept in state.json and the answer files on Drive).")\n'
+)
+
+
 def code(text):
+    global GUARD_FROM_NOW
+    body = text.strip("\n")
+    if GUARD_FROM_NOW:
+        body = GUARD + body
+    if "state = json.loads(STATE_FILE" in body:
+        GUARD_FROM_NOW = True
     CELLS.append({
         "cell_type": "code",
         "execution_count": None,
         "metadata": {},
         "outputs": [],
-        "source": text.strip("\n").splitlines(keepends=True),
+        "source": body.splitlines(keepends=True),
     })
 
 
@@ -161,6 +176,7 @@ LEARNING_RATE = 2e-4
 # Logits alone are BATCH x 1280 x 151936 floats; 2 x 8 keeps 16 rows per step inside a 15 GB T4
 # (not measured on Kaggle: lower BATCH_SIZE to 1 and raise GRAD_ACCUM to 16 on an out-of-memory error).
 BATCH_SIZE, GRAD_ACCUM = 2, 8
+SAVE_STEPS = 50                      # a training checkpoint (on Drive) every this many optimiser steps, about 3 minutes on a T4
 GATE_BATCH = 8                       # rows generated together in the GPU gates (length-sorted, left-padded)
 SELECT_ROWS_PER_FAMILY = 12          # validation rows per family that judge each epoch
 SELECT_PATIENCE = 2                  # epochs without a better validation score before training stops
@@ -205,6 +221,7 @@ if SMOKE:
     UPLOAD = False
     EPOCHS, MAX_NEW, SELECT_ROWS_PER_FAMILY, LITERT_AGREEMENT_ROWS = 5, 96, 4, 8
     SMOKE_STEPS, SMOKE_TRAIN_ROWS, SMOKE_EVAL_ROWS = 20, 64, 16
+    SAVE_STEPS = 10
     CORPUS_ROWS = 20                 # a small corpus through the generator keeps the build stage fast
 
 def on_kaggle():
@@ -448,15 +465,30 @@ def deterministic_zip(source_dir, zip_path, top):
             archive.writestr(info, path.read_bytes())
     return zip_path
 
+def remote_commit():
+    """The commit SOURCE_REF names on the remote right now, without cloning; None when it is not a branch or tag."""
+    try:
+        listed = sh(["git", "ls-remote", SOURCE_REPOSITORY, SOURCE_REF]).split()
+    except Exception:
+        return None
+    return listed[0] if listed and re.fullmatch(r"[0-9a-f]{40}", listed[0]) else None
+
 def build_corpus():
     """The corpus directory for this run, built from SOURCE_REF (or reused from an identical earlier build)."""
+    out = WORK / "corpus-build" / "aive-app-integration-corpus"
+    earlier, current = state.get("corpusBuild", {}), remote_commit()
+    if (current and earlier.get("commit") == current and earlier.get("rows") == CORPUS_ROWS
+            and all((out / name).is_file() for name in ("manifest.json", "score.py"))):
+        # Nothing changed since the last build: no JDK, no clone, no Gradle. This is what a Colab reconnect hits.
+        print(f"corpus already built from {current[:10]} with the same row count; reusing it (no toolchain needed)")
+        RESULTS["corpusBuild"] = {"repository": SOURCE_REPOSITORY, "ref": SOURCE_REF, "commit": current, "rows": CORPUS_ROWS, "reused": True}
+        return out, current
     env = ensure_jdk()
     checkout, commit = resolve_source()
     print(f"corpus source: {SOURCE_REPOSITORY} @ {SOURCE_REF} = {commit}")
     vendor = ensure_vendor(checkout)
     RESULTS["corpusBuild"] = {"repository": SOURCE_REPOSITORY, "ref": SOURCE_REF, "commit": commit, "rows": CORPUS_ROWS, "vendor": vendor,
                               "java": [l for l in subprocess.run(["java", "-version"], env=env, capture_output=True, text=True).stderr.splitlines() if "version" in l][:1]}
-    out = WORK / "corpus-build" / "aive-app-integration-corpus"
     previous = state.get("corpusBuild", {})
     if (out / "manifest.json").is_file() and previous.get("commit") == commit and previous.get("rows") == CORPUS_ROWS:
         print("corpus already built from this commit and row count; reusing it")
@@ -700,20 +732,61 @@ save_results()
 
 code(r'''
 # ---- Generation and scoring helpers --------------------------------------------------------------------------
-def generate_batch(model, prompts, max_new=None):
-    """Greedy answers for [prompts], GATE_BATCH at a time, longest first, left-padded. Stops at <|im_end|>."""
+class AnswerStore:
+    """Answers kept on disk as they are produced, keyed by a hash of the exact prompt, so a stage that is
+    interrupted (a Colab disconnect, a crash) resumes from the last saved answer, not from the start. The file
+    name carries the identity of what produced the answers (adapter file hash, answer length), so answers from
+    another adapter are never reused. A half-written file is discarded, never trusted."""
+    def __init__(self, path):
+        self.path, self.answers = Path(path), {}
+        if self.path.is_file():
+            try:
+                self.answers = json.loads(self.path.read_text())
+            except ValueError:
+                self.answers = {}
+
+    @staticmethod
+    def key(prompt):
+        return hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+
+    def get(self, prompt):
+        return self.answers.get(self.key(prompt))
+
+    def put(self, prompt, answer):
+        self.answers[self.key(prompt)] = answer
+
+    def save(self):
+        temporary = self.path.with_name(self.path.name + ".tmp")
+        temporary.write_text(json.dumps(self.answers))
+        temporary.replace(self.path)
+
+def generate_batch(model, prompts, max_new=None, store=None):
+    """Greedy answers for [prompts], GATE_BATCH at a time, longest first, left-padded. Stops at <|im_end|>.
+    With a [store], every finished batch is saved and a rerun skips what is already answered."""
     max_new = max_new or MAX_NEW
     TOKENIZER.padding_side = "left"
     order = sorted(range(len(prompts)), key=lambda i: -len(prompts[i]))
     answers = [None] * len(prompts)
     for start in range(0, len(order), GATE_BATCH):
         chunk = order[start:start + GATE_BATCH]
-        ids = TOKENIZER([prompts[i] for i in chunk], return_tensors="pt", padding=True, add_special_tokens=False).to(model.device)
-        with torch.no_grad(), torch.autocast("cuda", dtype=torch.float16, enabled=DEVICE == "cuda"):
-            out = model.generate(**ids, max_new_tokens=max_new, do_sample=False, eos_token_id=STOP_IDS,
-                                 pad_token_id=TOKENIZER.pad_token_id)
-        for k, i in enumerate(chunk):
-            answers[i] = TOKENIZER.decode(out[k][ids["input_ids"].shape[1]:], skip_special_tokens=True)
+        todo = [i for i in chunk if store is None or store.get(prompts[i]) is None]
+        if todo:
+            ids = TOKENIZER([prompts[i] for i in todo], return_tensors="pt", padding=True, add_special_tokens=False).to(model.device)
+            with torch.no_grad(), torch.autocast("cuda", dtype=torch.float16, enabled=DEVICE == "cuda"):
+                out = model.generate(**ids, max_new_tokens=max_new, do_sample=False, eos_token_id=STOP_IDS,
+                                     pad_token_id=TOKENIZER.pad_token_id)
+            for k, i in enumerate(todo):
+                answer = TOKENIZER.decode(out[k][ids["input_ids"].shape[1]:], skip_special_tokens=True)
+                answers[i] = answer
+                if store is not None:
+                    store.put(prompts[i], answer)
+            if store is not None:
+                store.save()
+        for i in chunk:
+            if answers[i] is None:
+                answers[i] = store.get(prompts[i])
+        if store is not None and start % (GATE_BATCH * 8) == 0:
+            print(f"  generated {min(start + GATE_BATCH, len(order))}/{len(order)} (saved)", flush=True)
     return answers
 
 def prompts_of(rows):
@@ -791,7 +864,7 @@ def train():
             output_dir=str(checkpoints), per_device_train_batch_size=BATCH_SIZE, gradient_accumulation_steps=GRAD_ACCUM,
             num_train_epochs=EPOCHS, max_steps=SMOKE_STEPS if SMOKE else -1,
             learning_rate=LEARNING_RATE, lr_scheduler_type="cosine", warmup_ratio=0.05,
-            fp16=DEVICE == "cuda", logging_steps=25, eval_strategy="no", save_strategy="epoch", save_total_limit=1,
+            fp16=DEVICE == "cuda", logging_steps=25, eval_strategy="no", save_strategy="steps", save_steps=SAVE_STEPS, save_total_limit=2,
             report_to=[], seed=SEED, data_seed=SEED,
         ),
         train_dataset=rows,
@@ -847,7 +920,11 @@ def evaluate(label, answers_by_split, rows_by_split):
 def gate1():
     model = AutoModelForCausalLM.from_pretrained(BASE_MODEL, torch_dtype=torch.float16 if DEVICE == "cuda" else torch.float32).to(DEVICE)
     model = PeftModel.from_pretrained(model, ADAPTER_DIR).eval()
-    answers = {s: generate_batch(model, prompts_of(ALL[s])) for s in ("test", "adversarial")}
+    adapter_id = sha256(Path(ADAPTER_DIR) / "adapter_model.safetensors")[:12]
+    store = AnswerStore(WORK / f"gate1-answers-{adapter_id}-{MAX_NEW}.json")
+    if store.answers:
+        print(f"Gate 1: resuming with {len(store.answers)} answers already saved for adapter {adapter_id}")
+    answers = {s: generate_batch(model, prompts_of(ALL[s]), store=store) for s in ("test", "adversarial")}
     del model; gc.collect()
     if DEVICE == "cuda": torch.cuda.empty_cache()
     (WORK / "gate1-predictions.json").write_text(json.dumps({s: dict(zip([r["id"] for r in ALL[s]], answers[s])) for s in answers}))
@@ -1086,12 +1163,23 @@ def gate2():
         tests = random.Random("onnx-gate").sample(tests, ONNX_GATE_TEST_ROWS)
     rows_by_split, answers = {"test": tests, "adversarial": ALL["adversarial"]}, {}
     started = time.time()
+    store = AnswerStore(WORK / f"gate2-answers-{sha256(Path(ONNX['adapterPath']))[:12]}-{MAX_NEW}.json")
+    if store.answers:
+        print(f"Gate 2: resuming with {len(store.answers)} answers already saved")
     for split, rows in rows_by_split.items():
         answers[split] = []
         for i, row in enumerate(rows):
-            answers[split].append(ort_generate(session, base_int8, tokenizer, render_prompt(row["system"], row["user"]), MAX_NEW, extra))
+            prompt = render_prompt(row["system"], row["user"])
+            answer = store.get(prompt)
+            if answer is None:
+                answer = ort_generate(session, base_int8, tokenizer, prompt, MAX_NEW, extra)
+                store.put(prompt, answer)
+                if (i + 1) % 10 == 0:
+                    store.save()
+            answers[split].append(answer)
             if (i + 1) % 25 == 0:
-                print(f"  onnx {split}: {i + 1}/{len(rows)} rows, {(time.time() - started) / 60:.1f} min", flush=True)
+                print(f"  onnx {split}: {i + 1}/{len(rows)} rows, {(time.time() - started) / 60:.1f} min (saved)", flush=True)
+        store.save()
     del session; gc.collect()
     result = evaluate("Gate 2 (ONNX INT8 + adapter, CPU)", answers, rows_by_split)
     # The same rows scored from Gate 1's answers: the drop is measured like for like.
