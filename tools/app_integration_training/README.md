@@ -57,8 +57,10 @@ system prompt) are not model behaviours; they are hard checks on the corpus itse
 criteria; the rest rely on the adapter having learned it.
 
 Recall (`Memory`, `Relevant memory`, `Memory timeline`) is supplied as `PromptContext.dynamicContext` blocks and the
-real `renderTask` renders it after the criteria and before the artifacts (the F4 rows; `MEMORY PROTOCOL` is a dynamic
-block in the app too and is not rendered, at most 2,400 characters of recall are). Habits (`HABITS`) and `SESSION SO FAR`,
+real `renderTask` renders it after the criteria and before the artifacts (the F4 rows; the `Memory protocol` block is also a dynamic block in the app and `renderTask` puts it in the stable prefix as
+`MEMORY PROTOCOL`, right after `ROLE`; at most 2,400 characters of recall are rendered). The layout check allows
+`ROLE` then `MEMORY PROTOCOL` in the prefix and does not count the protocol's `⟦memory⟧` marker as volatile; F7 rows
+carry no memory, so their prefixes and `no_overlap_with` allowance are unchanged. Habits (`HABITS`) and `SESSION SO FAR`,
 `NOTES` stay artifact blocks. See Limits for habits.
 
 ## The `checks` vocabulary (version 1)

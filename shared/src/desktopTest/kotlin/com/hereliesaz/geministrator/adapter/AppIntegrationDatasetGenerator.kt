@@ -191,7 +191,7 @@ object AppIntegrationDatasetGenerator {
     /**
      * Labels the app delivers as [PromptContext.dynamicContext] blocks (MemoryLayerController.recallForPrompt), so the
      * generator supplies them the same way and the real renderTask decides what the model sees. The protocol block is
-     * dynamic in the app too and renderTask leaves it out. `Habits` is still an artifact here (F6).
+     * dynamic in the app too; renderTask renders it into the stable part after ROLE. `Habits` is still an artifact here (F6).
      * TODO: F6 rows move off artifacts when habits are redesigned as programmatic replay (owner's pending redesign);
      * the on-device model does not receive the `Habits` block from dynamicContext today.
      */

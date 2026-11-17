@@ -3,6 +3,7 @@ package com.hereliesaz.geministrator.providers
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ProviderRunId
+import com.hereliesaz.geministrator.memory.MEMORY_PROTOCOL_PROMPT_LABEL
 import com.hereliesaz.geministrator.memory.MEMORY_RECALL_PROMPT_LABEL
 import com.hereliesaz.geministrator.memory.RECALL_UNTRUSTED_NOTE
 import kotlin.time.TimeSource
@@ -256,6 +257,10 @@ class OnDeviceTextAgentProvider(
          * always begins with `TASK`, a letter. Qwen's pre-tokenizer isolates a run of newlines, so the
          * tokens of the two parts read one after the other are the tokens of the whole text.
          *
+         * A `Memory protocol` block (stable prefix or dynamic context) renders as `MEMORY PROTOCOL\n<text>\n\n`
+         * into [TaskParts.stable] right after the ROLE block: it is constant text, so the head stays
+         * byte-identical across calls while memory is on. Absent, nothing is rendered.
+         *
          * Memory recall ([MEMORY_RECALL_LABELS] blocks of the dynamic context, capped by
          * [MAX_RECALL_CHARS]) renders after the acceptance criteria and before the artifacts, in the dynamic
          * part only, so the stable prefix never changes with recall. When [maxInputTokens] is given and the
@@ -265,7 +270,10 @@ class OnDeviceTextAgentProvider(
         fun renderTaskParts(request: AgentTaskRequest, planOnly: Boolean = false, maxInputTokens: Int? = null): TaskParts {
             val role = request.promptContext.stablePrefix.firstOrNull { it.label == ROLE_BLOCK_LABEL }?.content
                 ?: request.roleInstructions
-            val stable = if (role.isNotBlank()) "ROLE\n" + role.trim() + "\n\n" else ""
+            val roleBlock = if (role.isNotBlank()) "ROLE\n" + role.trim() + "\n\n" else ""
+            val protocol = memoryProtocol(request)
+            val protocolBlock = if (protocol != null) "MEMORY PROTOCOL\n$protocol\n\n" else ""
+            var stable = roleBlock + protocolBlock
             val recall = recallBlocks(request)
             fun render(withRecall: Boolean): String = buildString {
                 append("TASK\n").append(request.objective.trim()).append("\n\n")
@@ -291,8 +299,19 @@ class OnDeviceTextAgentProvider(
             if (recall.isNotEmpty() && maxInputTokens != null && estimateTokens(stable.length + dynamic.length) > maxInputTokens) {
                 dynamic = render(withRecall = false)
             }
+            // The protocol is rules, not recall: it is not subject to the recall cap or the recall drop. Only
+            // when the prompt still exceeds the limit without recall is it dropped, and last.
+            if (protocolBlock.isNotEmpty() && maxInputTokens != null && estimateTokens(stable.length + dynamic.length) > maxInputTokens) {
+                stable = roleBlock
+            }
             return TaskParts(stable, dynamic)
         }
+
+        /** The trimmed text of the request's `Memory protocol` block, from either part of its prompt context. */
+        internal fun memoryProtocol(request: AgentTaskRequest): String? =
+            (request.promptContext.stablePrefix + request.promptContext.dynamicContext)
+                .firstOrNull { it.label == MEMORY_PROTOCOL_PROMPT_LABEL }
+                ?.content?.trim()?.takeIf(String::isNotEmpty)
 
         /**
          * The memory blocks the on-device model sees, as (label, trimmed content): only [MEMORY_RECALL_LABELS]

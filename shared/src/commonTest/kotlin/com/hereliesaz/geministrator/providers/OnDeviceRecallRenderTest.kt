@@ -59,7 +59,8 @@ class OnDeviceRecallRenderTest {
             ),
         )
         assertFalse(text.contains("habit text"))
-        assertFalse(text.contains("protocol text"))
+        // The protocol is rules, rendered in the stable part before TASK (see OnDeviceMemoryProtocolTest).
+        assertTrue(text.contains("MEMORY PROTOCOL\nprotocol text\n\nTASK"), text)
         assertFalse(text.contains("preamble text"))
         assertTrue(text.contains("cache size is 40 MB"))
     }

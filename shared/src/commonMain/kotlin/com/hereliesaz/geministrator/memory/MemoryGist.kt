@@ -33,6 +33,9 @@ internal fun MemoryRecallHit.gistNotes(): String = buildString {
     if (resolution != null) append("\n  ✓ settled since; an earlier view was set aside")
 }
 
+/** The label of the first-prompt block that carries [MEMORY_PROTOCOL] in a prompt context. */
+internal const val MEMORY_PROTOCOL_PROMPT_LABEL: String = "Memory protocol"
+
 /** Characters of recalled text in one prompt block. */
 internal const val MAX_RECALL_CHARS = 6_000
 
