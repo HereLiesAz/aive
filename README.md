@@ -85,4 +85,4 @@ Start with [`docs/README.md`](docs/README.md).
 
 ## License
 
-Source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE); not open source. Path-by-path layout: [LICENSING](LICENSING). Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Open source under the [Apache License, Version 2.0](LICENSE), commercial use included. Path-by-path layout: [LICENSING](LICENSING). Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
