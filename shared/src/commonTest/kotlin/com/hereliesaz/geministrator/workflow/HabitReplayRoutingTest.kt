@@ -5,6 +5,8 @@ import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ArtifactRef
+import com.hereliesaz.geministrator.domain.CONTEXT_PROVENANCE_METADATA_KEY
+import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
@@ -206,7 +208,11 @@ class HabitReplayRoutingTest {
         metadata: Map<String, String> = emptyMap(),
         reviewStatus: TaskRunStatus = TaskRunStatus.Completed,
     ): WorkflowRun {
-        val out = ArtifactRef(ArtifactId("o$i"), ArtifactKind.Research, TaskRunId("tw$i"), "out", textContent = text, metadata = metadata, createdAtEpochMillis = 1L)
+        // The runtime labels what a task produced; an unlabelled artifact counts as unknown, which is untrusted.
+        val out = ArtifactRef(
+            ArtifactId("o$i"), ArtifactKind.Research, TaskRunId("tw$i"), "out", textContent = text,
+            metadata = metadata + (CONTEXT_PROVENANCE_METADATA_KEY to ContextProvenance.AgentArtifact.name), createdAtEpochMillis = 1L,
+        )
         val review = ArtifactRef(ArtifactId("v$i"), ArtifactKind.Verification, TaskRunId("tv$i"), "rev", textContent = verdict, createdAtEpochMillis = 1L)
         return WorkflowRun(
             id = WorkflowRunId("run$i"), projectId = project.id, workflowDefinitionId = WorkflowDefinitionId("w"),
@@ -284,8 +290,9 @@ class HabitReplayRoutingTest {
         observer.observe(project, definition("Say hello"), run(2, "Hello there.\n/habit proc:unknown@1\n"))
         assertEquals(1, ledger.state.value.habits.single().matcherMisses)
         val decisions = events.seen.filterIsInstance<PolicyDecisionRecorded>()
-        assertEquals(listOf("habit-invoked", "habit-ref-ignored"), decisions.map { it.code })
-        assertEquals(listOf(PolicyEffect.Allow, PolicyEffect.Deny), decisions.map { it.effect })
+        // An approved text habit is recorded, then said not to apply (its task had already finished); a stranger is ignored.
+        assertEquals(listOf("habit-invoked", "habit-not-eligible", "habit-ref-ignored"), decisions.map { it.code })
+        assertEquals(listOf(PolicyEffect.Allow, PolicyEffect.Deny, PolicyEffect.Deny), decisions.map { it.effect })
         // An unapproved habit is ignored too.
         ledger.revoke(habit.id)
         observer.observe(project, definition("Say hello"), run(3, "Hello.\n/habit ${habit.ref}\n"))
