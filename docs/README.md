@@ -135,6 +135,7 @@ Memory is organised per workflow run: every run has its own memory bank, continu
 
 [`Orchestration_layer.md`](Orchestration_layer.md) is the Kaggle training sequence for the orchestration model family.
 
+[`../tools/app_integration_training/README.md`](../tools/app_integration_training/README.md) describes the corpus, verifiers and release gates for the one planned adapter that makes the on-device model follow the app's prompt layout, memory and habit text, and prompt-cache order (nothing trained or measured yet).
 [`../tools/app_integration_training/README.md`](../tools/app_integration_training/README.md) (section "Kaggle") covers the notebook that trains, gates, exports and releases the app-integration LoRA adapter.
 
 ### Research background

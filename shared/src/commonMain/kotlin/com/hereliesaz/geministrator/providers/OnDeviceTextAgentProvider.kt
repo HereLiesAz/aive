@@ -222,7 +222,8 @@ class OnDeviceTextAgentProvider(
         private const val MAX_PLAN_PREVIEW_CHARS = 8_000
         private const val CANCELLED = "On-device session cancelled"
 
-        private const val SYSTEM_PROMPT =
+        /** The one system prompt every on-device task sends; the adapter corpus (tools/app_integration_training) reads it from here. */
+        const val SYSTEM_PROMPT =
             "You are a careful assistant doing one small text task: summarise, classify, extract or rewrite. " +
                 "Work only from the text given. Return only the result, with no preamble. " +
                 "Do not claim to have read files, run commands or changed anything."

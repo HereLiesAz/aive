@@ -72,6 +72,18 @@ object HabitOffers {
         return (listOf(header) + entries).joinToString("\n")
     }
 
+    /** The `Habits` block text: offered habits, then offered sequences, or null when neither applies. */
+    fun offerText(
+        habits: List<FormedHabit>,
+        sequences: List<FormedSequence>,
+        objective: String,
+        nowEpochMillis: Long,
+    ): String? {
+        val habitText = render(select(habits, objective), nowEpochMillis)
+        val sequenceText = renderSequences(selectSequences(sequences, objective), nowEpochMillis)
+        return listOfNotNull(habitText, sequenceText).joinToString("\n").ifBlank { null }
+    }
+
     /** The sequences whose first step a task names, at most two. */
     fun selectSequences(sequences: List<FormedSequence>, objective: String): List<FormedSequence> {
         val taskWords = words(objective).toSet()

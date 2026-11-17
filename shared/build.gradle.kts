@@ -179,3 +179,22 @@ tasks.matching { it.name == "desktopTest" }.configureEach {
         .withPropertyName("suiteCountDocs")
         .withPathSensitivity(PathSensitivity.RELATIVE)
 }
+
+// The app-integration adapter corpus (tools/app_integration_training) is written by
+// AppIntegrationDatasetWriterTest only when -Daive.appIntegration.outDir=<dir> is given to Gradle; the
+// property is passed to the test JVM and the task then always runs. Normal runs never set it.
+tasks.matching { it.name == "desktopTest" }.configureEach {
+    val test = this as? org.gradle.api.tasks.testing.Test ?: return@configureEach
+    val keys = listOf("aive.appIntegration.outDir", "aive.appIntegration.commit")
+    var requested = false
+    keys.forEach { key ->
+        System.getProperty(key)?.let {
+            test.systemProperty(key, it)
+            if (key.endsWith("outDir")) requested = true
+        }
+    }
+    if (requested) {
+        test.outputs.upToDateWhen { false }
+        test.outputs.cacheIf { false }
+    }
+}
