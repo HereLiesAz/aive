@@ -1212,7 +1212,7 @@ class MemoryLayerController(
         // Hits a chronological query found read in time order, apart from the rest.
         val (timeline, relevant) = hits.partition { it.node.id.value in chronological }
         val blocks = buildList {
-            if (firstPrompt) add(PromptContextBlock("Memory protocol", MEMORY_PROTOCOL))
+            if (firstPrompt) add(PromptContextBlock(MEMORY_PROTOCOL_PROMPT_LABEL, MEMORY_PROTOCOL))
             // A specialist role's lessons are not listed here: they arrive through the cue path (cloud, phrases,
             // summaries by depth) when the work touches them. A first-prompt pointer says so.
             if (firstPrompt && runCatchingCancellable { roleLessons(request.orchestrationContext.roleId?.value.orEmpty()) }.getOrNull()?.isNotEmpty() == true) {

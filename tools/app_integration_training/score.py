@@ -324,10 +324,12 @@ def layout_problem(system, user):
     if TASK_MARK not in user:
         return "no task block"
     prefix = prefix_of(user)
-    if _labels(prefix) != ["ROLE"]:
-        return "the stable prefix holds more than the role block"
+    if _labels(prefix) not in (["ROLE"], ["ROLE", "MEMORY PROTOCOL"]):
+        return "the stable prefix holds more than the role block and the memory protocol"
+    # The protocol is constant rules text and names the memory marker by design, so it is not volatile content.
+    checked = re.sub(r"\n\nMEMORY PROTOCOL\n[^\n]*", "", prefix)
     for pattern in _VOLATILE:
-        if pattern.search(prefix):
+        if pattern.search(checked):
             return "volatile content in the stable prefix: " + pattern.pattern
     suffix = _labels(user.split(TASK_MARK, 1)[1])
     if "ROLE" in suffix:
