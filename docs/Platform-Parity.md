@@ -71,6 +71,7 @@ Each needs an owner decision or a larger build than a parity pass:
 | Feature | Android | Desktop | Web |
 |---|---|---|---|
 | LiteRT-LM generative runtime (small tasks, Qwen2.5-0.5B) | Yes (arm64-v8a, x86_64; CPU) | Yes (Windows x64, macOS arm64, Linux x64/arm64; CPU) | No: its JavaScript API is an early preview, and ORT Web has not been run in a browser |
+| LiteRT-LM prompt-prefix reuse (cloned primed session per role) | Yes (same engine) | Yes (same engine) | No (no LiteRT-LM web build) |
 
 ## Local model inference (ONNX)
 
