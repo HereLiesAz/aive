@@ -171,7 +171,7 @@ the same for every clerk engine, and none of it judges which memory is right.
   far to memory.
 - **The prompt's cue cloud is not gated by the query plan.** Only the heavy query grip (`Relevant
   memory`, `Memory timeline`) waits on the plan's "memory is needed"; the cloud, protocol, role lessons
-  and habits come regardless.
+  and habits come regardless. Habits the keeper approved can also run without a model call or as gated steps; see [PROCEDURAL_MEMORY.md](architecture/PROCEDURAL_MEMORY.md) section 11.
 - **Lingering goes deeper.** `MemoryDwell` (held in the session, never stored) counts hits per topic: a
   cue surfaced for it, or the agent following it. Each hit raises the depth one level, and the dwell
   falls by one for every 300 tokens that pass. Levels: the keyword cloud and a gist; key phrases

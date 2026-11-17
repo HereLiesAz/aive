@@ -210,6 +210,8 @@ data class TaskUsage(
      * model), so [costUsd] is a floor and a dollar cap cannot trust it.
      */
     val costUnknown: Boolean = false,
+    /** Tokens replayed habits saved on this task: what a model call would have used. Not part of [totalTokens]. */
+    val tokensAvoided: Long = 0,
 ) {
     val totalTokens: Long get() = inputTokens + outputTokens
 }

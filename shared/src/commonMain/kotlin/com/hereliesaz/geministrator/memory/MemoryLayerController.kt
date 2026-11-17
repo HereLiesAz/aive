@@ -356,6 +356,7 @@ class MemoryLayerController(
     suspend fun updateSettings(transform: (MemoryLayerSettings) -> MemoryLayerSettings) {
         drainMutex.withLock {
             val next = settingsStore.update(transform)
+            if (!next.enabled || !next.proceduralTraceCaptureEnabled) MemoryRuntimeBridge.replayLedger?.invalidateAll()
             mutableEngines.value = next.assembleAgents(engineProvider, nowEpochMillis)
             resetLayers()
         }
@@ -619,6 +620,8 @@ class MemoryLayerController(
                 if (owner == workflowId) runCatchingCancellable { held.record(key, null) }
             }
             resetLayers()
+            // Replay templates were generalised from what this memory held: they go with it.
+            MemoryRuntimeBridge.replayLedger?.invalidateAll()
         }
         publish()
     }
@@ -641,6 +644,8 @@ class MemoryLayerController(
                 if (store.replaceIfRevision(contextual.revision, contextual.without(episodeId))) break
             }
             resetLayers()
+            // A forgotten episode may be a source of a replay template; none outlives forgetting.
+            MemoryRuntimeBridge.replayLedger?.invalidateAll()
         }
         publish()
     }
@@ -992,7 +997,23 @@ class MemoryLayerController(
             return null
         }
         val now = nowEpochMillis()
-        return com.hereliesaz.geministrator.memory.procedural.HabitOffers.offerText(habits, formedSequences(workflowId), objective, now)
+        val offers = com.hereliesaz.geministrator.memory.procedural.HabitOffers.offerText(habits, formedSequences(workflowId), objective, now)
+        // The keeper's approved habits, as references the agent may choose with a line of its own.
+        val catalogue = MemoryRuntimeBridge.replayLedger?.state?.value
+            ?.let { com.hereliesaz.geministrator.memory.procedural.HabitCatalogue.render(it, habits) }
+        return listOfNotNull(offers, catalogue).joinToString("\n").ifBlank { null }
+    }
+
+    /**
+     * Tasks the keeper's approved executor habits propose for [objective]: the same proposals the Habits panel
+     * makes by hand, empty when none is approved and verified. They are ordinary tasks; adding them to a workflow
+     * puts a human-approval task in front of each.
+     */
+    suspend fun habitStepTasks(workflowId: String, objective: String): List<com.hereliesaz.geministrator.domain.TaskDefinition> {
+        val state = MemoryRuntimeBridge.replayLedger?.state?.value ?: return emptyList()
+        return com.hereliesaz.geministrator.memory.procedural.HabitStepReplay.plan(
+            formedHabits(workflowId), formedSequences(workflowId), objective, state,
+        )
     }
 
     /**
@@ -1480,6 +1501,10 @@ class MemoryLayerController(
         MemoryRuntimeBridge.promptContextProvider = promptContextProvider
         MemoryRuntimeBridge.procedureTraceSink = procedureTraceSink
         MemoryRuntimeBridge.procedureTraceReader = procedureTraceReader
+        MemoryRuntimeBridge.habitLearningOn = { active && settings.value.proceduralTraceCaptureEnabled }
+        MemoryRuntimeBridge.habitStepProposer = { objective ->
+            selectedWorkflow()?.let { habitStepTasks(it, objective) }.orEmpty()
+        }
         scope.launch { runCatchingCancellable { recoverCapturedSessions() } }
         drainSoon()
     }

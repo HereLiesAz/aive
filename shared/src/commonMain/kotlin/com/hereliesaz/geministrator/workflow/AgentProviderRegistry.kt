@@ -22,6 +22,7 @@ import com.hereliesaz.geministrator.orchestration.LocalOrchestrationUtilityFamil
 import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.hereliesaz.geministrator.providers.AgentCapabilities
 import com.hereliesaz.geministrator.providers.AgentProvider
+import com.hereliesaz.geministrator.providers.HabitReplayAgentProvider
 import com.hereliesaz.geministrator.providers.OnDeviceTextAgentProvider
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.sync.withLock
@@ -49,6 +50,11 @@ data class ProviderSelectionRequest(
      * pinned creature, which reports the failure instead of switching silently.
      */
     val failoverAllowed: Boolean = false,
+    /**
+     * An approved habit may answer this task with no model call ([com.hereliesaz.geministrator.memory.procedural.HabitReplayPlanner]
+     * said so just now). The replay provider then goes first; unless it is excluded, a task without this flag never sees it.
+     */
+    val habitReplay: Boolean = false,
 )
 
 class AgentProviderRegistry(
@@ -232,6 +238,18 @@ class AgentProviderRegistry(
                 return provider
             }
             else -> Unit
+        }
+
+        // An approved habit that can answer this task goes first, ahead of a pinned provider: the keeper approved it.
+        if (request.habitReplay) {
+            providersById[HabitReplayAgentProvider.ID]
+                ?.takeIf { it.id !in request.excludedProviderIds }
+                ?.let { replay ->
+                    val supported = readableCapabilities(replay)?.supported
+                    if (supported != null && supported.containsAll(required) && replay.supportsRepository(request.repository)) {
+                        return replay.also { notePicked(it) }
+                    }
+                }
         }
 
         // The on-device provider is a candidate only for a small task that needs no repository access

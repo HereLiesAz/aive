@@ -202,6 +202,8 @@ sealed interface AgentEvent {
          * unknown, not because the run was free. A dollar cap does not treat such usage as zero.
          */
         val costUnknown: Boolean = false,
+        /** Tokens a model call would have used and this run did not (a replayed habit); 0 for every ordinary run. */
+        val tokensAvoided: Long = 0,
     ) : AgentEvent {
         init {
             require(cacheHitFraction == null || cacheHitFraction in 0f..1f) {

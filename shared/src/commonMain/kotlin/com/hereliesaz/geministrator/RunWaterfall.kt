@@ -48,7 +48,7 @@ internal data class WaterfallSegment(val phase: WaterfallPhase, val startMillis:
 }
 
 /** Provider usage summed over an attempt; [costUsd] is null when no provider reported a cost. */
-internal data class WaterfallUsage(val inputTokens: Long = 0, val outputTokens: Long = 0, val costUsd: Double? = null) {
+internal data class WaterfallUsage(val inputTokens: Long = 0, val outputTokens: Long = 0, val costUsd: Double? = null, val tokensAvoided: Long = 0) {
     val totalTokens: Long get() = inputTokens + outputTokens
 }
 
@@ -243,6 +243,7 @@ private class BarBuilder(val taskId: TaskDefinitionId, var attempt: Int, val sta
     private var input = 0L
     private var output = 0L
     private var cost: Double? = null
+    private var avoided = 0L
     private var usageSeen = false
 
     val phase: WaterfallPhase get() = marks.last().first
@@ -277,6 +278,7 @@ private class BarBuilder(val taskId: TaskDefinitionId, var attempt: Int, val sta
         input += usage.inputTokens ?: 0
         output += usage.outputTokens ?: 0
         usage.costUsd?.let { cost = (cost ?: 0.0) + it }
+        avoided += usage.tokensAvoided
     }
 
     fun build(endMillis: Long, ongoing: Boolean): WaterfallBar {
@@ -293,7 +295,7 @@ private class BarBuilder(val taskId: TaskDefinitionId, var attempt: Int, val sta
             segments = segments,
             outcome = outcome,
             ongoing = ongoing,
-            usage = if (usageSeen) WaterfallUsage(input, output, cost) else null,
+            usage = if (usageSeen) WaterfallUsage(input, output, cost, avoided) else null,
         )
     }
 }

@@ -886,6 +886,7 @@ class ProviderBackedManagedSessionGateway(
         cacheHitFraction = cacheHitFraction,
         latencyMillis = latencyMillis,
         costUnknown = costUnknown,
+        tokensAvoided = tokensAvoided,
     ).sanitized()
 
     private fun AgentEvent.memoryReplayKey(): String = when (this) {
@@ -898,7 +899,7 @@ class ProviderBackedManagedSessionGateway(
         is AgentEvent.Completed -> "completed:${runId.value}"
         is AgentEvent.Failed -> "failed:${runId.value}:${reason}"
         is AgentEvent.UsageReported ->
-            "usage:${runId.value}:${inputTokens}:${outputTokens}:${costUsd}:${cacheHitFraction}:${latencyMillis}:${costUnknown}"
+            "usage:${runId.value}:${inputTokens}:${outputTokens}:${costUsd}:${cacheHitFraction}:${latencyMillis}:${costUnknown}:${tokensAvoided}"
     }
 
     private fun List<ProviderArtifact>.upsertArtifact(artifact: ProviderArtifact): List<ProviderArtifact> {

@@ -2106,13 +2106,19 @@ class ApplicationRuntime private constructor(
              * test's scheduler needs to stay deterministic.
              */
             runtimeDispatcher: kotlinx.coroutines.CoroutineDispatcher? = null,
+            /** Decides which approved habits answer a task with no model call; null replays nothing. */
+            habitReplay: com.hereliesaz.geministrator.memory.procedural.HabitReplayPlanner? = null,
+            /** Whether habit learning is on; replay learns and replays only while it is. */
+            habitLearningOn: () -> Boolean = { true },
         ): ApplicationRuntime {
             val runtimeJob = SupervisorJob(scope.coroutineContext[Job])
             val runtimeScope = runtimeScopeOf(scope, runtimeJob, runtimeDispatcher)
             // Refinement-ladder training data: attached here, recording only once capture is switched on.
             com.hereliesaz.geministrator.workflow.refinement.LadderDatasetBridge.attach(persistence.inferenceSettings)
             val registry = providerRegistry ?: AgentProviderRegistry(
-                providers = providers,
+                providers = providers + listOfNotNull(
+                    habitReplay?.let { com.hereliesaz.geministrator.providers.HabitReplayAgentProvider(it) },
+                ),
                 inferenceSettings = persistence.inferenceSettings,
                 orchestrationUtilities = orchestrationUtilities,
                 localModelLibrary = localModelLibrary,
@@ -2141,6 +2147,7 @@ class ApplicationRuntime private constructor(
                     eventSink = RepositoryWorkflowEventSink(persistence.events),
                     orchestrationUtilities = orchestrationUtilities,
                     surfaceRuntime = roleSurfaceRuntime,
+                    habitReplay = habitReplay,
                 )
                 // Nested workflow nodes run child runs through this same engine and persistence.
                 // Each child gets its own coordinator because coordinator cycles are not reentrant.
@@ -2153,6 +2160,13 @@ class ApplicationRuntime private constructor(
                     orchestrationUtilities = orchestrationUtilities,
                     surfaceRuntime = roleSurfaceRuntime,
                     spendCaps = spendCaps,
+                    habitReplayObserver = habitReplay?.let {
+                        com.hereliesaz.geministrator.workflow.HabitReplayObserver(
+                            ledger = { it.ledger },
+                            allowed = habitLearningOn,
+                            events = RepositoryWorkflowEventSink(persistence.events),
+                        )
+                    },
                     deadlineAllowance = { task, taskRun ->
                         val provider = taskRun.assignedProviderId?.let(registry::provider)
                         val kind = com.hereliesaz.geministrator.workflow.DeadlinePolicy

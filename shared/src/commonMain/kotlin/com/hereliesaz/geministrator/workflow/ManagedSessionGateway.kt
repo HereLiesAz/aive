@@ -185,6 +185,8 @@ data class ManagedSessionUsage(
      * says so instead of counting it as free ([SpendCaps]).
      */
     val costUnknown: Boolean = false,
+    /** Tokens a replayed habit saved (see [AgentEvent.UsageReported.tokensAvoided]). */
+    val tokensAvoided: Long = 0,
 )
 
 /**
@@ -201,6 +203,7 @@ internal fun ManagedSessionUsage.sanitized(): ManagedSessionUsage {
         costUnknown = costUnknown || unusableCost,
         cacheHitFraction = cacheHitFraction?.takeIf { it in 0f..1f },
         latencyMillis = latencyMillis?.takeIf { it >= 0L },
+        tokensAvoided = tokensAvoided.coerceAtLeast(0L),
     )
 }
 
@@ -215,6 +218,7 @@ internal fun ManagedSessionUsage?.plusReport(next: ManagedSessionUsage): Managed
         cacheHitFraction = next.cacheHitFraction ?: base.cacheHitFraction,
         latencyMillis = next.latencyMillis ?: base.latencyMillis,
         costUnknown = base.costUnknown || next.costUnknown,
+        tokensAvoided = base.tokensAvoided + next.tokensAvoided,
     )
 }
 
@@ -223,7 +227,7 @@ internal fun com.hereliesaz.geministrator.domain.TaskUsage?.plus(
     report: ManagedSessionUsage,
 ): com.hereliesaz.geministrator.domain.TaskUsage? {
     val clean = report.sanitized()
-    if (clean.inputTokens == null && clean.outputTokens == null && clean.costUsd == null && !clean.costUnknown) return this
+    if (clean.inputTokens == null && clean.outputTokens == null && clean.costUsd == null && !clean.costUnknown && clean.tokensAvoided == 0L) return this
     val base = this ?: com.hereliesaz.geministrator.domain.TaskUsage()
     return base.copy(
         inputTokens = base.inputTokens + (clean.inputTokens ?: 0),
@@ -233,6 +237,7 @@ internal fun com.hereliesaz.geministrator.domain.TaskUsage?.plus(
             else -> (base.costUsd ?: 0.0) + clean.costUsd
         },
         costUnknown = base.costUnknown || clean.costUnknown,
+        tokensAvoided = base.tokensAvoided + clean.tokensAvoided,
     )
 }
 

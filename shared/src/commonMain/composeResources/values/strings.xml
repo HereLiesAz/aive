@@ -835,6 +835,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="waterfall_outcome_ended">ended with the run</string>
     <string name="waterfall_usage">%1$s tokens in, %2$s out</string>
     <string name="waterfall_cost">cost %1$s</string>
+    <string name="waterfall_avoided">about %1$s tokens avoided by reusing a habit</string>
     <string name="waterfall_no_usage">No usage reported</string>
     <string name="hive_more_editing">More editing</string>
     <string name="hive_run_number">RUN %1$d</string>
@@ -1171,7 +1172,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="memory_similarity_needed_to_condense_0_1">Similarity needed to condense (0–1)</string>
     <string name="memory_stored_memory">Stored memory</string>
     <string name="memory_habits">Habits</string>
-    <string name="memory_habits_hint">What the swarm keeps doing, learned from what finished: an operation done three or more times is offered to the agents whose task names it, as counts and facts. Nothing here runs anything. A flag, a decision or an override is only information; the habit can always be chosen.</string>
+    <string name="memory_habits_hint">What the swarm keeps doing, learned from what finished: an operation done three or more times is offered to the agents whose task names it, as counts and facts. A habit runs only after you approve it here, and every step it proposes still waits at its own approval. A flag, a decision or an override is only information; the habit can always be chosen.</string>
     <string name="memory_habits_learning">Habits: learning</string>
     <string name="memory_habits_off">Habits: off</string>
     <string name="memory_habits_none">No habit has formed yet. It takes three finished runs of the same named operation.</string>
@@ -2265,4 +2266,12 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="improvement_quick_change">quick change</string>
     <string name="improvement_new_generation">new generation</string>
     <string name="step_always_asks">Always asks you first, and tries once</string>
+    <string name="memory_habits_replay_summary">Replay: %1$s habits approved to run, %2$s replays with no model call, about %3$s tokens avoided, %4$s times an agent chose a habit the matcher had missed.</string>
+    <string name="memory_habits_replay_text_line">Text habit %1$s, version %2$s: generalised from %3$s accepted runs. %4$s. Replayed %5$s times, about %6$s tokens avoided.</string>
+    <string name="memory_habits_replay_step_line">Steps habit %1$s, version %2$s: %3$s. %4$s. Approving it lets it be proposed as steps; each step still waits for your approval.</string>
+    <string name="memory_habits_replay_approved">Approved to run</string>
+    <string name="memory_habits_replay_unapproved">Not approved</string>
+    <string name="memory_habits_replay_quarantined">Quarantined: %1$s</string>
+    <string name="memory_habits_replay_approve">Approve</string>
+    <string name="memory_habits_replay_revoke">Revoke</string>
 </resources>
