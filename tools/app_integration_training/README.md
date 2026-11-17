@@ -395,9 +395,9 @@ been tried on a device; until then it is `null` and the stock model runs.
 
 ## Colab
 
-The notebook also runs on Google Colab:
+The notebook also runs on Google Colab. Open it with this link, which always loads the current file from `main`: [Open in Colab](https://colab.research.google.com/github/HereLiesAz/aive/blob/main/tools/app_integration_training/app_integration_adapter.ipynb). Do not reopen an older copy from Drive, and do not use "Save a copy in GitHub" on it (that overwrites the generated notebook on `main`; "Save a copy in Drive" is safe).
 
-1. File > Open notebook > GitHub, and open `tools/app_integration_training/app_integration_adapter.ipynb` from `HereLiesAz/aive`.
+1. Open the link above.
 2. Runtime > Change runtime type > a GPU (T4 is enough to start).
 3. Left sidebar > Secrets: add `GITHUB_TOKEN` (`contents:write` on `HereLiesAz/aive`) and turn on Notebook access. It is only needed when `UPLOAD = True`.
 4. Run with `SMOKE = True` first. Allow the Google Drive prompt: `state.json` and `results.json` live in `MyDrive/aive-app-integration`, so a rerun resumes after a disconnect.
