@@ -10,9 +10,19 @@ import com.hereliesaz.geministrator.memory.AndroidOrtMemorySessionManager
 import com.hereliesaz.geministrator.memory.MemoryEpoch8ModelCatalog
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentRole
 import com.hereliesaz.geministrator.providers.OnDeviceTextGeneration
+import com.hereliesaz.geministrator.providers.OrtPrefixBackend
+import com.hereliesaz.geministrator.providers.OrtPrefixReuse
+import com.hereliesaz.geministrator.providers.OrtPrimedHead
+import com.hereliesaz.geministrator.providers.PromptPrefixStats
+import com.hereliesaz.geministrator.providers.PromptPrefixSwitch
+import com.hereliesaz.geministrator.providers.QwenChatPrompt
 import com.hereliesaz.geministrator.providers.OnDeviceTextGenerator
+import java.io.File
 import java.nio.FloatBuffer
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
@@ -37,39 +47,104 @@ internal class AndroidOnDeviceTextGenerator(
 
     override fun isReady(): Boolean = installedRole() != null
 
+    /** What one generation works on; the held head outlives it, so the backend reads it only during a call. */
+    private class Call(
+        val session: OrtSession,
+        val tokenizer: HuggingFaceTokenizer,
+        val modelRoot: File,
+        val extraInputs: Map<String, OnnxTensor>,
+        val modelKey: String,
+    )
+
+    @Volatile
+    private var call: Call? = null
+
+    private fun current(): Call = checkNotNull(call) { "No generation is running" }
+
+    private fun generation(call: Call, text: String, inputTokens: Long): OnDeviceTextGeneration =
+        OnDeviceTextGeneration(
+            text = text,
+            inputTokens = inputTokens,
+            outputTokens = call.tokenizer.encode(text).ids.size.toLong(),
+        )
+
+    private inner class HeldPrefix(private val held: AndroidOrtHeldHead) : OrtPrimedHead {
+        override fun generate(tail: String, maxNewTokens: Int): OnDeviceTextGeneration {
+            val c = current()
+            val text = generator.generate(
+                session = c.session,
+                tokenizer = c.tokenizer,
+                modelRoot = c.modelRoot,
+                prompt = tail,
+                maxNewTokens = maxNewTokens,
+                extraInputs = c.extraInputs,
+                heldHead = held,
+            ).trim()
+            return generation(c, text, held.length + c.tokenizer.encode(tail).ids.size.toLong())
+        }
+
+        override fun close() = held.close()
+    }
+
+    private val backend = object : OrtPrefixBackend {
+        override fun encode(text: String): LongArray = current().tokenizer.encode(text).ids
+
+        override fun prime(head: String): OrtPrimedHead {
+            val c = current()
+            return HeldPrefix(generator.prime(c.session, c.tokenizer, c.modelRoot, head, c.extraInputs))
+        }
+
+        override fun generateWhole(prompt: String, maxNewTokens: Int): OnDeviceTextGeneration {
+            val c = current()
+            val text = generator.generate(
+                session = c.session,
+                tokenizer = c.tokenizer,
+                modelRoot = c.modelRoot,
+                prompt = prompt,
+                maxNewTokens = maxNewTokens,
+                extraInputs = c.extraInputs,
+            ).trim()
+            return generation(c, text, c.tokenizer.encode(prompt).ids.size.toLong())
+        }
+    }
+
+    private val callLock = Mutex()
+    private val reuse = OrtPrefixReuse(backend, adapterId = { call?.modelKey }, switch = PromptPrefixSwitch())
+
+    override fun prefixStats(): PromptPrefixStats = reuse.stats()
+
     override suspend fun generate(system: String, user: String, maxNewTokens: Int): OnDeviceTextGeneration =
-        withContext(Dispatchers.Default) {
-            val role = installedRole() ?: error("No local instruct model is installed")
-            // Already installed (checked above), so this resolves the files without downloading.
-            val installed = installer.ensureInstalled(role)
-            // The memory layer's own spec for this clerk, so its cached session is reused.
-            val prepared = sessions.sessionFor(installed.onnxModel.absolutePath, MemoryEpoch8ModelCatalog.modelSpec(role))
-            val prompt = buildString {
-                append("<|im_start|>system\n").append(system).append("<|im_end|>\n")
-                append("<|im_start|>user\n").append(user).append("<|im_end|>\n")
-                append("<|im_start|>assistant\n")
-            }
+        generate(system, "", user, maxNewTokens)
+
+    override suspend fun generate(
+        system: String,
+        stablePrefix: String,
+        dynamic: String,
+        maxNewTokens: Int,
+    ): OnDeviceTextGeneration = withContext(Dispatchers.Default) {
+        val role = installedRole() ?: error("No local instruct model is installed")
+        // Already installed (checked above), so this resolves the files without downloading.
+        val installed = installer.ensureInstalled(role)
+        // The memory layer's own spec for this clerk, so its cached session is reused.
+        val prepared = sessions.sessionFor(installed.onnxModel.absolutePath, MemoryEpoch8ModelCatalog.modelSpec(role))
+        val split = QwenChatPrompt.formatSplit(system, stablePrefix, dynamic)
+        callLock.withLock {
             HuggingFaceTokenizer.newInstance(installed.root.toPath()).use { tokenizer ->
                 val zeroAdapter = zeroAdapterInputs(prepared.session)
-                val text = try {
-                    generator.generate(
-                        session = prepared.session,
-                        tokenizer = tokenizer,
-                        modelRoot = installed.root,
-                        prompt = prompt,
-                        maxNewTokens = maxNewTokens,
-                        extraInputs = zeroAdapter,
-                    ).trim()
+                try {
+                    call = Call(prepared.session, tokenizer, installed.root, zeroAdapter, installed.onnxModel.absolutePath)
+                    if (stablePrefix.isEmpty()) {
+                        backend.generateWhole(split.head + split.tail, maxNewTokens)
+                    } else {
+                        reuse.generate(split.head, split.tail, maxNewTokens)
+                    }
                 } finally {
+                    call = null
                     zeroAdapter.values.forEach(OnnxTensor::close)
                 }
-                OnDeviceTextGeneration(
-                    text = text,
-                    inputTokens = tokenizer.encode(prompt).ids.size.toLong(),
-                    outputTokens = tokenizer.encode(text).ids.size.toLong(),
-                )
             }
         }
+    }
 
     /**
      * Zero-valued tensors for the base graph's LoRA inputs (every float input the generation loop

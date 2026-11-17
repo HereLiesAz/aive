@@ -48,7 +48,7 @@ interface LiteRtLmModel {
         complete(prefix + rest, listener)
 
     /** How the prefix cache did, or null when this engine keeps none. */
-    fun prefixStats(): LiteRtLmPrefixStats? = null
+    fun prefixStats(): PromptPrefixStats? = null
 
     fun close()
 }
@@ -106,7 +106,7 @@ class LiteRtLmTextGenerator(
     }
 
     /** How the prefix cache has done on the loaded engine; null when none is loaded or it keeps none. */
-    fun prefixStats(): LiteRtLmPrefixStats? = model?.prefixStats()
+    override fun prefixStats(): PromptPrefixStats? = model?.prefixStats()
 
     override suspend fun generate(system: String, user: String, maxNewTokens: Int): OnDeviceTextGeneration =
         generate(system, "", user, maxNewTokens)

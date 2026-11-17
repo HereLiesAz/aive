@@ -39,6 +39,9 @@ interface OnDeviceTextGenerator {
         dynamic: String,
         maxNewTokens: Int,
     ): OnDeviceTextGeneration = generate(system, stablePrefix + dynamic, maxNewTokens)
+
+    /** How this generator's prompt-prefix cache has done, or null when it keeps none or none is loaded. */
+    fun prefixStats(): PromptPrefixStats? = null
 }
 
 /**

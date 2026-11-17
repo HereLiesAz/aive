@@ -193,6 +193,9 @@ import com.hereliesaz.geministrator.resources.settings_local_orchestration_2
 import com.hereliesaz.geministrator.resources.settings_on_device_small_tasks
 import com.hereliesaz.geministrator.resources.settings_on_device_small_tasks_description
 import com.hereliesaz.geministrator.resources.settings_on_device_small_tasks_no_model
+import com.hereliesaz.geministrator.resources.settings_on_device_small_tasks_reuse_idle
+import com.hereliesaz.geministrator.resources.settings_on_device_small_tasks_reuse_off
+import com.hereliesaz.geministrator.resources.settings_on_device_small_tasks_reuse_on
 import com.hereliesaz.geministrator.resources.settings_on_device_small_tasks_runtime
 import com.hereliesaz.geministrator.resources.settings_on_device_small_tasks_off
 import com.hereliesaz.geministrator.resources.settings_on_device_small_tasks_on
@@ -1136,8 +1139,19 @@ internal fun ProviderSettingsScreen(
                 )
             }
             setting.runtimeLabel?.let { label ->
+                val reuse = setting.promptReuse
                 Text(
-                    stringResource(Res.string.settings_on_device_small_tasks_runtime, label),
+                    stringResource(Res.string.settings_on_device_small_tasks_runtime, label) +
+                        when {
+                            reuse == null -> ""
+                            reuse.switchedOff -> " " + stringResource(Res.string.settings_on_device_small_tasks_reuse_off)
+                            reuse.tasks == 0L -> " " + stringResource(Res.string.settings_on_device_small_tasks_reuse_idle)
+                            else -> " " + stringResource(
+                                Res.string.settings_on_device_small_tasks_reuse_on,
+                                reuse.hits.toInt(),
+                                reuse.tasks.toInt(),
+                            )
+                        },
                     style = AzphaltType.body,
                     color = azphaltOnSurface(),
                 )

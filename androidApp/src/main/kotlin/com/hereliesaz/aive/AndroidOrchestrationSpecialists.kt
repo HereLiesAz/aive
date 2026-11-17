@@ -338,6 +338,7 @@ internal class AndroidOrchestrationCausalGenerator(
         prompt: String,
         maxNewTokens: Int,
         extraInputs: Map<String, OnnxTensor> = emptyMap(),
+        heldHead: AndroidOrtHeldHead? = null,
     ): String {
         val config = loadModelConfig(modelRoot)
         val promptIds = tokenizer.encode(prompt).ids
@@ -346,15 +347,20 @@ internal class AndroidOrchestrationCausalGenerator(
             .mapNotNull { token -> tokenizer.encode(token).ids.singleOrNull() }
             .toSet()
         val generated = mutableListOf<Long>()
-        var totalLength = promptIds.size
+        var totalLength = (heldHead?.length ?: 0) + promptIds.size
         var activeResult: OrtSession.Result? = null
         var stopped = false
         try {
-            val owned = mutableListOf<OnnxTensor>()
-            activeResult = try {
-                session.run(buildInputs(session, promptIds, totalLength, null, config, owned, extraInputs))
-            } finally {
-                owned.forEach(OnnxTensor::close)
+            activeResult = if (heldHead == null) {
+                val owned = mutableListOf<OnnxTensor>()
+                try {
+                    session.run(buildInputs(session, promptIds, totalLength, null, config, owned, extraInputs))
+                } finally {
+                    owned.forEach(OnnxTensor::close)
+                }
+            } else {
+                // [prompt] is only the tail: it runs on the head's `present.*` tensors, which [heldHead] keeps.
+                runChunks(session, promptIds, heldHead.length, heldHead.result, config, extraInputs, logitsOnLast = true)
             }
             repeat(maxNewTokens) {
                 if (stopped) return@repeat
@@ -379,6 +385,65 @@ internal class AndroidOrchestrationCausalGenerator(
             activeResult?.close()
         }
         return tokenizer.decode(generated.toLongArray(), true)
+    }
+
+    /**
+     * Runs [headPrompt] once and keeps its `present.*` tensors so later calls can run only their tail on
+     * them. The caller owns the returned head and must close it.
+     */
+    fun prime(
+        session: OrtSession,
+        tokenizer: HuggingFaceTokenizer,
+        modelRoot: File,
+        headPrompt: String,
+        extraInputs: Map<String, OnnxTensor> = emptyMap(),
+    ): AndroidOrtHeldHead {
+        val config = loadModelConfig(modelRoot)
+        val headIds = tokenizer.encode(headPrompt).ids
+        require(headIds.isNotEmpty()) { "Tokenizer returned no head tokens" }
+        val result = runChunks(session, headIds, 0, null, config, extraInputs, logitsOnLast = false)
+        return AndroidOrtHeldHead(result, headIds.size)
+    }
+
+    /**
+     * Runs [ids] in bounded chunks (the graph emits full-sequence logits, so a long chunk copies a large
+     * tensor), each on the one before it; the first chunk's past is [past], which this never closes.
+     * Only the last chunk returns logits, and only when [logitsOnLast]. The caller closes the result.
+     */
+    private fun runChunks(
+        session: OrtSession,
+        ids: LongArray,
+        startLength: Int,
+        past: OrtSession.Result?,
+        config: ModelConfig,
+        extraInputs: Map<String, OnnxTensor>,
+        logitsOnLast: Boolean,
+    ): OrtSession.Result {
+        val cacheOnly = session.outputNames.filterTo(linkedSetOf()) { it != "logits" }
+        var length = startLength
+        var own: OrtSession.Result? = null
+        try {
+            var start = 0
+            while (start < ids.size) {
+                val end = minOf(start + PREFILL_CHUNK_TOKENS, ids.size)
+                val chunk = ids.copyOfRange(start, end)
+                length += chunk.size
+                val owned = mutableListOf<OnnxTensor>()
+                val result = try {
+                    val inputs = buildInputs(session, chunk, length, own ?: past, config, owned, extraInputs)
+                    if (end == ids.size && logitsOnLast) session.run(inputs) else session.run(inputs, cacheOnly)
+                } finally {
+                    owned.forEach(OnnxTensor::close)
+                }
+                own?.close()
+                own = result
+                start = end
+            }
+            return requireNotNull(own) { "No tokens to run" }
+        } catch (failure: Throwable) {
+            own?.close()
+            throw failure
+        }
     }
 
     private fun buildInputs(
@@ -478,4 +543,14 @@ internal class AndroidOrchestrationCausalGenerator(
         this[name]?.jsonPrimitive?.int ?: error("Model config is missing field")
 
     private data class ModelConfig(val numKeyValueHeads: Int, val headDim: Int)
+
+    private companion object {
+        /** Tokens run at once when a head or tail is read on top of an existing cache. */
+        const val PREFILL_CHUNK_TOKENS = 32
+    }
+}
+
+/** A prompt head already run: its `present.*` outputs, kept alive until [close], and its token count. */
+internal class AndroidOrtHeldHead(val result: OrtSession.Result, val length: Int) : AutoCloseable {
+    override fun close() = result.close()
 }

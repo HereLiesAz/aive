@@ -176,8 +176,8 @@ class LiteRtLmPrefixReuseTest {
         assertEquals(2, r.backend.primed.size)
         r.run(roleA)
         assertEquals(2, r.backend.primed.size)
-        assertEquals(LiteRtLmPrefixKey("none", "h"), LiteRtLmPrefixKey.of(null, "h"))
-        assertEquals(LiteRtLmPrefixKey("none", "h"), LiteRtLmPrefixKey.of("  ", "h"))
+        assertEquals(PromptPrefixKey("none", "h"), PromptPrefixKey.of(null, "h"))
+        assertEquals(PromptPrefixKey("none", "h"), PromptPrefixKey.of("  ", "h"))
     }
 
     @Test

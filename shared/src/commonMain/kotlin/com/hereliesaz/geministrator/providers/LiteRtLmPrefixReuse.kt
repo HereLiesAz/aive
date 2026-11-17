@@ -3,33 +3,6 @@ package com.hereliesaz.geministrator.providers
 import kotlin.concurrent.Volatile
 import kotlinx.coroutines.CancellationException
 
-/**
- * How often the LiteRT-LM prompt-prefix cache helped. [hits] reused a primed prefix, [misses] primed a
- * new one, [fallbacks] gave up on the cache and ran the whole prompt. [prefixTokensEstimate] is the
- * estimated size of the prefix primed now (0 when none), so `hits * prefixTokensEstimate` is roughly the
- * prompt work saved. Exposed on [LiteRtLmTextGenerator.prefixStats]; no screen shows it yet.
- */
-data class LiteRtLmPrefixStats(
-    val hits: Long = 0,
-    val misses: Long = 0,
-    val fallbacks: Long = 0,
-    val prefixTokensEstimate: Int = 0,
-)
-
-/**
- * What a primed prefix is valid for: the adapter the engine ran under ([NO_ADAPTER] for the plain base)
- * and the exact head text. A prefix primed under one adapter is never reused under another, because the
- * adapter changes the keys and values the model stores for the same text.
- */
-data class LiteRtLmPrefixKey(val adapterId: String, val head: String) {
-    companion object {
-        const val NO_ADAPTER: String = "none"
-
-        fun of(adapterId: String?, head: String): LiteRtLmPrefixKey =
-            LiteRtLmPrefixKey(adapterId?.takeIf(String::isNotBlank) ?: NO_ADAPTER, head)
-    }
-}
-
 /** A session that has already read a prompt head. Each [start] runs one tail on a copy of it. */
 interface LiteRtLmPrimedPrefix {
     /** Runs [tail] on a copy of the primed state; the returned completion releases the copy. Throws if the copy or the stream cannot start. */
@@ -49,15 +22,6 @@ interface LiteRtLmPrefixBackend {
 }
 
 /**
- * Remembers across engine reloads that the prefix path failed once, so a broken cache is tried once per
- * process, not once per load.
- */
-class LiteRtLmPrefixSwitch {
-    @Volatile
-    var disabled: Boolean = false
-}
-
-/**
  * Keeps one primed [LiteRtLmPrimedPrefix] for the most recent head, so a call whose head matches runs only
  * its tail. Not thread-safe by itself: [LiteRtLmTextGenerator] calls it only while holding its
  * single-generation lock, which also covers [close].
@@ -70,23 +34,23 @@ class LiteRtLmPrefixSwitch {
 class LiteRtLmPrefixReuse(
     private val backend: LiteRtLmPrefixBackend,
     private val adapterId: () -> String? = { null },
-    private val switch: LiteRtLmPrefixSwitch = LiteRtLmPrefixSwitch(),
+    private val switch: PromptPrefixSwitch = PromptPrefixSwitch(),
     private val minPrefixTokens: Int = MIN_PREFIX_TOKENS,
 ) {
-    private var primedKey: LiteRtLmPrefixKey? = null
+    private var primedKey: PromptPrefixKey? = null
     private var primed: LiteRtLmPrimedPrefix? = null
     private var primedTokens = 0
 
     @Volatile
-    private var snapshot = LiteRtLmPrefixStats()
+    private var snapshot = PromptPrefixStats()
 
-    fun stats(): LiteRtLmPrefixStats = snapshot
+    fun stats(): PromptPrefixStats = snapshot.copy(switchedOff = switch.disabled)
 
     /** Runs [tail] after [head]; the text sent to the model is exactly head + tail either way. */
     fun complete(head: String, tail: String, listener: LiteRtLmCompletionListener): LiteRtLmCompletion {
         val headTokens = OnDeviceTextAgentProvider.estimateTokens(head.length)
         if (switch.disabled || headTokens < minPrefixTokens) return backend.completeWhole(head + tail, listener)
-        val key = LiteRtLmPrefixKey.of(adapterId(), head)
+        val key = PromptPrefixKey.of(adapterId(), head)
         try {
             val current = primed
             val hit = current != null && primedKey == key
