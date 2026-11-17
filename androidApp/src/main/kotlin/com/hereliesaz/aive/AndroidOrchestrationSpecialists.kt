@@ -13,6 +13,8 @@ import com.hereliesaz.geministrator.inference.LocalModelLoadPlan
 import com.hereliesaz.geministrator.inference.LocalModelRuntimeCapabilities
 import com.hereliesaz.geministrator.memory.AndroidOrtMemorySessionManager
 import com.hereliesaz.geministrator.memory.MemoryMicroAgentModelSpec
+import com.hereliesaz.geministrator.orchestration.AppIntegrationInstallState
+import com.hereliesaz.geministrator.orchestration.AppIntegrationRelease
 import com.hereliesaz.geministrator.orchestration.CatalogBackedLocalOrchestrationSpecialistRuntime
 import com.hereliesaz.geministrator.orchestration.DecisionInformedOrchestrationUtilities
 import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities
@@ -77,6 +79,8 @@ internal object AndroidOrchestrationSpecialists {
 internal class AndroidOrchestrationSpecialistInstaller(
     context: Context,
     httpClient: HttpClient,
+    /** The released app-integration adapter; tests pass a fixture. */
+    private val appIntegration: () -> AppIntegrationRelease? = OrchestrationSpecialistCatalog::appIntegration,
 ) {
     private val installRoot = File(context.filesDir, "aive/orchestration-specialists")
     private val downloader = AndroidResumableFileDownloader(httpClient)
@@ -95,6 +99,18 @@ internal class AndroidOrchestrationSpecialistInstaller(
         }.distinctBy(LocalModelArtifactDescriptor::logicalArtifactId)
     }
 
+    /** The released app-integration adapter and its shared base for Android (base first), or none. */
+    fun appIntegrationArtifacts(): List<LocalModelArtifactDescriptor> =
+        appIntegration()?.artifacts(AndroidOrchestrationSpecialists.runtimeCapabilities).orEmpty()
+
+    /** The released adapter's release (size, gate line), or null; the same value the generators read. */
+    fun appIntegrationRelease(): AppIntegrationRelease? = appIntegration()
+
+    fun appIntegrationState(): AppIntegrationInstallState = AppIntegrationInstallState.of(
+        appIntegration(),
+        AndroidOrchestrationSpecialists.runtimeCapabilities,
+    ) { installed(it) != null }
+
     /** The installed decision model's directory, or null when it is not released or not installed. */
     fun decisionModelRoot(): File? {
         val plan = runCatching {
@@ -109,7 +125,7 @@ internal class AndroidOrchestrationSpecialistInstaller(
     fun hasAnyInstalledReleasedArtifact(): Boolean = releasedArtifacts().any { installed(it) != null }
 
     fun allReleasedInstalled(): Boolean {
-        val artifacts = releasedArtifacts()
+        val artifacts = releasedArtifacts() + appIntegrationArtifacts()
         return artifacts.isNotEmpty() && artifacts.all { installed(it) != null }
     }
 
@@ -133,7 +149,9 @@ internal class AndroidOrchestrationSpecialistInstaller(
     }
 
     suspend fun installReleased(onProgress: (String) -> Unit = {}) = mutex.withLock {
-        val artifacts = releasedArtifacts()
+        // The app-integration adapter and its base install with the specialists: one action, as for the decision model.
+        val artifacts = (releasedArtifacts() + appIntegrationArtifacts())
+            .distinctBy(LocalModelArtifactDescriptor::logicalArtifactId)
         require(artifacts.isNotEmpty()) { "No released orchestration specialists are compatible with Android" }
         artifacts.forEachIndexed { artifactIndex, artifact ->
             if (installed(artifact) != null) return@forEachIndexed
@@ -144,6 +162,7 @@ internal class AndroidOrchestrationSpecialistInstaller(
                 url = artifact.downloadUrl,
                 output = downloaded,
                 expectedSha256 = artifact.sha256,
+                expectedSize = appIntegration()?.takeIf { it.adapter.logicalArtifactId == artifact.logicalArtifactId }?.adapterSizeBytes,
             )
             onProgress("Installing ${artifact.assetName}")
             if (artifact.kind == LocalModelArtifactKind.Adapter) {
@@ -180,7 +199,7 @@ internal class AndroidOrchestrationSpecialistInstaller(
         // Remove every artifact the released catalog knows about, not only the load plan Android
         // currently prefers. A device may still have a merged model from an older app version after
         // a newer catalog starts preferring shared-base adapters.
-        OrchestrationSpecialistCatalog.released().allArtifacts().forEach { artifact ->
+        (OrchestrationSpecialistCatalog.released().allArtifacts() + appIntegration()?.let { it.sharedBaseVariants + it.adapter }.orEmpty()).forEach { artifact ->
             if (artifact.kind == LocalModelArtifactKind.Adapter) {
                 val file = adapterFile(artifact)
                 file.delete()

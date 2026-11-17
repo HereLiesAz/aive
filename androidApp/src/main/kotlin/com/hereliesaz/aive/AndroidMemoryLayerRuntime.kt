@@ -34,6 +34,8 @@ import com.hereliesaz.geministrator.memory.MemoryMicroAgentRole
 import com.hereliesaz.geministrator.memory.MemoryModelReleaseBundle
 import com.hereliesaz.geministrator.memory.StructuredMemoryMicroAgent
 import com.hereliesaz.geministrator.inference.LiteRtLmModelCatalog
+import com.hereliesaz.geministrator.inference.LiteRtLmModelSelection
+import com.hereliesaz.geministrator.providers.AppIntegrationAdapterSelector
 import com.hereliesaz.geministrator.providers.LiteRtLmTextGenerator
 import com.hereliesaz.geministrator.providers.OnDeviceTextRuntime
 import com.hereliesaz.geministrator.providers.SelectingOnDeviceTextGenerator
@@ -562,6 +564,8 @@ private class AndroidMemoryLocalModels(
     /** Called after the LiteRT-LM model is installed or removed, so a loaded engine is dropped. */
     private val onLiteRtLmChanged: suspend () -> Unit,
     scope: CoroutineScope,
+    /** The merged app-integration model, once one is pinned in [LiteRtLmModelCatalog.adapterModel]; null now. */
+    private val adapterInstaller: AndroidLiteRtLmModelInstaller? = null,
 ) : MemoryLocalModelManager {
     private val mutableModels = MutableStateFlow(emptyList<MemoryLocalModelStatus>())
     override val models: StateFlow<List<MemoryLocalModelStatus>> = mutableModels.asStateFlow()
@@ -573,7 +577,10 @@ private class AndroidMemoryLocalModels(
     override suspend fun install(id: String) {
         mark(id) { it.copy(installing = true, error = null) }
         val failure = runCatching {
-            if (id == liteRtInstaller.artifact.id) {
+            if (adapterInstaller != null && id == adapterInstaller.artifact.id) {
+                adapterInstaller.install()
+                onLiteRtLmChanged()
+            } else if (id == liteRtInstaller.artifact.id) {
                 liteRtInstaller.install()
                 onLiteRtLmChanged()
             } else {
@@ -586,7 +593,10 @@ private class AndroidMemoryLocalModels(
     }
 
     override suspend fun remove(id: String) {
-        if (id == liteRtInstaller.artifact.id) {
+        if (adapterInstaller != null && id == adapterInstaller.artifact.id) {
+            onLiteRtLmChanged()
+            adapterInstaller.remove()
+        } else if (id == liteRtInstaller.artifact.id) {
             onLiteRtLmChanged()
             liteRtInstaller.remove()
         } else {
@@ -608,6 +618,15 @@ private class AndroidMemoryLocalModels(
             eyebrow = "LiteRT-LM",
             name = liteRtInstaller.artifact.displayName,
             installed = liteRtInstaller.modelFile() != null,
+        ) + listOfNotNull(
+            adapterInstaller?.let {
+                MemoryLocalModelStatus(
+                    id = it.artifact.id,
+                    eyebrow = "LiteRT-LM",
+                    name = it.artifact.displayName,
+                    installed = it.modelFile() != null,
+                )
+            },
         )
     }
 
@@ -624,6 +643,8 @@ internal class AndroidMemoryLayerRuntime(
     context: Context,
     httpClient: HttpClient,
     cacheDirectory: File,
+    /** Where the released app-integration adapter and its base are installed (Settings, Local orchestration). */
+    orchestrationInstaller: AndroidOrchestrationSpecialistInstaller,
 ) : AutoCloseable {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val installer = AndroidMemoryModelInstaller(context, httpClient)
@@ -646,8 +667,20 @@ internal class AndroidMemoryLayerRuntime(
     /** Small text tasks on the memory clerks' installed instruct model (see AndroidOnDeviceTextGenerator). */
     private val liteRtInstaller = AndroidLiteRtLmModelInstaller(context, httpClient, LiteRtLmModelCatalog.qwen25Instruct05b)
     private val resourceProbe = AndroidOnDeviceResourceProbe(context)
+    /** The merged app-integration model, only once one is pinned (null now); it is preferred when installed. */
+    private val liteRtAdapterInstaller = LiteRtLmModelCatalog.adapterModel?.let { AndroidLiteRtLmModelInstaller(context, httpClient, it) }
     private val liteRtGenerator = LiteRtLmTextGenerator(
-        modelPath = { if (liteRtLmAbiSupported()) liteRtInstaller.modelFile()?.absolutePath else null },
+        modelPath = {
+            if (!liteRtLmAbiSupported()) {
+                null
+            } else {
+                LiteRtLmModelSelection.choose(
+                    adapterModel = LiteRtLmModelCatalog.adapterModel,
+                    adapterModelPath = { liteRtAdapterInstaller?.modelFile()?.absolutePath },
+                    stockModelPath = { liteRtInstaller.modelFile()?.absolutePath },
+                )?.path
+            }
+        },
         loader = AndroidLiteRtLmEngineLoader(File(cacheDirectory, "litertlm")),
         resources = resourceProbe,
         scope = scope,
@@ -659,7 +692,18 @@ internal class AndroidMemoryLayerRuntime(
             SelectingOnDeviceTextGenerator.Candidate(OnDeviceTextRuntime.LiteRtLm, liteRtGenerator),
             SelectingOnDeviceTextGenerator.Candidate(
                 OnDeviceTextRuntime.OnnxRuntime,
-                AndroidOnDeviceTextGenerator(installer, sessionManager),
+                AndroidOnDeviceTextGenerator(
+                    installer,
+                    sessionManager,
+                    appIntegration = AppIntegrationAdapterSelector(
+                        release = orchestrationInstaller::appIntegrationRelease,
+                        runtime = AndroidOrchestrationSpecialists.runtimeCapabilities,
+                        installedAdapter = orchestrationInstaller::installed,
+                        installedBase = orchestrationInstaller::installed,
+                        load = { file -> AndroidLoraAdapter.load(file) },
+                        trainedFor = { adapter -> adapter.metadata["base"] },
+                    ),
+                ),
             ),
         ),
         resources = resourceProbe,
@@ -708,7 +752,7 @@ internal class AndroidMemoryLayerRuntime(
         procedureCatalog = com.hereliesaz.geministrator.memory.procedural.androidSqlProcedureCatalog(context, memoryLineage),
         engineProvider = engineProvider,
         scope = scope,
-        localModels = AndroidMemoryLocalModels(installer, liteRtInstaller, { liteRtGenerator.release() }, scope),
+        localModels = AndroidMemoryLocalModels(installer, liteRtInstaller, { liteRtGenerator.release() }, scope, liteRtAdapterInstaller),
     )
 
     fun attach() = controller.attach()

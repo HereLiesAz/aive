@@ -30,6 +30,16 @@ data class LocalOrchestrationSpecialistSetting(
     val totalRoles: Int,
     val onInstall: () -> Unit,
     val onRemove: () -> Unit,
+    /** The released app-integration adapter, installed with the specialists above; null when none is released. */
+    val appIntegration: AppIntegrationAdapterLine? = null,
+)
+
+/** One line under Local orchestration about the app-integration adapter small tasks on this device can use. */
+data class AppIntegrationAdapterLine(
+    /** Both the adapter and its shared base are installed and verified. */
+    val installed: Boolean,
+    /** The release gates in one line (worst family per gate), or null. */
+    val gateSummary: String? = null,
 )
 
 sealed interface LocalOrchestrationSpecialistStatus {
@@ -51,6 +61,8 @@ data class OnDeviceSmallTaskSetting(
     val runtimeLabel: String? = null,
     /** How the runtime's prompt reuse has done (shown after the runtime label); null when it keeps none. */
     val promptReuse: com.hereliesaz.geministrator.providers.PromptPrefixStats? = null,
+    /** Whether the app-integration adapter was used, or why not (shown after the runtime label); null when there is nothing to say. */
+    val adapterNote: String? = null,
     val onEnabledChange: (Boolean) -> Unit,
 )
 

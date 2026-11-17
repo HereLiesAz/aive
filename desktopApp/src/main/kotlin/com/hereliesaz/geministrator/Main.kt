@@ -164,8 +164,17 @@ fun main() {
     // Small text tasks on the memory clerks' installed instruct model, when the keeper turns it on.
     val liteRtLmInstaller = DesktopLiteRtLmModelInstaller(httpClient, com.hereliesaz.geministrator.inference.LiteRtLmModelCatalog.qwen25Instruct05b)
     val onDeviceResourceProbe = DesktopOnDeviceResourceProbe()
+    // The merged app-integration model, only once one is pinned (null now); it is preferred when installed.
+    val liteRtLmAdapterInstaller = com.hereliesaz.geministrator.inference.LiteRtLmModelCatalog.adapterModel
+        ?.let { DesktopLiteRtLmModelInstaller(httpClient, it) }
     val liteRtLmGenerator = com.hereliesaz.geministrator.providers.LiteRtLmTextGenerator(
-        modelPath = { liteRtLmInstaller.modelFile()?.absolutePath },
+        modelPath = {
+            com.hereliesaz.geministrator.inference.LiteRtLmModelSelection.choose(
+                adapterModel = com.hereliesaz.geministrator.inference.LiteRtLmModelCatalog.adapterModel,
+                adapterModelPath = { liteRtLmAdapterInstaller?.modelFile()?.absolutePath },
+                stockModelPath = { liteRtLmInstaller.modelFile()?.absolutePath },
+            )?.path
+        },
         loader = DesktopLiteRtLmEngineLoader(java.io.File(System.getProperty("java.io.tmpdir"), "aive-litertlm-cache")),
         resources = onDeviceResourceProbe,
         scope = memoryScope,
@@ -179,7 +188,18 @@ fun main() {
             ),
             com.hereliesaz.geministrator.providers.SelectingOnDeviceTextGenerator.Candidate(
                 com.hereliesaz.geministrator.providers.OnDeviceTextRuntime.OnnxRuntime,
-                DesktopOnDeviceTextGenerator(memoryModelInstaller, memorySessions),
+                DesktopOnDeviceTextGenerator(
+                    memoryModelInstaller,
+                    memorySessions,
+                    appIntegration = com.hereliesaz.geministrator.providers.AppIntegrationAdapterSelector(
+                        release = orchestrationSpecialistInstaller::appIntegrationRelease,
+                        runtime = DesktopOrchestrationSpecialists.runtimeCapabilities,
+                        installedAdapter = orchestrationSpecialistInstaller::installed,
+                        installedBase = orchestrationSpecialistInstaller::installed,
+                        load = { file -> DesktopLoraAdapter.load(file) },
+                        trainedFor = { adapter -> adapter.metadata["base"] },
+                    ),
+                ),
             ),
         ),
         resources = onDeviceResourceProbe,
@@ -194,7 +214,7 @@ fun main() {
         procedureCatalog = com.hereliesaz.geministrator.memory.procedural.desktopSqlProcedureCatalog(memoryLineage),
         engineProvider = DesktopMemoryEngineProvider(memoryEngines, memoryModelInstaller, memorySessions),
         scope = memoryScope,
-        localModels = DesktopMemoryLocalModels(memoryModelInstaller, liteRtLmInstaller, { liteRtLmGenerator.release() }, memoryScope),
+        localModels = DesktopMemoryLocalModels(memoryModelInstaller, liteRtLmInstaller, { liteRtLmGenerator.release() }, memoryScope, liteRtLmAdapterInstaller),
     ).also { it.attach() }
     val entireRecorder = EntireRecorder()
     val desktopEntire = DesktopEntire()
@@ -437,6 +457,13 @@ fun main() {
                             }
                         }
                     },
+                    appIntegration = orchestrationSpecialistInstaller.appIntegrationRelease()?.let { release ->
+                        com.hereliesaz.geministrator.AppIntegrationAdapterLine(
+                            installed = orchestrationSpecialistInstaller.appIntegrationState() ==
+                                com.hereliesaz.geministrator.orchestration.AppIntegrationInstallState.Installed,
+                            gateSummary = release.gateSummary,
+                        )
+                    },
                     onRemove = {
                         uiScope.launch {
                             localOrchestrationStatus = try {
@@ -662,6 +689,7 @@ fun main() {
                             modelInstalled = onDeviceTextGenerator.isReady(),
                             runtimeLabel = onDeviceTextGenerator.activeRuntime()?.label,
                             promptReuse = onDeviceTextGenerator.activePrefixStats(),
+                            adapterNote = onDeviceTextGenerator.activeAdapterNote(),
                             onEnabledChange = { enabled ->
                                 onDeviceSmallTaskPreference.enabled = enabled
                                 onDeviceSmallTasksEnabled = enabled

@@ -328,6 +328,8 @@ internal class DesktopMemoryLocalModels(
     /** Called after the LiteRT-LM model is installed or removed, so a loaded engine is dropped. */
     private val onLiteRtLmChanged: suspend () -> Unit,
     scope: CoroutineScope,
+    /** The merged app-integration model, once one is pinned in `LiteRtLmModelCatalog.adapterModel`; null now. */
+    private val adapterInstaller: DesktopLiteRtLmModelInstaller? = null,
 ) : MemoryLocalModelManager {
     private val mutableModels = MutableStateFlow(emptyList<MemoryLocalModelStatus>())
     override val models: StateFlow<List<MemoryLocalModelStatus>> = mutableModels.asStateFlow()
@@ -339,7 +341,10 @@ internal class DesktopMemoryLocalModels(
     override suspend fun install(id: String) {
         mark(id) { it.copy(installing = true, error = null) }
         val failure = runCatching {
-            if (id == liteRtInstaller.artifact.id) {
+            if (adapterInstaller != null && id == adapterInstaller.artifact.id) {
+                adapterInstaller.install()
+                onLiteRtLmChanged()
+            } else if (id == liteRtInstaller.artifact.id) {
                 liteRtInstaller.install()
                 onLiteRtLmChanged()
             } else {
@@ -352,7 +357,10 @@ internal class DesktopMemoryLocalModels(
     }
 
     override suspend fun remove(id: String) {
-        if (id == liteRtInstaller.artifact.id) {
+        if (adapterInstaller != null && id == adapterInstaller.artifact.id) {
+            onLiteRtLmChanged()
+            adapterInstaller.remove()
+        } else if (id == liteRtInstaller.artifact.id) {
             onLiteRtLmChanged()
             liteRtInstaller.remove()
         } else {
@@ -374,6 +382,15 @@ internal class DesktopMemoryLocalModels(
             eyebrow = "LiteRT-LM",
             name = liteRtInstaller.artifact.displayName,
             installed = liteRtInstaller.modelFile() != null,
+        ) + listOfNotNull(
+            adapterInstaller?.let {
+                MemoryLocalModelStatus(
+                    id = it.artifact.id,
+                    eyebrow = "LiteRT-LM",
+                    name = it.artifact.displayName,
+                    installed = it.modelFile() != null,
+                )
+            },
         )
     }
 

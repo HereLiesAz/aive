@@ -40,6 +40,7 @@ import com.hereliesaz.geministrator.AzphaltMotion
 import com.hereliesaz.geministrator.shouldReduceMotion
 import com.hereliesaz.geministrator.CrashReportingSetting
 import com.hereliesaz.geministrator.KeylessDefaults
+import com.hereliesaz.geministrator.AppIntegrationAdapterLine
 import com.hereliesaz.geministrator.LocalOrchestrationSpecialistSetting
 import com.hereliesaz.geministrator.LocalOrchestrationSpecialistStatus
 import com.hereliesaz.geministrator.OnDeviceSmallTaskPreference
@@ -57,6 +58,7 @@ import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import com.hereliesaz.geministrator.distributed.SettingsDistributedComputeConfigurationStore
 import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.onDeviceTextProviderOrNull
+import com.hereliesaz.geministrator.orchestration.AppIntegrationInstallState
 import com.hereliesaz.geministrator.orchestration.OrchestrationQuestion
 import com.hereliesaz.geministrator.providers.llm.AnthropicMessagesApi
 import com.hereliesaz.geministrator.providers.llm.AnthropicProvider
@@ -154,6 +156,7 @@ class MainActivity : ComponentActivity() {
             context = this,
             httpClient = repositoryHttpClient,
             cacheDirectory = cacheDir,
+            orchestrationInstaller = orchestrationSpecialistInstaller,
         )
     }
     private val memoryRuntime by memoryRuntimeDelegate
@@ -304,6 +307,12 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                         }
+                    },
+                    appIntegration = orchestrationSpecialistInstaller.appIntegrationRelease()?.let { release ->
+                        AppIntegrationAdapterLine(
+                            installed = orchestrationSpecialistInstaller.appIntegrationState() == AppIntegrationInstallState.Installed,
+                            gateSummary = release.gateSummary,
+                        )
                     },
                     onRemove = {
                         uiScope.launch {
@@ -676,6 +685,7 @@ class MainActivity : ComponentActivity() {
                             modelInstalled = memoryRuntime.onDeviceTextGenerator.isReady(),
                             runtimeLabel = memoryRuntime.onDeviceTextGenerator.activeRuntime()?.label,
                             promptReuse = memoryRuntime.onDeviceTextGenerator.activePrefixStats(),
+                            adapterNote = memoryRuntime.onDeviceTextGenerator.activeAdapterNote(),
                             onEnabledChange = { enabled ->
                                 onDeviceSmallTaskPreference.enabled = enabled
                                 onDeviceSmallTasksEnabled = enabled
