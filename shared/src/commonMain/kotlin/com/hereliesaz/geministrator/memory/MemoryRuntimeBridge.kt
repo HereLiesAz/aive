@@ -68,6 +68,8 @@ object MemoryRuntimeBridge {
     /** True while memory is attached and habit learning is switched on; replay learns and replays only then. */
     var habitLearningOn: () -> Boolean = { false }
     var habitStepProposer: (suspend (String) -> List<com.hereliesaz.geministrator.domain.TaskDefinition>)? = null
+    /** The one task an approved executor habit an agent chose (`proc:<operation>@<version>`) proposes, or why not; null while memory is not attached. */
+    var habitRefProposer: (suspend (ref: String, idPrefix: String) -> com.hereliesaz.geministrator.memory.procedural.HabitInvocation.Result)? = null
 
     fun reset() {
         observer = NoOpMemorySessionObserver
@@ -76,6 +78,7 @@ object MemoryRuntimeBridge {
         procedureTraceReader = NoOpProcedureTraceReader
         cautionClerk = null
         habitStepProposer = null
+        habitRefProposer = null
         habitLearningOn = { false }
     }
 }

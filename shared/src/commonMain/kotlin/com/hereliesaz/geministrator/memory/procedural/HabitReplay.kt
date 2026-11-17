@@ -252,6 +252,32 @@ object HabitStepReplay {
             habit.operation !in state.quarantinedOperations
 
     /**
+     * The one task for the habit [ref] an agent chose (`proc:<operation>@<version>`), or why not. It applies the
+     * same eligibility as [plan]: approved at that version, not quarantined, verified and unturned. The task is
+     * the ordinary [HabitInvocation] proposal; adding it behind its own human-approval task is the caller's act.
+     */
+    fun planFor(
+        habits: List<FormedHabit>,
+        ref: String,
+        state: ReplayLedgerState,
+        idPrefix: String,
+    ): HabitInvocation.Result {
+        val body = ref.removePrefix("proc:")
+        val version = body.substringAfterLast('@').toIntOrNull()
+            ?: return HabitInvocation.Result.Refused("That is not a habit reference.")
+        val operation = body.substringBeforeLast('@')
+        val habit = habits.firstOrNull { it.operation == operation && it.version == version }
+            ?: return HabitInvocation.Result.Refused("No habit by that name and version has formed.")
+        if (operation in state.quarantinedOperations) {
+            return HabitInvocation.Result.Refused("That habit is quarantined until the keeper approves it again.")
+        }
+        if (!eligible(habit, state)) {
+            return HabitInvocation.Result.Refused("That habit is not approved and verified at this version.")
+        }
+        return HabitInvocation.propose(habit, TaskDefinitionId("$idPrefix-1"))
+    }
+
+    /**
      * The tasks for the task text [objective], or empty. They are the same [HabitInvocation] proposals the
      * keeper can add by hand: each carries a human-approval policy and, once added through
      * [com.hereliesaz.geministrator.workflow.WorkflowCompositionService.addProposedTasks], its own human-approval

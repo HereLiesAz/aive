@@ -1016,6 +1016,17 @@ class MemoryLayerController(
         )
     }
 
+    /** The one task the approved executor habit [ref] proposes, or why not (see HabitStepReplay.planFor). */
+    suspend fun habitRefTask(
+        workflowId: String,
+        ref: String,
+        idPrefix: String,
+    ): com.hereliesaz.geministrator.memory.procedural.HabitInvocation.Result {
+        val state = MemoryRuntimeBridge.replayLedger?.state?.value
+            ?: return com.hereliesaz.geministrator.memory.procedural.HabitInvocation.Result.Refused("Habit replay is off.")
+        return com.hereliesaz.geministrator.memory.procedural.HabitStepReplay.planFor(formedHabits(workflowId), ref, state, idPrefix)
+    }
+
     /**
      * The sequences of operations [workflowId] has seen repeat in the same order across runs, from the
      * same reach as [formedHabits]. Empty while memory or procedural capture is off.
@@ -1504,6 +1515,10 @@ class MemoryLayerController(
         MemoryRuntimeBridge.habitLearningOn = { active && settings.value.proceduralTraceCaptureEnabled }
         MemoryRuntimeBridge.habitStepProposer = { objective ->
             selectedWorkflow()?.let { habitStepTasks(it, objective) }.orEmpty()
+        }
+        MemoryRuntimeBridge.habitRefProposer = { ref, idPrefix ->
+            selectedWorkflow()?.let { habitRefTask(it, ref, idPrefix) }
+                ?: com.hereliesaz.geministrator.memory.procedural.HabitInvocation.Result.Refused("Memory is not attached to a workflow.")
         }
         scope.launch { runCatchingCancellable { recoverCapturedSessions() } }
         drainSoon()

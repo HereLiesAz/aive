@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.Project
+import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
@@ -20,6 +21,16 @@ import com.hereliesaz.geministrator.memory.procedural.ReplayStatus
 import com.hereliesaz.geministrator.memory.procedural.ReplaySourceRun
 import com.hereliesaz.geministrator.policy.PolicyEffect
 import com.hereliesaz.geministrator.providers.HabitReplayAgentProvider
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+/** An approved executor habit an agent chose, from a task that has finished; [HabitLiveFiring] decides whether it acts. */
+data class HabitChoice(
+    val runId: com.hereliesaz.geministrator.domain.WorkflowRunId,
+    val taskId: TaskDefinitionId,
+    val roleId: String,
+    val ref: String,
+)
 
 /**
  * Teaches and polices habit replay from what a run did. It reads the run and the definition, runs nothing and
@@ -30,7 +41,9 @@ import com.hereliesaz.geministrator.providers.HabitReplayAgentProvider
  * - a habit step (a task a habit proposed) that failed or was turned back quarantines that operation;
  * - a `/habit <ref>` line an agent wrote is checked against the approved catalogue: an approved ref is counted
  *   (a matcher miss when replay had not fired) and named in the run's story, anything else is ignored and the
- *   story says so. A task that read untrusted content is never obeyed.
+ *   story says so. A task that read untrusted content is never obeyed. An accepted executor-habit choice is
+ *   queued ([takeChoices]) for [HabitLiveFiring], which adds its steps to the live run behind their own approvals;
+ *   an accepted text-habit choice is never applied, because the task that wrote it had already finished.
  *
  * Each outcome is read once per process; the ledger also remembers task runs it has read.
  */
@@ -41,6 +54,13 @@ class HabitReplayObserver(
 ) {
     private val replayed = mutableMapOf<String, String>()
     private val done = mutableSetOf<String>()
+    private val queueLock = Mutex()
+    private val queued = mutableListOf<HabitChoice>()
+
+    /** The accepted executor-habit choices not yet handed on; each is returned once. */
+    suspend fun takeChoices(): List<HabitChoice> = queueLock.withLock {
+        queued.toList().also { queued.clear() }
+    }
 
     suspend fun observe(project: Project, definition: WorkflowDefinition, run: WorkflowRun) {
         val store = ledger() ?: return
@@ -88,6 +108,18 @@ class HabitReplayObserver(
                     if (taskRun.assignedProviderId != HabitReplayAgentProvider.ID) store.recordMiss(ref)
                 }
                 note(run, task.id.value, roleId, ref, approved, untrusted, run.updatedAtEpochMillis)
+                if (approved && textHabit != null) {
+                    story(
+                        run, task.id, roleId, ref, PolicyEffect.Deny, "habit-not-eligible",
+                        "Habit $ref was not applied: the task that chose it had already finished with its own answer, " +
+                            "and a replay can only answer a task before it starts. The answer stands.",
+                        run.updatedAtEpochMillis,
+                    )
+                } else if (approved) {
+                    queueLock.withLock {
+                        if (queued.size < MAX_QUEUED) queued += HabitChoice(run.id, task.id, roleId, ref)
+                    }
+                }
             }
 
             if (taskRun.assignedProviderId == HabitReplayAgentProvider.ID) continue
@@ -124,6 +156,21 @@ class HabitReplayObserver(
                         else -> "Ignored $ref: it is not an approved habit."
                     },
                     occurredAtEpochMillis = at,
+                ),
+            )
+        }
+    }
+
+    private suspend fun story(
+        run: WorkflowRun, taskId: TaskDefinitionId, roleId: String, ref: String,
+        effect: PolicyEffect, code: String, reason: String, at: Long,
+    ) {
+        runCatching {
+            events.append(
+                PolicyDecisionRecorded(
+                    workflowRunId = run.id, taskDefinitionId = taskId, effect = effect, code = code, action = "InvokeHabit",
+                    subjectType = "agent", subjectId = roleId, resourceType = "habit", resourceId = ref,
+                    reason = reason, occurredAtEpochMillis = at,
                 ),
             )
         }
@@ -177,5 +224,6 @@ class HabitReplayObserver(
         private const val MAX_TEXT = 8000
         private const val MAX_CONTEXT = 2000
         private const val MAX_REMEMBERED = 4096
+        private const val MAX_QUEUED = 16
     }
 }

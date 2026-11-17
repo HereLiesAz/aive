@@ -44,7 +44,7 @@ system prompt is the real `OnDeviceTextAgentProvider.SYSTEM_PROMPT` (made `const
 Family F6 now covers only habits that are offered and not replayed: habits nobody approved. A habit the keeper approved
 normally never reaches the model (text habits are replayed with no model call, effectful ones become gated steps), and
 the generator still renders the `Habits` block with `HabitOffers.offerText` only, with no approved catalogue and no
-`/habit` line yet.
+`/habit` line yet. (The app now acts on an agent's `/habit` line: an approved executor habit's step is added to the live run behind its own approval; the corpus is unchanged.)
 
 | F6a | A formed habit fits and the criteria permit it: may adopt it and say so, by its exact rendered name | `HabitOffers.offerText` (`select`, `render`, `selectSequences`, `renderSequences`) on synthetic `FormedHabit` and `FormedSequence` | `habit_adopt`: names the offered operation, none outside the offer, no claim it ran, no number outside the block |
 | F6b | A habit conflicts with the task or the criteria: follow the task, do not adopt it | same | `habit_declined` |

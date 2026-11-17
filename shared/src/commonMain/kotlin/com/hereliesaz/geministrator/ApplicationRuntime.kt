@@ -1159,6 +1159,46 @@ class ApplicationRuntime private constructor(
         null
     }
 
+    private val habitFiring by lazy {
+        com.hereliesaz.geministrator.workflow.HabitLiveFiring(
+            events = RepositoryWorkflowEventSink(persistence.events),
+            composition = com.hereliesaz.geministrator.workflow.WorkflowCompositionService(persistence),
+        )
+    }
+
+    /**
+     * Acts on the executor habits agents chose with a `/habit <ref>` line that the observer accepted
+     * (docs/architecture/PROCEDURAL_MEMORY.md, section 11): each adds its step to the run on screen behind its own
+     * human-approval task, after the task that chose it, through [com.hereliesaz.geministrator.workflow.HabitLiveFiring].
+     * Called after a cycle, outside the cycle's lock, because it takes the lock itself. It never fails a cycle.
+     */
+    private suspend fun fireHabitChoices() {
+        val choices = try {
+            coordinator.takeHabitChoices()
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            emptyList()
+        }
+        for (choice in choices) {
+            try {
+                runtimeMutex.withLock {
+                    val snapshot = current ?: return@withLock
+                    val run = newestRun(snapshot.state.run)
+                    habitFiring.fire(choice, snapshot.definition, run, decisionTime(nowEpochMillis(), run)) { definition, followed ->
+                        persistence.runs.put(followed)
+                        replaceCurrent(snapshot.copy(definition = definition, state = snapshot.state.copy(run = followed)))
+                        publishCurrent()
+                    }
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (failure: Exception) {
+                appLog("Habit", "A habit an agent chose could not be added: ${failure.message ?: "unknown error"}")
+            }
+        }
+    }
+
     /**
      * Rewinds the active run to [taskDefinitionId] in place: that creature and what follows it start
      * again while the rest of the swarm keeps running ([WorkflowRuntimeCoordinator.rewind]).
@@ -1734,6 +1774,7 @@ class ApplicationRuntime private constructor(
                     delay(RETRY_BACKOFF_MILLIS * consecutiveFailures.coerceAtMost(MAX_BACKOFF_MULTIPLIER))
                 } else {
                     consecutiveFailures = 0
+                    fireHabitChoices()
                 }
             }
         }

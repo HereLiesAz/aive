@@ -178,6 +178,9 @@ class WorkflowRuntimeCoordinator(
         observeHabitReplay(project, definition, state.run)
     }
 
+    /** The executor-habit choices agents made that the observer accepted and nobody has acted on yet (see [HabitLiveFiring]). */
+    suspend fun takeHabitChoices(): List<HabitChoice> = habitReplayObserver?.takeChoices().orEmpty()
+
     private suspend fun observeHabitReplay(project: Project, definition: WorkflowDefinition, run: WorkflowRun) {
         try {
             habitReplayObserver?.observe(project, definition, run)
