@@ -1,6 +1,6 @@
 # Third-party notices
 
-The Aive is licensed under the PolyForm Noncommercial License 1.0.0 (`LICENSE`). The components below
+The Aive is licensed under the Apache License, Version 2.0 (`LICENSE`, `NOTICE`). The components below
 keep their own licenses; see `LICENSING` for the layout.
 
 ## WordNet

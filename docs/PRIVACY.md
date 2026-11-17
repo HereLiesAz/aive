@@ -2,7 +2,7 @@
 
 **Effective date: November 13, 2026**
 
-This policy describes the current source-available builds of **The Aive**, application ID `com.hereliesaz.aive`.
+This policy describes the current open-source builds of **The Aive**, application ID `com.hereliesaz.aive`.
 
 The Aive is a workflow orchestration application. It can store workflow information locally and, when you choose to use an external executor or provider, send the information needed to perform that work to the service you selected.
 
@@ -228,4 +228,4 @@ Material changes to The Aive's data handling should be accompanied by an update 
 
 ## Contact
 
-The Aive is a source-available project (PolyForm Noncommercial 1.0.0) maintained by **HereLiesAz**. Privacy questions and reports can be raised through the repository at `HereLiesAz/aive` on GitHub.
+The Aive is an open-source project (Apache License 2.0) maintained by **HereLiesAz**. Privacy questions and reports can be raised through the repository at `HereLiesAz/aive` on GitHub.
