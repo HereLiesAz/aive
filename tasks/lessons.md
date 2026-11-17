@@ -149,3 +149,12 @@ HereLiesAz/workflows owns every workflow family, every stored secret and every r
 - A new target-repository workflow is rejected by sync unless it is admitted centrally (source SHA-256 in `scripts/semantic_catalog.py`, with a purpose profile where the central workflow takes one). Cloudflare, Play and signing keys live in the central repository, never in this one.
 - A pinned central action reference must be at or after the last change to the action (`test_play_publish_resilience.py`). Changing the action means repinning every central workflow that uses it in the same change.
 - When a sync has been failing, fix the sync first: a long-blocked sync regenerates stale registry sources when it finally runs.
+
+## Interfaces: consolidate, and justify each one (2026-11-17)
+
+Owner correction: "How did I say no to new interfaces? I said we needed to consolidate interfaces and make sure that any interface we have that isn't built into another UI is absolutely necessary."
+
+- The rule is not "never add an interface". It is: consolidate interfaces, and any interface that is not built into another UI must be absolutely necessary.
+- New information belongs inside a surface that already exists (a line in the Keeper's room's This device status, a field in an existing panel) before it gets a surface of its own. Adding text to an existing surface is not a new interface.
+- A standalone screen, tab, dialog or panel needs a stated reason it cannot live inside an existing one.
+- Do not cite a rule the owner did not state, and do not skip useful work (such as showing cache statistics) by invoking one.
