@@ -388,3 +388,16 @@ been tried on a device; until then it is `null` and the stock model runs.
   list, and `gates({"test": ..., "adversarial": ...})` or `gates(test, adversarial)`, on the corpus's own
   answers before training. Per-family values may be numbers or objects with a `score` field.
 - That a model passing these gates is better than the unadapted model inside the app.
+
+## Colab
+
+The notebook also runs on Google Colab:
+
+1. File > Open notebook > GitHub, and open `tools/app_integration_training/app_integration_adapter.ipynb` from `HereLiesAz/aive`.
+2. Runtime > Change runtime type > a GPU (T4 is enough to start).
+3. Left sidebar > Secrets: add `GITHUB_TOKEN` (`contents:write` on `HereLiesAz/aive`) and turn on Notebook access. It is only needed when `UPLOAD = True`.
+4. Run with `SMOKE = True` first. Allow the Google Drive prompt: `state.json` and `results.json` live in `MyDrive/aive-app-integration`, so a rerun resumes after a disconnect.
+
+The toolchain (JDK, Gradle cache, the clones of this repository and of the two vendored builds) goes on the runtime's local disk, not on Drive, because Gradle writes thousands of small files. After a Colab disconnect it is downloaded again (a few minutes).
+
+The corpus build checks out `HereLiesAz/conveyance-h2g2` and `HereLiesAz/Conveyance` at the commits pinned in `.github/workflows/multiplatform.yml`, as CI does. Without them Gradle resolves an Android-only artifact and `:shared:compileKotlinDesktop` fails with `No matching variant ... conveyance-h2g2-android`.

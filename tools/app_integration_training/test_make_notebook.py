@@ -120,6 +120,71 @@ class MakeNotebookTest(unittest.TestCase):
             with zipfile.ZipFile(root / "one.zip") as archive:
                 self.assertEqual(sorted(archive.namelist()), archive.namelist())
 
+    def test_the_vendored_builds_are_checked_out_at_ci_pins(self):
+        """The first real Kaggle build failed ('No matching variant ... conveyance-h2g2-android') because a plain clone
+        lacks vendor/conveyance-h2g2 and vendor/.../Conveyance, which CI checks out at pinned commits."""
+        import shutil
+        import subprocess
+        import tempfile
+
+        notebook = json.loads(NOTEBOOK.read_text())
+        source = next(s for s in code_cells(notebook) if "def ensure_vendor" in s)
+        wanted = {"VENDOR_HOST", "VENDOR_PATHS", "vendor_pins", "ensure_vendor"}
+        body = []
+        for node in ast.parse(source).body:
+            names = {t.id for t in getattr(node, "targets", []) if isinstance(t, ast.Name)} | {getattr(node, "name", "")}
+            if names & wanted:
+                body.append(node)
+
+        def sh(command, cwd=None):
+            return subprocess.run(command, cwd=cwd, check=True, capture_output=True, text=True).stdout
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            pins = {}
+            for repository in ("HereLiesAz/conveyance-h2g2", "HereLiesAz/Conveyance"):
+                origin = root / "origin" / repository
+                origin.mkdir(parents=True)
+                sh(["git", "init", "-q"], cwd=origin)
+                (origin / "README.md").write_text(repository)
+                sh(["git", "add", "."], cwd=origin)
+                sh(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-qm", "pin"], cwd=origin)
+                pins[repository] = sh(["git", "rev-parse", "HEAD"], cwd=origin).strip()
+                sh(["git", "config", "uploadpack.allowAnySHA1InWant", "true"], cwd=origin)
+            checkout = root / "checkout"
+            (checkout / ".github" / "workflows").mkdir(parents=True)
+            workflow = "\n".join(
+                f"        with:\n          repository: {repo}\n          ref: {sha} # pinned\n          path: x"
+                for repo, sha in pins.items())
+            (checkout / ".github" / "workflows" / "multiplatform.yml").write_text(workflow)
+            namespace = {"Path": Path, "re": re, "shutil": shutil, "subprocess": subprocess, "sh": sh}
+            exec(compile(ast.Module(body, []), "ensure_vendor", "exec"), namespace)
+            namespace["VENDOR_HOST"] = str(root / "origin")
+            self.assertEqual(pins, namespace["vendor_pins"](checkout))
+            namespace["ensure_vendor"](checkout)
+            self.assertEqual("HereLiesAz/conveyance-h2g2", (checkout / "vendor/conveyance-h2g2/README.md").read_text())
+            self.assertEqual("HereLiesAz/Conveyance",
+                             (checkout / "vendor/conveyance-h2g2/vendor/Conveyance/README.md").read_text())
+            # a rerun finds both already at the pin and fetches nothing
+            namespace["VENDOR_HOST"] = str(root / "does-not-exist")
+            namespace["ensure_vendor"](checkout)
+
+    def test_a_missing_pin_stops_with_a_plain_message(self):
+        notebook = json.loads(NOTEBOOK.read_text())
+        source = next(s for s in code_cells(notebook) if "def vendor_pins" in s)
+        import tempfile
+        wanted = {"VENDOR_PATHS", "vendor_pins"}
+        body = [n for n in ast.parse(source).body
+                if ({t.id for t in getattr(n, "targets", []) if isinstance(t, ast.Name)} | {getattr(n, "name", "")}) & wanted]
+        namespace = {"Path": Path, "re": re}
+        exec(compile(ast.Module(body, []), "vendor_pins", "exec"), namespace)
+        with tempfile.TemporaryDirectory() as directory:
+            checkout = Path(directory)
+            (checkout / ".github" / "workflows").mkdir(parents=True)
+            (checkout / ".github" / "workflows" / "multiplatform.yml").write_text("name: x\n")
+            with self.assertRaises(RuntimeError):
+                namespace["vendor_pins"](checkout)
+
 
 if __name__ == "__main__":
     unittest.main()

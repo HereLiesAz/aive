@@ -218,8 +218,10 @@ def work_root():
 
 ROOT = work_root()
 WORK = ROOT / ("aive-app-integration-smoke" if SMOKE else "aive-app-integration")
-# Shared by SMOKE and full runs, so Gradle, the JDK and the clone are downloaded once.
-TOOLCHAIN = ROOT / "aive-app-integration-toolchain"
+# Shared by SMOKE and full runs, so Gradle, the JDK and the clone are downloaded once. On Colab it lives on the
+# runtime's local disk: Gradle writes thousands of small files, which is very slow on a mounted Google Drive.
+# After a Colab disconnect it is rebuilt (minutes); state.json and results.json stay on Drive and resume the run.
+TOOLCHAIN = (Path("/content") if on_colab() else ROOT) / "aive-app-integration-toolchain"
 STATE_FILE, RESULTS_FILE = WORK / "state.json", WORK / "results.json"
 ASSETS = WORK / "release-assets"
 ASSETS.mkdir(parents=True, exist_ok=True)
@@ -345,6 +347,51 @@ def resolve_source():
     assert re.fullmatch(r"[0-9a-f]{40}", commit), f"unexpected commit {commit!r}"
     return checkout, commit
 
+VENDOR_HOST = "https://github.com"   # where the two vendored builds are cloned from (a test points it at a local folder)
+# Where each vendored build goes inside the clone, exactly as CI lays them out (multiplatform.yml 'Check out h2g2'
+# and 'Check out Conveyance'). Without vendor/conveyance-h2g2 the build resolves a published Android-only artifact
+# and :shared:compileKotlinDesktop fails with 'No matching variant ... conveyance-h2g2-android'.
+VENDOR_PATHS = {"HereLiesAz/conveyance-h2g2": "vendor/conveyance-h2g2",
+                "HereLiesAz/Conveyance": "vendor/conveyance-h2g2/vendor/Conveyance"}
+
+def vendor_pins(checkout):
+    """{repository: commit} read from the repository's own CI workflow, so the notebook always builds against the
+    same pins CI does (README 'Bumping the vendor pins')."""
+    text = (checkout / ".github" / "workflows" / "multiplatform.yml").read_text()
+    pins = {}
+    for repository, ref in re.findall(r"repository:\s*(HereLiesAz/[\w.-]+)\s*\n\s*ref:\s*([0-9a-f]{40})", text):
+        pins.setdefault(repository, ref)
+    missing = [r for r in VENDOR_PATHS if r not in pins]
+    if missing:
+        raise RuntimeError(f"No pinned commit for {missing} in .github/workflows/multiplatform.yml; the vendored builds cannot be checked out")
+    return {r: pins[r] for r in VENDOR_PATHS}
+
+def ensure_vendor(checkout):
+    """Check out the two vendored builds at CI's pinned commits (shallow). Reruns reuse a checkout already at the pin."""
+    pins = vendor_pins(checkout)
+    for repository, path in VENDOR_PATHS.items():
+        target = checkout / path
+        commit = pins[repository]
+        current = ""
+        if (target / ".git").is_dir():
+            current = subprocess.run(["git", "rev-parse", "HEAD"], cwd=target, capture_output=True, text=True).stdout.strip()
+        if current == commit:
+            print(f"vendor {repository} already at {commit[:10]}")
+            continue
+        shutil.rmtree(target, ignore_errors=True)
+        target.mkdir(parents=True)
+        sh(["git", "init", "-q"], cwd=target)
+        sh(["git", "remote", "add", "origin", f"{VENDOR_HOST}/{repository}"], cwd=target)
+        try:
+            sh(["git", "fetch", "--depth", "1", "origin", commit], cwd=target)
+        except Exception as error:
+            raise RuntimeError(f"Could not fetch {repository} at {commit[:10]} from {VENDOR_HOST}: {type(error).__name__}. "
+                               "CI checks both out with the default token, so they should be public; if one is private, "
+                               "the notebook needs a token that can read it.") from None
+        sh(["git", "checkout", "-q", "--force", "FETCH_HEAD"], cwd=target)
+        print(f"vendor {repository} -> {path} @ {commit[:10]}")
+    return pins
+
 def run_gradle(checkout, env, out_dir, log_path):
     """Run the generator through the repository's Gradle wrapper; stream progress; stop on failure with the log tail."""
     env = dict(env)
@@ -392,7 +439,8 @@ def build_corpus():
     env = ensure_jdk()
     checkout, commit = resolve_source()
     print(f"corpus source: {SOURCE_REPOSITORY} @ {SOURCE_REF} = {commit}")
-    RESULTS["corpusBuild"] = {"repository": SOURCE_REPOSITORY, "ref": SOURCE_REF, "commit": commit, "rows": CORPUS_ROWS,
+    vendor = ensure_vendor(checkout)
+    RESULTS["corpusBuild"] = {"repository": SOURCE_REPOSITORY, "ref": SOURCE_REF, "commit": commit, "rows": CORPUS_ROWS, "vendor": vendor,
                               "java": [l for l in subprocess.run(["java", "-version"], env=env, capture_output=True, text=True).stderr.splitlines() if "version" in l][:1]}
     out = WORK / "corpus-build" / "aive-app-integration-corpus"
     previous = state.get("corpusBuild", {})
