@@ -31,6 +31,9 @@ interface OnDeviceTextRuntimeSource {
 
     /** The prompt-prefix cache stats of that runtime's generator, or null when it keeps none. */
     fun activePrefixStats(): PromptPrefixStats? = null
+
+    /** What that runtime's generator says about the app-integration adapter (used, or why not), or null. */
+    fun activeAdapterNote(): String? = null
 }
 
 /**

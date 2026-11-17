@@ -22,6 +22,9 @@ class SelectingOnDeviceTextGenerator(
     override fun activePrefixStats(): PromptPrefixStats? =
         readyCandidates().firstOrNull()?.let { runCatching { it.generator.prefixStats() }.getOrNull() }
 
+    override fun activeAdapterNote(): String? =
+        readyCandidates().firstOrNull()?.let { (it.generator as? OnDeviceAdapterNoteSource)?.adapterNote() }
+
     /** Ready while a model is installed and the device is not hot, so routing skips a hot device. */
     override fun isReady(): Boolean =
         OnDeviceResourceGate.thermalHold(resources.snapshot()) == null && readyCandidates().isNotEmpty()

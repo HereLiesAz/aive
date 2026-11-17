@@ -45,7 +45,16 @@ object LiteRtLmModelCatalog {
         license = "Apache-2.0",
     )
 
-    val all: List<LiteRtLmModelArtifact> = listOf(qwen25Instruct05b)
+    /**
+     * The merged full model the app-integration notebook's LiteRT-LM export produces (the adapter folded into
+     * Qwen2.5-0.5B-Instruct), pinned by hand after a device trial: copy its file name, URL, size and SHA-256
+     * from the release's `results.json`. LiteRT-LM has no adapter-as-input path, so this is a second model
+     * file, not an adapter. Null until pinned; nothing is guessed. When it is pinned and installed the runtime
+     * runs it instead of [qwen25Instruct05b] ([LiteRtLmModelSelection]); otherwise the stock model runs.
+     */
+    val adapterModel: LiteRtLmModelArtifact? = null
+
+    val all: List<LiteRtLmModelArtifact> = listOfNotNull(qwen25Instruct05b, adapterModel)
 
     fun byId(id: String): LiteRtLmModelArtifact? = all.firstOrNull { it.id == id }
 }
@@ -62,4 +71,25 @@ object LiteRtLmRuntime {
         supportedPrecisions = setOf("int8"),
         supportsSharedBaseAdapters = false,
     )
+}
+
+/** The LiteRT-LM model file a generation loads, and whether it is the merged app-integration model. */
+data class LiteRtLmModelChoice(val path: String, val adapterModel: Boolean)
+
+/** The pure choice between the merged app-integration model and the stock one. */
+object LiteRtLmModelSelection {
+    /**
+     * The merged model's path when [adapterModel] is pinned and installed ([adapterModelPath] is non-null),
+     * else the stock model's path, else null. A pinned but missing merged model never blocks the stock one.
+     */
+    fun choose(
+        adapterModel: LiteRtLmModelArtifact?,
+        adapterModelPath: () -> String?,
+        stockModelPath: () -> String?,
+    ): LiteRtLmModelChoice? {
+        if (adapterModel != null) {
+            adapterModelPath()?.let { return LiteRtLmModelChoice(it, adapterModel = true) }
+        }
+        return stockModelPath()?.let { LiteRtLmModelChoice(it, adapterModel = false) }
+    }
 }

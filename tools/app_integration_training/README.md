@@ -175,14 +175,14 @@ python3 -m unittest test_score                             # the scorer's tests 
 
 ## Where training plugs in
 
-The existing Kaggle notebooks (`tools/orchestration_training/aive_orchestration_specialists.ipynb`,
-`make_notebook.py`) already train a LoRA adapter on Qwen2.5-0.5B-Instruct with loss on the answer only, gate it,
-export an INT8 base with LoRA weights as graph inputs, and publish an fp16 adapter with a catalog. This corpus
-would replace the role rows with the `messages` of `train.jsonl` (validation for early stopping), run
-`score.py` on the test and adversarial predictions instead of `json_exact`, and publish one adapter. Those
-notebooks are not edited here. Note that the app's ONNX path feeds zero adapter weights today
-(`AndroidOnDeviceTextGenerator.zeroAdapterInputs`), and the LiteRT-LM path runs the stock model with no adapter
-(docs/Memory-layer.md), so a released adapter also needs a loading path on the on-device text generator.
+The Kaggle notebook (`make_notebook.py`, below) trains one LoRA adapter on Qwen2.5-0.5B-Instruct over this corpus
+(loss on the answer only), gates it with `score.py`, exports an INT8 base with LoRA weights as graph inputs and
+publishes an fp16 adapter with a catalog. **The app side now exists** (it has not been run on a device): the
+catalog is read as its own `appIntegration` entry, the adapter and its base install with Settings, Local
+orchestration, and the ONNX small-task generators on Android and desktop feed the adapter's tensors instead of
+zeros when both are installed (`AppIntegrationAdapterSelector`, over the loader the orchestration specialists use).
+The LiteRT-LM path still runs the stock model until the notebook's merged model is pinned by hand in
+`LiteRtLmModelCatalog.adapterModel`; the runtime then prefers it only when it is pinned and installed.
 
 ## Limits (honest)
 
@@ -203,6 +203,12 @@ notebooks are not edited here. Note that the app's ONNX path feeds zero adapter 
   note in front of it; rows without the protocol block still carry that note inside `RELEVANT MEMORY`.
 - Settled contrasts render only `✓ settled since; an earlier view was set aside` (the injected form). The longer
   "resolved, previously contested" text (`divergenceLines`) is not used by any injection, so it is not in the corpus.
+- **The app side is unverified on a device.** The catalog entry, install, ONNX adapter feed and the LiteRT-LM
+  preference are covered by tests with fakes (and a real adapter file on desktop); nothing has loaded a released
+  adapter into a real session. Whether the base's graph inputs match the adapter's tensor names, whether the
+  answers match the gates through the app's prompts, and the prefix cache on an adapter run are for a device to
+  prove. If the adapter lacks an input or names another base, small tasks run on the plain model and the status
+  line under This device says why.
 - **Recall reaches the on-device model; habits do not.** `OnDeviceTextAgentProvider.renderTask` now renders the
   `Memory`, `Relevant memory` and `Memory timeline` blocks of `PromptContext.dynamicContext` (capped at 2,400
   characters, each led by the untrusted note, dropped first when the prompt would exceed the runtime's limit). The
@@ -354,11 +360,11 @@ curl -LO https://github.com/HereLiesAz/aive/releases/download/app-integration-v1
 python3 tools/orchestration_training/register_catalog.py catalog.json
 ~~~
 
-`register_catalog.py` currently refuses this catalog: the app's orchestration catalog accepts only
-`orchestration:*` specialists, and registering `app-integration:assistant` there would make the whole released
-catalog unreadable. Nothing in the app consumes an `app-integration` adapter yet; that wiring is not part of
-this notebook. The LiteRT-LM file is pinned in `LiteRtLmModelCatalog` by hand (size and SHA-256 are in
-`results.json`) after it has been tried on a device.
+`register_catalog.py` writes the `app-integration:assistant` entry to the app catalog's own `appIntegration` field
+(with its scores and the adapter's size); it accepts exactly that id outside `orchestration:*` and refuses any other,
+writing nothing. Commit the change; the app then offers the adapter in Settings, Local orchestration. The LiteRT-LM
+file is pinned in `LiteRtLmModelCatalog.adapterModel` by hand (size and SHA-256 are in `results.json`) after it has
+been tried on a device; until then it is `null` and the stock model runs.
 
 ### What was not verified
 

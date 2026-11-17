@@ -1499,6 +1499,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_hereliesaz_aive_github_issue_tracker_exception">HereLiesAz/aive GitHub issue tracker (exception, stack trace, app version, Android version, </string>
     <string name="settings_import">Import</string>
     <string name="settings_import_data_from_json">Import data from JSON</string>
+    <string name="settings_app_integration_adapter">A released app-integration adapter for small tasks on this device installs with the specialists above and is used once installed. Without it, or when it does not fit the model, they run on the plain model.</string>
+    <string name="settings_app_integration_adapter_gates">Release gates: %1$s.</string>
+    <string name="settings_app_integration_adapter_installed">App-integration adapter installed.</string>
     <string name="settings_install_failed">Install failed</string>
     <string name="settings_install_local_planner">Install local planner (%1$s)</string>
     <string name="settings_install_released_specialists">Install the decision model</string>

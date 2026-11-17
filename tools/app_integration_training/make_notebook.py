@@ -1138,6 +1138,7 @@ def descriptor(logical_id, path, kind, precision, fmt, adapter_id=None, capabili
         "releaseRepository": RELEASE_REPOSITORY, "releaseTag": RELEASE_TAG,
         "assetName": path.name, "sha256": sha256(path), "format": fmt, "precision": precision,
         "kind": kind, "capabilities": sorted(capabilities),
+        "sizeBytes": path.stat().st_size,
     }
     if adapter_id:
         d["adapterId"] = adapter_id
@@ -1232,8 +1233,8 @@ else:
   git add -A && git commit -m "feat: register the app-integration adapter"
 
 Notes:
-  - register_catalog.py refuses specialist ids outside orchestration:* until the app has a catalog that
-    reads {SPECIALIST_ID}; today that command stops with a message and changes nothing.
+  - register_catalog.py writes {SPECIALIST_ID} to the app catalog's own `appIntegration` field (with the
+    adapter's size and the gate scores) and still refuses every other id outside orchestration:*.
   - The merged LiteRT-LM file is not in catalog.json. To ship it, add its size and SHA-256 from results.json
     to LiteRtLmModelCatalog by hand, and test it on a device first.""")
 ''')

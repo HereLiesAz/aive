@@ -132,6 +132,12 @@ python3 tools/orchestration_training/register_catalog.py catalog.json
 ~~~
 
 This writes the released specialists into `OrchestrationSpecialistCatalog.RELEASED`. Commit that change.
+The one other id it accepts is `app-integration:assistant` (the app-integration adapter notebook): that entry is
+not an orchestration specialist, so it is written to the constant's own `appIntegration` field (with its scores
+and the adapter's size), and a newer release replaces it whole. Any other id outside `orchestration:*` is still
+refused and nothing is written. The app installs that adapter and its base with the specialists above and feeds
+its tensors to the on-device small-task generators through the loader the specialists use (see
+`docs/Memory-layer.md`, On-device runtimes for small text tasks); this has not been run on a device.
 Android and desktop install released artifacts explicitly from **Settings → Local Orchestration**
 (SHA-256 verified; nothing downloads during inference) and use them once any is installed. Both
 support merged INT8 models and the shared INT8 base + fp16 adapter shape, and prefer the adapter shape

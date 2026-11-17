@@ -4,6 +4,11 @@ Usage: python3 tools/orchestration_training/register_catalog.py path/to/catalog.
 
 New passing artifacts are preferred, while previously released roles and compatible older variants
 remain registered as fallbacks. Scores stay in the release catalog and model manifests.
+
+The one other id accepted is `app-integration:assistant` (tools/app_integration_training): it is not an
+orchestration specialist, so it is written to the constant's own `appIntegration` field, with its scores
+(the app shows the gate line) and the adapter's size, and a newer release replaces the older one whole
+(an adapter only fits the base it was trained on). Any other id outside `orchestration:*` is refused.
 """
 import json
 import re
@@ -25,7 +30,9 @@ FIELDS = (
     "kind",
     "adapterId",
     "capabilities",
+    "sizeBytes",
 )
+APP_INTEGRATION_ID = "app-integration:assistant"
 BEGIN = "    // register_catalog.py:begin\n"
 END = "    // register_catalog.py:end\n"
 
@@ -42,6 +49,20 @@ def specialist(value):
             entry[key] = variants
     if value.get("adapter"):
         entry["adapter"] = artifact(value["adapter"])
+    return entry
+
+
+def app_integration(value):
+    """The catalog's `appIntegration` field from a release catalog's app-integration specialist entry."""
+    adapter = value.get("adapter")
+    bases = [artifact(item) for item in value.get("sharedBaseVariants", [])]
+    if not adapter or not bases:
+        raise SystemExit(f"{APP_INTEGRATION_ID} needs an adapter and at least one shared base")
+    if adapter.get("kind") != "Adapter" or any(item.get("kind") != "SharedBase" for item in bases):
+        raise SystemExit(f"{APP_INTEGRATION_ID}: expected a shared base and an Adapter artifact")
+    entry = {"specialistId": APP_INTEGRATION_ID, "sharedBaseVariants": bases, "adapter": artifact(adapter)}
+    if value.get("scores"):
+        entry["scores"] = value["scores"]
     return entry
 
 
@@ -88,6 +109,15 @@ def merge_specialists(existing, incoming):
 
 
 def validate(catalog):
+    entry = catalog.get("appIntegration")
+    if entry:
+        seen = set()
+        for value in entry["sharedBaseVariants"] + [entry["adapter"]]:
+            if value["logicalArtifactId"] in seen:
+                raise SystemExit(f"{APP_INTEGRATION_ID}: duplicate artifact {value['logicalArtifactId']}")
+            seen.add(value["logicalArtifactId"])
+            if not re.fullmatch(r"[0-9a-f]{64}", value["sha256"]):
+                raise SystemExit(f"{value['logicalArtifactId']}: sha256 is not a lowercase SHA-256 digest")
     seen_specialists = set()
     for entry in catalog["specialists"]:
         specialist_id = entry["specialistId"]
@@ -112,16 +142,26 @@ def validate(catalog):
 
 def register(path, kotlin=KOTLIN):
     incoming = json.loads(Path(path).read_text())
-    # OrchestrationSpecialistCatalog.parse() rejects any id outside orchestration:*, which would make the
-    # whole released catalog unreadable in the app. Refuse here, before anything is written.
-    foreign = [e["specialistId"] for e in incoming.get("specialists", []) if not e["specialistId"].startswith("orchestration:")]
+    # OrchestrationSpecialistCatalog.parse() rejects any id outside orchestration:* in `specialists`, which would make
+    # the whole released catalog unreadable in the app. The app-integration adapter has its own field; everything
+    # else is refused here, before anything is written.
+    ids = [e["specialistId"] for e in incoming.get("specialists", [])]
+    foreign = [i for i in ids if not i.startswith("orchestration:") and i != APP_INTEGRATION_ID]
     if foreign:
         raise SystemExit(
-            f"refusing to register {foreign}: the app's orchestration catalog only accepts orchestration:* specialists "
-            "(for example app-integration:assistant has no catalog in the app yet). Nothing was written."
+            f"refusing to register {foreign}: the app's catalog only accepts orchestration:* specialists "
+            f"and {APP_INTEGRATION_ID}. Nothing was written."
         )
+    if ids.count(APP_INTEGRATION_ID) > 1:
+        raise SystemExit(f"refusing to register {APP_INTEGRATION_ID} more than once. Nothing was written.")
+    app_entries = [e for e in incoming.get("specialists", []) if e["specialistId"] == APP_INTEGRATION_ID]
+    orchestration = {"specialists": [e for e in incoming.get("specialists", []) if e["specialistId"] != APP_INTEGRATION_ID]}
     source = Path(kotlin).read_text()
-    merged = merge_specialists(current_catalog(source), incoming)
+    existing = current_catalog(source)
+    merged = merge_specialists(existing, orchestration)
+    app = app_integration(app_entries[0]) if app_entries else existing.get("appIntegration")
+    if app:
+        merged["appIntegration"] = app
     validate(merged)
 
     compact = json.dumps(merged, separators=(",", ":"))
@@ -138,8 +178,9 @@ def register(path, kotlin=KOTLIN):
 
 def main(path):
     merged = register(path)
+    adapter = " and the app-integration adapter" if merged.get("appIntegration") else ""
     print(
-        f"registered {len(merged['specialists'])} specialists in "
+        f"registered {len(merged['specialists'])} specialists{adapter} in "
         f"{KOTLIN.relative_to(KOTLIN.parents[8])}"
     )
 
