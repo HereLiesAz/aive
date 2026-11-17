@@ -19,6 +19,9 @@ class SelectingOnDeviceTextGenerator(
 
     override fun activeRuntime(): OnDeviceTextRuntime? = readyCandidates().firstOrNull()?.runtime
 
+    override fun activePrefixStats(): PromptPrefixStats? =
+        readyCandidates().firstOrNull()?.let { runCatching { it.generator.prefixStats() }.getOrNull() }
+
     /** Ready while a model is installed and the device is not hot, so routing skips a hot device. */
     override fun isReady(): Boolean =
         OnDeviceResourceGate.thermalHold(resources.snapshot()) == null && readyCandidates().isNotEmpty()

@@ -22,8 +22,8 @@ import com.hereliesaz.geministrator.providers.LiteRtLmEngineLoader
 import com.hereliesaz.geministrator.providers.LiteRtLmModel
 import com.hereliesaz.geministrator.providers.LiteRtLmPrefixBackend
 import com.hereliesaz.geministrator.providers.LiteRtLmPrefixReuse
-import com.hereliesaz.geministrator.providers.LiteRtLmPrefixStats
-import com.hereliesaz.geministrator.providers.LiteRtLmPrefixSwitch
+import com.hereliesaz.geministrator.providers.PromptPrefixStats
+import com.hereliesaz.geministrator.providers.PromptPrefixSwitch
 import com.hereliesaz.geministrator.providers.LiteRtLmPrimedPrefix
 import com.hereliesaz.geministrator.providers.OnDeviceResourceProbe
 import com.hereliesaz.geministrator.providers.OnDeviceResourceSnapshot
@@ -106,7 +106,7 @@ internal fun liteRtLmAbiSupported(): Boolean =
 /** The only code that touches the LiteRT-LM Android classes. CPU backend. */
 internal class AndroidLiteRtLmEngineLoader(private val cacheDirectory: File) : LiteRtLmEngineLoader {
     /** Shared by every engine this loader builds, so a failing prefix cache is given up once per process. */
-    private val prefixSwitch = LiteRtLmPrefixSwitch()
+    private val prefixSwitch = PromptPrefixSwitch()
 
     override suspend fun load(modelPath: String): LiteRtLmModel = withContext(Dispatchers.IO) {
         try {
@@ -139,7 +139,7 @@ internal class AndroidLiteRtLmEngineLoader(private val cacheDirectory: File) : L
 
 private class LiteRtLmEngineModel(
     private val engine: Engine,
-    prefixSwitch: LiteRtLmPrefixSwitch,
+    prefixSwitch: PromptPrefixSwitch,
 ) : LiteRtLmModel {
     // Greedy decoding (top-k 1), like the ONNX generators.
     private fun sessionConfig() = SessionConfig(SamplerConfig(1, 1.0, 1.0, 0))
@@ -210,7 +210,7 @@ private class LiteRtLmEngineModel(
     override fun complete(prefix: String, rest: String, listener: LiteRtLmCompletionListener): LiteRtLmCompletion =
         prefixReuse.complete(prefix, rest, listener)
 
-    override fun prefixStats(): LiteRtLmPrefixStats = prefixReuse.stats()
+    override fun prefixStats(): PromptPrefixStats = prefixReuse.stats()
 
     override fun close() {
         prefixReuse.close()

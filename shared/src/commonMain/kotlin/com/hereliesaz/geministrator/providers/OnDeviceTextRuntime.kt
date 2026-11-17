@@ -28,6 +28,9 @@ enum class OnDeviceTextRuntime(
 interface OnDeviceTextRuntimeSource {
     /** The runtime the next generation would run on, or null when none is ready. */
     fun activeRuntime(): OnDeviceTextRuntime?
+
+    /** The prompt-prefix cache stats of that runtime's generator, or null when it keeps none. */
+    fun activePrefixStats(): PromptPrefixStats? = null
 }
 
 /**

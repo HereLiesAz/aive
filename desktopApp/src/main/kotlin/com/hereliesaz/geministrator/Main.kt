@@ -661,6 +661,7 @@ fun main() {
                             enabled = onDeviceSmallTasksEnabled,
                             modelInstalled = onDeviceTextGenerator.isReady(),
                             runtimeLabel = onDeviceTextGenerator.activeRuntime()?.label,
+                            promptReuse = onDeviceTextGenerator.activePrefixStats(),
                             onEnabledChange = { enabled ->
                                 onDeviceSmallTaskPreference.enabled = enabled
                                 onDeviceSmallTasksEnabled = enabled
