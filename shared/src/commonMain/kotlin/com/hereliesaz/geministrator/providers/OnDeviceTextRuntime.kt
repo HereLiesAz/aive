@@ -51,6 +51,19 @@ object QwenChatPrompt {
         append("<|im_start|>assistant\n")
     }
 
+    /** [format] cut in two: [head] ends where [stablePrefix] ends, [tail] is the rest; `head + tail` equals [format]. */
+    data class Split(val head: String, val tail: String)
+
+    /**
+     * The same prompt as `format(system, stablePrefix + dynamic)`, split after [stablePrefix]. The cut must
+     * sit at a blank-line boundary with a letter after it (see [OnDeviceTextAgentProvider.renderTaskParts]),
+     * so the tokenizer sees the same tokens whether the halves are read together or one after the other.
+     */
+    fun formatSplit(system: String, stablePrefix: String, dynamic: String): Split = Split(
+        head = "<|im_start|>system\n$system<|im_end|>\n<|im_start|>user\n$stablePrefix",
+        tail = "$dynamic<|im_end|>\n<|im_start|>assistant\n",
+    )
+
     internal val MARKERS = listOf("<|im_start|>", "<|im_end|>", "<|endoftext|>")
 }
 

@@ -28,6 +28,17 @@ interface OnDeviceTextGenerator {
     fun isReady(): Boolean
 
     suspend fun generate(system: String, user: String, maxNewTokens: Int): OnDeviceTextGeneration
+
+    /**
+     * The same call with the user text in two parts, `stablePrefix + dynamic`: the leading part repeats
+     * across calls for the same role, so an engine may keep its work on it. The default ignores the split.
+     */
+    suspend fun generate(
+        system: String,
+        stablePrefix: String,
+        dynamic: String,
+        maxNewTokens: Int,
+    ): OnDeviceTextGeneration = generate(system, stablePrefix + dynamic, maxNewTokens)
 }
 
 /**
@@ -52,6 +63,9 @@ class OnDeviceTextAgentProvider(
             ?: (generator as? OnDeviceTextRuntimeSource)?.activeRuntime()?.maxInputTokens
             ?: DEFAULT_MAX_INPUT_TOKENS
     override val workKind: com.hereliesaz.geministrator.workflow.WorkKind get() = com.hereliesaz.geministrator.workflow.WorkKind.OnDeviceModel
+
+    /** A task prompt cut after the role block; see [renderTaskParts]. */
+    data class TaskParts(val stable: String, val dynamic: String)
 
     private enum class Phase { AwaitingApproval, Ready, Cancelled }
 
@@ -187,9 +201,11 @@ class OnDeviceTextAgentProvider(
 
     private suspend fun generateOrThrow(request: AgentTaskRequest, planOnly: Boolean): OnDeviceTextGeneration {
         check(isAvailable()) { "The on-device model is not installed" }
+        val parts = renderTaskParts(request, planOnly)
         return generator.generate(
             system = SYSTEM_PROMPT,
-            user = renderTask(request, planOnly),
+            stablePrefix = parts.stable,
+            dynamic = parts.dynamic,
             maxNewTokens = maxNewTokens,
         )
     }
@@ -213,26 +229,41 @@ class OnDeviceTextAgentProvider(
          * shared preamble), the objective, its acceptance criteria and upstream text artifacts.
          * [estimateTokens] of the same parts is what routing compares with [maxInputTokens].
          */
-        fun renderTask(request: AgentTaskRequest, planOnly: Boolean = false): String = buildString {
+        fun renderTask(request: AgentTaskRequest, planOnly: Boolean = false): String =
+            renderTaskParts(request, planOnly).let { it.stable + it.dynamic }
+
+        /**
+         * [renderTask] in two parts whose concatenation is exactly its text. [TaskParts.stable] is the
+         * leading `ROLE\n<role>\n\n` block (empty when there is no role); it repeats across every task of a
+         * role, plan-only or not, so an engine can keep its work on it.
+         *
+         * Invariant: a non-empty [TaskParts.stable] ends with a blank line (`\n\n`) and [TaskParts.dynamic]
+         * always begins with `TASK`, a letter. Qwen's pre-tokenizer isolates a run of newlines, so the
+         * tokens of the two parts read one after the other are the tokens of the whole text.
+         */
+        fun renderTaskParts(request: AgentTaskRequest, planOnly: Boolean = false): TaskParts {
             val role = request.promptContext.stablePrefix.firstOrNull { it.label == ROLE_BLOCK_LABEL }?.content
                 ?: request.roleInstructions
-            if (role.isNotBlank()) append("ROLE\n").append(role.trim()).append("\n\n")
-            append("TASK\n").append(request.objective.trim()).append("\n\n")
-            if (request.acceptanceCriteria.isNotEmpty()) {
-                append("ACCEPTANCE CRITERIA\n")
-                request.acceptanceCriteria.forEachIndexed { index, criterion ->
-                    append(index + 1).append(". ").append(criterion.description.trim()).append("\n")
+            val stable = if (role.isNotBlank()) "ROLE\n" + role.trim() + "\n\n" else ""
+            val dynamic = buildString {
+                append("TASK\n").append(request.objective.trim()).append("\n\n")
+                if (request.acceptanceCriteria.isNotEmpty()) {
+                    append("ACCEPTANCE CRITERIA\n")
+                    request.acceptanceCriteria.forEachIndexed { index, criterion ->
+                        append(index + 1).append(". ").append(criterion.description.trim()).append("\n")
+                    }
+                    append("\n")
                 }
-                append("\n")
-            }
-            request.contextArtifacts.forEach { artifact ->
-                val text = artifact.textContent?.takeIf(String::isNotBlank) ?: return@forEach
-                append(artifact.label.uppercase()).append("\n").append(text.trim()).append("\n\n")
-            }
-            if (planOnly) {
-                append("PLAN ONLY\nReply with a short numbered plan for this task. Do not perform it yet.")
-            }
-        }.trim()
+                request.contextArtifacts.forEach { artifact ->
+                    val text = artifact.textContent?.takeIf(String::isNotBlank) ?: return@forEach
+                    append(artifact.label.uppercase()).append("\n").append(text.trim()).append("\n\n")
+                }
+                if (planOnly) {
+                    append("PLAN ONLY\nReply with a short numbered plan for this task. Do not perform it yet.")
+                }
+            }.trim()
+            return TaskParts(stable, dynamic)
+        }
 
         /** Rough token count for [chars] characters of English text (four characters a token). */
         fun estimateTokens(chars: Int): Int = (chars.coerceAtLeast(0) + CHARS_PER_TOKEN - 1) / CHARS_PER_TOKEN

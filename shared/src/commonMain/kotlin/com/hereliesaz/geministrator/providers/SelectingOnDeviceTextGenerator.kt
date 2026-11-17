@@ -38,6 +38,26 @@ class SelectingOnDeviceTextGenerator(
         throw unavailable ?: IllegalStateException("The on-device model is not installed")
     }
 
+    override suspend fun generate(
+        system: String,
+        stablePrefix: String,
+        dynamic: String,
+        maxNewTokens: Int,
+    ): OnDeviceTextGeneration {
+        OnDeviceResourceGate.thermalHold(resources.snapshot())?.let { throw OnDeviceGenerationDeclined(it) }
+        var unavailable: OnDeviceRuntimeUnavailableException? = null
+        for (candidate in readyCandidates()) {
+            try {
+                return candidate.generator.generate(system, stablePrefix, dynamic, maxNewTokens)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (skipped: OnDeviceRuntimeUnavailableException) {
+                unavailable = skipped
+            }
+        }
+        throw unavailable ?: IllegalStateException("The on-device model is not installed")
+    }
+
     companion object {
         /** The first runtime of [preference] that is in [ready], or null. */
         fun choose(preference: List<OnDeviceTextRuntime>, ready: Set<OnDeviceTextRuntime>): OnDeviceTextRuntime? =
