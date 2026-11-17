@@ -129,6 +129,25 @@ class RegisterCatalogTest(unittest.TestCase):
             ids,
         )
 
+    def test_refuses_a_specialist_the_app_catalog_cannot_read(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            kotlin = root / "OrchestrationSpecialistCatalog.kt"
+            original = (
+                'object OrchestrationSpecialistCatalog {\n'
+                + register_catalog.BEGIN
+                + '    const val RELEASED: String = """{"specialists":[]}"""\n'
+                + register_catalog.END
+                + '}\n'
+            )
+            kotlin.write_text(original)
+            incoming = root / "catalog.json"
+            incoming.write_text(json.dumps({"specialists": [{"specialistId": "app-integration:assistant"}]}))
+            with self.assertRaises(SystemExit) as raised:
+                register_catalog.register(incoming, kotlin)
+            self.assertIn("app-integration:assistant", str(raised.exception))
+            self.assertEqual(original, kotlin.read_text())
+
 
 if __name__ == "__main__":
     unittest.main()

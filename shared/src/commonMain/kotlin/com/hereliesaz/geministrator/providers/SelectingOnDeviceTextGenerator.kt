@@ -19,6 +19,9 @@ class SelectingOnDeviceTextGenerator(
 
     override fun activeRuntime(): OnDeviceTextRuntime? = readyCandidates().firstOrNull()?.runtime
 
+    override fun activePrefixStats(): PromptPrefixStats? =
+        readyCandidates().firstOrNull()?.let { runCatching { it.generator.prefixStats() }.getOrNull() }
+
     /** Ready while a model is installed and the device is not hot, so routing skips a hot device. */
     override fun isReady(): Boolean =
         OnDeviceResourceGate.thermalHold(resources.snapshot()) == null && readyCandidates().isNotEmpty()
@@ -29,6 +32,26 @@ class SelectingOnDeviceTextGenerator(
         for (candidate in readyCandidates()) {
             try {
                 return candidate.generator.generate(system, user, maxNewTokens)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (skipped: OnDeviceRuntimeUnavailableException) {
+                unavailable = skipped
+            }
+        }
+        throw unavailable ?: IllegalStateException("The on-device model is not installed")
+    }
+
+    override suspend fun generate(
+        system: String,
+        stablePrefix: String,
+        dynamic: String,
+        maxNewTokens: Int,
+    ): OnDeviceTextGeneration {
+        OnDeviceResourceGate.thermalHold(resources.snapshot())?.let { throw OnDeviceGenerationDeclined(it) }
+        var unavailable: OnDeviceRuntimeUnavailableException? = null
+        for (candidate in readyCandidates()) {
+            try {
+                return candidate.generator.generate(system, stablePrefix, dynamic, maxNewTokens)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (skipped: OnDeviceRuntimeUnavailableException) {

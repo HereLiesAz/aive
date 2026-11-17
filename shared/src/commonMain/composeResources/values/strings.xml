@@ -1557,6 +1557,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_on_device_small_tasks_description">Sends short text tasks (summarise, classify, extract, rewrite) that need no repository access to the model installed on this device, at no cost. Larger tasks and anything that reads or writes a repository still go to your sources. Your sources remain the swarm's agents.</string>
     <string name="settings_on_device_small_tasks_no_model">No local model is installed yet. Install the LiteRT-LM small-task model or a memory stage's local model from the Memory swarm; this takes effect once one is installed.</string>
     <string name="settings_on_device_small_tasks_runtime">Runs on %1$s.</string>
+    <string name="settings_on_device_small_tasks_reuse_on">Prompt reuse on, %1$d of %2$d tasks.</string>
+    <string name="settings_on_device_small_tasks_reuse_idle">Prompt reuse on, no tasks yet.</string>
+    <string name="settings_on_device_small_tasks_reuse_off">Prompt reuse is off after an error.</string>
     <string name="settings_on_device_small_tasks_off">Small tasks on this device</string>
     <string name="settings_on_device_small_tasks_on">Small tasks on this device</string>
     <string name="settings_crash_reports_waiting">Waiting to be sent, exactly as it will be sent: %1$s</string>

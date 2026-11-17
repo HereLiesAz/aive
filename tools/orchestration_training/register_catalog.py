@@ -112,6 +112,14 @@ def validate(catalog):
 
 def register(path, kotlin=KOTLIN):
     incoming = json.loads(Path(path).read_text())
+    # OrchestrationSpecialistCatalog.parse() rejects any id outside orchestration:*, which would make the
+    # whole released catalog unreadable in the app. Refuse here, before anything is written.
+    foreign = [e["specialistId"] for e in incoming.get("specialists", []) if not e["specialistId"].startswith("orchestration:")]
+    if foreign:
+        raise SystemExit(
+            f"refusing to register {foreign}: the app's orchestration catalog only accepts orchestration:* specialists "
+            "(for example app-integration:assistant has no catalog in the app yet). Nothing was written."
+        )
     source = Path(kotlin).read_text()
     merged = merge_specialists(current_catalog(source), incoming)
     validate(merged)

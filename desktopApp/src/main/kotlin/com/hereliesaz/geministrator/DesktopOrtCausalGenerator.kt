@@ -35,6 +35,7 @@ internal class DesktopOrtCausalGenerator(
         progress: (String) -> Unit = {},
         writingLabel: String = "Writing",
         extraInputs: Map<String, OnnxTensor> = emptyMap(),
+        heldHead: DesktopOrtHeldHead? = null,
     ): String {
         val config = loadModelConfig(modelRoot)
         val promptIds = tokenizer.encode(prompt).ids
@@ -50,7 +51,9 @@ internal class DesktopOrtCausalGenerator(
         // Chunking bounds each logits tensor to PREFILL_CHUNK_TOKENS * vocab, and intermediate
         // chunks don't request `logits` at all.
         val cacheOnlyOutputs = session.outputNames.filterTo(linkedSetOf()) { it != LOGITS_OUTPUT }
-        var totalLength = 0
+        // With a held head, [prompt] is only the tail: it runs on the head's `present.*` tensors, which stay
+        // owned by [heldHead] (never closed here) and are fed as the first chunk's `past_key_values.*`.
+        var totalLength = heldHead?.length ?: 0
         var activeResult: OrtSession.Result? = null
         try {
             val chunks = prefillChunks(promptIds.size, PREFILL_CHUNK_TOKENS)
@@ -64,7 +67,7 @@ internal class DesktopOrtCausalGenerator(
                     session = session,
                     tokenIds = chunkIds,
                     totalLength = totalLength,
-                    previousResult = previous,
+                    previousResult = previous ?: heldHead?.result,
                     config = config,
                     owned = owned,
                     extraInputs = extraInputs,
@@ -111,6 +114,45 @@ internal class DesktopOrtCausalGenerator(
             activeResult?.close()
         }
         return tokenizer.decode(generated.toLongArray(), true)
+    }
+
+    /**
+     * Runs [headPrompt] once, in the same bounded chunks as [generate], and keeps its `present.*` tensors
+     * so later calls can run only their tail on them. The caller owns the returned head and must close it.
+     */
+    fun prime(
+        session: OrtSession,
+        tokenizer: HuggingFaceTokenizer,
+        modelRoot: java.io.File,
+        headPrompt: String,
+        extraInputs: Map<String, OnnxTensor> = emptyMap(),
+    ): DesktopOrtHeldHead {
+        val config = loadModelConfig(modelRoot)
+        val headIds = tokenizer.encode(headPrompt).ids
+        require(headIds.isNotEmpty()) { "Tokenizer returned no head tokens" }
+        val cacheOnlyOutputs = session.outputNames.filterTo(linkedSetOf()) { it != LOGITS_OUTPUT }
+        var totalLength = 0
+        var active: OrtSession.Result? = null
+        try {
+            prefillChunks(headIds.size, PREFILL_CHUNK_TOKENS).forEach { range ->
+                val chunkIds = headIds.copyOfRange(range.first, range.last + 1)
+                totalLength += chunkIds.size
+                val previous = active
+                val owned = mutableListOf<OnnxTensor>()
+                val inputs = buildInputs(session, chunkIds, totalLength, previous, config, owned, extraInputs)
+                val next = try {
+                    session.run(inputs, cacheOnlyOutputs)
+                } finally {
+                    owned.forEach(OnnxTensor::close)
+                }
+                previous?.close()
+                active = next
+            }
+            return DesktopOrtHeldHead(requireNotNull(active), totalLength)
+        } catch (failure: Throwable) {
+            active?.close()
+            throw failure
+        }
     }
 
     private fun buildInputs(
@@ -251,4 +293,9 @@ internal class DesktopOrtCausalGenerator(
             }
         }
     }
+}
+
+/** A prompt head already run: its `present.*` outputs, kept alive until [close], and its token count. */
+internal class DesktopOrtHeldHead(val result: OrtSession.Result, val length: Int) : AutoCloseable {
+    override fun close() = result.close()
 }

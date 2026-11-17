@@ -71,6 +71,9 @@ Each needs an owner decision or a larger build than a parity pass:
 | Feature | Android | Desktop | Web |
 |---|---|---|---|
 | LiteRT-LM generative runtime (small tasks, Qwen2.5-0.5B) | Yes (arm64-v8a, x86_64; CPU) | Yes (Windows x64, macOS arm64, Linux x64/arm64; CPU) | No: its JavaScript API is an early preview, and ORT Web has not been run in a browser |
+| LiteRT-LM prompt-prefix reuse (cloned primed session per role) | Yes (same engine) | Yes (same engine) | No (no LiteRT-LM web build) |
+| ONNX Runtime prompt-prefix reuse (held `present.*` of the role head, small tasks only; shared `OrtPrefixReuse`) | Yes (multi-token tail on the cache branch not yet run on a device) | Yes (same chunked cache-branch reads the plain path already does) | No (no small-task generator in the browser) |
+| Prompt-reuse status in Keeper's room > This device | Yes | Yes | No (no on-device small tasks) |
 
 ## Local model inference (ONNX)
 

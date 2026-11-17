@@ -13,6 +13,11 @@ import com.hereliesaz.geministrator.providers.LiteRtLmCompletion
 import com.hereliesaz.geministrator.providers.LiteRtLmCompletionListener
 import com.hereliesaz.geministrator.providers.LiteRtLmEngineLoader
 import com.hereliesaz.geministrator.providers.LiteRtLmModel
+import com.hereliesaz.geministrator.providers.LiteRtLmPrefixBackend
+import com.hereliesaz.geministrator.providers.LiteRtLmPrefixReuse
+import com.hereliesaz.geministrator.providers.PromptPrefixStats
+import com.hereliesaz.geministrator.providers.PromptPrefixSwitch
+import com.hereliesaz.geministrator.providers.LiteRtLmPrimedPrefix
 import com.hereliesaz.geministrator.providers.OnDeviceResourceProbe
 import com.hereliesaz.geministrator.providers.OnDeviceResourceSnapshot
 import com.hereliesaz.geministrator.providers.OnDeviceRuntimeUnavailableException
@@ -105,6 +110,9 @@ internal class DesktopOnDeviceResourceProbe : OnDeviceResourceProbe {
  * [OnDeviceRuntimeUnavailableException] turns into a fall back to the ONNX runtime.
  */
 internal class DesktopLiteRtLmEngineLoader(private val cacheDirectory: File) : LiteRtLmEngineLoader {
+    /** Shared by every engine this loader builds, so a failing prefix cache is given up once per process. */
+    private val prefixSwitch = PromptPrefixSwitch()
+
     override suspend fun load(modelPath: String): LiteRtLmModel = withContext(Dispatchers.IO) {
         try {
             cacheDirectory.mkdirs()
@@ -121,7 +129,7 @@ internal class DesktopLiteRtLmEngineLoader(private val cacheDirectory: File) : L
                 runCatching { engine.close() }
                 throw failure
             }
-            DesktopLiteRtLmEngineModel(engine)
+            DesktopLiteRtLmEngineModel(engine, prefixSwitch)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Throwable) {
@@ -133,14 +141,19 @@ internal class DesktopLiteRtLmEngineLoader(private val cacheDirectory: File) : L
     }
 }
 
-private class DesktopLiteRtLmEngineModel(private val engine: Engine) : LiteRtLmModel {
-    override fun complete(prompt: String, listener: LiteRtLmCompletionListener): LiteRtLmCompletion {
-        // Greedy decoding (top-k 1), like the ONNX generators.
-        val session = engine.createSession(SessionConfig(SamplerConfig(1, 1.0, 1.0, 0)))
+private class DesktopLiteRtLmEngineModel(
+    private val engine: Engine,
+    prefixSwitch: PromptPrefixSwitch,
+) : LiteRtLmModel {
+    // Greedy decoding (top-k 1), like the ONNX generators.
+    private fun sessionConfig() = SessionConfig(SamplerConfig(1, 1.0, 1.0, 0))
+
+    /** Runs [input] on [session] and hands the session to a completion that frees it; closes it if the stream cannot start. */
+    private fun stream(session: Session, input: String, listener: LiteRtLmCompletionListener): LiteRtLmCompletion {
         val completion = DesktopLiteRtLmSessionCompletion(session)
         try {
             session.generateContentStream(
-                listOf(InputData.Text(prompt)),
+                listOf(InputData.Text(input)),
                 object : ResponseCallback {
                     override fun onNext(response: String) {
                         listener.onText(response)
@@ -164,7 +177,47 @@ private class DesktopLiteRtLmEngineModel(private val engine: Engine) : LiteRtLmM
         return completion
     }
 
+    /**
+     * One primed base session per distinct (adapter, head). Each call clones it (the clone shares the
+     * base's key/value state copy-on-write) and streams only the tail on the clone, so the completion
+     * frees the clone and never the base. The base is closed with the model.
+     */
+    private val prefixReuse = LiteRtLmPrefixReuse(
+        backend = object : LiteRtLmPrefixBackend {
+            override fun prime(head: String): LiteRtLmPrimedPrefix {
+                val base = engine.createSession(sessionConfig())
+                try {
+                    base.runPrefill(listOf(InputData.Text(head)))
+                } catch (failure: Throwable) {
+                    runCatching { base.close() }
+                    throw failure
+                }
+                return object : LiteRtLmPrimedPrefix {
+                    override fun start(tail: String, listener: LiteRtLmCompletionListener): LiteRtLmCompletion =
+                        stream(base.clone(), tail, listener)
+
+                    override fun close() {
+                        runCatching { base.close() }
+                    }
+                }
+            }
+
+            override fun completeWhole(prompt: String, listener: LiteRtLmCompletionListener): LiteRtLmCompletion =
+                stream(engine.createSession(sessionConfig()), prompt, listener)
+        },
+        switch = prefixSwitch,
+    )
+
+    override fun complete(prompt: String, listener: LiteRtLmCompletionListener): LiteRtLmCompletion =
+        stream(engine.createSession(sessionConfig()), prompt, listener)
+
+    override fun complete(prefix: String, rest: String, listener: LiteRtLmCompletionListener): LiteRtLmCompletion =
+        prefixReuse.complete(prefix, rest, listener)
+
+    override fun prefixStats(): PromptPrefixStats = prefixReuse.stats()
+
     override fun close() {
+        prefixReuse.close()
         engine.close()
     }
 }

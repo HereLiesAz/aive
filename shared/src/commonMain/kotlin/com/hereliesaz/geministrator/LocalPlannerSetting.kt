@@ -49,6 +49,8 @@ data class OnDeviceSmallTaskSetting(
     val modelInstalled: Boolean,
     /** The runtime the next small task would run on (for example LiteRT-LM); null with no model. */
     val runtimeLabel: String? = null,
+    /** How the runtime's prompt reuse has done (shown after the runtime label); null when it keeps none. */
+    val promptReuse: com.hereliesaz.geministrator.providers.PromptPrefixStats? = null,
     val onEnabledChange: (Boolean) -> Unit,
 )
 

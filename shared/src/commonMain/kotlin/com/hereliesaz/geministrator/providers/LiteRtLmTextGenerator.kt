@@ -3,6 +3,7 @@ package com.hereliesaz.geministrator.providers
 import kotlin.concurrent.Volatile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
@@ -37,6 +38,17 @@ interface LiteRtLmCompletion {
 interface LiteRtLmModel {
     /** Starts a completion of the raw (already chat-templated) [prompt]; the listener gets the text. */
     fun complete(prompt: String, listener: LiteRtLmCompletionListener): LiteRtLmCompletion
+
+    /**
+     * Starts a completion of [prefix] followed by [rest], which together are exactly the prompt
+     * [complete] would take. An engine may keep the model's work on [prefix] and reuse it when the next
+     * call starts with the same prefix. The default runs the whole text with no reuse.
+     */
+    fun complete(prefix: String, rest: String, listener: LiteRtLmCompletionListener): LiteRtLmCompletion =
+        complete(prefix + rest, listener)
+
+    /** How the prefix cache did, or null when this engine keeps none. */
+    fun prefixStats(): PromptPrefixStats? = null
 
     fun close()
 }
@@ -93,8 +105,20 @@ class LiteRtLmTextGenerator(
         }
     }
 
-    override suspend fun generate(system: String, user: String, maxNewTokens: Int): OnDeviceTextGeneration {
-        val prompt = QwenChatPrompt.format(system, user)
+    /** How the prefix cache has done on the loaded engine; null when none is loaded or it keeps none. */
+    override fun prefixStats(): PromptPrefixStats? = model?.prefixStats()
+
+    override suspend fun generate(system: String, user: String, maxNewTokens: Int): OnDeviceTextGeneration =
+        generate(system, "", user, maxNewTokens)
+
+    override suspend fun generate(
+        system: String,
+        stablePrefix: String,
+        dynamic: String,
+        maxNewTokens: Int,
+    ): OnDeviceTextGeneration {
+        val split = QwenChatPrompt.formatSplit(system, stablePrefix, dynamic)
+        val prompt = split.head + split.tail
         val limit = maxNewTokens.coerceIn(1, MAX_NEW_TOKENS_CAP)
         if (OnDeviceTextAgentProvider.estimateTokens(prompt.length) + limit > LITERT_LM_CONTEXT_TOKENS) {
             throw OnDeviceRuntimeUnavailableException("The task is too long for the LiteRT-LM model's context")
@@ -105,7 +129,13 @@ class LiteRtLmTextGenerator(
             try {
                 val path = modelPath() ?: throw OnDeviceRuntimeUnavailableException("No LiteRT-LM model is installed")
                 val loaded = ensureLoaded(path)
-                OnDeviceTextGeneration(text = sanitizeOnDeviceText(complete(loaded, prompt, limit)))
+                val text = if (stablePrefix.isEmpty()) {
+                    complete(loaded, limit, offCaller = false) { loaded.complete(prompt, it) }
+                } else {
+                    // Priming a prefix reads it on the calling thread, so it runs off the caller's.
+                    complete(loaded, limit, offCaller = true) { loaded.complete(split.head, split.tail, it) }
+                }
+                OnDeviceTextGeneration(text = sanitizeOnDeviceText(text))
             } finally {
                 scheduleIdleRelease()
             }
@@ -138,25 +168,28 @@ class LiteRtLmTextGenerator(
 
     private class StreamFailure(message: String) : RuntimeException(message)
 
-    private suspend fun complete(loaded: LiteRtLmModel, prompt: String, maxNewTokens: Int): String {
+    private suspend fun complete(
+        loaded: LiteRtLmModel,
+        maxNewTokens: Int,
+        offCaller: Boolean,
+        start: (LiteRtLmCompletionListener) -> LiteRtLmCompletion,
+    ): String {
         val events = Channel<String>(Channel.UNLIMITED)
+        val listener = object : LiteRtLmCompletionListener {
+            override fun onText(chunk: String) {
+                events.trySend(chunk)
+            }
+
+            override fun onFinished() {
+                events.close()
+            }
+
+            override fun onFailed(message: String) {
+                events.close(StreamFailure(message))
+            }
+        }
         val call = try {
-            loaded.complete(
-                prompt,
-                object : LiteRtLmCompletionListener {
-                    override fun onText(chunk: String) {
-                        events.trySend(chunk)
-                    }
-
-                    override fun onFinished() {
-                        events.close()
-                    }
-
-                    override fun onFailed(message: String) {
-                        events.close(StreamFailure(message))
-                    }
-                },
-            )
+            if (offCaller) withContext(Dispatchers.Default) { start(listener) } else start(listener)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Throwable) {
