@@ -281,7 +281,10 @@ def manifest_entries(manifest):
     """(relative path, sha256) for every file the manifest lists, whichever of the two shapes it uses."""
     files = manifest.get("files")
     if isinstance(files, dict):
-        return [(name, v if isinstance(v, str) else v["sha256"]) for name, v in files.items()]
+        # The Kotlin writer keys each entry by split ("train") and names the file inside it
+        # ({"file": "train.jsonl", "sha256": ..., "rows": ...}); a plain name -> sha256 map is the other shape.
+        return [(name if isinstance(v, str) else (v.get("file") or v.get("path") or v.get("name") or name),
+                 v if isinstance(v, str) else v["sha256"]) for name, v in files.items()]
     if isinstance(files, list):
         return [(v.get("path") or v.get("name") or v["file"], v["sha256"]) for v in files]
     raise ValueError("manifest.json has no `files` (a name -> sha256 map, or a list of {path, sha256})")
@@ -488,7 +491,7 @@ def verify_corpus(directory):
 code(r'''
 # ---- Corpus: found, verified against manifest.json (SHA-256), counted ----------------------------------------
 SPLITS = ("train", "validation", "test", "adversarial")
-REQUIRED_ROW_KEYS = ("id", "family", "system", "user", "expected", "split", "checks")
+REQUIRED_ROW_KEYS = ("id", "family", "sub", "messages", "split", "checks", "system", "user", "expected")
 # Used when no Kaggle dataset is attached: the same corpus zip, committed in this folder.
 CORPUS_URLS = [
     f"https://raw.githubusercontent.com/HereLiesAz/aive/{ref}/tools/app_integration_training/aive-app-integration-corpus.zip"
@@ -550,6 +553,11 @@ ALL = {}
 for split in SPLITS:
     rows = [json.loads(line) for line in (DATA / f"{split}.jsonl").open() if line.strip()]
     for row in rows:
+        # The writer's chat format is messages = [system, user, assistant]; the rest of this notebook (and the app's
+        # own prompt) speaks of system / user / expected, so they are read out of it once, here.
+        messages = row.get("messages") or []
+        assert [m.get("role") for m in messages] == ["system", "user", "assistant"], f"{split} row {row.get('id')}: messages are not system, user, assistant"
+        row["system"], row["user"], row["expected"] = (m["content"] for m in messages)
         missing = [k for k in REQUIRED_ROW_KEYS if k not in row]
         assert not missing, f"{split} row {row.get('id')} lacks {missing}"
         assert row["split"] == split, f"{row['id']} is in {split}.jsonl but says split={row['split']}"
@@ -569,60 +577,44 @@ spec = importlib.util.spec_from_file_location("aive_app_integration_score", SCOR
 SCORE = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = SCORE
 spec.loader.exec_module(SCORE)
-for name in ("score_rows", "gates"):
+for name in ("score", "gates", "corpus_problems"):
     assert callable(getattr(SCORE, name, None)), f"score.py must define {name}()"
 
-# Documented interface: score_rows(rows, predictions) -> {family: score}; gates(per_family) -> (ok, failures).
-# What is not pinned down is how predictions are keyed and what gates() receives, so both are probed here,
-# once, on the corpus's own expected answers (which must score 1.0), before any hour of training is spent.
-SCORE_STYLE, GATES_STYLE = {}, {}
-
-def family_value(value):
-    if isinstance(value, (int, float)):
-        return float(value)
-    for key in ("score", "pass_rate", "rate", "value"):
-        if key in value:
-            return float(value[key])
-    raise KeyError(f"cannot read a score out of {value!r}")
+# score.py's real interface: score(rows, {id: output}, splits) -> ({split: {name: [passed, total]}}, failures),
+# gates(table, corpus_issues) -> [(description, passed)], corpus_problems(rows) -> [problem] (the layout and
+# prefix-stability checks over every row, which the corpus checks once, here, before the rows are cut for SMOKE).
+CORPUS_ISSUES = SCORE.corpus_problems([r for s in SPLITS for r in ALL[s]])
+assert not CORPUS_ISSUES, f"the corpus fails its own layout and prefix checks: {CORPUS_ISSUES[:5]}"
 
 def call_score(rows, answers):
-    """Per-family scores for [rows] given [answers] (a list in row order): {family: float}."""
-    by_id = {r["id"]: a for r, a in zip(rows, answers)}
-    styles = [SCORE_STYLE["style"]] if SCORE_STYLE else ["by_id", "list"]
-    failure = None
-    for style in styles:
-        try:
-            result = SCORE.score_rows(rows, by_id if style == "by_id" else list(answers))
-            SCORE_STYLE["style"] = style
-            return {family: family_value(v) for family, v in result.items()}
-        except Exception as caught:
-            failure = caught
-    raise RuntimeError(f"score.py's score_rows could not be called with the predictions as an id->text map or a list: {failure!r}")
+    """Per-family pass rates for [rows] given [answers] (a list in row order): {family: float}."""
+    splits = tuple(sorted({r["split"] for r in rows}))
+    table, _ = SCORE.score(rows, {r["id"]: a for r, a in zip(rows, answers)}, splits=splits)
+    families = {r["family"] for r in rows}
+    totals = collections.defaultdict(lambda: [0, 0])
+    for per_name in table.values():
+        for name, (passed, total) in per_name.items():
+            if name in families:
+                totals[name][0] += passed
+                totals[name][1] += total
+    return {name: passed / total for name, (passed, total) in totals.items() if total}
 
-def call_gates(test_scores, adversarial_scores):
-    """(ok, failures) from score.py's gates() given the per-family scores of both splits."""
-    attempts = {
-        "by_split": lambda: SCORE.gates({"test": test_scores, "adversarial": adversarial_scores}),
-        "positional": lambda: SCORE.gates(test_scores, adversarial_scores),
-    }
-    order = [GATES_STYLE["style"]] if GATES_STYLE else list(attempts)
-    failure = None
-    for style in order:
-        try:
-            ok, failures = attempts[style]()
-            GATES_STYLE["style"] = style
-            return bool(ok), failures
-        except Exception as caught:
-            failure = caught
-    raise RuntimeError(f"score.py's gates could not be called with {{'test':..,'adversarial':..}} or (test, adversarial): {failure!r}")
+def call_gates(rows_by_split, answers_by_split):
+    """(ok, failed gate descriptions): score.py's gates over the test and adversarial rows with these answers."""
+    rows = [r for s in ("test", "adversarial") for r in rows_by_split[s]]
+    answers = {r["id"]: a for s in ("test", "adversarial") for r, a in zip(rows_by_split[s], answers_by_split[s])}
+    table, _ = SCORE.score(rows, answers, splits=("test", "adversarial"))
+    results = SCORE.gates(table, CORPUS_ISSUES)
+    return all(passed for _, passed in results), [description for description, passed in results if not passed]
 
-perfect = {s: call_score(ALL[s], [r["expected"] for r in ALL[s]]) for s in ("test", "adversarial")}
-for s, per_family in perfect.items():
+perfect_answers = {s: [r["expected"] for r in ALL[s]] for s in ("test", "adversarial")}
+for s in ("test", "adversarial"):
+    per_family = call_score(ALL[s], perfect_answers[s])
     flawed = {f: v for f, v in per_family.items() if v < 1.0}
     assert not flawed, f"score.py gives the corpus's own expected answers less than 1.0 on {s}: {flawed}; the corpus or score.py is wrong"
-ok, failures = call_gates(perfect["test"], perfect["adversarial"])
+ok, failures = call_gates(ALL, perfect_answers)
 assert ok, f"score.py's gates fail the corpus's own expected answers: {failures}"
-print(f"score.py checked on the expected answers (predictions as {SCORE_STYLE['style']}, gates as {GATES_STYLE['style']})")
+print("score.py checked on the corpus's own expected answers: every family 1.0 and every gate passes")
 
 if SMOKE:
     def tiny(rows, n):
@@ -842,7 +834,7 @@ def row_failures(rows, answers):
 def evaluate(label, answers_by_split, rows_by_split):
     """Score both splits with score.py, print the per-family table, apply score.py's gates."""
     per = {s: call_score(rows_by_split[s], answers_by_split[s]) for s in ("test", "adversarial")}
-    ok, gate_failures = call_gates(per["test"], per["adversarial"])
+    ok, gate_failures = call_gates(rows_by_split, answers_by_split)
     print(f"\n{label}: per-family scores")
     print(f"{'family':8}{'test':>8}{'adversarial':>13}")
     for fam in sorted(set(per["test"]) | set(per["adversarial"])):
