@@ -196,15 +196,25 @@ if SMOKE:
     SMOKE_STEPS, SMOKE_TRAIN_ROWS, SMOKE_EVAL_ROWS = 20, 64, 16
     CORPUS_ROWS = 20                 # a small corpus through the generator keeps the build stage fast
 
+def on_kaggle():
+    """True on a Kaggle kernel. Kaggle images also ship `google.colab`, so importing it proves nothing."""
+    return bool(os.environ.get("KAGGLE_KERNEL_RUN_TYPE")) or Path("/kaggle/working").is_dir()
+
+def on_colab():
+    """True only on a real Colab runtime (the Colab host marker), never merely because `google.colab` imports."""
+    return not on_kaggle() and (Path("/var/colab/hostname").exists() or bool(os.environ.get("COLAB_RELEASE_TAG")))
+
 def work_root():
     """Where the session's work lives. Colab loses /content when a runtime disconnects, so on Colab the
-    work goes to Google Drive: a rerun resumes from state.json. Kaggle keeps /kaggle/working."""
-    try:
-        from google.colab import drive
-    except ImportError:
+    work goes to Google Drive: a rerun resumes from state.json. Kaggle keeps /kaggle/working. Anywhere else
+    (a local Jupyter) the work stays in the current directory."""
+    if on_kaggle():
         return Path("/kaggle/working")
-    drive.mount("/content/drive")
-    return Path("/content/drive/MyDrive")
+    if on_colab():
+        from google.colab import drive
+        drive.mount("/content/drive")
+        return Path("/content/drive/MyDrive")
+    return Path.cwd()
 
 ROOT = work_root()
 WORK = ROOT / ("aive-app-integration-smoke" if SMOKE else "aive-app-integration")
@@ -1116,18 +1126,19 @@ code(r'''
 import requests
 
 def github_token():
-    """GITHUB_TOKEN from Kaggle secrets, Colab secrets, or the environment, whichever this runs on. Never printed."""
-    try:
-        from kaggle_secrets import UserSecretsClient
-        return UserSecretsClient().get_secret("GITHUB_TOKEN").strip()
-    except ImportError:
-        pass
-    try:
+    """GITHUB_TOKEN from the environment, Kaggle or Colab, whichever this runs on. Never printed."""
+    token = (os.environ.get("GITHUB_TOKEN") or "").strip()
+    if token:
+        return token
+    if on_kaggle():
+        try:
+            from kaggle_secrets import UserSecretsClient
+            token = (UserSecretsClient().get_secret("GITHUB_TOKEN") or "").strip()
+        except Exception as error:
+            raise RuntimeError("No GITHUB_TOKEN from Kaggle: add it under Add-ons > Secrets and attach it to this notebook (" + type(error).__name__ + ")") from None
+    elif on_colab():
         from google.colab import userdata
-        return (userdata.get("GITHUB_TOKEN") or "").strip()
-    except ImportError:
-        pass
-    token = os.environ.get("GITHUB_TOKEN")
+        token = (userdata.get("GITHUB_TOKEN") or "").strip()
     if not token:
         raise RuntimeError("No GITHUB_TOKEN: add it as a Kaggle or Colab secret, or set the environment variable")
     return token
