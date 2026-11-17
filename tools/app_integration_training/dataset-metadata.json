@@ -2,7 +2,7 @@
   "title": "Aive App Integration Corpus",
   "id": "hereliesaz/aive-app-integration-corpus",
   "subtitle": "Chat-format training and gating data that teaches Qwen2.5-0.5B to work inside The Aive",
-  "description": "Generated from the contracts in HereLiesAz/aive. train/validation/test/adversarial .jsonl rows carry id, family (F1..F7), system, user, expected, split and checks. manifest.json records the source commit and the SHA-256 of every file; score.py scores the declarative checks per family and applies the release gates.",
+  "description": "Optional copy of the corpus the notebook builds itself. Generated from the contracts in HereLiesAz/aive. train/validation/test/adversarial .jsonl rows carry id, family (F1..F7), system, user, expected, split and checks. manifest.json records the source commit and the SHA-256 of every file; score.py scores the declarative checks per family and applies the release gates.",
   "licenses": [{ "name": "Apache 2.0" }],
   "keywords": ["text generation", "json"]
 }

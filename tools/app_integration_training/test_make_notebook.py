@@ -82,8 +82,43 @@ class MakeNotebookTest(unittest.TestCase):
             "score_rows",
             "gates",
             "app-integration-v1",
+            "BUILD_CORPUS_ON_KAGGLE = True",
+            'SOURCE_REF = "main"',
+            "GENERATOR_GRADLE_ARGS",
+            "AIVE_APP_INTEGRATION_ROWS",
+            "CORPUS_ROWS = 20",
+            "GRADLE_USER_HOME",
         ):
             self.assertIn(required, text, f"notebook lacks {required!r}")
+
+    def test_the_generator_invocation_lives_in_one_constant(self):
+        text = "\n".join(code_cells(json.loads(NOTEBOOK.read_text())))
+        self.assertEqual(1, text.count(":shared:desktopTest"))
+        self.assertEqual(1, text.count("-Daive.appIntegration.outDir"))
+
+    def test_the_corpus_zip_is_deterministic(self):
+        import os
+        import tempfile
+        import zipfile
+
+        notebook = json.loads(NOTEBOOK.read_text())
+        source = next(s for s in code_cells(notebook) if "def deterministic_zip" in s)
+        function = next(n for n in ast.parse(source).body if isinstance(n, ast.FunctionDef) and n.name == "deterministic_zip")
+        namespace = {"Path": Path, "zipfile": zipfile}
+        exec(compile(ast.Module([function], []), "deterministic_zip", "exec"), namespace)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for index, name in enumerate(("b.jsonl", "a.jsonl", "sub/manifest.json")):
+                path = root / "data" / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(f"row {index}\n")
+            first = namespace["deterministic_zip"](root / "data", root / "one.zip", "corpus").read_bytes()
+            for path in (root / "data").rglob("*"):
+                os.utime(path, (1_000_000_000, 1_000_000_000))
+            second = namespace["deterministic_zip"](root / "data", root / "two.zip", "corpus").read_bytes()
+            self.assertEqual(first, second)
+            with zipfile.ZipFile(root / "one.zip") as archive:
+                self.assertEqual(sorted(archive.namelist()), archive.namelist())
 
 
 if __name__ == "__main__":
