@@ -62,6 +62,12 @@ object MemoryRuntimeBridge {
     var procedureTraceReader: ProcedureTraceReader = NoOpProcedureTraceReader
     /** Optional clerk that adds recall to the caution recognizer; null leaves the recognizer alone. */
     var cautionClerk: com.hereliesaz.geministrator.memory.procedural.CautionClerk? = null
+    /** The habit replay state (docs/architecture/PROCEDURAL_MEMORY.md, section 11); forgetting and clearing erase it. */
+    var replayLedger: com.hereliesaz.geministrator.memory.procedural.HabitReplayLedger? = null
+    /** Tasks an approved executor habit proposes for an objective; each is gated when added. Null while memory is not attached. */
+    /** True while memory is attached and habit learning is switched on; replay learns and replays only then. */
+    var habitLearningOn: () -> Boolean = { false }
+    var habitStepProposer: (suspend (String) -> List<com.hereliesaz.geministrator.domain.TaskDefinition>)? = null
 
     fun reset() {
         observer = NoOpMemorySessionObserver
@@ -69,5 +75,7 @@ object MemoryRuntimeBridge {
         procedureTraceSink = NoOpProcedureTraceSink
         procedureTraceReader = NoOpProcedureTraceReader
         cautionClerk = null
+        habitStepProposer = null
+        habitLearningOn = { false }
     }
 }

@@ -108,6 +108,7 @@ internal fun WorkflowEvent.logText(): String = when (this) {
         outputTokens?.let { append(", out $it") }
         costUsd?.let { append(", \$$it") }
         latencyMillis?.let { append(", ${it}ms") }
+        if (tokensAvoided > 0) append(", reused a habit with no model call, about $tokensAvoided tokens avoided")
     }
     is PolicyDecisionRecorded -> "Policy ${effect.name} ($code): $action on $resourceType" +
         (resourceId?.let { " $it" } ?: "") + " by $subjectType" + (subjectId?.let { " $it" } ?: "") + ": $reason"

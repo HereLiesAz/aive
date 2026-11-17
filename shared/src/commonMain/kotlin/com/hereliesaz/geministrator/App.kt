@@ -253,6 +253,8 @@ fun App(
                 deadlineHistory = deadlineHistory,
                 traceExport = com.hereliesaz.geministrator.telemetry.WorkflowTraceExport.durable,
                 delegations = delegations,
+                habitReplay = HabitReplayHost.planner,
+                habitLearningOn = { com.hereliesaz.geministrator.memory.MemoryRuntimeBridge.habitLearningOn() },
                 // The runtime's cycle and its saves are not UI work.
                 runtimeDispatcher = kotlinx.coroutines.Dispatchers.Default,
             )

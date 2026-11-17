@@ -210,6 +210,8 @@ data class ProviderUsageRecorded(
     val latencyMillis: Long? = null,
     /** Billed but unpriced: [costUsd] does not cover this usage ([com.hereliesaz.geministrator.domain.TaskUsage.costUnknown]). */
     val costUnknown: Boolean = false,
+    /** Tokens a replayed habit saved on this report (0 for a model run). */
+    val tokensAvoided: Long = 0,
     override val occurredAtEpochMillis: Long,
 ) : WorkflowEvent
 

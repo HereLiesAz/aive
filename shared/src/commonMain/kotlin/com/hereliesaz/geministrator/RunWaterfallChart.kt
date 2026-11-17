@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.waterfall_bar_label
+import com.hereliesaz.geministrator.resources.waterfall_avoided
 import com.hereliesaz.geministrator.resources.waterfall_cost
 import com.hereliesaz.geministrator.resources.waterfall_empty
 import com.hereliesaz.geministrator.resources.waterfall_hint
@@ -113,7 +114,9 @@ private fun WaterfallBar.usageSummary(): String {
     val reported = usage ?: return stringResource(Res.string.waterfall_no_usage)
     val tokens = stringResource(Res.string.waterfall_usage, reported.inputTokens.toString(), reported.outputTokens.toString())
     val cost = reported.costUsd?.let { stringResource(Res.string.waterfall_cost, formatWaterfallCost(it)) }
-    return if (cost == null) tokens else "$tokens, $cost"
+    val avoided = reported.tokensAvoided.takeIf { it > 0 }
+        ?.let { stringResource(Res.string.waterfall_avoided, it.toString()) }
+    return listOfNotNull(tokens, cost, avoided).joinToString(", ")
 }
 
 /**

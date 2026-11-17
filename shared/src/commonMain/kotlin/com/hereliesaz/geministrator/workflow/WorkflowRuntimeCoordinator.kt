@@ -99,6 +99,8 @@ class WorkflowRuntimeCoordinator(
     private val deadlineSample: (TaskDefinition, TaskRun, Long) -> Unit = { _, _, _ -> },
     /** Whether a creature past its hard point is stopped ([HARD_DEADLINES_ENABLED]); tests set it. */
     private val enforceDeadlines: Boolean = HARD_DEADLINES_ENABLED,
+    /** Learns replayable habits from accepted runs and quarantines one that was turned back; null does neither. */
+    private val habitReplayObserver: HabitReplayObserver? = null,
 ) {
     private val gateCoordinator = ApprovalGateCoordinator(
         persistence.approvalGates,
@@ -168,6 +170,17 @@ class WorkflowRuntimeCoordinator(
         // untrusted content in front of it; it never affects the run.
         try {
             habitDecisions.observe(project, definition, state.run)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+        }
+        // Accepted text runs teach replay; a replayed result turned back quarantines its habit; it never affects the run.
+        observeHabitReplay(project, definition, state.run)
+    }
+
+    private suspend fun observeHabitReplay(project: Project, definition: WorkflowDefinition, run: WorkflowRun) {
+        try {
+            habitReplayObserver?.observe(project, definition, run)
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (_: Exception) {

@@ -77,6 +77,8 @@ class WorkflowEngine(
     private val surfaceRuntime: RoleSurfaceRuntimeRegistry = RoleSurfaceRuntimeRegistry.Empty,
     /** The compiled output checks a step may name with [VerificationPolicy.Deterministic]; none by default. */
     private val outputValidators: TaskOutputValidatorRegistry = TaskOutputValidatorRegistry.Empty,
+    /** Decides whether an approved habit answers a task with no model call; null (the default) never replays. */
+    private val habitReplay: com.hereliesaz.geministrator.memory.procedural.HabitReplayPlanner? = null,
 ) {
     private val rolesById: Map<RoleDefinitionId, RoleDefinition> = roles.associateBy { it.id }
 
@@ -291,6 +293,7 @@ class WorkflowEngine(
                         reservedThisBatch[budgetRoleId] = (reservedThisBatch[budgetRoleId] ?: 0L) + ownEstimate
                     }
 
+                    val replays = replaysWithoutModel(project, definition, nextRun, task, taskRun, role, taskRun.failedProviders.toSet())
                     val selection = ProviderSelectionRequest(
                         preferredProviderId = role.preferredProviderId,
                         requiredCapabilities = role.capabilitiesRequired,
@@ -300,6 +303,7 @@ class WorkflowEngine(
                         excludedProviderIds = taskRun.failedProviders.toSet(),
                         failoverAllowed = isProviderAuto(role, task),
                         requiresToolFilter = task.contract?.requiresToolFilter() == true || role.toolCeiling.isNotEmpty(),
+                        habitReplay = replays,
                     )
                     val providerId = sessionGateway.resolveProvider(selection)
                     val providerLimit = definition.concurrencyPolicy.perProviderLimits[providerId] ?: Int.MAX_VALUE
@@ -819,6 +823,7 @@ class WorkflowEngine(
                             cacheHitFraction = usage.cacheHitFraction,
                             latencyMillis = usage.latencyMillis,
                             costUnknown = usage.costUnknown,
+                            tokensAvoided = usage.tokensAvoided,
                             occurredAtEpochMillis = nowEpochMillis,
                         ),
                     )
@@ -1044,6 +1049,43 @@ class WorkflowEngine(
                     ),
                 )
             }
+        }
+    }
+
+    /**
+     * True when an approved habit may answer [task] with no model call. Never throws: a replay that cannot be
+     * decided is no replay, and the task runs as it would have.
+     */
+    private suspend fun replaysWithoutModel(
+        project: Project,
+        definition: WorkflowDefinition,
+        run: WorkflowRun,
+        task: TaskDefinition,
+        taskRun: TaskRun,
+        role: RoleDefinition,
+        failed: Set<AgentProviderId>,
+    ): Boolean {
+        val planner = habitReplay ?: return false
+        if (com.hereliesaz.geministrator.providers.HabitReplayAgentProvider.ID in failed) return false
+        return try {
+            val request = buildProviderTaskRequest(
+                project = project,
+                definition = definition,
+                run = run,
+                task = task,
+                taskRun = taskRun,
+                role = role,
+                orchestrationUtilities = orchestrationUtilities,
+            )
+            val query = com.hereliesaz.geministrator.providers.HabitReplayAgentProvider.queryOf(
+                request,
+                constrained = task.providerConstraints !is ProviderConstraints.None,
+            ).let { it.copy(requiredCapabilities = it.requiredCapabilities + role.capabilitiesRequired) }
+            planner.decide(query) is com.hereliesaz.geministrator.memory.procedural.ReplayDecision.Replay
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            false
         }
     }
 

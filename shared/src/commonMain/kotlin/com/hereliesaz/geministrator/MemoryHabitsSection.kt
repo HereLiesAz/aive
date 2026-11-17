@@ -65,6 +65,19 @@ import com.hereliesaz.geministrator.resources.memory_habits_replace
 import com.hereliesaz.geministrator.resources.memory_habits_sequence_line
 import com.hereliesaz.geministrator.resources.memory_habits_sequences
 import com.hereliesaz.geministrator.resources.memory_habits_stats
+import com.hereliesaz.geministrator.resources.memory_habits_replay_approve
+import com.hereliesaz.geministrator.resources.memory_habits_replay_approved
+import com.hereliesaz.geministrator.resources.memory_habits_replay_quarantined
+import com.hereliesaz.geministrator.resources.memory_habits_replay_revoke
+import com.hereliesaz.geministrator.resources.memory_habits_replay_step_line
+import com.hereliesaz.geministrator.resources.memory_habits_replay_summary
+import com.hereliesaz.geministrator.resources.memory_habits_replay_text_line
+import com.hereliesaz.geministrator.resources.memory_habits_replay_unapproved
+import com.hereliesaz.geministrator.memory.MemoryRuntimeBridge
+import com.hereliesaz.geministrator.memory.procedural.HabitReplayLedger
+import com.hereliesaz.geministrator.memory.procedural.HabitReplayPlanner
+import com.hereliesaz.geministrator.memory.procedural.HabitStepReplay
+import com.hereliesaz.geministrator.memory.procedural.ReplayStatus
 import com.hereliesaz.geministrator.resources.memory_habits_stands
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
@@ -282,6 +295,7 @@ internal fun MemoryHabitsSection(controller: MemoryLayerController, settings: Me
             )
         }
     }
+    ReplayHabitsBlock(habits)
     message?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface()) }
     val shown = proposal
     if (shown != null && host != null) {
@@ -387,3 +401,86 @@ private fun HabitLogView(
     )
 }
 
+
+/** The app's one replay ledger and planner, kept with the other durable UI state. */
+internal object HabitReplayHost {
+    private const val KEY = "procedural.habit-replay.v1"
+
+    val ledger: HabitReplayLedger by lazy {
+        HabitReplayLedger(
+            load = { DurableUiState.store.getString(KEY) },
+            save = { DurableUiState.store.putString(KEY, it) },
+        ).also { MemoryRuntimeBridge.replayLedger = it }
+    }
+
+    val planner: HabitReplayPlanner by lazy { HabitReplayPlanner(ledger) { MemoryRuntimeBridge.habitLearningOn() } }
+}
+
+/**
+ * Inside the Habits panel: the one summary line, then each habit the keeper can approve to run (text habits
+ * the swarm generalised, and executor habits that proposed steps) with an Approve or Revoke. Approval is
+ * for that version only. It approves the habit, never a step's outside effects: each step it proposes still
+ * waits behind its own human-approval task.
+ */
+@Composable
+private fun ReplayHabitsBlock(habits: List<FormedHabit>) {
+    val ledger = HabitReplayHost.ledger
+    val state by ledger.state.collectAsState()
+    val approvedText = state.habits.count { it.approved && it.status == ReplayStatus.Active }
+    val approvedSteps = habits.count { "${it.operation}@${it.version}" in state.approvedOperations }
+    val misses = state.habits.sumOf { it.matcherMisses } + state.operationMatcherMisses
+    if (state.habits.isEmpty() && habits.none { it.offered }) return
+    Text(
+        stringResource(
+            Res.string.memory_habits_replay_summary,
+            (approvedText + approvedSteps).toString(), state.replays.toString(), state.tokensAvoided.toString(), misses.toString(),
+        ),
+        style = AzphaltType.body,
+        color = azphaltOnSurface(),
+    )
+    state.habits.forEach { habit ->
+        val status = when {
+            habit.status != ReplayStatus.Active -> stringResource(Res.string.memory_habits_replay_quarantined, habit.reason ?: habit.status.name.lowercase())
+            habit.approved -> stringResource(Res.string.memory_habits_replay_approved)
+            else -> stringResource(Res.string.memory_habits_replay_unapproved)
+        }
+        Text(
+            stringResource(
+                Res.string.memory_habits_replay_text_line,
+                habit.id, habit.version.toString(), habit.template.sourceRuns.toString(), status,
+                habit.replays.toString(), habit.tokensAvoided.toString(),
+            ),
+            style = AzphaltType.body,
+            color = azphaltOnSurface(),
+        )
+        val on = habit.approved && habit.status == ReplayStatus.Active
+        AzphaltPill(
+            stringResource(if (on) Res.string.memory_habits_replay_revoke else Res.string.memory_habits_replay_approve),
+            "memory-replay-${habit.id}",
+            selected = on,
+            onClick = { if (on) ledger.revoke(habit.id) else ledger.approve(habit.id) },
+        )
+    }
+    habits.filter { it.offered && it.verifiedUses >= HabitStepReplay.MIN_VERIFIED_USES && it.rejectedUses == 0 }.forEach { habit ->
+        val on = HabitStepReplay.eligible(habit, state)
+        val preview = (HabitInvocation.propose(habit, com.hereliesaz.geministrator.domain.TaskDefinitionId("preview")) as? HabitInvocation.Result.Proposed)
+            ?.task?.objective ?: habit.operation
+        Text(
+            stringResource(
+                Res.string.memory_habits_replay_step_line,
+                habit.operation, habit.version.toString(), preview,
+                if (on) stringResource(Res.string.memory_habits_replay_approved) else stringResource(Res.string.memory_habits_replay_unapproved),
+            ),
+            style = AzphaltType.body,
+            color = azphaltOnSurface(),
+        )
+        AzphaltPill(
+            stringResource(if (on) Res.string.memory_habits_replay_revoke else Res.string.memory_habits_replay_approve),
+            "memory-replay-steps-${habit.operation}",
+            selected = on,
+            onClick = {
+                if (on) ledger.revokeOperation(habit.operation, habit.version) else ledger.approveOperation(habit.operation, habit.version)
+            },
+        )
+    }
+}
