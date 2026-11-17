@@ -48,8 +48,8 @@ base. LiteRT-LM gets a *merged full model* (`merge_and_unload()`, then `litert-t
 `LoraConfig(loraPath)` exists in `SessionConfig`, but no converter that writes a separate LiteRT-LM LoRA
 file is documented, so none is attempted.
 
-The gates, the scoring and the corpus come from `tools/app_integration_training/` (`score.py` ships in the
-corpus dataset and is called here, not reimplemented).
+The gates, the scoring and the corpus come from `tools/app_integration_training/` in the cloned commit
+(`score.py` is called here, not reimplemented).
 
 ---
 
@@ -72,13 +72,17 @@ follows the corpus's contract. It does not prove the app benefits on a device.
 - Local: the `GITHUB_TOKEN` environment variable. The token is never printed.
 
 ### 2. Operational loop
-1. **Build the corpus zip** (needs a JDK and Gradle; see `tools/app_integration_training/README.md`), then
-   upload it as the Kaggle dataset `hereliesaz/aive-app-integration-corpus` and attach it to this notebook.
-2. **Run** on a GPU (T4 or P100) with Internet on. Set `SMOKE = True` first: it trains 20 steps on 64 rows
-   and runs every later cell on tiny splits, so the whole pipeline is proven in minutes. Then `SMOKE = False`.
-3. **Release**: `UPLOAD = True` publishes the pre-release `app-integration-v1` (adapter, optional merged
+1. **Run** on a GPU (T4 or P100) with Internet on. The first stage builds the corpus itself
+   (`BUILD_CORPUS_ON_KAGGLE = True`): it clones the repository at `SOURCE_REF`, makes sure a JDK 21 is there,
+   runs the generator through the repo's Gradle wrapper, verifies the files against the manifest's SHA-256,
+   and saves `aive-app-integration-corpus.zip` as a notebook output (optional to upload or commit). Set
+   `SMOKE = True` first: a 20-row corpus, 20 training steps on 64 rows, and every later cell on tiny splits,
+   so the whole pipeline is proven quickly. Then `SMOKE = False`.
+   With `BUILD_CORPUS_ON_KAGGLE = False` it uses an attached dataset
+   `hereliesaz/aive-app-integration-corpus`, else the zip committed in the repository.
+2. **Release**: `UPLOAD = True` publishes the pre-release `app-integration-v1` (adapter, optional merged
    LiteRT-LM file, `catalog.json`, `results.json`).
-4. **Register**: the last cell prints the exact commands.
+3. **Register**: the last cell prints the exact commands.
 
 The ONNX shared base (`orchestration-base-v4`) must already be published; if it is not, run
 `tools/orchestration_training/notebooks/base.ipynb` once with `UPLOAD = True`.
@@ -168,10 +172,29 @@ LITERT_PREFILL_LENGTHS = "8,64,256,1024"           # multi-prefill signatures; t
 LITERT_BUNDLE_FLAG = ("--bundle_litert_lm", "true")  # write a .litertlm bundle (tokenizer and metadata inside)
 LITERT_SMOKE_PACKAGES = ["litert-lm", "litert_lm"]   # pip names tried in order for the Python runtime
 
+# ---- Corpus build stage: the notebook builds its own corpus from the repository -----------------------------
+BUILD_CORPUS_ON_KAGGLE = True        # True: clone, run the generator through Gradle, verify, zip. False: use an attached
+                                     # Kaggle dataset, else the zip committed in the repository
+SOURCE_REPOSITORY = "https://github.com/HereLiesAz/aive"
+SOURCE_REF = "main"                  # branch, tag or commit to build the corpus (and its score.py) from
+CORPUS_ROWS = None                   # regular rows through AIVE_APP_INTEGRATION_ROWS; None keeps the generator's default
+JDK_MAJOR = 21
+GRADLE_TIMEOUT_HOURS = 2.5           # first run downloads Gradle, the Kotlin toolchain and dependencies
+# The ONE place the generator's invocation lives. UNVERIFIED: the Kotlin writer was still being written
+# when this was authored (expected form below, after the existing orchestration builder). {out} is the
+# directory it must fill with train/validation/test/adversarial .jsonl and manifest.json; fix these three
+# constants if the real test class, property or variable name differs.
+GENERATOR_GRADLE_ARGS = ["--no-daemon", "--console=plain", ":shared:desktopTest",
+                         "--tests", "*AppIntegrationDatasetWriterTest", "-Daive.appIntegration.outDir={out}", "--rerun"]
+GENERATOR_ROWS_ENV = "AIVE_APP_INTEGRATION_ROWS"
+GENERATOR_EXTRA_ENV = {}             # e.g. {"AIVE_EXPORT_APP_INTEGRATION_DATASETS": "{out}"} if the writer reads an env var
+CORPUS_ZIP_NAME = "aive-app-integration-corpus.zip"
+
 if SMOKE:
     UPLOAD = False
     EPOCHS, MAX_NEW, SELECT_ROWS_PER_FAMILY, LITERT_AGREEMENT_ROWS = 5, 96, 4, 8
     SMOKE_STEPS, SMOKE_TRAIN_ROWS, SMOKE_EVAL_ROWS = 20, 64, 16
+    CORPUS_ROWS = 20                 # a small corpus through the generator keeps the build stage fast
 
 def work_root():
     """Where the session's work lives. Colab loses /content when a runtime disconnects, so on Colab the
@@ -183,7 +206,10 @@ def work_root():
     drive.mount("/content/drive")
     return Path("/content/drive/MyDrive")
 
-WORK = work_root() / ("aive-app-integration-smoke" if SMOKE else "aive-app-integration")
+ROOT = work_root()
+WORK = ROOT / ("aive-app-integration-smoke" if SMOKE else "aive-app-integration")
+# Shared by SMOKE and full runs, so Gradle, the JDK and the clone are downloaded once.
+TOOLCHAIN = ROOT / "aive-app-integration-toolchain"
 STATE_FILE, RESULTS_FILE = WORK / "state.json", WORK / "results.json"
 ASSETS = WORK / "release-assets"
 ASSETS.mkdir(parents=True, exist_ok=True)
@@ -221,6 +247,176 @@ print(f"SMOKE={SMOKE} UPLOAD={UPLOAD} EXPORT_ONNX={EXPORT_ONNX} EXPORT_LITERTLM=
 ''')
 
 code(r'''
+# ---- Corpus build stage: clone, JDK 21, Gradle generator, verify, zip ---------------------------------------
+# No GPU is needed here, Internet must be on. The first run downloads Gradle, the Kotlin toolchain and the
+# project's dependencies into TOOLCHAIN (several GB, tens of minutes); a rerun reuses them. Any failure stops
+# the notebook: it never falls back to a different corpus after a failed build.
+import re, urllib.request, zipfile
+from collections import deque
+
+def manifest_entries(manifest):
+    """(relative path, sha256) for every file the manifest lists, whichever of the two shapes it uses."""
+    files = manifest.get("files")
+    if isinstance(files, dict):
+        return [(name, v if isinstance(v, str) else v["sha256"]) for name, v in files.items()]
+    if isinstance(files, list):
+        return [(v.get("path") or v.get("name") or v["file"], v["sha256"]) for v in files]
+    raise ValueError("manifest.json has no `files` (a name -> sha256 map, or a list of {path, sha256})")
+
+def sh(cmd, cwd=None, env=None):
+    proc = subprocess.run([str(c) for c in cmd], cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    if proc.returncode != 0:
+        raise RuntimeError(f"`{' '.join(map(str, cmd))}` failed with exit code {proc.returncode}:\n{proc.stdout[-3000:]}")
+    return proc.stdout
+
+def java_major(env):
+    try:
+        proc = subprocess.run(["java", "-version"], env=env, capture_output=True, text=True)
+    except FileNotFoundError:
+        return None
+    found = re.search(r'version "(\d+)', proc.stderr + proc.stdout)
+    return int(found.group(1)) if found else None
+
+def with_java_home(home):
+    env = dict(os.environ)
+    env["JAVA_HOME"] = str(home)
+    env["PATH"] = f"{home}/bin:{env.get('PATH', '')}"
+    return env
+
+def ensure_jdk():
+    """An environment with JDK JDK_MAJOR (21) on its PATH: the installed one, apt's, or a downloaded Temurin."""
+    env = dict(os.environ)
+    if java_major(env) == JDK_MAJOR:
+        print(f"JDK {JDK_MAJOR} already installed")
+        return env
+    print(f"java is {java_major(env)}, not {JDK_MAJOR}: installing openjdk-{JDK_MAJOR}-jdk-headless with apt-get")
+    try:
+        sh(["apt-get", "update", "-qq"])
+        sh(["apt-get", "install", "-y", "-qq", f"openjdk-{JDK_MAJOR}-jdk-headless"])
+        for home in sorted(Path("/usr/lib/jvm").glob(f"*{JDK_MAJOR}*")):
+            if (home / "bin" / "java").is_file() and java_major(with_java_home(home)) == JDK_MAJOR:
+                print("JDK from apt:", home)
+                return with_java_home(home)
+        print(f"apt installed a package but no JDK {JDK_MAJOR} was found under /usr/lib/jvm")
+    except Exception as failure:
+        print(f"apt-get route failed: {str(failure)[:500]}")
+    # Temurin from Adoptium: the API redirects to the latest GA tarball.
+    jdk_dir = TOOLCHAIN / "jdk"
+    url = f"https://api.adoptium.net/v3/binary/latest/{JDK_MAJOR}/ga/linux/x64/jdk/hotspot/normal/eclipse"
+    homes = [p for p in jdk_dir.glob("*") if (p / "bin" / "java").is_file()] if jdk_dir.is_dir() else []
+    if not homes:
+        shutil.rmtree(jdk_dir, ignore_errors=True)
+        jdk_dir.mkdir(parents=True)
+        archive = jdk_dir / "temurin.tar.gz"
+        print("downloading Temurin from", url)
+        with urllib.request.urlopen(url, timeout=600) as response, open(archive, "wb") as out:
+            shutil.copyfileobj(response, out, 8 << 20)
+        with tarfile.open(archive) as tar:
+            tar.extractall(jdk_dir, **({"filter": "data"} if hasattr(tarfile, "data_filter") else {}))
+        archive.unlink()
+        homes = [p for p in jdk_dir.glob("*") if (p / "bin" / "java").is_file()]
+    if homes and java_major(with_java_home(homes[0])) == JDK_MAJOR:
+        print("JDK from Temurin:", homes[0])
+        return with_java_home(homes[0])
+    raise RuntimeError(f"No JDK {JDK_MAJOR}: java is absent or another version, apt-get failed and the Temurin download did not give a working JDK")
+
+def resolve_source():
+    """Clone SOURCE_REPOSITORY at SOURCE_REF (shallow); returns (checkout, full commit SHA)."""
+    checkout = TOOLCHAIN / "source"
+    TOOLCHAIN.mkdir(parents=True, exist_ok=True)
+    if not (checkout / ".git").is_dir():
+        shutil.rmtree(checkout, ignore_errors=True)
+        checkout.mkdir(parents=True)
+        sh(["git", "init", "-q"], cwd=checkout)
+        sh(["git", "remote", "add", "origin", SOURCE_REPOSITORY], cwd=checkout)
+    sh(["git", "fetch", "--depth", "1", "origin", SOURCE_REF], cwd=checkout)
+    sh(["git", "checkout", "-q", "--force", "FETCH_HEAD"], cwd=checkout)
+    commit = sh(["git", "rev-parse", "HEAD"], cwd=checkout).strip()
+    assert re.fullmatch(r"[0-9a-f]{40}", commit), f"unexpected commit {commit!r}"
+    return checkout, commit
+
+def run_gradle(checkout, env, out_dir, log_path):
+    """Run the generator through the repository's Gradle wrapper; stream progress; stop on failure with the log tail."""
+    env = dict(env)
+    env["GRADLE_USER_HOME"] = str(TOOLCHAIN / "gradle-home")   # wrapper distribution, dependencies and the build cache
+    for key, value in GENERATOR_EXTRA_ENV.items():
+        env[key] = value.replace("{out}", str(out_dir))
+    if CORPUS_ROWS is not None:
+        env[GENERATOR_ROWS_ENV] = str(CORPUS_ROWS)
+    gradlew = checkout / "gradlew"
+    gradlew.chmod(0o755)
+    cmd = [str(gradlew), "--build-cache", *[a.replace("{out}", str(out_dir)) for a in GENERATOR_GRADLE_ARGS]]
+    print("gradle:", " ".join(cmd[1:]))
+    tail, started, last_report = deque(maxlen=200), time.time(), 0.0
+    with open(log_path, "w") as log:
+        proc = subprocess.Popen(cmd, cwd=checkout, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+        for line in proc.stdout:
+            log.write(line)
+            tail.append(line.rstrip())
+            if time.time() - last_report > 60:
+                last_report = time.time()
+                print(f"  [{(time.time() - started) / 60:5.1f} min] {tail[-1][:160]}", flush=True)
+            if time.time() - started > GRADLE_TIMEOUT_HOURS * 3600:
+                proc.kill()
+                tail.append(f"TIMEOUT: stopped after {GRADLE_TIMEOUT_HOURS} h")
+                break
+        proc.wait()
+    if proc.returncode != 0:
+        print("\n".join(tail))
+        raise RuntimeError(f"The corpus generator failed (exit {proc.returncode}); the last {len(tail)} log lines are above, the full log is {log_path}")
+    print(f"gradle finished in {(time.time() - started) / 60:.1f} min")
+
+def deterministic_zip(source_dir, zip_path, top):
+    """A zip whose bytes depend only on the files: sorted entries, fixed timestamps and modes."""
+    source_dir, zip_path = Path(source_dir), Path(zip_path)
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+        for path in sorted(p for p in source_dir.rglob("*") if p.is_file()):
+            info = zipfile.ZipInfo(f"{top}/{path.relative_to(source_dir).as_posix()}", date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o644 << 16
+            archive.writestr(info, path.read_bytes())
+    return zip_path
+
+def build_corpus():
+    """The corpus directory for this run, built from SOURCE_REF (or reused from an identical earlier build)."""
+    env = ensure_jdk()
+    checkout, commit = resolve_source()
+    print(f"corpus source: {SOURCE_REPOSITORY} @ {SOURCE_REF} = {commit}")
+    RESULTS["corpusBuild"] = {"repository": SOURCE_REPOSITORY, "ref": SOURCE_REF, "commit": commit, "rows": CORPUS_ROWS,
+                              "java": [l for l in subprocess.run(["java", "-version"], env=env, capture_output=True, text=True).stderr.splitlines() if "version" in l][:1]}
+    out = WORK / "corpus-build" / "aive-app-integration-corpus"
+    previous = state.get("corpusBuild", {})
+    if (out / "manifest.json").is_file() and previous.get("commit") == commit and previous.get("rows") == CORPUS_ROWS:
+        print("corpus already built from this commit and row count; reusing it")
+    else:
+        shutil.rmtree(out.parent, ignore_errors=True)
+        out.mkdir(parents=True)
+        run_gradle(checkout, env, out, WORK / "gradle.log")
+        if not (out / "manifest.json").is_file():
+            raise RuntimeError(f"Gradle finished but {out}/manifest.json was not written: the generator did not write to {{out}}; "
+                               "check GENERATOR_GRADLE_ARGS / GENERATOR_EXTRA_ENV against the Kotlin writer")
+    # score.py and the Kaggle metadata live in the repository, not in the Kotlin output.
+    for name in ("score.py", "dataset-metadata.json"):
+        source = checkout / "tools" / "app_integration_training" / name
+        if not (out / name).is_file() and source.is_file():
+            shutil.copy2(source, out / name)
+    (out / "build-info.json").write_text(json.dumps(RESULTS["corpusBuild"], indent=2, sort_keys=True) + "\n")
+    manifest = json.loads((out / "manifest.json").read_text())
+    if manifest.get("source_commit") not in (None, commit):
+        raise RuntimeError(f"manifest.json says source_commit {manifest['source_commit']} but the checkout is {commit}")
+    return out, commit
+
+def verify_corpus(directory):
+    """Every file the manifest lists must exist and match its SHA-256 (the same check an attached dataset gets)."""
+    manifest = json.loads((Path(directory) / "manifest.json").read_text())
+    for name, digest in manifest_entries(manifest):
+        path = Path(directory) / name
+        assert path.is_file(), f"manifest.json lists {name}, which the generator did not write"
+        assert sha256(path) == digest, f"{name} does not match manifest.json: refusing this corpus"
+    return manifest
+''')
+
+code(r'''
 # ---- Corpus: found, verified against manifest.json (SHA-256), counted ----------------------------------------
 SPLITS = ("train", "validation", "test", "adversarial")
 REQUIRED_ROW_KEYS = ("id", "family", "system", "user", "expected", "split", "checks")
@@ -250,34 +446,36 @@ def download_corpus():
         return
     raise FileNotFoundError(f"No dataset attached and the corpus download failed; attach {CORPUS_DATASET} or turn on internet")
 
-def manifest_entries(manifest):
-    """(relative path, sha256) for every file the manifest lists, whichever of the two shapes it uses."""
-    files = manifest.get("files")
-    if isinstance(files, dict):
-        return [(name, v if isinstance(v, str) else v["sha256"]) for name, v in files.items()]
-    if isinstance(files, list):
-        return [(v.get("path") or v.get("name") or v["file"], v["sha256"]) for v in files]
-    raise ValueError("manifest.json has no `files` (a name -> sha256 map, or a list of {path, sha256})")
-
-found = find_dataset()
-if found is None:
-    download_corpus()
+if BUILD_CORPUS_ON_KAGGLE:
+    # Built here, from the repository, by the generator: a failure stops the notebook (no silent fallback).
+    DATA, SOURCE_COMMIT = build_corpus()
+    MANIFEST = verify_corpus(DATA)
+    zip_path = deterministic_zip(DATA, WORK / CORPUS_ZIP_NAME, "aive-app-integration-corpus")
+    output_dir = Path("/kaggle/working") if Path("/kaggle/working").is_dir() else WORK
+    if zip_path.parent != output_dir:
+        shutil.copy2(zip_path, output_dir / CORPUS_ZIP_NAME)   # a notebook output: upload or commit it if you want to
+    RESULTS["corpusBuild"].update({"zip": CORPUS_ZIP_NAME, "zipBytes": zip_path.stat().st_size, "zipSha256": sha256(zip_path)})
+    state["corpusBuild"] = {"commit": SOURCE_COMMIT, "rows": CORPUS_ROWS}; save_state()
+    print(f"corpus zip: {output_dir / CORPUS_ZIP_NAME}, {zip_path.stat().st_size / 2**20:.2f} MB, sha256 {RESULTS['corpusBuild']['zipSha256']}")
+else:
+    # Fallbacks: an attached Kaggle dataset, then the zip committed in the repository.
     found = find_dataset()
-if found is None:
-    raise FileNotFoundError(f"No corpus found: attach {CORPUS_DATASET} to this notebook")
-DATA, MANIFEST = found
+    if found is None:
+        download_corpus()
+        found = find_dataset()
+    if found is None:
+        raise FileNotFoundError(f"No corpus found: attach {CORPUS_DATASET}, or set BUILD_CORPUS_ON_KAGGLE = True")
+    DATA, MANIFEST = found
+    verify_corpus(DATA)
+    SOURCE_COMMIT = MANIFEST.get("source_commit", "unknown")
 listed = dict(manifest_entries(MANIFEST))
 for name in [f"{s}.jsonl" for s in SPLITS]:
     assert name in listed, f"manifest.json does not list {name}"
-for name, digest in listed.items():
-    path = DATA / name
-    assert path.is_file(), f"manifest.json lists {name}, which is missing from the dataset"
-    assert sha256(path) == digest, f"{name} does not match manifest.json: refusing this corpus"
 SCORE_PATH = DATA / "score.py"
 assert SCORE_PATH.is_file(), "the corpus must ship score.py next to its manifest"
 if "score.py" not in listed:
-    print("WARNING: manifest.json does not list score.py, so it was not verified")
-SOURCE_COMMIT = MANIFEST.get("source_commit", "unknown")
+    print(f"WARNING: manifest.json does not list score.py, so it was not verified (sha256 {sha256(SCORE_PATH)}, from the same commit)")
+RESULTS["scoreSha256"] = sha256(SCORE_PATH)
 
 ALL = {}
 for split in SPLITS:
