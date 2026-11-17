@@ -99,7 +99,9 @@ class HabitLiveFiringTest {
             objective = "o", status = runStatus,
             taskRuns = mapOf(
                 choosing to TaskRun(TaskRunId("tw"), choosing, status, assignedRoleId = writer.id, artifacts = listOf(out)),
-                later to TaskRun(TaskRunId("tl"), later, TaskRunStatus.Blocked, assignedRoleId = writer.id),
+                // Its only dependency (the choosing task) is complete, so a real run has already released it; a Blocked follower
+                // here would be an impossible state, and the refresh rightly turns it Ready.
+                later to TaskRun(TaskRunId("tl"), later, TaskRunStatus.Ready, assignedRoleId = writer.id),
             ),
             createdAtEpochMillis = 1L, updatedAtEpochMillis = 50L, roleSnapshot = listOf(writer),
         )
@@ -141,7 +143,7 @@ class HabitLiveFiringTest {
         assertIs<TaskExecutor.GitHubAction>(step.executor)
         // The task that chose it, and the rest of the run, are as they were.
         assertEquals(before, into.run.taskRuns.getValue(choosing))
-        assertEquals(TaskRunStatus.Blocked, into.run.taskRuns.getValue(later).status)
+        assertEquals(TaskRunStatus.Ready, into.run.taskRuns.getValue(later).status)
         assertEquals(definition().tasks, into.definition.tasks.take(2))
         // The gate is released (its dependency is complete) and waits for a person; the step waits behind it.
         assertTrue(into.run.taskRuns.getValue(gate.id).status in setOf(TaskRunStatus.Ready, TaskRunStatus.AwaitingApproval))
