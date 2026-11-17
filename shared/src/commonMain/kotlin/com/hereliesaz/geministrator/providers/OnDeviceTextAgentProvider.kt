@@ -3,6 +3,9 @@ package com.hereliesaz.geministrator.providers
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ProviderRunId
+import com.hereliesaz.geministrator.memory.MEMORY_PROTOCOL_PROMPT_LABEL
+import com.hereliesaz.geministrator.memory.MEMORY_RECALL_PROMPT_LABEL
+import com.hereliesaz.geministrator.memory.RECALL_UNTRUSTED_NOTE
 import kotlin.time.TimeSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -204,7 +207,7 @@ class OnDeviceTextAgentProvider(
 
     private suspend fun generateOrThrow(request: AgentTaskRequest, planOnly: Boolean): OnDeviceTextGeneration {
         check(isAvailable()) { "The on-device model is not installed" }
-        val parts = renderTaskParts(request, planOnly)
+        val parts = renderTaskParts(request, planOnly, maxInputTokens)
         return generator.generate(
             system = SYSTEM_PROMPT,
             stablePrefix = parts.stable,
@@ -233,8 +236,17 @@ class OnDeviceTextAgentProvider(
          * shared preamble), the objective, its acceptance criteria and upstream text artifacts.
          * [estimateTokens] of the same parts is what routing compares with [maxInputTokens].
          */
-        fun renderTask(request: AgentTaskRequest, planOnly: Boolean = false): String =
-            renderTaskParts(request, planOnly).let { it.stable + it.dynamic }
+        fun renderTask(request: AgentTaskRequest, planOnly: Boolean = false, maxInputTokens: Int? = null): String =
+            renderTaskParts(request, planOnly, maxInputTokens).let { it.stable + it.dynamic }
+
+        /**
+         * [estimateTokens] of the prompt as it is rendered ([renderTask]), memory recall included: the one
+         * estimate of a built request's input. Before dispatch no request exists and recall is not yet
+         * drawn, so [estimateTaskInputTokens][com.hereliesaz.geministrator.workflow.estimateTaskInputTokens]
+         * counts the part that cannot be dropped; recall is dropped first at render time (see [renderTaskParts]).
+         */
+        fun estimateRequestTokens(request: AgentTaskRequest, planOnly: Boolean = false): Int =
+            estimateTokens(renderTask(request, planOnly).length)
 
         /**
          * [renderTask] in two parts whose concatenation is exactly its text. [TaskParts.stable] is the
@@ -244,12 +256,26 @@ class OnDeviceTextAgentProvider(
          * Invariant: a non-empty [TaskParts.stable] ends with a blank line (`\n\n`) and [TaskParts.dynamic]
          * always begins with `TASK`, a letter. Qwen's pre-tokenizer isolates a run of newlines, so the
          * tokens of the two parts read one after the other are the tokens of the whole text.
+         *
+         * A `Memory protocol` block (stable prefix or dynamic context) renders as `MEMORY PROTOCOL\n<text>\n\n`
+         * into [TaskParts.stable] right after the ROLE block: it is constant text, so the head stays
+         * byte-identical across calls while memory is on. Absent, nothing is rendered.
+         *
+         * Memory recall ([MEMORY_RECALL_LABELS] blocks of the dynamic context, capped by
+         * [MAX_RECALL_CHARS]) renders after the acceptance criteria and before the artifacts, in the dynamic
+         * part only, so the stable prefix never changes with recall. When [maxInputTokens] is given and the
+         * prompt with recall would exceed it, recall is left out first: it is the one optional input, while
+         * the criteria and artifacts are what the task is.
          */
-        fun renderTaskParts(request: AgentTaskRequest, planOnly: Boolean = false): TaskParts {
+        fun renderTaskParts(request: AgentTaskRequest, planOnly: Boolean = false, maxInputTokens: Int? = null): TaskParts {
             val role = request.promptContext.stablePrefix.firstOrNull { it.label == ROLE_BLOCK_LABEL }?.content
                 ?: request.roleInstructions
-            val stable = if (role.isNotBlank()) "ROLE\n" + role.trim() + "\n\n" else ""
-            val dynamic = buildString {
+            val roleBlock = if (role.isNotBlank()) "ROLE\n" + role.trim() + "\n\n" else ""
+            val protocol = memoryProtocol(request)
+            val protocolBlock = if (protocol != null) "MEMORY PROTOCOL\n$protocol\n\n" else ""
+            var stable = roleBlock + protocolBlock
+            val recall = recallBlocks(request)
+            fun render(withRecall: Boolean): String = buildString {
                 append("TASK\n").append(request.objective.trim()).append("\n\n")
                 if (request.acceptanceCriteria.isNotEmpty()) {
                     append("ACCEPTANCE CRITERIA\n")
@@ -257,6 +283,9 @@ class OnDeviceTextAgentProvider(
                         append(index + 1).append(". ").append(criterion.description.trim()).append("\n")
                     }
                     append("\n")
+                }
+                if (withRecall) {
+                    recall.forEach { (label, content) -> append(label.uppercase()).append("\n").append(content).append("\n\n") }
                 }
                 request.contextArtifacts.forEach { artifact ->
                     val text = artifact.textContent?.takeIf(String::isNotBlank) ?: return@forEach
@@ -266,8 +295,69 @@ class OnDeviceTextAgentProvider(
                     append("PLAN ONLY\nReply with a short numbered plan for this task. Do not perform it yet.")
                 }
             }.trim()
+            var dynamic = render(withRecall = true)
+            if (recall.isNotEmpty() && maxInputTokens != null && estimateTokens(stable.length + dynamic.length) > maxInputTokens) {
+                dynamic = render(withRecall = false)
+            }
+            // The protocol is rules, not recall: it is not subject to the recall cap or the recall drop. Only
+            // when the prompt still exceeds the limit without recall is it dropped, and last.
+            if (protocolBlock.isNotEmpty() && maxInputTokens != null && estimateTokens(stable.length + dynamic.length) > maxInputTokens) {
+                stable = roleBlock
+            }
             return TaskParts(stable, dynamic)
         }
+
+        /** The trimmed text of the request's `Memory protocol` block, from either part of its prompt context. */
+        internal fun memoryProtocol(request: AgentTaskRequest): String? =
+            (request.promptContext.stablePrefix + request.promptContext.dynamicContext)
+                .firstOrNull { it.label == MEMORY_PROTOCOL_PROMPT_LABEL }
+                ?.content?.trim()?.takeIf(String::isNotEmpty)
+
+        /**
+         * The memory blocks the on-device model sees, as (label, trimmed content): only [MEMORY_RECALL_LABELS]
+         * from the request's dynamic context, each led by the untrusted-recall note (added here when the block
+         * lacks it), in the order given, within [MAX_RECALL_CHARS] of rendered text. A block that does not fit is
+         * cut at a line boundary and the blocks after it are dropped; one that would keep only the note is dropped.
+         * `Habits` is not passed: the owner is redesigning habits as programmatic replay, not prompt text.
+         */
+        internal fun recallBlocks(request: AgentTaskRequest): List<Pair<String, String>> {
+            var remaining = MAX_RECALL_CHARS
+            val kept = mutableListOf<Pair<String, String>>()
+            for (block in request.promptContext.dynamicContext) {
+                if (block.label !in MEMORY_RECALL_LABELS) continue
+                val body = block.content.trim().takeIf(String::isNotEmpty) ?: continue
+                val content = if (body.startsWith(RECALL_UNTRUSTED_NOTE)) body else RECALL_UNTRUSTED_NOTE + "\n" + body
+                // Rendered as LABEL, newline, content, blank line.
+                val overhead = block.label.length + 3
+                val allowed = remaining - overhead
+                if (content.length <= allowed) {
+                    kept += block.label to content
+                    remaining -= overhead + content.length
+                    continue
+                }
+                if (allowed > 0) {
+                    val lineEnd = if (content[allowed] == '\n') allowed else content.substring(0, allowed).lastIndexOf('\n')
+                    val trimmed = if (lineEnd > 0) content.substring(0, lineEnd).trimEnd() else ""
+                    // Keep it only if some body remains after the note.
+                    if (trimmed.length > RECALL_UNTRUSTED_NOTE.length) kept += block.label to trimmed
+                }
+                break
+            }
+            return kept
+        }
+
+        /**
+         * The most characters of memory recall rendered into one on-device prompt, labels and the untrusted
+         * note included: 2,400 characters (about 600 tokens) so recall cannot flood a small model whose whole
+         * input is [DEFAULT_MAX_INPUT_TOKENS].
+         */
+        const val MAX_RECALL_CHARS: Int = 2_400
+
+        /**
+         * The dynamic-context labels rendered as recall: `Memory`, `Relevant memory`, `Memory timeline`.
+         * Not `Habits` (being redesigned as programmatic replay), nor the swarm preamble or other blocks.
+         */
+        val MEMORY_RECALL_LABELS: Set<String> = setOf("Memory", MEMORY_RECALL_PROMPT_LABEL, "Memory timeline")
 
         /** Rough token count for [chars] characters of English text (four characters a token). */
         fun estimateTokens(chars: Int): Int = (chars.coerceAtLeast(0) + CHARS_PER_TOKEN - 1) / CHARS_PER_TOKEN

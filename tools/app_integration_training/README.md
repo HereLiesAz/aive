@@ -56,10 +56,12 @@ system prompt) are not model behaviours; they are hard checks on the corpus itse
 `NOT_IN_TEXT` is `The text you gave me does not say.` About 60 percent of F5 rows also state it in the
 criteria; the rest rely on the adapter having learned it.
 
-Memory and habit text sits in artifact blocks of the user text (`MEMORY PROTOCOL`, `MEMORY`, `RELEVANT MEMORY`,
-`HABITS`, `SESSION SO FAR`, `NOTES`). See Limits: today's `renderTask` does not render
-`promptContext.dynamicContext`, so this placement is an assumption about how the app will hand recall and
-habits to the on-device model.
+Recall (`Memory`, `Relevant memory`, `Memory timeline`) is supplied as `PromptContext.dynamicContext` blocks and the
+real `renderTask` renders it after the criteria and before the artifacts (the F4 rows; the `Memory protocol` block is also a dynamic block in the app and `renderTask` puts it in the stable prefix as
+`MEMORY PROTOCOL`, right after `ROLE`; at most 2,400 characters of recall are rendered). The layout check allows
+`ROLE` then `MEMORY PROTOCOL` in the prefix and does not count the protocol's `⟦memory⟧` marker as volatile; F7 rows
+carry no memory, so their prefixes and `no_overlap_with` allowance are unchanged. Habits (`HABITS`) and `SESSION SO FAR`,
+`NOTES` stay artifact blocks. See Limits for habits.
 
 ## The `checks` vocabulary (version 1)
 
@@ -207,13 +209,12 @@ The LiteRT-LM path still runs the stock model until the notebook's merged model 
   answers match the gates through the app's prompts, and the prefix cache on an adapter run are for a device to
   prove. If the adapter lacks an input or names another base, small tasks run on the plain model and the status
   line under This device says why.
-- **Recall and habits do not reach the on-device model today.** `OnDeviceTextAgentProvider.renderTask`
-  (`OnDeviceTextAgentProvider.kt:217`) renders the role block, the objective, the criteria and text
-  artifacts only. The `Habits`, `Memory`, `Relevant memory` and `Memory timeline` blocks live in
-  `PromptContext.dynamicContext` (built in `MemoryLayerController.recallForPrompt`, `ProviderTaskRequestFactory`),
-  which `renderTask` ignores, and `sendMessage` is rejected (one generation per task). The corpus puts those
-  blocks in artifact blocks, which `renderTask` does render. F4 and F6 only matter once the app hands recall
-  and habits to this provider that way; that is an app change this work does not make.
+- **Recall reaches the on-device model; habits do not.** `OnDeviceTextAgentProvider.renderTask` now renders the
+  `Memory`, `Relevant memory` and `Memory timeline` blocks of `PromptContext.dynamicContext` (capped at 2,400
+  characters, each led by the untrusted note, dropped first when the prompt would exceed the runtime's limit). The
+  `Habits` block is not passed: habits are being redesigned as programmatic replay, so the F6 rows still put the
+  habit text in an artifact block, which the app does not do today, and F6 only matters once that redesign lands.
+  `sendMessage` is rejected (one generation per task).
 - A session that runs `/remindme` would need a path for the on-device answer to reach
   `MemorySessionObserver.onRemindMe`; the F4d rows assume it does.
 - Habit rows count what `HabitOffers` renders (uses, completed, failed, reviewed, last used, strength, flags). The
