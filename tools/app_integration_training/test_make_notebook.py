@@ -79,8 +79,8 @@ class MakeNotebookTest(unittest.TestCase):
             "MAX_NEW = 512",
             "KV_CACHE_TOKENS = 1280",
             '"<|im_start|>system\\n"',
-            "score_rows",
-            "gates",
+            "SCORE.score(",
+            "SCORE.gates(",
             "app-integration-v1",
             "BUILD_CORPUS_ON_KAGGLE = True",
             'SOURCE_REF = "main"',
@@ -168,6 +168,50 @@ class MakeNotebookTest(unittest.TestCase):
             # a rerun finds both already at the pin and fetches nothing
             namespace["VENDOR_HOST"] = str(root / "does-not-exist")
             namespace["ensure_vendor"](checkout)
+
+    def test_scoring_uses_score_py_as_it_really_is(self):
+        """The notebook once called score_rows(), which score.py does not have. Run the notebook's own wrappers against
+        the real score.py on rows in the Kotlin writer's shape."""
+        import collections
+        notebook = json.loads(NOTEBOOK.read_text())
+        source = next(s for s in code_cells(notebook) if "def call_score" in s)
+        wanted = {"call_score", "call_gates"}
+        body = [n for n in ast.parse(source).body if isinstance(n, ast.FunctionDef) and n.name in wanted]
+        spec = importlib.util.spec_from_file_location("aive_app_integration_score", HERE / "score.py")
+        score = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(score)
+        namespace = {"SCORE": score, "collections": collections, "CORPUS_ISSUES": []}
+        exec(compile(ast.Module(body, []), "scoring", "exec"), namespace)
+
+        def row(index, split):
+            return {"id": f"F1-{split}-{index}", "family": "F1", "sub": "F1a", "split": split, "checks": {"exact": "ok"},
+                    "checks_version": score.CHECKS_VERSION,
+                    "messages": [{"role": "system", "content": "s"}, {"role": "user", "content": "u"},
+                                 {"role": "assistant", "content": "ok"}]}
+
+        rows = [row(i, "test") for i in range(4)] + [row(i, "adversarial") for i in range(2)]
+        self.assertEqual({"F1": 1.0}, namespace["call_score"](rows, ["ok"] * 6))
+        self.assertEqual({"F1": 0.0}, namespace["call_score"](rows, ["nope"] * 6))
+        by_split = {"test": rows[:4], "adversarial": rows[4:]}
+        ok, failed = namespace["call_gates"](by_split, {"test": ["ok"] * 4, "adversarial": ["ok"] * 2})
+        self.assertFalse(ok)   # the other families have no rows here, so their gates cannot pass
+        self.assertNotIn("F1 on test >= 0.90", failed)
+
+    def test_manifest_entries_reads_the_shape_the_kotlin_writer_produces(self):
+        """The first real Colab run failed with 'manifest.json lists train, which the generator did not write':
+        the writer keys files by split and names the file inside the entry."""
+        notebook = json.loads(NOTEBOOK.read_text())
+        source = next(s for s in code_cells(notebook) if "def manifest_entries" in s)
+        function = next(n for n in ast.parse(source).body if isinstance(n, ast.FunctionDef) and n.name == "manifest_entries")
+        namespace = {}
+        exec(compile(ast.Module([function], []), "manifest_entries", "exec"), namespace)
+        entries = namespace["manifest_entries"]
+        writer = {"files": {"train": {"file": "train.jsonl", "sha256": "a" * 64, "rows": 3},
+                            "adversarial": {"file": "adversarial.jsonl", "sha256": "b" * 64, "rows": 9}}}
+        self.assertEqual([("train.jsonl", "a" * 64), ("adversarial.jsonl", "b" * 64)], entries(writer))
+        self.assertEqual([("x.jsonl", "c" * 64)], entries({"files": {"x.jsonl": "c" * 64}}))
+        self.assertEqual([("y.jsonl", "d" * 64)], entries({"files": [{"path": "y.jsonl", "sha256": "d" * 64}]}))
+        self.assertEqual([("z.jsonl", "e" * 64)], entries({"files": {"z": {"path": "z.jsonl", "sha256": "e" * 64}}}))
 
     def test_the_base_is_imported_from_the_first_source_that_has_it(self):
         notebook = json.loads(NOTEBOOK.read_text())
