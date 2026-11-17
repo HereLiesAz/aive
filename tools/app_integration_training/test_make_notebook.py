@@ -169,6 +169,44 @@ class MakeNotebookTest(unittest.TestCase):
             namespace["VENDOR_HOST"] = str(root / "does-not-exist")
             namespace["ensure_vendor"](checkout)
 
+    def test_the_base_is_imported_from_the_first_source_that_has_it(self):
+        notebook = json.loads(NOTEBOOK.read_text())
+        source = next(s for s in code_cells(notebook) if "def published_base" in s)
+        function = next(n for n in ast.parse(source).body if isinstance(n, ast.FunctionDef) and n.name == "published_base")
+
+        def run(kaggle, hugging_face, github):
+            calls = []
+
+            def make(name, outcome):
+                def source(*args):
+                    calls.append(name)
+                    if isinstance(outcome, Exception):
+                        raise outcome
+                    return outcome
+                return source
+
+            namespace = {"Path": Path, "base_in": lambda directory: None,
+                         "base_from_kaggle": make("kaggle", kaggle),
+                         "base_from_huggingface": make("huggingface", hugging_face),
+                         "base_from_github": make("github", github)}
+            exec(compile(ast.Module([function], []), "published_base", "exec"), namespace)
+            return namespace["published_base"](Path("/nonexistent")), calls
+
+        found = ("data", b"raw", Path("a.tar.gz"))
+        self.assertEqual((found, ["kaggle"]), run(found, None, None))
+        self.assertEqual((found, ["kaggle", "huggingface", "github"]), run(None, None, found))
+        self.assertEqual((found, ["kaggle", "huggingface"]), run(AssertionError("bad sha"), found, None))
+        self.assertEqual((None, ["kaggle", "huggingface", "github"]), run(None, None, None))
+
+    def test_no_key_is_ever_printed_when_importing_the_base(self):
+        notebook = json.loads(NOTEBOOK.read_text())
+        source = next(s for s in code_cells(notebook) if "def base_from_kaggle" in s)
+        for name in ("base_from_kaggle", "base_from_huggingface"):
+            function = next(n for n in ast.parse(source).body if isinstance(n, ast.FunctionDef) and n.name == name)
+            for call in (n for n in ast.walk(function) if isinstance(n, ast.Call) and getattr(n.func, "id", "") == "print"):
+                names = {n.id for n in ast.walk(call) if isinstance(n, ast.Name)}
+                self.assertFalse(names & {"key", "token"}, f"{name} prints a key: {ast.unparse(call)}")
+
     def test_a_missing_pin_stops_with_a_plain_message(self):
         notebook = json.loads(NOTEBOOK.read_text())
         source = next(s for s in code_cells(notebook) if "def vendor_pins" in s)
