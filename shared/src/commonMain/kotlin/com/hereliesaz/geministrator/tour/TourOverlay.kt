@@ -58,6 +58,9 @@ import com.hereliesaz.geministrator.azphaltLiveRegion
 import com.hereliesaz.geministrator.azphaltOnSurface
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.tour_back
+import com.hereliesaz.geministrator.resources.tour_failed_line
+import com.hereliesaz.geministrator.resources.tour_hide
+import com.hereliesaz.geministrator.resources.tour_preparing_line
 import com.hereliesaz.geministrator.resources.tour_got_it
 import com.hereliesaz.geministrator.resources.tour_know_this
 import com.hereliesaz.geministrator.resources.tour_less
@@ -95,6 +98,12 @@ fun Modifier.tourEscapeKey(): Modifier = onPreviewKeyEvent { event ->
 @Composable
 fun TourOverlayHost() {
     val state = TourController.state
+    val preparation = TourController.preparation
+    // No lesson yet: say what is happening (writing the tour, or that it could not be written) instead of drawing nothing.
+    if (preparation != TourPreparation.None && (state == null || (state.lessons.isEmpty() && state.phase != TourPhase.Dismissed))) {
+        PreparationLine(failed = preparation == TourPreparation.Failed)
+        return
+    }
     if (state == null || state.phase == TourPhase.Dismissed) return
     // After the last step the layer is gone, except while the closing question (do you feel you know what you are doing now) is open.
     val closing = state.finished && state.checkInLine != null
@@ -135,6 +144,34 @@ private fun ClosingCard(line: String) {
                 Text(plain(line), style = AzphaltType.body, color = azphaltOnSurface())
                 CheckInReplies()
                 AzphaltPill(stringResource(Res.string.tour_stop), "tour-stop", onClick = { TourController.escape() })
+            }
+        }
+    }
+}
+
+@Composable
+private fun PreparationLine(failed: Boolean) {
+    Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.BottomEnd) {
+        AzphaltSurface(Azphalt.Ink) {
+            Row(
+                Modifier.clip(RoundedCornerShape(999.dp)).background(Azphalt.Ink).padding(start = 16.dp, end = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    stringResource(if (failed) Res.string.tour_failed_line else Res.string.tour_preparing_line),
+                    style = AzphaltType.eyebrow,
+                    color = azphaltOnSurface(),
+                )
+                AzphaltPill(
+                    label = stringResource(if (failed) Res.string.tour_hide else Res.string.tour_stop),
+                    seed = "tour-prep-hide",
+                    onClick = {
+                        TourController.preparation = TourPreparation.None
+                        if (!failed) TourController.escape()
+                    },
+                    tone = PillTone.Quiet,
+                )
             }
         }
     }

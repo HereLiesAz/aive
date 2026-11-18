@@ -41,3 +41,8 @@ internal fun tutorialNeedsSourceLine(objective: String, gate: FeedGate, sourcePi
 internal object QueenAwayNotice {
     var shown: Boolean by mutableStateOf(false)
 }
+
+/** Whether a tutorial run is in progress, so a second "teach me" goal does not stop the first one's layer. Lives outside composition. */
+internal object TutorialRunGuard {
+    var running: Boolean = false
+}

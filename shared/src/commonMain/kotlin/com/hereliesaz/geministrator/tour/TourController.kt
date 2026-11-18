@@ -17,6 +17,9 @@ object TourController {
     var state: TourState? by mutableStateOf(null)
         private set
 
+    /** Whether the tour is still being written (or failed to be): the overlay says so until the first lesson shows. */
+    var preparation: TourPreparation by mutableStateOf(TourPreparation.None)
+
     /** Receives the keeper's quick reply to an open check-in (the follow creature's answer path). */
     var checkInSink: ((CheckInReply) -> Unit)? = null
 
