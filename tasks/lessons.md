@@ -175,3 +175,5 @@ Rules:
 - Where the words leave a real gap, ask one narrow question. Do not fill the gap with the broadest reading, and do not narrow it silently either.
 - Never attribute a rule or a decision to the owner that is not in his words. Quote them when relying on them.
 - When correcting, undo only what the correction undoes.
+
+- Never key a destructive reset on a commit id. A reset that deletes hours of results must test the content it depends on (here: the corpus files' hashes), because any unrelated merge to main moves the commit.

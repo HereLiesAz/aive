@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.60 — from 2026-10-27
 
+- **The notebook keeps its training when `main` moves.** A rerun after merging #850 and #851 deleted a finished adapter and both passed gates, because the notebook treated any new commit as a new corpus. It now rebuilds the corpus and compares the content of its split files; training and gate results are discarded only when that content differs.
 - **The notebook publishes a passing adapter on its own.** Everything already saved to Drive as it ran; when the gates pass and a GitHub key is in the Colab or Kaggle secrets, the adapter and the LiteRT-LM model now also go to the `app-integration-v1` pre-release without setting `UPLOAD`, so the result is never held only by a session.
 - **The notebook builds the LiteRT-LM export environment on local disk.** Gate 1 and the ONNX stages passed on Colab, then `python -m venv` failed because Google Drive cannot hold a virtual environment's symlinks. The environment now lives beside the toolchain, and `virtualenv` is used when this Python has no `ensurepip`.
 - **The corpus generator no longer runs out of distinct prompts for the new F3 trap rows, and the notebook prints the generator's own error.** The first run on the new corpus compiled and then stopped at `IllegalStateException` because phrasings such as "Which files did you change?" repeated verbatim; each now carries a ticket number, and a failing Gradle step prints the failure text from the test report.

@@ -479,6 +479,14 @@ def remote_commit():
         return None
     return listed[0] if listed and re.fullmatch(r"[0-9a-f]{40}", listed[0]) else None
 
+def corpus_digest(directory):
+    """The content of a built corpus: the sha256 of each split file its manifest lists."""
+    try:
+        files = json.loads((Path(directory) / "manifest.json").read_text())["files"]
+        return {name: entry["sha256"] for name, entry in files.items()}
+    except (OSError, KeyError, ValueError):
+        return None
+
 def forget_training():
     """A new corpus makes every earlier result about an older one: drop its adapter, checkpoints and gate verdicts."""
     for key in ("train", "gate1", "gate2"):
@@ -508,11 +516,16 @@ def build_corpus():
     if (out / "manifest.json").is_file() and previous.get("commit") == commit and previous.get("rows") == CORPUS_ROWS:
         print("corpus already built from this commit and row count; reusing it")
     else:
-        if previous and (previous.get("commit") != commit or previous.get("rows") != CORPUS_ROWS):
-            forget_training()
+        before = corpus_digest(out)
         shutil.rmtree(out.parent, ignore_errors=True)
         out.mkdir(parents=True)
         run_gradle(checkout, env, out, WORK / "gradle.log")
+        after = corpus_digest(out)
+        # Judged by content, not by commit: a new commit that leaves the corpus identical keeps its training and gates.
+        if (before and after and before != after) or (previous and CORPUS_ROWS != previous.get("rows")):
+            forget_training()
+        elif before and before == after:
+            print("the rebuilt corpus is identical to the last one: training and gate results are kept")
         if not (out / "manifest.json").is_file():
             raise RuntimeError(f"Gradle finished but {out}/manifest.json was not written: the generator did not write to {{out}}; "
                                "check GENERATOR_GRADLE_ARGS / GENERATOR_EXTRA_ENV against the Kotlin writer")
