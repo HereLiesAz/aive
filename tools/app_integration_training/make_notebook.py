@@ -136,7 +136,7 @@ if importlib.util.find_spec("diffusers") is not None:
 
 # ---- Switches ----------------------------------------------------------------------------------------
 SMOKE = False                        # True: 20 steps on 64 rows, tiny splits, every cell runs; nothing is published
-UPLOAD = False                       # True: publish to the GitHub pre-release (needs the GITHUB_TOKEN secret)
+UPLOAD = False                       # True: publish to the GitHub pre-release; a run that passes its gates publishes anyway when a GitHub token is present
 EXPORT_ONNX = True                   # Export A: ONNX Runtime shared-base adapter + Gate 2
 EXPORT_LITERTLM = True               # Export B: merged full model for LiteRT-LM (litert-torch)
 
@@ -1477,13 +1477,15 @@ elif EXPORT_LITERTLM and not RELEASABLE:
 save_results()
 if RELEASABLE:
     release_paths.append(RESULTS_FILE)
+# Gates passed: publish whenever a GitHub token is present, so the result never lives only on a session's disk.
+PUBLISH = RELEASABLE and (UPLOAD or bool(secret("GITHUB_TOKEN")))
 print("assets:", [p.name for p in release_paths] or "none")
 if not RELEASABLE:
     print("NO RELEASE: " + ("SMOKE run" if SMOKE else f"gates {gate_status}"))
-elif UPLOAD:
+elif PUBLISH:
     upload(release_paths, RELEASE_TAG)
 else:
-    print(f"UPLOAD is False: the release files are in {ASSETS}; set UPLOAD = True to publish {RELEASE_TAG}")
+    print(f"No GitHub key was found and UPLOAD is False: the release files are in {ASSETS} (on Drive); set UPLOAD = True to publish {RELEASE_TAG}")
 ''')
 
 code(r'''
@@ -1492,7 +1494,7 @@ if SMOKE:
     print("SMOKE run finished: every stage ran on tiny splits. Check results.json for what each stage reported, then set SMOKE = False and run again.")
 elif not RELEASABLE:
     print(f"Nothing to release. Read the failing rows in {RESULTS_FILE}, improve the corpus, rebuild the dataset, run again.")
-elif not UPLOAD:
+elif not PUBLISH:
     print(f"Set UPLOAD = True (with the GITHUB_TOKEN secret) and run this cell group again; nothing was published. Files: {ASSETS}")
 else:
     print(f"""Published {RELEASE_TAG}. On your machine, from a checkout of {RELEASE_REPOSITORY}:
