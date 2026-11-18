@@ -1378,7 +1378,10 @@ if EXPORT_LITERTLM and not (LITERT.get("modelPath") and Path(LITERT["modelPath"]
     cli = [str(venv / "bin" / LITERT_CLI[0]), *LITERT_CLI[1:]]
 
     def cli_works():
-        done = subprocess.run([*cli, "--help"], capture_output=True, text=True)
+        # Import the function the command wraps: that fails on a missing dependency (tensorflow) and succeeds when the command can run.
+        # (Not `--help`: Fire prints help and exits non-zero.)
+        done = subprocess.run([str(venv / "bin" / "python"), "-c", "from litert_torch.generative.export_hf.export import export"],
+                              capture_output=True, text=True)
         return done.returncode == 0, (done.stdout + done.stderr)
 
     # litert-torch imports tensorflow for a flatbuffer schema but does not install it: a CLI that crashes on import is a missing
