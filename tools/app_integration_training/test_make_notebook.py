@@ -213,6 +213,14 @@ class MakeNotebookTest(unittest.TestCase):
         self.assertIn('trainer.accelerator, "scaler", None) is None', text)
         self.assertIn("No GPU. Runtime > Change runtime type > GPU", text)
 
+    def test_a_failed_gate_repairs_only_the_failing_families(self):
+        text = "\n".join(code_cells(json.loads(NOTEBOOK.read_text())))
+        self.assertIn("def repair(families, round_no)", text)
+        self.assertIn("failing_families(RESULTS[\"gate1\"][\"gateFailures\"])", text)
+        self.assertIn("REPAIR_ROUNDS = 2", text)
+        # the collator must not see the family: it lives beside the rows, not in them
+        self.assertNotIn('"labels": [-100] * len(prompt) + answer, "family"', text)
+
     def test_the_answer_store_resumes_and_never_trusts_a_half_written_file(self):
         import hashlib
         import tempfile
