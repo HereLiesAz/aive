@@ -199,7 +199,7 @@ LITERT_CLI = ["litert-torch", "export_hf"]
 LITERT_QUANTIZATION_RECIPE = "dynamic_wi8_afp32"   # the q8 recipe (8-bit weights, float activations)
 LITERT_PREFILL_LENGTHS = "8,64,256,1024"           # multi-prefill signatures; the installed file's set is not known here
 LITERT_BUNDLE_FLAG = ("--bundle_litert_lm", "true")  # write a .litertlm bundle (tokenizer and metadata inside)
-LITERT_SMOKE_PACKAGES = ["litert-lm", "litert_lm"]   # pip names tried in order for the Python runtime
+LITERT_SMOKE_PACKAGES = ["litert-lm-api", "litert-lm"]   # pip names tried in order; the `litert_lm` module comes from litert-lm-api
 
 # ---- Corpus build stage: the notebook builds its own corpus from the repository -----------------------------
 BUILD_CORPUS_ON_KAGGLE = True        # True: clone, run the generator through Gradle, verify, zip. False: use an attached
@@ -1396,15 +1396,20 @@ if EXPORT_LITERTLM and not (LITERT.get("modelPath") and Path(LITERT["modelPath"]
         raise RuntimeError(LITERT["reason"] + ". Set EXPORT_LITERTLM = False to release the ONNX adapter alone.")
     flags = [("--model", str(merged)), ("--output_dir", str(converted)), ("--quantization_recipe", LITERT_QUANTIZATION_RECIPE),
              ("--cache_length", str(KV_CACHE_TOKENS)), ("--prefill_lengths", LITERT_PREFILL_LENGTHS), LITERT_BUNDLE_FLAG]
-    _, help_text = run([*cli, "--help"], root / "export-help.log")
-    absent = [f for f, _ in flags if f.lstrip("-") not in help_text]
-    LITERT["helpText"] = help_text[-6000:]
-    if absent:
-        LITERT.update({"ran": False, "reason": f"`{' '.join(LITERT_CLI)} --help` does not list {absent}; fix the LITERT_* constants"})
+    # The command is a Python Fire wrapper around one function, so its parameter names are the flags: read them, rather than
+    # searching help text (Fire prints required parameters as MODEL and OUTPUT_DIR, not as flags).
+    probe = subprocess.run(
+        [str(venv / "bin" / "python"), "-c",
+         "import inspect; from litert_torch.generative.export_hf.export import export; print(' '.join(inspect.signature(export).parameters))"],
+        capture_output=True, text=True)
+    accepted = probe.stdout.split()
+    absent = [f for f, _ in flags if f.lstrip("-") not in accepted]
+    LITERT["acceptedFlags"] = accepted
+    if absent or probe.returncode != 0:
+        LITERT.update({"ran": False, "reason": f"litert-torch export_hf does not take {absent or 'the flags'}; it takes {accepted or probe.stderr[-300:]}"})
         save_results()
         raise RuntimeError(
-            f"litert-torch does not accept the flags {absent}. The flag names in the LITERT_* constants were written without "
-            f"being able to check them. Its help text is in results.json and {root / 'export-help.log'}; correct the constants, run again.")
+            f"litert-torch does not accept the flags {absent}. It takes: {accepted}. Correct the LITERT_* constants (the names are in results.json).")
     shutil.rmtree(converted, ignore_errors=True)
     exit_code, output = run([*cli, *[f"{k}={v}" for k, v in flags]], root / "export.log", timeout=4 * 3600)
     produced = sorted([p for ext in ("*.litertlm", "*.task") for p in converted.rglob(ext)], key=lambda p: -p.stat().st_size)
@@ -1426,23 +1431,24 @@ if EXPORT_LITERTLM:
 
 code(r'''
 # ---- Smoke-test the converted file with the litert_lm Python package; agreement with Gate 1 ------------------
-# UNVERIFIED API: the Python runtime's session calls below are written from memory. The app feeds the engine
+# The calls below follow litert-lm-api 0.19.2 (Engine, create_session, run_prefill, run_decode().texts). The app feeds the engine
 # an already-templated raw prompt (LiteRtLmModel.complete), so only the raw-session API is used here; the
 # conversation API would apply a template of its own and make the comparison meaningless. If the package
 # cannot be installed or its API differs, that is recorded in results.json, not skipped silently.
 SMOKE_SCRIPT = r"""
 import json, sys
-model_path, prompts_path, out_path = sys.argv[1:4]
+model_path, prompts_path, out_path, cache = sys.argv[1:5]
 import litert_lm
 prompts = json.load(open(prompts_path))
-engine = litert_lm.Engine(model_path)
+engine = litert_lm.Engine(model_path, max_num_tokens=int(cache))
 outputs = []
 for prompt in prompts:
-    session = engine.create_session()
+    # apply_prompt_template=False: the prompt is already the app's ChatML text; greedy, to compare with Gate 1.
+    session = engine.create_session(apply_prompt_template=False, max_output_tokens=512,
+                                    sampler_config=litert_lm.SamplerConfig(top_k=1, temperature=0.0))
     session.run_prefill([prompt])
-    outputs.append(session.run_decode())
-    close = getattr(session, "close", None)
-    if close: close()
+    outputs.append(session.run_decode().texts[0])
+    session.close()
 json.dump(outputs, open(out_path, "w"))
 """
 
@@ -1463,7 +1469,7 @@ def litert_smoke():
     rows = tests[::stride][:LITERT_AGREEMENT_ROWS]
     (root / "smoke.py").write_text(SMOKE_SCRIPT)
     (root / "smoke-prompts.json").write_text(json.dumps(prompts_of(rows)))
-    exit_code, output = run([python, str(root / "smoke.py"), LITERT["modelPath"], str(root / "smoke-prompts.json"), str(root / "smoke-out.json")],
+    exit_code, output = run([python, str(root / "smoke.py"), LITERT["modelPath"], str(root / "smoke-prompts.json"), str(root / "smoke-out.json"), str(KV_CACHE_TOKENS)],
                             root / "smoke.log", timeout=3 * 3600)
     if exit_code != 0:
         return {"ran": False, "package": installed, "pipFreeze": freeze, "reason": f"the smoke script failed (exit {exit_code}); log in {root / 'smoke.log'}: {output[-800:]}"}
