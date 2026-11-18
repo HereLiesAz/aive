@@ -1282,6 +1282,12 @@ if EXPORT_LITERTLM and not (LITERT.get("modelPath") and Path(LITERT["modelPath"]
     root = WORK / "litert"
     merged, converted, venv = root / "merged", root / "converted", LITERT_VENV
     root.mkdir(exist_ok=True)
+    # The merged model and its conversion belong to one adapter: a different adapter makes both stale.
+    stamp = root / "merged.adapter-sha256"
+    adapter_sha = sha256(Path(ADAPTER_DIR) / "adapter_model.safetensors")
+    if not stamp.is_file() or stamp.read_text().strip() != adapter_sha:
+        shutil.rmtree(merged, ignore_errors=True)
+        shutil.rmtree(converted, ignore_errors=True)
     if not (merged / "model.safetensors").is_file():
         shutil.rmtree(merged, ignore_errors=True)
         full = AutoModelForCausalLM.from_pretrained(BASE_MODEL, torch_dtype=torch.float32)
@@ -1289,6 +1295,7 @@ if EXPORT_LITERTLM and not (LITERT.get("modelPath") and Path(LITERT["modelPath"]
         full.save_pretrained(merged, safe_serialization=True)
         TOKENIZER.save_pretrained(merged)
         del full; gc.collect()
+        stamp.write_text(adapter_sha)
     if not (venv / "bin" / LITERT_CLI[0]).is_file():
         shutil.rmtree(venv, ignore_errors=True)
         make_venv(venv)
