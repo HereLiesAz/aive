@@ -29,10 +29,15 @@ class LiteRtLmModelCatalogTest {
     }
 
     @Test
-    fun noMergedAppIntegrationModelIsPinnedYet() {
-        // It is pinned by hand after a device trial; nothing may be guessed into the catalog.
-        assertEquals(null, LiteRtLmModelCatalog.adapterModel)
-        assertEquals(listOf(LiteRtLmModelCatalog.qwen25Instruct05b), LiteRtLmModelCatalog.all)
+    fun theMergedAppIntegrationModelIsPinnedFromItsRelease() {
+        val model = LiteRtLmModelCatalog.adapterModel!!
+        assertEquals("6f2ccf749a8ebab4a08a0d17396fe0df0bce9936da37b9f36c88fba159e0dab3", model.sha256)
+        assertEquals(528_255_232L, model.sizeBytes)
+        assertEquals("litertlm", model.format)
+        assertTrue(model.downloadUrl.startsWith("https://github.com/HereLiesAz/aive/releases/download/app-integration-v1/"))
+        assertTrue(model.downloadUrl.endsWith(model.fileName))
+        assertEquals(model, LiteRtLmModelCatalog.byId(model.id))
+        assertEquals(listOf(LiteRtLmModelCatalog.qwen25Instruct05b, model), LiteRtLmModelCatalog.all)
     }
 
     private val pinned = LiteRtLmModelCatalog.qwen25Instruct05b.copy(

@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.60 — from 2026-10-27
 
+- **The merged app-integration LiteRT-LM model is pinned in the catalog.** `LiteRtLmModelCatalog.adapterModel` is the `app-integration-v1` release's `.litertlm` asset (528,255,232 bytes, SHA-256 `6f2ccf74…9dab3`, Apache-2.0), so it installs like the stock model and, once installed, `LiteRtLmModelSelection` runs it instead of the stock model. The notebook's 50-row smoke test on that file matched Gate 1 exactly; no device trial has been run, and the stock model still runs when this one is not installed.
 - **The LiteRT-LM export installs the packager version litert-torch was written for.** The conversion ran, then packaging stopped on `module 'litert_lm_builder' has no attribute 'TfLiteModelType'`: litert-torch 0.10.0 asks for `litert-lm-builder>=0.18.0`, pip chose 0.19.2, and that release removed the class (0.18.x has it). The notebook now pins `litert-lm-builder>=0.18,<0.19` in the export environment.
 - **The notebook no longer mistakes litert-torch's help exit code for a crash.** With tensorflow installed the command printed its help and the notebook still stopped, because Fire exits non-zero after `--help`. The check now imports the export function itself.
 - **A rerun can no longer fail the publish on its own `results.json`.** Release assets are immutable and `results.json` changes every run, so a second attempt would have been refused; it is now published as `results-<version>-<hash>.json`.

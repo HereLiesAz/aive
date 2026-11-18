@@ -328,7 +328,7 @@ internal class DesktopMemoryLocalModels(
     /** Called after the LiteRT-LM model is installed or removed, so a loaded engine is dropped. */
     private val onLiteRtLmChanged: suspend () -> Unit,
     scope: CoroutineScope,
-    /** The merged app-integration model, once one is pinned in `LiteRtLmModelCatalog.adapterModel`; null now. */
+    /** The merged app-integration model, pinned in `LiteRtLmModelCatalog.adapterModel` from the app-integration-v1 release. */
     private val adapterInstaller: DesktopLiteRtLmModelInstaller? = null,
 ) : MemoryLocalModelManager {
     private val mutableModels = MutableStateFlow(emptyList<MemoryLocalModelStatus>())
