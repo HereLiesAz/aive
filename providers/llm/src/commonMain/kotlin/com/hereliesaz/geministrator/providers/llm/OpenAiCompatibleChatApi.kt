@@ -93,6 +93,24 @@ class OpenAiCompatibleChatApi(
         )
     }
 
+    private suspend fun postChat(apiKey: String, prompt: String, maxOutputTokens: Int?) = client.post("$baseUrl/chat/completions") {
+        if (apiKey.isNotEmpty()) header(HttpHeaders.Authorization, "Bearer $apiKey")
+        extraHeaders.forEach { (name, value) -> header(name, value) }
+        contentType(ContentType.Application.Json)
+        setBody(
+            CompatibleChatRequest(
+                model = model,
+                messages = listOf(CompatibleChatMessage(role = "user", content = prompt)),
+                maxTokens = maxOutputTokens,
+            ),
+        )
+    }
+
+    private companion object {
+        const val GATEWAY_RETRIES = 2
+        const val GATEWAY_HICCUP = "Provider returned error"
+    }
+
     override suspend fun generate(prompt: String): TextGenerationResult = generate(prompt, maxOutputTokens = null)
 
     override suspend fun generateWithBudget(prompt: String, maxOutputTokens: Int): TextGenerationResult =
@@ -101,21 +119,22 @@ class OpenAiCompatibleChatApi(
     private suspend fun generate(prompt: String, maxOutputTokens: Int?): TextGenerationResult {
         val apiKey = sendableApiKey()
 
-        val response = client.post("$baseUrl/chat/completions") {
-            if (apiKey.isNotEmpty()) header(HttpHeaders.Authorization, "Bearer $apiKey")
-            extraHeaders.forEach { (name, value) -> header(name, value) }
-            contentType(ContentType.Application.Json)
-            setBody(
-                CompatibleChatRequest(
-                    model = model,
-                    messages = listOf(CompatibleChatMessage(role = "user", content = prompt)),
-                    maxTokens = maxOutputTokens,
-                ),
-            )
+        // A routing gateway (Kilo's kilo-auto/free, OpenRouter) hands each request to whichever upstream is free, and now and
+        // then that upstream refuses it ("Provider returned error", often HTTP 400) though the same request succeeds a moment
+        // later on another one. Asking again is the answer, twice at most; any other failure is final at once.
+        var attempt = 0
+        var failedBody = ""
+        var response = postChat(apiKey, prompt, maxOutputTokens)
+        while (response.status.value !in 200..299) {
+            failedBody = response.boundedBodyText().redactSecrets().take(800)
+            if (attempt >= GATEWAY_RETRIES || !failedBody.contains(GATEWAY_HICCUP)) break
+            attempt++
+            kotlinx.coroutines.delay(800L * attempt)
+            response = postChat(apiKey, prompt, maxOutputTokens)
         }
 
         if (response.status.value !in 200..299) {
-            val responseBody = response.boundedBodyText().redactSecrets().take(800)
+            val responseBody = failedBody
             throw HttpStatusFailure(
                 status = response.status.value,
                 message = "Unable to generate compatible chat response: HTTP ${response.status.value}" +
