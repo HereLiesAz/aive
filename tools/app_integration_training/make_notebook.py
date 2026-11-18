@@ -1252,11 +1252,22 @@ def sanitize_on_device_text(raw):
         text = text.replace(marker, "")
     return text.strip()
 
+# The venv lives on local disk: Google Drive cannot hold the symlinks a venv is made of.
+LITERT_VENV = TOOLCHAIN / "litert-venv"
+
+def make_venv(path):
+    """venv, or virtualenv when this Python ships no ensurepip (Debian/Colab images without python3-venv)."""
+    if subprocess.run([sys.executable, "-m", "venv", str(path)], capture_output=True).returncode == 0:
+        return
+    shutil.rmtree(path, ignore_errors=True)
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "virtualenv"], check=True)
+    subprocess.run([sys.executable, "-m", "virtualenv", str(path)], check=True)
+
 LITERT = RESULTS.setdefault("litertLm", {"enabled": EXPORT_LITERTLM})
 LITERT["enabled"] = EXPORT_LITERTLM
 if EXPORT_LITERTLM and not (LITERT.get("modelPath") and Path(LITERT["modelPath"]).is_file()):
     root = WORK / "litert"
-    merged, converted, venv = root / "merged", root / "converted", root / "venv"
+    merged, converted, venv = root / "merged", root / "converted", LITERT_VENV
     root.mkdir(exist_ok=True)
     if not (merged / "model.safetensors").is_file():
         shutil.rmtree(merged, ignore_errors=True)
@@ -1267,7 +1278,7 @@ if EXPORT_LITERTLM and not (LITERT.get("modelPath") and Path(LITERT["modelPath"]
         del full; gc.collect()
     if not (venv / "bin" / LITERT_CLI[0]).is_file():
         shutil.rmtree(venv, ignore_errors=True)
-        subprocess.run([sys.executable, "-m", "venv", str(venv)], check=True)
+        make_venv(venv)
         exit_code, _ = run([str(venv / "bin" / "python"), "-m", "pip", "install", "-q", LITERT_PACKAGE], root / "pip-litert-torch.log")
         if exit_code != 0:
             LITERT.update({"ran": False, "reason": f"pip install {LITERT_PACKAGE} failed (see {root / 'pip-litert-torch.log'})"})
@@ -1327,7 +1338,7 @@ json.dump(outputs, open(out_path, "w"))
 """
 
 def litert_smoke():
-    root, venv = WORK / "litert", WORK / "litert" / "venv"
+    root, venv = WORK / "litert", LITERT_VENV
     python = str(venv / "bin" / "python")
     installed = None
     for package in LITERT_SMOKE_PACKAGES:
