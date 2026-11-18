@@ -1591,7 +1591,10 @@ elif EXPORT_LITERTLM and not RELEASABLE:
     LITERT["release"] = "not released: a gate failed or this is a SMOKE run"
 save_results()
 if RELEASABLE:
-    release_paths.append(RESULTS_FILE)
+    # Release assets are immutable and results.json changes every run: publish it under a name that carries its own hash.
+    results_asset = ASSETS / f"results-{VERSION}-{sha256(RESULTS_FILE)[:8]}.json"
+    shutil.copy2(RESULTS_FILE, results_asset)
+    release_paths.append(results_asset)
 # Gates passed: publish whenever a GitHub token is present, so the result never lives only on a session's disk.
 PUBLISH = RELEASABLE and (UPLOAD or bool(secret("GITHUB_TOKEN")))
 print("assets:", [p.name for p in release_paths] or "none")
