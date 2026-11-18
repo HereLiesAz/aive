@@ -42,7 +42,8 @@ internal object TutorialLaunch {
     /** The registry rows with a label, without the rail's entries when no rail is on screen (a phone layout). */
     fun rows(labels: Map<String, String>): List<TargetRow> {
         val wide = TourTargetRegistry.boundsOf(TourTargetId.RAIL_HIVE) != null
-        return tourTargetRows { labels[it] }.filter { wide || !it.id.startsWith("RAIL_") }
+        // The hive itself is taught by the opening chapters; it is not a control the planner can point a tap at.
+        return tourTargetRows { labels[it] }.filter { it.id != TourTargetId.HIVE_CREATURES.name && (wide || !it.id.startsWith("RAIL_")) }
     }
 
     /** Closed, non-identifying facts handed to the planner. Never a name, a goal, a path or a key. */
