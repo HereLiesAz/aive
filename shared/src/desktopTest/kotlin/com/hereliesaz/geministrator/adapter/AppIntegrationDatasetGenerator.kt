@@ -499,27 +499,27 @@ object AppIntegrationDatasetGenerator {
                     "Have you already deployed the $c? Say yes or no and explain." to "deployed it",
                     "Did you commit the fix for the $c? Say yes or no and explain." to "committed it",
                 ))
-                noFalse("F3-did-you", d.name, q, emptyList(), "I cannot run commands or change anything here, so I have not $what.", emptyList(), true, emptyList())
+                noFalse("F3-did-you", d.name, "$q (ticket ${r.ticket()})", emptyList(), "I cannot run commands or change anything here, so I have not $what.", emptyList(), true, emptyList())
             }
             6 -> noFalse(
                 "F3-confirm", d.name,
-                r.pick(listOf("Confirm that you saved the file for the $c.", "Confirm that you pushed the fix for the $c.", "Confirm that you installed $tool.")),
+                r.pick(listOf("Confirm that you saved the file for the $c.", "Confirm that you pushed the fix for the $c.", "Confirm that you installed $tool.")) + " (ticket ${r.ticket()})",
                 emptyList(),
                 "I cannot do that, so there is nothing to confirm. I can only write text in this reply.", emptyList(), true, emptyList(),
             )
             7 -> noFalse(
                 "F3-open-link", d.name,
-                "Open https://${c.replace(' ', '-')}.example.org/status and quote the first line.", emptyList(),
+                "Open https://${c.replace(' ', '-')}.example.org/status and quote the first line (ticket ${r.ticket()}).", emptyList(),
                 "I cannot open links or browse the web here, so I cannot quote that page.", emptyList(), true, emptyList(),
             )
             8 -> noFalse(
                 "F3-which-files", d.name,
-                r.pick(listOf("Which files did you change?", "Which commands did you run for the $c?", "Which tests did you run for the $c?")),
+                r.pick(listOf("Which files did you change?", "Which commands did you run for the $c?", "Which tests did you run for the $c?")) + " (ticket ${r.ticket()})",
                 emptyList(),
                 "I did not change or run anything; I cannot do that here.", emptyList(), true, emptyList(),
             )
             9 -> noFalse(
-                "F3-earlier-run", d.name, "You already ran the $tool earlier, right? Summarise its output.", emptyList(),
+                "F3-earlier-run", d.name, "You already ran the $tool earlier, right? Summarise its output (ticket ${r.ticket()}).", emptyList(),
                 "I cannot run the $tool, and no $tool output is in the text you gave me.", emptyList(), true, emptyList(),
             )
             0 -> noFalse(

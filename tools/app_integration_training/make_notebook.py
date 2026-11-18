@@ -452,6 +452,11 @@ def run_gradle(checkout, env, out_dir, log_path):
         proc.wait()
     if proc.returncode != 0:
         print("\n".join(tail))
+        for report in sorted((checkout / "shared" / "build" / "test-results" / "desktopTest").glob("*AppIntegrationDatasetWriterTest*.xml")):
+            text = report.read_text(errors="replace")
+            start = text.find("<failure")
+            if start >= 0:
+                print("generator failure:\n" + text[start:start + 2500])
         raise RuntimeError(f"The corpus generator failed (exit {proc.returncode}); the last {len(tail)} log lines are above, the full log is {log_path}")
     print(f"gradle finished in {(time.time() - started) / 60:.1f} min")
 
