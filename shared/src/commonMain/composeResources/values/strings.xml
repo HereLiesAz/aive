@@ -469,6 +469,15 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="scar_hatched">Done</string>
     <string name="scar_withered">Failed</string>
     <string name="scar_stopped">Stopped</string>
+    <string name="run_all_pill">All runs</string>
+    <string name="run_all_filter_all">All</string>
+    <string name="run_all_filter_running">Running</string>
+    <string name="run_all_filter_paused">Paused</string>
+    <string name="run_all_filter_done">Done</string>
+    <string name="run_all_filter_failed">Failed</string>
+    <string name="run_all_filter_stopped">Stopped</string>
+    <string name="run_all_open_now">Open now</string>
+    <string name="run_all_empty">No runs in this group.</string>
     <string name="hive_new">New swarm</string>
     <string name="hive_new_name">New swarm</string>
     <string name="hive_new_empty">An empty swarm. Describe the work below and the queen drafts it, or add roles yourself and draw a strand from one creature’s tail to another.</string>
@@ -1293,6 +1302,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_what_it_made">What it made</string>
     <string name="first_hive_options">More: name, repository</string>
     <string name="first_hive_teach_seed">Teach me how to use the Aive</string>
+    <string name="first_hive_teach_me">Teach me</string>
+    <string name="tutorial_needs_source_line">The lessons are planned by the queen, who thinks with a Source, and none is connected yet. Connect one below, then feed this again.</string>
+    <string name="queen_away_notice_label">The queen</string>
     <string name="first_hive_free_line">Free to start: a free source is picked for you. Free sources may log what you write. Prompts and repository text leave this device.</string>
     <string name="first_hive_own_key">Use my own key</string>
     <string name="first_hive_connect">Connect a source</string>

@@ -1,6 +1,9 @@
 package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.resources.hive_show_timeline
+import com.hereliesaz.geministrator.resources.first_hive_teach_seed
+import com.hereliesaz.geministrator.resources.queen_away_notice_label
+import com.hereliesaz.geministrator.resources.queen_say_missing_queen_away
 import com.hereliesaz.geministrator.resources.hive_more_editing
 import com.hereliesaz.geministrator.resources.hive_show_hive
 import com.hereliesaz.geministrator.resources.hive_stop_cancel
@@ -579,6 +582,15 @@ fun ControlRoom(
     PlatformBackHandler(enabled = flipHost.editing && flippedId != null) { flipHost.send(CardFlipEvent.Back) }
     // An objective queued in the feed bar starts once its swarm finishes, wherever the keeper is.
     QueuedFeedLauncher(liveWorkflow, onLaunchWorkflow)
+    // "Teach me" from the Keeper's room, with a hive on screen: its seeded goal is queued on that hive like any queued objective.
+    val teachSeedForHive = stringResource(Res.string.first_hive_teach_seed)
+    val teachPending = TutorialRequests.pending
+    LaunchedEffect(teachPending, liveWorkflow?.run?.id) {
+        val live = liveWorkflow ?: return@LaunchedEffect
+        if (teachPending && teachTarget(true) == TeachTarget.QueueOnHive && TutorialRequests.take()) {
+            HiveFeedQueue.queue(live.run.id, teachSeedForHive)
+        }
+    }
 
     
     val openKeeper = {
@@ -646,6 +658,19 @@ fun ControlRoom(
             )
         }
         Column(Modifier.weight(1f).fillMaxHeight()) {
+            // The queen had no run to say she is away on: one plain line here, leading to Connections.
+            if (QueenAwayNotice.shown) {
+                AzphaltNote(
+                    seed = "queen-away-notice",
+                    label = stringResource(Res.string.queen_away_notice_label),
+                    value = stringResource(Res.string.queen_say_missing_queen_away),
+                    onClick = {
+                        QueenAwayNotice.shown = false
+                        openConnections()
+                    },
+                    modifier = Modifier.fillMaxWidth().padding(8.dp),
+                )
+            }
             if (compact) {
                 ShellHeader(
                     crumbs = crumbs,

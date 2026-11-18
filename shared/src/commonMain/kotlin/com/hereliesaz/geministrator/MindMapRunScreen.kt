@@ -134,6 +134,8 @@ import com.hereliesaz.geministrator.resources.first_hive_objective
 import com.hereliesaz.geministrator.resources.hive_what_it_made
 import com.hereliesaz.geministrator.resources.first_hive_hint
 import com.hereliesaz.geministrator.resources.first_hive_teach_seed
+import com.hereliesaz.geministrator.resources.first_hive_teach_me
+import com.hereliesaz.geministrator.resources.tutorial_needs_source_line
 import com.hereliesaz.geministrator.resources.first_hive_free_line
 import com.hereliesaz.geministrator.resources.first_hive_own_key
 import com.hereliesaz.geministrator.resources.first_hive
@@ -672,6 +674,14 @@ internal fun MindMapRunScreen(
                         starterLabel?.let { stringResource(Res.string.prompt_starter_goal, it) },
                     )
                 }
+                // "Teach me" from Keeper's room > About lands here: the same seeded goal, fed through this form's own gate.
+                val teachSeedText = stringResource(Res.string.first_hive_teach_seed)
+                LaunchedEffect(TutorialRequests.pending) {
+                    if (TutorialRequests.take()) {
+                        objectiveDraft = teachSeedText
+                        seededObjective = ""
+                    }
+                }
                 PromptSuggestBox(
                     kind = PromptKind.Objective,
                     value = objective,
@@ -692,6 +702,19 @@ internal fun MindMapRunScreen(
                         label = { Text(stringResource(if (firstLaunch) Res.string.first_hive_objective else Res.string.overview_objective)) },
                         minLines = if (compact) 2 else 3,
                         modifier = Modifier.fillMaxWidth().then(field.modifier).tourTarget(TourTargetId.GOAL_FIELD),
+                    )
+                }
+                if (firstLaunch) {
+                    // Replays the lesson without retyping it: the goal is filled in, and Feed it still goes through the gate.
+                    AzphaltPill(
+                        label = stringResource(Res.string.first_hive_teach_me),
+                        seed = "first-hive-teach-me",
+                        onClick = {
+                            objectiveDraft = teachSeedText
+                            seededObjective = ""
+                            onDismissLaunchError()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
                 AzphaltPill(
@@ -740,6 +763,10 @@ internal fun MindMapRunScreen(
                     Text(message, style = AzphaltType.body, color = azphaltOnSurface())
                 }
                 if (repositoryGated) repositoryFields()
+                // A lesson asked for with no Source to plan it: said plainly here, not left to silence (no model is called for this line).
+                if (tutorialNeedsSourceLine(objective, gate, autoSource)) {
+                    Text(stringResource(Res.string.tutorial_needs_source_line), style = AzphaltType.body, color = azphaltOnSurface())
+                }
                 if (autoSource && (gate == FeedGate.Provider || gate == FeedGate.Open)) {
                     // One muted line instead of the gate, the free pills and the own-key pill.
                     Text(stringResource(Res.string.first_hive_free_line), style = AzphaltType.body, color = azphaltOnSurface())

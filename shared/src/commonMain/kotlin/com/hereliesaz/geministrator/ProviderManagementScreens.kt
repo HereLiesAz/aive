@@ -44,6 +44,7 @@ import com.hereliesaz.geministrator.distributed.DistributedComputeUiState
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.keeper_add_provider
+import com.hereliesaz.geministrator.resources.first_hive_teach_me
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_add
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_card_url
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_explain
@@ -810,6 +811,17 @@ internal fun ProviderSettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+        // Replays the lesson: the seeded goal goes to the launch form (or the hive on screen) without retyping it.
+        val aboutLinks = LocalPlaceLinks.current
+        AzphaltPill(
+            stringResource(Res.string.first_hive_teach_me),
+            "about-teach-me",
+            onClick = {
+                TutorialRequests.pending = true
+                aboutLinks.openPlace?.invoke(ControlRoomDestination.Overview)
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
         AzphaltPill(
             stringResource(Res.string.keeper_advanced_tracing),
             "about-advanced",

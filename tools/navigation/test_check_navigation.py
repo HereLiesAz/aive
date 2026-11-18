@@ -45,5 +45,38 @@ class CheckNavigationTest(unittest.TestCase):
         self.assertEqual(["ControlRoomDestination.Brand"], [m for m in nav.undeclared_places(g, lambda p: src if p.endswith("ControlRoomUi.kt") else "")])
 
 
+    def with_capability(self, symbol, cid="x.y"):
+        g = tiny()
+        g["nodes"][0]["capabilities"] = [{"id": cid, "symbol": symbol, "what": "test"}]
+        return g
+
+    def test_a_capability_whose_symbol_is_declared_passes(self):
+        src = ["internal fun allRunsFor(runs: List<Run>) = runs\n", "enum class Mode {\n    One,\n}\n"]
+        self.assertEqual([], nav.capability_problems(self.with_capability("allRunsFor"), src))
+        self.assertEqual([], nav.capability_problems(self.with_capability("Mode.One"), src))
+        self.assertEqual([], nav.capability_problems(self.with_capability("openRoleAt"), ["internal fun PlaceLinks.openRoleAt() {}"]))
+
+    def test_a_capability_whose_symbol_vanished_fails(self):
+        found = nav.capability_problems(self.with_capability("allRunsFor"), ["fun somethingElse() {}"])
+        self.assertEqual(1, len(found))
+        self.assertIn("allRunsFor", found[0])
+
+    def test_a_mention_is_not_a_declaration(self):
+        self.assertEqual(1, len(nav.capability_problems(self.with_capability("gone"), ["val x = gone()\n"])))
+
+    def test_a_capability_needs_an_id_and_a_symbol_and_ids_are_unique(self):
+        g = tiny()
+        g["nodes"][0]["capabilities"] = [{"id": "a.b"}]
+        self.assertEqual(1, len(nav.capability_problems(g, [])))
+        g["nodes"][0]["capabilities"] = [{"id": "a.b", "symbol": "f"}]
+        g["nodes"][1]["capabilities"] = [{"id": "a.b", "symbol": "f"}]
+        self.assertTrue(any("twice" in m for m in nav.capability_problems(g, ["fun f() {}"])))
+
+    def test_problems_reports_a_missing_capability_symbol(self):
+        g = self.with_capability("gone")
+        found = nav.problems(g, read=lambda p: "", texts=lambda: ["fun other() {}"])
+        self.assertTrue(any("gone" in m for m in found))
+
+
 if __name__ == "__main__":
     unittest.main()
