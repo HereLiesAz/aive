@@ -88,9 +88,19 @@ class TutorialDirector(
     private val level: () -> QueenLevel = { QueenLevel.Quiet },
     /** Where her lines to the keeper go (Messages). Each is a string, never model text. */
     private val say: (TutorialSay) -> Unit = {},
+    /**
+     * The chapters that play at once, before the swarm has planned anything: fixed, so the tour starts the moment the keeper feeds
+     * the goal, and the keeper plays them while the plan is written. The swarm's own chapters follow. Empty: the tour waits for the plan.
+     */
+    private val opening: List<LessonPayload> = emptyList(),
     private val tick: suspend () -> Unit = { delay(POLL_MILLIS) },
 ) {
     suspend fun run(goal: String, scope: TutorialScope, runKey: String?): TutorialOutcome {
+        val head = opening.size
+        if (head > 0) {
+            surface.start(runKey, head)
+            opening.forEach(surface::addLesson)
+        }
         var comfort = loadComfort()
         val shaky = comfort.shakyIds()
         val table = TeachingPrompts.targetTable(rows, whereOf)
@@ -138,11 +148,11 @@ class TutorialDirector(
         // 2. The lessons, one ahead of the keeper. The queen follows the keeper the whole way: what they open, tap and answer, how long
         // they stay and which way they go are signals that cost no model call ([tutorialAttention]); a model is only used to write lessons,
         // through the paced, spend-capped model she was given, so there is no fixed count of calls.
-        surface.start(runKey, steps.size)
+        if (head == 0) surface.start(runKey, steps.size) else surface.setTotal(head + steps.size)
         val replies = Channel<CheckInReply>(Channel.UNLIMITED)
         surface.onReply { replies.trySend(it) }
-        val lessons = mutableListOf<LessonPayload>()
-        var total = steps.size
+        val lessons = mutableListOf<LessonPayload>().apply { addAll(opening) }
+        var total = head + steps.size
         var dropped = 0
         var record = CheckInRecord()
         var checkInAbout: Int? = null
@@ -208,7 +218,7 @@ class TutorialDirector(
                     lastIndex = now.index
                 }
 
-                if (now.finished && lessons.size + dropped >= steps.size) {
+                if (now.finished && lessons.size + dropped >= head + steps.size) {
                     val last = lessons.lastOrNull()
                     if (last != null && !closingAnswered) {
                         if (!closing) {
@@ -235,7 +245,7 @@ class TutorialDirector(
                     return TutorialOutcome.Ended(lessons.size, dropped, finished = true, reached = reached)
                 }
                 // Every step was dropped: nothing to show, and nothing is invented in its place.
-                if (total == 0 && lessons.size + dropped >= steps.size) return TutorialOutcome.Ended(lessons.size, dropped, finished = false)
+                if (total == 0 && lessons.size + dropped >= head + steps.size) return TutorialOutcome.Ended(lessons.size, dropped, finished = false)
 
                 // The queen's attention: say nothing, update, ask, or slow down, from signals alone (pure; no model call).
                 val shownIndex = now.index - 1
@@ -280,7 +290,7 @@ class TutorialDirector(
                 }
 
                 // The next lesson, only while the keeper is within one of it.
-                val next = lessons.size + dropped
+                val next = lessons.size + dropped - head
                 if (next < steps.size && now.index >= lessons.size - 1) {
                     val step = steps[next]
                     val row = rows.first { it.id == step.target }

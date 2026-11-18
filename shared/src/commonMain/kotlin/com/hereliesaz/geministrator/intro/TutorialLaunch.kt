@@ -46,9 +46,19 @@ internal object TutorialLaunch {
     }
 
     /** Closed, non-identifying facts handed to the planner. Never a name, a goal, a path or a key. */
-    fun facts(rows: List<TargetRow>): List<String> = listOf(
+    fun facts(rows: List<TargetRow>, opened: Boolean = false): List<String> = listOfNotNull(
         if (rows.any { it.id.startsWith("RAIL_") }) "The window is wide: the left rail is on screen." else "The window is a phone layout: there is no left rail.",
+        if (opened) "The first chapters already showed the keeper the hive's creatures hatching, work changing hands, a creature's Work tab and the queen's Messages: go on from there and do not repeat them." else null,
     )
+
+    /** Only the fixed opening, for a keeper with no Source yet: it needs no model, so the tour still starts at once. */
+    suspend fun playOpening(): Boolean {
+        val chapters = tutorialOpening()
+        TourController.stop()
+        TourController.start(runKey = null, total = chapters.size)
+        chapters.forEach(TourController::addLesson)
+        return true
+    }
 
     suspend fun run(
         goal: String,
@@ -60,6 +70,8 @@ internal object TutorialLaunch {
         level: () -> com.hereliesaz.geministrator.queen.QueenLevel = { com.hereliesaz.geministrator.queen.QueenLevel.Quiet },
         /** Where her lines to the keeper go (Messages). */
         say: (com.hereliesaz.geministrator.queen.TutorialSay) -> Unit = {},
+        /** The chapters that play before the plan exists ([tutorialOpening]); empty keeps the tour waiting for the plan. */
+        opening: List<com.hereliesaz.geministrator.tour.LessonPayload> = emptyList(),
     ): TutorialOutcome? {
         val scope = TutorialRouter.classify(goal) ?: return null
         val rows = rows(labels)
@@ -72,7 +84,8 @@ internal object TutorialLaunch {
             rows = rows,
             whereOf = { places[it].orEmpty() },
             surface = TourControllerSurface,
-            facts = facts(rows),
+            facts = facts(rows, opened = opening.isNotEmpty()),
+            opening = opening,
             loadComfort = { store.load() },
             saveComfort = { store.save(it) },
             nowMillis = nowMillis,

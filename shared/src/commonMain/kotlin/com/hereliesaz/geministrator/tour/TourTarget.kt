@@ -121,6 +121,11 @@ enum class TourTargetId(
         labelKey = "hive_stop_run",
         place = "above a hive while it runs",
     ),
+    HIVE_CREATURES(
+        labelKey = "tour_target_creatures",
+        place = "the hive on screen, where its creatures hatch and work",
+        observable = setOf(ExpectKind.RunHatched, ExpectKind.RunHandedOff, ExpectKind.RunArtifact, ExpectKind.RunDone),
+    ),
     CREATURE_TAB_NEEDS(
         labelKey = "creature_tab_needs",
         place = "on a creature's sheet, after a creature is opened",

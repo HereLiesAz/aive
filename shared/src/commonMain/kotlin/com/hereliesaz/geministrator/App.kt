@@ -502,7 +502,11 @@ fun App(
         if (!com.hereliesaz.geministrator.intro.TutorialRouter.isTutorialGoal(objective)) return
         val modelFor = queenModelFor
         if (modelFor == null) {
-            scope.launch { if (runtime?.noteQueenAway() != true) QueenAwayNotice.shown = true }
+            scope.launch {
+                if (runtime?.noteQueenAway() != true) QueenAwayNotice.shown = true
+                // The opening needs no model: the keeper still sees the hive taught, and the rest waits for a Source.
+                com.hereliesaz.geministrator.intro.TutorialLaunch.playOpening()
+            }
             return
         }
         // One tour at a time: a second goal would stop the first one's layer out from under it.
@@ -520,6 +524,7 @@ fun App(
                     com.hereliesaz.geministrator.tour.TourController.preparation = com.hereliesaz.geministrator.tour.TourPreparation.None
                     // The keeper is told once in Messages, with a link to Connections.
                     if (runtime?.noteQueenAway() != true) QueenAwayNotice.shown = true
+                    com.hereliesaz.geministrator.intro.TutorialLaunch.playOpening()
                     return@launch
                 }
                 val active = runtime
@@ -536,12 +541,17 @@ fun App(
                     // She follows the keeper through the tour and says so in Messages, at her level's pace (no model call for it).
                     level = { active?.queenLevelNow() ?: com.hereliesaz.geministrator.queen.QueenLevel.Quiet },
                     say = { line -> scope.launch { active?.noteTutorial(line, tutorialRunId) } },
+                    opening = com.hereliesaz.geministrator.intro.tutorialOpening(),
                 )
                 appLog("AiveTutorial", "Tutorial ended: $outcome")
                 // Never shown a lesson: say so, rather than leaving the keeper waiting on a layer that will not come.
                 val shown = (outcome as? com.hereliesaz.geministrator.intro.TutorialOutcome.Ended)?.written ?: 0
                 com.hereliesaz.geministrator.tour.TourController.preparation =
-                    if (shown > 0) com.hereliesaz.geministrator.tour.TourPreparation.None else com.hereliesaz.geministrator.tour.TourPreparation.Failed
+                    if (shown > 0 || com.hereliesaz.geministrator.tour.TourController.state?.lessons?.isNotEmpty() == true) {
+                        com.hereliesaz.geministrator.tour.TourPreparation.None
+                    } else {
+                        com.hereliesaz.geministrator.tour.TourPreparation.Failed
+                    }
             } catch (failure: CancellationException) {
                 com.hereliesaz.geministrator.tour.TourController.preparation = com.hereliesaz.geministrator.tour.TourPreparation.None
                 throw failure
