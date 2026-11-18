@@ -4,7 +4,10 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.60 — from 2026-10-27
 
+<<<<<<< HEAD
 - **The notebook's LiteRT-LM stage now matches the real packages.** Read from the `litert-torch` 0.10.0 and `litert-lm-api` 0.19.2 wheels: the export flags are checked against the `export` function's own parameters (Fire prints required ones as `MODEL`/`OUTPUT_DIR`, which a help-text search would call absent), and the smoke test uses the real API: `Engine(path, max_num_tokens=1280)`, a session with `apply_prompt_template=False` (the prompt is already ChatML), greedy sampling, and `run_decode().texts[0]` (it returns a `Responses` object, not a string). The runtime package is `litert-lm-api`.
+=======
+>>>>>>> origin/main
 - **The notebook installs the dependency `litert-torch` forgot.** The LiteRT-LM export stopped with "litert-torch does not accept the flags …" because the command crashed on `ModuleNotFoundError: No module named 'tensorflow'` while printing its help, and that crash was read as missing flags. A command that does not start is now reported as such, and `tensorflow-cpu` (then `tensorflow`) is installed into its environment before the flags are checked.
 - **A failed gate reworks only what failed.** When Gate 1 fails, the notebook no longer stops for a full retrain: it continues training the adapter for one gentle epoch on the failing families' rows (plus a quarter as many replayed rows from the others), up to two rounds, judging again after each. The adapter before each repair is kept in `adapter-before-repair-N/`.
 - **The notebook can use a trained adapter instead of training one.** A folder `adopt-adapter/` in the work folder (`adapter_model.safetensors`, `adapter_config.json`, `adopt.json`) makes a run skip training, pin the corpus to the commit named in `adopt.json`, and reuse the saved gate answers for that adapter. It exists because a reset bug deleted an adapter that had passed both gates; its files were recovered from Drive's Trash.
