@@ -175,7 +175,19 @@
    "canonical_for": [],
    "inplace_editor": false,
    "back_to": "app.start",
-   "source_resolved": true
+   "source_resolved": true,
+   "capabilities": [
+    {
+     "id": "tutorial.source-line",
+     "symbol": "tutorialNeedsSourceLine",
+     "what": "Plain line in the launch form when a lesson is asked for and no Source is connected (no model called)"
+    },
+    {
+     "id": "tutorial.queen-away-notice",
+     "symbol": "QueenAwayNotice",
+     "what": "Shell line leading to Connections when the queen is away and there is no run to say so on"
+    }
+   ]
   },
   {
    "id": "hive.build",
@@ -381,7 +393,19 @@
    "canonical_for": [],
    "inplace_editor": false,
    "back_to": "hive.live",
-   "source_resolved": true
+   "source_resolved": true,
+   "capabilities": [
+    {
+     "id": "run.list-all",
+     "symbol": "allRunsFor",
+     "what": "All runs overflow on the run-scars row: every run of every project, any status, full objective and id; tapping one opens it"
+    },
+    {
+     "id": "run.filter-status",
+     "symbol": "RunStatusFilter",
+     "what": "Status filter of the All runs list (running, paused, done, failed, stopped)"
+    }
+   ]
   },
   {
    "id": "hive.made",
@@ -1722,7 +1746,14 @@
    "edits": [],
    "canonical_for": [],
    "inplace_editor": false,
-   "back_to": "keeper"
+   "back_to": "keeper",
+   "capabilities": [
+    {
+     "id": "tutorial.replay",
+     "symbol": "TutorialRequests",
+     "what": "Teach me: replays the seeded tutorial goal without retyping it"
+    }
+   ]
   },
   {
    "id": "keeper.provider",

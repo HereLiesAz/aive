@@ -502,7 +502,7 @@ fun App(
         if (!com.hereliesaz.geministrator.intro.TutorialRouter.isTutorialGoal(objective)) return
         val modelFor = queenModelFor
         if (modelFor == null) {
-            scope.launch { runtime?.noteQueenAway() }
+            scope.launch { if (runtime?.noteQueenAway() != true) QueenAwayNotice.shown = true }
             return
         }
         scope.launch {
@@ -514,7 +514,7 @@ fun App(
                 if (base == null) {
                     appLog("AiveTutorial", "No usable Source for the queen: the tutorial layer is not started")
                     // The keeper is told once in Messages, with a link to Connections.
-                    runtime?.noteQueenAway()
+                    if (runtime?.noteQueenAway() != true) QueenAwayNotice.shown = true
                     return@launch
                 }
                 val active = runtime

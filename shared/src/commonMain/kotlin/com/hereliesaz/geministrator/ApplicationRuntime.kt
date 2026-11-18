@@ -212,15 +212,18 @@ class ApplicationRuntime private constructor(
 
     /**
      * Her own model was needed (the tutorial's start) and no Source could give one: one plain Messages line on the current run
-     * ([com.hereliesaz.geministrator.queen.missingWhenQueenAway]), said once per run, leading to Connections.
+     * ([com.hereliesaz.geministrator.queen.missingWhenQueenAway]), said once per run, leading to Connections. Returns false when there is no
+     * current run to put it on, so the caller shows [QueenAwayNotice] instead of saying nothing.
      */
-    internal suspend fun noteQueenAway() = runtimeMutex.withLock {
-        val id = current?.state?.run?.id?.value ?: return@withLock
+    internal suspend fun noteQueenAway(): Boolean = runtimeMutex.withLock {
+        // No current run: nothing to put the line on. False tells the caller to say it somewhere else that is visible.
+        val id = current?.state?.run?.id?.value ?: return@withLock false
         val known = queenMissing[id].orEmpty()
         val next = com.hereliesaz.geministrator.queen.missingWhenQueenAway(known)
-        if (next.size == known.size) return@withLock
+        if (next.size == known.size) return@withLock true
         rememberMissing(id, next)
         publishCurrent()
+        true
     }
 
     /**
