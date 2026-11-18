@@ -1399,6 +1399,7 @@ private fun MainDestination(
                             onResumeRun = { onPauseRun(false) },
                             onEditWorkflow = { openHiveInWorkflows(null) },
                             onOpenCreature = onOpenCreature,
+                            onOpenCreatureWork = { id -> onOpenCreatureOn(id, CreatureTab.Work) },
                         )
                             }
                             // No second launcher under a live hive: a finished one offers "Feed it more"

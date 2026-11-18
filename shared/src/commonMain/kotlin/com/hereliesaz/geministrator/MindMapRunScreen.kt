@@ -131,7 +131,6 @@ import com.hereliesaz.geministrator.resources.feed_gate_repository
 import com.hereliesaz.geministrator.resources.feed_gate_use_free
 import com.hereliesaz.geministrator.resources.feed_gate_unsupported_repository
 import com.hereliesaz.geministrator.resources.first_hive_objective
-import com.hereliesaz.geministrator.resources.hive_what_it_made
 import com.hereliesaz.geministrator.resources.first_hive_hint
 import com.hereliesaz.geministrator.resources.first_hive_teach_seed
 import com.hereliesaz.geministrator.resources.first_hive_teach_me
@@ -190,8 +189,11 @@ internal fun MindMapRunScreen(
      * link opens the creature only when it is not already the selected one.
      */
     onOpenCreature: ((String) -> Unit)? = null,
+    /** Opens a creature on its Work tab, where its artifacts are: a "What it made" row is a link to it. */
+    onOpenCreatureWork: ((String) -> Unit)? = null,
 ) {
     val openCreature: (String) -> Unit = onOpenCreature ?: { id -> if (selectedTaskId != id) onTaskSelected(id) }
+    val openCreatureWork: (String) -> Unit = onOpenCreatureWork ?: openCreature
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
     // A long press on the swarm offers Delete hive for the hive on screen; a running one is refused
     // there, in a plain line, and nothing is deleted (HiveDeletion.kt).
@@ -957,32 +959,11 @@ internal fun MindMapRunScreen(
         )
         }
 
-        // What it made, on the hive itself: the finished work of the creatures nothing else feeds on,
-        // so the result is never three taps deep in a creature's panel. Selectable, to take it away.
-        if (run.status == WorkflowRunStatus.Completed) {
-            val tasks = liveWorkflow.definition.tasks
-            val finalTasks = tasks.filter { task -> tasks.none { task.id in it.dependsOn } }.map { it.id }.toSet()
-            val made = run.taskRuns.filterKeys { it in finalTasks }.values
-                .flatMap { it.artifacts }
-                .filter { !it.textContent.isNullOrBlank() }
-            if (made.isNotEmpty()) {
-                androidx.compose.foundation.text.selection.SelectionContainer {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        made.forEach { artifact ->
-                            AzphaltRecord(
-                                seed = "made-${artifact.id.value}",
-                                eyebrow = stringResource(Res.string.hive_what_it_made),
-                                title = artifact.label,
-                                richBody = markdownLite(
-                                    artifact.textContent.orEmpty().trim().let { text ->
-                                        if (text.length > MADE_PREVIEW_CHARS) text.take(MADE_PREVIEW_CHARS).trimEnd() + "…" else text
-                                    },
-                                ),
-                            )
-                        }
-                    }
-                }
-            }
+        // What it made, on the hive itself: every artifact of a finished run, grouped by creature, each row
+        // opening that creature's Work, with Show all, a filter, Copy and Open (ArtifactBrowse.kt). The
+        // result is never three taps deep in a creature's panel, and a failed or cancelled run keeps its work.
+        if (run.status.isFinished()) {
+            HiveMadeSection(definition = liveWorkflow.definition, run = run, onOpenWork = openCreatureWork)
         }
 
         if (compact && run.status.isFinished()) {
@@ -1224,7 +1205,6 @@ private fun TaskRunStatus.activityRank(): Int = when (this) {
 }
 
 /** How much of a finished result shows on the hive; the creature's Work holds all of it. */
-private const val MADE_PREVIEW_CHARS = 2_400
 
 /** A first hive's name, from the first words of what it was fed. */
 internal fun firstHiveName(objective: String, fallback: String = "First hive"): String =

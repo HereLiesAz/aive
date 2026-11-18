@@ -639,7 +639,8 @@ internal fun TechnicalInspector(
                         )
                     }
                 }
-                // Its artifacts: what it made, each opening on its contents (once the Artifacts place).
+                // Its artifacts: what it made, each opening on its contents, selectable, with its type, Copy, and Open
+                // for a web link (ArtifactActions). The hive's "What it made" lists them for the whole run.
                 LiveInspectorLine(stringResource(Res.string.inspector_artifacts), taskRun.artifacts.size.toString())
                 taskRun.artifacts.forEach { artifact ->
                     val open = openArtifact == artifact.id.value
@@ -656,10 +657,15 @@ internal fun TechnicalInspector(
                         well = if (open) {
                             {
                                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    artifact.uri?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface()) }
-                                    artifact.textContent?.takeIf(String::isNotBlank)?.let {
-                                        Text(it, style = AzphaltType.body, color = azphaltOnSurface())
+                                    SelectionContainer {
+                                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            artifact.uri?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface()) }
+                                            artifact.textContent?.takeIf(String::isNotBlank)?.let {
+                                                Text(it, style = AzphaltType.body, color = azphaltOnSurface())
+                                            }
+                                        }
                                     }
+                                    ArtifactActions(artifact, "artifact-${artifact.id.value}")
                                 }
                             }
                         } else null,
