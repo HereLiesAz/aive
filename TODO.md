@@ -169,10 +169,10 @@ A checked box means implemented and covered by automated tests. It does not mean
 
 ## P1 — Product shell
 
-- [x] Replace placeholder screens for Company, Artifacts, and Inbox with live runtime data; Workflows remains static templates.
+- [x] Replace placeholder screens for Company, Artifacts, and Inbox with live runtime data; Workflows remains static templates. (The Artifacts and Runs destinations were later retired into the hive and the creature panel; see the next lines.)
 - [x] Project chooser / recent projects.
-- [x] Run history and resumable active runs.
-- [x] Artifact browser with provenance (live artifacts from task runs, grouped by task).
+- [x] Run history and resumable active runs: the hive's run scars switch to a finished run, and its Timeline reads it. A cross-project "All runs" list on the hive's comb row is still to build.
+- [x] Artifacts with provenance, in surfaces that already exist (the Artifacts screen is gone): the hive's **What it made** lists every artifact of any finished run grouped by creature, with a filter, Show all, Copy and Open, each row opening that creature's Work; the Work tab's artifacts are selectable with Copy, type and Open; Messages artifact cards open the creature's Work (`ArtifactBrowse.kt`). Image preview for `image/*` is not built: no image loader is in the app, and no dependency was added.
 - [x] Inbox for approvals, failures, escalations, and requests for human attention.
 - [x] Settings shows connected providers; static fallback when none configured.
 - [x] Surface The Aive icon/brand consistently across Android, Desktop, and Web.

@@ -69,6 +69,7 @@ import com.hereliesaz.geministrator.resources.hall_monitor_hall_monitor_review
 import com.hereliesaz.geministrator.resources.hall_monitor_isolated_counterfactual
 import com.hereliesaz.geministrator.resources.hall_monitor_paused
 import com.hereliesaz.geministrator.resources.inbox_action_answer
+import com.hereliesaz.geministrator.resources.inbox_artifact_open_work
 import com.hereliesaz.geministrator.resources.inbox_artifact_waiting
 import com.hereliesaz.geministrator.resources.inbox_budget_where
 import com.hereliesaz.geministrator.resources.inbox_kind_budget
@@ -687,6 +688,11 @@ private fun WaitDetail(
                     Spacer(Modifier.height(5.dp))
                     Text(it, style = AzphaltType.body, color = azphaltMutedOnSurface())
                 }
+                // The card is a link: the whole artifact, its copy and its link, are on the creature's Work.
+                LinkText(
+                    stringResource(Res.string.inbox_artifact_open_work),
+                    onClick = { actions.openCreature(entry.taskId, CreatureTab.Work) },
+                )
             }
         }
     }

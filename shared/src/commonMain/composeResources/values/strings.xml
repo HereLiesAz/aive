@@ -321,6 +321,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inbox_artifact_waiting">Artifact waiting</string>
     <string name="inbox_action_answer">Answer it</string>
     <string name="inbox_open_creature">Open this creature</string>
+    <string name="inbox_artifact_open_work">See it in this creature's Work</string>
     <string name="inbox_question_where">Its agent asked you a question. Answer it on this creature’s Needs.</string>
     <string name="inbox_budget_where">Raise it on this creature’s role, in Breeds.</string>
 
@@ -1291,6 +1292,25 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="district_loading">Gathering the swarms…</string>
     <string name="district_load_failed">The swarms could not be read: %1$s</string>
     <string name="hive_what_it_made">What it made</string>
+    <plurals name="hive_made_count">
+        <item quantity="one">%1$d artifact from this run</item>
+        <item quantity="other">%1$d artifacts from this run</item>
+    </plurals>
+    <string name="hive_made_filter">Filter by creature, label, kind, link or type</string>
+    <string name="hive_made_none_match">Nothing it made matches "%1$s".</string>
+    <string name="hive_made_show_all">Show all</string>
+    <string name="hive_made_show_less">Show less</string>
+    <string name="artifact_media_type">Type · %1$s</string>
+    <string name="artifact_copy">Copy</string>
+    <string name="artifact_copy_link">Copy link</string>
+    <string name="artifact_copied">Copied.</string>
+    <string name="artifact_copy_failed">Could not copy.</string>
+    <string name="artifact_open">Open</string>
+    <string name="artifact_open_pull_request">Open pull request</string>
+    <string name="artifact_open_release">Open release</string>
+    <string name="artifact_open_media">Open media</string>
+    <string name="artifact_open_change">Open change</string>
+    <string name="artifact_open_failed">Could not open the link.</string>
     <string name="first_hive_options">More: name, repository</string>
     <string name="first_hive_teach_seed">Teach me how to use the Aive</string>
     <string name="first_hive_free_line">Free to start: a free source is picked for you. Free sources may log what you write. Prompts and repository text leave this device.</string>

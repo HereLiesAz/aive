@@ -384,6 +384,29 @@
    "source_resolved": true
   },
   {
+   "id": "hive.made",
+   "kind": "panel",
+   "area": "Hive",
+   "label": "What it made (every artifact of a finished run: filter, Show all, Copy, Open)",
+   "source": "ArtifactBrowse.kt:HiveMadeSection",
+   "reachable_via": "in a finished hive, under its status",
+   "files": [
+    "ArtifactBrowse.kt",
+    "MindMapRunScreen.kt"
+   ],
+   "symbols": [
+    "HiveMadeSection",
+    "artifactEntries",
+    "matching",
+    "groupedByCreature"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.live",
+   "source_resolved": true
+  },
+  {
    "id": "hive.launchbar",
    "kind": "panel",
    "area": "Hive",
@@ -724,6 +747,27 @@
    "canonical_for": [],
    "inplace_editor": false,
    "back_to": "creature.panel"
+  },
+  {
+   "id": "creature.artifact",
+   "kind": "panel",
+   "area": "Creature",
+   "label": "Creature > Work > artifact (selectable text, type, Copy, Copy link, Open)",
+   "source": "ArtifactBrowse.kt:ArtifactActions",
+   "reachable_via": "tap an artifact in the Work tab, or a What it made row's actions",
+   "files": [
+    "ArtifactBrowse.kt",
+    "LiveTechnicalInspector.kt"
+   ],
+   "symbols": [
+    "ArtifactActions",
+    "artifactWebUri"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "creature.work",
+   "source_resolved": true
   },
   {
    "id": "creature.mind",
@@ -4913,6 +4957,66 @@
    "kind": "back",
    "status": "present",
    "auto": true
+  },
+  {
+   "from": "hive.live",
+   "to": "hive.made",
+   "trigger": "finished run: What it made",
+   "callback": "HiveMadeSection",
+   "source": "MindMapRunScreen.kt",
+   "kind": "system",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "hive.made",
+   "to": "creature.work",
+   "trigger": "tap an artifact row (its creature)",
+   "callback": "onOpenCreatureWork -> Task(taskId, Work)",
+   "source": "ArtifactBrowse.kt:HiveMadeSection",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.made",
+   "to": "hive.live",
+   "trigger": "Back",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "creature.work",
+   "to": "creature.artifact",
+   "trigger": "tap an artifact",
+   "callback": "ArtifactActions",
+   "source": "LiveTechnicalInspector.kt",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "creature.artifact",
+   "to": "creature.work",
+   "trigger": "Back",
+   "callback": "PlatformBackHandler",
+   "source": "App.kt:519",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "inbox.detail",
+   "to": "creature.work",
+   "trigger": "artifact card: See it in this creature's Work",
+   "callback": "Task(taskId, Work)",
+   "source": "LiveInboxScreen.kt:WaitDetail",
+   "kind": "link",
+   "status": "present",
+   "auto": false
   }
  ],
  "flows": [
