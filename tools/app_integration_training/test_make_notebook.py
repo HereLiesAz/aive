@@ -207,6 +207,12 @@ class MakeNotebookTest(unittest.TestCase):
         self.assertIn("store=store", text)
         self.assertEqual(2, text.count("AnswerStore(WORK /"))
 
+    def test_resume_survives_a_missing_scaler_and_a_missing_gpu_stops_early(self):
+        text = "\n".join(code_cells(json.loads(NOTEBOOK.read_text())))
+        self.assertIn('scaler.pt', text)
+        self.assertIn('trainer.accelerator, "scaler", None) is None', text)
+        self.assertIn("No GPU. Runtime > Change runtime type > GPU", text)
+
     def test_the_answer_store_resumes_and_never_trusts_a_half_written_file(self):
         import hashlib
         import tempfile
