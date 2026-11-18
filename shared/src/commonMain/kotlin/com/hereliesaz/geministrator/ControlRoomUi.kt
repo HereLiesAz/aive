@@ -283,6 +283,21 @@ fun ControlRoom(
 ) {
     val ground = Azphalt.currentGround
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
+    // The tour waits on what the swarm does as well as on taps: each publish of the live run is read against the last one
+    // (tour/RunSignals.kt) and what changed is handed to the layer, only while a tour is showing.
+    val seenByTour = remember { RunSeenByTour() }
+    LaunchedEffect(liveWorkflow?.run, liveWorkflow?.queen?.size) {
+        val live = liveWorkflow ?: return@LaunchedEffect
+        val tour = com.hereliesaz.geministrator.tour.TourController
+        val before = seenByTour.run?.takeIf { it.id == live.run.id }
+        val queenBefore = if (before != null) seenByTour.queenLines else 0
+        val queenNow = live.queen.size
+        seenByTour.run = live.run
+        seenByTour.queenLines = queenNow
+        if (tour.state == null) return@LaunchedEffect
+        com.hereliesaz.geministrator.tour.runSignals(live.definition, before, live.run, queenBefore, queenNow)
+            .forEach { tour.dispatch(com.hereliesaz.geministrator.tour.TourAction.Observed(com.hereliesaz.geministrator.tour.TourEvent.Run(it))) }
+    }
     // Semantic zoom (docs/Swarm-OS.md): the district is all the way out; a neighbourhood is one workflow.
     // Held here so the breadcrumb, Back and the hive agree on where the keeper is.
     val district = rememberDurableBooleanState("overview.zoom.district")
@@ -1610,3 +1625,9 @@ private fun swarmRoles(state: ApplicationRuntimeState): List<RoleDefinition> = w
  */
 internal fun restingHiveAfterLoad(restingId: String, definitions: List<WorkflowDefinition>?): String =
     if (restingId.isBlank() || definitions == null || definitions.any { it.id.value == restingId }) restingId else ""
+
+/** The last publish of the live run the tour read, so the next one can be read against it. Lives with the shell, not the run. */
+internal class RunSeenByTour {
+    var run: com.hereliesaz.geministrator.domain.WorkflowRun? = null
+    var queenLines: Int = 0
+}
