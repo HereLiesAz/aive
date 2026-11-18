@@ -246,6 +246,13 @@ def work_root():
 
 ROOT = work_root()
 WORK = ROOT / ("aive-app-integration-smoke" if SMOKE else "aive-app-integration")
+# A folder `adopt-adapter/` in the work folder (adapter_model.safetensors, adapter_config.json, adopt.json) makes this run use that
+# trained adapter instead of training: the corpus is pinned to the commit in adopt.json (the one it was trained and judged on), so
+# its saved gate answers apply and nothing is retrained.
+ADOPT = WORK / "adopt-adapter"
+if (ADOPT / "adopt.json").is_file() and (ADOPT / "adapter_model.safetensors").is_file():
+    SOURCE_REF = json.loads((ADOPT / "adopt.json").read_text())["corpusCommit"]
+    print(f"adopting the adapter in {ADOPT.name}: corpus pinned to {SOURCE_REF[:10]}")
 # Shared by SMOKE and full runs, so Gradle, the JDK and the clone are downloaded once. On Colab it lives on the
 # runtime's local disk: Gradle writes thousands of small files, which is very slow on a mounted Google Drive.
 # After a Colab disconnect it is rebuilt (minutes); state.json and results.json stay on Drive and resume the run.
@@ -877,6 +884,17 @@ class SelectByScore(TrainerCallback):
 
 def train():
     out, best_dir, checkpoints = WORK / "adapter", WORK / "best", WORK / "checkpoints"
+    if (ADOPT / "adopt.json").is_file() and (ADOPT / "adapter_model.safetensors").is_file():
+        adopted = sha256(ADOPT / "adapter_model.safetensors")
+        if state.get("train", {}).get("adopted") != adopted or not (out / "adapter_model.safetensors").is_file():
+            shutil.rmtree(out, ignore_errors=True)
+            out.mkdir(parents=True)
+            for name in ("adapter_model.safetensors", "adapter_config.json"):
+                shutil.copy2(ADOPT / name, out / name)
+            state["train"] = {"history": [], "best": None, "bestEpoch": None, "stale": 0, "done": True, "adopted": adopted}
+            save_state()
+        print("using the adopted adapter", adopted[:12], "- no training")
+        return out
     if state.get("train", {}).get("done") and (out / "adapter_model.safetensors").is_file():
         print("training already done:", state["train"]["bestEpoch"], state["train"]["best"])
         return out
