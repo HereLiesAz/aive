@@ -278,8 +278,9 @@ random.seed(SEED); np.random.seed(SEED); torch.manual_seed(SEED); torch.cuda.man
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 if DEVICE != "cuda":
-    print("WARNING: no GPU. Turn on a GPU accelerator; training on CPU will not finish." if not SMOKE
-          else "no GPU: SMOKE continues on CPU, slowly")
+    if not SMOKE:
+        raise SystemExit("No GPU. Runtime > Change runtime type > GPU, then Run all; saved progress resumes.")
+    print("no GPU: SMOKE continues on CPU, slowly")
 else:
     print("GPU:", torch.cuda.get_device_name(0), f"{torch.cuda.get_device_properties(0).total_memory / 2**30:.1f} GiB")
 RESULTS.update({"smoke": SMOKE, "baseModel": BASE_MODEL, "releaseTag": RELEASE_TAG})
@@ -874,6 +875,13 @@ def train():
     last = get_last_checkpoint(str(checkpoints)) if checkpoints.is_dir() else None
     if last:
         print("resuming from", last)
+        # A checkpoint saved under fp16 carries scaler.pt; if this run has no gradient scaler
+        # (CPU runtime, or an accelerate build that creates none), loading it raises.
+        # Dropping the file only resets the loss scale; weights, optimizer and scheduler resume.
+        scaler_file = Path(last) / "scaler.pt"
+        if scaler_file.is_file() and getattr(trainer.accelerator, "scaler", None) is None:
+            scaler_file.rename(scaler_file.with_suffix(".pt.unused"))
+            print("no gradient scaler in this run: resuming without the saved loss scale")
     trainer.train(resume_from_checkpoint=last)
     if select.record["best"] is None or not (best_dir / "adapter_model.safetensors").is_file():
         raise RuntimeError("Session deadline reached before the first epoch finished: nothing saved; run again")
