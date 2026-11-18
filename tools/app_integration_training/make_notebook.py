@@ -1376,6 +1376,24 @@ if EXPORT_LITERTLM and not (LITERT.get("modelPath") and Path(LITERT["modelPath"]
             save_results()
             raise RuntimeError(LITERT["reason"] + ". Set EXPORT_LITERTLM = False to release the ONNX adapter alone.")
     cli = [str(venv / "bin" / LITERT_CLI[0]), *LITERT_CLI[1:]]
+
+    def cli_works():
+        done = subprocess.run([*cli, "--help"], capture_output=True, text=True)
+        return done.returncode == 0, (done.stdout + done.stderr)
+
+    # litert-torch imports tensorflow for a flatbuffer schema but does not install it: a CLI that crashes on import is a missing
+    # dependency, not a flag that is absent. Add it (CPU build) before judging the flags.
+    works, probe = cli_works()
+    if not works and "tensorflow" in probe:
+        for package in ("tensorflow-cpu", "tensorflow"):
+            run([str(venv / "bin" / "python"), "-m", "pip", "install", "-q", package], root / f"pip-{package}.log")
+            works, probe = cli_works()
+            if works:
+                break
+    if not works:
+        LITERT.update({"ran": False, "reason": "the litert-torch command does not start: " + probe.strip()[-600:]})
+        save_results()
+        raise RuntimeError(LITERT["reason"] + ". Set EXPORT_LITERTLM = False to release the ONNX adapter alone.")
     flags = [("--model", str(merged)), ("--output_dir", str(converted)), ("--quantization_recipe", LITERT_QUANTIZATION_RECIPE),
              ("--cache_length", str(KV_CACHE_TOKENS)), ("--prefill_lengths", LITERT_PREFILL_LENGTHS), LITERT_BUNDLE_FLAG]
     _, help_text = run([*cli, "--help"], root / "export-help.log")
