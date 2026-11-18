@@ -108,3 +108,7 @@ Today: a hint layer rings static controls while the hive fed the same goal is an
 - [ ] 5. Immersion: full-screen spotlight, a named creature's voice per chapter, chapter strip with skip, replay and resume; the last chapter hands the keeper the hive and its output (the finished tour).
 - [ ] 6. Waiting is never empty: the swarm's own work is the thing on screen while the next chapter is written; no Source says so with a link.
 - [ ] 7. Tests: pure reducers (event expectations, chapter queue), director against a fake run; nav map and docs updated.
+
+Decisions (keeper, 2026-11-18): a fixed opening begins at once while the swarm writes the rest, and the swarm continues the tour on its own. "Fully immersive, not simple written text": a chapter is something the keeper sees and does in the real app (creature cards moving, hand-offs lighting up, a real decision to make, a real artifact to open), with the narration beside it, never a card of text.
+- Opening (fixed, instant): the tour hive hatches on screen with the keeper watching; the opening chapters are the real hatching, first hand-off and first message, spotlit.
+- Continuation (swarm-made): the Planner and Writer extend the chapter list from what the run has shown so far, paced by the Source.
