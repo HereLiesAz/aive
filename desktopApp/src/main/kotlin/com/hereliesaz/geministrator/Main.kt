@@ -164,7 +164,7 @@ fun main() {
     // Small text tasks on the memory clerks' installed instruct model, when the keeper turns it on.
     val liteRtLmInstaller = DesktopLiteRtLmModelInstaller(httpClient, com.hereliesaz.geministrator.inference.LiteRtLmModelCatalog.qwen25Instruct05b)
     val onDeviceResourceProbe = DesktopOnDeviceResourceProbe()
-    // The merged app-integration model, only once one is pinned (null now); it is preferred when installed.
+    // The merged app-integration model, pinned from the app-integration-v1 release; it is preferred when installed.
     val liteRtLmAdapterInstaller = com.hereliesaz.geministrator.inference.LiteRtLmModelCatalog.adapterModel
         ?.let { DesktopLiteRtLmModelInstaller(httpClient, it) }
     val liteRtLmGenerator = com.hereliesaz.geministrator.providers.LiteRtLmTextGenerator(

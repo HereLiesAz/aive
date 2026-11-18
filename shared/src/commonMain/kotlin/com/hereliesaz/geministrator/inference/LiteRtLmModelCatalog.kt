@@ -47,12 +47,24 @@ object LiteRtLmModelCatalog {
 
     /**
      * The merged full model the app-integration notebook's LiteRT-LM export produces (the adapter folded into
-     * Qwen2.5-0.5B-Instruct), pinned by hand after a device trial: copy its file name, URL, size and SHA-256
-     * from the release's `results.json`. LiteRT-LM has no adapter-as-input path, so this is a second model
-     * file, not an adapter. Null until pinned; nothing is guessed. When it is pinned and installed the runtime
+     * Qwen2.5-0.5B-Instruct), pinned from the `app-integration-v1` release (file name, URL, size and SHA-256 are the release asset's own; the
+     * notebook's smoke test on 50 test rows matched Gate 1 exactly, but no device trial has been run). LiteRT-LM has no adapter-as-input path, so this is a second model
+     * file, not an adapter. Nothing is guessed: change these values only from a release. When it is pinned and installed the runtime
      * runs it instead of [qwen25Instruct05b] ([LiteRtLmModelSelection]); otherwise the stock model runs.
      */
-    val adapterModel: LiteRtLmModelArtifact? = null
+    val adapterModel: LiteRtLmModelArtifact? = LiteRtLmModelArtifact(
+        id = "litertlm:qwen2.5-0.5b-instruct:app-integration:q8",
+        displayName = "Qwen2.5-0.5B-Instruct, app-integration (LiteRT-LM)",
+        foundationModelId = "Qwen/Qwen2.5-0.5B-Instruct",
+        fileName = "Qwen2.5-0.5B-Instruct-aive-app-integration_multi-prefill-seq_q8_ekv1280-v1.litertlm",
+        downloadUrl = "https://github.com/HereLiesAz/aive/releases/download/app-integration-v1/" +
+            "Qwen2.5-0.5B-Instruct-aive-app-integration_multi-prefill-seq_q8_ekv1280-v1.litertlm",
+        sizeBytes = 528_255_232L,
+        sha256 = "6f2ccf749a8ebab4a08a0d17396fe0df0bce9936da37b9f36c88fba159e0dab3",
+        format = "litertlm",
+        precision = "int8",
+        license = "Apache-2.0",
+    )
 
     val all: List<LiteRtLmModelArtifact> = listOfNotNull(qwen25Instruct05b, adapterModel)
 

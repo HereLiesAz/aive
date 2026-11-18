@@ -564,7 +564,7 @@ private class AndroidMemoryLocalModels(
     /** Called after the LiteRT-LM model is installed or removed, so a loaded engine is dropped. */
     private val onLiteRtLmChanged: suspend () -> Unit,
     scope: CoroutineScope,
-    /** The merged app-integration model, once one is pinned in [LiteRtLmModelCatalog.adapterModel]; null now. */
+    /** The merged app-integration model, pinned in [LiteRtLmModelCatalog.adapterModel] from the app-integration-v1 release. */
     private val adapterInstaller: AndroidLiteRtLmModelInstaller? = null,
 ) : MemoryLocalModelManager {
     private val mutableModels = MutableStateFlow(emptyList<MemoryLocalModelStatus>())
@@ -667,7 +667,7 @@ internal class AndroidMemoryLayerRuntime(
     /** Small text tasks on the memory clerks' installed instruct model (see AndroidOnDeviceTextGenerator). */
     private val liteRtInstaller = AndroidLiteRtLmModelInstaller(context, httpClient, LiteRtLmModelCatalog.qwen25Instruct05b)
     private val resourceProbe = AndroidOnDeviceResourceProbe(context)
-    /** The merged app-integration model, only once one is pinned (null now); it is preferred when installed. */
+    /** The merged app-integration model, pinned from the app-integration-v1 release; it is preferred when installed. */
     private val liteRtAdapterInstaller = LiteRtLmModelCatalog.adapterModel?.let { AndroidLiteRtLmModelInstaller(context, httpClient, it) }
     private val liteRtGenerator = LiteRtLmTextGenerator(
         modelPath = {
