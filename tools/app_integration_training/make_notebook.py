@@ -178,8 +178,8 @@ LEARNING_RATE = 2e-4
 BATCH_SIZE, GRAD_ACCUM = 2, 8
 SAVE_STEPS = 50                      # a training checkpoint (on Drive) every this many optimiser steps, about 3 minutes on a T4
 GATE_BATCH = 8                       # rows generated together in the GPU gates (length-sorted, left-padded)
-SELECT_ROWS_PER_FAMILY = 12          # validation rows per family that judge each epoch
-SELECT_PATIENCE = 2                  # epochs without a better validation score before training stops
+SELECT_ROWS_PER_FAMILY = 24          # validation rows per family that judge each epoch
+SELECT_PATIENCE = 4                  # epochs without a better validation score before training stops
 TIME_BUDGET_HOURS = 11.0             # Kaggle ends a session at 12 h; training stops at the deadline and resumes
 SESSION_STARTED = time.time()
 
@@ -474,6 +474,15 @@ def remote_commit():
         return None
     return listed[0] if listed and re.fullmatch(r"[0-9a-f]{40}", listed[0]) else None
 
+def forget_training():
+    """A new corpus makes every earlier result about an older one: drop its adapter, checkpoints and gate verdicts."""
+    for key in ("train", "gate1", "gate2"):
+        state.pop(key, None)
+    for name in ("adapter", "best", "checkpoints"):
+        shutil.rmtree(WORK / name, ignore_errors=True)
+    save_state()
+    print("the corpus changed since the last run: earlier training and gate results are discarded")
+
 def build_corpus():
     """The corpus directory for this run, built from SOURCE_REF (or reused from an identical earlier build)."""
     out = WORK / "corpus-build" / "aive-app-integration-corpus"
@@ -494,6 +503,8 @@ def build_corpus():
     if (out / "manifest.json").is_file() and previous.get("commit") == commit and previous.get("rows") == CORPUS_ROWS:
         print("corpus already built from this commit and row count; reusing it")
     else:
+        if previous and (previous.get("commit") != commit or previous.get("rows") != CORPUS_ROWS):
+            forget_training()
         shutil.rmtree(out.parent, ignore_errors=True)
         out.mkdir(parents=True)
         run_gradle(checkout, env, out, WORK / "gradle.log")
@@ -836,7 +847,7 @@ class SelectByScore(TrainerCallback):
         self.record["history"].append({"epoch": epoch, "worstFamily": worst, "mean": mean})
         print(f"epoch {epoch}: worst-family validation score {worst:.3f}, mean {mean:.3f}")
         best = self.record["best"]
-        if best is None or (worst, mean) > (best["worst"], best["mean"]):
+        if best is None or (worst, mean) >= (best["worst"], best["mean"]):  # a tie goes to the later epoch: the lower learning rate
             self.record["best"], self.record["bestEpoch"], self.record["stale"] = {"worst": worst, "mean": mean}, epoch, 0
             self.model.save_pretrained(self.best_dir)
         else:
@@ -941,7 +952,9 @@ def gate1():
 if "gate1" not in state:
     gate1_answers = gate1()
     RESULTS["gate1"] = evaluate("Gate 1 (adapter, PyTorch)", gate1_answers, ALL)
-    state["gate1"] = {"ok": RESULTS["gate1"]["ok"]}; save_state(); save_results()
+    save_results()
+    if RESULTS["gate1"]["ok"]:  # a failed gate is judged again on the next run, so a fix to the notebook is not masked
+        state["gate1"] = {"ok": True}; save_state()
 else:
     stored = json.loads((WORK / "gate1-predictions.json").read_text())
     gate1_answers = {s: [stored[s][r["id"]] for r in ALL[s]] for s in stored}
