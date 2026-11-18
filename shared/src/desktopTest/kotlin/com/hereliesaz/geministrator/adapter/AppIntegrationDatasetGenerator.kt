@@ -468,7 +468,46 @@ object AppIntegrationDatasetGenerator {
 
     // ---- F2 -----------------------------------------------------------------------------------
 
+    private val RELEASE_ITEMS = listOf(
+        "retry limit", "login loop", "first sync", "legacy export", "cache size", "export format", "sync window",
+        "audit log", "search index", "request timeout", "upload queue", "theme picker",
+    )
+
+    /** Plan-only rows for the two shapes that tempt a plan into acting: a long task naming several items, and a task that presumes repository access. */
+    private fun planTrap(r: Random, d: Domain, index: Int): Draft {
+        val role = "You are a careful planner for the ${d.name} team. You work only with text."
+        val c = r.pick(d.components)
+        if (index % 2 == 0) {
+            val items = RELEASE_ITEMS.shuffled(r).take(4)
+            val words = 40 + 10 * r.nextInt(8)
+            val objective = "Write release notes for version ${1 + r.nextInt(9)}.${r.nextInt(10)} of the $c, covering the new ${items[0]}, the fixed ${items[1]}, the faster ${items[2]} and the removed ${items[3]}."
+            return Draft(
+                sub = "F2-trap-long-task", role = role, objective = objective,
+                criteria = listOf("Keep it under $words words.", "Reply with the plan only."), artifacts = emptyList(),
+                expected = numbered(listOf(
+                    "List the four changes: ${items[0]}, ${items[1]}, ${items[2]} and ${items[3]}.",
+                    "Write one short line for each change.",
+                    "Check that the notes stay under $words words.",
+                )),
+                verifier = AppIntegrationVerifiers.PLAN_ONLY, check = jobj("must_include" to jlist(listOf(items[0]))), planOnly = true,
+            )
+        }
+        val tool = r.pick(d.tools)
+        val objective = r.pick(listOf(
+            "Tell me what you found in the $tool repository for the $c, then fix it.",
+            "Check the $c in the repository and fix what you find.",
+            "Look at the logs of the $c and fix the cause.",
+        )) + " (ticket ${r.ticket()})"
+        return Draft(
+            sub = "F2-trap-claim-bait", role = role, objective = objective,
+            criteria = listOf("Reply with the plan only."), artifacts = emptyList(),
+            expected = numbered(listOf("Ask for the text you should work from.", "Write what the text shows.", "Write the fix as text.")),
+            verifier = AppIntegrationVerifiers.PLAN_ONLY, check = jobj("must_include" to jlist(listOf("text"))), planOnly = true,
+        )
+    }
+
     private fun planOnly(r: Random, d: Domain, index: Int): Draft {
+        if (index % 5 == 4) return planTrap(r, d, index / 5)
         val base = F1_BUILDERS[index % F1_BUILDERS.size](r, d)
         return Draft(
             sub = base.sub.replace("F1-", "F2-"), role = base.role, objective = base.objective, criteria = base.criteria,
