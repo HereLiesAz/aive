@@ -1397,6 +1397,14 @@ if EXPORT_LITERTLM and not (LITERT.get("modelPath") and Path(LITERT["modelPath"]
         LITERT.update({"ran": False, "reason": "the litert-torch command does not start: " + probe.strip()[-600:]})
         save_results()
         raise RuntimeError(LITERT["reason"] + ". Set EXPORT_LITERTLM = False to release the ONNX adapter alone.")
+    # litert-torch 0.10.0 asks for litert-lm-builder>=0.18.0 and so gets the newest, which dropped `TfLiteModelType` that
+    # litert-torch's packaging step uses (0.18.x has it). Pin the builder to the series it was written against.
+    python_in_venv = str(venv / "bin" / "python")
+    builder_ok = subprocess.run(
+        [python_in_venv, "-c", "from litert_lm_builder import litertlm_builder as b; b.TfLiteModelType.PREFILL_DECODE"],
+        capture_output=True, text=True).returncode == 0
+    if not builder_ok:
+        run([python_in_venv, "-m", "pip", "install", "-q", "litert-lm-builder>=0.18,<0.19"], root / "pip-litert-lm-builder.log")
     flags = [("--model", str(merged)), ("--output_dir", str(converted)), ("--quantization_recipe", LITERT_QUANTIZATION_RECIPE),
              ("--cache_length", str(KV_CACHE_TOKENS)), ("--prefill_lengths", LITERT_PREFILL_LENGTHS), LITERT_BUNDLE_FLAG]
     # The command is a Python Fire wrapper around one function, so its parameter names are the flags: read them, rather than
