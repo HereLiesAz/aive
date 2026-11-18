@@ -4,6 +4,7 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.60 — from 2026-10-27
 
+- **The desktop test source compiles again.** `DesktopOrchestrationSpecialistInstallerTest` used `assertEquals` without importing it, so every CI run on `main` since the app-integration adapter work stopped at "Test desktop app" and never built Android, Wasm or a release.
 - **The LiteRT-LM export no longer reuses a merged model built from a different adapter.** The merged model is stamped with the adapter it came from; after retraining, a mismatch discards it and its conversion instead of exporting the old adapter's weights.
 - **The notebook keeps its training when `main` moves.** A rerun after merging #850 and #851 deleted a finished adapter and both passed gates, because the notebook treated any new commit as a new corpus. It now rebuilds the corpus and compares the content of its split files; training and gate results are discarded only when that content differs.
 - **The notebook publishes a passing adapter on its own.** Everything already saved to Drive as it ran; when the gates pass and a GitHub key is in the Colab or Kaggle secrets, the adapter and the LiteRT-LM model now also go to the `app-integration-v1` pre-release without setting `UPLOAD`, so the result is never held only by a session.
