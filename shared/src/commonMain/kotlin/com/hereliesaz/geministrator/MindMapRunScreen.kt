@@ -706,8 +706,9 @@ internal fun MindMapRunScreen(
                         modifier = Modifier.fillMaxWidth().then(field.modifier).tourTarget(TourTargetId.GOAL_FIELD),
                     )
                 }
-                if (firstLaunch) {
-                    // Replays the lesson without retyping it: the goal is filled in, and Feed it still goes through the gate.
+                if (firstLaunch && objective.trim() != teachSeedText) {
+                    // Brings the lesson goal back without retyping it: the goal is filled in, and Feed it still goes through the gate.
+                    // Hidden while the field already holds it (the first launch seeds it), where it would only repeat Feed it.
                     AzphaltPill(
                         label = stringResource(Res.string.first_hive_teach_me),
                         seed = "first-hive-teach-me",

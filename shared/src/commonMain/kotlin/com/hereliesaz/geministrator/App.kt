@@ -505,6 +505,10 @@ fun App(
             scope.launch { if (runtime?.noteQueenAway() != true) QueenAwayNotice.shown = true }
             return
         }
+        // One tour at a time: a second goal would stop the first one's layer out from under it.
+        if (TutorialRunGuard.running) return
+        TutorialRunGuard.running = true
+        com.hereliesaz.geministrator.tour.TourController.preparation = com.hereliesaz.geministrator.tour.TourPreparation.Preparing
         scope.launch {
             // The run the tutorial started on, taken before anything else can replace the current one.
             val tutorialRunId = runtime?.currentRunId()
@@ -513,6 +517,7 @@ fun App(
                 val base = modelFor(com.hereliesaz.geministrator.queen.orchestratorPin(roles))
                 if (base == null) {
                     appLog("AiveTutorial", "No usable Source for the queen: the tutorial layer is not started")
+                    com.hereliesaz.geministrator.tour.TourController.preparation = com.hereliesaz.geministrator.tour.TourPreparation.None
                     // The keeper is told once in Messages, with a link to Connections.
                     if (runtime?.noteQueenAway() != true) QueenAwayNotice.shown = true
                     return@launch
@@ -533,10 +538,18 @@ fun App(
                     say = { line -> scope.launch { active?.noteTutorial(line, tutorialRunId) } },
                 )
                 appLog("AiveTutorial", "Tutorial ended: $outcome")
+                // Never shown a lesson: say so, rather than leaving the keeper waiting on a layer that will not come.
+                val shown = (outcome as? com.hereliesaz.geministrator.intro.TutorialOutcome.Ended)?.written ?: 0
+                com.hereliesaz.geministrator.tour.TourController.preparation =
+                    if (shown > 0) com.hereliesaz.geministrator.tour.TourPreparation.None else com.hereliesaz.geministrator.tour.TourPreparation.Failed
             } catch (failure: CancellationException) {
+                com.hereliesaz.geministrator.tour.TourController.preparation = com.hereliesaz.geministrator.tour.TourPreparation.None
                 throw failure
             } catch (failure: Exception) {
                 appLog("AiveTutorial", "Tutorial failed: ${failure::class.simpleName}")
+                com.hereliesaz.geministrator.tour.TourController.preparation = com.hereliesaz.geministrator.tour.TourPreparation.Failed
+            } finally {
+                TutorialRunGuard.running = false
             }
         }
     }

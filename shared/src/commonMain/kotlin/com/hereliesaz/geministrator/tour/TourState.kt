@@ -5,6 +5,9 @@ enum class StepOutcome { Met, Skipped, Next, Missed }
 
 enum class TourPhase { Showing, Paused, Dismissed }
 
+/** Before the first lesson exists: the tour is being written, or could not be. Said in a plain line so waiting is never silent. */
+enum class TourPreparation { None, Preparing, Failed }
+
 /** Everything the keeper can do to the layer, plus what the real screen reports. */
 sealed interface TourAction {
     data class Observed(val event: TourEvent) : TourAction
