@@ -179,6 +179,8 @@ BATCH_SIZE, GRAD_ACCUM = 2, 8
 SAVE_STEPS = 50                      # a training checkpoint (on Drive) every this many optimiser steps, about 3 minutes on a T4
 GATE_BATCH = 8                       # rows generated together in the GPU gates (length-sorted, left-padded)
 SELECT_ROWS_PER_FAMILY = 24          # validation rows per family that judge each epoch
+REPAIR_ROUNDS = 2                    # when a gate fails, retrain only what failed, this many times, before giving up
+REPAIR_LEARNING_RATE = 5e-5          # a repair continues from the trained adapter, so it moves gently
 SELECT_PATIENCE = 4                  # epochs without a better validation score before training stops
 TIME_BUDGET_HOURS = 11.0             # Kaggle ends a session at 12 h; training stops at the deadline and resumes
 SESSION_STARTED = time.time()
@@ -756,6 +758,7 @@ ENCODED = {}
 for split in ("train",):
     encoded = [(r, encode_row(r)) for r in ALL[split]]
     ENCODED[split] = [e for _, e in encoded if e]
+    ENCODED_FAMILY = [r["family"] for r, e in encoded if e]   # parallel to ENCODED["train"], kept out of the rows the collator sees
     skipped = [r["id"] for r, e in encoded if not e]
     RESULTS["skippedTooLong"] = {"count": len(skipped), "ids": skipped[:50]}
     print(f"{split}: {len(ENCODED[split])} rows encoded, {len(skipped)} longer than {MAX_LENGTH} tokens skipped")
@@ -944,6 +947,46 @@ def train():
     if DEVICE == "cuda": torch.cuda.empty_cache()
     return out
 
+def failing_families(gate_failures):
+    """The families a gate failure names ("F2 on adversarial >= 0.75" -> F2); a failure that names none repairs every family."""
+    found = sorted({m.group(1) for text in gate_failures for m in [re.match(r"\s*(F\d+)", text)] if m})
+    return found or sorted(set(ENCODED_FAMILY))
+
+def repair(families, round_no):
+    """Continue training the adapter on the families that failed (all of their training rows) plus a quarter as many rows from the
+    others, so they are not forgotten: one gentle epoch, not a new training run. The adapter before the repair is kept."""
+    out = Path(ADAPTER_DIR)
+    shutil.rmtree(out.parent / f"adapter-before-repair-{round_no}", ignore_errors=True)
+    shutil.copytree(out, out.parent / f"adapter-before-repair-{round_no}")
+    model = AutoModelForCausalLM.from_pretrained(BASE_MODEL, torch_dtype=torch.float32).to(DEVICE)
+    model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+    model.enable_input_require_grads()
+    model = PeftModel.from_pretrained(model, out, is_trainable=True)
+    rng = random.Random(f"repair:{round_no}")
+    target = [row for row, fam in zip(ENCODED["train"], ENCODED_FAMILY) if fam in families]
+    others = [row for row, fam in zip(ENCODED["train"], ENCODED_FAMILY) if fam not in families]
+    rows = target + rng.sample(others, min(len(others), len(target) // 4))
+    rng.shuffle(rows)
+    print(f"repair round {round_no}: {len(target)} rows of {families} and {len(rows) - len(target)} replayed rows, one epoch")
+    trainer = Trainer(
+        model=model,
+        args=TrainingArguments(
+            output_dir=str(WORK / "repair-checkpoints"), per_device_train_batch_size=BATCH_SIZE, gradient_accumulation_steps=GRAD_ACCUM,
+            num_train_epochs=1, learning_rate=REPAIR_LEARNING_RATE, lr_scheduler_type="cosine", warmup_ratio=0.05,
+            fp16=DEVICE == "cuda", logging_steps=25, eval_strategy="no", save_strategy="no", report_to=[],
+            seed=SEED + round_no, data_seed=SEED + round_no,
+        ),
+        train_dataset=rows,
+        data_collator=DataCollatorForSeq2Seq(TOKENIZER, padding=True, label_pad_token_id=-100),
+    )
+    trainer.train()
+    model.save_pretrained(out)
+    TOKENIZER.save_pretrained(out)
+    state.setdefault("train", {}).setdefault("repairs", []).append({"round": round_no, "families": families, "rows": len(rows)})
+    save_state()
+    del trainer, model; gc.collect()
+    if DEVICE == "cuda": torch.cuda.empty_cache()
+
 ADAPTER_DIR = train()
 RESULTS["training"] = state["train"]; save_results()
 ''')
@@ -988,6 +1031,16 @@ def gate1():
 if "gate1" not in state:
     gate1_answers = gate1()
     RESULTS["gate1"] = evaluate("Gate 1 (adapter, PyTorch)", gate1_answers, ALL)
+    # A failed gate reworks only what failed: continue training on the failing families, then judge again.
+    for round_no in range(1, REPAIR_ROUNDS + 1):
+        if RESULTS["gate1"]["ok"] or SMOKE:
+            break
+        families = failing_families(RESULTS["gate1"]["gateFailures"])
+        print(f"\nGate 1 failed on {families}: repairing those, not retraining everything (round {round_no} of {REPAIR_ROUNDS})")
+        repair(families, round_no)
+        gate1_answers = gate1()
+        RESULTS["gate1"] = evaluate(f"Gate 1 after repair round {round_no}", gate1_answers, ALL)
+        RESULTS["gate1"]["repairRounds"] = round_no
     save_results()
     if RESULTS["gate1"]["ok"]:  # a failed gate is judged again on the next run, so a fix to the notebook is not masked
         state["gate1"] = {"ok": True}; save_state()
