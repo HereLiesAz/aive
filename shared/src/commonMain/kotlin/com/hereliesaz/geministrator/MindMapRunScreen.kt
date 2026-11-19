@@ -1107,7 +1107,7 @@ internal fun MindMapRunScreen(
 }
 
 /** Everything on the wide hive page that is not tissue: title, controls bar, feed bar, padding. */
-private val WIDE_HIVE_CHROME = 300.dp
+private val WIDE_HIVE_CHROME = 230.dp
 
 /** The wide tissue never shrinks below this, however short the window. */
 private val WIDE_TISSUE_MIN = 460.dp

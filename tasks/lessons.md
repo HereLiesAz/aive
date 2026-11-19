@@ -208,3 +208,7 @@ The keeper's founding picture is a living flowchart that does not look like a fl
 - Before any UI work, read `tasks/hive-redesign.md`, and ask of each screen: does this look like a living hive, or like a form, a card or a diagram?
 - Look at the running app (desktop, at the keeper's screen size) before calling UI work done. A clean compile is not the test.
 - When the keeper restates the founding picture, record it as the first line of the plan and put it above audits and release work.
+
+## A redesign keeps every function
+
+The keeper's rule for the hive redesign: it MUST have ALL functionality available. In step 1 I removed the Setup/Swarm switch and with it the only way to see every creature at once during a live run. Before deleting or merging any control, list what it did and where that is reachable afterwards; a control that goes away must come back somewhere (a button, a gesture, a state of the organism), not be dropped. Check it in the running screens, not only in the code.

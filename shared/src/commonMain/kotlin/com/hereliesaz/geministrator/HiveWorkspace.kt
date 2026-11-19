@@ -76,6 +76,8 @@ import com.hereliesaz.geministrator.resources.creature_panel_place
 import com.hereliesaz.geministrator.resources.hive_active_of
 import com.hereliesaz.geministrator.resources.hive_centre
 import com.hereliesaz.geministrator.resources.hive_creatures_active
+import com.hereliesaz.geministrator.resources.hive_show_all_creatures
+import com.hereliesaz.geministrator.resources.hive_show_growth
 import com.hereliesaz.geministrator.resources.hive_feed_eyebrow
 import com.hereliesaz.geministrator.resources.hive_feed_launch
 import com.hereliesaz.geministrator.resources.hive_feed_placeholder
@@ -295,7 +297,7 @@ internal fun HivePageTitle(
     onEyebrowClick: (() -> Unit)? = null,
 ) {
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 eyebrow.uppercase(),
                 style = AzphaltType.eyebrow,
@@ -310,7 +312,7 @@ internal fun HivePageTitle(
             )
             Text(
                 title,
-                style = AzphaltType.hero.copy(fontSize = 40.sp, lineHeight = 44.sp, letterSpacing = (-0.045f).sp * 40),
+                style = AzphaltType.hero.copy(fontSize = 26.sp, lineHeight = 30.sp, letterSpacing = (-0.045f).sp * 26),
                 color = azphaltOnSurface(),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -352,6 +354,9 @@ internal fun HiveControlsBar(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Every creature at once (true) or the hive growing, unborn ones as eggs (false). Null in Edit, which always shows all. */
+    swarm: Boolean = false,
+    onSwarmChange: ((Boolean) -> Unit)? = null,
 ) {
     AzphaltThemedSurface(Azphalt.Ink) {
         BoxWithConstraints(modifier.fillMaxWidth()) {
@@ -397,6 +402,13 @@ internal fun HiveControlsBar(
                 if (building) {
                     RoundGlyphButton(HiveGlyph.Undo, stringResource(Res.string.build_undo), enabled = canUndo, onClick = onUndo)
                     RoundGlyphButton(HiveGlyph.Redo, stringResource(Res.string.build_redo), enabled = canRedo, onClick = onRedo)
+                }
+                onSwarmChange?.let { change ->
+                    RoundGlyphButton(
+                        HiveGlyph.Swarm,
+                        stringResource(if (swarm) Res.string.hive_show_growth else Res.string.hive_show_all_creatures),
+                        onClick = { change(!swarm) },
+                    )
                 }
                 RoundGlyphButton(HiveGlyph.Target, stringResource(Res.string.hive_centre), onClick = camera::centre)
                 RoundGlyphButton(HiveGlyph.ZoomOut, stringResource(Res.string.terrarium_zoom_out), onClick = { camera.stepOut(onSurface) })
@@ -778,6 +790,8 @@ internal enum class HiveGlyph(val path: String) {
     Target("M20 12a8 8 0 1 1-16 0a8 8 0 1 1 16 0M15 12a3 3 0 1 1-6 0a3 3 0 1 1 6 0"),
     Close("M6 6l12 12M18 6L6 18"),
     Play("M8 5l11 7-11 7V5z"),
+    /** Three creatures: every one at once. */
+    Swarm("M8 8a2 2 0 1 1-4 0a2 2 0 1 1 4 0M20 8a2 2 0 1 1-4 0a2 2 0 1 1 4 0M14 17a2 2 0 1 1-4 0a2 2 0 1 1 4 0"),
 }
 
 @Composable

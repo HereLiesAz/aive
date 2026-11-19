@@ -32,7 +32,6 @@ import com.hereliesaz.geministrator.domain.WorkflowRun
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.hereliesaz.geministrator.resources.Res
-import com.hereliesaz.geministrator.resources.hive_view_label
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.semantics.onLongClick
@@ -145,8 +144,9 @@ internal fun GeministratorWorkflowTerrarium(
     val tissue = remember(projection, stagedDefinition, run) {
         projectTissue(stagedDefinition, run, projection.subjects.associate { it.node.id to it.position }, roles)
     }
-    // Who is born and who is still an egg, from the run's task statuses. Build shows every creature, and
-    // so does the Swarm view, the whole swarm at once; Setup is the flowchart kept simple.
+    // Who is born and who is still an egg, from the run's task statuses: the hive grows as the work does.
+    // Edit shows every creature. Outside Edit one round button on the controls bar shows every creature at once
+    // (the whole swarm) instead of letting the hive grow; it is a state of the one hive, not a second screen.
     val births = remember(stagedDefinition, run) { projectBirths(stagedDefinition, run) }
     // Who shares a creature: ordered tasks of one role. Build and the Swarm view keep one creature per task.
     val roaming = remember(stagedDefinition, run) { projectRoaming(stagedDefinition, run) }
@@ -382,19 +382,9 @@ internal fun GeministratorWorkflowTerrarium(
                 canRedo = tide.canRedo,
                 onUndo = undo,
                 onRedo = redo,
+                swarm = swarmView.value,
+                onSwarmChange = if (building) null else { all -> swarmView.value = all },
             )
-            // Setup, the flowchart kept simple, or Swarm, the whole swarm at once. Edit always shows all of it.
-            if (!building) {
-                AzphaltThemedSurface(Azphalt.Ink) {
-                    Row(Modifier.fillMaxWidth().background(Azphalt.Ink).padding(start = 8.dp, end = 8.dp, bottom = 10.dp)) {
-                        SetupSwarmSwitch(
-                            swarm = swarmView.value,
-                            onSwarmChange = { swarmView.value = it },
-                            label = stringResource(Res.string.hive_view_label),
-                        )
-                    }
-                }
-            }
         }
         val field: @Composable () -> Unit = {
           // Programmatic steps, local or remote, wear the neuron: the swarm reads as a flowchart.

@@ -16,6 +16,9 @@ My drift: I spent the 1.0 audit on installers, CI and error handling, and put th
 2. **Setup is reshaped as the hive's structure.** The same information (what depends on what) drawn as organic tissue and growth, not cards and lines, in the one hive view.
 3. **A creature's settings live inside the creature.** Tap it and it swells open in place; its settings are parts of its body you touch. No form below the screen.
 
+## Constraint: ALL functionality stays
+The keeper: the redesign MUST have ALL functionality available. Every control and view that exists today stays reachable. The look changes; nothing is lost. Each step lists what it moved and where it now lives (step 1: the Setup/Swarm switch is now the round "show every creature at once" button on the hive controls bar).
+
 ## Proposed approach (needs the keeper's approval; nothing is built)
 Work in this order, one PR per step, each looked at in the running desktop app, with before and after screenshots in the PR.
 
