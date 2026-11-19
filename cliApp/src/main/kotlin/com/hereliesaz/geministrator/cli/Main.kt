@@ -91,13 +91,16 @@ private suspend fun resume(): Int = HeadlessEngine.open().use { engine ->
 private suspend fun serve(): Int = HeadlessEngine.open().use { engine ->
     HeadlessControlServer.start(engine).use { server ->
         println("The Aive headless engine listening at ${server.address}. State is independent of the desktop application.")
-        val terminal = System.console()
-        if (terminal == null) {
-            // Service/CI/SSH deployments may have no controlling TTY. The server stays alive,
-            // while owner decisions remain inaccessible to every HTTP or agent interface.
-            CountDownLatch(1).await()
-        } else {
-            serveKeeperConsole(engine, terminal)
+        // Telegram and Discord bots, only when the environment switches them on (docs/Chat-Bots.md). They cannot approve.
+        HeadlessChatBots.startIfEnabled(engine).use {
+            val terminal = System.console()
+            if (terminal == null) {
+                // Service/CI/SSH deployments may have no controlling TTY. The server stays alive,
+                // while owner decisions remain inaccessible to every HTTP or agent interface.
+                CountDownLatch(1).await()
+            } else {
+                serveKeeperConsole(engine, terminal)
+            }
         }
     }
     0

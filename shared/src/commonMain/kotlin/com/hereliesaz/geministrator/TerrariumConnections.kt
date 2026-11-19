@@ -30,6 +30,7 @@ import com.hereliesaz.geministrator.resources.template_group_fewer
 import com.hereliesaz.geministrator.resources.template_group_internal
 import com.hereliesaz.geministrator.resources.template_group_more
 import com.hereliesaz.geministrator.resources.build_step_repo_fetch
+import com.hereliesaz.geministrator.resources.build_step_chat_post
 import com.hereliesaz.geministrator.resources.build_step_repo_status
 import com.hereliesaz.geministrator.resources.build_step_tests
 import com.hereliesaz.geministrator.resources.build_build
@@ -281,6 +282,14 @@ private fun TerrariumAddCreature(
                     ),
                     seed = "add-step-${step.idStem}",
                     onClick = { onEdit(addTerrariumCreature(definition, TerrariumNewcomer.Step(step))) },
+                )
+            }
+            // "Post to my chat" is offered only where a chat bot can run (the desktop); it joins with its approval creature.
+            if (com.hereliesaz.geministrator.chat.LocalChatBotHost.current != null) {
+                AzphaltPill(
+                    label = stringResource(Res.string.build_step_chat_post),
+                    seed = "add-step-chat-post",
+                    onClick = { onEdit(addTerrariumCreature(definition, TerrariumNewcomer.PostToChat)) },
                 )
             }
         }

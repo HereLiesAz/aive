@@ -25,6 +25,10 @@ uses Code Reviewer; Antagonist is available in the roster for explicit assignmen
 
 [`architecture/DISTRIBUTED_COMPUTE.md`](architecture/DISTRIBUTED_COMPUTE.md) defines `TaskExecutor.Distributed` placement, the `computeRelay/` WebSocket relay, relay tokens, delegation targets, lease claim/heartbeat/progress/requeue behavior, the executor kinds Android and Desktop nodes accept, and the `MeshCrypto` pairing/encryption primitives.
 
+### Chat bots
+
+[`Chat-Bots.md`](Chat-Bots.md) describes the Telegram and Discord bots (desktop and `aive serve`): notifications, `/status`, `/run` and a confirmed `/stop`, the "Post to my chat" step, pairing and the allowlist. Nothing in a chat can approve anything.
+
 ### Claude connector
 
 [`Connector.md`](Connector.md) describes `connector/`, the Cloudflare Worker that lets Claude read a paired device's state (read-only tools, Google sign-in, its OAuth server), what it trusts, and how to revoke it. The wire protocol it reuses is in [`Remote-API.md`](Remote-API.md#relay).

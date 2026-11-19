@@ -617,6 +617,46 @@ A Cloudflare Worker that is a remote MCP server for Claude's connectors, in fron
 - Collector headers are stored in the app's local settings, not the platform credential store. Users are told to use a trace-only ingest key.
 - Ids exported by default (project, run, task, role, workflow definition, provider session) and token counts can still reveal activity patterns to the collector.
 
+### Chat bots (Telegram and Discord; desktop and `aive serve`, opt-in)
+
+The keeper can read status, start and stop a run, and be told what needs them, from a direct message to a bot they made. Behavior: [Chat bots](Chat-Bots.md). Off by default, one switch per platform, never on Android.
+
+**Assets**
+- The bot token of each platform. Whoever holds it can read the bot's messages (the keeper's commands) and send as the bot.
+- The paired chat identity (the one account the bot answers).
+- Status text: hive names, run ids and objectives (clipped), counts.
+
+**Threats**
+- A stranger messages the bot, or adds it to a group, to read status or start a run.
+- A stolen bot token: the thief reads what the keeper sends the bot, and sends the keeper text that looks like it came from The Aive.
+- A stolen or hijacked chat account (or an unlocked phone) of the keeper.
+- A stranger races the keeper's `/pair`, or guesses the code.
+- Text from chat (a pasted prompt, a mention, markup) used as injection or to ping people.
+- A command that approves a plan or a gate.
+- A "Post to my chat" step used to send data to a chat that is not the keeper's, or without the keeper's consent.
+
+**Mitigations in place**
+- **No approval is reachable.** The command set is closed and has no approving member; the handler holds only the control host, which has no member that decides a gate, lifts a spend stop or reads a key store. Approval-shaped messages parse to "unknown". `ChatCommandTest`, `ChatHandlerAndNotifierTest` (records every call the host gets) and `ChatApprovalBoundaryTest` (scans the sources) enforce it. Invariant 8 covers it.
+- **Start and stop use the control host exactly as the control API does**: `/run` goes through `startRun` (same validation and refusals; the objective is marked external content, so a step that can change something waits at a context-taint gate; a run is refused while another is unfinished). The run stops at its plan approval, in the app. `/stop` names the run and needs a second `/stop confirm` within 60 seconds, for that run only, once.
+- **Allowlist.** Only direct messages from the paired user and chat are acted on. Every other message, group, channel and bot is dropped without any reply, counted and rate limited (strangers 6 a minute, the keeper 20). The keeper's identity is both ids compared exactly.
+- **Pairing.** `/pair` starts a one-time six-digit code from the platform's secure random source (no weak fallback: without one, pairing is off), shown only in the app, valid 5 minutes, single use, ended by three wrong tries, bound to the chat that asked, compared in constant time. A second chat cannot replace a waiting challenge. Replacing or removing a token unpairs.
+- **Tokens** are kept in the app's key store (Keychain, Secret Service, DPAPI; refused if none, never a settings file), read from the environment by the headless engine, never shown, logged or printed, and masked in every outgoing text (`ControlRedaction` knows both token shapes; the exact token is also masked). Nothing in the transports logs a URL (Telegram's token is part of the request path).
+- **Output** is plain text only: Telegram without `parse_mode` and with link previews off, Discord with empty `allowed_mentions`. Control and invisible characters are removed before scrubbing, links are removed, replies are bounded under each platform's limit, and a reply is built from the app's own words (a clipped objective is the only run text, in `/runs` and `/stop`).
+- **Inbound is bounded and strict**: 2,000 characters, exact command words, no arguments where none belong, a hive id of a safe alphabet, nothing echoed back.
+- **Post to my chat** needs an unconditional human-approval gate before it (validator, `MissingStepApproval`) and refuses to run unless that gate was approved in this run; it sends only to the keeper's paired chat of each platform that is on, never to another id; text is scrubbed, link-free and at most 3,000 characters; one attempt; a restart is reported, not repeated; its output is external content for the taint rule and it counts as able to change things.
+- Telegram's long poll and the Discord Gateway are outbound only. No webhook, interaction endpoint or open port exists. Discord uses no privileged intent.
+
+**What a stolen bot token or a stolen chat account can and cannot do**
+- A thief with the **bot token** can read what the keeper sends the bot and impersonate the bot to the keeper (including a fake pairing prompt, which cannot pair anything because the code is shown only in the app). They cannot make The Aive act: The Aive acts only on messages from the paired identity, and a second connection with the same token does not change who is paired. They cannot read keys, runs or hives.
+- A thief with the **keeper's chat account** can read status, hive names and run objectives, start a run of a saved hive (still held at its plan approval and, for steps that can change something, at a context-taint gate) and stop the live run after a confirm. They **cannot approve, reject or release anything**, cannot lift a spend stop, cannot read keys, and cannot change a hive. Unpair in the Keeper's room ends it.
+
+**Residual risks**
+- Anyone holding the bot token can impersonate the bot to the keeper, and the platforms see every message in the clear (no end-to-end encryption in Telegram bot chats or Discord direct messages).
+- A hijacked keeper account can start a run on the keeper's linked sources, so it spends credit; the run still waits at its gates and spend caps still stop it. There is no per-command spend cap beyond the existing ones.
+- `/runs` and `/stop` show a clipped objective; an objective is text an earlier launch wrote and may hold something the keeper would not want in a chat. Keys are masked; other private text is not.
+- The paired identity is kept in per-user preferences (not a secret), so another process of the same user can read it. The desktop app and `aive serve` share it; run one of them per bot.
+- Not verified against the live services in the session that wrote it (see the change log).
+
 ### Persistence
 
 **Threats**
@@ -651,7 +691,7 @@ The following invariants must hold regardless of the integration used:
 
 Invariant 4, together with the gate-decider, approval-policy and add-on permission checks, is decided by the in-process policy decision point ([`architecture/POLICY.md`](architecture/POLICY.md)). Its denials and approval requirements are recorded on the run timeline. A policy rule may add a gate but must never relax an invariant.
 7. An agent's question to the keeper is drawn only from the host catalog in `AgentUi`; anything outside it is shown as plain text, and no part of it is executed, fetched or rendered as markup.
-8. No remote or local-agent interface (MCP bridge, control API, A2A server, headless control commands) can approve, reject or release a gate, lift a spend stop, or remove a human approval. Those decisions are made only inside the application runtime, by the keeper. The independent headless runtime's local attached keeper console is an in-process human-decision surface, not a remote API; it requires an exact confirmation after displaying task details.
+8. No remote or local-agent interface (MCP bridge, control API, A2A server, headless control commands, Telegram and Discord chat bots) can approve, reject or release a gate, lift a spend stop, or remove a human approval. Those decisions are made only inside the application runtime, by the keeper. The independent headless runtime's local attached keeper console is an in-process human-decision surface, not a remote API; it requires an exact confirmation after displaying task details.
 9. The plan reviewer (`orchestration/PlanReview.kt`) is advisory. It reads a plan before a run exists and returns words; it decides no approval gate, relaxes no invariant, and the reworked plan passes `OrchestrationPlan.validateAgainst` and the workflow graph validator like any plan, so invariant 4 still holds for it. The reviewer's text and the plan are model text (the reviewer reads step objectives a model wrote; the planner reads the reviewer's objections back): both are shown as plain text only, and a plan reaches a run only when the keeper starts it in the app (invariant 8). A reviewed plan left undecided is kept on the device (`ReviewedPlanStore`) so a restart does not lose it; the store sits outside workflow persistence, the setup file and every export (so an import cannot forge it and no remote interface can read or write it), holds no approval, and is dropped if anything the plan was made from has changed (for a saved hive's rough design, the design itself). A saved hive is planned only from the hive's own Launch in the app; the control API and MCP `startRun` path stay unplanned, as invariant 8 requires, and the planned run is saved under a new id so the saved design is never overwritten. Starting it is still the keeper's Start in the app.
 10. Remote compute leases never run GitHub Actions executors; those run only on the origin device, where the keeper's approval was given. A node may revoke only itself; revoking another node, or re-enrolling a revoked node ID, needs the relay's owner token. A relay session never creates a pool, and enrolment bodies are size-capped while read.
 11. A remote pairing's relay is validated (https, bare origin) every time it is read or imported, and a setup file cannot move an existing pairing to a different relay unless the keeper confirms that change on the import summary. When no system store is available, the node key and pool token are kept for the session only unless the keeper opts into the plaintext preferences fallback; an unreadable store never replaces the node identity.

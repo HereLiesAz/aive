@@ -68,6 +68,10 @@ API credentials come from the environment: `OPENAI_API_KEY`, `GEMINI_API_KEY`, `
 
 CLI results exit `0` on success, `1` on workflow failure/API refusal, `2` on invalid usage, `3` on transport/runtime failure, and `4` for pending human approval without a terminal. See [MCP](MCP.md), [Threat model](THREAT_MODEL.md), [Architecture](architecture/ARCHITECTURE.md).
 
+## Chat bots
+
+`aive serve` can run the Telegram and Discord bots ([Chat bots](Chat-Bots.md)) when the environment switches them on: `AIVE_CHAT_TELEGRAM=on` with `AIVE_TELEGRAM_BOT_TOKEN`, and `AIVE_CHAT_DISCORD=on` with `AIVE_DISCORD_BOT_TOKEN`. Off otherwise. The tokens are read from the environment only and never printed. The pairing code appears on the daemon's output. Chat can read status and start or stop a run through the same host as the control API; it cannot approve anything.
+
 ## Tests
 
 ```sh

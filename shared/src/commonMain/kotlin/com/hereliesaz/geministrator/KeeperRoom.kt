@@ -45,6 +45,8 @@ import com.hereliesaz.geministrator.resources.keeper_about
 import com.hereliesaz.geministrator.resources.keeper_about_lead
 import com.hereliesaz.geministrator.resources.keeper_appearance
 import com.hereliesaz.geministrator.resources.keeper_appearance_lead
+import com.hereliesaz.geministrator.resources.keeper_chat_bots
+import com.hereliesaz.geministrator.resources.keeper_chat_bots_lead
 import com.hereliesaz.geministrator.resources.keeper_compute
 import com.hereliesaz.geministrator.resources.keeper_compute_lead
 import com.hereliesaz.geministrator.resources.keeper_connections
@@ -125,6 +127,8 @@ internal enum class KeeperSection(
     Delegations(Res.string.keeper_delegations, Res.string.keeper_delegations_lead, false, KeeperGroup.Routines),
     Schedules(Res.string.keeper_schedules, Res.string.keeper_schedules_lead, false, KeeperGroup.Routines),
     LocalAgents(Res.string.keeper_local_agents, Res.string.keeper_local_agents_lead, false, KeeperGroup.Sources),
+    /** Telegram and Discord bots (desktop only; docs/Chat-Bots.md). */
+    ChatBots(Res.string.keeper_chat_bots, Res.string.keeper_chat_bots_lead, false, KeeperGroup.Routines),
     Improvement(Res.string.keeper_improvement, Res.string.keeper_improvement_lead, false, KeeperGroup.Routines),
     /** The spend caps, on every width. */
     Limits(Res.string.keeper_limits, Res.string.keeper_limits_lead, false, KeeperGroup.Allowance),
