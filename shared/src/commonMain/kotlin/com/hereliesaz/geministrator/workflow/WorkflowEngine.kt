@@ -1281,6 +1281,35 @@ class WorkflowEngine(
         )
     }
 
+    /**
+     * A step that declares an effect was dispatched and a restart left no confirmed outcome: the effect may or may
+     * not have happened, so it is never dispatched again on its own. The keeper chooses retry or fail through the
+     * ordinary escalation flow ([resolveEscalation]).
+     */
+    suspend fun escalateOutcomeUncertain(
+        run: WorkflowRun,
+        taskDefinitionId: TaskDefinitionId,
+        reason: String,
+        nowEpochMillis: Long,
+    ): WorkflowRun {
+        val taskRun = requireNotNull(run.taskRuns[taskDefinitionId]) { "Task run ${taskDefinitionId.value} is missing" }
+        TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Escalated)
+        eventSink.append(HumanDecisionRequired(run.id, taskDefinitionId, reason, nowEpochMillis))
+        eventSink.append(TaskEscalated(run.id, taskDefinitionId, reason, occurredAtEpochMillis = nowEpochMillis))
+        return run.copy(
+            status = WorkflowRunStatus.AwaitingHuman,
+            taskRuns = run.taskRuns + (
+                taskDefinitionId to taskRun.copy(
+                    status = TaskRunStatus.Escalated,
+                    blockingReason = BlockingReason(WorkflowRunFactory.OUTCOME_UNCERTAIN, reason),
+                    progress = null,
+                    progressMessage = reason,
+                )
+            ),
+            updatedAtEpochMillis = nowEpochMillis,
+        )
+    }
+
     fun approvePlanGate(run: WorkflowRun, taskDefinitionId: TaskDefinitionId, nowEpochMillis: Long): WorkflowRun {
         require(!run.status.isTerminal()) { "Workflow ${run.id.value} is already ${run.status}" }
         val taskRun = requireNotNull(run.taskRuns[taskDefinitionId]) { "Task run ${taskDefinitionId.value} is missing" }
