@@ -36,10 +36,12 @@ aive runs start --hive-id my-hive --objective "Check release"
 aive runs get <run-id>
 aive runs events <run-id> --limit 50
 aive approvals                        # read only
+aive sources                          # read only: which Sources are on
+aive agents                           # read only: which vendor CLIs are installed and on
 aive runs stop <run-id> --yes
 ```
 
-`serve` uses the same authenticated loopback `ControlApi` and `RuntimeControlHost` as The Aive's desktop JVM runtime, with 21 commands and the same validation and context-taint checks. Its default port is 41243. Set `AIVE_HEADLESS_PORT` to change it. `AIVE_HEADLESS_CONTROL_URL` and `AIVE_HEADLESS_TOKEN_FILE` override discovery when needed; they never direct commands to the desktop app automatically. `--json` produces machine-readable responses; `--file -` reads JSON input from stdin; destructive actions require `--yes`. `aive --help` lists all commands.
+`serve` uses the same authenticated loopback `ControlApi` and `RuntimeControlHost` as The Aive's desktop JVM runtime, with 23 commands and the same validation and context-taint checks. Its default port is 41243. Set `AIVE_HEADLESS_PORT` to change it. `AIVE_HEADLESS_CONTROL_URL` and `AIVE_HEADLESS_TOKEN_FILE` override discovery when needed; they never direct commands to the desktop app automatically. `--json` produces machine-readable responses; `--file -` reads JSON input from stdin; destructive actions require `--yes`. `aive --help` lists all commands.
 
 When the *daemon itself* has a real terminal, its in-process keeper console supports `status`, `approvals`, `approve <task-id>`, `quit`. Human approval requires an exact second confirmation after showing the task details. No approval decision can be sent via the HTTP control API, MCP, or remote commands. A service without a terminal leaves gates pending; stop it and use `aive resume` in a keeper terminal.
 

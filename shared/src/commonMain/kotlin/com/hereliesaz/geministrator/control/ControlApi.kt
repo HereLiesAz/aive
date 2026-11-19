@@ -52,6 +52,8 @@ class ControlApi(
             ControlRoute(ControlMethod.GET, "/approvals", "list_approvals"),
             ControlRoute(ControlMethod.GET, "/providers", "list_providers"),
             ControlRoute(ControlMethod.GET, "/settings", "get_settings"),
+            ControlRoute(ControlMethod.GET, "/sources", "list_sources"),
+            ControlRoute(ControlMethod.GET, "/agents", "list_agents"),
         )
 
         private val json = Json { ignoreUnknownKeys = true }
@@ -167,6 +169,8 @@ class ControlApi(
             "list_approvals" -> host.listApprovals()
             "list_providers" -> host.listProviders()
             "get_settings" -> host.settings()
+            "list_sources" -> host.listSources()
+            "list_agents" -> host.listAgents()
             else -> controlError(ControlErrorCode.NotFound, "Unknown path")
         }
     }
