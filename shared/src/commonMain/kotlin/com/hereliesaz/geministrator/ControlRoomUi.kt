@@ -1167,6 +1167,37 @@ private fun MainDestination(
             onDestinationSelected(ControlRoomDestination.Workflows)
         }
     }
+    // On a wide window the live hive's acts ride on the hive's own controls bar; the row above keeps them only for a phone or the timeline.
+    val hiveActionsList = run {
+        val live = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
+            ?.takeIf { destination == ControlRoomDestination.Overview && !district.value && restingHive.value.isBlank() }
+        if (live == null || compact || showTimeline) emptyList() else buildList {
+            if (!live.run.status.isFinished()) {
+                val paused = live.run.keeperPause != null
+                add(
+                    HiveAction(
+                        if (paused) HiveGlyph.Play else HiveGlyph.Pause,
+                        stringResource(if (paused) Res.string.hive_resume_run else Res.string.hive_pause_run),
+                        onClick = { onPauseRun(!paused) },
+                        selected = paused,
+                        modifier = Modifier.tourTarget(TourTargetId.HIVE_PAUSE),
+                    ),
+                )
+                add(
+                    HiveAction(
+                        HiveGlyph.Stop,
+                        stringResource(Res.string.hive_stop_run),
+                        onClick = { confirmingStopRun = true },
+                        modifier = Modifier.tourTarget(TourTargetId.HIVE_STOP),
+                    ),
+                )
+            }
+            add(HiveAction(HiveGlyph.Timeline, stringResource(Res.string.hive_show_timeline), onClick = { showTimeline = true }))
+            add(HiveAction(HiveGlyph.Share, hiveCardShareLabel(), onClick = { sharingHiveCard = !sharingHiveCard }, selected = sharingHiveCard))
+            add(HiveAction(HiveGlyph.Edit, stringResource(Res.string.hive_more_editing), onClick = { openHiveInWorkflows(null) }))
+        }
+    }
+    CompositionLocalProvider(LocalHiveActions provides hiveActionsList) {
     Column(modifier.fillMaxSize()) {
         // A first launch is one step: no places to wander off to until there is a hive. A stopped or
         // waking hive keeps the row, so every hive, the Stable and the Store stay reachable.
@@ -1174,7 +1205,7 @@ private fun MainDestination(
         val liveHive = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
             ?.takeIf { destination == ControlRoomDestination.Overview && !district.value && restingHive.value.isBlank() }
         // Wide windows have the rail; the row stays only for a live hive's own pills.
-        if (destination.navigationItem == ControlRoomDestination.Overview && !firstLaunch && (compact || liveHive != null)) {
+        if (destination.navigationItem == ControlRoomDestination.Overview && !firstLaunch && (compact || (liveHive != null && showTimeline))) {
             val inDistrictNow = destination == ControlRoomDestination.Overview && district.value
             // Only while the run is unfinished; red, since it ends the work. It leads the row on a phone,
             // where the hive's own pills scroll off the end, and heads them on a wide window.
@@ -1602,6 +1633,7 @@ private fun MainDestination(
 
             }
         }
+    }
     }
 }
 
