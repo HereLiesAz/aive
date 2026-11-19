@@ -260,7 +260,7 @@ internal fun GeministratorWorkflowTerrarium(
 
     // Framed, the controls bar drives the field's zoom and focus; unframed, the field keeps its own.
     val camera = remember(definition.id) { TerrariumCamera() }
-    camera.driven = frame != null || readOnly
+    camera.driven = frame != null || readOnly || (heading == null && LocalHiveActions.current.isNotEmpty())
     camera.controlsHidden = readOnly
 
     // The semantic focus stack (TerrariumFocus.kt): what the camera shows follows the selection.
@@ -357,7 +357,23 @@ internal fun GeministratorWorkflowTerrarium(
         if (readOnly) {
             // It only watches: no controls above the field.
         } else if (frame == null) {
-            if (heading == null) {
+            if (heading == null && LocalHiveActions.current.isNotEmpty()) {
+                // A live hive on a phone: the same controls bar as on a wide screen, so it is one organism.
+                HiveControlsBar(
+                    building = building,
+                    onBuildingChange = { building = it },
+                    status = null,
+                    onStatusClick = null,
+                    camera = camera,
+                    onSurface = onSurface,
+                    canUndo = tide.canUndo,
+                    canRedo = tide.canRedo,
+                    onUndo = undo,
+                    onRedo = redo,
+                    swarm = swarmView.value,
+                    onSwarmChange = if (building) null else { all -> swarmView.value = all },
+                )
+            } else if (heading == null) {
                 TerrariumModeToggle(
                     building = building,
                     onBuildingChange = { building = it },

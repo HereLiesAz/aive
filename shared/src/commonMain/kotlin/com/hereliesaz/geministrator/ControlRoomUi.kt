@@ -1171,7 +1171,7 @@ private fun MainDestination(
     val hiveActionsList = run {
         val live = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
             ?.takeIf { destination == ControlRoomDestination.Overview && !district.value && restingHive.value.isBlank() }
-        if (live == null || compact || showTimeline) emptyList() else buildList {
+        if (live == null || showTimeline) emptyList() else buildList {
             if (!live.run.status.isFinished()) {
                 val paused = live.run.keeperPause != null
                 add(
@@ -1250,7 +1250,7 @@ private fun MainDestination(
                         },
                     )
                 },
-                showControls = liveHive != null,
+                showControls = liveHive != null && showTimeline,
             ) {
                 // The hive's own controls, on their own row under the places.
                 stopPill()

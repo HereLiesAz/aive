@@ -8,6 +8,8 @@ import com.hereliesaz.geministrator.prompts.PromptSuggestions
 import com.hereliesaz.geministrator.prompts.rememberPromptHistory
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -346,7 +348,8 @@ internal fun HivePageTitle(
 internal fun HiveControlsBar(
     building: Boolean,
     onBuildingChange: (Boolean) -> Unit,
-    status: String,
+    /** The "doing now" line; null on a phone, where the page above already says it. */
+    status: String?,
     onStatusClick: (() -> Unit)?,
     camera: TerrariumCamera,
     onSurface: (() -> Unit)?,
@@ -391,7 +394,7 @@ internal fun HiveControlsBar(
                 ) {
                     Box(Modifier.size(7.dp).clip(CircleShape).background(Azphalt.Yellow))
                     Text(
-                        status,
+                        status.orEmpty(),
                         style = AzphaltType.body.copy(fontSize = 13.sp, fontWeight = FontWeight.Medium),
                         color = azphaltMutedOnSurface(),
                         maxLines = 1,
@@ -427,17 +430,21 @@ internal fun HiveControlsBar(
                 .padding(start = 8.dp, end = 8.dp)
             if (narrow) {
                 Column(frameModifier) {
+                    // The mode switch on its own, then the round buttons in a row that scrolls sideways
+                    // when the screen is too narrow for all of them.
                     Row(Modifier.fillMaxWidth().heightIn(min = 64.dp), verticalAlignment = Alignment.CenterVertically) {
                         modeSwitch()
-                        Spacer(Modifier.weight(1f))
-                        buttons()
                     }
-                    statusLine(Modifier.fillMaxWidth())
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) { buttons() }
+                    if (status != null) statusLine(Modifier.fillMaxWidth())
                 }
             } else {
                 Row(frameModifier, verticalAlignment = Alignment.CenterVertically) {
                     modeSwitch()
-                    statusLine(Modifier.weight(1f))
+                    if (status != null) statusLine(Modifier.weight(1f)) else Spacer(Modifier.weight(1f))
                     buttons()
                 }
             }
