@@ -345,11 +345,26 @@ class MainActivity : ComponentActivity() {
                 val remoteEventWatchers by AiveRemoteBridge.eventWatchers.collectAsState()
                 val onDeviceSmallTaskPreference = remember { OnDeviceSmallTaskPreference() }
                 var onDeviceSmallTasksEnabled by remember { mutableStateOf(onDeviceSmallTaskPreference.enabled) }
+                // The vendor CLIs the keeper turned on (Keeper's room › Local agents), run in the app's hidden Linux runtime
+                // (docs/Local-CLI-Agents.md, "On a phone"). A switch rebuilds the provider list.
+                var cliAgentsGeneration by remember { mutableStateOf(0) }
+                val cliAgentsScope = remember { kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.Default) }
+                val cliAgentSettings = remember { AndroidCliAgentSettings(this@MainActivity) }
+                val cliRuntime = remember {
+                    AndroidCliRuntime(
+                        nativeLibraryDir = java.io.File(applicationInfo.nativeLibraryDir),
+                        dataRoot = java.io.File(filesDir, "cli-runtime"),
+                        httpClient = repositoryHttpClient,
+                        scope = cliAgentsScope,
+                    )
+                }
+                val cliAgents = remember { AndroidCliAgents(cliRuntime, cliAgentSettings, cliAgentsScope, onChanged = { cliAgentsGeneration += 1 }) }
                 val providers = remember(
                     credentials,
                     repositoryCredentials,
                     installedGeminiApi,
                     onDeviceSmallTasksEnabled,
+                    cliAgentsGeneration,
                 ) {
                     configuredAndroidProviders(
                         credentials = credentials,
@@ -360,7 +375,14 @@ class MainActivity : ComponentActivity() {
                     ) + listOfNotNull(
                         // Small text tasks on the memory clerks' installed model, when the keeper turns it on.
                         onDeviceTextProviderOrNull(onDeviceSmallTasksEnabled, memoryRuntime.onDeviceTextGenerator),
-                    )
+                    ) + configuredAndroidCliProviders(cliAgentSettings, cliRuntime, cliAgents) { source ->
+                        // The repository token reaches a clone only when the keeper turned on Passing keys for that CLI.
+                        when (source) {
+                            com.hereliesaz.geministrator.domain.RepositorySource.GitHub -> repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITHUB_ID)
+                            com.hereliesaz.geministrator.domain.RepositorySource.GitLab -> repositoryCredentials.cleanKey(RepositoryServiceCatalog.GITLAB_ID)
+                            com.hereliesaz.geministrator.domain.RepositorySource.Local -> null
+                        }
+                    }
                 }
                 // Hosted memory stages use whichever provider each stage names, with current credentials.
                 LaunchedEffect(credentials) {
@@ -552,7 +574,10 @@ class MainActivity : ComponentActivity() {
                             configuringProviderId = null
                         },
                     )
-                    else -> App(
+                    else -> androidx.compose.runtime.CompositionLocalProvider(
+                        com.hereliesaz.geministrator.providers.cli.LocalCliAgentHost provides cliAgents,
+                    ) {
+                    App(
                         breedPurchases = breedPurchases,
                         mcpHost = mcpHost,
                         mcpConsent = mcpConsent,
@@ -735,6 +760,7 @@ class MainActivity : ComponentActivity() {
                             onSharePairingCode = remoteAccessController::share,
                         ),
                     )
+                    }
                 }
             }
 

@@ -41,6 +41,7 @@ import com.hereliesaz.geministrator.resources.local_agents_test_ok
 import com.hereliesaz.geministrator.resources.local_agents_test_failed
 import com.hereliesaz.geministrator.resources.local_agents_testing
 import com.hereliesaz.geministrator.resources.local_agents_login_note
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 
@@ -58,7 +59,13 @@ internal fun LocalAgentsPart() {
     var reload by remember { mutableStateOf(0) }
     var testing by remember { mutableStateOf<String?>(null) }
     var installing by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(reload) { statuses = host.statuses() }
+    LaunchedEffect(reload) {
+        while (true) {
+            statuses = host.statuses()
+            if (statuses.none { it.busy }) break
+            delay(2_000)
+        }
+    }
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(stringResource(Res.string.local_agents_note), style = AzphaltType.body, color = azphaltOnSurface())
@@ -70,6 +77,13 @@ internal fun LocalAgentsPart() {
             onClick = { WorkspaceAgentMode.setReadOnly(!readOnly) },
         )
         Text(stringResource(Res.string.local_agents_workspace_note), style = AzphaltType.body, color = azphaltOnSurface())
+        host.removeRuntimeLabel?.let { label ->
+            AzphaltPill(
+                label = label,
+                seed = "local-agents-remove-runtime",
+                onClick = { scope.launch { host.removeRuntime(); reload += 1 } },
+            )
+        }
         statuses.forEach { status ->
             CliCard(
                 status = status,
@@ -117,10 +131,10 @@ private fun CliCard(
         seed = "local-agent-${status.spec.id}",
         eyebrow = where,
         title = status.spec.displayName,
-        body = listOf(status.spec.sandboxNote, stringResource(Res.string.local_agents_login_note), tested).joinToString("\n"),
+        body = listOfNotNull(status.note, status.spec.sandboxNote,stringResource(Res.string.local_agents_login_note), tested).joinToString("\n"),
         well = {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (!found && status.spec.npmPackage != null) {
+                if (!found && status.canInstall) {
                     AzphaltPill(
                         label = stringResource(if (installing) Res.string.local_agents_installing else Res.string.local_agents_install),
                         seed = "local-agent-install-${status.spec.id}", onClick = { if (!installing) onInstall() },

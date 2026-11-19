@@ -24,6 +24,31 @@ enum class CliPromptChannel {
 enum class CliOutputFormat { ClaudeStreamJson, CodexJsonl, PlainText }
 
 /**
+ * How to put a CLI into the phone's hidden, app-private Termux-derived runtime (docs/Local-CLI-Agents.md, "On a phone"). The desktop
+ * ignores it (it uses [CliAgentSpec.npmPackage] and the programs the keeper installed). Recipes follow the design reference HG2Gui's
+ * catalogue of install routes (facts only: package names and version pins), and none has been run on a device by this project.
+ */
+data class AndroidCliInstall(
+    val source: Source,
+    /** The Termux package name ([Source.TermuxPackage]) or the npm package name ([Source.Npm]). */
+    val packageName: String,
+    /** The exact npm version to install, or null for the latest. Ignored for a Termux package. */
+    val version: String? = null,
+    /** Termux packages installed first (the Node runtime for an npm CLI). */
+    val runtimePackages: List<String> = emptyList(),
+    /** What the keeper should know before pressing Install, in plain words. */
+    val note: String = "",
+) {
+    enum class Source { TermuxPackage, Npm }
+
+    /** The `npm install -g` argument (`name@version`), or null for a Termux package. */
+    val npmSpec: String? get() = if (source == Source.Npm) packageName + (version?.let { "@$it" } ?: "") else null
+
+    /** The Termux packages `apt-get install` is given for this CLI: its runtime, and the CLI itself when it is a Termux package. */
+    val aptPackages: List<String> get() = runtimePackages + if (source == Source.TermuxPackage) listOf(packageName) else emptyList()
+}
+
+/**
  * One LLM CLI the app can drive headless (docs/Local-CLI-Agents.md). The app runs the vendor's own CLI
  * under the login the keeper already has on this computer, so it needs and keeps no API key for it.
  *
@@ -60,6 +85,8 @@ data class CliAgentSpec(
      * switching the CLI on, with it missing, runs exactly that command and nothing else; see DesktopCliAgents.install.
      */
     val npmPackage: String? = null,
+    /** How to install it in the phone's hidden runtime, or null when there is no known route (it is then not offered on a phone). */
+    val androidInstall: AndroidCliInstall? = null,
     private val build: (CliAgentSpec, CliRunMode, String) -> List<String>,
 ) {
     /** The arguments (after the program) for [mode], without the prompt; [workingDirectory] is where it runs. Pure. */
@@ -126,6 +153,10 @@ object CliAgentSpecs {
     /** Claude Code. `claude -p` reads its prompt from stdin; no shell or web tool is allowed, so it only edits files. */
     val Claude = CliAgentSpec(
         npmPackage = "@anthropic-ai/claude-code",
+        androidInstall = AndroidCliInstall(
+            AndroidCliInstall.Source.Npm, "@anthropic-ai/claude-code", version = "2.1.112", runtimePackages = listOf("nodejs-lts"),
+            note = "Pinned to 2.1.112, the last release that is JavaScript: newer ones ship a native program with no Android build. Older than the current release.",
+        ),
         id = "cli-claude", displayName = "Claude Code", binaries = listOf("claude"),
         promptChannel = CliPromptChannel.Stdin, outputFormat = CliOutputFormat.ClaudeStreamJson,
         capabilities = setOf(
@@ -150,6 +181,7 @@ object CliAgentSpecs {
     /** Codex CLI. `codex exec -` reads stdin; its own OS sandbox confines writes to the workspace (its network setting is Codex's own). */
     val Codex = CliAgentSpec(
         npmPackage = "@openai/codex",
+        androidInstall = AndroidCliInstall(AndroidCliInstall.Source.TermuxPackage, "codex", note = "Installed from the Termux package repository."),
         id = "cli-codex", displayName = "Codex", binaries = listOf("codex"),
         promptChannel = CliPromptChannel.Stdin, outputFormat = CliOutputFormat.CodexJsonl,
         capabilities = setOf(
@@ -176,6 +208,9 @@ object CliAgentSpecs {
      */
     val Gemini = CliAgentSpec(
         npmPackage = "@google/gemini-cli",
+        androidInstall = AndroidCliInstall(
+            AndroidCliInstall.Source.Npm, "@google/gemini-cli", runtimePackages = listOf("nodejs-lts"), note = "A JavaScript bundle.",
+        ),
         id = "cli-gemini", displayName = "Gemini CLI", binaries = listOf("gemini"),
         promptChannel = CliPromptChannel.Stdin, outputFormat = CliOutputFormat.PlainText,
         capabilities = setOf(
@@ -195,6 +230,9 @@ object CliAgentSpecs {
     /** Qwen Code, a fork of Gemini CLI with the same headless flags. */
     val Qwen = CliAgentSpec(
         npmPackage = "@qwen-code/qwen-code",
+        androidInstall = AndroidCliInstall(
+            AndroidCliInstall.Source.Npm, "@qwen-code/qwen-code", runtimePackages = listOf("nodejs-lts"), note = "Not checked on Android: it is a fork of Gemini CLI.",
+        ),
         id = "cli-qwen", displayName = "Qwen Code", binaries = listOf("qwen"),
         promptChannel = CliPromptChannel.Stdin, outputFormat = CliOutputFormat.PlainText,
         capabilities = Gemini.capabilities,
@@ -214,6 +252,10 @@ object CliAgentSpecs {
      */
     val Antigravity = CliAgentSpec(
         id = "cli-antigravity", displayName = "Antigravity", binaries = listOf("agy"),
+        androidInstall = AndroidCliInstall(
+            AndroidCliInstall.Source.Npm, "@bash0816/agy-termux", version = "1.4.12", runtimePackages = listOf("nodejs-lts"),
+            note = "A community build for Termux, not by Google: it downloads and patches Google's release and can update itself.",
+        ),
         promptChannel = CliPromptChannel.Argument, outputFormat = CliOutputFormat.PlainText,
         capabilities = setOf(AgentCapability.RepositoryRead, AgentCapability.PlanGeneration, AgentCapability.PlanApproval),
         sandboxNote = "Headless, a tool that needs approval is denied and the run goes on, so it can read and answer but not edit or run commands " +
@@ -252,6 +294,9 @@ object CliAgentSpecs {
      */
     val Copilot = CliAgentSpec(
         npmPackage = "@github/copilot",
+        androidInstall = AndroidCliInstall(
+            AndroidCliInstall.Source.Npm, "@github/copilot", runtimePackages = listOf("nodejs-lts"), note = "Not checked on Android; it may need a native part Android lacks.",
+        ),
         id = "cli-copilot", displayName = "GitHub Copilot CLI", binaries = listOf("copilot"),
         promptChannel = CliPromptChannel.Argument, outputFormat = CliOutputFormat.PlainText,
         capabilities = Gemini.capabilities,
@@ -284,6 +329,9 @@ object CliAgentSpecs {
     val Amp = CliAgentSpec(
         id = "cli-amp", displayName = "Amp", binaries = listOf("amp"),
         npmPackage = "@sourcegraph/amp",
+        androidInstall = AndroidCliInstall(
+            AndroidCliInstall.Source.Npm, "@sourcegraph/amp", runtimePackages = listOf("nodejs-lts"), note = "Not checked on Android.",
+        ),
         promptChannel = CliPromptChannel.Argument, outputFormat = CliOutputFormat.PlainText,
         capabilities = setOf(AgentCapability.RepositoryRead, AgentCapability.PlanGeneration, AgentCapability.PlanApproval),
         optionalKeyEnvironment = listOf("AMP_API_KEY"),
@@ -297,6 +345,9 @@ object CliAgentSpecs {
     val Kilo = CliAgentSpec(
         id = "cli-kilo", displayName = "Kilo Code", binaries = listOf("kilo"),
         npmPackage = "@kilocode/cli",
+        androidInstall = AndroidCliInstall(
+            AndroidCliInstall.Source.Npm, "@kilocode/cli", runtimePackages = listOf("nodejs-lts"), note = "Not checked on Android.",
+        ),
         promptChannel = CliPromptChannel.Argument, outputFormat = CliOutputFormat.PlainText,
         capabilities = setOf(AgentCapability.RepositoryRead, AgentCapability.PlanGeneration, AgentCapability.PlanApproval),
         sandboxNote = "Headless, a request for a permission is rejected and the run ends, so it reads and answers; the app never passes --auto. " +

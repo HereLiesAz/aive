@@ -77,6 +77,78 @@ val buildAndroidDjlTokenizerNative = registerAndroidRustLibrary(
     outputDir = generatedAndroidDjlTokenizerJniDir,
 )
 
+// The hidden Linux runtime that runs the vendors' CLIs on a phone (docs/Local-CLI-Agents.md, "On a phone") needs proot, which
+// Android only lets an app execute from the APK's native libraries. They are Termux's own proot packages, fetched here, checked
+// against the SHA-256 pins below (a mismatch fails the build), unpacked with the host's `ar` and `tar`, and put in jniLibs/arm64-v8a.
+// Nothing is committed to the repository. If the host is offline or lacks `ar`/`tar`, the task warns and the build has no runtime:
+// the app then says "The Linux runtime is not available in this build". The loader's name is given to proot by PROOT_LOADER; libtalloc's
+// NEEDED entry (`libtalloc.so.2`, which cannot be an APK library name) is rewritten in place to `libtalloc.so`.
+// proot is GPL-2.0-or-later and libtalloc LGPL-3.0-or-later; see THIRD_PARTY_NOTICES.md.
+val generatedAndroidProotJniDir = layout.buildDirectory.dir("generated/proot/jniLibs")
+val fetchAndroidProotRuntime = tasks.register("fetchAndroidProotRuntime") {
+    group = "build"
+    description = "Fetches the pinned Termux proot packages into jniLibs/arm64-v8a."
+    outputs.dir(generatedAndroidProotJniDir)
+    doLast {
+        data class Pin(val url: String, val sha256: String, val files: Map<String, String>)
+        val base = "https://packages.termux.dev/apt/termux-main/pool/main"
+        val termux = "data/data/com.termux/files/usr"
+        val pins = listOf(
+            Pin(
+                "$base/p/proot/proot_5.1.107.102_aarch64.deb", "10a394b585c2fc2b2c8502544f4e5f1be581dc8bfff79e8ba62f16207423e030",
+                mapOf("$termux/bin/proot" to "libproot.so", "$termux/libexec/proot/loader" to "libproot-loader.so"),
+            ),
+            Pin(
+                "$base/libt/libtalloc/libtalloc_2.5.0_aarch64.deb", "556591f43bb773ad8777e1a29522640866a55f95dab71914418b94a8c58ad5a7",
+                mapOf("$termux/lib/libtalloc.so.2.5.0" to "libtalloc.so"),
+            ),
+            Pin(
+                "$base/liba/libandroid-shmem/libandroid-shmem_0.7_aarch64.deb", "0da3a24d558b93c92bcf8d611e0826a99ff96e396b148e6cdf33b47c47c57ff6",
+                mapOf("$termux/lib/libandroid-shmem.so" to "libandroid-shmem.so"),
+            ),
+        )
+        val out = generatedAndroidProotJniDir.get().asFile.resolve("arm64-v8a")
+        out.deleteRecursively()
+        val work = temporaryDir
+        work.deleteRecursively()
+        work.mkdirs()
+        try {
+            pins.forEachIndexed { index, pin ->
+                val deb = work.resolve("pin$index.deb")
+                java.net.URI(pin.url).toURL().openStream().use { input -> deb.outputStream().use { input.copyTo(it) } }
+                val actual = java.security.MessageDigest.getInstance("SHA-256").digest(deb.readBytes()).joinToString("") { "%02x".format(it) }
+                if (actual != pin.sha256) throw GradleException("${pin.url} has SHA-256 $actual, not the pinned ${pin.sha256}")
+                val unpacked = work.resolve("unpacked$index")
+                unpacked.mkdirs()
+                val process = ProcessBuilder("sh", "-c", "ar p \"\$0\" data.tar.xz | tar -xJ -C \"\$1\"", deb.absolutePath, unpacked.absolutePath)
+                    .redirectErrorStream(true).start()
+                val log = process.inputStream.bufferedReader().readText()
+                if (process.waitFor() != 0) throw java.io.IOException("ar/tar failed: $log")
+                out.mkdirs()
+                pin.files.forEach { (from, to) ->
+                    var bytes = unpacked.resolve(from).readBytes()
+                    if (to == "libproot.so") {
+                        // The NEEDED entry for talloc, in the same number of bytes: "libtalloc.so.2\0" becomes "libtalloc.so\0\0\0".
+                        val needle = "libtalloc.so.2\u0000".toByteArray(Charsets.ISO_8859_1)
+                        val patched = "libtalloc.so\u0000\u0000\u0000".toByteArray(Charsets.ISO_8859_1)
+                        var at = -1
+                        for (i in 0..bytes.size - needle.size) {
+                            if (needle.indices.all { bytes[i + it] == needle[it] }) { at = i; break }
+                        }
+                        if (at < 0) throw GradleException("libproot.so no longer names libtalloc.so.2; update the patch in fetchAndroidProotRuntime")
+                        bytes = bytes.copyOf().also { patched.copyInto(it, at) }
+                    }
+                    out.resolve(to).writeBytes(bytes)
+                    out.resolve(to).setExecutable(true)
+                }
+            }
+        } catch (failure: java.io.IOException) {
+            out.deleteRecursively()
+            logger.warn("The Linux runtime for CLI agents is not in this build: ${failure.message}")
+        }
+    }
+}
+
 // Keystore file for release signing: AIVE_KEYSTORE_PATH, else the central workflow's KEYSTORE_FILE,
 // else app/keystore.jks at the repository root. Null (unsigned release) when none exists.
 fun releaseKeystorePath(): String? {
@@ -121,6 +193,7 @@ android {
         res.srcDir(generatedAndroidBrandResDir.get().asFile)
         jniLibs.srcDir(generatedAndroidBitcosJniDir.get().asFile)
         jniLibs.srcDir(generatedAndroidDjlTokenizerJniDir.get().asFile)
+        jniLibs.srcDir(generatedAndroidProotJniDir.get().asFile)
     }
 
     // Release signing (GitHub APK in multiplatform.yml, Play bundle in the central android-play-release
@@ -185,6 +258,8 @@ android {
     packaging {
         // DJL's tokenizer jar bundles desktop natives (~55 MB); Android loads libdjl_tokenizer.so.
         resources.excludes += "native/lib/**"
+        // The CLI runtime executes proot from the app's native library folder, so the libraries must be extracted there.
+        jniLibs.useLegacyPackaging = true
     }
 
     compileOptions {
@@ -201,7 +276,7 @@ tasks.named("preBuild") {
 tasks.matching { task ->
     task.name.startsWith("merge") && task.name.endsWith("JniLibFolders")
 }.configureEach {
-    dependsOn(buildAndroidBitcosNative, buildAndroidDjlTokenizerNative)
+    dependsOn(buildAndroidBitcosNative, buildAndroidDjlTokenizerNative, fetchAndroidProotRuntime)
 }
 
 dependencies {

@@ -47,6 +47,19 @@ Notes.
 - **Workflows over the relay** run on the runtime tied to the app's UI, so a `launch` is queued in memory and starts when the app is next opened on that device (Remote API, "Limitation"). Prompts run at once.
 - **Mesh primitives.** `shared/.../mesh/` (pairing invitation, AES-GCM cipher, scheduler) compiles for every target, including Web Crypto, but no platform builds a mesh transport from it yet; it is not part of any flow above.
 
+## Local CLI agents
+
+| Capability | Play | GitHub | Desktop | Web | CLI |
+|---|---|---|---|---|---|
+| Vendor CLIs as agent providers (Claude Code, Codex, Gemini CLI, ...) | yes, in a hidden Linux runtime (not run on a device yet) | yes, the same | yes (the programs the keeper installed) | no (a browser cannot run a program) | not yet (`aive agents` manages them; the headless engine does not use them) |
+| Where they run | the app's private runtime (Termux bootstrap under proot), `arm64-v8a` only | same | the keeper's own computer | n/a | n/a |
+| Install a CLI from its card | yes (apt or npm in the runtime; the first press downloads the runtime) | yes | yes (npm) | n/a | yes (`aive agents install`) |
+| Repository | cloned by address (GitHub or GitLab; private only with Passing keys); returned as a patch | same | a worktree of the linked Local repository, on a branch | n/a | n/a |
+| Remove the runtime | yes (Keeper's room) | yes | n/a | n/a | n/a |
+| Not offered on a phone | Grok Build, Cursor, OpenCode, Aider (no known Android route) | same | n/a | n/a | n/a |
+
+Notes. Play and GitHub get the same runtime. Whether Play accepts bundled GPL proot libraries and a runtime that downloads and runs packages is the owner's call; the build supports leaving them out (without them the app says the runtime is not available).
+
 ## What changed in this pass
 
 - One shared gating rule and the "why it is holding" reason in Compute (all platforms that join a pool).

@@ -14,6 +14,12 @@ data class CliAgentStatus(
     val lastTest: CliTestResult? = null,
     /** Whether a repository that tracks this CLI's own project settings may be run (off: it is refused). */
     val allowProjectConfig: Boolean = false,
+    /** A plain-words line the host wants shown on the card (what it is preparing, or why this CLI cannot run here), or null. */
+    val note: String? = null,
+    /** True while the host is working on this CLI or its runtime (the screen asks again every couple of seconds). */
+    val busy: Boolean = false,
+    /** Whether the card offers Install while the CLI is missing. The desktop: when it has an npm package. */
+    val canInstall: Boolean = spec.npmPackage != null,
 )
 
 /** What the Test button saw: whether the installed CLI answered a tiny read-only prompt, and how. */
@@ -36,6 +42,14 @@ interface CliAgentHost {
 
     /** Runs the installed CLI read-only on a tiny prompt in an empty folder; uses the keeper's own quota. */
     suspend fun test(id: String): CliTestResult
+
+    /**
+     * The label of a button that deletes the hidden Linux runtime this host keeps (the phone), or null where there is none
+     * (the desktop runs the programs the keeper installed). Pressing it also cancels a download in progress.
+     */
+    val removeRuntimeLabel: String? get() = null
+
+    suspend fun removeRuntime() = Unit
 }
 
 val LocalCliAgentHost = compositionLocalOf<CliAgentHost?> { null }
