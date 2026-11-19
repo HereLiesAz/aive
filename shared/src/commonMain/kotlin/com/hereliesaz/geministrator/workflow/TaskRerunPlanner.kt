@@ -163,7 +163,7 @@ object TaskRerunPlanner {
         do {
             val approvals = rerun
                 .mapNotNull(tasksById::get)
-                .filter { it.isRepositoryMutation() }
+                .filter { it.isRepositoryMutation() || it.isEffectfulStep() }
                 .map { approvalAncestors(it.id, tasksById) }
                 .filter { ancestors -> ancestors.none { it in rerun } }
                 .flatten()
