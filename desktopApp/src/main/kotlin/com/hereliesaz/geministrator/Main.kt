@@ -86,6 +86,11 @@ fun main() {
         systemPrefersReduced = desktopPrefersReducedMotion(),
     )
     val providerCredentialStore = DesktopProviderCredentialStore()
+    // Gemini in Google Search needs a Chromium-based browser on this computer (a Source the keeper adds on purpose).
+    ChromiumLocator.find()?.let { chromium ->
+        com.hereliesaz.geministrator.providers.llm.GoogleAiModeHost.browser = DesktopAiModeBrowser(chromium)
+        ProviderCatalog.googleAiModeAvailable = true
+    }
     val projectFileService = DesktopProjectFileService()
     val repositoryCredentialStore = DesktopRepositoryCredentialStore()
     // Keyless sources start on, once each: a source the keeper disconnects later stays off (docs/Keepers-Room.md).
