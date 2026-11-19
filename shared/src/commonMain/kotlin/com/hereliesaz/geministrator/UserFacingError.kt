@@ -50,6 +50,9 @@ fun classifyError(raw: String?): ErrorKind {
         // A reply cut off at the provider's output limit: not a key, quota or outage problem.
         "truncated" in text && "token" in text -> ErrorKind.OutputTooLong
 
+        // The app's own deadline sentences (CLI, A2A, Moyai), before the codes: a session id in them ("ab400cd1") must not read as a status.
+        "did not finish in time" in text || "timed out and was stopped" in text -> ErrorKind.TimedOut
+
         // What the provider said in its status and error codes decides first: a status or a code is a statement, a
         // word in a body is not (a message about a "billing_address" field is no billing failure). A spent balance
         // is named before the rest, since it often comes as a 429 that waiting will not fix.

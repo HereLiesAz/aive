@@ -15,6 +15,10 @@ import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.domain.SpendCapKind
 import com.hereliesaz.geministrator.domain.WorkflowSpendPause
+import com.hereliesaz.geministrator.domain.ApprovalGateId
+import com.hereliesaz.geministrator.domain.ArtifactId
+import com.hereliesaz.geministrator.domain.WorkflowGlobalPause
+import com.hereliesaz.geministrator.domain.WorkflowGlobalPauseKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -221,7 +225,7 @@ class DeadlineReducerTest {
     }
 
     /** [seen] is when the cycle last looked, a minute before the test's `now`, so the gap is not read as the app being away. */
-    private fun fixture(status: TaskRunStatus = TaskRunStatus.Running, spendPause: WorkflowSpendPause? = null, seen: Long = 0): Pair<WorkflowDefinition, WorkflowRun> {
+    private fun fixture(status: TaskRunStatus = TaskRunStatus.Running, spendPause: WorkflowSpendPause? = null, seen: Long = 0, globalPause: WorkflowGlobalPause? = null): Pair<WorkflowDefinition, WorkflowRun> {
         val def = WorkflowDefinition(
             id = WorkflowDefinitionId("d"), name = "d",
             tasks = listOf(TaskDefinition(id = id, name = "Step", objective = "o", roleId = null)),
@@ -230,7 +234,7 @@ class DeadlineReducerTest {
             id = WorkflowRunId("r"), projectId = ProjectId("p"), workflowDefinitionId = def.id, objective = "o",
             status = WorkflowRunStatus.Running,
             taskRuns = mapOf(id to TaskRun(TaskRunId("tr"), id, status, assignedRoleId = null, clock = clock().copy(lastSeenEpochMillis = seen))),
-            createdAtEpochMillis = 0, updatedAtEpochMillis = 0, spendPause = spendPause,
+            createdAtEpochMillis = 0, updatedAtEpochMillis = 0, spendPause = spendPause, globalPause = globalPause,
         )
         return def to run
     }
@@ -259,6 +263,19 @@ class DeadlineReducerTest {
 
     @Test fun spendPausedRunNeverAdvances() {
         val (def, run) = fixture(spendPause = WorkflowSpendPause(SpendCapKind.RunCost, "cap", 1.0, 1.0, emptyList(), 0))
+        val r = DeadlineReducer.reduce(def, run, 500 * MIN, { null }, autoFor = { _, _ -> auto8 })
+        assertTrue(r.hardStops.isEmpty())
+        assertEquals(TaskRunStatus.Running, r.run.taskRuns.getValue(id).status)
+    }
+
+    @Test fun nannyFrozenRunNeverAdvances() {
+        val freeze = WorkflowGlobalPause(
+            kind = WorkflowGlobalPauseKind.HallMonitorReview, reason = "Nanny report passed.",
+            reportArtifactId = ArtifactId("report"), antagonistReviewArtifactId = ArtifactId("review"),
+            orchestratorGateId = ApprovalGateId("o"), humanGateId = ApprovalGateId("h"),
+            taskSnapshots = emptyList(), pausedAtEpochMillis = 0,
+        )
+        val (def, run) = fixture(globalPause = freeze)
         val r = DeadlineReducer.reduce(def, run, 500 * MIN, { null }, autoFor = { _, _ -> auto8 })
         assertTrue(r.hardStops.isEmpty())
         assertEquals(TaskRunStatus.Running, r.run.taskRuns.getValue(id).status)
