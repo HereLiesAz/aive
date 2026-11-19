@@ -818,7 +818,7 @@
    "id": "creature.jobeditor",
    "kind": "entity-editor",
    "area": "Creature",
-   "label": "Job editor in Work tab (objective, criteria, approval, retries, runs-on)",
+   "label": "Job in Work tab (read-only summary; Edit view is the one editor)",
    "source": "HiveJobEditor.kt:79",
    "reachable_via": "Work tab",
    "files": [
@@ -827,13 +827,9 @@
    "symbols": [
     "HiveJobEditor"
    ],
-   "edits": [
-    "task.job",
-    "task.approval",
-    "task.runsOn"
-   ],
+   "edits": [],
    "canonical_for": [],
-   "inplace_editor": true,
+   "inplace_editor": false,
    "back_to": "creature.work",
    "source_resolved": true
   },
@@ -841,7 +837,7 @@
    "id": "creature.providerrow",
    "kind": "entity-editor",
    "area": "Creature",
-   "label": "Provider picker row in Work tab",
+   "label": "Provider summary row in Work tab (read-only; role pin changes in the Roster)",
    "source": "CreatureProviderRow.kt:29",
    "reachable_via": "Work tab",
    "files": [
@@ -852,11 +848,9 @@
     "CreatureProviderRow",
     "ProviderChoiceRow"
    ],
-   "edits": [
-    "role.provider"
-   ],
+   "edits": [],
    "canonical_for": [],
-   "inplace_editor": true,
+   "inplace_editor": false,
    "back_to": "creature.work",
    "source_resolved": true
   },
@@ -864,7 +858,7 @@
    "id": "creature.mind.roleform",
    "kind": "entity-editor",
    "area": "Creature",
-   "label": "Role form embedded in Mind tab",
+   "label": "Role summary in Mind tab (links to the Roster role form)",
    "source": "LiveTechnicalInspector.kt:698",
    "reachable_via": "Mind tab (focusRole)",
    "files": [
@@ -873,20 +867,16 @@
    "symbols": [
     "focusRole"
    ],
-   "edits": [
-    "role.provider",
-    "role.tokenBudget",
-    "role.instructions"
-   ],
+   "edits": [],
    "canonical_for": [],
-   "inplace_editor": true,
+   "inplace_editor": false,
    "back_to": "creature.mind"
   },
   {
    "id": "creature.mind.proposals",
    "kind": "entity-editor",
    "area": "Creature",
-   "label": "Role-instruction proposals in Mind tab",
+   "label": "Role-instruction proposals link in Mind tab (decided in the Roster)",
    "source": "RoleInstructionProposalPanel.kt:66",
    "reachable_via": "Mind tab",
    "files": [
@@ -895,11 +885,9 @@
    "symbols": [
     "RoleInstructionProposalPanel"
    ],
-   "edits": [
-    "role.instructions"
-   ],
+   "edits": [],
    "canonical_for": [],
-   "inplace_editor": true,
+   "inplace_editor": false,
    "back_to": "creature.mind",
    "source_resolved": true
   },
@@ -907,7 +895,7 @@
    "id": "creature.mind.stablepicker",
    "kind": "entity-editor",
    "area": "Creature",
-   "label": "Stable creature picker in Mind tab",
+   "label": "Stable creature line in Mind tab (picked in the Roster)",
    "source": "StableScreens.kt:563",
    "reachable_via": "Mind tab",
    "files": [
@@ -917,11 +905,9 @@
     "CreaturePicker",
     "PickerRow"
    ],
-   "edits": [
-    "role.stableCreature"
-   ],
+   "edits": [],
    "canonical_for": [],
-   "inplace_editor": true,
+   "inplace_editor": false,
    "back_to": "creature.mind",
    "source_resolved": true
   },
