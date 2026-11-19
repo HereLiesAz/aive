@@ -298,7 +298,10 @@ fun ControlRoom(
             tour.hive = emptyList()
             return@LaunchedEffect
         }
-        tour.hive = com.hereliesaz.geministrator.tour.creatureLines(live.definition, live.run, live.roles)
+        val lines = com.hereliesaz.geministrator.tour.creatureLines(live.definition, live.run, live.roles)
+        com.hereliesaz.geministrator.tour.CreatureSpots.focus =
+            com.hereliesaz.geministrator.tour.spotlightFor(tour.hive, lines, com.hereliesaz.geministrator.tour.CreatureSpots.focus)
+        tour.hive = lines
         com.hereliesaz.geministrator.tour.runSignals(live.definition, before, live.run, queenBefore, queenNow)
             .forEach { tour.dispatch(com.hereliesaz.geministrator.tour.TourAction.Observed(com.hereliesaz.geministrator.tour.TourEvent.Run(it))) }
     }

@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import com.russhwolf.settings.Settings
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.hereliesaz.geministrator.tour.tourCreature
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -860,7 +861,7 @@ private fun MascotNodeTerrarium(
                                         val colour = CreatureRigCache.peek(slug)?.let(::somaColour) ?: return@mapNotNull null
                                         colour to gestator.contribution
                                     },
-                                    modifier = Modifier.fillMaxSize(),
+                                    modifier = Modifier.fillMaxSize().tourCreature(node.id),
                                 )
                             }
                         },
@@ -870,7 +871,7 @@ private fun MascotNodeTerrarium(
                                 hueSeed = subject.identitySeed,
                                 state = node.state,
                                 motionPhase = { motionPhase() },
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier.fillMaxSize().tourCreature(node.id),
                                 reach = { tendrilReach(node.id) },
                                 rigOverride = rigOverrideFor(node.id, LocalProgrammaticNodes.current),
                             )

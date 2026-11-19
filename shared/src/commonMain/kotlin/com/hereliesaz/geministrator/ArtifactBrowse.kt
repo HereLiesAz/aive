@@ -41,6 +41,8 @@ import com.hereliesaz.geministrator.resources.hive_made_none_match
 import com.hereliesaz.geministrator.resources.hive_made_show_all
 import com.hereliesaz.geministrator.resources.hive_made_show_less
 import com.hereliesaz.geministrator.resources.hive_what_it_made
+import com.hereliesaz.geministrator.tour.TourTargetId
+import com.hereliesaz.geministrator.tour.tourTarget
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.pluralStringResource
@@ -214,6 +216,7 @@ internal fun HiveMadeSection(
         stringResource(Res.string.hive_what_it_made).uppercase(),
         style = AzphaltType.eyebrow,
         color = azphaltOnSurface(),
+        modifier = Modifier.tourTarget(TourTargetId.HIVE_MADE),
     )
     Text(
         pluralStringResource(Res.plurals.hive_made_count, entries.size, entries.size),

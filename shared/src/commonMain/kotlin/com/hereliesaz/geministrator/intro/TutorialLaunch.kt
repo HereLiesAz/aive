@@ -43,7 +43,7 @@ internal object TutorialLaunch {
     fun rows(labels: Map<String, String>): List<TargetRow> {
         val wide = TourTargetRegistry.boundsOf(TourTargetId.RAIL_HIVE) != null
         // The hive itself is taught by the opening chapters; it is not a control the planner can point a tap at.
-        return tourTargetRows { labels[it] }.filter { it.id != TourTargetId.HIVE_CREATURES.name && (wide || !it.id.startsWith("RAIL_")) }
+        return tourTargetRows { labels[it] }.filter { it.id != TourTargetId.HIVE_CREATURES.name && it.id != TourTargetId.HIVE_MADE.name && (wide || !it.id.startsWith("RAIL_")) }
     }
 
     /** Closed, non-identifying facts handed to the planner. Never a name, a goal, a path or a key. */
@@ -73,6 +73,8 @@ internal object TutorialLaunch {
         say: (com.hereliesaz.geministrator.queen.TutorialSay) -> Unit = {},
         /** The chapters that play before the plan exists ([tutorialOpening]); empty keeps the tour waiting for the plan. */
         opening: List<com.hereliesaz.geministrator.tour.LessonPayload> = emptyList(),
+        /** The chapter that ends the tour once the swarm's own chapters are written ([tutorialClosing]). */
+        closing: List<com.hereliesaz.geministrator.tour.LessonPayload> = emptyList(),
     ): TutorialOutcome? {
         val scope = TutorialRouter.classify(goal) ?: return null
         val rows = rows(labels)
@@ -87,6 +89,7 @@ internal object TutorialLaunch {
             surface = TourControllerSurface,
             facts = facts(rows, opened = opening.isNotEmpty()),
             opening = opening,
+            closing = closing,
             loadComfort = { store.load() },
             saveComfort = { store.save(it) },
             nowMillis = nowMillis,

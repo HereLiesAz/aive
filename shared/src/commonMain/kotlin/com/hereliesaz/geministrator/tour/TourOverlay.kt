@@ -117,7 +117,7 @@ fun TourOverlayHost() {
     }
     if (state == null || state.phase == TourPhase.Dismissed) return
     // What is happening to each creature and egg, beside whatever step is showing.
-    HiveLines(TourController.hive)
+    HiveLines(TourController.hive, CreatureSpots.focus)
     // After the last step the layer is gone, except while the closing question (do you feel you know what you are doing now) is open.
     val closing = state.finished && state.checkInLine != null
     if (state.finished && !closing) return
@@ -164,7 +164,7 @@ private fun ClosingCard(line: String) {
 
 /** Each creature and egg of the hive on screen with where it is now, so the keeper watches the swarm work while the tour speaks. */
 @Composable
-private fun HiveLines(lines: List<CreatureLine>) {
+private fun HiveLines(lines: List<CreatureLine>, focus: String?) {
     if (lines.isEmpty()) return
     Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.TopEnd) {
         AzphaltSurface(Azphalt.Ink) {
@@ -186,7 +186,7 @@ private fun HiveLines(lines: List<CreatureLine>) {
                         CreatureStage.Failed -> stringResource(Res.string.tour_stage_failed)
                         CreatureStage.Cancelled -> stringResource(Res.string.tour_stage_cancelled)
                     }
-                    Text("${plain(line.name)} · $stage", style = AzphaltType.body, color = azphaltOnSurface(), maxLines = 1)
+                    Text("${if (line.id == focus) "› " else ""}${plain(line.name)} · $stage", style = AzphaltType.body, color = azphaltOnSurface(), maxLines = 1)
                 }
             }
         }
@@ -246,7 +246,9 @@ private fun PausedLine() {
 private fun TourLayer(state: TourState, step: LessonPayload) {
     var origin by remember { mutableStateOf(Offset.Zero) }
     val targetId = TourTargetId.fromId(step.target)
-    val windowBounds: Rect? = targetId?.let { TourTargetRegistry.boundsOf(it) }
+    // Pointed at the hive, the ring goes to the creature the hive just acted on when it is on screen.
+    val creatureBounds: Rect? = if (targetId == TourTargetId.HIVE_CREATURES) CreatureSpots.focus?.let { CreatureSpots.boundsOf(it) } else null
+    val windowBounds: Rect? = creatureBounds ?: targetId?.let { TourTargetRegistry.boundsOf(it) }
     val hole = windowBounds?.translate(-origin.x, -origin.y)?.inflate(6f)
     var height by remember { mutableStateOf(0f) }
     val pulse = pulseAlpha()

@@ -29,6 +29,20 @@ import com.hereliesaz.geministrator.resources.tour_open_queen_checkin
 import com.hereliesaz.geministrator.resources.tour_open_queen_another
 import com.hereliesaz.geministrator.resources.tour_open_queen_small1
 import com.hereliesaz.geministrator.resources.tour_open_queen_small2
+import com.hereliesaz.geministrator.resources.tour_open_needs_sentence
+import com.hereliesaz.geministrator.resources.tour_open_needs_explain
+import com.hereliesaz.geministrator.resources.tour_open_needs_missed
+import com.hereliesaz.geministrator.resources.tour_open_needs_checkin
+import com.hereliesaz.geministrator.resources.tour_open_needs_another
+import com.hereliesaz.geministrator.resources.tour_open_needs_small1
+import com.hereliesaz.geministrator.resources.tour_open_needs_small2
+import com.hereliesaz.geministrator.resources.tour_close_made_sentence
+import com.hereliesaz.geministrator.resources.tour_close_made_explain
+import com.hereliesaz.geministrator.resources.tour_close_made_missed
+import com.hereliesaz.geministrator.resources.tour_close_made_checkin
+import com.hereliesaz.geministrator.resources.tour_close_made_another
+import com.hereliesaz.geministrator.resources.tour_close_made_small1
+import com.hereliesaz.geministrator.resources.tour_close_made_small2
 import com.hereliesaz.geministrator.tour.ExpectKind
 import com.hereliesaz.geministrator.tour.LessonPayload
 import com.hereliesaz.geministrator.tour.TourExpect
@@ -73,6 +87,16 @@ internal suspend fun tutorialOpening(): List<LessonPayload> = listOf(
         smaller = listOf(getString(Res.string.tour_open_work_small1), getString(Res.string.tour_open_work_small2)),
     ),
     LessonPayload(
+        target = TourTargetId.CREATURE_TAB_NEEDS.name,
+        sentence = getString(Res.string.tour_open_needs_sentence),
+        expect = TourExpect(ExpectKind.Opened, TourTargetId.CREATURE_TAB_NEEDS.name),
+        explain = getString(Res.string.tour_open_needs_explain),
+        ifMissed = getString(Res.string.tour_open_needs_missed),
+        checkIn = getString(Res.string.tour_open_needs_checkin),
+        anotherWay = getString(Res.string.tour_open_needs_another),
+        smaller = listOf(getString(Res.string.tour_open_needs_small1), getString(Res.string.tour_open_needs_small2)),
+    ),
+    LessonPayload(
         target = TourTargetId.MESSAGES_BUTTON.name,
         sentence = getString(Res.string.tour_open_queen_sentence),
         expect = TourExpect(ExpectKind.Tapped, TourTargetId.MESSAGES_BUTTON.name),
@@ -81,5 +105,22 @@ internal suspend fun tutorialOpening(): List<LessonPayload> = listOf(
         checkIn = getString(Res.string.tour_open_queen_checkin),
         anotherWay = getString(Res.string.tour_open_queen_another),
         smaller = listOf(getString(Res.string.tour_open_queen_small1), getString(Res.string.tour_open_queen_small2)),
+    ),
+)
+
+/**
+ * The tour's one closing chapter, after the swarm's own: the hive presents what it made. It waits on the run finishing
+ * ([ExpectKind.RunDone]), so the last thing the keeper sees is the finished work, in the place every hive keeps it.
+ */
+internal suspend fun tutorialClosing(): List<LessonPayload> = listOf(
+    LessonPayload(
+        target = TourTargetId.HIVE_MADE.name,
+        sentence = getString(Res.string.tour_close_made_sentence),
+        expect = TourExpect(ExpectKind.RunDone, null),
+        explain = getString(Res.string.tour_close_made_explain),
+        ifMissed = getString(Res.string.tour_close_made_missed),
+        checkIn = getString(Res.string.tour_close_made_checkin),
+        anotherWay = getString(Res.string.tour_close_made_another),
+        smaller = listOf(getString(Res.string.tour_close_made_small1), getString(Res.string.tour_close_made_small2)),
     ),
 )
