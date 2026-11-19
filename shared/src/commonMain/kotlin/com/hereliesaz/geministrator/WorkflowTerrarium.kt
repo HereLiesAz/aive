@@ -19,6 +19,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.hereliesaz.geministrator.tour.TourTargetId
 import com.hereliesaz.geministrator.tour.tourTarget
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.conveyance.h2g2.H2g2TerrariumRelationshipKind
@@ -520,13 +521,13 @@ internal fun GeministratorWorkflowTerrarium(
             )
         }
         if (frame == null) {
-            Box(Modifier.fillMaxWidth().height(if (compact) 470.dp else 620.dp).tourTarget(com.hereliesaz.geministrator.tour.TourTargetId.HIVE_CREATURES)) { shownField() }
+            Box(Modifier.fillMaxWidth().height(if (compact) 470.dp else 620.dp).tourTarget(TourTargetId.HIVE_CREATURES)) { shownField() }
             // No shell to hold a sheet: the flipped card's detail sits under the field.
             if (shellFlip == null && flipping) flippedId?.let { id ->
                 flipHost.detail?.invoke(id, Modifier.padding(top = 8.dp))
             }
         } else {
-            Box(Modifier.tourTarget(com.hereliesaz.geministrator.tour.TourTargetId.HIVE_CREATURES)) {
+            Box(Modifier.tourTarget(TourTargetId.HIVE_CREATURES)) {
                 HiveTissueFrame(height = frame.tissueHeight, building = building) { shownField() }
             }
             frame.feedBar()
