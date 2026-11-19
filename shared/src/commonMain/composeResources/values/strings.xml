@@ -2183,8 +2183,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="tour_resume">Resume</string>
     <string name="tour_stop">Stop the tour</string>
     <string name="tour_paused_line">Tour paused</string>
-    <string name="tour_preparing_line">Writing your tour. Its first step appears here.</string>
-    <string name="tour_failed_line">The tour could not be written. Teach me tries again.</string>
+    <string name="tour_preparing_line">Writing your tour; its first step appears here</string>
+    <string name="tour_failed_line">Tour not written; Teach me tries again</string>
     <string name="tour_hide">Hide</string>
     <string name="tour_hive_title">The hive</string>
     <string name="tour_hive_egg_growth">Egg, %1$d%%</string>

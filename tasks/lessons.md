@@ -177,3 +177,5 @@ Rules:
 - When correcting, undo only what the correction undoes.
 
 - Never key a destructive reset on a commit id. A reset that deletes hours of results must test the content it depends on (here: the corpus files' hashes), because any unrelated merge to main moves the commit.
+
+- A guard test is part of the contract: before adding strings or sources near one (here `NoPrewrittenCurriculumTest` for every `tour_*` string and the tour sources), read it and check each new string against its rules by hand, because CI is the only compiler and a red main starves every merge behind it.
