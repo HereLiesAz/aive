@@ -131,6 +131,7 @@ import com.hereliesaz.geministrator.resources.feed_gate_use_free
 import com.hereliesaz.geministrator.resources.feed_gate_unsupported_repository
 import com.hereliesaz.geministrator.resources.first_hive_objective
 import com.hereliesaz.geministrator.resources.first_hive_hint
+import com.hereliesaz.geministrator.resources.first_hive_next
 import com.hereliesaz.geministrator.resources.first_hive_teach_seed
 import com.hereliesaz.geministrator.resources.first_hive_teach_me
 import com.hereliesaz.geministrator.resources.tutorial_needs_source_line
@@ -322,6 +323,7 @@ internal fun MindMapRunScreen(
             if (firstLaunch) {
                 Text(stringResource(Res.string.first_hive), style = if (compact) AzphaltType.section else AzphaltType.hero, color = azphaltOnSurface())
                 Text(stringResource(Res.string.first_hive_hint), style = AzphaltType.body, color = azphaltOnSurface())
+                Text(stringResource(Res.string.first_hive_next), style = AzphaltType.body, color = azphaltOnSurface())
             } else {
                 RuntimeStateRecord(runtimeState, compact)
             }
