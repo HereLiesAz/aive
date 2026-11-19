@@ -166,6 +166,9 @@ private fun ClosingCard(line: String) {
 @Composable
 private fun HiveLines(lines: List<CreatureLine>, focus: String?) {
     if (lines.isEmpty()) return
+    // The keeper can always put it away: it never stays over the messages and options it sits beside.
+    var hidden by remember { mutableStateOf(false) }
+    if (hidden) return
     // Below the header, never over the breadcrumb and the page title.
     Box(Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 132.dp), contentAlignment = Alignment.TopEnd) {
         AzphaltSurface(Azphalt.Ink) {
@@ -174,6 +177,7 @@ private fun HiveLines(lines: List<CreatureLine>, focus: String?) {
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(stringResource(Res.string.tour_hive_title).uppercase(), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+                AzphaltPill(label = stringResource(Res.string.tour_hide), seed = "tour-hive-hide", onClick = { hidden = true })
                 lines.forEach { line ->
                     val stage = when (line.stage) {
                         CreatureStage.Egg -> stringResource(Res.string.tour_hive_egg_growth, ((line.growth ?: 0f) * 100).toInt())
