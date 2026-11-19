@@ -44,7 +44,7 @@ Connections (providers, A2A agents, repo services, MCP servers: `ProviderManagem
 
 | Place | Reach | Back |
 |---|---|---|
-| **Live hive** (Live/Build/Flowchart modes; Setup/Swarm switch) | default | -> district |
+| **Live hive** (Live/Edit modes; Setup/Swarm switch) | default | -> district |
 | **Resting hive** (`RestingHive`, `HiveScreens.kt:288`) | district cell, New hive (`MainDestination` L957-L963), HiveCard import | -> district |
 | **Timeline** (Overview/Waterfall/Events/Memory/Log) | Timeline pill -> `showTimeline` (`overview.timeline`); creature Work "Open its trace" (`ControlRoomUi.kt:433`: sets timeline + `panelSetAside`) | `:355` back to hive |
 | **Creature panel** (phone ModalBottomSheet `ControlRoomUi.kt:607`; wide dock 310dp `:593`) tabs Needs/Work/Mind (`CreatureTab`, `LiveTechnicalInspector.kt:854`) | `selectCreature` (toggling, `:274`), `openCreature` (non-toggling, `:283`), `openInbox` (selects creature + Needs tab, `:332-345`); tab = `creature.panel.tab` | sheet dismiss / wide Back -> `closePanel` (set aside, stays selected, `:293`); App-level Back clears selection (`App.kt:526`) |
@@ -135,7 +135,7 @@ Key: LINK = display already navigates to the canonical place (callback cited). T
 - Canonical: Keeper's room > Projects (files/export) + hive launch Options (name/repository). Displays: District group headers (`DistrictScreen.kt` `project.uppercase()`, TEXT), hive eyebrow "RUNNING · project" (TEXT), launch fields. No project destination.
 
 ### 2.16 Appearance / device settings
-- Canonical: Keeper's room > Appearance/Device. Displays: reduce motion / creature labels referenced in docs only; Hive Setup/Swarm switch (`SetupSwarmSwitch`) and Live/Build/Flowchart are view state, not settings.
+- Canonical: Keeper's room > Appearance/Device. Displays: reduce motion / creature labels referenced in docs only; Hive Setup/Swarm switch (`SetupSwarmSwitch`) and Live/Edit are view state, not settings.
 
 ---
 
@@ -230,7 +230,7 @@ Impact: H = blocks the owner rule outright or loses user context; M = duplicate/
 sealed interface Destination {
     // Hive side
     data object District : Destination
-    data class Hive(val definitionId: String, val runId: String? = null, val view: HiveView? = null) : Destination   // Live/Build/Flowchart/Timeline(+view)
+    data class Hive(val definitionId: String, val runId: String? = null, val view: HiveView? = null) : Destination   // Live/Edit/Timeline(+view)
     data class Creature(val taskId: String, val tab: CreatureTab = Work, val definitionId: String? = null) : Destination
     data class Run(val runId: String) : Destination                    // => Hive(runId) on its Timeline
     data class Artifact(val taskId: String, val artifactId: String) : Destination

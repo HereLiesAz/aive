@@ -1350,6 +1350,8 @@ private fun MainDestination(
                                     currentRun = it.run,
                                     onLoadRuns = { onLoadRunHistory().flatMap { pair -> pair.second } },
                                     onReplay = onSwitchRun,
+                                    // The same side margin as the pills above it (it sat against the sidebar).
+                                    modifier = Modifier.padding(horizontal = hiveGutter(compact)),
                                 )
                             }
                             if (live != null && showTimeline) {
@@ -1357,7 +1359,7 @@ private fun MainDestination(
                                     runKey = live.run.id.value,
                                     refreshKey = live.run.updatedAtEpochMillis,
                                     onLoadTimeline = onLoadRunTimeline,
-                                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                                    modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = hiveGutter(compact)),
                                     taskName = { id -> live.definition.tasks.firstOrNull { it.id == id }?.name ?: id.value },
                                     selectedTaskId = selectedTaskId,
                                     // Every row, bar and log line here is a link: it opens its creature and never closes it (B3).
