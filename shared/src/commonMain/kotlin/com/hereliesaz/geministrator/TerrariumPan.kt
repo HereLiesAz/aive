@@ -8,17 +8,19 @@ import kotlin.math.hypot
  * What a finger does on the hive's open ground (Build and Live alike). Decided here, away from the
  * pointer plumbing in MascotNodeTerrarium.kt, so it can be tested:
  *
- *  - one finger that starts on empty ground pans the camera;
+ *  - one finger that starts on empty ground is left to the page, so it scrolls the screen;
  *  - one finger that starts on a strand cuts it (only while the strand can be cut, i.e. in Build);
- *  - two fingers zoom and pan together;
+ *  - two fingers move the hive: pinch zooms, and the pair's drift pans the camera;
  *  - a strand is drawn only from a creature's tail, and a creature is moved by its body. Those are
  *    handled on the creature itself and never reach the ground.
  *
- * Cutting used to be the default for any drag on empty ground, which left no way to pan.
+ * Cutting used to be the default for any drag on empty ground, which left no way to pan. Then one
+ * finger panned, which made a page with a hive on it hard to scroll: the ground caught every swipe
+ * that started on it. The camera now answers to two fingers only.
  */
 
-/** What a one-finger drag that began on open ground is for. */
-internal enum class CanvasDragIntent { Pan, Slice }
+/** What a one-finger drag that began on open ground is for: the page's scroll, or a cut. */
+internal enum class CanvasDragIntent { Scroll, Slice }
 
 /** A strand within this distance of the finger counts as touched (dp at 48dp-target scale, in px at density 1). */
 internal const val STRAND_TOUCH_DP = 20f
@@ -27,11 +29,11 @@ internal const val STRAND_TOUCH_DP = 20f
 internal const val PAN_MARGIN = 0.1f
 
 /**
- * A drag that starts on a strand cuts it, when [sliceAvailable]; any other drag on the ground pans.
- * Slice is not offered in Live, where the wiring cannot be edited, so a drag there always pans.
+ * A drag that starts on a strand cuts it, when [sliceAvailable]; any other one-finger drag on the
+ * ground scrolls the page. Slice is not offered in Live, where the wiring cannot be edited.
  */
 internal fun canvasDragIntent(startedOnStrand: Boolean, sliceAvailable: Boolean): CanvasDragIntent =
-    if (startedOnStrand && sliceAvailable) CanvasDragIntent.Slice else CanvasDragIntent.Pan
+    if (startedOnStrand && sliceAvailable) CanvasDragIntent.Slice else CanvasDragIntent.Scroll
 
 /** The shortest distance from [p] to the polyline [line]; infinity for an empty line. */
 internal fun distanceToPolyline(p: Offset, line: List<Offset>): Float {
