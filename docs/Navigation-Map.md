@@ -143,8 +143,7 @@ Key: LINK = display already navigates to the canonical place (callback cited). T
 
 | Mechanism | Defined | Goes to | Entity-aware? |
 |---|---|---|---|
-| `openConnections` | `ControlRoomUi.kt:893` | Keeper > Connections | No (generic) |
-| `openConnectionsFromPanel` | `:260` | same (duplicated; also sets `keeper.open`) | No |
+| `openConnections` | `ControlRoomUi.kt` (`openConnectionsAt`), body in `PlaceLinks.kt` `openConnectionsPlace` | Keeper > Connections (the one route; the panel's former copy is gone) | No (generic) |
 | `onOpenCompute` | `:427` | `Compute` destination -> Keeper Compute part | No |
 | `onOpenLimits` | `:1199` | Keeper > Limits/Device | Part-level (wide/compact switch embedded) |
 | `openKeeper` | `:448` | Keeper list (resets `keeper.open` when coming from elsewhere) | No |
@@ -161,7 +160,7 @@ Key: LINK = display already navigates to the canonical place (callback cited). T
 
 Observed bugs in these mechanisms:
 - Leaving Overview clears the selected creature (`App.kt:738-740`) and `creature.panel.task` (`ControlRoomUi.kt` LaunchedEffect ~L317), so **every link out of the creature panel (Connections, Compute, Limits) returns to the whole hive, not the creature/tab the user left** (the opener does push Overview onto `navigationHistory`, but selection/tab are not part of history).
-- `openConnections` is implemented twice with the same body (`:260` and `:893`).
+- Fixed: `openConnections` is one route, `openConnectionsPlace` (`PlaceLinks.kt`).
 - Links from non-Overview places to a creature do not exist (no destination switch inside `openCreature`).
 - `needs_budget` meter and `LiveInspectorLine` links use different cues (see 4.3).
 

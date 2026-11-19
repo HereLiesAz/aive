@@ -120,6 +120,8 @@ import com.hereliesaz.geministrator.resources.inspector_answered_by
 import com.hereliesaz.geministrator.resources.inspector_answered_by_after
 import com.hereliesaz.geministrator.resources.inspector_artifacts
 import com.hereliesaz.geministrator.resources.inspector_attempt
+import com.hereliesaz.geministrator.resources.inspector_technical_details
+import com.hereliesaz.geministrator.resources.needs_health
 import com.hereliesaz.geministrator.resources.inspector_blocked
 import com.hereliesaz.geministrator.resources.inspector_checkpoint
 import com.hereliesaz.geministrator.resources.inspector_context_artifacts_sent
@@ -347,7 +349,20 @@ internal fun TechnicalInspector(
         when (tab) {
             CreatureTab.Needs -> {
                 creatureNeeds(taskId, liveWorkflow.definition, liveWorkflow.run, liveWorkflow.roles)
-                    ?.let { CreatureNeedsPanel(it, titled = false, onOpenMind = { onTabChange(CreatureTab.Mind) }) }
+                    ?.let { needs ->
+                        // The meters are how it is doing, not a decision: folded away, so this tab shows what is asked of you.
+                        var healthOpen by remember(taskId) { mutableStateOf(false) }
+                        AzphaltPill(
+                            label = stringResource(Res.string.needs_health),
+                            seed = "needs-health-$selectedTaskId",
+                            selected = healthOpen,
+                            onClick = { healthOpen = !healthOpen },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        AzphaltChildBand(visible = healthOpen) {
+                            CreatureNeedsPanel(needs, titled = false, onOpenMind = { onTabChange(CreatureTab.Mind) })
+                        }
+                    }
                 // A question its agent asked you (docs/Agent-UI.md): a wait like any other.
                 taskRun.keeperQuestion?.takeIf { taskRun.awaitsKeeperAnswer() }?.let { question ->
                     AgentQuestionPanel(
@@ -440,7 +455,8 @@ internal fun TechnicalInspector(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                if (!creatureNeedsYou(taskRun) && creatureNeeds(taskId, liveWorkflow.definition, liveWorkflow.run, liveWorkflow.roles) == null) {
+                // The meters are folded away above, so a creature asking nothing says so whether or not they exist.
+                if (!creatureNeedsYou(taskRun)) {
                     Text(stringResource(Res.string.creature_needs_nothing), style = AzphaltType.body, color = azphaltOnSurface())
                 }
             }
@@ -550,17 +566,6 @@ internal fun TechnicalInspector(
                 com.hereliesaz.geministrator.workflow.slowCreatureAllowedMinutes(task, taskRun)?.let {
                     LiveInspectorLine(stringResource(Res.string.inspector_time), stringResource(Res.string.creature_taking_longer, it.toString()), live = true)
                 }
-                // An executor that lives off this device or behind an integration links to where that is set up.
-                val executorLink = when (executor) {
-                    is TaskExecutor.Distributed -> onOpenCompute
-                    is TaskExecutor.GitHubAction, is TaskExecutor.ExternalService -> onOpenConnections
-                    else -> null
-                }
-                LiveInspectorLine(stringResource(Res.string.inspector_executor), executor.displayName(), onClick = executorLink)
-                LiveInspectorLine(stringResource(Res.string.inspector_executor_ref), executor.reference(), onClick = executorLink)
-                (taskRun.assignedRoleId?.value ?: task.roleId?.value)
-                    ?.takeIf { it != executor.reference() }
-                    ?.let { LiveInspectorLine(stringResource(Res.string.inspector_responsible_role), it) }
                 // The source that answered links to that source's own screen; with none yet, to Connections.
                 LiveInspectorLine(
                     stringResource(Res.string.inspector_provider),
@@ -573,9 +578,32 @@ internal fun TechnicalInspector(
                     } ?: "—",
                     onClick = sourceLink(taskRun.assignedProviderId?.value) ?: onOpenConnections,
                 )
+                var detailsOpen by remember(taskId) { mutableStateOf(false) }
+                AzphaltPill(
+                    label = stringResource(Res.string.inspector_technical_details),
+                    seed = "work-details-$selectedTaskId",
+                    selected = detailsOpen,
+                    onClick = { detailsOpen = !detailsOpen },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                AzphaltChildBand(visible = detailsOpen) {
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                // An executor that lives off this device or behind an integration links to where that is set up.
+                val executorLink = when (executor) {
+                    is TaskExecutor.Distributed -> onOpenCompute
+                    is TaskExecutor.GitHubAction, is TaskExecutor.ExternalService -> onOpenConnections
+                    else -> null
+                }
+                LiveInspectorLine(stringResource(Res.string.inspector_executor), executor.displayName(), onClick = executorLink)
+                LiveInspectorLine(stringResource(Res.string.inspector_executor_ref), executor.reference(), onClick = executorLink)
+                (taskRun.assignedRoleId?.value ?: task.roleId?.value)
+                    ?.takeIf { it != executor.reference() }
+                    ?.let { LiveInspectorLine(stringResource(Res.string.inspector_responsible_role), it) }
                 LiveInspectorLine(stringResource(Res.string.inspector_attempt), taskRun.attempt.toString())
                 LiveInspectorLine(stringResource(Res.string.inspector_provider_run), taskRun.providerRunId?.value ?: "—")
                 LiveInspectorLine(stringResource(Res.string.inspector_external_run), taskRun.externalRunId ?: "—")
+                    }
+                }
                 taskRun.progress?.let { progress ->
                     LiveInspectorLine(stringResource(Res.string.inspector_progress), "${(progress * 100f).toInt()}%", live = true)
                 }

@@ -394,6 +394,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inspector_sending">Sending…</string>
     <string name="inspector_sent">Sent</string>
     <string name="needs_needs">NEEDS</string>
+    <string name="needs_health">How it is doing</string>
+    <string name="inspector_technical_details">Technical details</string>
     <string name="mind_instructions">ITS MIND · INSTRUCTIONS</string>
     <string name="mind_tools">TOOLS</string>
     <string name="mind_budget">TOKEN BUDGET PER RUN</string>
@@ -1297,6 +1299,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="first_hive">Your first hive</string>
     <string name="first_hive_default_name">First hive</string>
     <string name="first_hive_hint">Tell the queen what you want done. She drafts the swarm and hatches the creatures it needs.</string>
+    <string name="first_hive_next">1. The queen drafts a plan.\n2. You read it and approve it.\n3. Creatures do the work, and ask you when they need a decision.</string>
     <string name="first_hive_objective">What do you want to get done?</string>
     <string name="first_hive_feed">Work</string>
     <string name="hive_gone">This swarm is gone. Hive, above, leads back to the rest.</string>
