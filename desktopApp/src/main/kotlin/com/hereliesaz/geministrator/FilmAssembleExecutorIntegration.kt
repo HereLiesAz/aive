@@ -134,10 +134,11 @@ internal class FilmAssembleExecutorIntegration(
         val result = runner.run(command, folder, ffmpegEnvironment(environment()), null, timeoutMillis) { line ->
             progressMillis(line)?.let { run.doneMillis = it }
         }
+        val startFailure = result.startFailure
         return when {
-            result.startFailure != null -> {
+            startFailure != null -> {
                 partial.delete()
-                failed("ffmpeg could not be started: ${clean(result.startFailure)}. $FFMPEG_INSTALL_HINT")
+                failed("ffmpeg could not be started: ${clean(startFailure)}. $FFMPEG_INSTALL_HINT")
             }
             result.timedOut -> {
                 partial.delete()
