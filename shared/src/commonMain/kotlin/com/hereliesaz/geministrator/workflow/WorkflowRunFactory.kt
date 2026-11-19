@@ -39,6 +39,9 @@ object WorkflowRunFactory {
     const val APPROVAL_NOT_GRANTED = "APPROVAL_NOT_GRANTED"
     /** A task skipped because its condition was not met: a branch not taken, not a failure. */
     const val CONDITION_NOT_MET = "CONDITION_NOT_MET"
+
+    /** A creature that never ran because a task it waited on failed and the run ended failed. */
+    const val UPSTREAM_FAILED = "UPSTREAM_FAILED"
     /** A task not yet released: something it depends on has not settled. */
     const val WAITING_FOR_DEPENDENCIES = "WAITING_FOR_DEPENDENCIES"
 
