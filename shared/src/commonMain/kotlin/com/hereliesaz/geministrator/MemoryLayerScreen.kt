@@ -361,7 +361,7 @@ private fun MemoryLayerControls(controller: MemoryLayerController, connectedProv
         onClick = { tuningOpen = !tuningOpen },
         modifier = Modifier.fillMaxWidth(),
     )
-    if (tuningOpen) {
+    AzphaltChildBand(visible = tuningOpen) {
     MemorySectionLabel(stringResource(Res.string.memory_stage, selectedStage.stage.name))
     selectedStage.roles.forEach { role ->
         StageEngineEditor(

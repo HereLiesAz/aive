@@ -719,7 +719,7 @@ internal fun MindMapRunScreen(
                     onClick = { optionsOpen = !optionsOpen },
                     modifier = Modifier.fillMaxWidth().tourTarget(TourTargetId.OPTIONS_PILL),
                 )
-                if (optionsOpen) {
+                AzphaltChildBand(visible = optionsOpen) {
                 if (firstLaunch) projectFields()
                 if (!repositoryGated) repositoryFields()
                 LaunchLineagePicker(

@@ -843,7 +843,7 @@ internal fun ProviderSettingsScreen(
             onClick = { aboutAdvancedOpen = !aboutAdvancedOpen },
             modifier = Modifier.fillMaxWidth(),
         )
-        if (aboutAdvancedOpen) TraceExportSettingsSection()
+        AzphaltChildBand(visible = aboutAdvancedOpen) { TraceExportSettingsSection() }
         PromptHistorySettingsSection()
 
       }
@@ -880,7 +880,7 @@ internal fun ProviderSettingsScreen(
                     onClick = { relayAdvancedOpen = !relayAdvancedOpen },
                     modifier = Modifier.fillMaxWidth(),
                 )
-                if (relayAdvancedOpen) {
+                AzphaltChildBand(visible = relayAdvancedOpen) {
                     Text(
                         stringResource(Res.string.remote_access_advanced_explain),
                         style = AzphaltType.body,
@@ -1594,7 +1594,7 @@ internal fun ProviderSettingsScreen(
             onClick = { dataAdvancedOpen = !dataAdvancedOpen },
             modifier = Modifier.fillMaxWidth(),
         )
-        if (dataAdvancedOpen) {
+        AzphaltChildBand(visible = dataAdvancedOpen) {
         ProviderSectionLabel(stringResource(Res.string.settings_data))
         if (exportTriggered) {
             LaunchedEffect(Unit) {
