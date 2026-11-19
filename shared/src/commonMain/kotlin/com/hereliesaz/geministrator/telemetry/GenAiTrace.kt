@@ -387,6 +387,7 @@ object WorkflowTraceBuilder {
                     put(GenAiAttributes.PROVIDER_ID, OtelAttributeValue.Text(usage.providerId.value))
                     put(GenAiAttributes.PROVIDER_RUN_ID, OtelAttributeValue.Text(usage.providerRunId.value))
                     put(GenAiAttributes.TASK_ID, OtelAttributeValue.Text(usage.taskDefinitionId.value))
+                    usage.model?.let { put(GenAiAttributes.REQUEST_MODEL, OtelAttributeValue.Text(it)) }
                     usage.inputTokens?.let { put(GenAiAttributes.USAGE_INPUT_TOKENS, OtelAttributeValue.Integer(it)) }
                     usage.outputTokens?.let { put(GenAiAttributes.USAGE_OUTPUT_TOKENS, OtelAttributeValue.Integer(it)) }
                     usage.costUsd?.let { put(GenAiAttributes.USAGE_COST_USD, OtelAttributeValue.Decimal(it)) }

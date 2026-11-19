@@ -212,6 +212,16 @@ data class ProviderUsageRecorded(
     val costUnknown: Boolean = false,
     /** Tokens a replayed habit saved on this report (0 for a model run). */
     val tokensAvoided: Long = 0,
+    /**
+     * The model id the provider says it sent the request to; null when the provider does not expose one
+     * (a CLI agent, an A2A peer, an on-device run, a replayed habit). Events written before this field
+     * existed decode with null.
+     */
+    val model: String? = null,
+    /** SHA-256 (hex) of the request text as sent to the provider; never the text. Null where the app cannot see that text. */
+    val requestSha256: String? = null,
+    /** Length in characters of that request text. Null with [requestSha256]. */
+    val requestChars: Int? = null,
     override val occurredAtEpochMillis: Long,
 ) : WorkflowEvent
 

@@ -887,6 +887,9 @@ class ProviderBackedManagedSessionGateway(
         latencyMillis = latencyMillis,
         costUnknown = costUnknown,
         tokensAvoided = tokensAvoided,
+        model = model?.takeIf { it.isNotBlank() },
+        requestSha256 = requestSha256,
+        requestChars = requestChars,
     ).sanitized()
 
     private fun AgentEvent.memoryReplayKey(): String = when (this) {

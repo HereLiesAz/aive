@@ -187,6 +187,11 @@ data class ManagedSessionUsage(
     val costUnknown: Boolean = false,
     /** Tokens a replayed habit saved (see [AgentEvent.UsageReported.tokensAvoided]). */
     val tokensAvoided: Long = 0,
+    /** The model the provider reports it used, or null ([AgentEvent.UsageReported.model]). */
+    val model: String? = null,
+    /** Fingerprint of the request text as sent: SHA-256 hex and length, never the text. */
+    val requestSha256: String? = null,
+    val requestChars: Int? = null,
 )
 
 /**
@@ -219,6 +224,10 @@ internal fun ManagedSessionUsage?.plusReport(next: ManagedSessionUsage): Managed
         latencyMillis = next.latencyMillis ?: base.latencyMillis,
         costUnknown = base.costUnknown || next.costUnknown,
         tokensAvoided = base.tokensAvoided + next.tokensAvoided,
+        // The later report's request wins as a whole: a fingerprint and its length must describe one request.
+        model = next.model ?: base.model,
+        requestSha256 = if (next.requestSha256 != null) next.requestSha256 else base.requestSha256,
+        requestChars = if (next.requestSha256 != null) next.requestChars else base.requestChars,
     )
 }
 

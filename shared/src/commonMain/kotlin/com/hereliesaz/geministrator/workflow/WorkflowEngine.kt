@@ -824,6 +824,9 @@ class WorkflowEngine(
                             latencyMillis = usage.latencyMillis,
                             costUnknown = usage.costUnknown,
                             tokensAvoided = usage.tokensAvoided,
+                            model = usage.model,
+                            requestSha256 = usage.requestSha256,
+                            requestChars = usage.requestChars,
                             occurredAtEpochMillis = nowEpochMillis,
                         ),
                     )
@@ -1430,6 +1433,9 @@ class WorkflowEngine(
                                 cacheHitFraction = usage.cacheHitFraction,
                                 latencyMillis = usage.latencyMillis,
                                 costUnknown = usage.costUnknown,
+                                model = usage.model,
+                                requestSha256 = usage.requestSha256,
+                                requestChars = usage.requestChars,
                                 occurredAtEpochMillis = nowEpochMillis,
                             ),
                         )
