@@ -598,6 +598,8 @@ fun App(
         continuesWorkflowRunIds: List<WorkflowRunId>,
         existingProject: Project?,
         objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
+        /** The keeper switched on "have every result reviewed" in the launch form's options. */
+        requireReview: Boolean = false,
         onFinished: (Throwable?) -> Unit = {},
     ) = runLaunch(onFinished) { activeRuntime ->
         researchRepository[0] = repository
@@ -615,6 +617,7 @@ fun App(
                 objectiveProvenance = objectiveProvenance,
                 research = researchStep,
                 researchContext = researchContext,
+                requireReview = requireReview,
             )
         } else {
             launchSteps.push("Starting the starter workflow…")
@@ -1048,7 +1051,7 @@ fun App(
                             selectedTaskIdValue = if (selectedTaskId == taskId) "" else taskId
                         },
                         onLoadLaunchableRuns = { runtime?.loadLaunchableRuns() ?: emptyList() },
-                        onLaunchWorkflow = { projectName, objective, repository, continuesWorkflowRunIds ->
+                        onLaunchWorkflow = { projectName, objective, repository, continuesWorkflowRunIds, requireReview ->
                             val existingProject = when (val state = runtimeState) {
                                 is ApplicationRuntimeState.NoRun -> state.project
                                 // "Continue" from a finished run's view stays in that run's project.
@@ -1056,7 +1059,7 @@ fun App(
                                     state.presentation.project.takeIf { continuesWorkflowRunIds.isNotEmpty() }
                                 else -> null
                             }
-                            launchObjective(projectName, objective, repository, continuesWorkflowRunIds, existingProject)
+                            launchObjective(projectName, objective, repository, continuesWorkflowRunIds, existingProject, requireReview = requireReview)
                         },
                         onApproveTask = { taskId ->
                             scope.launch {

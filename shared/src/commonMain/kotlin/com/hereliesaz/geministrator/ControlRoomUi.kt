@@ -201,7 +201,7 @@ fun ControlRoom(
     destinations: List<ControlRoomDestination> = ControlRoomDestination.entries,
     selectedTaskId: String?,
     onTaskSelected: (String) -> Unit,
-    onLaunchWorkflow: (String, String, RepositoryRef?, List<WorkflowRunId>) -> Unit,
+    onLaunchWorkflow: (String, String, RepositoryRef?, List<WorkflowRunId>, Boolean) -> Unit,
     onLoadLaunchableRuns: suspend () -> List<LaunchableRun> = { emptyList() },
     onApproveTask: (String) -> Unit,
     onRejectPlan: (String) -> Unit,
@@ -1062,7 +1062,7 @@ private fun MainDestination(
     onOpenCreature: (String) -> Unit,
     /** Opens a creature's panel on a given tab: where a question or a spent budget is resolved. */
     onOpenCreatureOn: (String, CreatureTab) -> Unit,
-    onLaunchWorkflow: (String, String, RepositoryRef?, List<WorkflowRunId>) -> Unit,
+    onLaunchWorkflow: (String, String, RepositoryRef?, List<WorkflowRunId>, Boolean) -> Unit,
     onLoadLaunchableRuns: suspend () -> List<LaunchableRun> = { emptyList() },
     onApproveTask: (String) -> Unit,
     onRejectPlan: (String) -> Unit,

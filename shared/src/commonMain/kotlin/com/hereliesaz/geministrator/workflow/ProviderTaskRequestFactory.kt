@@ -131,6 +131,10 @@ internal fun buildProviderTaskRequest(
                         ),
                     )
                 }
+                // A check of an untemplated step's plain text is given the four generic criteria; a step with a template of its own is unchanged.
+                (CheckWorkWrap.decide(definition, run, task) as? CheckWorkWrapDecision.Wrap)?.let {
+                    add(PromptContextBlock("Criteria to check", it.requirements, ContextProvenance.KeeperWritten))
+                }
                 addAll(utilityBlocks)
             },
             reusePolicy = definition.promptReusePolicy,

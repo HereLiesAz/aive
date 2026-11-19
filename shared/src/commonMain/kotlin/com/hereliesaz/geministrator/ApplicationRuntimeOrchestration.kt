@@ -72,6 +72,8 @@ private class PlanInputs(
     val missing: List<com.hereliesaz.geministrator.queen.Missing> = emptyList(),
     /** Her planner and reviewer, staffed from the generic roles. */
     val staffing: com.hereliesaz.geministrator.queen.QueenStaffing? = null,
+    /** The keeper switched on "have every result reviewed" in the launch form's options: the checklist then holds `R-review`. */
+    val requireReview: Boolean = false,
 ) {
     fun withResearch(outcome: com.hereliesaz.geministrator.research.ResearchOutcome): PlanInputs {
         if (outcome.record.isEmpty) return this
@@ -88,7 +90,7 @@ private class PlanInputs(
                         (if (outcome.docs.isEmpty()) "" else com.hereliesaz.geministrator.research.AiveDocsResearch.PLAN_INSTRUCTION)
                 },
             ),
-            design, supplementalRoles, rolesToPersist, objectiveProvenance, outcome.record, missing, staffing,
+            design, supplementalRoles, rolesToPersist, objectiveProvenance, outcome.record, missing, staffing, requireReview,
         )
     }
 
@@ -114,6 +116,7 @@ private suspend fun ApplicationRuntime.planInputs(
     design: Pair<WorkflowDefinition, RoughDesign>? = null,
     supplementalRoles: List<RoleDefinition> = emptyList(),
     objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
+    requireReview: Boolean = false,
 ): PlanInputs {
     val parents = requireKnownParentRuns(continuesWorkflowRunIds)
     val cleanProjectName = projectName.trim()
@@ -178,6 +181,7 @@ private suspend fun ApplicationRuntime.planInputs(
         objectiveProvenance = objectiveProvenance,
         missing = staffingMissing(staffing, providerRegistry.linkedSourceIds()),
         staffing = staffing,
+        requireReview = requireReview,
     )
 }
 
@@ -397,6 +401,7 @@ private suspend fun ApplicationRuntime.planAndDecide(
             objectiveExternal = inputs.objectiveProvenance.isUntrusted(),
             roles = inputs.launchRoles,
             availableRoleIds = inputs.plannerRoles.map { it.id.value }.toSet(),
+            requireReview = inputs.requireReview,
         )
         val checklist = com.hereliesaz.geministrator.orchestration.Requirements.extract(requirementInputs)
         val outcome = reviewUntilApproved(
@@ -508,6 +513,8 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
     /** The queen's research before planning (docs/Keepers-Room.md); null plans without it. */
     research: com.hereliesaz.geministrator.research.ResearchStep? = null,
     researchContext: com.hereliesaz.geministrator.research.ResearchContext = com.hereliesaz.geministrator.research.ResearchContext(),
+    /** The keeper asked, in the launch form's options, for every result to be reviewed (OR-ed with the goal's own words). */
+    requireReview: Boolean = false,
 ) {
     reportLaunchProgress("Reading your objective…")
     val cleanObjective = objective.trim()
@@ -520,7 +527,7 @@ suspend fun ApplicationRuntime.launchOrchestratedWorkflow(
         return
     }
 
-    var inputs = planInputs(projectName, objective, repository, existingProject, continuesWorkflowRunIds, objectiveProvenance = objectiveProvenance)
+    var inputs = planInputs(projectName, objective, repository, existingProject, continuesWorkflowRunIds, objectiveProvenance = objectiveProvenance, requireReview = requireReview)
     if (research != null) {
         reportLaunchProgress("Looking for what could help before planning…")
         val outcome = try {
