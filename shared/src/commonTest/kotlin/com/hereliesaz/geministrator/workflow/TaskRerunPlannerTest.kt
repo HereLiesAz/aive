@@ -9,7 +9,10 @@ import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.ProviderRunId
+import com.hereliesaz.geministrator.domain.StepEffect
+import com.hereliesaz.geministrator.domain.TaskContract
 import com.hereliesaz.geministrator.domain.TaskDefinition
+import com.hereliesaz.geministrator.domain.TemplateRef
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRunId
@@ -280,6 +283,35 @@ class TaskRerunPlannerTest {
         }
         // A fresh approval already between the rerun task and the change is enough.
         assertEquals(setOf(approve, b, push), TaskRerunPlanner.rerunSet(guarded, setOf(approve)))
+    }
+
+    @Test
+    fun anEffectfulStepThatRunsAgainNeverReusesAnEarlierApproval() {
+        // approve -> b -> send: `send` declares an effect through its contract (not a repository operation).
+        val guarded = definition(
+            agent(a),
+            TaskDefinition(
+                id = approve,
+                name = "Approve",
+                objective = "Approve",
+                roleId = null,
+                executor = TaskExecutor.HumanApproval(),
+                dependsOn = setOf(a),
+            ),
+            agent(b, approve),
+            agent(push, b).copy(
+                contract = TaskContract(
+                    TemplateRef("change-connected-source", 1),
+                    effects = setOf(StepEffect.MutatesConnectedSource),
+                ),
+            ),
+        )
+        val source = finished(guarded)
+        val fork = fork(guarded, source, TaskRerunRequest(b))
+
+        assertEquals(setOf(approve, b, push), TaskRerunPlanner.rerunSet(guarded, setOf(b)))
+        assertNotEquals(TaskRunStatus.Completed, fork.run.taskRuns.getValue(approve).status)
+        assertNotEquals(TaskRunStatus.Completed, fork.run.taskRuns.getValue(push).status)
     }
 
     private fun project() = Project(

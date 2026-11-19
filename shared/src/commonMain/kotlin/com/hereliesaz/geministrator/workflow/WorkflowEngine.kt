@@ -175,9 +175,15 @@ class WorkflowEngine(
         return refreshed
     }
 
+    /**
+     * What a dispatch pass did. [spendTrip] is set when a spend cap was already reached by the usage known
+     * when a task was about to start: nothing further started in that pass, and the caller raises the stop
+     * ([pauseRunForSpendCap]) for it.
+     */
     data class DispatchResult(
         val run: WorkflowRun,
         val handles: Map<TaskDefinitionId, ManagedSessionHandle>,
+        val spendTrip: SpendCapTrip? = null,
     )
 
     suspend fun dispatchReadyTasks(
@@ -186,6 +192,13 @@ class WorkflowEngine(
         run: WorkflowRun,
         existingHandles: Map<TaskDefinitionId, ManagedSessionHandle> = emptyMap(),
         nowEpochMillis: Long,
+        /**
+         * Asked, with the run as it stands at that moment, before each task that would start a billed session (or
+         * draft a plan) and again after plan drafts have been charged: a cap already reached by the usage known
+         * then starts nothing more in this pass and is returned as [DispatchResult.spendTrip]. Null (the default)
+         * checks nothing here; the runtime's own once-per-cycle check still applies.
+         */
+        spendGuard: (suspend (WorkflowRun) -> SpendCapTrip?)? = null,
     ): DispatchResult {
         if (run.status.isTerminal()) return DispatchResult(run, existingHandles)
 
@@ -278,6 +291,11 @@ class WorkflowEngine(
                         )
                         continue
                     }
+
+                    // A spend cap already reached by the usage known now starts nothing: a cap is checked once per
+                    // cycle, and usage can land (this run's, another run's, a plan draft's) between that check and
+                    // here. Nothing in this pass has started a session yet, so what was chosen so far is dropped.
+                    spendGuard?.invoke(nextRun)?.let { trip -> return DispatchResult(nextRun, handles, spendTrip = trip) }
 
                     // The budget is checked against usage that has landed, and tasks of this role that are
                     // running have reported none yet: left to start together they would each be within the
@@ -453,6 +471,8 @@ class WorkflowEngine(
                 val providerLimit = definition.concurrencyPolicy.perProviderLimits[pending.providerId] ?: Int.MAX_VALUE
                 val providerActive = activeByProvider[pending.providerId] ?: 0
                 if (remainingSlots > 0 && providerActive < providerLimit) {
+                    // The drafts above were billed generations: the cap sees them before this one starts.
+                    spendGuard?.invoke(nextRun)?.let { trip -> return DispatchResult(nextRun, handles, spendTrip = trip) }
                     pendingAgentDispatches += pending
                     activeByProvider[pending.providerId] = providerActive + 1
                     remainingSlots -= 1
@@ -1280,6 +1300,35 @@ class WorkflowEngine(
         return run.copy(
             status = WorkflowRunStatus.AwaitingHuman,
             taskRuns = run.taskRuns + (taskDefinitionId to taskRun.copy(status = TaskRunStatus.Escalated)),
+            updatedAtEpochMillis = nowEpochMillis,
+        )
+    }
+
+    /**
+     * A step that declares an effect was dispatched and a restart left no confirmed outcome: the effect may or may
+     * not have happened, so it is never dispatched again on its own. The keeper chooses retry or fail through the
+     * ordinary escalation flow ([resolveEscalation]).
+     */
+    suspend fun escalateOutcomeUncertain(
+        run: WorkflowRun,
+        taskDefinitionId: TaskDefinitionId,
+        reason: String,
+        nowEpochMillis: Long,
+    ): WorkflowRun {
+        val taskRun = requireNotNull(run.taskRuns[taskDefinitionId]) { "Task run ${taskDefinitionId.value} is missing" }
+        TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Escalated)
+        eventSink.append(HumanDecisionRequired(run.id, taskDefinitionId, reason, nowEpochMillis))
+        eventSink.append(TaskEscalated(run.id, taskDefinitionId, reason, occurredAtEpochMillis = nowEpochMillis))
+        return run.copy(
+            status = WorkflowRunStatus.AwaitingHuman,
+            taskRuns = run.taskRuns + (
+                taskDefinitionId to taskRun.copy(
+                    status = TaskRunStatus.Escalated,
+                    blockingReason = BlockingReason(WorkflowRunFactory.OUTCOME_UNCERTAIN, reason),
+                    progress = null,
+                    progressMessage = reason,
+                )
+            ),
             updatedAtEpochMillis = nowEpochMillis,
         )
     }

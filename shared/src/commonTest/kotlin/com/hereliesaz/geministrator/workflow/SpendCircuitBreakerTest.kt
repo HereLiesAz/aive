@@ -334,6 +334,145 @@ class SpendCircuitBreakerTest {
         assertEquals(3.0, pause.spentUsd)
     }
 
+    // ---- Spend caps at dispatch ----
+
+    @Test
+    fun hourlySpendThatLandedSinceTheLastCheckStopsTheRunBeforeAReadyTaskStarts(): Unit = runTest {
+        val now = 10 * ONE_HOUR_MILLIS
+        val persistence = InMemoryWorkflowPersistence()
+        persistence.projects.put(project())
+        val other = WorkflowRun(
+            id = WorkflowRunId("other"),
+            projectId = ProjectId("project"),
+            workflowDefinitionId = WorkflowDefinitionId("other"),
+            objective = "Other",
+            status = WorkflowRunStatus.Running,
+            taskRuns = emptyMap(),
+            createdAtEpochMillis = now - 600_000L,
+            updatedAtEpochMillis = now - 600_000L,
+        )
+        persistence.runs.put(other)
+        persistence.events.append(usageEvent(other.id, costUsd = 1.0, at = now - 600_000L))
+
+        val gateway = UsageGateway()
+        val definition = definition(task(working))
+        val paused = run(definition, taskRun(working, TaskRunStatus.Ready))
+            .copy(keeperPause = com.hereliesaz.geministrator.domain.WorkflowKeeperPause(pausedAtEpochMillis = 10L))
+        val coordinator = coordinator(persistence, gateway, roles(budget = null), SpendCaps(hourlySpendCapUsd = 2.5))
+
+        // First cycle: under the cap. The hourly sum is taken (and not again for a minute); nothing starts, the keeper paused it.
+        val first = coordinator.cycle(project(), definition, WorkflowRuntimeState(paused, emptyMap()), now, ::artifactId)
+        assertNull(first.run.spendPause)
+        assertEquals(0, gateway.created)
+
+        // Another run's spend lands, taking the hour over the cap. The keeper resumes ten seconds later, inside the
+        // minute the cycle's own hourly check waits between sums.
+        persistence.events.append(usageEvent(other.id, costUsd = 3.0, at = now + 5_000L))
+        val resumedRun = first.run.copy(keeperPause = null, updatedAtEpochMillis = now + 6_000L)
+        val second = coordinator.cycle(project(), definition, WorkflowRuntimeState(resumedRun, first.handles), now + 10_000L, ::artifactId)
+
+        assertEquals(0, gateway.created, "no session starts once the hour is over its cap")
+        val pause = assertNotNull(second.run.spendPause, "the stop is raised, not just the start refused")
+        assertEquals(SpendCapKind.HourlySpend, pause.kind)
+        assertEquals(4.0, pause.spentUsd)
+        assertEquals(SPEND_CAP_STOP, second.run.taskRuns.getValue(working).blockingReason?.code)
+    }
+
+    @Test
+    fun aRunAlreadyOverItsCostCapStartsNothingAndTheStopIsRaised(): Unit = runTest {
+        val gateway = UsageGateway()
+        val done = TaskDefinitionId("done")
+        val withDone = definition(task(done), task(working), task(waiting))
+        val run = run(
+            withDone,
+            taskRun(done, TaskRunStatus.Completed, usage = TaskUsage(10, 10, 2.0)),
+            taskRun(working, TaskRunStatus.Ready),
+            taskRun(waiting, TaskRunStatus.Ready),
+        )
+        val result = coordinator(InMemoryWorkflowPersistence(), gateway, roles(budget = null), SpendCaps(runCostCapUsd = 1.0))
+            .cycle(project(), withDone, WorkflowRuntimeState(run, emptyMap()), 20L, ::artifactId)
+
+        assertEquals(0, gateway.created)
+        assertEquals(SpendCapKind.RunCost, assertNotNull(result.run.spendPause).kind)
+    }
+
+    @Test
+    fun dispatchStartsNothingWhileTheGuardReportsAReachedCapAndReturnsTheTrip(): Unit = runTest {
+        val gateway = UsageGateway()
+        val definition = definition(task(working), task(waiting))
+        val run = run(definition, taskRun(working, TaskRunStatus.Ready), taskRun(waiting, TaskRunStatus.Ready))
+        val trip = SpendCapTrip(SpendCapKind.HourlySpend, 1.0, 1.5)
+
+        val result = WorkflowEngine(gateway, roles(budget = null))
+            .dispatchReadyTasks(project(), definition, run, nowEpochMillis = 2L, spendGuard = { trip })
+
+        assertEquals(0, gateway.created, "no session starts")
+        assertEquals(trip, result.spendTrip)
+        assertTrue(result.handles.isEmpty())
+        assertEquals(TaskRunStatus.Ready, result.run.taskRuns.getValue(working).status, "the task waits, untouched")
+        assertEquals(TaskRunStatus.Ready, result.run.taskRuns.getValue(waiting).status)
+    }
+
+    @Test
+    fun dispatchUnderTheCapIsUnchanged(): Unit = runTest {
+        val gateway = UsageGateway()
+        val definition = definition(task(working), task(waiting))
+        val run = run(definition, taskRun(working, TaskRunStatus.Ready), taskRun(waiting, TaskRunStatus.Ready))
+        val caps = SpendCaps(runCostCapUsd = 5.0)
+
+        val guarded = WorkflowEngine(gateway, roles(budget = null))
+            .dispatchReadyTasks(project(), definition, run, nowEpochMillis = 2L, spendGuard = { runCostTrip(it, caps) })
+        val control = UsageGateway()
+        val unguarded = WorkflowEngine(control, roles(budget = null))
+            .dispatchReadyTasks(project(), definition, run, nowEpochMillis = 2L)
+
+        assertNull(guarded.spendTrip)
+        assertEquals(2, gateway.created)
+        assertEquals(control.created, gateway.created)
+        assertEquals(unguarded.run.taskRuns.mapValues { it.value.status }, guarded.run.taskRuns.mapValues { it.value.status })
+    }
+
+    @Test
+    fun theCapIsCheckedForEachTaskInThePassNotOncePerCycle(): Unit = runTest {
+        val gateway = UsageGateway()
+        val definition = definition(task(working), task(waiting))
+        val run = run(definition, taskRun(working, TaskRunStatus.Ready), taskRun(waiting, TaskRunStatus.Ready))
+        var asked = 0
+        // Under the cap for the first task, over it by the time the second is considered (usage landed in between).
+        val guard: suspend (WorkflowRun) -> SpendCapTrip? = {
+            asked += 1
+            if (asked >= 2) SpendCapTrip(SpendCapKind.RunCost, 1.0, 1.2) else null
+        }
+
+        val result = WorkflowEngine(gateway, roles(budget = null))
+            .dispatchReadyTasks(project(), definition, run, nowEpochMillis = 2L, spendGuard = guard)
+
+        assertEquals(2, asked, "asked before each task, not once for the pass")
+        assertNotNull(result.spendTrip)
+        assertEquals(0, gateway.created, "what was chosen before the cap was seen had not started, and does not")
+    }
+
+    @Test
+    fun unpricedUsageStillStopsDispatchUnderADollarCapUntilTheKeeperAcceptsIt(): Unit = runTest {
+        val billed = TaskUsage(inputTokens = 5_000, outputTokens = 900, costUsd = null, costUnknown = true)
+        val done = TaskDefinitionId("done")
+        val withDone = definition(task(done), task(working))
+        val run = run(withDone, taskRun(done, TaskRunStatus.Completed, usage = billed), taskRun(working, TaskRunStatus.Ready))
+        val caps = SpendCaps(runCostCapUsd = 5.0)
+
+        val refused = UsageGateway()
+        val first = WorkflowEngine(refused, roles(budget = null))
+            .dispatchReadyTasks(project(), withDone, run, nowEpochMillis = 2L, spendGuard = { runCostTrip(it, caps) })
+        assertTrue(assertNotNull(first.spendTrip).unknownCost)
+        assertEquals(0, refused.created)
+
+        val accepted = UsageGateway()
+        val second = WorkflowEngine(accepted, roles(budget = null))
+            .dispatchReadyTasks(project(), withDone, run.copy(unpricedCostAccepted = true), nowEpochMillis = 2L, spendGuard = { runCostTrip(it, caps) })
+        assertNull(second.spendTrip, "the keeper's word that unpriced spend may go on is kept")
+        assertEquals(1, accepted.created)
+    }
+
     // ---- Spend a dollar cap cannot count ----
 
     @Test

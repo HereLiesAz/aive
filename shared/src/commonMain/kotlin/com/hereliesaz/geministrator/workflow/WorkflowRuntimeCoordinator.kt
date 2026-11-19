@@ -542,7 +542,12 @@ class WorkflowRuntimeCoordinator(
                 run = nextRun,
                 existingHandles = nextHandles,
                 nowEpochMillis = nowEpochMillis,
+                spendGuard = spendGuardForDispatch(nextRun, nowEpochMillis),
             )
+            // A cap reached by usage that landed after this cycle's own check: nothing started, and the run stops.
+            dispatched.spendTrip?.let { trip ->
+                return stopForSpendCap(project, definition, dispatched.run, dispatched.handles, trip, nowEpochMillis)
+            }
             nextRun = dispatched.run
             if (nextRun.status.isTerminal()) {
                 return terminate(project, definition, nextRun, dispatched.handles, nowEpochMillis)
@@ -785,7 +790,13 @@ class WorkflowRuntimeCoordinator(
      * hourly spend across runs is summed when this run's known cost rises, and at least once a
      * minute otherwise. A Hall Monitor pause is left to its own review.
      */
-    private suspend fun spendCapTrip(previous: WorkflowRun, run: WorkflowRun, nowEpochMillis: Long): SpendCapTrip? {
+    private suspend fun spendCapTrip(
+        previous: WorkflowRun,
+        run: WorkflowRun,
+        nowEpochMillis: Long,
+        /** Sum the hour now even if it was summed less than a minute ago: a task is about to start on the answer. */
+        forceHourly: Boolean = false,
+    ): SpendCapTrip? {
         if (run.globalPause != null || run.spendPause != null) return null
         val caps = spendCaps()
         runCostTrip(run, caps)?.let { return it }
@@ -793,7 +804,7 @@ class WorkflowRuntimeCoordinator(
         val lastCheck = lastHourlySpendCheckAtMillis
         val costRose = run.knownCostUsd() > previous.knownCostUsd() ||
             (run.hasUnpricedUsage() && !previous.hasUnpricedUsage())
-        if (!costRose && lastCheck != null && nowEpochMillis - lastCheck < HOURLY_SPEND_RECHECK_MILLIS) return null
+        if (!forceHourly && !costRose && lastCheck != null && nowEpochMillis - lastCheck < HOURLY_SPEND_RECHECK_MILLIS) return null
         lastHourlySpendCheckAtMillis = nowEpochMillis
         val spent = hourlySpend(persistence, nowEpochMillis, alsoRunId = run.id, ambient = ambientSpend)
         return when {
@@ -802,6 +813,21 @@ class WorkflowRuntimeCoordinator(
             spent.unpricedUsage && !run.unpricedCostAccepted ->
                 SpendCapTrip(SpendCapKind.HourlySpend, hourlyCap, spent.knownUsd, unknownCost = true)
             else -> null
+        }
+    }
+
+    /**
+     * The check [WorkflowEngine.dispatchReadyTasks] makes before it starts a task. The first call in a pass sums the
+     * hour afresh (a task is about to be started on the answer, and spend from another run may have landed since this
+     * cycle's own check, which waits a minute between sums); later calls sum it again only when this run's cost has
+     * risen since the call before, as the cycle's check does.
+     */
+    private fun spendGuardForDispatch(start: WorkflowRun, nowEpochMillis: Long): suspend (WorkflowRun) -> SpendCapTrip? {
+        var last: WorkflowRun? = null
+        return { run ->
+            val trip = spendCapTrip(previous = last ?: start, run = run, nowEpochMillis = nowEpochMillis, forceHourly = last == null)
+            last = run
+            trip
         }
     }
 
@@ -1802,15 +1828,16 @@ class WorkflowRuntimeCoordinator(
         }
     }
 
-    private fun blockUnavailableSystemExecutors(
+    private suspend fun blockUnavailableSystemExecutors(
         project: Project,
         definition: WorkflowDefinition,
         run: WorkflowRun,
         now: Long,
     ): WorkflowRun {
         val definitions = definition.tasks.associateBy { it.id }
+        var next = run
         var changed = false
-        val taskRuns = run.taskRuns.mapValues { (id, taskRun) ->
+        for ((id, taskRun) in run.taskRuns) {
             val executor = taskRun.executor ?: definitions[id]?.executor
             val blockable = taskRun.status in setOf(
                 TaskRunStatus.Ready,
@@ -1819,32 +1846,44 @@ class WorkflowRuntimeCoordinator(
                 TaskRunStatus.Verifying,
             )
             if (
-                blockable &&
-                remoteComputeCoordinator?.owns(taskRun) != true &&
-                executor != null &&
-                executor.isSystemExecutor() &&
-                !executorIntegrations.isAvailable(executor, project)
+                !blockable ||
+                remoteComputeCoordinator?.owns(taskRun) == true ||
+                executor == null ||
+                !executor.isSystemExecutor() ||
+                executorIntegrations.isAvailable(executor, project)
             ) {
-                TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Blocked)
-                changed = true
-                taskRun.copy(
-                    status = TaskRunStatus.Blocked,
-                    blockingReason = BlockingReason(
-                        WorkflowRunFactory.EXECUTOR_INTEGRATION_UNAVAILABLE,
-                        "${executor.displayLabel()} is not available in this runtime.",
-                    ),
-                    progress = null,
-                    progressMessage = null,
-                )
-            } else {
-                taskRun
+                continue
             }
+            val dispatched = taskRun.status == TaskRunStatus.Running || taskRun.status == TaskRunStatus.Verifying
+            if (dispatched && taskRun.externalRunId == null && definitions[id]?.isEffectfulStep() == true) {
+                // Dispatched, effectful, and nothing to ask about its outcome: returning it to Ready later would
+                // run the effect a second time. The keeper decides (retry or fail), knowing it may have happened.
+                val reason = "Outcome unknown after restart: ${executor.displayLabel()} was running " +
+                    "\"${definitions[id]?.name.orEmpty()}\" and its result was not recorded, so its effect " +
+                    "may or may not have happened. Check the target, then retry or fail this step."
+                next = engine.escalateOutcomeUncertain(next, id, reason, now)
+                ensureFailureEscalationGate(run = next, taskId = id, reason = reason, now = now)
+                changed = true
+                continue
+            }
+            TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Blocked)
+            changed = true
+            next = next.copy(
+                taskRuns = next.taskRuns + (
+                    id to taskRun.copy(
+                        status = TaskRunStatus.Blocked,
+                        blockingReason = BlockingReason(
+                            WorkflowRunFactory.EXECUTOR_INTEGRATION_UNAVAILABLE,
+                            "${executor.displayLabel()} is not available in this runtime.",
+                        ),
+                        progress = null,
+                        progressMessage = null,
+                    )
+                ),
+                updatedAtEpochMillis = now,
+            )
         }
-        return if (changed) {
-            run.copy(taskRuns = taskRuns, updatedAtEpochMillis = now)
-        } else {
-            run
-        }
+        return if (changed) next.copy(updatedAtEpochMillis = now) else run
     }
 
     private fun TaskExecutor.displayLabel(): String = when (this) {

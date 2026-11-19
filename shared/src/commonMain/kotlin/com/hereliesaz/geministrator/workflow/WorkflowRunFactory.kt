@@ -33,6 +33,8 @@ import com.hereliesaz.geministrator.policy.isDenied
 
 object WorkflowRunFactory {
     const val EXECUTOR_INTEGRATION_UNAVAILABLE = "EXECUTOR_INTEGRATION_UNAVAILABLE"
+    /** A step that declares an effect was dispatched, and a restart left no confirmed outcome: the keeper decides. */
+    const val OUTCOME_UNCERTAIN = "OUTCOME_UNCERTAIN"
     const val CONTRACT_INPUT_MISSING = "CONTRACT_INPUT_MISSING"
     const val APPROVAL_NOT_GRANTED = "APPROVAL_NOT_GRANTED"
     /** A task skipped because its condition was not met: a branch not taken, not a failure. */
