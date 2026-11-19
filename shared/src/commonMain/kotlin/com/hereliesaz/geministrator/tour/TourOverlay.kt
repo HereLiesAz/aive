@@ -69,6 +69,7 @@ import com.hereliesaz.geministrator.resources.tour_stage_failed
 import com.hereliesaz.geministrator.resources.tour_stage_cancelled
 import com.hereliesaz.geministrator.resources.tour_hive_title
 import com.hereliesaz.geministrator.resources.tour_hive_egg_growth
+import com.hereliesaz.geministrator.resources.tour_hive_more
 import com.hereliesaz.geministrator.resources.tour_failed_line
 import com.hereliesaz.geministrator.resources.tour_hide
 import com.hereliesaz.geministrator.resources.tour_preparing_line
@@ -178,7 +179,10 @@ private fun HiveLines(lines: List<CreatureLine>, focus: String?) {
             ) {
                 Text(stringResource(Res.string.tour_hive_title).uppercase(), style = AzphaltType.eyebrow, color = azphaltOnSurface())
                 AzphaltPill(label = stringResource(Res.string.tour_hide), seed = "tour-hive-hide", onClick = { hidden = true })
-                lines.forEach { line ->
+                // Only what is still going on, at most four, so the card stays small over the swarm it describes.
+                val finished = setOf(CreatureStage.Done, CreatureStage.Cancelled, CreatureStage.Withered)
+                val shown = lines.filter { it.stage !in finished }.ifEmpty { lines }.take(4)
+                shown.forEach { line ->
                     val stage = when (line.stage) {
                         CreatureStage.Egg -> stringResource(Res.string.tour_hive_egg_growth, ((line.growth ?: 0f) * 100).toInt())
                         CreatureStage.Withered -> stringResource(Res.string.tour_stage_withered)
@@ -192,6 +196,9 @@ private fun HiveLines(lines: List<CreatureLine>, focus: String?) {
                         CreatureStage.Cancelled -> stringResource(Res.string.tour_stage_cancelled)
                     }
                     Text("${if (line.id == focus) "› " else ""}${plain(line.name)} · $stage", style = AzphaltType.body, color = azphaltOnSurface(), maxLines = 1)
+                }
+                if (lines.size > shown.size) {
+                    Text(stringResource(Res.string.tour_hive_more, lines.size - shown.size), style = AzphaltType.body, color = azphaltOnSurface())
                 }
             }
         }
