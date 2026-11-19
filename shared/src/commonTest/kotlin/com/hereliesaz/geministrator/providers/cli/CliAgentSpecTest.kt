@@ -96,6 +96,20 @@ class CliAgentSpecTest {
     }
 
     @Test
+    fun cursorAmpKiloOpenCodeAndAiderNeverSkipChecksAndTakeThePromptLast() {
+        listOf(CliAgentSpecs.Cursor, CliAgentSpecs.Amp, CliAgentSpecs.Kilo, CliAgentSpecs.OpenCode, CliAgentSpecs.Aider).forEach { spec ->
+            CliRunMode.entries.forEach { mode ->
+                val args = spec.arguments(mode, "/w", "do the task")
+                assertEquals("do the task", args.last(), spec.id)
+                assertEquals(null, CliAgentSpecs.violation(spec.fixedArguments(mode, "/w")), "${spec.id} $mode")
+            }
+            assertFalse(AgentCapability.ShellExecution in spec.capabilities, spec.id)
+        }
+        assertFalse("--dry-run" in CliAgentSpecs.Aider.fixedArguments(CliRunMode.EditFiles, "/w"))
+        assertTrue("--dry-run" in CliAgentSpecs.Aider.fixedArguments(CliRunMode.ReadOnly, "/w"))
+    }
+
+    @Test
     fun anArgumentPromptIsLastAndBoundedAndNoSpecCanBeGivenAnEmptyCommand() {
         val viaArgument = CliAgentSpec(
             id = "cli-test", displayName = "Test", binaries = listOf("t"), promptChannel = CliPromptChannel.Argument,

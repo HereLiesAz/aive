@@ -55,6 +55,11 @@ data class CliAgentSpec(
      * that starts with it. Matched at any depth and without regard to case.
      */
     val projectConfig: List<String> = emptyList(),
+    /**
+     * The npm package that installs this CLI (`npm install -g`), or null when the vendor installs it another way. The keeper
+     * switching the CLI on, with it missing, runs exactly that command and nothing else; see DesktopCliAgents.install.
+     */
+    val npmPackage: String? = null,
     private val build: (CliAgentSpec, CliRunMode, String) -> List<String>,
 ) {
     /** The arguments (after the program) for [mode], without the prompt; [workingDirectory] is where it runs. Pure. */
@@ -120,6 +125,7 @@ object CliAgentSpecs {
 
     /** Claude Code. `claude -p` reads its prompt from stdin; no shell or web tool is allowed, so it only edits files. */
     val Claude = CliAgentSpec(
+        npmPackage = "@anthropic-ai/claude-code",
         id = "cli-claude", displayName = "Claude Code", binaries = listOf("claude"),
         promptChannel = CliPromptChannel.Stdin, outputFormat = CliOutputFormat.ClaudeStreamJson,
         capabilities = setOf(
@@ -143,6 +149,7 @@ object CliAgentSpecs {
 
     /** Codex CLI. `codex exec -` reads stdin; its own OS sandbox confines writes to the workspace (its network setting is Codex's own). */
     val Codex = CliAgentSpec(
+        npmPackage = "@openai/codex",
         id = "cli-codex", displayName = "Codex", binaries = listOf("codex"),
         promptChannel = CliPromptChannel.Stdin, outputFormat = CliOutputFormat.CodexJsonl,
         capabilities = setOf(
@@ -168,6 +175,7 @@ object CliAgentSpecs {
      * and shell commands stay unapproved (denied headless).
      */
     val Gemini = CliAgentSpec(
+        npmPackage = "@google/gemini-cli",
         id = "cli-gemini", displayName = "Gemini CLI", binaries = listOf("gemini"),
         promptChannel = CliPromptChannel.Stdin, outputFormat = CliOutputFormat.PlainText,
         capabilities = setOf(
@@ -186,6 +194,7 @@ object CliAgentSpecs {
 
     /** Qwen Code, a fork of Gemini CLI with the same headless flags. */
     val Qwen = CliAgentSpec(
+        npmPackage = "@qwen-code/qwen-code",
         id = "cli-qwen", displayName = "Qwen Code", binaries = listOf("qwen"),
         promptChannel = CliPromptChannel.Stdin, outputFormat = CliOutputFormat.PlainText,
         capabilities = Gemini.capabilities,
@@ -242,6 +251,7 @@ object CliAgentSpecs {
      * shell tool, allows file writes only when the role may edit, and never passes `--allow-all` or `--yolo`.
      */
     val Copilot = CliAgentSpec(
+        npmPackage = "@github/copilot",
         id = "cli-copilot", displayName = "GitHub Copilot CLI", binaries = listOf("copilot"),
         promptChannel = CliPromptChannel.Argument, outputFormat = CliOutputFormat.PlainText,
         capabilities = Gemini.capabilities,
@@ -255,8 +265,77 @@ object CliAgentSpecs {
         },
     )
 
+    /**
+     * Cursor's agent CLI (`agent -p <prompt>`). Headless, a change that needs approval is refused unless `--force` is given, which the
+     * app never does; there is no read-only flag, so a read-only run relies on that refusal and on Cursor's own permission rules.
+     */
+    val Cursor = CliAgentSpec(
+        id = "cli-cursor", displayName = "Cursor", binaries = listOf("agent", "cursor-agent"),
+        promptChannel = CliPromptChannel.Argument, outputFormat = CliOutputFormat.PlainText,
+        capabilities = setOf(AgentCapability.RepositoryRead, AgentCapability.RepositoryWrite, AgentCapability.PlanGeneration, AgentCapability.PlanApproval),
+        optionalKeyEnvironment = listOf("CURSOR_API_KEY"),
+        sandboxNote = "Headless, anything that needs approval (shell commands included) is refused; the app never passes --force. " +
+            "A repository that tracks Cursor settings is refused unless you allow project settings.",
+        projectConfig = listOf(".cursor/"),
+        build = { _, _, _ -> listOf("--output-format", "text", "-p") },
+    )
+
+    /** Amp (`amp -x <prompt>`): the final message on stdout. It has no documented skip-everything flag; its own tool rules apply. */
+    val Amp = CliAgentSpec(
+        id = "cli-amp", displayName = "Amp", binaries = listOf("amp"),
+        npmPackage = "@sourcegraph/amp",
+        promptChannel = CliPromptChannel.Argument, outputFormat = CliOutputFormat.PlainText,
+        capabilities = setOf(AgentCapability.RepositoryRead, AgentCapability.PlanGeneration, AgentCapability.PlanApproval),
+        optionalKeyEnvironment = listOf("AMP_API_KEY"),
+        sandboxNote = "Run with its own tool permissions, which the app cannot narrow from the command line; declared for reading and planning only. " +
+            "A repository that tracks Amp settings is refused unless you allow project settings.",
+        projectConfig = listOf(".amp/"),
+        build = { _, _, _ -> listOf("-x") },
+    )
+
+    /** Kilo Code CLI (`kilo run <prompt>`). Without `--auto` a request for a permission is rejected, so it reads and answers; the app never passes `--auto`. */
+    val Kilo = CliAgentSpec(
+        id = "cli-kilo", displayName = "Kilo Code", binaries = listOf("kilo"),
+        npmPackage = "@kilocode/cli",
+        promptChannel = CliPromptChannel.Argument, outputFormat = CliOutputFormat.PlainText,
+        capabilities = setOf(AgentCapability.RepositoryRead, AgentCapability.PlanGeneration, AgentCapability.PlanApproval),
+        sandboxNote = "Headless, a request for a permission is rejected and the run ends, so it reads and answers; the app never passes --auto. " +
+            "A repository that tracks Kilo settings is refused unless you allow project settings.",
+        projectConfig = listOf(".kilo/", "kilo.json"),
+        build = { _, _, dir -> listOf("run", "--dir", dir, "--format", "default") },
+    )
+
+    /** OpenCode (`opencode run <prompt>`). Its flags beyond `run` are not documented on its CLI page, so none are passed. */
+    val OpenCode = CliAgentSpec(
+        id = "cli-opencode", displayName = "OpenCode", binaries = listOf("opencode"),
+        npmPackage = "opencode-ai",
+        promptChannel = CliPromptChannel.Argument, outputFormat = CliOutputFormat.PlainText,
+        capabilities = setOf(AgentCapability.RepositoryRead, AgentCapability.PlanGeneration, AgentCapability.PlanApproval),
+        sandboxNote = "Run with its own permission settings, which the app cannot narrow from the command line; declared for reading and planning only. " +
+            "A repository that tracks OpenCode settings is refused unless you allow project settings.",
+        projectConfig = listOf(".opencode/", "opencode.json"),
+        build = { _, _, _ -> listOf("run") },
+    )
+
+    /**
+     * Aider (`aider --message <prompt>`). It edits only the files it is given and commits nothing here (`--no-auto-commits`); a
+     * read-only run is a `--dry-run`. The app never passes `--yes-always`, so a confirmation is declined.
+     */
+    val Aider = CliAgentSpec(
+        id = "cli-aider", displayName = "Aider", binaries = listOf("aider"),
+        promptChannel = CliPromptChannel.Argument, outputFormat = CliOutputFormat.PlainText,
+        capabilities = setOf(AgentCapability.RepositoryRead, AgentCapability.RepositoryWrite, AgentCapability.PlanGeneration, AgentCapability.PlanApproval),
+        sandboxNote = "It asks before changing anything and the app never answers yes for it; a read-only run is a dry run. Commits are off. " +
+            "A repository that tracks Aider settings is refused unless you allow project settings.",
+        projectConfig = listOf(".aider"),
+        build = { _, mode, _ ->
+            listOf("--no-auto-commits", "--no-pretty", "--no-stream") +
+                (if (mode == CliRunMode.ReadOnly) listOf("--dry-run") else emptyList()) + listOf("--message")
+        },
+    )
+
     /** Every CLI the app knows how to drive. Adding one is adding a spec here. */
-    val all: List<CliAgentSpec> = listOf(Claude, Codex, Gemini, Qwen, Antigravity, Grok, Copilot)
+    val all: List<CliAgentSpec> = listOf(Claude, Codex, Gemini, Qwen, Antigravity, Grok, Copilot, Cursor, Amp, Kilo, OpenCode, Aider)
 
     fun byId(id: String): CliAgentSpec? = all.firstOrNull { it.id == id }
 }
