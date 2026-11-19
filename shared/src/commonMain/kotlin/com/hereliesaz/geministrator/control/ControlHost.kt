@@ -25,6 +25,12 @@ interface ControlHost {
     suspend fun listProviders(): JsonObject
     suspend fun settings(): JsonObject
 
+    /** The Sources (name, whether it needs no key, whether it is switched on). Read-only: no key, and no way to change one, is here. */
+    suspend fun listSources(): JsonObject = JsonObject(emptyMap())
+
+    /** The vendor command-line agents on this computer (installed, switched on, version). Read-only: installing or enabling one is never offered here. */
+    suspend fun listAgents(): JsonObject = JsonObject(emptyMap())
+
     // Author hives.
     suspend fun createHive(spec: JsonObject): JsonObject
     suspend fun updateHive(id: String, patch: JsonObject): JsonObject

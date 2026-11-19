@@ -87,6 +87,8 @@ object Tools {
             "GET", "/approvals",
         ),
         Tool("aive_list_providers", "List providers with whether each is connected, what it can do, and recent failover notes. Never includes keys.", "GET", "/providers"),
+        Tool("aive_list_sources", "List the Sources (AI providers the app can use) with whether each is switched on. READ-ONLY: never includes keys, and nothing here connects, changes or switches one.", "GET", "/sources"),
+        Tool("aive_list_agents", "List the vendor command-line agents (Claude Code, Codex, Cursor and others) with whether each is installed and switched on. READ-ONLY: this interface cannot install, enable or run one.", "GET", "/agents"),
         Tool("aive_get_settings", "Read the app settings that hold no keys or tokens.", "GET", "/settings"),
         Tool(
             "aive_draft_hive", "Ask the app's linked planner to propose creatures for a prompt. Only proposes: nothing is saved or run. Pass the result to aive_create_hive to keep it.",

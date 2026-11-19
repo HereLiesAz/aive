@@ -29,8 +29,8 @@ class AiveCliTest {
     private fun run(vararg args: String): Int = cli.run(args.toList(), output, errors)
 
     @Test fun everyControlToolHasAUniqueTerminalCommand() {
-        assertEquals(21, Commands.all.size)
-        assertEquals(21, Commands.all.map { it.words }.distinct().size)
+        assertEquals(23, Commands.all.size)
+        assertEquals(23, Commands.all.map { it.words }.distinct().size)
         assertEquals(Tools.all.map { it.name }.toSet(), Commands.all.map { it.toolName }.toSet())
     }
 
