@@ -22,6 +22,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
+import com.hereliesaz.geministrator.events.ChainStatus
+import com.hereliesaz.geministrator.resources.log_integrity_intact
+import com.hereliesaz.geministrator.resources.log_integrity_altered
+import androidx.compose.runtime.produceState
 import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.log.LogLine
 import com.hereliesaz.geministrator.log.LogSource
@@ -69,6 +73,8 @@ internal class RunLogSources(
     val roleOfSession: (SessionActivityKey) -> String? = { null },
     /** The creature a feed belongs to, so its lines open it. */
     val taskOfSession: (SessionActivityKey) -> String? = { null },
+    /** Whether the run's events still match the hash chain recorded as they were written; [ChainStatus.NoChain] says nothing. */
+    val integrity: suspend () -> ChainStatus = { ChainStatus.NoChain },
 )
 
 private const val LOG_SOURCE_KEY = "overview.timeline.log.source"
@@ -122,6 +128,19 @@ internal fun RunLogView(
             wrap = true,
         )
         Text(logSourceNote(source), style = AzphaltType.endCap, color = azphaltOnSurface())
+        if (source == LogSource.Run) {
+            val integrity by produceState<ChainStatus>(ChainStatus.NoChain, events) { value = runCatching { sources.integrity() }.getOrDefault(ChainStatus.NoChain) }
+            when (val status = integrity) {
+                is ChainStatus.Intact -> Text(stringResource(Res.string.log_integrity_intact, status.count), style = AzphaltType.endCap, color = azphaltMutedOnSurface())
+                is ChainStatus.Altered -> Text(
+                    stringResource(Res.string.log_integrity_altered, status.recorded.count, status.actual.count),
+                    style = AzphaltType.endCap.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                    color = azphaltOnSurface(),
+                    modifier = Modifier.azphaltLiveRegion(),
+                )
+                ChainStatus.NoChain -> Unit
+            }
+        }
         if (roles.isNotEmpty()) {
             AzphaltTabs(
                 tabs = listOf(AzphaltTabItem(ALL_ROLES, stringResource(Res.string.log_roles_all))) +

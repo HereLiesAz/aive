@@ -1912,6 +1912,12 @@ class ApplicationRuntime private constructor(
         loadLatest()
     }
 
+    /** Whether the current run's events still match the hash chain recorded as they were written. */
+    suspend fun loadRunLogIntegrity(): com.hereliesaz.geministrator.events.ChainStatus {
+        val runId = runtimeMutex.withLock { current?.state?.run?.id } ?: return com.hereliesaz.geministrator.events.ChainStatus.NoChain
+        return persistence.eventChainStatus(runId)
+    }
+
     suspend fun loadRunTimeline(): List<WorkflowEvent> {
         val runId = runtimeMutex.withLock { current?.state?.run?.id } ?: return emptyList()
         return persistence.events.forRun(runId)

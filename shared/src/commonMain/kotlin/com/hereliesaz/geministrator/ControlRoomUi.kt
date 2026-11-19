@@ -237,6 +237,7 @@ fun ControlRoom(
     onLoadRunHistory: suspend () -> List<Pair<Project, List<WorkflowRun>>> = { emptyList() },
     onSwitchRun: (String) -> Unit = {},
     onLoadRunTimeline: suspend () -> List<WorkflowEvent> = { emptyList() },
+    onLoadLogIntegrity: suspend () -> com.hereliesaz.geministrator.events.ChainStatus = { com.hereliesaz.geministrator.events.ChainStatus.NoChain },
     onLoadWorkflowDefinitions: suspend () -> List<WorkflowDefinition> = { emptyList() },
     onExportDiagnosticBundle: suspend () -> String? = { null },
     onValidateWorkflow: () -> List<String> = { emptyList() },
@@ -750,6 +751,7 @@ fun ControlRoom(
                 onLoadRunHistory = onLoadRunHistory,
                 onSwitchRun = onSwitchRun,
                 onLoadRunTimeline = onLoadRunTimeline,
+                onLoadLogIntegrity = onLoadLogIntegrity,
                 onLoadWorkflowDefinitions = onLoadWorkflowDefinitions,
                 onExportDiagnosticBundle = onExportDiagnosticBundle,
                 onValidateWorkflow = onValidateWorkflow,
@@ -1089,6 +1091,7 @@ private fun MainDestination(
     onLoadRunHistory: suspend () -> List<Pair<Project, List<WorkflowRun>>>,
     onSwitchRun: (String) -> Unit,
     onLoadRunTimeline: suspend () -> List<WorkflowEvent>,
+    onLoadLogIntegrity: suspend () -> com.hereliesaz.geministrator.events.ChainStatus,
     onLoadWorkflowDefinitions: suspend () -> List<WorkflowDefinition>,
     onExportDiagnosticBundle: suspend () -> String?,
     onValidateWorkflow: () -> List<String>,
@@ -1392,6 +1395,7 @@ private fun MainDestination(
                                             taskOfSession = com.hereliesaz.geministrator.log.sessionTask(
                                                 live.run.taskRuns.values.associate { it.id to it.taskDefinitionId.value },
                                             ),
+                                            integrity = onLoadLogIntegrity,
                                         )
                                     },
                                     memoryContent = {
