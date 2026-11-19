@@ -1,7 +1,7 @@
 package com.hereliesaz.geministrator.prompts
 
+import com.hereliesaz.geministrator.AzphaltOfferBand
 import androidx.compose.foundation.layout.Box
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -15,7 +15,6 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.window.PopupProperties
 
 /** What [PromptSuggestBox] hands the field it wraps: wire these into the existing text field unchanged. */
 internal class PromptFieldState(
@@ -106,12 +105,7 @@ internal fun PromptSuggestBox(
                 },
             ),
         )
-        DropdownMenu(
-            expanded = showMenu && menuOpen && focused && items.isNotEmpty(),
-            onDismissRequest = { menuOpen = false },
-            // Offers must not take focus from the field: a focusable popup would swallow the next keystroke.
-            properties = PopupProperties(focusable = false),
-        ) {
+        AzphaltOfferBand(visible = showMenu && menuOpen && focused && items.isNotEmpty()) {
             items.forEach { choice ->
                 DropdownMenuItem(
                     text = { Text(choice.label, maxLines = 2, overflow = TextOverflow.Ellipsis) },

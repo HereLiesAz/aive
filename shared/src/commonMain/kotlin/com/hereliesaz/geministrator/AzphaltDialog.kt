@@ -1,6 +1,5 @@
 package com.hereliesaz.geministrator
 
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -30,12 +29,15 @@ fun AzphaltAlertDialog(
     onDismiss: () -> Unit = onDismissRequest,
 ) {
     MaterialTheme(colorScheme = GeministratorColors) {
+        // The dialog is the pressed pill opening up into a card, not a window dropped on top.
+        val (growShape, grow) = rememberGrowFromPill()
         AlertDialog(
             onDismissRequest = onDismissRequest,
+            modifier = grow,
             containerColor = Azphalt.Ink,
             titleContentColor = Azphalt.Ink.onOpposite(),
             textContentColor = Azphalt.Ink.onOpposite(),
-            shape = RoundedCornerShape(AzphaltShapes.dialogCorner),
+            shape = growShape,
             title = { Text(title, fontWeight = FontWeight.Black) },
             text = { Text(text) },
             confirmButton = {

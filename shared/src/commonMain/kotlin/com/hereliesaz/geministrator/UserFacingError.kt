@@ -196,7 +196,8 @@ internal fun ErrorDetailsToggle(raw: String?, seed: String, modifier: Modifier =
             selected = open,
             onClick = { open = !open },
         )
-        if (open) {
+        // The raw error grows out of the pill that shows it (h2g2 nest clock).
+        AzphaltChildBand(visible = open) {
             Text(
                 stringResource(Res.string.error_details_label) + ": " + text,
                 style = AzphaltType.body,

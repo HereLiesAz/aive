@@ -14,6 +14,7 @@ import com.hereliesaz.geministrator.resources.hive_resume_run
 import com.hereliesaz.geministrator.resources.hive_stop_text
 import com.hereliesaz.geministrator.resources.hive_stop_title
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.foundation.verticalScroll
@@ -796,13 +797,16 @@ fun ControlRoom(
                 showTimelineState = showTimeline,
                 runtimeState = runtimeState,
             )
-            if (inspectorVisible && !compact) selectedTaskId?.let { taskId ->
+            if (inspectorVisible && !compact) selectedTaskId?.let { taskId -> key(taskId) {
+                // Each creature's panel opens out of a capsule into its card (h2g2 nest morph).
+                val (growShape, grow) = rememberGrowFromPill(19.dp)
                 Box(
                     Modifier
                         .padding(end = hiveGutter(compact), bottom = 16.dp)
                         .width(DockedCreaturePanelWidth)
                         .fillMaxHeight()
-                        .clip(RoundedCornerShape(19.dp)),
+                        .then(grow)
+                        .clip(growShape),
                 ) {
                     Column(Modifier.fillMaxSize()) {
                         // In Edit the flipped card's detail leads the docked panel (no bottom sheet on a wide screen).
@@ -812,7 +816,7 @@ fun ControlRoom(
                         Box(Modifier.weight(1f).fillMaxWidth()) { creaturePanel(taskId, Modifier.fillMaxSize(), true) }
                     }
                 }
-            }
+            } }
             }
         }
         }

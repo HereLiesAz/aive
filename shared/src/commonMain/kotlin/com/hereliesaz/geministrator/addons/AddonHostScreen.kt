@@ -9,8 +9,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Checkbox
 import com.hereliesaz.geministrator.AzphaltButton
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.hereliesaz.conveyance.h2g2.H2g2Nest
+import com.hereliesaz.conveyance.h2g2.Option
+import com.hereliesaz.geministrator.Azphalt
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -165,26 +166,26 @@ fun AddonScreenRenderer(
                                 )
                             }
                             is AddonScreenItem.Select -> {
+                                // The pill opens into a card holding its options, in place - not a
+                                // menu dropped somewhere else (h2g2 containment nest).
                                 var expanded by remember(item.bindingId) { mutableStateOf(false) }
                                 val selected = bindingProvider(item.bindingId)
-                                Column {
-                                    AzphaltButton(
-                                        label = if (selected.isBlank()) item.label else "${item.label}: $selected",
-                                        onClick = { expanded = true },
-                                        enabled = item.options.isNotEmpty(),
-                                    )
-                                    DropdownMenu(
+                                val label = if (selected.isBlank()) item.label else "${item.label}: $selected"
+                                if (item.options.isEmpty()) {
+                                    AzphaltButton(label = label, onClick = {}, enabled = false)
+                                } else {
+                                    H2g2Nest(
+                                        label = label,
+                                        hue = Azphalt.Ink,
+                                        key = item.bindingId,
                                         expanded = expanded,
-                                        onDismissRequest = { expanded = false },
+                                        onExpandedChange = { expanded = it },
                                     ) {
                                         item.options.forEach { option ->
-                                            DropdownMenuItem(
-                                                text = { Text(option) },
-                                                onClick = {
-                                                    onInputUpdate(item.bindingId, option)
-                                                    expanded = false
-                                                },
-                                            )
+                                            Option(option, onPick = {
+                                                onInputUpdate(item.bindingId, option)
+                                                expanded = false
+                                            })
                                         }
                                     }
                                 }

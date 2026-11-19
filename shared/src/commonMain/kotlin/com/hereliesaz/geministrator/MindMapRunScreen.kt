@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -207,7 +206,7 @@ internal fun MindMapRunScreen(
         }
     }
     val scope = rememberCoroutineScope()
-    val activityEntrance = remember { AzphaltEntrance.childBand() }
+    val activityEntrance = remember { AzphaltEntrance.rollForChildBand() }
     var projectLoadError by remember(runtimeState) { mutableStateOf<String?>(null) }
     val noRunProject = (runtimeState as? ApplicationRuntimeState.NoRun)?.project
     val existingRepository = noRunProject?.repository
@@ -557,14 +556,7 @@ internal fun MindMapRunScreen(
                                 { Text(message, modifier = Modifier.azphaltLiveRegion()) }
                             },
                         )
-                        DropdownMenu(
-                            expanded = repositoryMenuExpanded && (repositorySuggestions.isNotEmpty() || recentLocators.isNotEmpty()),
-                            onDismissRequest = { repositoryMenuExpanded = false },
-                            modifier = Modifier.fillMaxWidth(),
-                            // Suggestions arrive while the keeper types: a focusable popup would take focus
-                            // from the field on the first result and swallow the next keystroke.
-                            properties = androidx.compose.ui.window.PopupProperties(focusable = false),
-                        ) {
+                        AzphaltOfferBand(visible = repositoryMenuExpanded && (repositorySuggestions.isNotEmpty() || recentLocators.isNotEmpty())) {
                             recentLocators.forEach { recent ->
                                 DropdownMenuItem(
                                     text = { Text(recent) },

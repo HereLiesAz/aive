@@ -503,7 +503,8 @@ internal fun AzphaltRecord(
         }
         AzphaltChildBand(visible = well != null) {
             Box(
-                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(wellFill(hue)).padding(14.dp),
+                // The band already sits one nest level in: its surface is that level's (note, then well).
+                modifier = Modifier.fillMaxWidth().clip(com.hereliesaz.conveyance.h2g2.nestSurface(com.hereliesaz.conveyance.h2g2.LocalNestDepth.current)).background(wellFill(hue)).padding(14.dp),
             ) {
                 // The well is its own dark surface: everything in it takes the opposite of the
                 // well, never the page ground's text colour (dark-on-dark on Mustard and Pink).

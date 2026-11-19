@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,7 +30,9 @@ internal fun HiveActionsMenu(
     onDismiss: () -> Unit,
 ) {
     Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(AzphaltShapes.dialogCorner), color = Azphalt.Ink) {
+        // The long-pressed hive opens into this card: it grows from a capsule (h2g2's nest morph).
+        val (growShape, grow) = rememberGrowFromPill()
+        Surface(modifier = grow, shape = growShape, color = Azphalt.Ink) {
             AzphaltThemedSurface(Azphalt.Ink) {
                 Column(
                     modifier = Modifier.padding(20.dp),

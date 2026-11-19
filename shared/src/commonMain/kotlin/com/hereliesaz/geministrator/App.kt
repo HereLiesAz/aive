@@ -1505,10 +1505,16 @@ private fun Throwable.toRuntimeFailureState(fallback: String): ApplicationRuntim
 @Composable
 private fun GeministratorTheme(content: @Composable () -> Unit) {
     LoadAzphaltFonts()
-    MaterialTheme(
-        colorScheme = GeministratorColors,
-        content = content,
-    )
+    // h2g2's motion (the containment nest, stack entrances) reads conveyance's reduced-motion
+    // local and H2g2Motion's scale; both follow AzphaltMotion, the one switch the keeper sees.
+    val reduce = AzphaltMotion.reduceMotion
+    LaunchedEffect(reduce) { com.hereliesaz.conveyance.h2g2.H2g2Motion.updateDurationScale(if (reduce) 0f else 1f) }
+    CompositionLocalProvider(com.hereliesaz.conveyance.compose.LocalReducedMotion provides reduce) {
+        MaterialTheme(
+            colorScheme = GeministratorColors,
+            content = content,
+        )
+    }
 }
 
 
