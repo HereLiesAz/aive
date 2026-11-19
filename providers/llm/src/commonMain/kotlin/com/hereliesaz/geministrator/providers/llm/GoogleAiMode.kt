@@ -146,4 +146,22 @@ class GoogleAiModeApi(
 object GoogleAiModeHost {
     @Volatile
     var browser: AiModeBrowser? = null
+
+    /**
+     * The platform has a browser view: the Source is listed (a Source the keeper adds on purpose) and the queen's research can ask
+     * it once it is connected and switched on. Called once at start-up.
+     */
+    fun install(view: AiModeBrowser) {
+        browser = view
+        com.hereliesaz.geministrator.ProviderCatalog.googleAiModeAvailable = true
+        com.hereliesaz.geministrator.research.GoogleAiModeResearch.answerer = answererFor(view)
+    }
+
+    /** One question, one answer: each ask is a fresh [GoogleAiModeApi] over [view]. */
+    fun answererFor(view: AiModeBrowser): com.hereliesaz.geministrator.research.QuestionAnswerer {
+        val started = kotlin.time.TimeSource.Monotonic.markNow()
+        return com.hereliesaz.geministrator.research.QuestionAnswerer { question ->
+            GoogleAiModeApi(view, now = { started.elapsedNow().inWholeMilliseconds }).generate(question).text
+        }
+    }
 }

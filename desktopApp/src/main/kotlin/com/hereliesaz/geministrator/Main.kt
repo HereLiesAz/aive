@@ -88,8 +88,7 @@ fun main() {
     val providerCredentialStore = DesktopProviderCredentialStore()
     // Gemini in Google Search needs a Chromium-based browser on this computer (a Source the keeper adds on purpose).
     ChromiumLocator.find()?.let { chromium ->
-        com.hereliesaz.geministrator.providers.llm.GoogleAiModeHost.browser = DesktopAiModeBrowser(chromium)
-        ProviderCatalog.googleAiModeAvailable = true
+        com.hereliesaz.geministrator.providers.llm.GoogleAiModeHost.install(DesktopAiModeBrowser(chromium))
     }
     val projectFileService = DesktopProjectFileService()
     val repositoryCredentialStore = DesktopRepositoryCredentialStore()

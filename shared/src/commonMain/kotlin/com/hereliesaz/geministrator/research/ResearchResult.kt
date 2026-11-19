@@ -6,6 +6,7 @@ enum class ResearchSource(val label: String) {
     ConnectedServer("connected MCP server"),
     AppBridge("this app's control interface"),
     SearchA2A("SearchA2A directory"),
+    GoogleAiMode("Google AI Mode"),
 }
 
 /** Why something the queen could have consulted was not. */

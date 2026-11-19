@@ -178,8 +178,7 @@ class MainActivity : ComponentActivity() {
         // Before anything opens the workflow store (WorkflowPersistenceFactory.durable).
         com.hereliesaz.geministrator.persistence.AndroidWorkflowPersistence.install(this)
         // Gemini in Google Search needs a browser view; this device has one (a Source the keeper adds on purpose).
-        com.hereliesaz.geministrator.providers.llm.GoogleAiModeHost.browser = AndroidAiModeBrowser(applicationContext)
-        com.hereliesaz.geministrator.ProviderCatalog.googleAiModeAvailable = true
+        com.hereliesaz.geministrator.providers.llm.GoogleAiModeHost.install(AndroidAiModeBrowser(applicationContext))
         CrashReporting.install(this) { crashReportNoticeVisible = true }
         // Before the queue reaches App: a request that waited too long is reported, not launched.
         AiveRemoteBridge.pruneExpired()

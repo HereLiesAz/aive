@@ -38,6 +38,8 @@ class ResearchCandidate(
     val serverLocation: String,
     val toolName: String,
     val lookup: ResearchLookup,
+    /** What the keeper is shown as what will be sent, for the [query] (the words are the same ones the lookup sends). */
+    val preview: (query: String) -> String = { "Look for agents by these words only: $it" },
 )
 
 /**
@@ -96,7 +98,7 @@ class ResearchStep(
                     serverName = candidate.serverName,
                     serverLocation = candidate.serverLocation,
                     toolName = candidate.toolName,
-                    argumentsPreview = "Look for agents by these words only: $query",
+                    argumentsPreview = candidate.preview(query),
                     runKey = runKey,
                 ),
             )
