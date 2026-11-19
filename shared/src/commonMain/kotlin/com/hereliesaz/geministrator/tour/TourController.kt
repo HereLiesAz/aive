@@ -17,6 +17,9 @@ object TourController {
     var state: TourState? by mutableStateOf(null)
         private set
 
+    /** Where each creature and egg of the hive on screen is, kept by the shell from the live run; the overlay lists it while a tour shows. */
+    var hive: List<CreatureLine> by mutableStateOf(emptyList())
+
     /** Whether the tour is still being written (or failed to be): the overlay says so until the first lesson shows. */
     var preparation: TourPreparation by mutableStateOf(TourPreparation.None)
 

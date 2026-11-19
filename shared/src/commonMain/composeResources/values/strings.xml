@@ -2186,6 +2186,17 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="tour_preparing_line">Writing your tour. Its first step appears here.</string>
     <string name="tour_failed_line">The tour could not be written. Teach me tries again.</string>
     <string name="tour_hide">Hide</string>
+    <string name="tour_hive_title">The hive</string>
+    <string name="tour_hive_egg_growth">Egg, %1$d%%</string>
+    <string name="tour_stage_withered">Withered</string>
+    <string name="tour_stage_waiting">Ready</string>
+    <string name="tour_stage_working">Working</string>
+    <string name="tour_stage_checking">Being checked</string>
+    <string name="tour_stage_retrying">Trying again</string>
+    <string name="tour_stage_needs_you">Needs you</string>
+    <string name="tour_stage_done">Done</string>
+    <string name="tour_stage_failed">Failed</string>
+    <string name="tour_stage_cancelled">Stopped</string>
     <string name="tour_open_hatch_sentence">Watch the hive. Each creature is one job, and it wakes when it has work.</string>
     <string name="tour_open_hatch_explain">A hive is a team the queen drafted for your goal. Every creature has a role and a job, and it hatches from its egg when what it needs is ready, so you can watch work begin.</string>
     <string name="tour_open_hatch_missed">Creatures hatch as the swarm starts. If none has moved yet, give it a moment.</string>

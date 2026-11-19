@@ -294,7 +294,11 @@ fun ControlRoom(
         val queenNow = live.queen.size
         seenByTour.run = live.run
         seenByTour.queenLines = queenNow
-        if (tour.state == null) return@LaunchedEffect
+        if (tour.state == null) {
+            tour.hive = emptyList()
+            return@LaunchedEffect
+        }
+        tour.hive = com.hereliesaz.geministrator.tour.creatureLines(live.definition, live.run, live.roles)
         com.hereliesaz.geministrator.tour.runSignals(live.definition, before, live.run, queenBefore, queenNow)
             .forEach { tour.dispatch(com.hereliesaz.geministrator.tour.TourAction.Observed(com.hereliesaz.geministrator.tour.TourEvent.Run(it))) }
     }
