@@ -31,4 +31,20 @@ class NavigationHistoryTest {
         assertEquals("Work", restoredTabOrDefault("t1", "Mind", "t2", "Work"))
         assertEquals("Work", restoredTabOrDefault("", "", "t1", "Work"))
     }
+
+    @Test
+    fun backLetsAnOpenCreatureGoBeforeLeavingThePlace() {
+        assertEquals(AppBackStep.LetCreatureGo, appBackStep(true, listOf(creature), onHive = true))
+    }
+
+    @Test
+    fun backReturnsToTheRecordedPlaceBeforeTheHive() {
+        assertEquals(AppBackStep.PopHistory, appBackStep(false, listOf(creature), onHive = false))
+    }
+
+    @Test
+    fun backWithNoHistoryGoesToTheHiveThenLeaves() {
+        assertEquals(AppBackStep.ToHive, appBackStep(false, emptyList(), onHive = false))
+        assertEquals(AppBackStep.LeaveApp, appBackStep(false, emptyList(), onHive = true))
+    }
 }

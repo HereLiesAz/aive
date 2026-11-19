@@ -38,3 +38,31 @@ internal object CreatureTabRestore {
 /** The tab to open [selectedTaskId] on: the restored one when it was restored for that creature, else [default]. */
 internal fun restoredTabOrDefault(restoredTask: String, restoredTab: String, selectedTaskId: String, default: String): String =
     if (restoredTask == selectedTaskId && restoredTab.isNotEmpty()) restoredTab else default
+
+/** What the app shell's Back does when no screen above it has claimed it (B2). */
+internal enum class AppBackStep {
+    /** A creature is selected with its panel already set aside (a screen above sets the open panel aside first): let it go. */
+    LetCreatureGo,
+
+    /** Return to the place the keeper left, with its creature and tab. */
+    PopHistory,
+
+    /** No way back is recorded: the hive is home. */
+    ToHive,
+
+    /** On the hive with nothing selected: the system's Back. */
+    LeaveApp,
+}
+
+/**
+ * The one precedence for the shell's Back: the selected creature goes first, then the recorded way back, then the hive.
+ * Screens above the shell (the docked panel and the phone sheet set their creature aside, a flipped card turns back,
+ * the Keeper's room list, the Timeline, the district zoom) register their own handlers later, so they answer first;
+ * this is what is left once they have not.
+ */
+internal fun appBackStep(creatureSelected: Boolean, history: List<NavEntry>, onHive: Boolean): AppBackStep = when {
+    creatureSelected -> AppBackStep.LetCreatureGo
+    history.isNotEmpty() -> AppBackStep.PopHistory
+    !onHive -> AppBackStep.ToHive
+    else -> AppBackStep.LeaveApp
+}

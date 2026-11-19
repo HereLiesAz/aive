@@ -360,7 +360,13 @@ internal fun TechnicalInspector(
                             modifier = Modifier.fillMaxWidth(),
                         )
                         AzphaltChildBand(visible = healthOpen) {
-                            CreatureNeedsPanel(needs, titled = false, onOpenMind = { onTabChange(CreatureTab.Mind) })
+                            CreatureNeedsPanel(needs, titled = false, onOpenMind = {
+                                // The budget is the role's: the meter goes to where it is raised, the Mind only without a Roster link.
+                                val budgetRoleId = taskRun.assignedRoleId?.value
+                                if (budgetRoleId == null || !placeLinks.openRoleAt(budgetRoleId, RoleField.TokenBudget)) {
+                                    onTabChange(CreatureTab.Mind)
+                                }
+                            })
                         }
                     }
                 // A question its agent asked you (docs/Agent-UI.md): a wait like any other.
@@ -598,7 +604,14 @@ internal fun TechnicalInspector(
                 LiveInspectorLine(stringResource(Res.string.inspector_executor_ref), executor.reference(), onClick = executorLink)
                 (taskRun.assignedRoleId?.value ?: task.roleId?.value)
                     ?.takeIf { it != executor.reference() }
-                    ?.let { LiveInspectorLine(stringResource(Res.string.inspector_responsible_role), it) }
+                    ?.let { responsibleRoleId ->
+                        // The role is the one place its instructions, budget and source change.
+                        LiveInspectorLine(
+                            stringResource(Res.string.inspector_responsible_role),
+                            responsibleRoleId,
+                            onClick = placeLinks.openRole?.let { open -> { open(responsibleRoleId) } },
+                        )
+                    }
                 LiveInspectorLine(stringResource(Res.string.inspector_attempt), taskRun.attempt.toString())
                 LiveInspectorLine(stringResource(Res.string.inspector_provider_run), taskRun.providerRunId?.value ?: "—")
                 LiveInspectorLine(stringResource(Res.string.inspector_external_run), taskRun.externalRunId ?: "—")
