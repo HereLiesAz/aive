@@ -472,6 +472,13 @@ internal fun GeministratorWorkflowTerrarium(
                                     .padding(horizontal = 16.dp, vertical = 14.dp),
                             ) {
                                 HiveJobEditor(definition = stagedDefinition, task = openTask, onEdit = ::applyEdit)
+                                TerrariumCreatureActions(
+                                    definition = stagedDefinition,
+                                    selected = openTask,
+                                    onEdit = ::applyEdit,
+                                    removeBlocked = terrariumRemoveBlocked(liveRun),
+                                    modifier = Modifier.padding(top = 12.dp),
+                                )
                             }
                         }
                     }

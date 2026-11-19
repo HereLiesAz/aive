@@ -4,6 +4,8 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.91 — from 2026-11-19
 
+- **Change: a creature's own acts moved into its card on the hive.** Detach, Hold output (Release output), Duplicate, Remove, what feeds it (each strand cuttable, each knot turning) and Feed it from now sit under its job on the card in Edit. Under the hive stay only the hive's own acts: Rehearse, Cluster (with Fold and its Remove), Add creature, Undo/Redo and Delete swarm. Nothing was removed. Seen in the desktop screenshot run (`2-hive-build`); the card scrolls, and the lower part was not touch-tested.
+
 - **Change: in Edit, a tapped creature opens its job on the hive.** The objective, acceptance criteria, approval, tries, time allowed and where it runs were a long form of pills under the hive. They are now a card that rises from the foot of the tissue over the creature's field, scrolls if it is long, and edits the staged hive like before (undo and redo apply). The connection and creature actions (Rehearse, Cluster, Detach, Hold output, Duplicate, Remove, Add creature, Fed by, Feed it from, Delete swarm) stay below, unchanged. Seen in the desktop screenshot run (`2-hive-build`, phone size); not touch-tested, and on a short phone field the card hides the creature's lower body.
 
 - **Fix: creature names no longer collide with a neighbour's source badge.** Every creature wore an "Auto" badge above its head, and in a tight hive it landed on the next creature's name ("Implement" under "Auto"). The badge now shows on the tapped creature, and always for a Pinned source; "Auto" on the rest said nothing new. The source is still in the creature's panel and its description. Seen in the desktop screenshot run (`25-shell-hive`).
