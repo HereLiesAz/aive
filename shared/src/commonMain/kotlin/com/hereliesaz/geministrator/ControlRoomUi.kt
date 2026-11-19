@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.BottomSheetDefaults
@@ -991,8 +992,10 @@ private fun Breadcrumb(crumbs: List<ShellCrumb>, modifier: Modifier = Modifier) 
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
-                    .defaultMinSize(minHeight = AzphaltMinTouchTarget)
                     .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
+                    // The text sits in the middle of its touch target, level with the chevrons beside it.
+                    .defaultMinSize(minHeight = AzphaltMinTouchTarget)
+                    .wrapContentHeight(Alignment.CenterVertically)
                     .semantics(mergeDescendants = true) {
                         contentDescription = crumb.label
                         if (last) {

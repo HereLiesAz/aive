@@ -166,7 +166,8 @@ private fun ClosingCard(line: String) {
 @Composable
 private fun HiveLines(lines: List<CreatureLine>, focus: String?) {
     if (lines.isEmpty()) return
-    Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.TopEnd) {
+    // Below the header, never over the breadcrumb and the page title.
+    Box(Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 132.dp), contentAlignment = Alignment.TopEnd) {
         AzphaltSurface(Azphalt.Ink) {
             Column(
                 Modifier.widthIn(max = 260.dp).clip(RoundedCornerShape(16.dp)).background(Azphalt.Ink).padding(12.dp),

@@ -190,3 +190,5 @@ I shipped gesture and animation changes verified only by compiles and unit tests
 - "Not tried on a device" in a PR body is a task still to do, not a disclosure that finishes it.
 
 - **A new string resource needs its import.** Compose resources are imported one by one (`import ...resources.<name>`); adding the `<string>` to strings.xml and using `Res.string.<name>` fails with "Unresolved reference" until the import is added. Grep an existing `Res.string` name in the file and mirror it.
+
+- **Look at what you build before you submit it (owner, twice).** A phone screenshot showed "Egg, 0%%", an overlay covering the breadcrumb, chevrons under their labels, and a switch floating outside its card: none needs a compiler to see, all needed one look. Compose resources do not unescape `%%` (use a single `%`); a Text with a min height is top-aligned unless wrapped (`wrapContentHeight(CenterVertically)`); an overlay needs a stated home that clears the header. When I cannot render (no Gradle here), say so and name the screens a change touches so the owner can look, and render the pure parts I can (screenshot tests on CI exist: `PanelScreenshotTest`).
