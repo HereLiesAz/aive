@@ -372,7 +372,10 @@ fun App(
     val researchDocNames = remember(contextChunkSources) {
         com.hereliesaz.geministrator.research.ChunkSourceDocNames(contextChunkSources) { researchRepository[0] }
     }
-    val researchStep = remember(mcpHost, mcpConsent, researchBridgeOn, researchServers.isNotEmpty(), researchOn, researchDocNames) {
+    // Gemini in Google Search, when the keeper added it as a Source and left it on (providers/llm GoogleAiMode).
+    val aiModeAnswerer = com.hereliesaz.geministrator.research.GoogleAiModeResearch.answerer
+        ?.takeIf { enabledProviders.any { it.id.value == ProviderCatalog.GOOGLE_AI_MODE_ID } }
+    val researchStep = remember(mcpHost, mcpConsent, researchBridgeOn, researchServers.isNotEmpty(), researchOn, researchDocNames, aiModeAnswerer) {
         if (!researchOn) return@remember null
         com.hereliesaz.geministrator.research.ResearchStep(
             local = buildList {
@@ -394,7 +397,18 @@ fun App(
             candidates = if (mcpConsent == null) {
                 emptyList()
             } else {
-                listOf(
+                listOfNotNull(
+                    aiModeAnswerer?.let { answerer ->
+                        com.hereliesaz.geministrator.research.ResearchCandidate(
+                            source = com.hereliesaz.geministrator.research.ResearchSource.GoogleAiMode,
+                            serverId = com.hereliesaz.geministrator.research.GoogleAiModeResearch.SERVER_ID,
+                            serverName = "Google AI Mode",
+                            serverLocation = com.hereliesaz.geministrator.research.GoogleAiModeResearch.LOCATION,
+                            toolName = "ask",
+                            lookup = com.hereliesaz.geministrator.research.GoogleAiModeLookup(answerer),
+                            preview = com.hereliesaz.geministrator.research.GoogleAiModeResearch::question,
+                        )
+                    },
                     com.hereliesaz.geministrator.research.ResearchCandidate(
                         source = com.hereliesaz.geministrator.research.ResearchSource.SearchA2A,
                         serverId = "research-searcha2a",

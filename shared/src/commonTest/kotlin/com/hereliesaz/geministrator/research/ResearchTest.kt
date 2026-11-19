@@ -113,6 +113,54 @@ class ResearchTest {
         assertTrue(with.contains("untrusted") && with.contains("only when its entry says connected") && with.contains("never a gate"))
     }
 
+    // Google AI Mode as a lookup
+
+    @Test
+    fun googleAiModeIsAskedOnlyAfterTheKeeperHasReadTheExactQuestionAndItsAnswerIsOneUntrustedLead() = runTest {
+        val sent = mutableListOf<String>()
+        val answerer = QuestionAnswerer { q -> sent += q; "Try the foo tool.  Docs: https://example.com/foo" }
+        val consent = Consent(McpConsentDecision.AllowForRun)
+        val step = ResearchStep(
+            candidates = listOf(
+                ResearchCandidate(
+                    source = ResearchSource.GoogleAiMode,
+                    serverId = GoogleAiModeResearch.SERVER_ID,
+                    serverName = "Google AI Mode",
+                    serverLocation = GoogleAiModeResearch.LOCATION,
+                    toolName = "ask",
+                    lookup = GoogleAiModeLookup(answerer),
+                    preview = GoogleAiModeResearch::question,
+                ),
+            ),
+            consent = consent,
+        )
+        val outcome = step.run("How do I integrate invoicing with Stripe?", ctx, "run-1")
+        assertEquals(1, consent.asked.size)
+        // What the keeper was shown is what was sent.
+        assertEquals(sent.single(), consent.asked.single().argumentsPreview)
+        val lead = outcome.leads.single()
+        assertEquals(ResearchSource.GoogleAiMode, lead.source)
+        assertFalse(lead.connected)
+        // Links in the answer are named, never kept.
+        assertFalse("https://" in lead.why)
+    }
+
+    @Test
+    fun aDeclinedGoogleAiModeQuestionIsNeverSent() = runTest {
+        var asked = false
+        val step = ResearchStep(
+            candidates = listOf(
+                ResearchCandidate(
+                    ResearchSource.GoogleAiMode, GoogleAiModeResearch.SERVER_ID, "Google AI Mode", GoogleAiModeResearch.LOCATION, "ask",
+                    GoogleAiModeLookup { asked = true; "x" }, GoogleAiModeResearch::question,
+                ),
+            ),
+            consent = Consent(McpConsentDecision.Deny),
+        )
+        step.run("How do I integrate invoicing with Stripe?", ctx, "run-2")
+        assertFalse(asked)
+    }
+
     // the step
 
     private class Consent(val decision: McpConsentDecision) : McpConsentGate {
