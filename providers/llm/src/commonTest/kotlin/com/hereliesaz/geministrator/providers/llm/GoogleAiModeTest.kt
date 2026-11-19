@@ -96,4 +96,27 @@ class GoogleAiModeTest {
         assertFalse(api.billsPerToken)
         assertEquals("google-ai-mode", api.modelId)
     }
+
+    private val noBrowser = object : AiModeBrowser {
+        override suspend fun <T> withPage(url: String, read: suspend (AiModePage) -> T): T = error("not used")
+    }
+
+    @Test
+    fun theSourceExistsOnlyWhereThePlatformProvidesABrowserView() {
+        GoogleAiModeHost.browser = null
+        try {
+            assertNull(HostedLlmProviders.entries.firstOrNull { it.id == GoogleAiMode.ID })
+            GoogleAiModeHost.browser = noBrowser
+            val spec = assertNotNull(HostedLlmProviders.entry(GoogleAiMode.ID))
+            assertTrue(spec.keyOptional)
+            assertTrue(HostedLlmProviders.GOOGLE_AI_MODE_PROTOCOL in spec.protocols)
+            // A provider is built from it, but it is never a planner's raw chat API.
+            assertEquals(GoogleAiMode.ID, HostedLlmProviders.create(spec, "anonymous").id.value)
+            assertFailsWith<IllegalArgumentException> { HostedLlmProviders.textApi(spec, "anonymous") }
+            // And it is never among the built-in entries a first launch connects by itself.
+            assertFalse(HostedLlmProviders.builtInEntries.any { it.id == GoogleAiMode.ID })
+        } finally {
+            GoogleAiModeHost.browser = null
+        }
+    }
 }

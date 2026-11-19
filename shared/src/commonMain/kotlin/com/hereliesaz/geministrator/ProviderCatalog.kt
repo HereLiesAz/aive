@@ -44,6 +44,13 @@ object ProviderCatalog {
     const val LLM7_ID = "llm7"
     const val OVHCLOUD_ID = "ovhcloud"
 
+    /** Gemini in Google Search through a browser view on the device (providers/llm GoogleAiMode); not a built-in entry: see [browserEntries]. */
+    const val GOOGLE_AI_MODE_ID = "google-ai-mode"
+
+    /** Set once at start-up by a platform that provides a browser view; the Source is listed only then. */
+    @kotlin.concurrent.Volatile
+    var googleAiModeAvailable: Boolean = false
+
     /** Stored for a [ProviderCatalogEntry.keyOptional] provider linked without a key. */
     const val ANONYMOUS_CREDENTIAL = "anonymous"
 
@@ -273,7 +280,7 @@ object ProviderCatalog {
      * remote A2A agents connected by Agent Card (docs/A2A.md), which are never chosen automatically.
      */
     val entries: List<ProviderCatalogEntry>
-        get() = builtInEntries + StoreLlmProviders.all().map(::storeEntry) + A2aAgentConnections.all().map(::a2aEntry)
+        get() = builtInEntries + StoreLlmProviders.all().map(::storeEntry) + A2aAgentConnections.all().map(::a2aEntry) + browserEntries()
 
     /** True for a remote A2A agent's id ([A2aAgentConnection.providerId]). */
     fun isA2aAgent(id: String): Boolean = id.startsWith(A2aAgentConnection.PROVIDER_ID_PREFIX)
@@ -283,6 +290,25 @@ object ProviderCatalog {
 
     /** True for a vendor CLI the app drives on this computer ([CliAgentSpecs]). */
     fun isCliAgent(id: String): Boolean = CliAgentSpecs.byId(id) != null
+
+    /**
+     * Gemini in Google Search, through a browser view on this device: no key, no login. Only where the platform provides the view,
+     * never connected by default and never chosen automatically (docs/Keepers-Room.md): the keeper adds it on purpose.
+     */
+    private fun browserEntries(): List<ProviderCatalogEntry> =
+        if (!googleAiModeAvailable) emptyList() else listOf(
+            ProviderCatalogEntry(
+                id = GOOGLE_AI_MODE_ID,
+                displayName = "Google AI Mode",
+                apiKeyUrl = "https://www.google.com/search?udm=50",
+                credentialLabel = "",
+                description = "Gemini in Google Search, asked through a hidden browser on this device. No key and no login. " +
+                    "It answers one question at a time: no instructions, no tools, no structured output, so it suits a role that " +
+                    "researches or explains, not one that must return a form. Google sees the question and this device's address, " +
+                    "and may ask for a human check. Used only by roles that prefer it.",
+                keyOptional = true,
+            ),
+        )
 
     private fun cliEntry(spec: CliAgentSpec) = ProviderCatalogEntry(
         id = spec.id,
