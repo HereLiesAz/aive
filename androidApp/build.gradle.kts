@@ -1,4 +1,7 @@
 import aive.build.BrandAssets
+import java.io.IOException
+import java.net.URI
+import java.security.MessageDigest
 import org.gradle.api.tasks.Exec
 
 plugins {
@@ -115,15 +118,15 @@ val fetchAndroidProotRuntime = tasks.register("fetchAndroidProotRuntime") {
         try {
             pins.forEachIndexed { index, pin ->
                 val deb = work.resolve("pin$index.deb")
-                java.net.URI(pin.url).toURL().openStream().use { input -> deb.outputStream().use { input.copyTo(it) } }
-                val actual = java.security.MessageDigest.getInstance("SHA-256").digest(deb.readBytes()).joinToString("") { "%02x".format(it) }
+                URI(pin.url).toURL().openStream().use { input -> deb.outputStream().use { input.copyTo(it) } }
+                val actual = MessageDigest.getInstance("SHA-256").digest(deb.readBytes()).joinToString("") { "%02x".format(it) }
                 if (actual != pin.sha256) throw GradleException("${pin.url} has SHA-256 $actual, not the pinned ${pin.sha256}")
                 val unpacked = work.resolve("unpacked$index")
                 unpacked.mkdirs()
                 val process = ProcessBuilder("sh", "-c", "ar p \"\$0\" data.tar.xz | tar -xJ -C \"\$1\"", deb.absolutePath, unpacked.absolutePath)
                     .redirectErrorStream(true).start()
                 val log = process.inputStream.bufferedReader().readText()
-                if (process.waitFor() != 0) throw java.io.IOException("ar/tar failed: $log")
+                if (process.waitFor() != 0) throw IOException("ar/tar failed: $log")
                 out.mkdirs()
                 pin.files.forEach { (from, to) ->
                     var bytes = unpacked.resolve(from).readBytes()
@@ -142,7 +145,7 @@ val fetchAndroidProotRuntime = tasks.register("fetchAndroidProotRuntime") {
                     out.resolve(to).setExecutable(true)
                 }
             }
-        } catch (failure: java.io.IOException) {
+        } catch (failure: IOException) {
             out.deleteRecursively()
             logger.warn("The Linux runtime for CLI agents is not in this build: ${failure.message}")
         }
