@@ -1343,7 +1343,7 @@ class ApplicationRuntime private constructor(
         if (terminalPass) queenTerminalReadForRun = run.id.value
         queenProposalsReadAt = now
         try {
-            val signals = queenSignals(definition, run, roles, queenStalled[run.id.value])
+            val signals = queenSignals(definition, run, roles, queenStalled[run.id.value], queenCaps())
             val candidates = queenCandidates(definition, run, signals, queenCaps(), roles, trainingUsage()) +
                 com.hereliesaz.geministrator.queen.wordingCandidates(definition, run, queenWordings[run.id.value].orEmpty())
             launchWordingCheckpoint(definition, run, signals)
@@ -1625,7 +1625,7 @@ class ApplicationRuntime private constructor(
         } ?: return@withLock QueenAccept.NothingChanged
         val (definition, run) = seen
         if (run.id.value != proposal.cycleRunId ||
-            queenAcceptRefused(proposal, definition, run, roles, queenCandidates(definition, run, queenSignals(definition, run, roles, queenStalled[run.id.value]), queenCaps(), roles, trainingUsage()))
+            queenAcceptRefused(proposal, definition, run, roles, queenCandidates(definition, run, queenSignals(definition, run, roles, queenStalled[run.id.value], queenCaps()), queenCaps(), roles, trainingUsage()))
         ) return@withLock QueenAccept.NothingChanged
         // Claim the row first (a compare-and-set), so only one tap runs the side effect; give it back if that does not take.
         val now = nowEpochMillis()

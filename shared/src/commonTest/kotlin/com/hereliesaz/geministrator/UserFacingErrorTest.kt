@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class UserFacingErrorTest {
     @Test
@@ -89,5 +90,13 @@ class UserFacingErrorTest {
     fun a2aAndMoyaiDidNotFinishInTimeReadAsTimedOut() {
         assertEquals(ErrorKind.TimedOut, classifyError("Remote agent timed out: it did not finish in time"))
         assertEquals(ErrorKind.TimedOut, classifyError("Moyai session abc12345 timed out: it did not finish in time"))
+    }
+
+    @Test
+    fun aSessionIdThatLooksLikeAStatusDoesNotHideTheTimeout() {
+        // Hex ids can hold a bounded 400 or 502: the app's own deadline sentence still wins, so the step fails over.
+        assertEquals(ErrorKind.TimedOut, classifyError("Moyai session ab400cd1 timed out: it did not finish in time"))
+        assertEquals(ErrorKind.TimedOut, classifyError("Moyai session x502y timed out: it did not finish in time"))
+        assertTrue(com.hereliesaz.geministrator.workflow.ProviderFailover.shouldFailOver("Moyai session ab400cd1 timed out: it did not finish in time"))
     }
 }

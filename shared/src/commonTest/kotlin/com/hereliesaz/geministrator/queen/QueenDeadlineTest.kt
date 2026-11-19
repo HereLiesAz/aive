@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.queen
 
 import com.hereliesaz.geministrator.CreatureTab
+import com.hereliesaz.geministrator.inboxItemKeys
 import com.hereliesaz.geministrator.domain.TaskClock
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskRunStatus
@@ -64,5 +65,11 @@ class QueenDeadlineTest {
     @Test fun anEscalatedStepGetsNoSecondNote() {
         val run = qRun(qTaskRun("a", TaskRunStatus.Escalated).copy(timedOutAttempts = 2), qTaskRun("b", TaskRunStatus.Running))
         assertTrue(queenUpdate(definition, run, roles, QueenLevel.Helpful).none { it.voice == QueenVoice.WatchTimedOut })
+    }
+
+    @Test fun quietStillSaysAHardExpiryThatEndedInAnEscalation() {
+        val run = qRun(qTaskRun("a", TaskRunStatus.Escalated, attempt = 3).copy(timedOutAttempts = 2), qTaskRun("b", TaskRunStatus.Running))
+        val notes = queenUpdate(definition, run, roles, QueenLevel.Quiet)
+        assertTrue(notes.any { it.voice == QueenVoice.WaitEscalation && it.attachedTo == inboxItemKeys(run, "a").single() })
     }
 }

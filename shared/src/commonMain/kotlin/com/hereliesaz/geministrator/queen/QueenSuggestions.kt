@@ -15,12 +15,10 @@ import com.hereliesaz.geministrator.domain.isUntrusted
 import com.hereliesaz.geministrator.domain.isUntrustedContext
 import com.hereliesaz.geministrator.workflow.SpendCaps
 import com.hereliesaz.geministrator.workflow.canMutate
-import com.hereliesaz.geministrator.workflow.formatUsd
 import com.hereliesaz.geministrator.workflow.improvement.ImprovementKind
 import com.hereliesaz.geministrator.workflow.improvement.ImprovementProposal
 import com.hereliesaz.geministrator.workflow.improvement.ImprovementSource
 import com.hereliesaz.geministrator.workflow.improvement.ProposalStatus
-import com.hereliesaz.geministrator.workflow.knownCostUsd
 import com.hereliesaz.geministrator.workflow.taintInputs
 
 /**
@@ -104,8 +102,6 @@ object QueenPacing {
 /** The subject a run-wide suggestion (the allowance, resting) is filed under. */
 internal const val QUEEN_RUN_SUBJECT: String = "swarm"
 
-private const val COST_PACE_PERCENT = 70
-private const val STEPS_LEFT_PERCENT = 40
 private const val SUMMARY_CHARS = 200
 private const val WORDING_CHARS = 280
 
@@ -190,12 +186,13 @@ internal fun queenCandidates(
     }
     found += shapeCandidates(definition, run, signals, roles)
     found += trainingCandidates(usage, roles)
-    costPace(definition, run, caps)?.let { found += it }
+    // From the signal when the caller raised it with the allowances; else worked out here, so a caller that did not pass them keeps the offer.
+    (signals.filterIsInstance<QueenSignal.CostPace>().firstOrNull() ?: costPaceSignal(definition, run, caps))?.let { found += costPace(it) }
     // The Nanny's findings are one more input to her own judgement; she keeps her own candidate when both name the same step and action.
     nannyCandidates(definition, run).forEach { n -> if (found.none { it.action == n.action && it.subject == n.subject }) found += n }
     // A finding about a template is hers to decide: offered now only when it would be accepted as it stands.
     nannyTemplateCandidates(definition, run, roles).forEach { n -> if (found.none { it.action == n.action && it.subject == n.subject }) found += n }
-    if (nanny && nannyPhase(definition, run) == NannyPhase.AwaitingReview && run.keeperPause == null) {
+    if (nanny && (signals.any { it is QueenSignal.NannyPending } || nannyPendingSignal(definition, run) != null)) {
         found += QueenCandidate(QueenAction.Rest, QUEEN_RUN_SUBJECT, QueenVoice.SuggestRestNanny, emptyList(), outside = false)
     }
     return found
@@ -235,22 +232,13 @@ internal fun shapeCandidates(
     return found
 }
 
-/** The run's known cost is close to its allowance while many steps are still to do. Null with no allowance set. */
-private fun costPace(definition: WorkflowDefinition, run: WorkflowRun, caps: SpendCaps): QueenCandidate? {
-    val cap = caps.runCostCapUsd ?: return null
-    val total = definition.tasks.size
-    if (total == 0) return null
-    val cost = run.knownCostUsd()
-    if (cost >= cap) return null
-    val percent = (cost * 100.0 / cap).toInt()
-    val left = definition.tasks.count { run.taskRuns[it.id]?.status.let { s -> s != TaskRunStatus.Completed && s != TaskRunStatus.Cancelled } }
-    if (percent < COST_PACE_PERCENT || left * 100 < total * STEPS_LEFT_PERCENT) return null
-    return QueenCandidate(
+/** The offer to raise the allowance, from the [QueenSignal.CostPace] signal (see [costPaceSignal]). */
+private fun costPace(signal: QueenSignal.CostPace): QueenCandidate =
+    QueenCandidate(
         QueenAction.RaiseAllowance, QUEEN_RUN_SUBJECT, QueenVoice.SuggestRaiseAllowance,
-        listOf(percent.toString(), formatUsd(cap)),
+        listOf(signal.percent.toString(), signal.capUsd),
         outside = false,
     )
-}
 
 /** The proposal id of a suggestion: the same state gives the same id, so the same signal never repeats. */
 internal fun queenSuggestionId(run: WorkflowRun, action: QueenAction, subject: String): String =
