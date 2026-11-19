@@ -84,7 +84,7 @@ object CliAgentSpecs {
      */
     val FORBIDDEN_FLAGS: List<String> = listOf(
         "--dangerously-skip-permissions", "--yolo", "--yes-always", "--dangerously-bypass-approvals-and-sandbox",
-        "danger-full-access", "--allow-all-tools", "--force", "bypassPermissions", "--approval-mode=yolo",
+        "danger-full-access", "--allow-all", "--always-approve", "--force", "bypassPermissions", "--approval-mode=yolo",
     )
 
     /** Options whose value lifts a check, in either spelling (`--approval-mode=yolo` and `--approval-mode yolo`). */
@@ -196,8 +196,67 @@ object CliAgentSpecs {
         build = { _, mode, _ -> listOf("--approval-mode", if (mode == CliRunMode.EditFiles) "auto_edit" else "default", "-p", STDIN_TASK_SENTENCE) },
     )
 
+    /**
+     * Google Antigravity CLI (`agy`). `agy -p <prompt>` runs once and prints the answer; the prompt is an argument (its documented
+     * form; a stdin prompt is only for `--input-format stream-json`). In headless mode a tool that needs approval is soft-denied, so
+     * with no rule in the keeper's own Antigravity settings it reads and answers and cannot edit or run commands: it is declared
+     * for read-only work, and the app never passes `--dangerously-skip-permissions`. Some versions reported no output when stdout is a
+     * pipe; the Test button shows it.
+     */
+    val Antigravity = CliAgentSpec(
+        id = "cli-antigravity", displayName = "Antigravity", binaries = listOf("agy"),
+        promptChannel = CliPromptChannel.Argument, outputFormat = CliOutputFormat.PlainText,
+        capabilities = setOf(AgentCapability.RepositoryRead, AgentCapability.PlanGeneration, AgentCapability.PlanApproval),
+        sandboxNote = "Headless, a tool that needs approval is denied and the run goes on, so it can read and answer but not edit or run commands " +
+            "unless your own Antigravity settings already allow them. The app never skips its permission checks. " +
+            "A repository that tracks Antigravity settings is refused unless you allow project settings.",
+        projectConfig = listOf(".antigravity/", ".gemini/"),
+        build = { _, _, _ -> listOf("--output-format", "text", "-p") },
+    )
+
+    /**
+     * xAI's Grok Build CLI (`grok`). `grok -p <prompt>` runs once; the app allows only Read and Grep (and Edit when the role may edit),
+     * denies its shell and web tools on the command line, and never passes `--always-approve`.
+     */
+    val Grok = CliAgentSpec(
+        id = "cli-grok", displayName = "Grok Build", binaries = listOf("grok"),
+        versionArgs = listOf("version"),
+        promptChannel = CliPromptChannel.Argument, outputFormat = CliOutputFormat.PlainText,
+        capabilities = setOf(
+            AgentCapability.RepositoryRead, AgentCapability.RepositoryWrite, AgentCapability.PlanGeneration,
+            AgentCapability.PlanApproval, AgentCapability.TestAuthoring,
+        ),
+        optionalKeyEnvironment = listOf("XAI_API_KEY"),
+        sandboxNote = "The app allows only the Read and Grep tools and, when it may edit, Edit, and denies its shell and web tools on the command line. " +
+            "A repository that tracks Grok settings is refused unless you allow project settings.",
+        projectConfig = listOf(".grok/"),
+        build = { _, mode, dir ->
+            listOf("--no-auto-update", "--cwd", dir, "--output-format", "plain", "--allow", "Read", "--allow", "Grep") +
+                (if (mode == CliRunMode.EditFiles) listOf("--allow", "Edit") else emptyList()) +
+                listOf("--deny", "Bash", "--deny", "WebFetch", "--deny", "WebSearch", "-p")
+        },
+    )
+
+    /**
+     * GitHub Copilot CLI (`copilot`). `copilot -p <prompt> -s --no-ask-user` runs once and prints only the answer; the app denies its
+     * shell tool, allows file writes only when the role may edit, and never passes `--allow-all` or `--yolo`.
+     */
+    val Copilot = CliAgentSpec(
+        id = "cli-copilot", displayName = "GitHub Copilot CLI", binaries = listOf("copilot"),
+        promptChannel = CliPromptChannel.Argument, outputFormat = CliOutputFormat.PlainText,
+        capabilities = Gemini.capabilities,
+        sandboxNote = "Its shell tool is denied on the command line; file writes are allowed only when it may edit. " +
+            "A repository that tracks Copilot settings is refused unless you allow project settings.",
+        projectConfig = listOf(".copilot/", ".github/agents/", ".github/copilot/"),
+        build = { _, mode, _ ->
+            listOf("--no-auto-update", "--no-ask-user", "-s", "--deny-tool=shell") +
+                (if (mode == CliRunMode.EditFiles) listOf("--allow-tool=write") else listOf("--deny-tool=write")) +
+                listOf("-p")
+        },
+    )
+
     /** Every CLI the app knows how to drive. Adding one is adding a spec here. */
-    val all: List<CliAgentSpec> = listOf(Claude, Codex, Gemini, Qwen)
+    val all: List<CliAgentSpec> = listOf(Claude, Codex, Gemini, Qwen, Antigravity, Grok, Copilot)
 
     fun byId(id: String): CliAgentSpec? = all.firstOrNull { it.id == id }
 }

@@ -22,6 +22,9 @@ Turn one on in **Keeper's room › Local agents**. It is off until you do. It th
 | Codex | `codex exec --json -C <tree> -`, prompt on stdin | its own `workspace-write` sandbox (commands inside the tree; its network setting is Codex's own, not set by the app); `read-only` otherwise | The only one that claims shell execution and testing. |
 | Gemini CLI | `gemini --approval-mode auto_edit -p <fixed sentence>`, task on stdin | file edits approved; shell not (denied headless) | Output is plain text. |
 | Qwen Code | the same flags as Gemini CLI | the same | A Gemini CLI fork. |
+| Antigravity | `agy --output-format text -p <prompt>`, prompt as an argument | none from the app: headless, a tool that needs approval is denied, so it reads and answers unless your own Antigravity settings allow more | Read-only here; the app never passes `--dangerously-skip-permissions`. Some versions printed nothing when stdout was a pipe: Test shows it. |
+| Grok Build | `grok --no-auto-update --cwd <tree> --output-format plain --allow Read --allow Grep [--allow Edit] --deny Bash --deny WebFetch --deny WebSearch -p <prompt>` | Edit tool only; shell and web denied | `XAI_API_KEY` may be passed if you choose. Never `--always-approve`. |
+| GitHub Copilot CLI | `copilot --no-auto-update --no-ask-user -s --deny-tool=shell (--allow-tool=write \| --deny-tool=write) -p <prompt>` | file writes only when the role may edit; shell denied | Never `--allow-all` or `--yolo`. |
 
 Adding another CLI is adding a spec (`CliAgentSpecs`): its binary, its headless flags, how to read its output.
 

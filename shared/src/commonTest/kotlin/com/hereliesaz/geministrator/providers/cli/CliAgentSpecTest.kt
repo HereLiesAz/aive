@@ -58,6 +58,44 @@ class CliAgentSpecTest {
     }
 
     @Test
+    fun antigravityGrokAndCopilotTakeTheirPromptAsTheLastArgumentAfterDashPAndNeverSkipChecks() {
+        listOf(CliAgentSpecs.Antigravity, CliAgentSpecs.Grok, CliAgentSpecs.Copilot).forEach { spec ->
+            assertEquals(CliPromptChannel.Argument, spec.promptChannel, spec.id)
+            CliRunMode.entries.forEach { mode ->
+                val args = spec.arguments(mode, "/w", "do the task")
+                assertEquals("-p", args[args.size - 2], "${spec.id} $mode")
+                assertEquals("do the task", args.last())
+                assertEquals(null, CliAgentSpecs.violation(spec.fixedArguments(mode, "/w")), "${spec.id} $mode")
+            }
+        }
+        // Their forbidden spellings are caught.
+        assertTrue(CliAgentSpecs.violation(listOf("--always-approve")) != null)
+        assertTrue(CliAgentSpecs.violation(listOf("--allow-all")) != null)
+        assertTrue(CliAgentSpecs.violation(listOf("--allow-all-paths")) != null)
+        assertEquals(null, CliAgentSpecs.violation(listOf("--allow-tool=write")))
+    }
+
+    @Test
+    fun grokAndCopilotEditOnlyWhenTheRoleMayAndNoneOfTheNewOnesCanRunAShell() {
+        val grokRead = CliAgentSpecs.Grok.fixedArguments(CliRunMode.ReadOnly, "/w")
+        val grokEdit = CliAgentSpecs.Grok.fixedArguments(CliRunMode.EditFiles, "/w")
+        assertFalse("Edit" in grokRead)
+        assertTrue("Edit" in grokEdit)
+        assertEquals("/w", grokEdit[grokEdit.indexOf("--cwd") + 1])
+        assertTrue(grokEdit.windowed(2).contains(listOf("--deny", "Bash")))
+        val copilotRead = CliAgentSpecs.Copilot.fixedArguments(CliRunMode.ReadOnly, "/w")
+        val copilotEdit = CliAgentSpecs.Copilot.fixedArguments(CliRunMode.EditFiles, "/w")
+        assertTrue("--deny-tool=write" in copilotRead && "--allow-tool=write" !in copilotRead)
+        assertTrue("--allow-tool=write" in copilotEdit && "--deny-tool=write" !in copilotEdit)
+        listOf(copilotRead, copilotEdit).forEach { assertTrue("--deny-tool=shell" in it) }
+        listOf(CliAgentSpecs.Antigravity, CliAgentSpecs.Grok, CliAgentSpecs.Copilot).forEach {
+            assertFalse(AgentCapability.ShellExecution in it.capabilities, it.id)
+        }
+        // Antigravity is read-only: headless, a tool that needs approval is denied.
+        assertFalse(AgentCapability.RepositoryWrite in CliAgentSpecs.Antigravity.capabilities)
+    }
+
+    @Test
     fun anArgumentPromptIsLastAndBoundedAndNoSpecCanBeGivenAnEmptyCommand() {
         val viaArgument = CliAgentSpec(
             id = "cli-test", displayName = "Test", binaries = listOf("t"), promptChannel = CliPromptChannel.Argument,
