@@ -24,6 +24,9 @@ object ControlRedaction {
         Regex("""(?i)\b(bearer|basic)(\s+)[A-Za-z0-9._~+/=\-]{8,}"""),
         // A key=value assignment that names what it holds; the name stays, the value goes.
         Regex("""(?i)(?<![A-Za-z0-9_\-])("?(?:x-)?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|secret|token|password|passwd|authorization)"?\s*[:=]\s*"?)(?!(?:bearer|basic)\s)[^\s",}&]{4,}"""),
+        // A Telegram bot token (digits, a colon, then the secret) and a Discord bot token (three dot-separated parts).
+        Regex("""\b[0-9]{6,12}:[A-Za-z0-9_\-]{30,}"""),
+        Regex("""\b[A-Za-z0-9_\-]{23,28}\.[A-Za-z0-9_\-]{6,7}\.[A-Za-z0-9_\-]{27,}"""),
         // JSON Web Tokens.
         Regex("""\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}"""),
         // A PEM private key block. One with no END line ends at the next quote or bracket or the end of the text,

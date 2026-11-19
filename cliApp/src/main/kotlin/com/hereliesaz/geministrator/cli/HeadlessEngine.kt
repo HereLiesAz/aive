@@ -61,6 +61,9 @@ class HeadlessEngine private constructor(
     private val httpClient: HttpClient,
     private val channel: FileChannel,
     private val lock: FileLock,
+    /** Where the chat bots, once `aive serve` starts them, receive a "Post to my chat" step's text (docs/Chat-Bots.md). */
+    val chatPoster: java.util.concurrent.atomic.AtomicReference<com.hereliesaz.geministrator.chat.ChatBotManager?> =
+        java.util.concurrent.atomic.AtomicReference(null),
 ) : AutoCloseable {
     override fun close() {
         runtime.close()
@@ -100,7 +103,8 @@ class HeadlessEngine private constructor(
                 val providerCredentials = HeadlessCredentials.providers(env)
                 val repositoryCredentials = HeadlessCredentials.repositories(env)
                 val providers = headlessProviders(providerCredentials, repositoryCredentials, httpClient)
-                val integrations = headlessExecutors(repositoryCredentials, httpClient)
+                val chatPoster = java.util.concurrent.atomic.AtomicReference<com.hereliesaz.geministrator.chat.ChatBotManager?>(null)
+                val integrations = headlessExecutors(repositoryCredentials, httpClient, chatPoster)
                 val persistence = desktopSqlWorkflowPersistence(File(directory, "workflows.db"))
                 val runtime = ApplicationRuntime.create(
                     providers = providers,
@@ -135,7 +139,7 @@ class HeadlessEngine private constructor(
                         }
                     },
                 )
-                return HeadlessEngine(runtime, host, planner, reviewer, scope, httpClient, channel, lock)
+                return HeadlessEngine(runtime, host, planner, reviewer, scope, httpClient, channel, lock, chatPoster)
             } catch (failure: Throwable) {
                 httpClient.close()
                 scope.cancel()
@@ -201,8 +205,11 @@ private fun headlessProviders(
 private fun headlessExecutors(
     repositories: Map<String, String>,
     client: HttpClient,
+    chatPoster: java.util.concurrent.atomic.AtomicReference<com.hereliesaz.geministrator.chat.ChatBotManager?>,
 ): TaskExecutorIntegrationRegistry {
     val integrations = mutableListOf<TaskExecutorIntegration>()
+    // Fails the step with a plain reason until `aive serve` has started a paired chat bot.
+    integrations += com.hereliesaz.geministrator.chat.ChatPostExecutorIntegration { text -> chatPoster.get()?.postToKeeper(text) ?: 0 }
     val repositoryClients = mutableListOf<RepositoryOperationClient>()
     repositories[RepositoryServiceCatalog.GITHUB_ID]?.let { token ->
         repositoryClients += GitHubRestRepositoryOperationClient(

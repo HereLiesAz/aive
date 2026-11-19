@@ -238,6 +238,9 @@ internal sealed interface TerrariumNewcomer {
     data class FromRole(val role: com.hereliesaz.geministrator.domain.RoleDefinition) : TerrariumNewcomer
     data class Step(val step: TerrariumStep) : TerrariumNewcomer
 
+    /** "Post to my chat": an approval creature and the post creature that waits for it (docs/Chat-Bots.md). */
+    data object PostToChat : TerrariumNewcomer
+
     /** A step template, made at the version [base] resolves to, so the step pins it. [name] is its title. */
     data class FromTemplate(
         val template: com.hereliesaz.geministrator.template.StepTemplate,
@@ -278,7 +281,17 @@ private fun freshTerrariumTaskId(definition: WorkflowDefinition, stem: String): 
  * every other edit and is rejected rather than partially applied.
  */
 internal fun addTerrariumCreature(definition: WorkflowDefinition, newcomer: TerrariumNewcomer): TerrariumDependencyEditResult {
+    if (newcomer is TerrariumNewcomer.PostToChat) {
+        val approvalId = freshTerrariumTaskId(definition, "chat-post-approval")
+        val withApproval = definition.copy(tasks = definition.tasks + com.hereliesaz.geministrator.chat.ChatPostStep.approvalTask(approvalId))
+        val postId = freshTerrariumTaskId(withApproval, "chat-post")
+        val both = withApproval.copy(tasks = withApproval.tasks + com.hereliesaz.geministrator.chat.ChatPostStep.postTask(postId, approvalId))
+        val problems = WorkflowGraphValidator.validate(both)
+        if (problems.isNotEmpty()) return TerrariumDependencyEditResult.Rejected(problems.joinToString("\n") { it.humanReadable() })
+        return TerrariumDependencyEditResult.Applied(both)
+    }
     val task = when (newcomer) {
+        is TerrariumNewcomer.PostToChat -> error("handled above")
         is TerrariumNewcomer.FromRole -> {
             val role = newcomer.role
             if (!role.enabled) return TerrariumDependencyEditResult.Rejected("${role.name} is switched off in the swarm")

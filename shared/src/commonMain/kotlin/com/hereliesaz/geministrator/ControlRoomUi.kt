@@ -1507,7 +1507,8 @@ private fun MainDestination(
                         (it != KeeperSection.Compute || computeAvailable) &&
                             (it != KeeperSection.Delegations || delegations != null) &&
                             it != KeeperSection.Improvement &&
-                            (it != KeeperSection.LocalAgents || com.hereliesaz.geministrator.providers.cli.LocalCliAgentHost.current != null)
+                            (it != KeeperSection.LocalAgents || com.hereliesaz.geministrator.providers.cli.LocalCliAgentHost.current != null) &&
+                            (it != KeeperSection.ChatBots || com.hereliesaz.geministrator.chat.LocalChatBotHost.current != null)
                     },
                     opening = KeeperSection.of(place),
                     selectedName = keeperSectionName,
@@ -1572,6 +1573,7 @@ private fun MainDestination(
                                         )
                                         KeeperSection.Delegations -> delegations?.let { DelegationsPart(it, compact) }
                                         KeeperSection.LocalAgents -> LocalAgentsPart()
+                                        KeeperSection.ChatBots -> ChatBotsPart()
                                         // The self-improvement cycle is one of the schedules' jobs, so its proposals sit under them.
                                         KeeperSection.Schedules -> {
                                             SchedulesPart(compact)

@@ -1641,6 +1641,26 @@
    "source_resolved": true
   },
   {
+   "id": "keeper.chatbots",
+   "kind": "place",
+   "area": "Keeper",
+   "label": "Keeper > Chat bots (desktop)",
+   "source": "ChatBotsPart.kt:60",
+   "reachable_via": "keeper.section=ChatBots",
+   "files": [
+    "ChatBotsPart.kt"
+   ],
+   "symbols": [
+    "KeeperSection.ChatBots",
+    "ChatBotsPart"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "keeper",
+   "source_resolved": true
+  },
+  {
    "id": "keeper.improvement",
    "kind": "place",
    "area": "Keeper",
@@ -3777,6 +3797,16 @@
   },
   {
    "from": "keeper",
+   "to": "keeper.chatbots",
+   "trigger": "part: Chat bots (desktop)",
+   "callback": "keeper.section",
+   "source": "KeeperRoom.kt:96",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "keeper",
    "to": "keeper.improvement",
    "trigger": "part: Improvement",
    "callback": "keeper.section",
@@ -4741,6 +4771,16 @@
    "trigger": "Back closes the part (phone) / pick another part",
    "callback": "PlatformBackHandler",
    "source": "LocalAgentsPart.kt:48",
+   "kind": "back",
+   "status": "present",
+   "auto": true
+  },
+  {
+   "from": "keeper.chatbots",
+   "to": "keeper",
+   "trigger": "Back closes the part (phone) / pick another part",
+   "callback": "PlatformBackHandler",
+   "source": "ChatBotsPart.kt:60",
    "kind": "back",
    "status": "present",
    "auto": true

@@ -60,6 +60,20 @@ Notes.
 
 Notes. Play and GitHub get the same runtime. Whether Play accepts bundled GPL proot libraries and a runtime that downloads and runs packages is the owner's call; the build supports leaving them out (without them the app says the runtime is not available).
 
+## Chat bots
+
+[Chat bots](Chat-Bots.md): a Telegram bot and a Discord bot for notifications, status and run control from the keeper's own chat. Outbound connections only.
+
+| Capability | Play | GitHub | Desktop | Web | CLI |
+|---|---|---|---|---|---|
+| Telegram bot (long polling) | limit (a phone cannot hold the connection) | limit | yes (off until switched on and paired) | limit (a browser tab cannot hold it) | yes (`aive serve`, from the environment) |
+| Discord bot (Gateway direct messages) | limit | limit | yes (same) | limit | yes (same) |
+| `/status`, `/hives`, `/runs`, `/run`, `/stop` (confirmed) | limit | limit | yes | limit | yes |
+| Notifications of what needs the keeper | limit | limit | yes | limit | yes |
+| Post to my chat step | limit | limit | yes | limit | yes (fails with a reason until a bot is paired) |
+| Token entry and pairing code in the Keeper's room | n/a | n/a | yes | n/a | n/a (token from the environment; code printed on the daemon's output) |
+| Approving or rejecting from chat | never | never | never | never | never |
+
 ## What changed in this pass
 
 - One shared gating rule and the "why it is holding" reason in Compute (all platforms that join a pool).

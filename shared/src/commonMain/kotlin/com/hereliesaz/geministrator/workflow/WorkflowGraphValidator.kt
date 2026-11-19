@@ -128,6 +128,12 @@ object WorkflowGraphValidator {
                 }
             }
 
+            // "Post to my chat" sends text to the keeper's chat: it is made only behind an unconditional approval.
+            val chatPost = task.executor.withoutPlacement() as? TaskExecutor.ExternalService
+            if (chatPost?.service == com.hereliesaz.geministrator.chat.CHAT_POST_SERVICE && !hasHumanApprovalAncestor(task.id)) {
+                errors += WorkflowValidationError.MissingStepApproval(task.id)
+            }
+
             // A repository operation placed on another device is still a repository operation.
             // Invariant 4 is decided by the policy decision point: statically, a declared approval
             // ancestor gates the mutation, and its absence denies it.

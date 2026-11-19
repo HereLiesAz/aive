@@ -231,8 +231,7 @@ fun main() {
     val controlRuntime = java.util.concurrent.atomic.AtomicReference<ApplicationRuntime?>(null)
     val controlDrafter = java.util.concurrent.atomic.AtomicReference<(suspend (String) -> com.hereliesaz.geministrator.control.ControlDraftOutcome)?>(null)
     val controlApi = DesktopControlApi()
-    controlApi.attachHost(
-        com.hereliesaz.geministrator.control.RuntimeControlHost(
+    val controlHost = com.hereliesaz.geministrator.control.RuntimeControlHost(
             runtime = controlRuntime::get,
             authoredStore = com.hereliesaz.geministrator.azphalt.SettingsAuthoredWorkflowStore(),
             drafter = controlDrafter::get,
@@ -269,9 +268,17 @@ fun main() {
                     put("controlApiAddress", kotlinx.serialization.json.JsonPrimitive(controlApi.baseUrl))
                 }
             },
-        ),
     )
+    controlApi.attachHost(controlHost)
     controlApi.startIfEnabled()
+    // Telegram and Discord bots (docs/Chat-Bots.md): off until the keeper turns one on, outbound connections only, and they
+    // reach the app only through the same host the control API uses, which cannot approve anything.
+    val chatBots = com.hereliesaz.geministrator.chat.ChatBotManager.create(
+        controlHost = controlHost,
+        runtime = controlRuntime::get,
+        secrets = DesktopChatBotCredentialStore(),
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+    ).also { it.start() }
     // The short-film hive (docs/Short-Film.md). Built once: the frames step counts its image budget per run
     // and tracks the drawings it has started, which a rebuild when a connection changes would lose.
     // The image model's connection is read at each call, so a newly connected OpenAI account is used at once.
@@ -391,6 +398,8 @@ fun main() {
                         .withIntegration(TestRunnerExecutorIntegration(testRunner))
                         .withIntegration(filmFrames)
                         .withIntegration(filmAssemble)
+                        // Sends to the keeper's own paired chat, so it runs only on this computer, behind its approval step.
+                        .withIntegration(com.hereliesaz.geministrator.chat.ChatPostExecutorIntegration { text -> chatBots.postToKeeper(text) })
                 }
                 val uiScope = rememberCoroutineScope()
                 var localPlannerStatus by remember {
@@ -621,6 +630,7 @@ fun main() {
                     )
                     else -> androidx.compose.runtime.CompositionLocalProvider(
                         com.hereliesaz.geministrator.providers.cli.LocalCliAgentHost provides cliAgents,
+                        com.hereliesaz.geministrator.chat.LocalChatBotHost provides chatBots,
                     ) {
                     App(
                         entire = desktopEntire,
