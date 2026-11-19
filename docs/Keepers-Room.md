@@ -56,7 +56,7 @@ One row per thing (`ConnectionRow`): its name, one line about it, its status and
 
 **Ground** is one radio group of six swatches, the current one ringed (`docs/BRANDING.md`, Ground and the shell header). **Reduce motion** (off by default, stored on this device as `aive.appearance.reduce-motion.v1`) holds the creatures and other looping movement still. It is OR-ed with the platform's own signal (Android's animator scale at 0, the browser's `prefers-reduced-motion`, or `AIVE_REDUCE_MOTION` on desktop), so it can turn motion off but never back on against the system; when the device already asks for less motion, the part says so.
 
-**Creature labels** (off by default, stored on this device as `aive.appearance.always-show-creature-labels.v1`): a hive of more than 12 creatures normally shows only the selected creature's label so packed cells stay readable; turned on, every creature keeps its label however full the hive is (`docs/Node-Creatures.md`).
+**Creature labels** (off by default, stored on this device as `aive.appearance.always-show-creature-labels.v1`): a hive of more than 6 creatures normally shows only the selected creature's label so packed cells stay readable; turned on, every creature keeps its label however full the hive is (`docs/Node-Creatures.md`).
 
 ## Messages
 
