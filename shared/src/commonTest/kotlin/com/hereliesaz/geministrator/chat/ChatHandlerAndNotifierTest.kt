@@ -139,7 +139,8 @@ class ChatHandlerAndNotifierTest {
     fun helpfulAlsoSaysARunStarted() {
         val n = notifier(QueenLevel.Helpful, TestClock())
         n.poll(emptyList())
-        assertEquals("Run new-run-1 started.", n.poll(listOf(run("new-run-1", "Running"))))
+        // A run id is shortened to its first eight characters in every message.
+        assertEquals("Run newrun12 started.", n.poll(listOf(run("newrun12345", "Running"))))
     }
 
     @Test
