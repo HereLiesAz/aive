@@ -12,9 +12,6 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 # Least privilege: each job below declares what it needs. id-token is only for the central
@@ -23,10 +20,9 @@ permissions:
   contents: read
 
 concurrency:
-  # Main/release runs must never be cancelled after an immutable tag has been created.
-  # Pull-request runs may cancel stale commits so review CI does not starve the release runners.
+  # Builds run only on a merge to main (or by hand): no run is ever cancelled once an immutable tag may exist.
   group: aive-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: false
 
 jobs:
   version:
@@ -136,7 +132,6 @@ jobs:
 
       - name: Reconstruct and verify Android signing keystore
         id: signing
-        if: github.event_name != 'pull_request'
         uses: ./.github/actions/android-keystore
         with:
           keystore-private: ${{ secrets.KEYSTORE_PRIVATE }}
@@ -151,13 +146,11 @@ jobs:
           expected-owner: ${{ secrets.KEYSTORE_OWNER }}
 
       - name: Export Android signing path
-        if: github.event_name != 'pull_request'
         run: |
           echo "AIVE_KEYSTORE_PATH=${{ steps.signing.outputs.keystore-path }}" >> "$GITHUB_ENV"
           echo "AIVE_KEYSTORE_TYPE=${{ steps.signing.outputs.store-type }}" >> "$GITHUB_ENV"
 
       - name: Select Android release versionCode
-        if: github.event_name != 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
@@ -227,17 +220,10 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            # Release minification runs on PRs too, so R8 keep-rule breaks surface before main.
-            ./gradlew -Papp.versionName="$AIVE_VERSION" \
-              :androidApp:assemblePlayDebug :androidApp:assembleGithubDebug \
-              :androidApp:minifyPlayReleaseWithR8 :androidApp:minifyGithubReleaseWithR8
-          else
-            ./gradlew -Papp.versionCode="$AIVE_VERSION_CODE" \
-              -Papp.versionName="$AIVE_VERSION" \
-              :androidApp:bundlePlayRelease \
-              :androidApp:assembleGithubRelease
-          fi
+          ./gradlew -Papp.versionCode="$AIVE_VERSION_CODE" \
+            -Papp.versionName="$AIVE_VERSION" \
+            :androidApp:bundlePlayRelease \
+            :androidApp:assembleGithubRelease
 
       - name: Verify Android native runtime packaging
         shell: bash
@@ -268,7 +254,6 @@ jobs:
           test "$bad" -eq 0
 
       - name: Verify 16 KB native library alignment
-        if: github.event_name != 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
@@ -316,7 +301,6 @@ jobs:
         run: ./gradlew :webApp:wasmJsBrowserProductionWebpack
 
       - name: Generate release notes
-        if: github.event_name != 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
@@ -343,11 +327,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            VARIANT_PATTERN='*playDebug*'
-          else
-            VARIANT_PATTERN='*playRelease*'
-          fi
+          VARIANT_PATTERN='*playRelease*'
           MATCHES=$(find androidApp/build/intermediates -type f -path "$VARIANT_PATTERN" -name 'AndroidManifest.xml' -print)
           if [ -z "$MATCHES" ]; then
             echo "::error::Could not find merged Play manifest for $VARIANT_PATTERN"
@@ -366,11 +346,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            VARIANT_PATTERN='*githubDebug*'
-          else
-            VARIANT_PATTERN='*githubRelease*'
-          fi
+          VARIANT_PATTERN='*githubRelease*'
           MATCHES=$(find androidApp/build/intermediates -type f -path "$VARIANT_PATTERN" -name 'AndroidManifest.xml' -print)
           if [ -z "$MATCHES" ]; then
             echo "::error::Could not find merged GitHub manifest for $VARIANT_PATTERN"
@@ -387,7 +363,6 @@ jobs:
           fi
 
       - name: Upload GitHub Android release
-        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: aive-android-github-release
@@ -395,7 +370,6 @@ jobs:
           if-no-files-found: error
 
       - name: Upload GitHub Android R8 mapping
-        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: aive-android-github-mapping
@@ -403,7 +377,6 @@ jobs:
           if-no-files-found: error
 
       - name: Upload Play Android release
-        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: aive-android-play-release
@@ -411,7 +384,6 @@ jobs:
           if-no-files-found: error
 
       - name: Upload release notes
-        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: aive-release-notes
@@ -440,10 +412,8 @@ jobs:
 
   desktop-packages:
     name: Desktop installer (${{ matrix.platform }})
-    # Dependabot PRs skip the three-OS installer matrix: a batch of dependency bumps
-    # otherwise holds every concurrent runner (2026-10-03). They still get `build`,
-    # and main builds the installers once the bump merges.
-    if: (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    # The three-OS installer matrix builds on a merge to main only.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: version
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 75
@@ -589,7 +559,7 @@ jobs:
 
   release:
     name: Publish patch-grouped release
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
     needs:
       - build
       - desktop-packages
@@ -706,7 +676,6 @@ jobs:
   # Standalone puppet-rig PWA until the full Aive browser app is connected.
   # Deliberately independent of Android/Desktop/Wasm build success.
   deploy-pages:
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

@@ -94,7 +94,7 @@ class TutorialDirector(
      */
     private val opening: List<LessonPayload> = emptyList(),
     /** The chapter that ends the tour, added once every chapter the swarm planned has been written. */
-    private val closing: List<LessonPayload> = emptyList(),
+    private val closingChapters: List<LessonPayload> = emptyList(),
     private val tick: suspend () -> Unit = { delay(POLL_MILLIS) },
 ) {
     suspend fun run(goal: String, scope: TutorialScope, runKey: String?): TutorialOutcome {
@@ -155,7 +155,7 @@ class TutorialDirector(
         surface.onReply { replies.trySend(it) }
         val lessons = mutableListOf<LessonPayload>().apply { addAll(opening) }
         var total = head + steps.size
-        val tail = closing.size
+        val tail = closingChapters.size
         var closingAdded = tail == 0
         var dropped = 0
         var record = CheckInRecord()
@@ -300,7 +300,7 @@ class TutorialDirector(
                     closingAdded = true
                     total += tail
                     surface.setTotal(total)
-                    closing.forEach { lessons += it; surface.addLesson(it) }
+                    closingChapters.forEach { chapter -> lessons += chapter; surface.addLesson(chapter) }
                     continue
                 }
                 if (next < steps.size && now.index >= lessons.size - 1) {
