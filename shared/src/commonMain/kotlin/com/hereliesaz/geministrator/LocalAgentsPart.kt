@@ -31,6 +31,8 @@ import com.hereliesaz.geministrator.resources.local_agents_project_off
 import com.hereliesaz.geministrator.resources.local_agents_project_on
 import com.hereliesaz.geministrator.resources.local_agents_off
 import com.hereliesaz.geministrator.resources.local_agents_on
+import com.hereliesaz.geministrator.resources.local_agents_install
+import com.hereliesaz.geministrator.resources.local_agents_installing
 import com.hereliesaz.geministrator.resources.local_agents_test
 import com.hereliesaz.geministrator.resources.local_agents_workspace_note
 import com.hereliesaz.geministrator.resources.local_agents_workspace_read_only
