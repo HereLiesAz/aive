@@ -455,15 +455,17 @@ internal fun GeministratorWorkflowTerrarium(
             // In Build the tapped creature opens its job on the tissue itself: a card grown from the foot of
             // the field with the objective, approval, tries, time and the rest, so the settings are inside
             // the hive and not a form under it. Everything the form had is here; undo and redo apply to it.
+            // It belongs to the creature that has turned over to its step's card (Edit's card flip), and rises
+            // under that card, so the creature opens in place as card and settings together.
             if (building && rehearsal == null && grouping == null) {
-                stagedDefinition.tasks.firstOrNull { it.id.value == selectedTaskId }?.let { openTask ->
+                stagedDefinition.tasks.firstOrNull { it.id.value == selectedTaskId && it.id.value == flippedId }?.let { openTask ->
                     Box(Modifier.fillMaxSize()) {
                         AzphaltThemedSurface(Azphalt.Ink) {
                             Column(
                                 Modifier
                                     .align(Alignment.BottomCenter)
                                     .fillMaxWidth()
-                                    .fillMaxHeight(0.5f)
+                                    .fillMaxHeight(0.4f)
                                     .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                                     .background(Azphalt.Ink.copy(alpha = 0.96f))
                                     // Taps and drags on the card are the card's, never the tissue's beneath it.
