@@ -160,16 +160,18 @@ internal fun Stable.onRunCleared(
     val progress = progress + 1
     if (progress < need) return copy(counted = counted, progress = progress)
 
-    val parts = contributors.ifEmpty { listOf(starter) }.map { key ->
-        bred.firstOrNull { it.id == key }?.let { Triple(it.body, it.tendrils, it.tail) } ?: Triple(key, key, key)
+    val candidates = contributors.ifEmpty { listOf(starter) }.distinct().map { key ->
+        val bredKey = bred.firstOrNull { it.id == key }
+        if (bredKey != null) Parent(key, bredKey.body, bredKey.tendrils, bredKey.tail) else Parent(key, key, key, key)
     }
-    val a = parts.first()
-    val b = parts.getOrElse(1) { a }
-    // Store-only breeds never pass themselves on: their part comes from the other parent.
-    fun pick(x: String, y: String): String? = listOf(x, y).firstOrNull { catalog[it]?.bred != false }
-    val body = pick(a.first, b.first)
-    val tendrils = pick(b.second, a.second)
-    val tail = pick(if (random.nextBoolean()) a.third else b.third, if (random.nextBoolean()) b.third else a.third)
+    val parents = chooseParents(candidates, catalog)
+    // Store-only breeds never pass themselves on: that part comes from another parent. Each part locus is offered
+    // first to a different parent, so with three parents each gives one part.
+    fun pick(offered: List<String>): String? = offered.firstOrNull { catalog[it]?.bred != false }
+    val body = pick(parents.map { it.body })
+    val tendrils = pick(parents.map { it.tendrils }.rotated(1))
+    val tail = pick(if (parents.size >= 3) parents.map { it.tail }.rotated(2) else parents.map { it.tail }.shuffled(random))
+    val parentBreeds = parents.map { it.body }.distinct()
 
     var stable = copy(counted = counted)
     val child = if (body == null || tendrils == null || tail == null) {
@@ -179,16 +181,15 @@ internal fun Stable.onRunCleared(
         body
     } else {
         val id = "bred-${run.id.value}"
-        stable = stable.copy(bred = stable.bred + BredCreature(id, body, tendrils, tail, listOf(a.first, b.first), generation))
+        stable = stable.copy(bred = stable.bred + BredCreature(id, body, tendrils, tail, parentBreeds, generation))
         id
     }
 
     // The next generation's pace: Fibonacci, swung by the parents' mutation, steered by how well they pair.
-    val breedA = catalog[a.first]
-    val breedB = catalog[b.first]
-    val swing = maxOf(breedA?.mutation ?: 1, breedB?.mutation ?: 1)
-    val paired = breedA != null && breedB != null &&
-        (breedA.id == breedB.id || breedA.genus == breedB.genus || breedB.id in breedA.pairsWith || breedA.id in breedB.pairsWith)
+    val breeds = parents.map { catalog[it.body] }
+    val swing = breeds.maxOf { it?.mutation ?: 1 }
+    val paired = breeds.all { it != null } &&
+        parents.pairs().all { (x, y) -> pairCoherence(x.body, y.body, catalog) >= PAIRED }
     val favourable = random.nextDouble() < if (paired) FAVOURABLE_IF_PAIRED else 1 - FAVOURABLE_IF_PAIRED
     val next = generation + 1
     val need = (fibonacci(next) + if (favourable) -swing else swing).coerceAtLeast(1)
@@ -204,7 +205,7 @@ internal fun Stable.onRunCleared(
         generation = next,
         progress = 0,
         need = need,
-        lastHatching = Hatching(generation, listOf(a.first, b.first).distinct(), child, stranger),
+        lastHatching = Hatching(generation, parentBreeds, child, stranger),
     )
 }
 

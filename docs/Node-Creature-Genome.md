@@ -2,6 +2,19 @@
 
 The creatures as living things in their own right: what they inherit, what they need, how they live, compete, wire together, breed, sicken and die. They're neurons, so their biology is a neuron's biology: tissue, blood supply, trophic support, firing, synapses, pruning, excitotoxicity. It runs as rule-driven artificial life in the spirit of Conway's Game of Life: simple local rules, complex behaviour. The lineage data is measured from the paintings (`tools/creature-genome/`, output `docs/swarm-terrarium/lineage.json`); the lineage map is on the mockup canvas.
 
+**Status: what the app runs and what is still the design target.**
+
+| Built (`Breeds.kt`, `BreedParents.kt`) | Design target, not built |
+|---|---|
+| Breeds, the stable, the starter, rarity, store breeds | Resources, Energy, Integrity, Charge, trophic reserve, Age |
+| Generations at Fib(*n*) cleared runs, swung by mutation | Ticks, wake and sleep, the capillaries |
+| Up to three parents, ranked by fit and by how new the pairing is | The seven-locus genome (pigment, accent, spectrum, core, pattern, skin, arbor) and cell kinds |
+| Body, tendrils and tail each taken whole from one parent | Kinship, Echo, septic creatures, the clone trap |
+| Pairing by breed, genus and `pairsWith`; the lottery for Rare, Very rare and Mythic | Fertility rules, mutation per locus, the Mythic conditions |
+| Programmatic work counts but never parents | Survival, competition, circuits, death by apoptosis |
+
+Everything below the table is the target unless it is in the left column.
+
 **Nothing here happens on its own.** Every event below is the visible form of something that happened in a run; [Ecology and the swarm](Ecology-and-the-Swarm.md) holds the binding rule, the full ledger, and the numbers the test bench uses. Where this page gives a rate, it's the bench's.
 
 ## The world
@@ -72,7 +85,8 @@ Rarity is how improbable a creature's allele combination is (summed allele surpr
 A creature's breed is the keeper's, not its role's: any agent can wear any breed the keeper owns. The catalog is `shared/src/commonMain/composeResources/files/breeds.json`, built from the lineage by `tools/creature-genome/breeds.py`; new breeds are added there with the same fields.
 
 - **The stable.** The keeper picks one starter (a Common breed); it is unlimited, and every agent without another creature wears it. Every other creature is owned one at a time, bred or bought, and lives in one agent at a time.
-- **Generations.** Generation *n* needs Fib(*n*) cleared workflows (1, 1, 2, 3, 5…). When they clear, the run's contributors hatch the next generation: body from one parent, tendrils from the other, tail from either. A pure child joins its breed's count; a mixed one is one of a kind.
+- **Generations.** Generation *n* needs Fib(*n*) cleared workflows (1, 1, 2, 3, 5…). When they clear, the run's contributors hatch the next generation: body from one parent, tendrils from another, tail from a third (or, with two parents, from either). A pure child joins its breed's count; a mixed one is one of a kind.
+- **Parents.** Up to three, one for each part, chosen from the six creatures that did the most of the run's work (`BreedParents.kt`). Every set of parents on offer is ranked by how well its breeds fit (the same breed 1.0, the same genus 0.8, listed in each other's pairing 0.6, otherwise 0.1) and by how seldom this stable has hatched that pair before. Both are z-scored across the sets and weighted 0.3 to 0.7, the ranking of arXiv:2603.01092 ("The Alien Space of Science") applied to breeds: a combination nobody here has made wins, but never an unfitting one (a set whose mean fit is under 0.3 is chosen only if no other set is left). Nothing in it is random and none of it is shown. The pace swings in the keeper's favour when every pair in the set is a good pair (0.6 or more). Echo, kinship and the fertility rules below are the design this builds toward; the app runs the rules in this section.
 - **Mutation.** Each breed has a positive mutation score. A hatch swings the next generation's workflow count by the parents' higher score, earlier or later, never below 1.
 - **Pairing.** Each breed lists the breeds it pairs with; its own kind and genus always do. A good pair swings the count in the keeper's favour three times in four; a poor pair, against.
 - **Lottery.** Each hatch draws once, rarest first: Mythic 1 in 1000, Very rare 1 in 100, Rare 1 in 20.
