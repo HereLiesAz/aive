@@ -888,7 +888,11 @@ private fun MascotNodeTerrarium(
                 // The creature carrying the egg wears it on top, so the egg has its tail tip to itself.
                 val carriesEgg = tissue?.egg?.feederIds?.lastOrNull() == node.id
                 // Which provider answers for it: Pinned never switches; Auto fails over. Ink and Yellow only.
-                LocalProviderBadges.current[node.id]?.takeIf { birth == null }?.let { badge ->
+                // "Auto" is the default and said nothing new while it sat on every creature and collided with
+                // its neighbours' names; it shows for the tapped creature, and a Pinned source always shows.
+                LocalProviderBadges.current[node.id]
+                    ?.takeIf { birth == null && (isSelected || it.routing is CreatureProviderRouting.Pinned) }
+                    ?.let { badge ->
                     val pinned = badge.routing is CreatureProviderRouting.Pinned
                     Text(
                         text = creatureProviderBadgeText(badge.routing, badge.pinnedName),
