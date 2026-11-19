@@ -141,7 +141,7 @@ import com.hereliesaz.geministrator.resources.common_cancel
 import com.hereliesaz.geministrator.resources.common_connect
 import com.hereliesaz.geministrator.resources.common_connected
 import com.hereliesaz.geministrator.resources.common_off
-import com.hereliesaz.geministrator.resources.settings_provider_use
+import com.hereliesaz.geministrator.resources.settings_provider_in_use
 import com.hereliesaz.geministrator.resources.common_dismiss
 import com.hereliesaz.geministrator.resources.common_retry
 import com.hereliesaz.geministrator.resources.settings_chars
@@ -460,13 +460,14 @@ internal fun ProviderSettingsScreen(
                     "disconnect-provider-${entry.id}",
                     onClick = { disconnectProviderId = entry.id },
                 )
+                // On the card with its other actions, the same pill idiom as the local agents' On/Off.
+                AzphaltPill(
+                    stringResource(if (enabled) Res.string.settings_provider_in_use else Res.string.common_off),
+                    "use-provider-${entry.id}",
+                    selected = enabled,
+                    onClick = { ProviderEnablement.set(entry.id, !enabled) },
+                )
             }
-            AzphaltToggle(
-                label = stringResource(Res.string.settings_provider_use, entry.displayName),
-                seed = "use-provider-${entry.id}",
-                selected = enabled,
-                onClick = { ProviderEnablement.set(entry.id, !enabled) },
-            )
             if (!healthDetails.isNullOrBlank()) {
                 ErrorDetailsToggle(healthDetails, seed = "health-${entry.id}")
             }
