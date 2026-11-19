@@ -75,6 +75,7 @@ private fun TourState.advance(outcome: StepOutcome): TourState =
 fun expectationMet(expect: TourExpect, event: TourEvent): Boolean = when (event) {
     is TourEvent.Tapped -> expect.kind == ExpectKind.Tapped && expect.target == event.id.name
     is TourEvent.Opened -> expect.kind == ExpectKind.Opened && expect.target == event.id.name
+    is TourEvent.Run -> expect.kind == event.signal.kind
 }
 
 fun reduceTour(state: TourState, action: TourAction): TourState = when (action) {

@@ -96,3 +96,19 @@ A blocker is anything that must be created or obtained for a particular hive to 
 - [ ] The keeper adds, marks done or drops a blocker in the existing hive form.
 - [ ] The Nanny's findings add blockers for the next hive; `Blockers.carryForward` is called when a run ends and read when the next is planned.
 - [ ] Nothing was compiled or run; CI verifies.
+
+## Immersive intro tour: the swarm shows the swarm
+
+Today: a hint layer rings static controls while the hive fed the same goal is an unrelated run (`intro/TutorialDirector.kt`, `tour/`). Wanted: the tour IS the swarm at work, and the keeper watches and does what the creatures do.
+
+- [ ] 1. Tour hive. "Teach me" launches a real swarm with a fixed cast: Scout (reads the app's own docs and nav map), Planner, Writer (one per chapter), Reviewer, Antagonist. They hatch, work, hand off and message on screen like any hive; their artifacts are the chapters.
+- [ ] 2. Chapters play as artifacts land, one ahead of the keeper. Each is voiced by the creature that made it and rings a real control or a real thing in the run (that creature's card, its Needs/Work/Mind tabs, Messages, the Story, Memory, "What it made").
+- [ ] 3. Steps wait on run events as well as taps (creature hatched, need raised, artifact made, dispute opened). `TourExpect` gains run-event kinds fed from the run's event stream.
+- [ ] 4. The keeper does it for real, in a sandbox: the tour hive raises a real decision (approve a plan), a real disagreement, a real artifact to open and copy. No repository, spend under the cap, keyless Source.
+- [ ] 5. Immersion: full-screen spotlight, a named creature's voice per chapter, chapter strip with skip, replay and resume; the last chapter hands the keeper the hive and its output (the finished tour).
+- [ ] 6. Waiting is never empty: the swarm's own work is the thing on screen while the next chapter is written; no Source says so with a link.
+- [ ] 7. Tests: pure reducers (event expectations, chapter queue), director against a fake run; nav map and docs updated.
+
+Decisions (keeper, 2026-11-18): a fixed opening begins at once while the swarm writes the rest, and the swarm continues the tour on its own. "Fully immersive, not simple written text": a chapter is something the keeper sees and does in the real app (creature cards moving, hand-offs lighting up, a real decision to make, a real artifact to open), with the narration beside it, never a card of text.
+- Opening (fixed, instant): the tour hive hatches on screen with the keeper watching; the opening chapters are the real hatching, first hand-off and first message, spotlit.
+- Continuation (swarm-made): the Planner and Writer extend the chapter list from what the run has shown so far, paced by the Source.

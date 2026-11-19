@@ -60,8 +60,9 @@ class TutorialDirectorTest {
         clock: () -> Long = { 0L },
         level: () -> QueenLevel = { QueenLevel.Quiet },
         say: (TutorialSay) -> Unit = {},
+        opening: List<LessonPayload> = emptyList(),
         tick: suspend () -> Unit,
-    ) = TutorialDirector(planner, reviewers, w, rows, { "somewhere" }, surface, saveComfort = save, nowMillis = clock, level = level, say = say, tick = tick)
+    ) = TutorialDirector(planner, reviewers, w, rows, { "somewhere" }, surface, saveComfort = save, nowMillis = clock, level = level, say = say, opening = opening, tick = tick)
 
     /** The keeper's side of a quick walk: answer any open question with [answer], else go on to the next step. */
     private fun walk(surface: FakeSurface, answer: CheckInReply = CheckInReply.Yes) {
@@ -81,6 +82,38 @@ class TutorialDirectorTest {
         }.run("goal", TutorialScope.Focused, null)
         assertEquals(TutorialOutcome.Ended(written = 3, dropped = 0, finished = true, reached = true), outcome)
         assertEquals(listOf("R1", "R2", "R3"), surface.state!!.lessons.map { it.target })
+    }
+
+    private fun openingLesson(id: String) = LessonPayload(
+        target = id,
+        sentence = "Open $id.",
+        expect = com.hereliesaz.geministrator.tour.TourExpect(ExpectKind.Tapped, id),
+        explain = "Short.",
+        ifMissed = "Again.",
+        checkIn = "Are you with me so far?",
+        anotherWay = "Other way.",
+        smaller = listOf("one", "two"),
+    )
+
+    @Test
+    fun theOpeningPlaysAtOnceAndThePlannedChaptersFollowIt() = runTest {
+        val surface = FakeSurface()
+        val outcome = director(surface, QueenModel { planOf(2) }, opening = listOf(openingLesson("R1"), openingLesson("R2"))) {
+            walk(surface)
+        }.run("goal", TutorialScope.Focused, null)
+        // The two fixed chapters come first, then the two the swarm planned; the tour is one run of four.
+        assertEquals(listOf("R1", "R2", "R1", "R2"), surface.state!!.lessons.map { it.target })
+        assertEquals(4, surface.state!!.stepTotal)
+        assertIs<TutorialOutcome.Ended>(outcome)
+        assertEquals(true, outcome.finished)
+    }
+
+    @Test
+    fun aPlanThatFailsLeavesTheOpeningStanding() = runTest {
+        val surface = FakeSurface()
+        val outcome = director(surface, QueenModel { "no steps here" }, opening = listOf(openingLesson("R1"))) { }.run("goal", TutorialScope.Broad, null)
+        assertIs<TutorialOutcome.PlanFailed>(outcome)
+        assertEquals(listOf("R1"), surface.state!!.lessons.map { it.target })
     }
 
     @Test

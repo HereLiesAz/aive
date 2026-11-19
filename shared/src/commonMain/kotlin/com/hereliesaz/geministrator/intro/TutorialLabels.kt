@@ -23,6 +23,7 @@ import com.hereliesaz.geministrator.resources.rail_memory
 import com.hereliesaz.geministrator.resources.rail_roster
 import com.hereliesaz.geministrator.resources.rail_stable
 import com.hereliesaz.geministrator.resources.rail_store
+import com.hereliesaz.geministrator.resources.tour_target_creatures
 import org.jetbrains.compose.resources.getString
 
 /**
@@ -45,6 +46,7 @@ internal suspend fun tutorialLabels(): Map<String, String> = mapOf(
         "build_build" to getString(Res.string.build_build),
         "hive_pause_run" to getString(Res.string.hive_pause_run),
         "hive_stop_run" to getString(Res.string.hive_stop_run),
+        "tour_target_creatures" to getString(Res.string.tour_target_creatures),
         "creature_tab_needs" to getString(Res.string.creature_tab_needs),
         "creature_tab_work" to getString(Res.string.creature_tab_work),
         "creature_tab_mind" to getString(Res.string.creature_tab_mind),

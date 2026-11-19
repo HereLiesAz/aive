@@ -960,12 +960,11 @@ internal fun MindMapRunScreen(
         )
         }
 
-        // What it made, on the hive itself: every artifact of a finished run, grouped by creature, each row
+        // What it made, on the hive itself: every artifact of the run so far, grouped by creature, each row
         // opening that creature's Work, with Show all, a filter, Copy and Open (ArtifactBrowse.kt). The
         // result is never three taps deep in a creature's panel, and a failed or cancelled run keeps its work.
-        if (run.status.isFinished()) {
-            HiveMadeSection(definition = liveWorkflow.definition, run = run, onOpenWork = openCreatureWork)
-        }
+        // Every hive presents its creation here, growing as creatures finish, not only once the whole run is done.
+        HiveMadeSection(definition = liveWorkflow.definition, run = run, onOpenWork = openCreatureWork)
 
         if (compact && run.status.isFinished()) {
             ContinueRunPanel(

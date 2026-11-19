@@ -46,8 +46,15 @@ class NoPrewrittenCurriculumTest {
         return false
     }
 
+    /**
+     * The one carve-out, by the keeper's own decision (2026-11-18): a short fixed opening, so the tour starts the instant the
+     * goal is fed while the swarm writes the rest. Its words are `tour_open_*`, they are read in `intro/TutorialOpening.kt`,
+     * and every later chapter is still generated on every run. A second prefix here would be a second syllabus.
+     */
+    private val openingKeyPrefix = "tour_open_"
+
     private fun chromeProblems(strings: Map<String, String>, words: Set<String>): List<String> =
-        strings.filterKeys { k -> chromeKeyPrefixes.any { k.startsWith(it) } }.mapNotNull { (k, v) ->
+        strings.filterKeys { k -> chromeKeyPrefixes.any { k.startsWith(it) } && !k.startsWith(openingKeyPrefix) }.mapNotNull { (k, v) ->
             when {
                 v.length > 48 -> "$k is longer than 48 characters"
                 v.count { it == '.' || it == '!' || it == '?' } > 1 -> "$k is more than one sentence"
@@ -112,6 +119,13 @@ class NoPrewrittenCurriculumTest {
         val all = File("src/commonMain/kotlin").walkTopDown().filter { it.isFile && it.extension == "kt" && it.name != "TourTarget.kt" }
         val hits = all.flatMap { f -> syllabusInCode(f.readText()).map { "${f.name}: $it" } }.toList()
         assertEquals(emptyList<String>(), hits)
+    }
+
+    @Test
+    fun theFixedOpeningIsExactlyFourChaptersAndNothingElseIsFixed() {
+        val opening = allStrings().keys.filter { it.startsWith(openingKeyPrefix) }
+        assertEquals(setOf("hatch", "handoff", "work", "queen"), opening.map { it.removePrefix(openingKeyPrefix).substringBefore('_') }.toSet())
+        assertEquals(4 * 7, opening.size)
     }
 
     // Meta-tests: each rule must detect a violation. -----------------------------------------------------------------

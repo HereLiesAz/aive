@@ -58,6 +58,17 @@ import com.hereliesaz.geministrator.azphaltLiveRegion
 import com.hereliesaz.geministrator.azphaltOnSurface
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.tour_back
+import com.hereliesaz.geministrator.resources.tour_stage_withered
+import com.hereliesaz.geministrator.resources.tour_stage_waiting
+import com.hereliesaz.geministrator.resources.tour_stage_working
+import com.hereliesaz.geministrator.resources.tour_stage_checking
+import com.hereliesaz.geministrator.resources.tour_stage_retrying
+import com.hereliesaz.geministrator.resources.tour_stage_needs_you
+import com.hereliesaz.geministrator.resources.tour_stage_done
+import com.hereliesaz.geministrator.resources.tour_stage_failed
+import com.hereliesaz.geministrator.resources.tour_stage_cancelled
+import com.hereliesaz.geministrator.resources.tour_hive_title
+import com.hereliesaz.geministrator.resources.tour_hive_egg_growth
 import com.hereliesaz.geministrator.resources.tour_failed_line
 import com.hereliesaz.geministrator.resources.tour_hide
 import com.hereliesaz.geministrator.resources.tour_preparing_line
@@ -105,6 +116,8 @@ fun TourOverlayHost() {
         return
     }
     if (state == null || state.phase == TourPhase.Dismissed) return
+    // What is happening to each creature and egg, beside whatever step is showing.
+    HiveLines(TourController.hive)
     // After the last step the layer is gone, except while the closing question (do you feel you know what you are doing now) is open.
     val closing = state.finished && state.checkInLine != null
     if (state.finished && !closing) return
@@ -144,6 +157,37 @@ private fun ClosingCard(line: String) {
                 Text(plain(line), style = AzphaltType.body, color = azphaltOnSurface())
                 CheckInReplies()
                 AzphaltPill(stringResource(Res.string.tour_stop), "tour-stop", onClick = { TourController.escape() })
+            }
+        }
+    }
+}
+
+/** Each creature and egg of the hive on screen with where it is now, so the keeper watches the swarm work while the tour speaks. */
+@Composable
+private fun HiveLines(lines: List<CreatureLine>) {
+    if (lines.isEmpty()) return
+    Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.TopEnd) {
+        AzphaltSurface(Azphalt.Ink) {
+            Column(
+                Modifier.widthIn(max = 260.dp).clip(RoundedCornerShape(16.dp)).background(Azphalt.Ink).padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(stringResource(Res.string.tour_hive_title).uppercase(), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+                lines.forEach { line ->
+                    val stage = when (line.stage) {
+                        CreatureStage.Egg -> stringResource(Res.string.tour_hive_egg_growth, ((line.growth ?: 0f) * 100).toInt())
+                        CreatureStage.Withered -> stringResource(Res.string.tour_stage_withered)
+                        CreatureStage.Waiting -> stringResource(Res.string.tour_stage_waiting)
+                        CreatureStage.Working -> stringResource(Res.string.tour_stage_working)
+                        CreatureStage.Checking -> stringResource(Res.string.tour_stage_checking)
+                        CreatureStage.Retrying -> stringResource(Res.string.tour_stage_retrying)
+                        CreatureStage.NeedsYou -> stringResource(Res.string.tour_stage_needs_you)
+                        CreatureStage.Done -> stringResource(Res.string.tour_stage_done)
+                        CreatureStage.Failed -> stringResource(Res.string.tour_stage_failed)
+                        CreatureStage.Cancelled -> stringResource(Res.string.tour_stage_cancelled)
+                    }
+                    Text("${plain(line.name)} · $stage", style = AzphaltType.body, color = azphaltOnSurface(), maxLines = 1)
+                }
             }
         }
     }

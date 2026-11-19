@@ -29,7 +29,14 @@ enum class ExpectKind(val wire: String) {
     SpendCapSet("spendCapSet"),
     SourcePinned("sourcePinned"),
     Paused("paused"),
-    ViewedLong("viewedLong");
+    ViewedLong("viewedLong"),
+
+    /** Things the swarm does, read from the run itself ([RunSignal]); a step waits on the hive, not on a tap. */
+    RunHatched("runHatched"),
+    RunHandedOff("runHandedOff"),
+    RunArtifact("runArtifact"),
+    RunDone("runDone"),
+    QueenSpoke("queenSpoke");
 
     companion object {
         fun fromWire(text: String): ExpectKind? = entries.firstOrNull { it.wire == text }
@@ -114,6 +121,11 @@ enum class TourTargetId(
         labelKey = "hive_stop_run",
         place = "above a hive while it runs",
     ),
+    HIVE_CREATURES(
+        labelKey = "tour_target_creatures",
+        place = "the hive on screen, where its creatures hatch and work",
+        observable = setOf(ExpectKind.RunHatched, ExpectKind.RunHandedOff, ExpectKind.RunArtifact, ExpectKind.RunDone),
+    ),
     CREATURE_TAB_NEEDS(
         labelKey = "creature_tab_needs",
         place = "on a creature's sheet, after a creature is opened",
@@ -179,6 +191,9 @@ fun tourTargetRows(labelOf: (String) -> String?): List<TargetRow> = TourTargetId
 sealed interface TourEvent {
     data class Tapped(val id: TourTargetId) : TourEvent
     data class Opened(val id: TourTargetId) : TourEvent
+
+    /** The hive did something the keeper can watch (see [runSignals]). */
+    data class Run(val signal: RunSignal) : TourEvent
 }
 
 /**
