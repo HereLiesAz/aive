@@ -272,7 +272,8 @@ private fun TourLayer(state: TourState, step: LessonPayload) {
                     addRect(Rect(Offset.Zero, size))
                     if (hole != null) addRoundRect(RoundRect(hole, CornerRadius(14f, 14f)))
                 }
-                drawPath(dim, Color(0xB31E1A17))
+                // Nothing to point at (the target is off screen): no scrim, so the screen stays readable under the caption.
+                if (hole != null) drawPath(dim, Color(0xB31E1A17))
                 if (hole != null) {
                     drawRoundRect(
                         color = ringColor.copy(alpha = pulse),
@@ -349,8 +350,11 @@ private fun TourCard(state: TourState, step: LessonPayload) {
                     onClick = { TourController.dispatch(TourAction.Next) },
                     tone = PillTone.Primary,
                 )
-                AzphaltPill(stringResource(Res.string.tour_know_this), "tour-know-this", onClick = { TourController.dispatch(TourAction.KnowThis) })
-                AzphaltPill(stringResource(Res.string.tour_pause), "tour-pause", onClick = { TourController.dispatch(TourAction.Pause) })
+                // Pause and "I know this" are secondary: shown with the longer explanation, so a step has three buttons, not six.
+                if (state.explainOpen) {
+                    AzphaltPill(stringResource(Res.string.tour_know_this), "tour-know-this", onClick = { TourController.dispatch(TourAction.KnowThis) })
+                    AzphaltPill(stringResource(Res.string.tour_pause), "tour-pause", onClick = { TourController.dispatch(TourAction.Pause) })
+                }
                 AzphaltPill(stringResource(Res.string.tour_stop), "tour-stop", onClick = { TourController.escape() })
             }
         }
