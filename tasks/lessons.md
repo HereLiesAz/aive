@@ -200,3 +200,11 @@ I shipped gesture and animation changes verified only by compiles and unit tests
 - **Never write `/*` inside a Kotlin comment** (`docs/*.md` in a KDoc): Kotlin block comments nest, so it opens a second comment and the file ends "Unclosed comment" plus a wall of unresolved-reference errors in every file that uses it. Spell a glob in a comment as words; inside a string literal it is fine. Grep new files for `/\*` outside strings before landing (#903 failed on it twice).
 
 - **In a Gradle Kotlin script `java` is the Java plugin extension**, so `java.net.URI(...)` or `java.io.IOException` fails script compilation ("Unresolved reference 'net' on receiver of type 'JavaPluginExtension'"). Import the classes at the top of the script instead.
+
+## The product is a living hive: hold that picture first
+
+The keeper's founding picture is a living flowchart that does not look like a flowchart: cards and lines are wrong, a living hive is right. I let it slide while I worked on tests, installers and error handling, and put the hive in a boxed panel with a form under it. Passing tests did not tell me the screens had stopped looking like a hive.
+
+- Before any UI work, read `tasks/hive-redesign.md`, and ask of each screen: does this look like a living hive, or like a form, a card or a diagram?
+- Look at the running app (desktop, at the keeper's screen size) before calling UI work done. A clean compile is not the test.
+- When the keeper restates the founding picture, record it as the first line of the plan and put it above audits and release work.
