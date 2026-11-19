@@ -31,6 +31,9 @@ interface CliAgentHost {
     /** Lets a repository that tracks this CLI's project settings (which can make it run commands) be used. Off by default. */
     fun setAllowProjectConfig(id: String, allow: Boolean) = Unit
 
+    /** Installs a CLI that [CliAgentSpec.npmPackage] names (the keeper asked for it); the result says what happened. */
+    suspend fun install(id: String): CliTestResult = CliTestResult(false, "Installing is not supported here.", 0, 0)
+
     /** Runs the installed CLI read-only on a tiny prompt in an empty folder; uses the keeper's own quota. */
     suspend fun test(id: String): CliTestResult
 }
