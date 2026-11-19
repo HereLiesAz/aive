@@ -161,13 +161,20 @@ val bundleAiveDocs = tasks.register("bundleAiveDocs") {
     val readme = rootProject.layout.projectDirectory.file("README.md").asFile
     val docsDir = rootProject.layout.projectDirectory.dir("docs").asFile
     val rootDir = aiveDocsResourcesRoot
+    // customDirectory for commonMain replaces the default composeResources folder instead of adding to it, so this root
+    // carries a copy of the checked-in resources too: without it no string or drawable is built (Unresolved reference 'Res.string...').
+    val ownResources = layout.projectDirectory.dir("src/commonMain/composeResources").asFile
+    inputs.dir(ownResources).withPropertyName("ownComposeResources").withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(rootProject.fileTree("docs") { include("*.md") }).withPropertyName("aiveDocs")
         .withPathSensitivity(PathSensitivity.RELATIVE)
     if (readme.isFile) inputs.file(readme).withPropertyName("aiveReadme")
     outputs.dir(rootDir)
     doLast {
-        val target = rootDir.get().asFile.resolve("files/aive-docs")
-        target.deleteRecursively()
+        val root = rootDir.get().asFile
+        root.deleteRecursively()
+        root.mkdirs()
+        if (ownResources.isDirectory) ownResources.copyRecursively(root, overwrite = true)
+        val target = root.resolve("files/aive-docs")
         target.mkdirs()
         val names = mutableListOf<String>()
         if (readme.isFile) {
