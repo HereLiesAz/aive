@@ -384,7 +384,11 @@ class WorkflowRuntimeCoordinator(
                 continue
             }
             val previousStatus = state.run.taskRuns[taskId]?.status
-            val outputRejected = nextRun.taskRuns[taskId]?.blockingReason?.takeIf { it.code == TASK_OUTPUT_REJECTED }
+            // Output turned back for what it is (a check it failed, a contract it broke) says so and is tried
+            // again as a verification failure; it is not "Executor failed", which hid why a lesson step ran four times.
+            val outputRejected = nextRun.taskRuns[taskId]?.blockingReason?.takeIf {
+                it.code == TASK_OUTPUT_REJECTED || it.code == OUTPUT_CONTRACT_VIOLATION
+            }
             val retryReason = when {
                 outputRejected != null -> RetryReason.VerificationFailed
                 previousStatus == TaskRunStatus.Verifying -> RetryReason.VerificationFailed
