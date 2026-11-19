@@ -542,7 +542,12 @@ class WorkflowRuntimeCoordinator(
                 run = nextRun,
                 existingHandles = nextHandles,
                 nowEpochMillis = nowEpochMillis,
+                spendGuard = spendGuardForDispatch(nextRun, nowEpochMillis),
             )
+            // A cap reached by usage that landed after this cycle's own check: nothing started, and the run stops.
+            dispatched.spendTrip?.let { trip ->
+                return stopForSpendCap(project, definition, dispatched.run, dispatched.handles, trip, nowEpochMillis)
+            }
             nextRun = dispatched.run
             if (nextRun.status.isTerminal()) {
                 return terminate(project, definition, nextRun, dispatched.handles, nowEpochMillis)
@@ -785,7 +790,13 @@ class WorkflowRuntimeCoordinator(
      * hourly spend across runs is summed when this run's known cost rises, and at least once a
      * minute otherwise. A Hall Monitor pause is left to its own review.
      */
-    private suspend fun spendCapTrip(previous: WorkflowRun, run: WorkflowRun, nowEpochMillis: Long): SpendCapTrip? {
+    private suspend fun spendCapTrip(
+        previous: WorkflowRun,
+        run: WorkflowRun,
+        nowEpochMillis: Long,
+        /** Sum the hour now even if it was summed less than a minute ago: a task is about to start on the answer. */
+        forceHourly: Boolean = false,
+    ): SpendCapTrip? {
         if (run.globalPause != null || run.spendPause != null) return null
         val caps = spendCaps()
         runCostTrip(run, caps)?.let { return it }
@@ -793,7 +804,7 @@ class WorkflowRuntimeCoordinator(
         val lastCheck = lastHourlySpendCheckAtMillis
         val costRose = run.knownCostUsd() > previous.knownCostUsd() ||
             (run.hasUnpricedUsage() && !previous.hasUnpricedUsage())
-        if (!costRose && lastCheck != null && nowEpochMillis - lastCheck < HOURLY_SPEND_RECHECK_MILLIS) return null
+        if (!forceHourly && !costRose && lastCheck != null && nowEpochMillis - lastCheck < HOURLY_SPEND_RECHECK_MILLIS) return null
         lastHourlySpendCheckAtMillis = nowEpochMillis
         val spent = hourlySpend(persistence, nowEpochMillis, alsoRunId = run.id, ambient = ambientSpend)
         return when {
@@ -802,6 +813,21 @@ class WorkflowRuntimeCoordinator(
             spent.unpricedUsage && !run.unpricedCostAccepted ->
                 SpendCapTrip(SpendCapKind.HourlySpend, hourlyCap, spent.knownUsd, unknownCost = true)
             else -> null
+        }
+    }
+
+    /**
+     * The check [WorkflowEngine.dispatchReadyTasks] makes before it starts a task. The first call in a pass sums the
+     * hour afresh (a task is about to be started on the answer, and spend from another run may have landed since this
+     * cycle's own check, which waits a minute between sums); later calls sum it again only when this run's cost has
+     * risen since the call before, as the cycle's check does.
+     */
+    private fun spendGuardForDispatch(start: WorkflowRun, nowEpochMillis: Long): suspend (WorkflowRun) -> SpendCapTrip? {
+        var last: WorkflowRun? = null
+        return { run ->
+            val trip = spendCapTrip(previous = last ?: start, run = run, nowEpochMillis = nowEpochMillis, forceHourly = last == null)
+            last = run
+            trip
         }
     }
 
