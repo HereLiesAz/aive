@@ -164,7 +164,12 @@ class CliRunScriptTest {
     @Test
     fun theRunFolderNameCannotEscapeTheRunsRoot() {
         val root = "${CliRunScript.RUNTIME_HOME}/.aive-cli"
-        assertEquals("$root/run", CliRunScript.runFolder("../../etc"))
+        // Only letters, digits and dashes survive: no dot, no slash, so it can never leave the root.
+        assertEquals("$root/etc", CliRunScript.runFolder("../../etc"))
+        listOf("../../etc", "a/b", "..", "x\u0000y").forEach { name ->
+            val tail = CliRunScript.runFolder(name).removePrefix("$root/")
+            assertTrue(tail.isNotEmpty() && '/' !in tail && '.' !in tail, name)
+        }
         assertEquals("$root/task-1", CliRunScript.runFolder("task-1"))
         assertEquals("$root/run", CliRunScript.runFolder(""))
     }
