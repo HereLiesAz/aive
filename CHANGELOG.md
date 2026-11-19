@@ -4,6 +4,8 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.91 — from 2026-11-19
 
+- **Change: the hive on a phone has the same controls bar as on a wide screen.** The Live/Edit pills and the row of Pause, Stop, Story, Share and More editing pills above the hive are now one bar on the hive's own frame: the Live/Edit switch, then the same round buttons (Pause or Resume, Stop, Timeline, Share hive card, More editing, Every creature, Centre, Zoom out, Zoom in), scrolling sideways when the screen is narrow. The on-field zoom controls give way to the bar's. Nothing was removed; the places row (District, Breeds, Nursery, Shop) and the Timeline view's pill row are unchanged. Seen in `26-shell-phone-hive` (desktop render at phone size); not touch-tested, and the two zoom buttons sit off the right edge until the bar is scrolled.
+
 - **Change: the card flip and the job card are one opening.** In Edit a tapped creature still turns over to its step's card (the flip stays); its job card now rises only under that flipped card, so card and settings read as one creature opened in place, instead of two panels that could stack. Seen in `24-edit-flipped-card`.
 
 - **Change: a creature's own acts moved into its card on the hive.** Detach, Hold output (Release output), Duplicate, Remove, what feeds it (each strand cuttable, each knot turning) and Feed it from now sit under its job on the card in Edit. Under the hive stay only the hive's own acts: Rehearse, Cluster (with Fold and its Remove), Add creature, Undo/Redo and Delete swarm. Nothing was removed. Seen in the desktop screenshot run (`2-hive-build`); the card scrolls, and the lower part was not touch-tested.
