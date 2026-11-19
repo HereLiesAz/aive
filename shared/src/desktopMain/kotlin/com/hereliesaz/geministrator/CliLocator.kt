@@ -8,7 +8,7 @@ import java.io.File
  * Never resolves against a repository or the current directory, so a checkout cannot supply the
  * program that runs.
  */
-internal object CliLocator {
+object CliLocator {
     fun locate(spec: CliAgentSpec, environment: Map<String, String> = System.getenv(), home: String = System.getProperty("user.home").orEmpty()): File? =
         locateBinary(spec.binaries, environment, home)
 

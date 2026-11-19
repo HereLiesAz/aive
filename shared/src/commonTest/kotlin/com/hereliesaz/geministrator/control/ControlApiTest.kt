@@ -169,6 +169,31 @@ class ControlApiTest {
         assertFalse(offending.single().mutating)
     }
 
+    /** Installing, switching on or off, and running a vendor CLI or a Source is local-only (`aive agents|sources ...` in a terminal); no route offers it. */
+    @Test
+    fun theRouteTableOffersNoWayToInstallEnableOrRunACliAgentOrSource() = runTest {
+        val words = setOf("install", "enable", "disable", "test", "run_agent", "set_enabled", "toggle", "switch")
+        val offending = ControlApi.routes.filter { route ->
+            val parts = route.name.split('_') + route.name + route.pattern.split('/').filter(String::isNotEmpty)
+            parts.any { it.lowercase() in words }
+        }
+        assertEquals(emptyList(), offending.map { it.method to it.pattern })
+        // The two listings are the only routes under /sources and /agents, and both only read.
+        val listings = ControlApi.routes.filter { it.pattern.startsWith("/sources") || it.pattern.startsWith("/agents") }
+        assertEquals(setOf(ControlMethod.GET to "/sources", ControlMethod.GET to "/agents"), listings.map { it.method to it.pattern }.toSet())
+        assertTrue(listings.none { it.mutating })
+        val paths = listOf(
+            "/agents", "/agents/cli-claude", "/agents/cli-claude/install", "/agents/cli-claude/enable", "/agents/cli-claude/disable",
+            "/agents/cli-claude/test", "/agents/cli-claude/run", "/sources", "/sources/openai", "/sources/openai/enable", "/sources/openai/disable",
+        )
+        for (path in paths) for (method in listOf("POST", "PUT", "PATCH", "DELETE")) {
+            val r = call(method, path, body = """{"enabled":true}""")
+            assertTrue(r.status in setOf(404, 405), "$method $path answered ${r.status}")
+        }
+        assertEquals(200, call("GET", "/agents").status)
+        assertEquals(200, call("GET", "/sources").status)
+    }
+
     @Test
     fun noRequestCanReachAnApprovalExceptToReadIt() = runTest {
         val paths = listOf(

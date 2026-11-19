@@ -7,7 +7,7 @@ package com.hereliesaz.geministrator
  * waiting on a terminal nobody sees. Shared by every desktop component that runs `git`, or a tool
  * that runs it (`entire`).
  */
-internal fun sanitizeGitEnvironment(environment: MutableMap<String, String>) {
+fun sanitizeGitEnvironment(environment: MutableMap<String, String>) {
     environment.keys
         .filter { key ->
             key.startsWith("GIT_", ignoreCase = true) ||
@@ -20,4 +20,4 @@ internal fun sanitizeGitEnvironment(environment: MutableMap<String, String>) {
     environment["GCM_INTERACTIVE"] = "Never"
 }
 
-internal fun sanitizeGitEnvironment(builder: ProcessBuilder) = sanitizeGitEnvironment(builder.environment())
+fun sanitizeGitEnvironment(builder: ProcessBuilder) = sanitizeGitEnvironment(builder.environment())

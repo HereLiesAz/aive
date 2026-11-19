@@ -30,6 +30,12 @@ fun main(args: Array<String>) {
                 require(args.size == 1) { "Usage: aive resume" }
                 runBlocking { resume() }
             }
+            "agents", "sources" -> {
+                // Local-only management runs in this process, never through the control API; the read-only listings fall through.
+                val terminal = System.console()?.let { console -> LocalTerminal { prompt -> console.readLine("%s", prompt) } }
+                LocalManagement(terminal).run(args.asList(), System.out, System.err)
+                    ?: AiveCli(HeadlessConnection.transport()).run(args.asList(), System.out, System.err)
+            }
             else -> {
                 // Help works even when no service is listening.
                 val help = args.isEmpty() || args.first() in setOf("--help", "-h", "help")

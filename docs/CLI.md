@@ -47,6 +47,19 @@ When the *daemon itself* has a real terminal, its in-process keeper console supp
 
 `aive serve` does not host or join a compute pool, run the A2A server or hold a Remote access link: those live in the desktop app and the Android GitHub build. See [Platform parity](Platform-Parity.md).
 
+## Local-only management of Sources and CLI agents
+
+```sh
+aive agents install cli-claude      # one `npm install -g <package>`, for a CLI that has one
+aive agents enable|disable cli-claude
+aive agents test cli-claude         # runs the installed CLI read-only on a tiny prompt (uses your own quota)
+aive sources enable|disable openai
+```
+
+These run **inside the CLI process** and are deliberately not control API commands: no HTTP route, MCP tool or token can install, switch on or run a vendor CLI. Each needs an attached interactive terminal (without one it exits `2` and changes nothing, even with `--yes`) and either `--yes` or the id typed back at the prompt. The only flags are `--yes` and `--json`; a key is never accepted as an argument. They edit the same durable stores as the desktop app (`CliAgentSettings` in the user's `java.util.prefs`, and `ProviderEnablement` in the durable UI state), so a switch made here shows in the desktop and the other way round. `aive agents` and `aive sources` alone remain the read-only listings.
+
+Follow-ups, not built: the headless engine does not yet use enabled CLI agents as providers (that needs `CliAgentProvider`, the worktree runner and its Git helpers moved out of `desktopApp`), does not yet honour the Source switches when it builds providers, and its `aive agents`/`aive sources` listings are empty (no views are wired into the headless control host).
+
 ## State, secrets, and isolation
 
 The headless engine defaults to `~/.aive/headless/` (override with `AIVE_HEADLESS_HOME`). It stores `workflows.db` (SQLite workflow history and events), `engine.lock` (one live engine per state directory) and `control/control-token` plus `control/control.json` (token file and nonsecret discovery). The desktop database `~/.aive/workflows.db` and desktop control port 41242 remain separate. Only `serve` exposes a local HTTP listener; `run` and `resume` work without one. Two engine processes may not run against the same database simultaneously.
