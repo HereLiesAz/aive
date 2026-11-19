@@ -9,14 +9,12 @@ import kotlin.test.assertTrue
 
 /** A Source switched off keeps its key and is used by nothing; switching it on needs no key. */
 class ProviderEnablementTest {
-    private val original = ProviderEnablement.store
-
     @AfterTest
     fun restore() {
-        ProviderEnablement.store = original
+        ProviderEnablement.useStore(null)
     }
 
-    private fun fresh() = DurableUiStateStore(MapSettings()).also { ProviderEnablement.store = it }
+    private fun fresh() = DurableUiStateStore(MapSettings()).also { ProviderEnablement.useStore(it) }
 
     @Test
     fun everySourceIsOnUntilItIsSwitchedOff() {
@@ -45,7 +43,7 @@ class ProviderEnablementTest {
         ProviderEnablement.set("kilo", false)
         ProviderEnablement.set("llm7", false)
         // A new session over the same store reads them back.
-        ProviderEnablement.store = store
+        ProviderEnablement.useStore(store)
         assertEquals(setOf("kilo", "llm7"), ProviderEnablement.disabled)
     }
 
