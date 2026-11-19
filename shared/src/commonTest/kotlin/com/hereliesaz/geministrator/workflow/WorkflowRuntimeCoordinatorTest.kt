@@ -111,7 +111,20 @@ class WorkflowRuntimeCoordinatorTest {
             artifactIdFactory = ::artifactId,
         )
 
-        val retried = result.run.taskRuns.getValue(taskId)
+        // A provider failure waits out a backoff before the retry starts, not the next second.
+        val waiting = result.run.taskRuns.getValue(taskId)
+        assertEquals(TaskRunStatus.Retrying, waiting.status)
+        assertEquals(2, waiting.attempt)
+        assertEquals(emptyMap(), result.handles)
+
+        val after = fixture.coordinator.cycle(
+            project = project(),
+            definition = definition,
+            state = WorkflowRuntimeState(result.run, result.handles),
+            nowEpochMillis = waiting.retryNotBefore!!,
+            artifactIdFactory = ::artifactId,
+        )
+        val retried = after.run.taskRuns.getValue(taskId)
         assertEquals(TaskRunStatus.Running, retried.status)
         assertEquals(2, retried.attempt)
         assertEquals(AgentProviderId("provider"), retried.assignedProviderId)
@@ -167,9 +180,10 @@ class WorkflowRuntimeCoordinatorTest {
         )
 
         assertEquals(2, result.run.taskRuns.getValue(mainId).attempt)
-        assertEquals(TaskRunStatus.Running, result.run.taskRuns.getValue(mainId).status)
+        // Waiting out the retry backoff, so still "being retried" and the handler waits.
+        assertEquals(TaskRunStatus.Retrying, result.run.taskRuns.getValue(mainId).status)
         assertEquals(TaskRunStatus.Blocked, result.run.taskRuns.getValue(handlerId).status)
-        assertEquals(setOf(mainId), result.handles.keys)
+        assertEquals(emptySet(), result.handles.keys)
     }
 
     @Test

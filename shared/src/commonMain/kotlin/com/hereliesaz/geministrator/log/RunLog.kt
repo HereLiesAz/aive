@@ -91,7 +91,7 @@ internal fun WorkflowEvent.logText(): String = when (this) {
     }
     is ArtifactCreated -> "Artifact created: ${artifact.kind.name} ${artifact.id.value}"
     is VerificationFailed -> "Verification failed: $reason"
-    is RetryScheduled -> "Retry scheduled, attempt $nextAttempt: $reason"
+    is RetryScheduled -> "Retry scheduled, attempt $nextAttempt${if (delayMillis > 0L) " in ${(delayMillis + 500L) / 1000L} s" else ""}: $reason"
     is TaskEscalated -> "Escalated: $reason" + (reassignedRoleId?.let { " (reassigned to ${it.value})" } ?: "")
     is TaskCompleted -> "Completed"
     is TaskFailed -> "Failed: $reason"
