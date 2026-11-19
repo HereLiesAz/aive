@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.orchestration.PlanDecision
 import com.hereliesaz.geministrator.orchestration.PlanVerdict
 import com.hereliesaz.geministrator.orchestration.SwarmReason
+import com.hereliesaz.geministrator.orchestration.worksFromLine
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.plan_decision_approved_after
 import com.hereliesaz.geministrator.resources.plan_decision_approved_first
@@ -96,6 +97,9 @@ internal fun PlanDecisionContent(
                                 color = azphaltOnSurface(),
                             )
                             Text(step.objective, style = AzphaltType.endCap, color = azphaltOnSurface())
+                            outcome.plan.worksFromLine(step)?.let { works ->
+                                Text(works, style = AzphaltType.endCap, color = azphaltOnSurface())
+                            }
                         }
                     }
                     if (outcome.rounds.any { it.verdict.reasons.isNotBlank() }) {

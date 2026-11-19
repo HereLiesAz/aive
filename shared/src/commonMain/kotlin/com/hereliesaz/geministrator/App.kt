@@ -232,6 +232,8 @@ fun App(
     val reduceMotion = AzphaltMotion.reduceMotion
     var projectIdToOpenAfterReload by remember { mutableStateOf<String?>(null) }
     var automaticProjectRestoreAttempted by remember(projectFileService) { mutableStateOf(false) }
+    // The app's own bundled docs, read once. Offered to a creature only when the queen gave its task an AiveDocs resource.
+    val aiveDocsSource = remember { com.hereliesaz.geministrator.retrieval.AiveDocsChunkSource() }
 
     LaunchedEffect(enabledProviders, duplexAttachment, executorIntegrations, roleSurfaceRuntime, workflowPersistence, orchestrationUtilities, contextChunkSources, runtimeGeneration) {
         runtime?.close()
@@ -247,7 +249,9 @@ fun App(
                 roleSurfaceRuntime = roleSurfaceRuntime,
                 orchestrationUtilities = orchestrationUtilities,
                 contextRetriever = com.hereliesaz.geministrator.retrieval.SimilarityContextRetriever(
-                    listOf(com.hereliesaz.geministrator.retrieval.ArtifactChunkSource) + contextChunkSources,
+                    // A task's resources (assigned by the queen) narrow or add to these; a task with none gets what it always did.
+                    listOf(com.hereliesaz.geministrator.retrieval.ArtifactChunkSource, aiveDocsSource) +
+                        contextChunkSources.map { com.hereliesaz.geministrator.retrieval.RepositoryFilesNarrowedSource(it) },
                 ),
                 spendCaps = { spendCapStore.caps },
                 queenLevel = { queenLevelStore.level },
@@ -425,6 +429,7 @@ fun App(
                 )
             },
             consent = mcpConsent ?: com.hereliesaz.geministrator.mcp.McpConsentGate.DenyUnasked,
+            appDocs = com.hereliesaz.geministrator.research.AiveDocsResearch(aiveDocsSource),
         )
     }
     val researchContext = com.hereliesaz.geministrator.research.ResearchContext(

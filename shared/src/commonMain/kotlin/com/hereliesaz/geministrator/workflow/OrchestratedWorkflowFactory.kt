@@ -27,11 +27,17 @@ object OrchestratedWorkflowFactory {
         val validated = plan.validateAgainst(packet)
         val rolesById = roles.associateBy { it.id.value }
         val stepIds = validated.steps.associate { it.id to TaskDefinitionId(it.id) }
+        // What the queen assigned each creature to work from: read leniently, bounded, and only to steps that exist.
+        val stepResources: (com.hereliesaz.geministrator.orchestration.OrchestrationPlanStep) -> List<com.hereliesaz.geministrator.domain.TaskResource> = { planStep ->
+            com.hereliesaz.geministrator.domain.TaskResources.fromJson(planStep.resources) { written ->
+                stepIds[written]?.takeIf { it.value != planStep.id }
+            }
+        }
         return WorkflowDefinition(
             id = id,
             name = objective.take(80),
             description = "Workflow planned by Aive's local orchestration planner.",
-            tasks = validated.steps.map { step ->
+            tasks = withTutorialDocs(objective, validated.steps.map { step ->
                 val templateId = step.templateId
                 if (templateId != null) {
                     val template = requireNotNull(com.hereliesaz.geministrator.template.BuiltInTemplates.byId[templateId]) {
@@ -47,6 +53,7 @@ object OrchestratedWorkflowFactory {
                         dependsOn = made.dependsOn + step.dependsOn.map { stepIds.getValue(it) },
                         approvalPolicy = if (step.requiresHumanApproval) ApprovalPolicy.HumanApproval else made.approvalPolicy,
                         environmentPlanningPolicy = EnvironmentPlanningPolicy.NotRequired,
+                        resources = stepResources(step),
                     )
                 }
                 val role = requireNotNull(rolesById[step.roleId]) {
@@ -67,9 +74,30 @@ object OrchestratedWorkflowFactory {
                         ApprovalPolicy.None
                     },
                     environmentPlanningPolicy = EnvironmentPlanningPolicy.NotRequired,
+                    resources = stepResources(step),
                 )
-            },
+            }),
             testDesignPolicy = TestDesignPolicy.BeforeAndAfterImplementation,
         )
+    }
+
+    /**
+     * A safety net only: a plan for a goal to be taught the app that gave no creature the app's docs gets them on its first
+     * research-like creature (else its first). The planner is told to assign them itself; nothing else is special-cased.
+     */
+    internal fun withTutorialDocs(objective: String, tasks: List<TaskDefinition>): List<TaskDefinition> {
+        if (tasks.isEmpty() || !com.hereliesaz.geministrator.intro.TutorialRouter.isTutorialGoal(objective)) return tasks
+        if (tasks.any { task -> com.hereliesaz.geministrator.domain.TaskResources.hasAiveDocs(task.resources) }) return tasks
+        val target = tasks.firstOrNull { task ->
+            val role = task.roleId?.value.orEmpty().lowercase()
+            role.contains("research") || role.contains("survey")
+        } ?: tasks.first()
+        return tasks.map { task ->
+            if (task.id == target.id) {
+                task.copy(resources = com.hereliesaz.geministrator.domain.TaskResources.bounded(task.resources + com.hereliesaz.geministrator.domain.TaskResource.AiveDocs()))
+            } else {
+                task
+            }
+        }
     }
 }

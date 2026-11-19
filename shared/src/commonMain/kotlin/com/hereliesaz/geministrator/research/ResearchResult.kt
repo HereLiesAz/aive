@@ -7,6 +7,8 @@ enum class ResearchSource(val label: String) {
     AppBridge("this app's control interface"),
     SearchA2A("SearchA2A directory"),
     GoogleAiMode("Google AI Mode"),
+    /** The app's own bundled docs, read on this device; never a lookup and never asked of the keeper. */
+    AiveDocs("the Aive's own docs"),
 }
 
 /** Why something the queen could have consulted was not. */
@@ -53,7 +55,12 @@ data class ResearchRecord(
     }
 }
 
-data class ResearchOutcome(val leads: List<ResearchLead>, val record: ResearchRecord) {
+data class ResearchOutcome(
+    val leads: List<ResearchLead>,
+    val record: ResearchRecord,
+    /** Excerpts of the app's own docs the queen read, each one line already cleaned and marked (see [AiveDocsResearch]); empty when none was relevant. */
+    val docs: List<String> = emptyList(),
+) {
     companion object {
         val None = ResearchOutcome(emptyList(), ResearchRecord())
     }

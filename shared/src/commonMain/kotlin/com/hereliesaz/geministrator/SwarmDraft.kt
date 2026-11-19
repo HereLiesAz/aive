@@ -74,7 +74,8 @@ internal fun swarmDraftPacket(prompt: String, roles: Collection<RoleDefinition>)
         instruction = "Propose the smallest dependency-correct swarm of creatures that can do this work, " +
             "at most $SWARM_DRAFT_MAX_CREATURES (fewer is better), each with one bounded job in a single terse sentence. " +
             "Group broad work into a few creatures rather than listing every detail. " +
-            "This is a proposal for a person to edit; nothing runs.",
+            "This is a proposal for a person to edit; nothing runs." +
+            com.hereliesaz.geministrator.domain.TaskResources.PLAN_INSTRUCTION,
     )
 
 /**
@@ -119,6 +120,9 @@ internal fun swarmDraftFromPlan(prompt: String, plan: OrchestrationPlan, roles: 
             executor = TaskExecutor.RoleAgent(role.id),
             dependsOn = step.dependsOn.mapTo(mutableSetOf()) { idFor.getValue(it.trim()) },
             approvalPolicy = if (step.requiresHumanApproval) ApprovalPolicy.HumanApproval else ApprovalPolicy.None,
+            resources = com.hereliesaz.geministrator.domain.TaskResources.fromJson(step.resources) { written ->
+                idFor[written.trim()]?.takeIf { it != idFor[rawIds[index]] }
+            },
         )
     }
     val candidate = WorkflowDefinition(id = com.hereliesaz.geministrator.domain.WorkflowDefinitionId("draft"), name = "draft", tasks = tasks)

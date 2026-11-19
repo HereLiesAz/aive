@@ -75,12 +75,18 @@ private class PlanInputs(
 ) {
     fun withResearch(outcome: com.hereliesaz.geministrator.research.ResearchOutcome): PlanInputs {
         if (outcome.record.isEmpty) return this
-        val tools = outcome.leads.toAvailableTools()
+        // The "From the Aive's own docs" lines come after the leads, already bounded and cleaned by the docs reader.
+        val tools = outcome.leads.toAvailableTools() + outcome.docs
         return PlanInputs(
             projectName, objective, repository, existingProject, parentRunIds, launchRoles, plannerRoles,
             packet.copy(
                 availableTools = tools,
-                instruction = if (tools.isEmpty()) packet.instruction else packet.instruction + com.hereliesaz.geministrator.research.RESEARCH_PLAN_INSTRUCTION,
+                instruction = if (tools.isEmpty()) {
+                    packet.instruction
+                } else {
+                    packet.instruction + com.hereliesaz.geministrator.research.RESEARCH_PLAN_INSTRUCTION +
+                        (if (outcome.docs.isEmpty()) "" else com.hereliesaz.geministrator.research.AiveDocsResearch.PLAN_INSTRUCTION)
+                },
             ),
             design, supplementalRoles, rolesToPersist, objectiveProvenance, outcome.record, missing, staffing,
         )
@@ -200,6 +206,7 @@ private val TEACHING_WORDS = Regex("\\b(teach|taught|tutor|learn|explain|walk me
 internal fun newWorkflowInstruction(objective: String, repository: RepositoryRef?, availableTools: List<String> = emptyList()): String = buildString {
     append("Create the minimal executable dependency-correct workflow DAG needed to satisfy the objective.")
     append(com.hereliesaz.geministrator.orchestration.SMALLEST_PLAN_INSTRUCTION)
+    append(com.hereliesaz.geministrator.domain.TaskResources.PLAN_INSTRUCTION)
     if (repository != null) {
         append(" A repository is linked (").append(repository.name).append("). A step sees only short excerpts of it, its README and docs first,")
         append(" so name the files or parts each step should read in that step's objective.")

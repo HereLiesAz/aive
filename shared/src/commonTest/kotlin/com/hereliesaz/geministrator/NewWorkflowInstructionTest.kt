@@ -14,7 +14,10 @@ class NewWorkflowInstructionTest {
 
     @Test
     fun anObjectiveWithNoRepositoryAndNoLessonKeepsTheOriginalInstruction() {
-        assertEquals(base + SMALLEST_PLAN_INSTRUCTION, newWorkflowInstruction("Fix the login bug", null))
+        assertEquals(
+            base + SMALLEST_PLAN_INSTRUCTION + com.hereliesaz.geministrator.domain.TaskResources.PLAN_INSTRUCTION,
+            newWorkflowInstruction("Fix the login bug", null),
+        )
     }
 
     @Test

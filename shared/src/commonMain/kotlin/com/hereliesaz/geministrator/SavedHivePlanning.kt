@@ -69,7 +69,7 @@ private fun TaskDefinition.agentRoleId(): RoleDefinitionId? =
 internal const val ROUGH_DESIGN_INSTRUCTION =
     "A keeper drew a rough design, in currentPlan (it may be empty). Decide exactly how best to carry out the objective: " +
         "keep the steps that are sound, change, add or remove steps so the plan is executable, and keep every dependency valid. " +
-        "Return the whole plan."
+        "Return the whole plan." + com.hereliesaz.geministrator.domain.TaskResources.PLAN_INSTRUCTION
 
 /**
  * The hive to run: [design] with its tasks replaced by [plan]'s, under a new id so the saved design stays as drawn.

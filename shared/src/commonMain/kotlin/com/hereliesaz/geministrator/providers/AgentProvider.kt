@@ -91,6 +91,10 @@ data class AgentTaskRequest(
     val isolationHint: IsolationHint = IsolationHint.ProviderDefault,
     val requirePlanApproval: Boolean = false,
     val promptContext: PromptContext = PromptContext(),
+    /** What the queen assigned this task to work from; empty means the context it always got. */
+    val resources: List<com.hereliesaz.geministrator.domain.TaskResource> = emptyList(),
+    /** The runs whose artifacts an UpstreamArtifacts resource narrows retrieval to; null means no narrowing. */
+    val resourceTaskRuns: Set<TaskRunId>? = null,
     val orchestrationContext: AgentOrchestrationContext = AgentOrchestrationContext(),
     val compoundInference: CompoundInferenceContext = CompoundInferenceContext.single(
         taskRunId = taskRunId,
