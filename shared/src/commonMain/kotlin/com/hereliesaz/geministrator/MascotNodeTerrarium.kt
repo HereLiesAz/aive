@@ -1221,8 +1221,8 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawTendril(
 internal val ClaspGreen = Color(0xFF6BE04A)
 private val ClaspRed = Color(0xFFFF3B30)
 
-/** Up to this many creatures, every one wears its name; more, and only the tapped one does. */
-internal const val NAMED_CREATURE_LIMIT = 12
+/** Up to this many creatures, every one wears its name; more, and only the tapped one does (seven creatures drawn together already overlapped their names). */
+internal const val NAMED_CREATURE_LIMIT = 6
 
 /**
  * Whether a creature wears its label on the field: always when it is selected or the keeper asked
