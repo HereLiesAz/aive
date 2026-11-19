@@ -2218,6 +2218,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="tour_hide">Hide</string>
     <string name="tour_hive_title">The hive</string>
     <string name="tour_hive_egg_growth">Egg, %1$d%</string>
+    <string name="tour_hive_more">and %1$d more</string>
     <string name="tour_stage_withered">Withered</string>
     <string name="tour_stage_waiting">Ready</string>
     <string name="tour_stage_working">Working</string>
