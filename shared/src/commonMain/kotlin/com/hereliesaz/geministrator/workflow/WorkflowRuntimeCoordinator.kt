@@ -1020,6 +1020,9 @@ class WorkflowRuntimeCoordinator(
                     cacheHitFraction = usage.cacheHitFraction,
                     latencyMillis = usage.latencyMillis,
                     costUnknown = usage.costUnknown,
+                    model = usage.model,
+                    requestSha256 = usage.requestSha256,
+                    requestChars = usage.requestChars,
                     occurredAtEpochMillis = nowEpochMillis,
                 ),
             )

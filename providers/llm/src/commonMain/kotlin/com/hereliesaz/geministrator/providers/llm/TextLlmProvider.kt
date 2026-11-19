@@ -12,6 +12,8 @@ import com.hereliesaz.geministrator.mcp.McpToolOutcome
 import com.hereliesaz.geministrator.mcp.McpToolSource
 import com.hereliesaz.geministrator.mcp.McpToolbox
 import com.hereliesaz.geministrator.mcp.restrictedTo
+import com.hereliesaz.geministrator.events.RequestFingerprint
+import com.hereliesaz.geministrator.events.fingerprintRequestText
 import com.hereliesaz.geministrator.providers.AgentCapabilities
 import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.providers.AgentProvider
@@ -67,6 +69,8 @@ open class TextLlmProvider(
         val generation: InterruptibleGeneration,
         /** MCP tool calls the run made: their results are external-provenance content. */
         var toolOutcomes: List<McpToolOutcome> = emptyList(),
+        /** Fingerprint (SHA-256 and length, never the text) of the prompt last sent to the model; null until a generation starts. */
+        var requestFingerprint: RequestFingerprint? = null,
         /** True while an [observe] collector holds the session: it ends the session itself when it finishes. */
         var observing: Boolean = false,
     )
@@ -209,7 +213,7 @@ open class TextLlmProvider(
             val phase = session.phase.filter { it != TextLlmSessionPhase.AwaitingApproval }.first()
             if (phase == TextLlmSessionPhase.Cancelled) {
                 // The plan was generated, and billed, before it was cancelled.
-                session.planResult?.let { emitUsage(runId, it) }
+                session.planResult?.let { emitUsage(runId, it, session) }
                 emit(AgentEvent.Failed(runId, "$displayName session cancelled"))
                 mutex.withLock { sessions.remove(runId) }
                 return
@@ -221,7 +225,7 @@ open class TextLlmProvider(
             val result = session.planResult ?: generateOrFail(runId, session) ?: return
             if (cancelledDuringGeneration(runId, session, result)) return
             emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text, session.toolOutcomes)))
-            emitUsage(runId, result)
+            emitUsage(runId, result, session)
         } else {
             if (session.phase.value == TextLlmSessionPhase.Cancelled) {
                 emit(AgentEvent.Failed(runId, "$displayName session cancelled"))
@@ -231,16 +235,16 @@ open class TextLlmProvider(
             val result = generateOrFail(runId, session) ?: return
             if (cancelledDuringGeneration(runId, session, result)) return
             emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text, session.toolOutcomes)))
-            emitUsage(runId, result)
+            emitUsage(runId, result, session)
         }
         emit(AgentEvent.Completed(runId))
         mutex.withLock { sessions.remove(runId) }
     }
 
     /** Token counts and, where the API reported cached input, the prompt-cache hit fraction; priced when the model has a price. */
-    private suspend fun FlowCollector<AgentEvent>.emitUsage(runId: ProviderRunId, result: TextGenerationResult) {
+    private suspend fun FlowCollector<AgentEvent>.emitUsage(runId: ProviderRunId, result: TextGenerationResult, session: Session) {
         val usage = billedUsage(result) ?: return
-        emit(usage.toEvent(runId))
+        emit(usage.toEvent(runId, api.modelId, session.requestFingerprint))
     }
 
     /** What [result] cost: its tokens, and a price (or "unknown", which a dollar cap does not treat as free). */
@@ -265,13 +269,16 @@ open class TextLlmProvider(
         val cacheHitFraction: Float?,
         val costUnknown: Boolean,
     ) {
-        fun toEvent(runId: ProviderRunId) = AgentEvent.UsageReported(
+        fun toEvent(runId: ProviderRunId, model: String?, request: RequestFingerprint?) = AgentEvent.UsageReported(
             runId = runId,
             inputTokens = inputTokens,
             outputTokens = outputTokens,
             costUsd = costUsd,
             cacheHitFraction = cacheHitFraction,
             costUnknown = costUnknown,
+            model = model,
+            requestSha256 = request?.sha256,
+            requestChars = request?.chars,
         )
     }
 
@@ -287,7 +294,7 @@ open class TextLlmProvider(
     ): Boolean {
         if (session.phase.value != TextLlmSessionPhase.Cancelled) return false
         // Dropped, but not free: the provider billed it.
-        emitUsage(runId, result)
+        emitUsage(runId, result, session)
         emit(AgentEvent.Failed(runId, "$displayName session cancelled"))
         mutex.withLock { sessions.remove(runId) }
         return true
@@ -305,9 +312,12 @@ open class TextLlmProvider(
         val toolbox = toolboxFor(session.request)
         val withTools = if (api is ToolCallingTextGenerationApi && toolbox != null) {
             try {
+                // The first round's prompt; later rounds append tool results the journal does not fingerprint.
+                val toolPrompt = renderPrompt(session.request).text + "\n\n" + McpToolLoop.TOOL_GUIDANCE
+                session.requestFingerprint = fingerprintRequestText(toolPrompt)
                 val outcome = McpToolLoop().run(
                     api = api,
-                    prompt = renderPrompt(session.request).text + "\n\n" + McpToolLoop.TOOL_GUIDANCE,
+                    prompt = toolPrompt,
                     toolbox = toolbox,
                     // A cancelled run starts no further round and calls no further tool.
                     isCancelled = { session.phase.value == TextLlmSessionPhase.Cancelled },
@@ -325,7 +335,11 @@ open class TextLlmProvider(
             null
         }
         // Streamed: visible reasoning goes out as Thinking, where memory can answer it mid-thought.
-        withTools ?: session.generation.run(renderPrompt(session.request)) { thought -> emit(AgentEvent.Thinking(runId, thought)) }
+        withTools ?: run {
+            val prompt = renderPrompt(session.request)
+            session.requestFingerprint = fingerprintRequestText(prompt.text)
+            session.generation.run(prompt) { thought -> emit(AgentEvent.Thinking(runId, thought)) }
+        }
     } catch (_: InterruptibleGeneration.GenerationCancelled) {
         failCancelled(runId)
     } catch (_: McpToolLoop.Cancelled) {
@@ -343,6 +357,9 @@ open class TextLlmProvider(
                         outputTokens = spent.spentOutputTokens,
                         costUsd = cost,
                         costUnknown = unknown,
+                        model = api.modelId,
+                        requestSha256 = session.requestFingerprint?.sha256,
+                        requestChars = session.requestFingerprint?.chars,
                     ),
                 )
             }

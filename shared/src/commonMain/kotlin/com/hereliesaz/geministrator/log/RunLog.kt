@@ -12,6 +12,7 @@ import com.hereliesaz.geministrator.events.HumanDecisionRequired
 import com.hereliesaz.geministrator.events.PolicyDecisionRecorded
 import com.hereliesaz.geministrator.events.ProviderUsageRecorded
 import com.hereliesaz.geministrator.events.RetryScheduled
+import com.hereliesaz.geministrator.events.shortFingerprint
 import com.hereliesaz.geministrator.events.TaskBecameReady
 import com.hereliesaz.geministrator.events.TaskCancelled
 import com.hereliesaz.geministrator.events.TaskCompleted
@@ -104,6 +105,11 @@ internal fun WorkflowEvent.logText(): String = when (this) {
         (editedObjective?.let { ", objective edited: $it" } ?: "")
     is ProviderUsageRecorded -> buildString {
         append("Usage: ${providerId.value}")
+        model?.let { append(", model $it") }
+        requestSha256?.let { sha ->
+            append(", request ${shortFingerprint(sha)}")
+            requestChars?.let { append(" ($it chars)") }
+        }
         inputTokens?.let { append(", in $it") }
         outputTokens?.let { append(", out $it") }
         costUsd?.let { append(", \$$it") }

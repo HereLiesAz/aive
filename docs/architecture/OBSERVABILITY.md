@@ -39,7 +39,7 @@ From the [OpenTelemetry GenAI semantic conventions](https://github.com/open-tele
 
 The Aive's own: `aive.usage.cost_usd` (no GenAI convention for cost exists yet), `aive.usage.cache_hit_fraction`, `aive.provider.id`, `aive.provider.run_id`, `aive.workflow.run_id`, `aive.project.id`, `aive.task.id`, `aive.task.attempt`, `aive.executor.kind` (the executor's kind only, never a script's source or an approval's label), `aive.artifact.kind`, `aive.approval.approved`.
 
-`gen_ai.request.model` is not set: the journal does not record the model.
+`gen_ai.request.model` is set on a `chat` span when the journal records the model (`ProviderUsageRecorded.model`), and left out when it does not. The journal also keeps `requestSha256` and `requestChars`, the SHA-256 and length of the request text as sent; they are shown in the Log's Run line (`model …, request ab12cd34 (N chars)`) and are **not** exported as span attributes. The prompt itself is never recorded. Only the hosted text providers (`TextLlmProvider`) fill them: the model is the one their API reports, and the fingerprint is of the prompt they render (with MCP tools, the first round's prompt; later rounds' tool results are not fingerprinted). CLI, A2A, on-device, GitLab, local-workspace and habit-replay providers, and plan drafts, leave all three null, as does any event written before they existed.
 
 ## Content
 

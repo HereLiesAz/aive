@@ -208,6 +208,11 @@ sealed interface AgentEvent {
         val costUnknown: Boolean = false,
         /** Tokens a model call would have used and this run did not (a replayed habit); 0 for every ordinary run. */
         val tokensAvoided: Long = 0,
+        /** The model id the request was sent to, when the provider knows it; null otherwise. Journaled as `ProviderUsageRecorded.model`. */
+        val model: String? = null,
+        /** SHA-256 (hex) and length of the request text as sent; never the text. Null when the provider cannot say. */
+        val requestSha256: String? = null,
+        val requestChars: Int? = null,
     ) : AgentEvent {
         init {
             require(cacheHitFraction == null || cacheHitFraction in 0f..1f) {
