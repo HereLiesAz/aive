@@ -34,6 +34,14 @@ class ResearchTest {
     }
 
     @Test
+    fun theAppTeachingItselfAsksNoDirectory() {
+        assertFalse(researchWanted("Teach me how to use the Aive", ctx))
+        assertFalse(researchWanted("Show me how the app works", ctx))
+        // A lesson about something else is still wanted.
+        assertTrue(researchWanted("Teach me how this works", ctx))
+    }
+
+    @Test
     fun anObjectiveNamingAProductIsWantedButPlainWorkIsNot() {
         assertTrue(researchWanted("Summarize my notes into Notion", ctx))
         assertTrue(researchWanted("post the report to GitHub", ctx))
