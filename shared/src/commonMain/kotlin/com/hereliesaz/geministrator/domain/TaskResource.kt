@@ -19,7 +19,7 @@ sealed interface TaskResource {
     @SerialName("aive_docs")
     data class AiveDocs(val topics: List<String> = emptyList()) : TaskResource
 
-    /** Only these files of the linked repository: paths or globs (`docs/*.md`). */
+    /** Only these files of the linked repository: paths or globs (the .md files under docs, say). */
     @Serializable
     @SerialName("repository_files")
     data class RepositoryFiles(val paths: List<String>) : TaskResource

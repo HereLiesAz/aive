@@ -8,7 +8,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * The app's own written docs (README.md and docs/*.md), bundled read-only at build time (shared/build.gradle.kts,
+ * The app's own written docs (README.md and the .md files under docs), bundled read-only at build time (shared/build.gradle.kts,
  * `bundleAiveDocs`) so the queen and her creatures can look up how the app works. Read from the app's resources
  * only; nothing here touches the network or the keeper's files.
  */
