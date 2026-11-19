@@ -229,7 +229,7 @@ internal fun TerrariumConnections(
                 )
             }
         }
-        HiveJobEditor(definition = definition, task = selected, onEdit = onEdit)
+        // The job (objective, approval, tries, time, source) opens on the hive itself: WorkflowTerrarium draws it as a card on the tissue.
         val candidates = definition.tasks.filter { it.id != selected.id && it.id !in selected.dependsOn }
         if (candidates.isNotEmpty()) {
             Text(stringResource(Res.string.build_add_connection), style = AzphaltType.eyebrow, color = azphaltOnSurface())

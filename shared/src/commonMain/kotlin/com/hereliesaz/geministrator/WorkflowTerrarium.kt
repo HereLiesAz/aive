@@ -42,6 +42,12 @@ import kotlinx.coroutines.withTimeoutOrNull
 import com.hereliesaz.geministrator.resources.hive_new_empty
 import com.hereliesaz.geministrator.resources.terrarium_could_not_stage_workflow_edit
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.Alignment
@@ -446,6 +452,31 @@ internal fun GeministratorWorkflowTerrarium(
                 flip = if (flipping) NodeFlip(flippedId, flowCards, flipHost::send) else null,
             )
           }
+            // In Build the tapped creature opens its job on the tissue itself: a card grown from the foot of
+            // the field with the objective, approval, tries, time and the rest, so the settings are inside
+            // the hive and not a form under it. Everything the form had is here; undo and redo apply to it.
+            if (building && rehearsal == null && grouping == null) {
+                stagedDefinition.tasks.firstOrNull { it.id.value == selectedTaskId }?.let { openTask ->
+                    Box(Modifier.fillMaxSize()) {
+                        AzphaltThemedSurface(Azphalt.Ink) {
+                            Column(
+                                Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth()
+                                    .fillMaxHeight(0.5f)
+                                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                                    .background(Azphalt.Ink.copy(alpha = 0.96f))
+                                    // Taps and drags on the card are the card's, never the tissue's beneath it.
+                                    .pointerInput(Unit) { detectTapGestures { } }
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                            ) {
+                                HiveJobEditor(definition = stagedDefinition, task = openTask, onEdit = ::applyEdit)
+                            }
+                        }
+                    }
+                }
+            }
             // An empty hive in Build says how it fills (mockup H6).
             if (building && stagedDefinition.tasks.isEmpty()) {
                 Box(Modifier.fillMaxSize()) {
