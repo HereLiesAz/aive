@@ -140,6 +140,8 @@ import com.hereliesaz.geministrator.resources.remote_access_enter_code
 import com.hereliesaz.geministrator.resources.common_cancel
 import com.hereliesaz.geministrator.resources.common_connect
 import com.hereliesaz.geministrator.resources.common_connected
+import com.hereliesaz.geministrator.resources.common_off
+import com.hereliesaz.geministrator.resources.settings_provider_use
 import com.hereliesaz.geministrator.resources.common_dismiss
 import com.hereliesaz.geministrator.resources.common_retry
 import com.hereliesaz.geministrator.resources.settings_chars
@@ -407,7 +409,10 @@ internal fun ProviderSettingsScreen(
                     on = keylessOff,
                     connectedIds = connectedProviderIds,
                     connect = onConnectFreeProvider,
-                    disconnect = onDisconnectProvider,
+                    disconnect = { id ->
+                        ProviderEnablement.set(id, true)
+                        onDisconnectProvider(id)
+                    },
                 )
                 keylessOff = !keylessOff
             },
@@ -433,13 +438,15 @@ internal fun ProviderSettingsScreen(
             val healthRaw = healthResults?.get(entry.id)
             val health = healthRaw?.substringBefore('\n')
             val healthDetails = healthRaw?.substringAfter('\n', "")
+            // Switched off: still connected (its key or link is kept), used by nothing, until the keeper switches it on.
+            val enabled = ProviderEnablement.isEnabled(entry.id)
             ConnectionRow(
                 name = entry.displayName,
                 detail = (health ?: stringResource(Res.string.settings_credential_configured)) +
                     (a2aAgents.firstOrNull { it.providerId == entry.id }?.ansName?.let {
                         " · " + stringResource(Res.string.keeper_orphan_name_claim, it)
                     } ?: ""),
-                status = health?.substringBefore(" ·") ?: stringResource(Res.string.common_connected),
+                status = if (!enabled) stringResource(Res.string.common_off) else health?.substringBefore(" ·") ?: stringResource(Res.string.common_connected),
                 connected = true,
                 compact = compact,
             ) {
@@ -454,6 +461,12 @@ internal fun ProviderSettingsScreen(
                     onClick = { disconnectProviderId = entry.id },
                 )
             }
+            AzphaltToggle(
+                label = stringResource(Res.string.settings_provider_use, entry.displayName),
+                seed = "use-provider-${entry.id}",
+                selected = enabled,
+                onClick = { ProviderEnablement.set(entry.id, !enabled) },
+            )
             if (!healthDetails.isNullOrBlank()) {
                 ErrorDetailsToggle(healthDetails, seed = "health-${entry.id}")
             }
@@ -743,6 +756,7 @@ internal fun ProviderSettingsScreen(
                 confirmLabel = stringResource(Res.string.confirm_disconnect_action),
                 onConfirm = {
                     disconnectProviderId = null
+                    ProviderEnablement.set(id, true)
                     onDisconnectProvider(id)
                     // A remote A2A agent is forgotten with its link; adding it again is one URL away.
                     if (ProviderCatalog.isA2aAgent(id)) A2aAgentConnections.remove(id)

@@ -220,7 +220,9 @@ fun App(
             actionDone = null
         }
     }
-    val providerReach by produceState(ProviderReach.Unknown, providers) { value = providerReach(providers) }
+    // A Source the keeper switched off stays connected (its key is kept) but is used by nothing: the runtime never sees it.
+    val enabledProviders = providers.filter { ProviderEnablement.isEnabled(it.id.value) }
+    val providerReach by produceState(ProviderReach.Unknown, enabledProviders) { value = providerReach(enabledProviders) }
     val launchSteps = remember { LiveStepsFeedModel(maxRows = 5) }
     val launchStepRows by launchSteps.rows.collectAsState()
     // A reviewed plan waiting on the keeper's final say: the run does not exist until it is answered.
@@ -231,13 +233,13 @@ fun App(
     var projectIdToOpenAfterReload by remember { mutableStateOf<String?>(null) }
     var automaticProjectRestoreAttempted by remember(projectFileService) { mutableStateOf(false) }
 
-    LaunchedEffect(providers, duplexAttachment, executorIntegrations, roleSurfaceRuntime, workflowPersistence, orchestrationUtilities, contextChunkSources, runtimeGeneration) {
+    LaunchedEffect(enabledProviders, duplexAttachment, executorIntegrations, roleSurfaceRuntime, workflowPersistence, orchestrationUtilities, contextChunkSources, runtimeGeneration) {
         runtime?.close()
         runtime = null
         runtimeState = ApplicationRuntimeState.Loading
         try {
             val created = ApplicationRuntime.create(
-                providers = providers,
+                providers = enabledProviders,
                 scope = scope,
                 duplexAttachment = duplexAttachment,
                 persistence = workflowPersistence,
@@ -710,7 +712,7 @@ fun App(
             mutableStateOf(
                 ControlRoomSession.destinationName
                     ?: startupControlRoomDestination(
-                        hasConfiguredProvider = providers.any { it !is OnDeviceTextAgentProvider },
+                        hasConfiguredProvider = enabledProviders.any { it !is OnDeviceTextAgentProvider },
                     ).name,
             )
         }
@@ -718,7 +720,7 @@ fun App(
         val destinations = ControlRoomDestination.available(distributedComputeAvailable)
         val destination = destinations
             .firstOrNull { it.name == destinationName }
-            ?: startupControlRoomDestination(hasConfiguredProvider = providers.any { it !is OnDeviceTextAgentProvider })
+            ?: startupControlRoomDestination(hasConfiguredProvider = enabledProviders.any { it !is OnDeviceTextAgentProvider })
         var selectedTaskIdValue by rememberDurableStringState("navigation.selected-task-id")
         val selectedTaskId = selectedTaskIdValue.takeIf(String::isNotBlank)
         var navigationHistory by remember { mutableStateOf(emptyList<NavEntry>()) }
@@ -1448,7 +1450,7 @@ fun App(
                         compact = maxWidth < ControlRoomBreakpoints.Wide,
                         contentPadding = paddingValues,
                         runtimeState = runtimeState,
-                        connectedProviderIds = providers.map { it.id.value }.toSet(),
+                        connectedProviderIds = providers.map { it.id.value }.toSet() + ProviderEnablement.disabled,
                         providerReach = providerReach,
                         onConnectFreeProvider = onConnectFreeProvider ?: onReconfigureProvider,
                         launchError = launchError,

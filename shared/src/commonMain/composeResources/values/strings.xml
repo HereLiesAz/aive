@@ -1522,6 +1522,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_diagnostic">Diagnostic</string>
     <string name="settings_diagnostics">Diagnostics</string>
     <string name="settings_disconnect">Disconnect</string>
+    <string name="settings_provider_use">Use %1$s</string>
     <string name="settings_distributed_compute">Distributed compute</string>
     <string name="settings_every_device_connects_outbound_to_the">Every device connects outbound to the relay, so no inbound port or shared local network is required.</string>
     <string name="settings_export_diagnostic_bundle">Export diagnostic bundle</string>

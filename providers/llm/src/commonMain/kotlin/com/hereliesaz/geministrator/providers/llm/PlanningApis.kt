@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.providers.llm
 
 import com.hereliesaz.geministrator.ProviderCatalog
+import com.hereliesaz.geministrator.ProviderEnablement
 import com.hereliesaz.geministrator.orchestration.FailoverOrchestrationAgentRuntime
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
 import com.hereliesaz.geministrator.orchestration.PlannerCandidate
@@ -10,15 +11,17 @@ import com.hereliesaz.geministrator.orchestration.PlannerCandidate
  * Grok, then the hosted providers in catalog order (keyless ones last). Null when none is linked.
  */
 fun configuredPlanningApi(credentials: Map<String, String>): TextGenerationApi? {
+    // A Source the keeper switched off keeps its key but is never used (ProviderEnablement).
+    val usable = ProviderEnablement.usable(credentials)
     fun key(id: String): LlmApiKeyProvider? =
-        credentials[id]?.trim()?.takeIf(String::isNotEmpty)?.let { value -> LlmApiKeyProvider { value } }
+        usable[id]?.trim()?.takeIf(String::isNotEmpty)?.let { value -> LlmApiKeyProvider { value } }
 
     key(ProviderCatalog.GEMINI_ID)?.let { return GeminiGenerateContentApi(it).metered(ProviderCatalog.GEMINI_ID) }
     key(ProviderCatalog.OPENAI_ID)?.let { return OpenAiResponsesApi(it).metered(ProviderCatalog.OPENAI_ID) }
     key(ProviderCatalog.ANTHROPIC_ID)?.let { return AnthropicMessagesApi(it).metered(ProviderCatalog.ANTHROPIC_ID) }
     key(ProviderCatalog.XAI_ID)?.let { return XaiResponsesApi(it).metered(ProviderCatalog.XAI_ID) }
     return HostedLlmProviders.entries.firstNotNullOfOrNull { spec ->
-        credentials[spec.id]?.trim()?.takeIf(String::isNotEmpty)?.let { credential ->
+        usable[spec.id]?.trim()?.takeIf(String::isNotEmpty)?.let { credential ->
             runCatching { HostedLlmProviders.textApi(spec, credential).metered(spec.id) }.getOrNull()
         }
     }
@@ -32,8 +35,9 @@ class PlanningApiEntry(val id: String, val name: String, val api: TextGeneration
  * last). The planner fails over down this list.
  */
 fun configuredPlanningApis(linked: Map<String, String>): List<PlanningApiEntry> {
+    val usable = ProviderEnablement.usable(linked)
     fun key(id: String): LlmApiKeyProvider? =
-        linked[id]?.trim()?.takeIf(String::isNotEmpty)?.let { value -> LlmApiKeyProvider { value } }
+        usable[id]?.trim()?.takeIf(String::isNotEmpty)?.let { value -> LlmApiKeyProvider { value } }
     fun name(id: String) = ProviderCatalog.entry(id)?.displayName ?: id
     return buildList {
         key(ProviderCatalog.GEMINI_ID)?.let { add(PlanningApiEntry(ProviderCatalog.GEMINI_ID, name(ProviderCatalog.GEMINI_ID), GeminiGenerateContentApi(it).metered(ProviderCatalog.GEMINI_ID))) }
@@ -41,7 +45,7 @@ fun configuredPlanningApis(linked: Map<String, String>): List<PlanningApiEntry> 
         key(ProviderCatalog.ANTHROPIC_ID)?.let { add(PlanningApiEntry(ProviderCatalog.ANTHROPIC_ID, name(ProviderCatalog.ANTHROPIC_ID), AnthropicMessagesApi(it).metered(ProviderCatalog.ANTHROPIC_ID))) }
         key(ProviderCatalog.XAI_ID)?.let { add(PlanningApiEntry(ProviderCatalog.XAI_ID, name(ProviderCatalog.XAI_ID), XaiResponsesApi(it).metered(ProviderCatalog.XAI_ID))) }
         HostedLlmProviders.entries.forEach { spec ->
-            linked[spec.id]?.trim()?.takeIf(String::isNotEmpty)?.let { secret ->
+            usable[spec.id]?.trim()?.takeIf(String::isNotEmpty)?.let { secret ->
                 runCatching { HostedLlmProviders.textApi(spec, secret) }.getOrNull()
                     ?.let { add(PlanningApiEntry(spec.id, name(spec.id), it.metered(spec.id))) }
             }
@@ -63,6 +67,7 @@ fun configuredPlanningRuntime(linked: Map<String, String>): OrchestrationAgentRu
  */
 fun memoryTextApi(credentials: Map<String, String>, providerId: String?, model: String?): TextGenerationApi? {
     if (providerId == null) return configuredPlanningApi(credentials)
+    if (!ProviderEnablement.isEnabled(providerId)) return null
     val credential = credentials[providerId]?.trim()?.takeIf(String::isNotEmpty)
     fun key() = credential?.let { value -> LlmApiKeyProvider { value } }
     return when (providerId) {
