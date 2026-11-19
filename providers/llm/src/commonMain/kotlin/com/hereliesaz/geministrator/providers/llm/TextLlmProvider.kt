@@ -83,6 +83,10 @@ open class TextLlmProvider(
         supported = setOf(
             AgentCapability.PlanGeneration,
             AgentCapability.PlanApproval,
+            // Writing up findings from what the model knows and from any tools the keeper connected: nothing with an effect outside
+            // the app (the same set a habit may replay, HabitReplayPlanner.TEXT_SAFE). Without it a role that researches (the
+            // starting Analyst) has no provider on a text-only install, and the first hive fails with "no agent can do this work".
+            AgentCapability.Research,
         ),
         promptCaching = api.promptCaching,
     )
