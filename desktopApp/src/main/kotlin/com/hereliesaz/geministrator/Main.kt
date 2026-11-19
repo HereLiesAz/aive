@@ -237,6 +237,31 @@ fun main() {
             authoredStore = com.hereliesaz.geministrator.azphalt.SettingsAuthoredWorkflowStore(),
             drafter = controlDrafter::get,
             appVersion = System.getProperty("jpackage.app-version")?.takeIf(String::isNotBlank) ?: "dev",
+            sourcesView = {
+                kotlinx.serialization.json.buildJsonObject {
+                    put("sources", kotlinx.serialization.json.JsonArray(com.hereliesaz.geministrator.ProviderCatalog.entries.map { e ->
+                        kotlinx.serialization.json.buildJsonObject {
+                            put("id", kotlinx.serialization.json.JsonPrimitive(e.id))
+                            put("name", kotlinx.serialization.json.JsonPrimitive(e.displayName))
+                            put("needsKey", kotlinx.serialization.json.JsonPrimitive(!e.keyOptional))
+                            put("enabled", kotlinx.serialization.json.JsonPrimitive(com.hereliesaz.geministrator.ProviderEnablement.isEnabled(e.id)))
+                        }
+                    }))
+                }
+            },
+            agentsView = {
+                kotlinx.serialization.json.buildJsonObject {
+                    put("agents", kotlinx.serialization.json.JsonArray(DesktopCliAgents().statuses().map { s ->
+                        kotlinx.serialization.json.buildJsonObject {
+                            put("id", kotlinx.serialization.json.JsonPrimitive(s.spec.id))
+                            put("name", kotlinx.serialization.json.JsonPrimitive(s.spec.displayName))
+                            put("installed", kotlinx.serialization.json.JsonPrimitive(s.path != null))
+                            put("enabled", kotlinx.serialization.json.JsonPrimitive(s.enabled))
+                            s.version?.let { put("version", kotlinx.serialization.json.JsonPrimitive(it)) }
+                        }
+                    }))
+                }
+            },
             settingsView = {
                 kotlinx.serialization.json.buildJsonObject {
                     put("a2aServerEnabled", kotlinx.serialization.json.JsonPrimitive(a2aServer.enabledPreference))

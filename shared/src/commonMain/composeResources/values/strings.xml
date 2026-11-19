@@ -562,6 +562,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="local_agents_on">On</string>
     <string name="local_agents_off">Off</string>
     <string name="local_agents_test">Test</string>
+    <string name="local_agents_install">Install</string>
+    <string name="local_agents_installing">Installing…</string>
     <string name="local_agents_keys_on">Passing its key variable</string>
     <string name="local_agents_keys_off">Using its login, not a key</string>
     <string name="local_agents_project_on">Using repository settings</string>

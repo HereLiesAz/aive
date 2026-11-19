@@ -46,6 +46,8 @@ internal object Commands {
         command("approvals", "list_approvals"),
         command("providers", "list_providers"),
         command("settings", "get_settings"),
+        command("sources", "list_sources"),
+        command("agents", "list_agents"),
     )
 }
 

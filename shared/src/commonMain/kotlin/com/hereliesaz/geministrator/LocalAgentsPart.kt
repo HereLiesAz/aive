@@ -55,6 +55,7 @@ internal fun LocalAgentsPart() {
     var statuses by remember { mutableStateOf<List<CliAgentStatus>>(emptyList()) }
     var reload by remember { mutableStateOf(0) }
     var testing by remember { mutableStateOf<String?>(null) }
+    var installing by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(reload) { statuses = host.statuses() }
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -71,7 +72,16 @@ internal fun LocalAgentsPart() {
             CliCard(
                 status = status,
                 testing = testing == status.spec.id,
+                installing = installing == status.spec.id,
                 host = host,
+                onInstall = {
+                    scope.launch {
+                        installing = status.spec.id
+                        host.install(status.spec.id)
+                        installing = null
+                        reload += 1
+                    }
+                },
                 onToggle = { host.setEnabled(status.spec.id, !status.enabled); reload += 1 },
                 onKeys = { host.setPassKeys(status.spec.id, !status.passKeys); reload += 1 },
                 onProjectConfig = { host.setAllowProjectConfig(status.spec.id, !status.allowProjectConfig); reload += 1 },
@@ -90,7 +100,7 @@ internal fun LocalAgentsPart() {
 
 @Composable
 private fun CliCard(
-    status: CliAgentStatus, testing: Boolean, host: CliAgentHost, onToggle: () -> Unit, onKeys: () -> Unit, onProjectConfig: () -> Unit, onTest: () -> Unit,
+    status: CliAgentStatus, testing: Boolean, installing: Boolean, onInstall: () -> Unit, host: CliAgentHost, onToggle: () -> Unit, onKeys: () -> Unit, onProjectConfig: () -> Unit, onTest: () -> Unit,
 ) {
     val found = status.path != null
     val where = if (found) stringResource(Res.string.local_agents_found, status.path.orEmpty(), status.version ?: "") else stringResource(Res.string.local_agents_not_installed)
@@ -108,6 +118,12 @@ private fun CliCard(
         body = listOf(status.spec.sandboxNote, stringResource(Res.string.local_agents_login_note), tested).joinToString("\n"),
         well = {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (!found && status.spec.npmPackage != null) {
+                    AzphaltPill(
+                        label = stringResource(if (installing) Res.string.local_agents_installing else Res.string.local_agents_install),
+                        seed = "local-agent-install-${status.spec.id}", onClick = { if (!installing) onInstall() },
+                    )
+                }
                 if (found) {
                     AzphaltPill(
                         label = stringResource(if (status.enabled) Res.string.local_agents_on else Res.string.local_agents_off),

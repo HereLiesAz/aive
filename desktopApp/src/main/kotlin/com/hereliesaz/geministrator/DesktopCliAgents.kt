@@ -63,6 +63,32 @@ internal class DesktopCliAgents(
         onChanged()
     }
 
+    /** `npm install -g <the spec's package>`, the one command, run in an empty folder; then the program is looked for again. */
+    override suspend fun install(id: String): CliTestResult {
+        val spec = CliAgentSpecs.byId(id) ?: return CliTestResult(false, "Unknown CLI.", now(), 0)
+        val pkg = spec.npmPackage ?: return CliTestResult(false, "${spec.displayName} is installed from its vendor's own instructions, not from here.", now(), 0)
+        val folder = Files.createTempDirectory("aive-cli-install-").toFile()
+        val started = now()
+        return try {
+            val npm = if (System.getProperty("os.name").orEmpty().startsWith("Windows")) "npm.cmd" else "npm"
+            val process = runner.run(listOf(npm, "install", "-g", pkg), folder, cliEnvironmentFor(spec, settings, environment()), null, INSTALL_TIMEOUT_MILLIS) { }
+            val millis = now() - started
+            when {
+                process.startFailure != null -> CliTestResult(false, "Could not run npm: ${process.startFailure}. Install Node.js, or install ${spec.displayName} yourself.", now(), millis)
+                process.timedOut -> CliTestResult(false, "Installing took longer than ${INSTALL_TIMEOUT_MILLIS / 1000} seconds.", now(), millis)
+                process.exitCode != 0 -> CliTestResult(false, "npm exit ${process.exitCode}: " + clean(process.stderrTail.ifBlank { "no output" }), now(), millis)
+                locate(spec) == null -> CliTestResult(false, "npm finished but ${spec.displayName} is not on this computer's path yet.", now(), millis)
+                else -> CliTestResult(true, "Installed $pkg.", now(), millis)
+            }
+        } catch (failure: kotlinx.coroutines.CancellationException) {
+            throw failure
+        } catch (failure: Exception) {
+            CliTestResult(false, failure.message ?: "The install failed.", now(), now() - started)
+        } finally {
+            folder.deleteRecursively()
+        }.also { tests[id] = it }
+    }
+
     override suspend fun test(id: String): CliTestResult {
         val spec = CliAgentSpecs.byId(id) ?: return CliTestResult(false, "Unknown CLI.", now(), 0)
         val program = locate(spec) ?: return CliTestResult(false, "${spec.displayName} is not installed (looked for ${spec.binaries.joinToString()}).", now(), 0)
@@ -114,6 +140,7 @@ internal class DesktopCliAgents(
 
     private companion object {
         const val TEST_TIMEOUT_MILLIS = 90_000L
+        const val INSTALL_TIMEOUT_MILLIS = 300_000L
     }
 }
 

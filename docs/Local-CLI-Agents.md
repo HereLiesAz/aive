@@ -24,9 +24,14 @@ Turn one on in **Keeper's room › Local agents**. It is off until you do. It th
 | Qwen Code | the same flags as Gemini CLI | the same | A Gemini CLI fork. |
 | Antigravity | `agy --output-format text -p <prompt>`, prompt as an argument | none from the app: headless, a tool that needs approval is denied, so it reads and answers unless your own Antigravity settings allow more | Read-only here; the app never passes `--dangerously-skip-permissions`. Some versions printed nothing when stdout was a pipe: Test shows it. |
 | Grok Build | `grok --no-auto-update --cwd <tree> --output-format plain --allow Read --allow Grep [--allow Edit] --deny Bash --deny WebFetch --deny WebSearch -p <prompt>` | Edit tool only; shell and web denied | `XAI_API_KEY` may be passed if you choose. Never `--always-approve`. |
+| Cursor | `agent --output-format text -p <prompt>` | refused unless `--force`, which the app never passes | `CURSOR_API_KEY` may be passed if you choose. Vendor-installed. |
+| Amp | `amp -x <prompt>` | its own tool rules | `AMP_API_KEY` optional. Reading and planning only. |
+| Kilo Code | `kilo run --dir <tree> --format default <prompt>` | permission requests are rejected (no `--auto`) | Reading and planning only. |
+| OpenCode | `opencode run <prompt>` | its own permission settings | Reading and planning only; its other flags are undocumented. |
+| Aider | `aider --no-auto-commits --no-pretty --no-stream [--dry-run] --message <prompt>` | asks before changing; never answered yes | Read-only runs are dry runs. |
 | GitHub Copilot CLI | `copilot --no-auto-update --no-ask-user -s --deny-tool=shell (--allow-tool=write \| --deny-tool=write) -p <prompt>` | file writes only when the role may edit; shell denied | Never `--allow-all` or `--yolo`. |
 
-Adding another CLI is adding a spec (`CliAgentSpecs`): its binary, its headless flags, how to read its output.
+A CLI that has an npm package shows **Install** when it is missing: one `npm install -g <package>`, run when you press it. Adding another CLI is adding a spec (`CliAgentSpecs`): its binary, its headless flags, how to read its output.
 
 ## Test, and what is not verified
 

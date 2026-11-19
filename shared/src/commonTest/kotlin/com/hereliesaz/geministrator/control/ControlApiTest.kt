@@ -33,6 +33,8 @@ class FakeControlHost : ControlHost {
     override suspend fun listApprovals(): JsonElement = JsonArray(listOf(obj("gateId" to "g1", "kind" to "PlanApproval")))
     override suspend fun listProviders() = obj("providers" to "none")
     override suspend fun settings() = obj("a2a" to "on")
+    override suspend fun listSources() = obj("sources" to "none")
+    override suspend fun listAgents() = obj("agents" to "none")
     override suspend fun createHive(spec: JsonObject): JsonObject {
         val name = spec["name"]?.jsonPrimitive?.content ?: controlError(ControlErrorCode.InvalidArgument, "name is required")
         hives["h${hives.size + 1}"] = name

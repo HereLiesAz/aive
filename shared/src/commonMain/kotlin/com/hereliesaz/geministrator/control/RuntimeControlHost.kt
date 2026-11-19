@@ -69,6 +69,10 @@ class RuntimeControlHost(
     /** Settings an agent may read; the caller lists only what holds no key. */
     private val settingsView: () -> JsonObject = { JsonObject(emptyMap()) },
     private val appVersion: String = "dev",
+    /** The Sources, read-only (no keys); empty where the host has none. */
+    private val sourcesView: () -> JsonObject = { JsonObject(emptyMap()) },
+    /** The vendor CLI agents, read-only; empty where the host cannot run programs. */
+    private val agentsView: suspend () -> JsonObject = { JsonObject(emptyMap()) },
 ) : ControlHost {
 
     companion object {
@@ -251,6 +255,10 @@ class RuntimeControlHost(
             )
         }
     }
+
+    override suspend fun listSources(): JsonObject = sourcesView()
+
+    override suspend fun listAgents(): JsonObject = agentsView()
 
     override suspend fun listProviders(): JsonObject {
         val r = rt()
