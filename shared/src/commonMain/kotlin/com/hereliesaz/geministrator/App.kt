@@ -772,9 +772,9 @@ fun App(
                 navigationHistory.isNotEmpty() ||
                 destination != ControlRoomDestination.Overview,
         ) {
-            when {
-                taskInspectorVisible -> selectedTaskIdValue = ""
-                navigationHistory.isNotEmpty() -> {
+            when (appBackStep(taskInspectorVisible, navigationHistory, destination == ControlRoomDestination.Overview)) {
+                AppBackStep.LetCreatureGo -> selectedTaskIdValue = ""
+                AppBackStep.PopHistory -> {
                     val back = navigationHistory.last()
                     destinationName = back.destination.name
                     navigationHistory = navigationHistory.dropLast(1)
@@ -784,9 +784,8 @@ fun App(
                         selectedTaskIdValue = back.taskId
                     }
                 }
-                destination != ControlRoomDestination.Overview -> {
-                    destinationName = ControlRoomDestination.Overview.name
-                }
+                AppBackStep.ToHive -> destinationName = ControlRoomDestination.Overview.name
+                AppBackStep.LeaveApp -> Unit
             }
         }
 

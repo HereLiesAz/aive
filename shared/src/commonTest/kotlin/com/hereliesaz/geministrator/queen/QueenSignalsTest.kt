@@ -64,4 +64,28 @@ class QueenSignalsTest {
         assertEquals(QueenRelay.Watch, note.relay)
         assertEquals("2", note.args[0])
     }
+
+    @Test
+    fun runCostNearItsAllowanceWithManyStepsLeftRaisesCostPace() {
+        val three = qDefinition(qTask("a"), qTask("b"), qTask("c"))
+        val run = qRun(qTaskRun("a", TaskRunStatus.Completed, cost = 0.8), qTaskRun("b", TaskRunStatus.Running), qTaskRun("c", TaskRunStatus.Blocked))
+        val caps = com.hereliesaz.geministrator.workflow.SpendCaps(runCostCapUsd = 1.0)
+        val pace = queenSignals(three, run, emptyList(), caps = caps).filterIsInstance<QueenSignal.CostPace>().single()
+        assertEquals(80, pace.percent)
+        assertEquals(com.hereliesaz.geministrator.workflow.formatUsd(1.0), pace.capUsd)
+        // No allowance: no signal. Allowance reached: the stop speaks, not the pace.
+        assertTrue(queenSignals(three, run, emptyList()).none { it is QueenSignal.CostPace })
+        assertTrue(queenSignals(three, run, emptyList(), caps = com.hereliesaz.geministrator.workflow.SpendCaps(runCostCapUsd = 0.5)).none { it is QueenSignal.CostPace })
+        // The offer is the same whether or not the caller raised the signal.
+        val fromSignal = queenCandidates(three, run, queenSignals(three, run, emptyList(), caps = caps), caps)
+        val fromCaps = queenCandidates(three, run, queenSignals(three, run, emptyList()), caps)
+        assertEquals(fromSignal, fromCaps)
+        assertEquals(listOf(QueenAction.RaiseAllowance), fromSignal.map { it.action })
+    }
+
+    @Test
+    fun costPaceAndNannyPendingAreNeverSaidAsAnINoticedLine() {
+        val signals = listOf(QueenSignal.CostPace("", 80, "\$1.00"), QueenSignal.NannyPending("n"))
+        assertEquals(null, watchRelay(definition, qRun(qTaskRun("a", TaskRunStatus.Running)), signals))
+    }
 }

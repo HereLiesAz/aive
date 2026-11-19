@@ -1357,7 +1357,8 @@ private fun MainDestination(
                                     modifier = Modifier.weight(1f).fillMaxWidth(),
                                     taskName = { id -> live.definition.tasks.firstOrNull { it.id == id }?.name ?: id.value },
                                     selectedTaskId = selectedTaskId,
-                                    onTaskSelected = onTaskSelected,
+                                    // Every row, bar and log line here is a link: it opens its creature and never closes it (B3).
+                                    onTaskSelected = onOpenCreature,
                                     onShowHive = { showTimeline = false },
                                     queenNotes = live.queen,
                                     logSources = remember(

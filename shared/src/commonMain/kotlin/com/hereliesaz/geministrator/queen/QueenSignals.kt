@@ -3,7 +3,11 @@ package com.hereliesaz.geministrator.queen
 import com.hereliesaz.geministrator.CreatureTab
 import com.hereliesaz.geministrator.creatureNeedsYou
 import com.hereliesaz.geministrator.domain.roleDisplayName
+import com.hereliesaz.geministrator.domain.HallMonitorRole
 import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.workflow.SpendCaps
+import com.hereliesaz.geministrator.workflow.formatUsd
+import com.hereliesaz.geministrator.workflow.knownCostUsd
 import com.hereliesaz.geministrator.domain.effectiveTokenBudget
 import com.hereliesaz.geministrator.domain.TaskRun
 import com.hereliesaz.geministrator.domain.TaskRunStatus
@@ -34,6 +38,12 @@ sealed interface QueenSignal {
 
     /** [steps] steps are blocked for the same reason [code]; [taskId] is the first of them. */
     data class RepeatedBlock(override val taskId: String, val code: String, val steps: Int) : QueenSignal
+
+    /** The run's known cost is [percent] percent of its allowance of [capUsd] (formatted) while many steps are still to do. [taskId] is empty: it is about the whole run. */
+    data class CostPace(override val taskId: String, val percent: Int, val capUsd: String) : QueenSignal
+
+    /** The Nanny's report is written and waits on its review before anything is frozen. [taskId] is the Nanny's step. Maps to the offer to rest the swarm; her relay already says it in words. */
+    data class NannyPending(override val taskId: String) : QueenSignal
 }
 
 /** What the queen saw of a run's progress, and when she first saw it: kept in the ledger so a restart does not reset the clock. */
@@ -93,6 +103,8 @@ fun queenSignals(
     roles: Collection<RoleDefinition>,
     /** From [stalledMinutes], when the caller keeps sightings. */
     stalledForMinutes: Int? = null,
+    /** The run's allowances, for [QueenSignal.CostPace]; null raises none. */
+    caps: SpendCaps? = null,
 ): List<QueenSignal> {
     val rolesById = roles.associateBy { it.id }
     val signals = mutableListOf<QueenSignal>()
@@ -123,7 +135,32 @@ fun queenSignals(
         val open = definition.tasks.firstOrNull { run.taskRuns[it.id]?.status.let { s -> s != TaskRunStatus.Completed && s != TaskRunStatus.Cancelled } }
         signals += QueenSignal.Stalled(open?.id?.value.orEmpty(), stalledForMinutes)
     }
+    if (caps != null) costPaceSignal(definition, run, caps)?.let { signals += it }
+    nannyPendingSignal(definition, run)?.let { signals += it }
     return signals
+}
+
+private const val COST_PACE_PERCENT_SIGNAL = 70
+private const val COST_PACE_STEPS_LEFT_PERCENT_SIGNAL = 40
+
+/** The run's known cost is close to its allowance while many steps are still to do. Null with no allowance set, or once it is reached (the stop speaks then). */
+internal fun costPaceSignal(definition: WorkflowDefinition, run: WorkflowRun, caps: SpendCaps): QueenSignal.CostPace? {
+    val cap = caps.runCostCapUsd ?: return null
+    val total = definition.tasks.size
+    if (total == 0) return null
+    val cost = run.knownCostUsd()
+    if (cost >= cap) return null
+    val percent = (cost * 100.0 / cap).toInt()
+    val left = definition.tasks.count { run.taskRuns[it.id]?.status.let { s -> s != TaskRunStatus.Completed && s != TaskRunStatus.Cancelled } }
+    if (percent < COST_PACE_PERCENT_SIGNAL || left * 100 < total * COST_PACE_STEPS_LEFT_PERCENT_SIGNAL) return null
+    return QueenSignal.CostPace("", percent, formatUsd(cap))
+}
+
+/** The Nanny's report waits on its review and the keeper has not rested the swarm. Null without a Nanny, in any other phase, or once rested. */
+internal fun nannyPendingSignal(definition: WorkflowDefinition, run: WorkflowRun): QueenSignal.NannyPending? {
+    if (run.keeperPause != null || nannyPhase(definition, run) != NannyPhase.AwaitingReview) return null
+    val step = definition.tasks.firstOrNull { it.roleId == HallMonitorRole.id }
+    return QueenSignal.NannyPending(step?.id?.value.orEmpty())
 }
 
 /**
@@ -214,5 +251,7 @@ internal fun watchRelay(definition: WorkflowDefinition, run: WorkflowRun, signal
             listOf(step.toString(), name),
             QueenLink.Creature(signal.taskId, CreatureTab.Mind),
         )
+        // Never chosen above: each has its voice elsewhere (her offer to raise the allowance; the Nanny's relay).
+        is QueenSignal.CostPace, is QueenSignal.NannyPending -> null
     }
 }

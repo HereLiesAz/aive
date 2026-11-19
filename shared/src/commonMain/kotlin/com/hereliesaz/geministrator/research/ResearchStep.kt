@@ -82,7 +82,10 @@ class ResearchStep(
             local.map { it.first }.filter { it !in reached }.forEach { skipped += ResearchSkip(it, ResearchSkipReason.TimedOut) }
         }
         var lookups = 0
-        for (candidate in candidates) {
+        // The app teaching itself needs no outside lookup: asking the keeper to let a search for "aive" leave the device, before
+        // their very first hive, is a question with no use (and a permission wall on the first screen). The local pass above still runs.
+        val outside = if (com.hereliesaz.geministrator.intro.TutorialRouter.isTutorialGoal(objective)) emptyList() else candidates
+        for (candidate in outside) {
             if (lookups >= budget.maxLookups) {
                 skipped += ResearchSkip(candidate.source, ResearchSkipReason.Budget)
                 continue

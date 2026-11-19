@@ -34,11 +34,21 @@ class ResearchTest {
     }
 
     @Test
-    fun theAppTeachingItselfAsksNoDirectory() {
-        assertFalse(researchWanted("Teach me how to use the Aive", ctx))
-        assertFalse(researchWanted("Show me how the app works", ctx))
-        // A lesson about something else is still wanted.
-        assertTrue(researchWanted("Teach me how this works", ctx))
+    fun theAppTeachingItselfAsksNoDirectoryButStillReadsTheApp() = runTest {
+        val transport = Scripted { McpIncoming(404, null) }
+        val consent = Consent(McpConsentDecision.AllowForRun)
+        val step = ResearchStep(
+            candidates = listOf(candidate(transport)),
+            consent = consent,
+            local = listOf(
+                ResearchSource.AppBridge to LocalResearchSource {
+                    listOf(ResearchLead("Bridge", ResearchSource.AppBridge, "this app", "shows hives", connected = true))
+                },
+            ),
+        )
+        val out = step.run("Teach me how to use the Aive", ResearchContext(bridgeEnabled = true), "p")
+        assertTrue(consent.asked.isEmpty() && transport.methods.isEmpty(), "nothing left the device")
+        assertEquals(listOf(ResearchSource.AppBridge), out.record.consulted)
     }
 
     @Test

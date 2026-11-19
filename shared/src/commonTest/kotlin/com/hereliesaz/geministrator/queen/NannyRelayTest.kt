@@ -96,6 +96,21 @@ class NannyRelayTest {
     }
 
     @Test
+    fun reportAwaitingReviewRaisesNannyPendingAndOffersARest() {
+        val r = run()
+        val signals = queenSignals(definition, r, emptyList())
+        assertEquals(listOf(QueenSignal.NannyPending("nanny")), signals.filterIsInstance<QueenSignal.NannyPending>())
+        // The offer to rest comes from the signal, and the queen's own "I noticed" does not speak for it.
+        val c = queenCandidates(definition, r, signals, com.hereliesaz.geministrator.workflow.SpendCaps())
+        assertEquals(QueenAction.Rest, c.single { it.action == QueenAction.Rest }.action)
+        assertNull(watchRelay(definition, r, signals))
+        // Once reviewed, rested, or with no Nanny, there is no signal.
+        assertTrue(queenSignals(definition, run(review = "revise"), emptyList()).none { it is QueenSignal.NannyPending })
+        assertTrue(queenSignals(definition, r.copy(keeperPause = com.hereliesaz.geministrator.domain.WorkflowKeeperPause(1L)), emptyList()).none { it is QueenSignal.NannyPending })
+        assertTrue(queenSignals(qDefinition(qTask("a")), qRun(qTaskRun("a", TaskRunStatus.Running)), emptyList()).none { it is QueenSignal.NannyPending })
+    }
+
+    @Test
     fun reviseVerdictIsRelayed() {
         assertEquals(QueenVoice.NannyRevise, nannyRelay(definition, run(review = "revise")).single().voice)
         assertEquals(QueenVoice.NannyRejected, nannyRelay(definition, run(review = "reject")).single().voice)
