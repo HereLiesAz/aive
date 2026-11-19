@@ -102,6 +102,14 @@ allEvents:
 SELECT payload FROM event ORDER BY occurred_at, seq;
 deleteEventsForRun:
 DELETE FROM event WHERE run_id = ?;
+eventCountForRun:
+SELECT COUNT(*) FROM event WHERE run_id = ?;
+eventPayloadsForRunBySeq:
+SELECT payload FROM event WHERE run_id = ? ORDER BY seq;
+deleteChainMeta:
+DELETE FROM meta WHERE key = ?;
+deleteAllChainMeta:
+DELETE FROM meta WHERE key LIKE 'chain:%';
 
 -- Roles
 upsertRole:

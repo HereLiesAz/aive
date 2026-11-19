@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.persistence
 
 import app.cash.sqldelight.async.coroutines.awaitAsList
+import app.cash.sqldelight.async.coroutines.awaitAsOne
 import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import app.cash.sqldelight.db.SqlDriver
 import com.hereliesaz.geministrator.log.AppLog
@@ -15,6 +16,9 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
+import com.hereliesaz.geministrator.events.ChainStatus
+import com.hereliesaz.geministrator.events.ChainTip
+import com.hereliesaz.geministrator.events.EventChain
 import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.persistence.db.WorkflowDatabase
 import com.hereliesaz.geministrator.workflow.ApprovalGate
@@ -182,6 +186,7 @@ class SqlWorkflowPersistence(
                 // Imported runs replace their own events, artifacts and gates so repeated loads are idempotent.
                 imported.runs.forEach { run ->
                     queries.deleteEventsForRun(run.id.value)
+                    queries.deleteChainMeta(chainKey(run.id.value))
                     queries.deleteGatesForRun(run.id.value)
                     run.taskRuns.values.forEach { queries.deleteArtifactsForTaskRun(it.id.value) }
                 }
@@ -301,6 +306,7 @@ class SqlWorkflowPersistence(
         queries.deleteDefinitions()
         queries.clearRuns()
         queries.clearEvents()
+        queries.deleteAllChainMeta()
         queries.deleteRoles()
         queries.clearArtifacts()
         queries.clearGates()
@@ -322,8 +328,32 @@ class SqlWorkflowPersistence(
     }
 
     private suspend fun writeEvent(event: WorkflowEvent) {
-        queries.appendEvent(event.workflowRunId.value, event.occurredAtEpochMillis, event.encode(WorkflowEvent.serializer()))
+        val runId = event.workflowRunId.value
+        val payload = event.encode(WorkflowEvent.serializer())
+        val before = queries.eventCountForRun(runId).awaitAsOne()
+        val recorded = queries.meta(chainKey(runId)).awaitAsOneOrNull()?.let(ChainTip::parse)
+        queries.appendEvent(runId, event.occurredAtEpochMillis, payload)
+        // The chain continues from the recorded tip, or starts with a run's first event. A run that already had events
+        // before the chain existed has none recorded and stays without one: its old events cannot be vouched for.
+        val tip = when {
+            recorded != null -> ChainTip(recorded.count + 1, EventChain.next(recorded.tip, payload))
+            before == 0L -> ChainTip(1, EventChain.next(EventChain.GENESIS, payload))
+            else -> null
+        }
+        if (tip != null) queries.putMeta(chainKey(runId), tip.encode())
     }
+
+    override suspend fun eventChainStatus(runId: WorkflowRunId): ChainStatus = locked {
+        val recorded = queries.meta(chainKey(runId.value)).awaitAsOneOrNull()?.let(ChainTip::parse)
+        if (recorded == null) {
+            ChainStatus.NoChain
+        } else {
+            val actual = EventChain.fold(queries.eventPayloadsForRunBySeq(runId.value).awaitAsList())
+            if (actual == recorded) ChainStatus.Intact(actual.count) else ChainStatus.Altered(recorded, actual)
+        }
+    }
+
+    private fun chainKey(runId: String) = "chain:$runId"
 
     private suspend fun writeRole(role: RoleDefinition) {
         guardOverwrite("role:${role.id.value}", RoleDefinition.serializer()) { queries.role(role.id.value).awaitAsOneOrNull() }

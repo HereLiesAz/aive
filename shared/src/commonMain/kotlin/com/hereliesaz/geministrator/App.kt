@@ -1373,6 +1373,7 @@ fun App(
                             }
                         },
                         onLoadRunTimeline = { runtime?.loadRunTimeline() ?: emptyList() },
+                        onLoadLogIntegrity = { runtime?.loadRunLogIntegrity() ?: com.hereliesaz.geministrator.events.ChainStatus.NoChain },
                         onLoadWorkflowDefinitions = { runtime?.persistence?.definitions?.all() ?: emptyList() },
                         onExportDiagnosticBundle = { runtime?.exportDiagnosticBundle() },
                         onValidateWorkflow = { runtime?.validateCurrentWorkflow() ?: emptyList() },

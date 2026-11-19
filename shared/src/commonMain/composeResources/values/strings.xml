@@ -878,6 +878,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_run_number">RUN %1$d</string>
     <string name="hive_active_of">%1$d / %2$d</string>
     <string name="hive_creatures_active">creatures active</string>
+    <string name="log_integrity_intact">Record intact: %1$d events, none changed since they were written.</string>
+    <string name="log_integrity_altered">This record was changed after it was written: %1$d events were recorded, %2$d are there now. Treat this log with care.</string>
     <string name="hive_centre">Centre the swarm</string>
     <string name="hive_show_all_creatures">Show every creature at once</string>
     <string name="hive_show_growth">Show the hive growing</string>

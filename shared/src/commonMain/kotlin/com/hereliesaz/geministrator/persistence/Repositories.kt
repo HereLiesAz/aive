@@ -12,6 +12,7 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
+import com.hereliesaz.geministrator.events.ChainStatus
 import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.workflow.ApprovalGate
 import com.hereliesaz.geministrator.workflow.ApprovalGateRepository
@@ -70,6 +71,12 @@ interface WorkflowPersistence : FailureEscalationDecisionStore {
      */
     suspend fun runsUpdatedSince(sinceEpochMillis: Long): List<WorkflowRun> =
         projects.all().flatMap { project -> runs.byProject(project.id) }.filter { it.updatedAtEpochMillis >= sinceEpochMillis }
+
+    /**
+     * Checks [runId]'s event journal against the hash chain recorded as its events were written. A store that keeps no
+     * chain (the Settings-backed and in-memory ones) says [ChainStatus.NoChain]; the SQL store overrides this.
+     */
+    suspend fun eventChainStatus(runId: WorkflowRunId): ChainStatus = ChainStatus.NoChain
 
     /** [runId]'s events that happened at or after [sinceEpochMillis], in order. */
     suspend fun eventsSince(runId: WorkflowRunId, sinceEpochMillis: Long): List<WorkflowEvent> =
