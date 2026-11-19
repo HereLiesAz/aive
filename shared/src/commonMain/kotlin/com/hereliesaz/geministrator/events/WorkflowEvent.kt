@@ -105,6 +105,8 @@ data class RetryScheduled(
     val nextAttempt: Int,
     val reason: String,
     override val occurredAtEpochMillis: Long,
+    /** How long the retry waits before it starts (a provider failure backs off); 0 for an immediate retry. */
+    val delayMillis: Long = 0L,
 ) : WorkflowEvent
 
 @Serializable

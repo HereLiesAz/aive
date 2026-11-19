@@ -218,7 +218,9 @@ class WorkflowEngine(
             .eachCount()
             .toMutableMap()
         val dispatchable = refreshed.taskRuns.values.filter {
-            it.status == TaskRunStatus.Ready || it.status == TaskRunStatus.Retrying
+            it.status == TaskRunStatus.Ready ||
+                // A retry of a provider failure waits out its backoff (retryNotBefore); a failover or the keeper's retry has none.
+                (it.status == TaskRunStatus.Retrying && (it.retryNotBefore ?: 0L) <= nowEpochMillis)
         }
 
         // Phase 1: collect all role-agent dispatches and resolve providers (synchronous).
@@ -1186,8 +1188,9 @@ class WorkflowEngine(
         return when (decision) {
             is FailureDecision.Retry -> {
                 TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Retrying)
+                val waitMillis = if (retryReason == RetryReason.ProviderFailure) retryBackoffMillis(taskRun.attempt, taskRun.id.value) else 0L
                 eventSink.append(
-                    RetryScheduled(run.id, taskDefinitionId, decision.nextAttempt, reason, nowEpochMillis),
+                    RetryScheduled(run.id, taskDefinitionId, decision.nextAttempt, reason, nowEpochMillis, delayMillis = waitMillis),
                 )
                 run.copy(
                     status = WorkflowRunStatus.Running,
@@ -1208,6 +1211,8 @@ class WorkflowEngine(
                             lastFailure = reason.takeIf {
                                 retryReason == RetryReason.VerificationFailed && task.retryPolicy.includeFailureContext
                             },
+                            // Only the provider's own trouble waits; a rejected output or plan is retried at once.
+                            retryNotBefore = if (waitMillis > 0L) nowEpochMillis + waitMillis else null,
                         )
                     ),
                     updatedAtEpochMillis = nowEpochMillis,
@@ -1656,4 +1661,21 @@ internal fun cancelledRunView(run: WorkflowRun, nowEpochMillis: Long): WorkflowR
         },
         updatedAtEpochMillis = nowEpochMillis,
     )
+}
+
+/** The first retry waits about this long; each further attempt doubles it, up to [RETRY_BACKOFF_MAX_MILLIS]. */
+internal const val RETRY_BACKOFF_BASE_MILLIS = 5_000L
+internal const val RETRY_BACKOFF_MAX_MILLIS = 60_000L
+
+/**
+ * How long a creature waits before retrying a provider failure on [attempt] (the one that just failed): 5 s doubling to
+ * 60 s, with up to 20% jitter taken from [seed] and the attempt, so creatures do not all retry in the same instant
+ * and the result is the same every time it is asked (no clock or dice).
+ */
+internal fun retryBackoffMillis(attempt: Int, seed: String): Long {
+    val doublings = (attempt - 1).coerceIn(0, 10)
+    val raw = (RETRY_BACKOFF_BASE_MILLIS shl doublings).coerceAtMost(RETRY_BACKOFF_MAX_MILLIS)
+    val hash = (seed.hashCode() * 31 + attempt) and 0x7fffffff
+    val jitterPerMille = (hash % 401) - 200 // -200..200 = -20%..+20%
+    return raw + raw * jitterPerMille / 1000
 }

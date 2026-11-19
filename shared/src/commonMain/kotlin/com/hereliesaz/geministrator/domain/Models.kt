@@ -262,6 +262,11 @@ data class TaskRun(
     val timedOutAttempts: Int = 0,
     /** Why the last attempt was turned back (a failed output check), handed to the next attempt's prompt; null otherwise. */
     val lastFailure: String? = null,
+    /**
+     * Epoch millis before which a Retrying task is not started again: a provider failure waits, longer each time, so a
+     * struggling provider is not hit every second. Null means no wait (a failover, the keeper's own retry, a turned-back output).
+     */
+    val retryNotBefore: Long? = null,
 ) {
     init {
         require(progress == null || progress in 0f..1f) { "Task progress must be normalized 0f..1f" }

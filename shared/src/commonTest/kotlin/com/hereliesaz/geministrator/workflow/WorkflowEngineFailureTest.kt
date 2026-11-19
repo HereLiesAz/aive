@@ -150,7 +150,8 @@ class WorkflowEngineFailureTest {
             definition = definition,
             run = first.run,
             existingHandles = first.handles,
-            nowEpochMillis = 20L,
+            // The retry of a provider failure waits out its backoff first.
+            nowEpochMillis = first.run.taskRuns.getValue(badId).retryNotBefore!!,
         )
         assertEquals(WorkflowRunStatus.Failed, second.run.status)
         assertEquals(TaskRunStatus.Failed, second.run.taskRuns.getValue(badId).status)
