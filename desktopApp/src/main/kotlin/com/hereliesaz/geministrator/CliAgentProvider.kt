@@ -236,7 +236,54 @@ internal class CliAgentProvider(
         }
     }
 
-    /** The CLI providers that are on and installed, ready to join the provider list. */
+    /** The environment a CLI gets: the basics, how it finds its own login, a proxy and certificates if set; no API key unless the keeper chose. */
+    internal fun cliEnvironment(): Map<String, String> = cliEnvironmentFor(spec, settings, environment())
+
+    private suspend fun changedPaths(worktree: File): List<String> {
+        val status = git(worktree, "status", "--porcelain=v1", "-z", "--untracked-files=all")
+        return status.stdout.text.split('\u0000').filter { it.length > 3 }.map { it.substring(3) }
+    }
+
+    private suspend fun git(directory: File, vararg args: String): BoundedProcessResult = runBoundedProcess(
+        command = listOf("git", "-c", "core.hooksPath=${noHooks.absolutePath}", "-c", "core.fsmonitor=false", "-c", "core.autocrlf=false") + args,
+        directory = directory, environment = null, timeoutMillis = GIT_TIMEOUT_MILLIS, maxChars = MAX_GIT_OUTPUT_CHARS,
+    )
+
+    private fun clean(text: String, max: Int = MAX_LINE_CHARS): String = ControlRedaction.scrub(text).take(max)
+
+    companion object {
+        private val noHooksDirs = mutableMapOf<String, File>()
+
+        /**
+         * The empty directory git's `core.hooksPath` points at, shared by every provider with this [root] and deleted at exit.
+         * Each provider used to make its own and never remove it, and the providers are rebuilt whenever settings change, so
+         * the temp folder collected one directory per rebuild.
+         */
+        @Synchronized
+        internal fun sharedNoHooksDir(root: File): File {
+            val key = root.absolutePath
+            noHooksDirs[key]?.takeIf { it.isDirectory }?.let { return it }
+            return Files.createTempDirectory(root.toPath(), "aive-cli-nohooks-").toFile()
+                .also { it.deleteOnExit() }
+                .also { noHooksDirs[key] = it }
+        }
+
+        const val DEFAULT_TIMEOUT_MILLIS = 30L * 60_000
+        private const val GIT_TIMEOUT_MILLIS = 120_000L
+        private const val MAX_GIT_OUTPUT_CHARS = 400_000
+        private const val MAX_PATCH_CHARS = 200_000
+        private const val MAX_ANSWER_CHARS = 20_000
+        private const val MAX_LINE_CHARS = 600
+        private const val MAX_REASON_CHARS = 600
+
+        /** Files whose content makes Git run commands (filters, drivers) or fetch other repositories. */
+        val GIT_CONTROL_FILES = setOf(".gitattributes", ".gitmodules")
+
+        val BASE_ENVIRONMENT: List<String> = ChildProcessEnvironment.BASE
+    }
+}
+
+/** The CLI providers that are on and installed, ready to join the provider list. */
 internal fun configuredCliProviders(
     settings: CliAgentSettings = CliAgentSettings(),
     locate: (CliAgentSpec) -> File? = { CliLocator.locate(it) },
