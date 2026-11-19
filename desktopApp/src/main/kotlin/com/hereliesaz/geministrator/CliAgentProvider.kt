@@ -22,7 +22,6 @@ import com.hereliesaz.geministrator.providers.cli.CliOutputReader
 import com.hereliesaz.geministrator.providers.cli.CliPromptChannel
 import com.hereliesaz.geministrator.providers.cli.CliRunMode
 import com.hereliesaz.geministrator.workflow.approvedEnginePlan
-import java.util.prefs.Preferences
 import java.io.File
 import java.nio.file.Files
 import java.util.UUID
@@ -34,28 +33,6 @@ import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-
-/** Which CLIs the keeper let run on this computer, and whether each may be given its API-key variables. Off by default. */
-internal class CliAgentSettings(private val node: () -> Preferences = { Preferences.userRoot().node(PREFERENCES_NODE) }) {
-    fun enabled(id: String): Boolean = node().getBoolean("$id.enabled", false)
-    fun setEnabled(id: String, value: Boolean) = write("$id.enabled", value)
-    fun passKeys(id: String): Boolean = node().getBoolean("$id.pass-keys", false)
-    fun setPassKeys(id: String, value: Boolean) = write("$id.pass-keys", value)
-
-    /** Whether a checkout that tracks this CLI's own project settings may be run (off: such a checkout is refused). */
-    fun allowProjectConfig(id: String): Boolean = node().getBoolean("$id.allow-project-config", false)
-    fun setAllowProjectConfig(id: String, value: Boolean) = write("$id.allow-project-config", value)
-
-    private fun write(key: String, value: Boolean) {
-        val n = node()
-        n.putBoolean(key, value)
-        runCatching { n.flush() }
-    }
-
-    private companion object {
-        const val PREFERENCES_NODE = "com/hereliesaz/geministrator/cli-agents"
-    }
-}
 
 /**
  * Drives one vendor LLM CLI headless as an agent provider (docs/Local-CLI-Agents.md). The CLI runs under
@@ -259,62 +236,12 @@ internal class CliAgentProvider(
         }
     }
 
-    /** The environment a CLI gets: the basics, how it finds its own login, a proxy and certificates if set; no API key unless the keeper chose. */
-    internal fun cliEnvironment(): Map<String, String> = cliEnvironmentFor(spec, settings, environment())
-
-    private suspend fun changedPaths(worktree: File): List<String> {
-        val status = git(worktree, "status", "--porcelain=v1", "-z", "--untracked-files=all")
-        return status.stdout.text.split('\u0000').filter { it.length > 3 }.map { it.substring(3) }
-    }
-
-    private suspend fun git(directory: File, vararg args: String): BoundedProcessResult = runBoundedProcess(
-        command = listOf("git", "-c", "core.hooksPath=${noHooks.absolutePath}", "-c", "core.fsmonitor=false", "-c", "core.autocrlf=false") + args,
-        directory = directory, environment = null, timeoutMillis = GIT_TIMEOUT_MILLIS, maxChars = MAX_GIT_OUTPUT_CHARS,
-    )
-
-    private fun clean(text: String, max: Int = MAX_LINE_CHARS): String = ControlRedaction.scrub(text).take(max)
-
-    companion object {
-        private val noHooksDirs = mutableMapOf<String, File>()
-
-        /**
-         * The empty directory git's `core.hooksPath` points at, shared by every provider with this [root] and deleted at exit.
-         * Each provider used to make its own and never remove it, and the providers are rebuilt whenever settings change, so
-         * the temp folder collected one directory per rebuild.
-         */
-        @Synchronized
-        internal fun sharedNoHooksDir(root: File): File {
-            val key = root.absolutePath
-            noHooksDirs[key]?.takeIf { it.isDirectory }?.let { return it }
-            return Files.createTempDirectory(root.toPath(), "aive-cli-nohooks-").toFile()
-                .also { it.deleteOnExit() }
-                .also { noHooksDirs[key] = it }
-        }
-
-        const val DEFAULT_TIMEOUT_MILLIS = 30L * 60_000
-        private const val GIT_TIMEOUT_MILLIS = 120_000L
-        private const val MAX_GIT_OUTPUT_CHARS = 400_000
-        private const val MAX_PATCH_CHARS = 200_000
-        private const val MAX_ANSWER_CHARS = 20_000
-        private const val MAX_LINE_CHARS = 600
-        private const val MAX_REASON_CHARS = 600
-
-        /** Files whose content makes Git run commands (filters, drivers) or fetch other repositories. */
-        val GIT_CONTROL_FILES = setOf(".gitattributes", ".gitmodules")
-
-        val BASE_ENVIRONMENT: List<String> = ChildProcessEnvironment.BASE
-    }
-}
-
-/** The environment a CLI gets: the basics, how it finds its own login, a proxy and certificates if set; no vendor key unless the keeper chose. */
-internal fun cliEnvironmentFor(spec: CliAgentSpec, settings: CliAgentSettings, inherited: Map<String, String>): Map<String, String> {
-    val allowed = CliAgentProvider.BASE_ENVIRONMENT + spec.authEnvironment + if (settings.passKeys(spec.id)) spec.optionalKeyEnvironment else emptyList()
-    val kept = inherited.filterKeys { key -> allowed.any { it.equals(key, ignoreCase = true) } }.toMutableMap()
-    sanitizeGitEnvironment(kept)
-    kept["NO_COLOR"] = "1"
-    kept["TERM"] = "dumb"
-    return kept
-}
+    /** The CLI providers that are on and installed, ready to join the provider list. */
+internal fun configuredCliProviders(
+    settings: CliAgentSettings = CliAgentSettings(),
+    locate: (CliAgentSpec) -> File? = { CliLocator.locate(it) },
+): List<AgentProvider> =
+    CliAgentSpecs.all.filter { settings.enabled(it.id) && locate(it) != null }.map { spec -> CliAgentProvider(spec, settings, locate = { locate(spec) }) }
 
 /** One line, no brackets or control characters, bounded: text from elsewhere cannot fake a header in the prompt or the plan. */
 internal fun safeLabel(text: String?, max: Int = 120): String =

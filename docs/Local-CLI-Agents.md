@@ -33,6 +33,10 @@ Turn one on in **Keeper's room › Local agents**. It is off until you do. It th
 
 A CLI that has an npm package shows **Install** when it is missing: one `npm install -g <package>`, run when you press it. Adding another CLI is adding a spec (`CliAgentSpecs`): its binary, its headless flags, how to read its output.
 
+## From a terminal
+
+`aive agents install|enable|disable|test <id>` does the same as the Keeper's room buttons, from the `aive` command line ([CLI](CLI.md)). It is local only: it needs an attached interactive terminal and `--yes` or a typed confirmation, and it is not reachable from the control API, MCP or any HTTP route, so an agent holding the token cannot install, enable or run a vendor CLI. The settings store and the install/test/status host live in `shared` (`desktopMain`), used by both the desktop and `aive`. `aive agents` alone lists them, read-only. The headless engine does not yet run enabled CLI agents as providers.
+
 ## Test, and what is not verified
 
 **The flags were written from each CLI's documentation. They have not been run against every version of every CLI by the people who wrote this.** That is why each CLI has a **Test** button: it runs the installed CLI read-only in an empty folder on a tiny prompt ("Reply with the single word OK") and shows what happened: the answer, or the exit code and the CLI's own error ("unknown option ..."). A flag that is wrong for your version shows there, not as a failed task, and is fixed in `CliAgentSpecs`. Test sends a real prompt, so it counts against your own plan or quota. Gemini CLI and Qwen Code, whose headless flags have changed between versions, are the likeliest to need a fix.

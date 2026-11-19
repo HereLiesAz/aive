@@ -14,7 +14,7 @@ import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 
 /** What a CLI process did: its exit code, whether it was stopped at the timeout, and the tail of its stderr. */
-internal data class CliProcessResult(
+data class CliProcessResult(
     val exitCode: Int,
     val timedOut: Boolean = false,
     val startFailure: String? = null,
@@ -22,7 +22,7 @@ internal data class CliProcessResult(
 )
 
 /** Runs a CLI and hands its output over a line at a time. A seam so tests need no real CLI. */
-internal fun interface CliProcessRunner {
+fun interface CliProcessRunner {
     suspend fun run(
         command: List<String>,
         directory: File,
@@ -39,7 +39,7 @@ internal fun interface CliProcessRunner {
  * [MAX_LINE_CHARS] is cut), stderr kept to its last [MAX_STDERR_CHARS], and the whole process tree ended
  * on timeout or when the caller is cancelled.
  */
-internal object ProcessCliRunner : CliProcessRunner {
+object ProcessCliRunner : CliProcessRunner {
     const val MAX_LINE_CHARS = 64_000
     const val MAX_STDERR_CHARS = 8_000
 

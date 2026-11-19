@@ -275,5 +275,6 @@ class AiveCli(
         append("\nRun 'aive <command> --help' for arguments.\n")
         append("Commands connect to the independent 'aive serve' headless runtime.\n")
         append("All approvals remain read-only in the CLI.\n")
+        append("Local-only, terminal required (never sent to the API): aive agents install|enable|disable|test <id> [--yes]; aive sources enable|disable <id> [--yes]\n")
     }
 }

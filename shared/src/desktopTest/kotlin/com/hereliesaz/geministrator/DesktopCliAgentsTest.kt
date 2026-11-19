@@ -106,13 +106,4 @@ class DesktopCliAgentsTest {
         val none = DesktopCliAgents(settings = settings(), runner = ok, locate = { null })
         assertTrue("not installed" in none.test("cli-claude").summary)
     }
-
-    @Test
-    fun onlyACliThatIsOnAndInstalledJoinsTheProviderList() {
-        val on = settings().also { it.setEnabled("cli-claude", true) }
-        val installed = { spec: com.hereliesaz.geministrator.providers.cli.CliAgentSpec -> if (spec.id == "cli-claude") File("/usr/bin/claude") else null }
-        assertEquals(listOf("cli-claude"), configuredCliProviders(on, installed).map { it.id.value }, "on and installed: registered")
-        assertEquals(emptyList(), configuredCliProviders(on) { null }.map { it.id.value }, "on but not installed: not registered")
-        assertEquals(emptyList(), configuredCliProviders(settings(), installed).map { it.id.value }, "installed but off: not registered")
-    }
 }

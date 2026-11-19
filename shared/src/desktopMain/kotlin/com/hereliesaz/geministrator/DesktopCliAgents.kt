@@ -1,7 +1,6 @@
 package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.control.ControlRedaction
-import com.hereliesaz.geministrator.providers.AgentProvider
 import com.hereliesaz.geministrator.providers.cli.CliAgentHost
 import com.hereliesaz.geministrator.providers.cli.CliAgentSpec
 import com.hereliesaz.geministrator.providers.cli.CliAgentSpecs
@@ -19,7 +18,7 @@ import java.nio.file.Files
  * Test that runs the installed CLI read-only on a tiny prompt so a wrong flag for its version shows up
  * as a message instead of a failed task. Turning one on or off rebuilds the provider list through [onChanged].
  */
-internal class DesktopCliAgents(
+class DesktopCliAgents(
     private val settings: CliAgentSettings = CliAgentSettings(),
     private val runner: CliProcessRunner = ProcessCliRunner,
     private val locate: (CliAgentSpec) -> File? = { CliLocator.locate(it) },
@@ -143,10 +142,3 @@ internal class DesktopCliAgents(
         const val INSTALL_TIMEOUT_MILLIS = 300_000L
     }
 }
-
-/** The CLI providers that are on and installed, ready to join the provider list. */
-internal fun configuredCliProviders(
-    settings: CliAgentSettings = CliAgentSettings(),
-    locate: (CliAgentSpec) -> File? = { CliLocator.locate(it) },
-): List<AgentProvider> =
-    CliAgentSpecs.all.filter { settings.enabled(it.id) && locate(it) != null }.map { spec -> CliAgentProvider(spec, settings, locate = { locate(spec) }) }

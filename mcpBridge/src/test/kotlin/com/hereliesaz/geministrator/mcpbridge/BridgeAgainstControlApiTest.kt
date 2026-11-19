@@ -139,6 +139,18 @@ class BridgeAgainstControlApiTest {
     }
 
     @Test
+    fun noToolInstallsEnablesOrRunsAVendorCliOrSource() {
+        val tools = rpc("tools/list")["result"]!!.jsonObject["tools"]!!.jsonArray.map { it.jsonObject["name"]!!.jsonPrimitive.content }
+        val words = setOf("install", "enable", "disable", "test", "toggle", "switch")
+        assertEquals(emptyList(), tools.filter { name -> name.split('_').any { it in words } })
+        for (name in listOf("aive_list_sources", "aive_list_agents")) {
+            val tool = Tools.byName(name)!!
+            assertEquals("GET", tool.method)
+            assertTrue(tool.readOnly, name)
+        }
+    }
+
+    @Test
     fun destructiveToolsSayTheyAreAndAreAnnotated() {
         val tools = rpc("tools/list")["result"]!!.jsonObject["tools"]!!.jsonArray.map { it.jsonObject }
         val destructive = tools.filter { it["annotations"]!!.jsonObject["destructiveHint"]?.jsonPrimitive?.content == "true" }
