@@ -23,6 +23,9 @@ class BreedsTest {
         listOf(
             Breed("a", "Thalassa 1", "Thalassa", "Common", starter = true, mutation = 2, pairsWith = listOf("b")),
             Breed("b", "Thalassa 2", "Thalassa", "Common"),
+            Breed("c", "Thalassa 3", "Thalassa", "Common"),
+            Breed("d", "Thalassa 4", "Thalassa", "Common"),
+            Breed("g", "Glacia 1", "Glacia", "Uncommon"),
             Breed("s", "Glacia 3", "Glacia", "Rare", source = "store"),
             Breed("m", "Viridia 4", "Viridia", "Mythic", source = "breed", lottery = "mythic"),
         ),
@@ -109,6 +112,43 @@ class BreedsTest {
         val child = assertNotNull(next.lastHatching?.child)
         val bred = next.bred.firstOrNull { it.id == child }
         if (bred != null) assertEquals(setOf("a", "b"), setOf(bred.body, bred.tendrils, bred.tail) + setOf("a", "b"))
+    }
+
+    private fun parent(key: String) = Parent(key, key, key, key)
+
+    @Test
+    fun threeContributorsAreAllParentsAndEachGivesOnePart() {
+        val stable = Stable(starter = "a")
+        val next = stable.onRunCleared(run("r1", "x", "y", "z"), listOf("a", "b", "g"), catalog, Random(7))
+        assertEquals(listOf("a", "b", "g"), next.lastHatching?.parents)
+        val child = next.bred.single()
+        assertEquals(listOf("a", "b", "g"), listOf(child.body, child.tendrils, child.tail))
+        assertEquals(listOf("a", "b", "g"), child.parents)
+    }
+
+    @Test
+    fun noMoreThanThreeParentsAndKinBeatsAStrangerWhenNothingHasBeenBredYet() {
+        val chosen = Stable(starter = "a").chooseParents(listOf("a", "b", "c", "g").map(::parent), catalog)
+        assertEquals(listOf("a", "b", "c"), chosen.map { it.key })
+        val many = Stable(starter = "a").chooseParents(listOf("a", "b", "c", "d", "g").map(::parent), catalog)
+        assertEquals(MAX_PARENTS, many.size)
+    }
+
+    @Test
+    fun aCombinationTheStableHasAlreadyBredLosesToOneItHasNot() {
+        val made = (1..3).map { BredCreature("x$it", body = "a", tendrils = "b", tail = "a", parents = listOf("a", "b"), generation = 2) }
+        val stable = Stable(starter = "a", bred = made)
+        assertEquals(3, stable.pairings()[setOf("a", "b")])
+        // All four breeds fit one another equally; only a and b have been bred together.
+        val chosen = stable.chooseParents(listOf("a", "b", "c", "d").map(::parent), catalog)
+        assertEquals(listOf("a", "c", "d"), chosen.map { it.key })
+    }
+
+    @Test
+    fun oneOrTwoContributorsAreTheirOwnParents() {
+        val stable = Stable(starter = "a")
+        assertEquals(listOf("a"), stable.chooseParents(listOf(parent("a")), catalog).map { it.key })
+        assertEquals(listOf("a", "g"), stable.chooseParents(listOf(parent("a"), parent("g")), catalog).map { it.key })
     }
 
     @Test
