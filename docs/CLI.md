@@ -58,7 +58,7 @@ aive sources enable|disable openai
 
 These run **inside the CLI process** and are deliberately not control API commands: no HTTP route, MCP tool or token can install, switch on or run a vendor CLI. Each needs an attached interactive terminal (without one it exits `2` and changes nothing, even with `--yes`) and either `--yes` or the id typed back at the prompt. The only flags are `--yes` and `--json`; a key is never accepted as an argument. They edit the same durable stores as the desktop app (`CliAgentSettings` in the user's `java.util.prefs`, and `ProviderEnablement` in the durable UI state), so a switch made here shows in the desktop and the other way round. `aive agents` and `aive sources` alone remain the read-only listings.
 
-Follow-ups, not built: the headless engine does not yet use enabled CLI agents as providers (that needs `CliAgentProvider`, the worktree runner and its Git helpers moved out of `desktopApp`), does not yet honour the Source switches when it builds providers, and its `aive agents`/`aive sources` listings are empty (no views are wired into the headless control host).
+Follow-ups, not built: the headless engine does not yet use enabled CLI agents as providers (that needs `CliAgentProvider`, the worktree runner and its Git helpers moved out of `desktopApp`), does not yet honour the Source switches when it builds providers. Its `aive agents` and `aive sources` listings are real: `aive serve` answers from the same views as the desktop app (`ControlViews`).
 
 ## State, secrets, and isolation
 

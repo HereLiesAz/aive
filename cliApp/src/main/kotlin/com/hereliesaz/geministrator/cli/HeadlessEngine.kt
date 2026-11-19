@@ -132,6 +132,8 @@ class HeadlessEngine private constructor(
                     authoredStore = authored,
                     drafter = { draft },
                     appVersion = "headless",
+                    sourcesView = { com.hereliesaz.geministrator.ControlViews.sources() },
+                    agentsView = { com.hereliesaz.geministrator.ControlViews.agents() },
                     settingsView = {
                         buildJsonObject {
                             put("runtime", "headless")
