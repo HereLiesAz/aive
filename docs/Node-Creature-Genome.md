@@ -2,6 +2,19 @@
 
 The creatures as living things in their own right: what they inherit, what they need, how they live, compete, wire together, breed, sicken and die. They're neurons, so their biology is a neuron's biology: tissue, blood supply, trophic support, firing, synapses, pruning, excitotoxicity. It runs as rule-driven artificial life in the spirit of Conway's Game of Life: simple local rules, complex behaviour. The lineage data is measured from the paintings (`tools/creature-genome/`, output `docs/swarm-terrarium/lineage.json`); the lineage map is on the mockup canvas.
 
+**Status: what the app runs and what is still the design target.**
+
+| Built (`Breeds.kt`, `BreedParents.kt`) | Design target, not built |
+|---|---|
+| Breeds, the stable, the starter, rarity, store breeds | Resources, Energy, Integrity, Charge, trophic reserve, Age |
+| Generations at Fib(*n*) cleared runs, swung by mutation | Ticks, wake and sleep, the capillaries |
+| Up to three parents, ranked by fit and by how new the pairing is | The seven-locus genome (pigment, accent, spectrum, core, pattern, skin, arbor) and cell kinds |
+| Body, tendrils and tail each taken whole from one parent | Kinship, Echo, septic creatures, the clone trap |
+| Pairing by breed, genus and `pairsWith`; the lottery for Rare, Very rare and Mythic | Fertility rules, mutation per locus, the Mythic conditions |
+| Programmatic work counts but never parents | Survival, competition, circuits, death by apoptosis |
+
+Everything below the table is the target unless it is in the left column.
+
 **Nothing here happens on its own.** Every event below is the visible form of something that happened in a run; [Ecology and the swarm](Ecology-and-the-Swarm.md) holds the binding rule, the full ledger, and the numbers the test bench uses. Where this page gives a rate, it's the bench's.
 
 ## The world
