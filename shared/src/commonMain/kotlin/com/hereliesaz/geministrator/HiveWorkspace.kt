@@ -52,6 +52,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -398,7 +399,11 @@ internal fun HiveControlsBar(
                     )
                 }
             }
+            val hiveActions = LocalHiveActions.current
             val buttons: @Composable () -> Unit = {
+                if (!building) hiveActions.forEach { action ->
+                    RoundGlyphButton(action.glyph, action.label, onClick = action.onClick, selected = action.selected, modifier = action.modifier)
+                }
                 if (building) {
                     RoundGlyphButton(HiveGlyph.Undo, stringResource(Res.string.build_undo), enabled = canUndo, onClick = onUndo)
                     RoundGlyphButton(HiveGlyph.Redo, stringResource(Res.string.build_redo), enabled = canRedo, onClick = onRedo)
@@ -440,8 +445,20 @@ internal fun HiveControlsBar(
     }
 }
 
+/** One of the live hive's own acts (Pause, Stop, Timeline, Share, More editing), drawn as a round button on the hive's controls bar. */
+internal class HiveAction(
+    val glyph: HiveGlyph,
+    val label: String,
+    val onClick: () -> Unit,
+    val selected: Boolean = false,
+    val modifier: Modifier = Modifier,
+)
+
+/** The live hive's acts, offered by the page to the controls bar of the hive frame drawn inside it. */
+internal val LocalHiveActions = androidx.compose.runtime.staticCompositionLocalOf<List<HiveAction>> { emptyList() }
+
 /** The controls bar keeps its status on the same line from this width up. */
-private val HiveControlsOneLineFrom = 560.dp
+private val HiveControlsOneLineFrom = 760.dp
 
 @Composable
 private fun ModeSegment(label: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
@@ -762,18 +779,27 @@ internal fun MindDefinitionList(identity: String, provider: String?, role: RoleD
 
 /** A round, outlined control on Ink: a 48dp target around a 34dp ring. */
 @Composable
-internal fun RoundGlyphButton(glyph: HiveGlyph, label: String, onClick: () -> Unit, enabled: Boolean = true) {
+internal fun RoundGlyphButton(
+    glyph: HiveGlyph,
+    label: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    selected: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
     val ink = if (enabled) azphaltOnSurface() else azphaltMutedOnSurface().copy(alpha = 0.5f)
     Box(
-        Modifier
+        modifier
             .size(AzphaltMinTouchTarget)
             .clip(CircleShape)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = label },
+            .semantics { contentDescription = label; if (selected) this.selected = true },
         contentAlignment = Alignment.Center,
     ) {
         Box(
-            Modifier.size(34.dp).border(1.dp, azphaltMutedOnSurface().copy(alpha = 0.5f), CircleShape),
+            Modifier.size(34.dp).clip(CircleShape)
+                .then(if (selected) Modifier.background(azphaltOnSurface().copy(alpha = 0.18f)) else Modifier)
+                .border(1.dp, azphaltMutedOnSurface().copy(alpha = 0.5f), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Glyph(glyph, ink, Modifier.size(17.dp))
@@ -791,6 +817,12 @@ internal enum class HiveGlyph(val path: String) {
     Close("M6 6l12 12M18 6L6 18"),
     Play("M8 5l11 7-11 7V5z"),
     /** Three creatures: every one at once. */
+    Pause("M8 5v14M16 5v14"),
+    Stop("M7 7h10v10H7z"),
+    /** Three rows of different length: the run, in order. */
+    Timeline("M4 7h16M4 12h10M4 17h13"),
+    Share("M12 4v11M8 8l4-4 4 4M5 14v6h14v-6"),
+    Edit("M4 20l1-5L16 4l4 4L9 19l-5 1M14 6l4 4"),
     Swarm("M8 8a2 2 0 1 1-4 0a2 2 0 1 1 4 0M20 8a2 2 0 1 1-4 0a2 2 0 1 1 4 0M14 17a2 2 0 1 1-4 0a2 2 0 1 1 4 0"),
 }
 
