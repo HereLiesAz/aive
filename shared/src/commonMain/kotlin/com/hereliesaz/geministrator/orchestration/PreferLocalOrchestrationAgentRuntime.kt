@@ -11,6 +11,8 @@ class PreferLocalOrchestrationAgentRuntime(
     private val localReady: () -> Boolean,
     private val cloud: OrchestrationAgentRuntime?,
 ) : OrchestrationAgentRuntime {
+    override val planners: List<OrchestrationAgentRuntime> get() = cloud?.planners.orEmpty()
+
     override suspend fun plan(packet: OrchestrationPacket): OrchestrationPlan = route { it.plan(packet) }
 
     override suspend fun repair(packet: OrchestrationPacket): OrchestrationPlan = route { it.repair(packet) }

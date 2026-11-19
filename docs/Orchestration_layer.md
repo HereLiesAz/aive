@@ -1597,3 +1597,14 @@ The queen decides how many creatures a goal needs, and the keeper approves or ov
 - **A one-creature hive is not a lighter hive.** It is built by the same factory as any plan: its step gets the same contract, Nanny watching and check for its effect class, and a step that sends, changes a connected source or pushes a diff still asks the keeper with the concrete effect, however small the plan.
 - Tests: `PlanSizingTest`, and the instruction test in `NewWorkflowInstructionTest` (the rule is present exactly once).
 
+## Plan parents
+
+A reviewed plan has three parents (`orchestration/PlanParents.kt`). Arguments from "The Alien Space of Science" (arXiv:2603.01092): a model asked for a plan samples the dense middle of the plans it has seen, and the fix is to ask for combinations nobody would usually make, while keeping them coherent.
+
+- **Three drafts.** The queen drafts the plan as before. Two other planners draft it too, each with a lens of its own (`PlannerLens`): *fewest* (the fewest steps that still meet every acceptance criterion) and *unusual* (the least usual shape that is still sound). Each tries the linked Sources in an order turned one place further than the queen's (`FailoverOrchestrationAgentRuntime.planners`), so a planner answers from another Source than hers when one is linked. With one Source linked, all three share it and only the lenses differ.
+- **The child.** The queen is shown the three drafts and writes one plan from them, tagging every step with the drafts it comes from (`OrchestrationPlanStep.parents`). A tag that names no draft is dropped.
+- **Code checks the child.** It must pass every rule code can tick (`Requirements.checkPure`) before the reviewer sees it. If it does not, or the merge call fails, the draft kept is the one that passes and is least like the others (shape: each step's role or template and how many steps it waits on; the queen's wins a tie). That is the paper's ranking: coherent first, then the least available.
+- **Still reviewed.** The parents raise the plan and approve nothing. The reviewer, the checklist and the keeper's decision are unchanged, and the extra calls come off the same money rule: the raise is skipped, and the queen's draft alone goes to review, when the rule would not allow a second planning call (`reviewGateFor`). `reviewUntilApproved(planningCalls)` counts the calls made.
+- **A planner that fails is no parent.** With no one else to ask (a local planner alone, or no second Source) the queen's draft is the plan.
+- **The Story** says how the plan was raised (`PlanningRecord.parentsLine`): the merge, with how many steps came from each parent, or which draft was kept and why.
+- Cost: up to four planning calls for a launch (three drafts and the merge), against one before. Tests: `PlanParentsTest`.

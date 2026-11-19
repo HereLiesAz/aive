@@ -126,6 +126,8 @@ suspend fun reviewUntilApproved(
      * reviewer, and the checklist is the whole review (see planningMayCall). Null always asks.
      */
     reviewGate: (suspend (callsSoFar: Int) -> CallDecision)? = null,
+    /** Planning calls already made when the first review is asked for: one, or more when the plan was raised from parents. */
+    planningCalls: Int = 1,
 ): PlanReviewOutcome {
     require(maxRounds > 0) { "maxRounds must be positive" }
     var plan = firstPlan
@@ -134,8 +136,8 @@ suspend fun reviewUntilApproved(
         reportLaunchProgress("$reviewerName is reviewing the plan (round $round of $maxRounds)…")
         onStage(PlanningPhase.Reviewing, plan, round)
         val unmetByCode = pureCheck?.invoke(plan)?.filter { it.verdict == RequirementVerdict.Unmet }.orEmpty()
-        // One planning call, then two per round (a review and a rework).
-        val skipped = if (unmetByCode.isEmpty()) reviewGate?.invoke(1 + 2 * (round - 1))?.skippedReason() else null
+        // The planning calls so far, then two per round (a review and a rework).
+        val skipped = if (unmetByCode.isEmpty()) reviewGate?.invoke(planningCalls + 2 * (round - 1))?.skippedReason() else null
         if (skipped != null) {
             // Nothing code can tick failed. With no review yet, that is the whole review; after a rejection the reworked plan is not approved unseen.
             if (rounds.isEmpty()) rounds += PlanReviewRound(plan, PlanVerdict.Approve(CHECKLIST_ONLY_REASONS))

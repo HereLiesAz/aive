@@ -29,6 +29,17 @@ class FailoverOrchestrationAgentRuntime(
 
     override val lastSourceId: String? get() = answeredBy
 
+    /** One planner for each lens, each trying the Sources in an order turned one place further than the last, so the first Source it asks is not the queen's when there is another. */
+    override val planners: List<OrchestrationAgentRuntime>
+        get() = if (candidates.isEmpty()) {
+            emptyList()
+        } else {
+            PlannerLens.entries.indices.map { index ->
+                val turn = (index + 1) % candidates.size
+                FailoverOrchestrationAgentRuntime(candidates.drop(turn) + candidates.take(turn), bench)
+            }
+        }
+
     override suspend fun plan(packet: OrchestrationPacket): OrchestrationPlan = attempt { it.plan(packet) }
 
     override suspend fun repair(packet: OrchestrationPacket): OrchestrationPlan = attempt { it.repair(packet) }

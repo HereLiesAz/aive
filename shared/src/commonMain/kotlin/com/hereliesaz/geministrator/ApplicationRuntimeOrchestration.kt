@@ -374,6 +374,33 @@ private fun PlanReviewOutcome.verdict(): PlanningVerdict = when {
 }
 
 /**
+ * The plan raised from the queen's [queenDraft] and her companions' drafts ([planFromParents]), or null when the money rule
+ * does not allow the extra calls (the first planning call is already made, so [callsSoFar] is one) or nobody else can draft.
+ */
+private suspend fun ApplicationRuntime.raisePlanFromParents(
+    inputs: PlanInputs,
+    packet: OrchestrationPacket,
+    queen: OrchestrationAgentRuntime,
+    queenDraft: OrchestrationPlan,
+    reviewer: PlanReviewer,
+): com.hereliesaz.geministrator.orchestration.ParentedPlan? {
+    if (queen.planners.isEmpty() || reviewGateFor(reviewer, 1) != com.hereliesaz.geministrator.queen.CallDecision.Allow) return null
+    reportLaunchProgress("Asking two more planners for their drafts…")
+    val requirementInputs = com.hereliesaz.geministrator.orchestration.RequirementInputs(
+        objective = inputs.objective,
+        objectiveExternal = inputs.objectiveProvenance.isUntrusted(),
+        roles = inputs.launchRoles,
+        availableRoleIds = inputs.plannerRoles.map { it.id.value }.toSet(),
+        requireReview = inputs.requireReview,
+    )
+    val checklist = com.hereliesaz.geministrator.orchestration.Requirements.extract(requirementInputs)
+    return com.hereliesaz.geministrator.orchestration.planFromParents(packet, queen, queenDraft) { candidate ->
+        com.hereliesaz.geministrator.orchestration.Requirements.checkPure(requirementInputs, candidate, checklist)
+            .count { it.verdict == com.hereliesaz.geministrator.orchestration.RequirementVerdict.Unmet }
+    }
+}
+
+/**
  * The plan for [inputs], made by [orchestrationRuntime] and, when [review] is set, read by the reviewer, reworked,
  * kept while it waits (with [planStore]) and put to the keeper through [confirmPlan]. Null when the keeper declines.
  * Without a review the planner's plan is returned as it is.
@@ -392,6 +419,9 @@ private suspend fun ApplicationRuntime.planAndDecide(
     var packet = inputs.packet
     var firstPlan = orchestrationRuntime.plan(packet)
     if (review == null) return ChosenPlan(firstPlan, null)
+    // A reviewed plan is raised from the queen's draft and two planners' (the parents), when the money rule allows the calls.
+    var parented: com.hereliesaz.geministrator.orchestration.ParentedPlan? = raisePlanFromParents(inputs, packet, orchestrationRuntime, firstPlan, review.first)
+    firstPlan = parented?.plan ?: firstPlan
     val proposed = firstPlan.steps.size
     var overrideTo: com.hereliesaz.geministrator.orchestration.PlanSizeChoice? = null
     while (true) {
@@ -419,6 +449,7 @@ private suspend fun ApplicationRuntime.planAndDecide(
             // The reviewer asks another Source than the planner's first, and is skipped (the checklist is the whole review) when the caps, a price or the room say so.
             plannerSource = { orchestrationRuntime.lastSourceId },
             reviewGate = { callsSoFar -> reviewGateFor(reviewer, callsSoFar) },
+            planningCalls = parented?.calls ?: 1,
         )
         val plan = outcome.plan
         val size = com.hereliesaz.geministrator.orchestration.PlanSizing.measure(inputs.objective, plan)
@@ -435,6 +466,7 @@ private suspend fun ApplicationRuntime.planAndDecide(
                 metByRules = ruleResults.count { it.verdict == com.hereliesaz.geministrator.orchestration.RequirementVerdict.Met },
                 suggestions = outcome.suggestions.size,
                 sizeLine = com.hereliesaz.geministrator.orchestration.PlanSizing.storyLine(proposed, overrideTo, plan.steps.size, size.bigForSmallGoal),
+                parentsLine = parented?.storyLine(),
             ),
             suggestions = outcome.suggestions,
         )
@@ -479,6 +511,8 @@ private suspend fun ApplicationRuntime.planAndDecide(
             reportLaunchProgress("Asking the planner again for ${if (choice == com.hereliesaz.geministrator.orchestration.PlanSizeChoice.One) "one creature" else "a swarm"}…")
             reportPlanningStage(planningStage(inputs, PlanningPhase.Planning, null, 0, role))
             firstPlan = orchestrationRuntime.plan(packet)
+            parented = raisePlanFromParents(inputs, packet, orchestrationRuntime, firstPlan, review.first)
+            firstPlan = parented?.plan ?: firstPlan
             continue
         }
         if (!start) {

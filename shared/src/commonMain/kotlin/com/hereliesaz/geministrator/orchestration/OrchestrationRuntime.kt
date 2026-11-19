@@ -35,6 +35,8 @@ data class OrchestrationPlanStep(
      * `upstream_artifacts` with `fromTasks`). Read leniently by [com.hereliesaz.geministrator.domain.TaskResources.fromJson].
      */
     val resources: List<kotlinx.serialization.json.JsonElement> = emptyList(),
+    /** Which parent drafts this step comes from, when the plan was merged from several (see [planFromParents]); empty otherwise. */
+    val parents: List<String> = emptyList(),
 )
 
 /** A template the planner may use: its id, title, input ports (required ones first) and what it may change. Not research text. */
@@ -86,6 +88,12 @@ interface OrchestrationAgentRuntime {
 
     /** The Source that answered the last call, when this runtime knows it (the reviewer prefers another); null otherwise. */
     val lastSourceId: String? get() = null
+
+    /**
+     * Other planners that answer from Sources other than this one's where more than one is linked, up to one for each
+     * [PlannerLens]; empty when there is no one else to ask (see [planFromParents]).
+     */
+    val planners: List<OrchestrationAgentRuntime> get() = emptyList()
 }
 
 object NoOrchestrationAgentRuntime : OrchestrationAgentRuntime {
