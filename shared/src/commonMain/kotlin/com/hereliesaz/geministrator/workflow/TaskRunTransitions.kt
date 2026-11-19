@@ -53,6 +53,8 @@ object TaskRunTransitions {
             TaskRunStatus.Completed,
             TaskRunStatus.Failed,
             TaskRunStatus.Retrying,
+            // A dispatched effectful step a restart left with no confirmed outcome (OUTCOME_UNCERTAIN).
+            TaskRunStatus.Escalated,
             TaskRunStatus.Cancelled,
         ),
         TaskRunStatus.Verifying to setOf(

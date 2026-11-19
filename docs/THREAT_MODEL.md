@@ -402,6 +402,7 @@ Every platform runs `NestedWorkflow` nodes through `WorkflowRunNestedWorkflowCli
 - A role can expose sensitive spreadsheet/database rows to a local or remote execution source.
 - Script-returned mutations can corrupt user-owned data if a surface is made writable.
 - Repeated remote-run reconciliation can replay non-idempotent writes.
+  Mitigated for effectful steps after a restart: a dispatched step that declares an effect and has no external run id is escalated as `OUTCOME_UNCERTAIN` for the keeper to retry or fail, never returned to Ready on its own. A crash inside the dispatch call, before Running is saved, is not covered.
 - Imported SQLite documents and network spreadsheets can be oversized or malformed.
 
 **Mitigations in place**

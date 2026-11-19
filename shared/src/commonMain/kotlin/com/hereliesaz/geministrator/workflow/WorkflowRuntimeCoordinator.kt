@@ -1825,15 +1825,16 @@ class WorkflowRuntimeCoordinator(
         }
     }
 
-    private fun blockUnavailableSystemExecutors(
+    private suspend fun blockUnavailableSystemExecutors(
         project: Project,
         definition: WorkflowDefinition,
         run: WorkflowRun,
         now: Long,
     ): WorkflowRun {
         val definitions = definition.tasks.associateBy { it.id }
+        var next = run
         var changed = false
-        val taskRuns = run.taskRuns.mapValues { (id, taskRun) ->
+        for ((id, taskRun) in run.taskRuns) {
             val executor = taskRun.executor ?: definitions[id]?.executor
             val blockable = taskRun.status in setOf(
                 TaskRunStatus.Ready,
@@ -1842,32 +1843,44 @@ class WorkflowRuntimeCoordinator(
                 TaskRunStatus.Verifying,
             )
             if (
-                blockable &&
-                remoteComputeCoordinator?.owns(taskRun) != true &&
-                executor != null &&
-                executor.isSystemExecutor() &&
-                !executorIntegrations.isAvailable(executor, project)
+                !blockable ||
+                remoteComputeCoordinator?.owns(taskRun) == true ||
+                executor == null ||
+                !executor.isSystemExecutor() ||
+                executorIntegrations.isAvailable(executor, project)
             ) {
-                TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Blocked)
-                changed = true
-                taskRun.copy(
-                    status = TaskRunStatus.Blocked,
-                    blockingReason = BlockingReason(
-                        WorkflowRunFactory.EXECUTOR_INTEGRATION_UNAVAILABLE,
-                        "${executor.displayLabel()} is not available in this runtime.",
-                    ),
-                    progress = null,
-                    progressMessage = null,
-                )
-            } else {
-                taskRun
+                continue
             }
+            val dispatched = taskRun.status == TaskRunStatus.Running || taskRun.status == TaskRunStatus.Verifying
+            if (dispatched && taskRun.externalRunId == null && definitions[id]?.isEffectfulStep() == true) {
+                // Dispatched, effectful, and nothing to ask about its outcome: returning it to Ready later would
+                // run the effect a second time. The keeper decides (retry or fail), knowing it may have happened.
+                val reason = "Outcome unknown after restart: ${executor.displayLabel()} was running " +
+                    "\"${definitions[id]?.name.orEmpty()}\" and its result was not recorded, so its effect " +
+                    "may or may not have happened. Check the target, then retry or fail this step."
+                next = engine.escalateOutcomeUncertain(next, id, reason, now)
+                ensureFailureEscalationGate(run = next, taskId = id, reason = reason, now = now)
+                changed = true
+                continue
+            }
+            TaskRunTransitions.requireAllowed(taskRun.status, TaskRunStatus.Blocked)
+            changed = true
+            next = next.copy(
+                taskRuns = next.taskRuns + (
+                    id to taskRun.copy(
+                        status = TaskRunStatus.Blocked,
+                        blockingReason = BlockingReason(
+                            WorkflowRunFactory.EXECUTOR_INTEGRATION_UNAVAILABLE,
+                            "${executor.displayLabel()} is not available in this runtime.",
+                        ),
+                        progress = null,
+                        progressMessage = null,
+                    )
+                ),
+                updatedAtEpochMillis = now,
+            )
         }
-        return if (changed) {
-            run.copy(taskRuns = taskRuns, updatedAtEpochMillis = now)
-        } else {
-            run
-        }
+        return if (changed) next.copy(updatedAtEpochMillis = now) else run
     }
 
     private fun TaskExecutor.displayLabel(): String = when (this) {
