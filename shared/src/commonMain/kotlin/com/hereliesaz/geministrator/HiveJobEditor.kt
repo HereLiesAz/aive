@@ -352,9 +352,13 @@ private val JOB_TIME_CHOICES: List<TimeLimit> =
 /** A label on the left and its control on the right. */
 @Composable
 private fun JobControlRow(label: String, control: @Composable () -> Unit) {
+    // The control is often wide (a pill with its own state); beside the label it squeezed the label to a
+    // letter a line in the docked panel, so the label sits above it and keeps its whole width.
     JobRow {
-        Text(label, style = AzphaltType.body, color = azphaltMutedOnSurface(), modifier = Modifier.weight(1f))
-        control()
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(label, style = AzphaltType.body, color = azphaltMutedOnSurface())
+            control()
+        }
     }
 }
 

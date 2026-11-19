@@ -4,6 +4,8 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.91 — from 2026-11-19
 
+- **Fix: a creature's Approval row no longer squeezes its label.** In the docked creature panel the Approval label shared a line with its wide pill and broke to "Appro / val" over a clipped row. The label now sits above the control. Seen in the desktop screenshot run (`27-shell-creature`).
+
 - **Change: on a wide window the live hive's own acts sit on the hive's controls bar.** Pause (Resume), Stop, Timeline, Share hive card and More editing were a row of pills above the hive; they are now round buttons beside Swarm, Centre and zoom, so the page is the title and the hive. Nothing was removed: the same acts, the same confirm on Stop, the same tour targets. A phone, and the Timeline view (where the hive is not on screen), keep the pill row. Looked at in the desktop screenshot run (`25-shell-hive`); not touch-tested.
 
 - **Harden: a run's event log is chained, so an edit made after the fact shows.** Each run's events are hashed in order (SHA-256 over the one before and the new event's text) and the store records the running count and tip as it writes. The Log tab's Run source reads them back: "Record intact: N events, none changed since they were written", or, in bold, that the record was changed after it was written and how many events were recorded against how many are there. Only the SQL store (Android and desktop) chains; the web's settings-backed store, in-memory stores and runs written before this say nothing. It is tamper-evidence, not proof: someone who can rewrite the whole store can rewrite the chain too, and `.ive` bundle export/import does not carry it yet. New `EventChainTest` (6). See docs/THREAT_MODEL.md.
