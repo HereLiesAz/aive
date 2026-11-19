@@ -38,7 +38,7 @@ class RunSignalsTest {
         taskDefinitionId = TaskDefinitionId(id),
         status = status,
         assignedRoleId = BuiltInRoles.ImplementationEngineer.id,
-        artifacts = List(artifacts) { ArtifactRef(ArtifactId("a$it"), ArtifactKind.Requirement, TaskRunId("run-$id"), "made") },
+        artifacts = List(artifacts) { ArtifactRef(ArtifactId("a$it"), ArtifactKind.Requirement, TaskRunId("run-$id"), "made", createdAtEpochMillis = 1L) },
     )
 
     private fun run(status: WorkflowRunStatus, vararg tasks: TaskRun) = WorkflowRun(
