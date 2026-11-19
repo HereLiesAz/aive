@@ -17,6 +17,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.domain.keeperName
 import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.resources.Res
@@ -170,6 +171,29 @@ internal fun TerrariumConnections(
             if (adding) TerrariumAddCreature(definition, roles, onEdit = { onEdit(it); adding = false })
             return@Column
         }
+        // The tapped creature's own acts (Detach, Hold output, Duplicate, Remove, Fed by, Feed it from) are on its card on the hive.
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { addPill() }
+        if (removeBlocked) {
+            Text(stringResource(Res.string.build_remove_blocked), style = AzphaltType.body, color = azphaltOnSurface())
+        }
+        if (adding) TerrariumAddCreature(definition, roles, onEdit = { onEdit(it); adding = false })
+    }
+}
+
+/**
+ * The tapped creature's own acts, on its card on the hive (WorkflowTerrarium.kt): Detach, Hold output,
+ * Duplicate, Remove, what feeds it (each cuttable, each knot turning) and what it could be fed by.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun TerrariumCreatureActions(
+    definition: WorkflowDefinition,
+    selected: TaskDefinition,
+    onEdit: (TerrariumDependencyEditResult) -> Unit,
+    removeBlocked: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         val names = definition.tasks.associate { it.id to it.name }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             AzphaltPill(
@@ -196,12 +220,10 @@ internal fun TerrariumConnections(
                     onClick = { onEdit(removeTerrariumCreatures(definition, setOf(selected.id))) },
                 )
             }
-            addPill()
         }
         if (removeBlocked) {
             Text(stringResource(Res.string.build_remove_blocked), style = AzphaltType.body, color = azphaltOnSurface())
         }
-        if (adding) TerrariumAddCreature(definition, roles, onEdit = { onEdit(it); adding = false })
         Text(stringResource(Res.string.build_fed_by, selected.name), style = AzphaltType.eyebrow, color = azphaltOnSurface())
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             selected.dependsOn.sortedBy { it.value }.forEach { upstream ->
@@ -229,7 +251,6 @@ internal fun TerrariumConnections(
                 )
             }
         }
-        // The job (objective, approval, tries, time, source) opens on the hive itself: WorkflowTerrarium draws it as a card on the tissue.
         val candidates = definition.tasks.filter { it.id != selected.id && it.id !in selected.dependsOn }
         if (candidates.isNotEmpty()) {
             Text(stringResource(Res.string.build_add_connection), style = AzphaltType.eyebrow, color = azphaltOnSurface())
