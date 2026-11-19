@@ -112,7 +112,8 @@ internal fun AgentTaskRequest.retrievalQuery(): String =
 /** The text content of the request's upstream artifacts, chunked. */
 object ArtifactChunkSource : ContextChunkSource {
     override suspend fun chunks(request: AgentTaskRequest): List<TextChunk> =
-        request.contextArtifacts.flatMap { artifact ->
+        // An UpstreamArtifacts resource narrows this to the named steps' runs; without one nothing is dropped.
+        request.contextArtifacts.filter { artifact -> request.resourceTaskRuns?.contains(artifact.taskRunId) ?: true }.flatMap { artifact ->
             val text = artifact.textContent ?: return@flatMap emptyList()
             chunkText(text).mapIndexed { i, part ->
                 TextChunk(

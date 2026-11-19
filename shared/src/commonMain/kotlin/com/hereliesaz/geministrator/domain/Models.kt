@@ -165,6 +165,8 @@ data class TaskDefinition(
      * kept on the step, and the run goes on (and can still complete). False for every older definition.
      */
     val optional: Boolean = false,
+    /** What the queen decided this creature works from (see [TaskResource]); empty for every older definition, which gets the context it always got. */
+    val resources: List<TaskResource> = emptyList(),
 )
 
 @Serializable

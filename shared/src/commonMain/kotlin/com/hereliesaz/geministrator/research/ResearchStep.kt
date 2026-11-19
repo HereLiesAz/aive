@@ -53,12 +53,31 @@ class ResearchStep(
     private val candidates: List<ResearchCandidate> = emptyList(),
     private val consent: McpConsentGate = McpConsentGate.DenyUnasked,
     private val budget: ResearchBudget = ResearchBudget(),
+    /** The app's own docs, read locally for any objective that bears on them; null reads none. Needs no consent. */
+    private val appDocs: AiveDocsResearch? = null,
 ) {
     /** True when there is something to consult, for [researchWanted]. */
     val lookupConfigured: Boolean get() = candidates.isNotEmpty()
 
+    /** The docs excerpts for [objective] within the local allowance; empty on a failure or a timeout. */
+    private suspend fun docsFor(objective: String): List<String> {
+        val reader = appDocs ?: return emptyList()
+        return try {
+            withTimeout(budget.wallClockMillis) { reader.excerpts(objective) }
+        } catch (_: TimeoutCancellationException) {
+            emptyList()
+        }
+    }
+
     suspend fun run(objective: String, context: ResearchContext, runKey: String): ResearchOutcome {
-        if (!researchWanted(objective, context.copy(lookupConfigured = context.lookupConfigured || lookupConfigured))) return ResearchOutcome.None
+        val docs = docsFor(objective)
+        if (!researchWanted(objective, context.copy(lookupConfigured = context.lookupConfigured || lookupConfigured))) {
+            return if (docs.isEmpty()) {
+                ResearchOutcome.None
+            } else {
+                ResearchOutcome(emptyList(), ResearchRecord(consulted = listOf(ResearchSource.AiveDocs)), docs)
+            }
+        }
         val leads = mutableListOf<ResearchLead>()
         val consulted = mutableListOf<ResearchSource>()
         val skipped = mutableListOf<ResearchSkip>()
@@ -126,7 +145,8 @@ class ResearchStep(
         }
         val kept = leads.toList()
         val offered = kept.toAvailableTools(budget).size
-        return ResearchOutcome(kept, ResearchRecord(consulted, skipped, offered, sent))
+        val looked = if (docs.isEmpty()) consulted.toList() else consulted + ResearchSource.AiveDocs
+        return ResearchOutcome(kept, ResearchRecord(looked, skipped, offered, sent), docs)
     }
 }
 

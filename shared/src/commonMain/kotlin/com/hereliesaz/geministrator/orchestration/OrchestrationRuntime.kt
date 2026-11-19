@@ -30,6 +30,11 @@ data class OrchestrationPlanStep(
      */
     val templateId: String? = null,
     val templateInputs: Map<String, String> = emptyMap(),
+    /**
+     * What this creature works from, as JSON objects (`{"kind": "aive_docs", "topics": [...]}`, `repository_files` with `paths`,
+     * `upstream_artifacts` with `fromTasks`). Read leniently by [com.hereliesaz.geministrator.domain.TaskResources.fromJson].
+     */
+    val resources: List<kotlinx.serialization.json.JsonElement> = emptyList(),
 )
 
 /** A template the planner may use: its id, title, input ports (required ones first) and what it may change. Not research text. */

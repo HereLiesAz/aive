@@ -239,6 +239,13 @@ fun planReviewPrompt(request: PlanReviewRequest): String = buildString {
         append(" | after ${step.dependsOn.joinToString(", ").ifEmpty { "nothing" }}")
         append(if (step.requiresHumanApproval) " | needs the keeper's approval" else "")
         append("\n  ").append(step.objective.trim())
+        request.plan.worksFromLine(step)?.let { append("\n  ").append(it) }
+    }
+    // Every plan: a step that needs facts about how the app works must list the app's docs among what it works from.
+    append("\n\nCheck: a step whose objective needs facts about how this app works (hives, the queen, roles, Sources, Messages, settings, ")
+    append("how to set up a swarm) must list the Aive's docs under \"Works from\". If one does not, object to that step and say so.")
+    request.plan.stepsMissingAiveDocs().takeIf { it.isNotEmpty() }?.let { missing ->
+        append(" Steps that look like this and list no docs: ").append(missing.joinToString(", ") { it.id }).append(".")
     }
 }
 

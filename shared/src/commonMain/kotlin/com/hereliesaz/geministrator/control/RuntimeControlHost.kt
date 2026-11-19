@@ -81,8 +81,8 @@ class RuntimeControlHost(
         private const val OBJECTIVE_MAX = 4_000
         private const val CRITERION_MAX = 500
         private const val STRING_CLIP = 4_000
-        private val SPEC_KEYS = setOf("id", "name", "objective", "kind", "roleId", "dependsOn", "acceptanceCriteria", "requiresHumanApproval", "label")
-        private val PATCH_KEYS = SPEC_KEYS - setOf("id", "kind")
+        private val SPEC_KEYS = setOf("id", "name", "objective", "kind", "roleId", "dependsOn", "acceptanceCriteria", "requiresHumanApproval", "label", "resources")
+        private val PATCH_KEYS = SPEC_KEYS - setOf("id", "kind", "resources")
         private val json = Json { encodeDefaults = true }
     }
 
@@ -614,6 +614,10 @@ class RuntimeControlHost(
                     dependsOn = deps,
                     acceptanceCriteria = criteria,
                     approvalPolicy = if (wantsApproval) ApprovalPolicy.HumanApproval else ApprovalPolicy.None,
+                    // What it works from (read-only here: listed in the hive's JSON by the app, not editable by patch yet).
+                    resources = com.hereliesaz.geministrator.domain.TaskResources.fromJson((spec["resources"] as? JsonArray)?.toList().orEmpty()) { written ->
+                        TaskDefinitionId(written).takeIf { written in taken || written in known }
+                    },
                 )
             }
             "approval" -> TaskDefinition(

@@ -30,6 +30,41 @@ val generateAppVersion = tasks.register("generateAppVersion") {
     }
 }
 
+/**
+ * Bundles the app's own written docs (README.md and docs/*.md) as read-only compose resources under
+ * files/aive-docs/, plus an index.txt of their names (resources cannot be listed at run time), so the queen can
+ * read how the app works (retrieval/AiveDocsChunkSource.kt). Generated on every build from the repository's files:
+ * there is no checked-in copy (the directory is git-ignored). Spaces in a file name become hyphens.
+ */
+val aiveDocsResourceDir: File = layout.projectDirectory.dir("src/commonMain/composeResources/files/aive-docs").asFile
+val bundleAiveDocs = tasks.register("bundleAiveDocs") {
+    val readme = rootProject.layout.projectDirectory.file("README.md").asFile
+    val docsDir = rootProject.layout.projectDirectory.dir("docs").asFile
+    val target = aiveDocsResourceDir
+    inputs.files(rootProject.fileTree("docs") { include("*.md") }).withPropertyName("aiveDocs")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    if (readme.isFile) inputs.file(readme).withPropertyName("aiveReadme")
+    outputs.dir(target)
+    outputs.cacheIf { false }
+    doLast {
+        target.deleteRecursively()
+        target.mkdirs()
+        val names = mutableListOf<String>()
+        if (readme.isFile) {
+            readme.copyTo(target.resolve("README.md"), overwrite = true)
+            names += "README.md"
+        }
+        val docs = docsDir.listFiles { f -> f.isFile && f.extension == "md" }.orEmpty().sortedBy { it.name }
+        if (docs.isNotEmpty()) target.resolve("docs").mkdirs()
+        docs.forEach { f ->
+            val safe = f.name.replace(' ', '-')
+            f.copyTo(target.resolve("docs/$safe"), overwrite = true)
+            names += "docs/$safe"
+        }
+        target.resolve("index.txt").writeText(names.joinToString("\n") + "\n")
+    }
+}
+
 /** Browser memory database worker (SQLite in OPFS); see memory-worker/memory.worker.js. */
 val memoryWorkerPackage: File = layout.projectDirectory.dir("memory-worker").asFile
 
@@ -171,6 +206,16 @@ tasks.whenTaskAdded(object : Action<Task> {
         }
     }
 })
+
+// Every task that reads the compose resources runs after the docs are bundled into them.
+tasks.configureEach {
+    val taskName = name
+    if (taskName != "bundleAiveDocs" &&
+        (taskName.contains("ComposeResources") || taskName.contains("ResourceAccessors") || taskName.contains("ValueResources"))
+    ) {
+        dependsOn(bundleAiveDocs)
+    }
+}
 
 // SuiteCountsInDocsTest reads the docs, so a docs edit must re-run the desktop tests instead of
 // being served from the up-to-date check or the build cache.
