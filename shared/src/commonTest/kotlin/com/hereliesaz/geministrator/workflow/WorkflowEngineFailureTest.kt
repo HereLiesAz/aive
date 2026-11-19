@@ -274,6 +274,57 @@ class WorkflowEngineFailureTest {
     }
 
     @Test
+    fun whenTheRunFailsWhatWaitedOnTheFailedTaskIsCancelledWithTheReason() = runBlocking {
+        val a = TaskDefinitionId("a")
+        val b = TaskDefinitionId("b")
+        val c = TaskDefinitionId("c")
+        val definition = WorkflowDefinition(
+            id = WorkflowDefinitionId("wf"),
+            name = "Workflow",
+            tasks = listOf(
+                TaskDefinition(id = a, name = "Build", objective = "Build", roleId = BuiltInRoles.ImplementationEngineer.id),
+                TaskDefinition(id = b, name = "Test", objective = "Test", roleId = BuiltInRoles.ImplementationEngineer.id, dependsOn = setOf(a)),
+                TaskDefinition(id = c, name = "Ship", objective = "Ship", roleId = BuiltInRoles.ImplementationEngineer.id, dependsOn = setOf(b)),
+            ),
+        )
+        val created = WorkflowRunFactory.create(
+            definition = definition,
+            workflowRunId = WorkflowRunId("run"),
+            projectId = ProjectId("project"),
+            objective = "Objective",
+            nowEpochMillis = 0L,
+            taskRunIdFactory = { id -> TaskRunId("run-${id.value}") },
+        )
+        val failed = created.copy(
+            taskRuns = created.taskRuns + (a to created.taskRuns.getValue(a).copy(status = TaskRunStatus.Failed)),
+        )
+        val events = InMemoryWorkflowEventSink()
+        val engine = WorkflowEngine(sessionGateway = NoOpGateway, roles = BuiltInRoles.all, eventSink = events)
+
+        val result = engine.handleFailure(
+            definition = definition,
+            run = failed,
+            taskDefinitionId = a,
+            retryReason = RetryReason.ProviderFailure,
+            reason = "build broke",
+            nowEpochMillis = 10L,
+            allowRetry = false,
+            allowReassign = false,
+        )
+
+        assertEquals(WorkflowRunStatus.Failed, result.status)
+        assertEquals(TaskRunStatus.Failed, result.taskRuns.getValue(a).status)
+        for (id in listOf(b, c)) {
+            val dependent = result.taskRuns.getValue(id)
+            assertEquals(TaskRunStatus.Cancelled, dependent.status, id.value)
+            assertEquals(WorkflowRunFactory.UPSTREAM_FAILED, dependent.blockingReason?.code, id.value)
+            assertTrue("Build" in dependent.blockingReason!!.message, dependent.blockingReason!!.message)
+        }
+        val cancelled = events.snapshot().filterIsInstance<com.hereliesaz.geministrator.events.TaskCancelled>().map { it.taskDefinitionId }
+        assertEquals(setOf(b, c), cancelled.toSet())
+    }
+
+    @Test
     fun aStepStoppedForItsAllowanceIsNotReassignedEither() = runBlocking {
         val taskId = TaskDefinitionId("implement")
         val definition = WorkflowDefinition(

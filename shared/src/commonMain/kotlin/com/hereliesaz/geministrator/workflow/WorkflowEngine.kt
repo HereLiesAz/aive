@@ -11,6 +11,7 @@ import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProviderConstraints
 import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.domain.requiresToolFilter
+import com.hereliesaz.geministrator.domain.TaskCondition
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.RetryReason
 import com.hereliesaz.geministrator.domain.RoleDefinition
@@ -1271,11 +1272,31 @@ class WorkflowEngine(
                     )
                 }
                 eventSink.append(WorkflowFailed(run.id, reason, nowEpochMillis))
+                // The run has ended: nothing more dispatches. What waited on the failed task (and had not started) can
+                // never run, so it ends Cancelled with the reason instead of reading Blocked forever. Failure handlers
+                // and any-outcome tasks keep their own conditions and are left as they are.
+                val waiting = downstreamOf(definition, taskDefinitionId)
+                val settled = run.taskRuns.mapValues { (id, other) ->
+                    if (id == taskDefinitionId) return@mapValues taskRun.copy(status = TaskRunStatus.Failed)
+                    val dependent = definition.tasks.firstOrNull { it.id == id }
+                    val neverStarted = other.status == TaskRunStatus.Blocked || other.status == TaskRunStatus.Created ||
+                        other.status == TaskRunStatus.Ready
+                    if (id in waiting && neverStarted && dependent?.condition is TaskCondition.Always) {
+                        eventSink.append(TaskCancelled(run.id, id, nowEpochMillis))
+                        other.copy(
+                            status = TaskRunStatus.Cancelled,
+                            blockingReason = BlockingReason(
+                                WorkflowRunFactory.UPSTREAM_FAILED,
+                                "Never ran: \"${task.name}\" failed, so the run ended.",
+                            ),
+                        )
+                    } else {
+                        other
+                    }
+                }
                 run.copy(
                     status = WorkflowRunStatus.Failed,
-                    taskRuns = run.taskRuns + (
-                        taskDefinitionId to taskRun.copy(status = TaskRunStatus.Failed)
-                    ),
+                    taskRuns = settled,
                     updatedAtEpochMillis = nowEpochMillis,
                 )
             }
@@ -1603,6 +1624,18 @@ class WorkflowEngine(
             }
         }
     }
+}
+
+/** Every task that depends on [failed], directly or through other tasks. */
+private fun downstreamOf(definition: WorkflowDefinition, failed: TaskDefinitionId): Set<TaskDefinitionId> {
+    val found = mutableSetOf<TaskDefinitionId>()
+    var frontier = setOf(failed)
+    while (frontier.isNotEmpty()) {
+        val next = definition.tasks.filter { t -> t.id !in found && t.dependsOn.any { it in frontier } }.map { it.id }.toSet()
+        found += next
+        frontier = next
+    }
+    return found
 }
 
 /**
