@@ -7,15 +7,15 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** What a finger does on the hive's ground: pan on empty ground, cut only from a strand, never lose the hive. */
+/** What a finger does on the hive's ground: one finger scrolls the page from empty ground, cuts only from a strand, never lose the hive. */
 class TerrariumPanTest {
     private val strand = listOf(Offset(0f, 100f), Offset(200f, 100f))
 
     @Test
-    fun aDragOnEmptyGroundPans() {
+    fun aOneFingerDragOnEmptyGroundScrollsThePage() {
         val onStrand = touchesStrand(Offset(100f, 300f), listOf(strand), 20f)
         assertFalse(onStrand)
-        assertEquals(CanvasDragIntent.Pan, canvasDragIntent(onStrand, sliceAvailable = true))
+        assertEquals(CanvasDragIntent.Scroll, canvasDragIntent(onStrand, sliceAvailable = true))
     }
 
     @Test
@@ -26,8 +26,8 @@ class TerrariumPanTest {
     }
 
     @Test
-    fun aStrandCannotBeCutInLiveSoTheDragPans() {
-        assertEquals(CanvasDragIntent.Pan, canvasDragIntent(startedOnStrand = true, sliceAvailable = false))
+    fun aStrandCannotBeCutInLiveSoTheDragScrollsThePage() {
+        assertEquals(CanvasDragIntent.Scroll, canvasDragIntent(startedOnStrand = true, sliceAvailable = false))
     }
 
     @Test

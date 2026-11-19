@@ -451,15 +451,16 @@ private fun MascotNodeTerrarium(
             Modifier
                 .fillMaxSize()
                 .pointerInput(Unit) {
-                    // One finger: on open ground it pans the camera; on a strand it cuts it (Build only).
-                    // Two fingers: pinch zooms (pinching out past the widest view surfaces to the district)
-                    // and the pair's drift pans. A strand is drawn from a creature's tail, not from here.
+                    // One finger: on open ground it is left unconsumed, so the page around the hive
+                    // scrolls; on a strand it cuts it (Build only). Two fingers move the hive: pinch
+                    // zooms (pinching out past the widest view surfaces to the district) and the pair's
+                    // drift pans. A strand is drawn from a creature's tail, not from here.
                     val slop = viewConfiguration.touchSlop
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
                         val intent = canvasDragIntentNow(down.position)
                         var travelled = Offset.Zero
-                        var mode: String? = null // null = not yet a drag, "pan", "slice", "pinch"
+                        var mode: String? = null // null = not yet a drag, "page", "slice", "pinch", "pan" (after a pinch)
                         var surfaced = false
                         var event0Multi = false
                         while (true) {
@@ -494,15 +495,11 @@ private fun MascotNodeTerrarium(
                             if (mode == null) {
                                 travelled += delta
                                 if (travelled.getDistance() <= slop) continue
-                                mode = if (intent == CanvasDragIntent.Slice) "slice" else "pan"
+                                mode = if (intent == CanvasDragIntent.Slice) "slice" else "page"
                                 if (mode == "slice") sliceTrail = listOf(down.position)
-                                if (mode == "pan") {
-                                    panningNow(true)
-                                    panByNow(travelled)
-                                    change.consume()
-                                    continue
-                                }
                             }
+                            // The page's scroll: not consumed, so the scrolling parent takes the drag.
+                            if (mode == "page") continue
                             if (mode == "slice") sliceTrail = sliceTrail + change.position else panByNow(delta)
                             change.consume()
                         }

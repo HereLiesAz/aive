@@ -279,7 +279,7 @@ The hive's camera follows the selection instead of asking you to zoom and pan (`
 7. **Whole chain**: all its ancestors and descendants.
 8. **Whole swarm**.
 
-**−** and the system Back step one view out; **+** steps back in through the views already passed. Selecting another creature starts again at Creature; tapping bare ground lets go of the selection and shows the whole hive. Creatures outside the view are dimmed, and the strands of its path are drawn in Yellow. A label by the control names the view (tap it to snap back to it). Pinching or dragging the ground moves the camera freely ("Free view") without changing the stack; stepping, or tapping the label, returns to the view. Drag empty ground to pan, pinch (or two fingers) to zoom and pan. A strand is cut by dragging across it (a drag that starts on a strand); a strand is drawn from a creature's tail.
+**−** and the system Back step one view out; **+** steps back in through the views already passed. Selecting another creature starts again at Creature; tapping bare ground lets go of the selection and shows the whole hive. Creatures outside the view are dimmed, and the strands of its path are drawn in Yellow. A label by the control names the view (tap it to snap back to it). Moving the ground with two fingers moves the camera freely ("Free view") without changing the stack; stepping, or tapping the label, returns to the view. The camera answers to two fingers only: pinch to zoom, drag the pair to pan. One finger on empty ground scrolls the page, so a hive on a long screen never traps a swipe. A strand is cut by dragging across it (a drag that starts on a strand); a strand is drawn from a creature's tail.
 
 ## The queen's suggestions (mid-run)
 
