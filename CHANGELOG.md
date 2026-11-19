@@ -4,6 +4,8 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.91 — from 2026-11-19
 
+- **Fix: creature names no longer collide with a neighbour's source badge.** Every creature wore an "Auto" badge above its head, and in a tight hive it landed on the next creature's name ("Implement" under "Auto"). The badge now shows on the tapped creature, and always for a Pinned source; "Auto" on the rest said nothing new. The source is still in the creature's panel and its description. Seen in the desktop screenshot run (`25-shell-hive`).
+
 - **Fix: a creature's Approval row no longer squeezes its label.** In the docked creature panel the Approval label shared a line with its wide pill and broke to "Appro / val" over a clipped row. The label now sits above the control. Seen in the desktop screenshot run (`27-shell-creature`).
 
 - **Change: on a wide window the live hive's own acts sit on the hive's controls bar.** Pause (Resume), Stop, Timeline, Share hive card and More editing were a row of pills above the hive; they are now round buttons beside Swarm, Centre and zoom, so the page is the title and the hive. Nothing was removed: the same acts, the same confirm on Stop, the same tour targets. A phone, and the Timeline view (where the hive is not on screen), keep the pill row. Looked at in the desktop screenshot run (`25-shell-hive`); not touch-tested.
