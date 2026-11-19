@@ -22,6 +22,15 @@ class ReviewRequirementTest {
     }
 
     @Test
+    fun theLaunchSwitchIsOrWithTheGoalsOwnWordsAndNeverOnByItself() {
+        // The switch in the launch form's options sets the flag; it also holds when the goal came from outside.
+        assertTrue(Requirements.extract(inputs("Write a brief.", review = true, external = true)).requiresReview)
+        assertTrue(Requirements.extract(inputs("Write a brief, it must be reviewed.", review = true)).requiresReview)
+        assertFalse(Requirements.extract(inputs("Write a brief.", review = false, external = true)).requiresReview)
+        assertFalse(RequirementInputs("x", false, aiveBuiltInRoles, emptySet()).requireReview)
+    }
+
+    @Test
     fun aReviewableStepNeedsACheckOfTheWorkAfterIt() {
         val goal = inputs("Write a brief.", review = true)
         val checklist = Requirements.extract(goal)

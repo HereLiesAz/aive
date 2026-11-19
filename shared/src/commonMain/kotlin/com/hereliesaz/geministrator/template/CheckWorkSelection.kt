@@ -24,6 +24,12 @@ sealed interface CheckWorkSelection {
     data class Refuse(val reason: String) : CheckWorkSelection
 
     companion object {
+        /** Kinds of work that are themselves a review: reviewing one never ends. */
+        private val REVIEW_KINDS = setOf(ArtifactKind.Review, ArtifactKind.Verification, ArtifactKind.HallMonitorReview)
+
+        /** The plain-words reason a review is not reviewed again. */
+        const val REVIEW_OF_REVIEW: String = "It is a review already. Reviewing a review never ends; read it instead."
+
         /** The four criteria any untemplated document is reviewed against. A model never invents criteria. */
         val GENERIC_CRITERIA: List<String> = listOf(
             "It answers what the task asked.",
@@ -44,6 +50,7 @@ sealed interface CheckWorkSelection {
             val effectful = template?.effectful == true || CHECKPOINT_COMMIT_METADATA_KEY in work.metadata ||
                 (template == null && work.kind == ArtifactKind.CodeChange)
             if (effectful) return Refuse("It is the result of a change in a tool or a repository, which a reviewer cannot see. Read it back instead.")
+            if (template == null && work.kind in REVIEW_KINDS) return Refuse(REVIEW_OF_REVIEW)
             val producible = template?.let { Producibles.forTemplate(it.id) }
             if (producible != null && !producible.reviewable) {
                 return Refuse(producible.notReviewableReason ?: "That kind of work is not reviewed.")

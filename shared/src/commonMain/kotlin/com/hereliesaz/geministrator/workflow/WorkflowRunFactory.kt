@@ -238,7 +238,17 @@ object WorkflowRunFactory {
             val mutationDenial = repositoryDenial ?: stepDenial
             // A step whose required input has no value stays held, with the reason in plain words.
             val missingInput = if (conditionMet) task.contract?.let(StepInstantiation::missingInputs).orEmpty() else emptyList()
+            // A check-work step whose work is an untemplated step's output that cannot be reviewed stays held, with the reason in plain words.
+            val checkRefusal = if (conditionMet && missingInput.isEmpty()) {
+                (CheckWorkWrap.decide(definition, run, task) as? CheckWorkWrapDecision.Refuse)?.reason
+            } else {
+                null
+            }
             when {
+                checkRefusal != null -> taskRun.copy(
+                    status = TaskRunStatus.Blocked,
+                    blockingReason = BlockingReason(code = CheckWorkWrap.CHECK_WORK_REFUSED, message = checkRefusal),
+                )
                 missingInput.isNotEmpty() -> taskRun.copy(
                     blockingReason = BlockingReason(
                         code = CONTRACT_INPUT_MISSING,

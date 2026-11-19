@@ -147,4 +147,6 @@
     <string name="keeper_advanced_data">Advanced: raw data export and import</string>
     <string name="keeper_advanced_a2a">Advanced: let other programs start swarms</string>
     <string name="memory_advanced">Advanced: engines, habits and tuning</string>
+    <string name="launch_review_every_result_on">Every result will be reviewed</string>
+    <string name="launch_review_every_result_off">Have every result reviewed</string>
 </resources>

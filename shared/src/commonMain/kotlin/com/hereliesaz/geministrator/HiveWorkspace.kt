@@ -255,7 +255,7 @@ internal fun feedLaunchesNow(status: WorkflowRunStatus): Boolean = status.isFini
 @Composable
 internal fun QueuedFeedLauncher(
     live: LiveWorkflowPresentation?,
-    onLaunchWorkflow: (String, String, com.hereliesaz.geministrator.domain.RepositoryRef?, List<WorkflowRunId>) -> Unit,
+    onLaunchWorkflow: (String, String, com.hereliesaz.geministrator.domain.RepositoryRef?, List<WorkflowRunId>, Boolean) -> Unit,
 ) {
     val due = queuedFeedDue(HiveFeedQueue.current, live?.run)
     // The run the queue was last fed for. The queue is only dropped once the launch is confirmed, i.e. the
@@ -265,7 +265,7 @@ internal fun QueuedFeedLauncher(
         val objective = due ?: return@LaunchedEffect
         val workflow = live ?: return@LaunchedEffect
         firedFor = workflow.run.id.value
-        onLaunchWorkflow(workflow.project.name, objective, workflow.project.repository, listOf(workflow.run.id))
+        onLaunchWorkflow(workflow.project.name, objective, workflow.project.repository, listOf(workflow.run.id), false)
     }
     androidx.compose.runtime.LaunchedEffect(live?.run?.id) {
         if (queuedFeedSettled(HiveFeedQueue.current, firedFor, live?.run)) {

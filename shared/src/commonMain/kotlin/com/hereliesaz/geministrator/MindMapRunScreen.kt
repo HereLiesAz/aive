@@ -120,6 +120,8 @@ import com.hereliesaz.geministrator.resources.overview_enter_name_and_objective
 import com.hereliesaz.geministrator.resources.overview_enter_objective
 import com.hereliesaz.geministrator.resources.overview_invalid_repository_location
 import com.hereliesaz.geministrator.resources.overview_options
+import com.hereliesaz.geministrator.resources.launch_review_every_result_off
+import com.hereliesaz.geministrator.resources.launch_review_every_result_on
 import com.hereliesaz.geministrator.resources.first_hive_options
 import com.hereliesaz.geministrator.resources.first_hive_connect_hint
 import com.hereliesaz.geministrator.resources.first_hive_connect
@@ -153,7 +155,7 @@ internal fun MindMapRunScreen(
     modifier: Modifier,
     selectedTaskId: String?,
     onTaskSelected: (String) -> Unit,
-    onLaunchWorkflow: (String, String, RepositoryRef?, List<WorkflowRunId>) -> Unit,
+    onLaunchWorkflow: (String, String, RepositoryRef?, List<WorkflowRunId>, Boolean) -> Unit,
     onLoadLaunchableRuns: suspend () -> List<LaunchableRun> = { emptyList() },
     projectFileService: ProjectFileService? = null,
     onImportProjectFile: suspend (String) -> String? = { null },
@@ -253,6 +255,11 @@ internal fun MindMapRunScreen(
     var optionsOpen by rememberDurableBooleanState(
         key = "overview.$draftScope.options-open",
         initialValue = existingRepository != null,
+    )
+    // Off by default; remembered with the draft like the fold itself. On: the plan's checklist holds R-review (Requirements).
+    var reviewEveryResult by rememberDurableBooleanState(
+        key = "overview.$draftScope.review-every-result",
+        initialValue = false,
     )
     var launchFieldsError by remember(runtimeState) { mutableStateOf<String?>(null) }
     var repositoryError by remember(runtimeState) { mutableStateOf<String?>(null) }
@@ -724,6 +731,13 @@ internal fun MindMapRunScreen(
                 AzphaltChildBand(visible = optionsOpen) {
                 if (firstLaunch) projectFields()
                 if (!repositoryGated) repositoryFields()
+                AzphaltToggle(
+                    stringResource(if (reviewEveryResult) Res.string.launch_review_every_result_on else Res.string.launch_review_every_result_off),
+                    "launch-review-every-result",
+                    selected = reviewEveryResult,
+                    onClick = { reviewEveryResult = !reviewEveryResult },
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 LaunchLineagePicker(
                     state = lineage,
                     runs = launchableRuns,
@@ -850,7 +864,7 @@ internal fun MindMapRunScreen(
                         if (locator.isEmpty()) {
                             repositoryError = null
                             objectiveHistory.record(objective)
-                            onLaunchWorkflow(name, objective.trim(), null, parents)
+                            onLaunchWorkflow(name, objective.trim(), null, parents, reviewEveryResult)
                         } else {
                             runCatching {
                                 parseRepositoryRef(
@@ -863,7 +877,7 @@ internal fun MindMapRunScreen(
                                     repositoryError = null
                                     objectiveHistory.record(objective)
                                     repositoryHistory.record(locator)
-                                    onLaunchWorkflow(name, objective.trim(), repository, parents)
+                                    onLaunchWorkflow(name, objective.trim(), repository, parents, reviewEveryResult)
                                 },
                                 onFailure = { failure ->
                                     repositoryError = failure.message ?: invalidRepositoryMessage
@@ -934,7 +948,7 @@ internal fun MindMapRunScreen(
                         HiveFeedBar(
                             run = run,
                             onLaunch = { objective ->
-                                onLaunchWorkflow(liveWorkflow.project.name, objective, liveWorkflow.project.repository, listOf(run.id))
+                                onLaunchWorkflow(liveWorkflow.project.name, objective, liveWorkflow.project.repository, listOf(run.id), false)
                             },
                             message = launchError,
                             onOpenConnections = onOpenSettings,
@@ -965,7 +979,7 @@ internal fun MindMapRunScreen(
                 runId = run.id,
                 parentObjective = run.objective,
                 onContinue = { continuation ->
-                    onLaunchWorkflow(liveWorkflow.project.name, continuation, liveWorkflow.project.repository, listOf(run.id))
+                    onLaunchWorkflow(liveWorkflow.project.name, continuation, liveWorkflow.project.repository, listOf(run.id), false)
                 },
             )
         }
