@@ -188,3 +188,5 @@ I shipped gesture and animation changes verified only by compiles and unit tests
 
 - For any change a person sees or touches: build the web app (`:webApp:wasmJsBrowserDistribution`, after publishing Conveyance and h2g2 to mavenLocal as CI does) or run the desktop app, drive it (Playwright; CDP `Input.dispatchTouchEvent` for multi-touch), and screenshot before and after.
 - "Not tried on a device" in a PR body is a task still to do, not a disclosure that finishes it.
+
+- **A new string resource needs its import.** Compose resources are imported one by one (`import ...resources.<name>`); adding the `<string>` to strings.xml and using `Res.string.<name>` fails with "Unresolved reference" until the import is added. Grep an existing `Res.string` name in the file and mirror it.
