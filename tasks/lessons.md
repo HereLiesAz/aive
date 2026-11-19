@@ -181,3 +181,10 @@ Rules:
 - A guard test is part of the contract: before adding strings or sources near one (here `NoPrewrittenCurriculumTest` for every `tour_*` string and the tour sources), read it and check each new string against its rules by hand, because CI is the only compiler and a red main starves every merge behind it.
 
 - A new test fixture must satisfy the type's own `init` rules before it is pushed (read the class, not just its constructor: `ArtifactRef` needs a `uri` or `textContent`). With no pull-request build, CI compiles but only main runs the tests, so a bad fixture is a red main.
+
+## Look at a UI change in the running app
+
+I shipped gesture and animation changes verified only by compiles and unit tests. The keeper said to use the PWA or the desktop app to see the change and try it.
+
+- For any change a person sees or touches: build the web app (`:webApp:wasmJsBrowserDistribution`, after publishing Conveyance and h2g2 to mavenLocal as CI does) or run the desktop app, drive it (Playwright; CDP `Input.dispatchTouchEvent` for multi-touch), and screenshot before and after.
+- "Not tried on a device" in a PR body is a task still to do, not a disclosure that finishes it.

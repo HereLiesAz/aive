@@ -409,7 +409,7 @@ internal fun RestingHive(
                 selected = sharing,
                 onClick = { sharing = !sharing },
             )
-            if (sharing) HiveCardSharePanel(current)
+            AzphaltChildBand(visible = sharing) { HiveCardSharePanel(current) }
         }
     }
 }

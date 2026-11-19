@@ -99,7 +99,7 @@ internal fun RunScars(
                 onClick = { allOpen = !allOpen },
             )
         }
-        if (allOpen) {
+        AzphaltChildBand(visible = allOpen) {
             Row(
                 modifier = Modifier.horizontalScroll(rememberScrollState()).padding(top = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
