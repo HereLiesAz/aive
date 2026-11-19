@@ -148,6 +148,20 @@ FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
 OTHER DEALINGS IN THE FONT SOFTWARE.
 ~~~
 
+## Linux runtime for CLI agents on Android (proot, fetched at build time; Termux bootstrap, downloaded at run time)
+
+Design reference: HG2Gui (github.com/HereLiesAz/HG2Gui, GPL-3.0, same author). No HG2Gui source is included in The Aive; only facts (release tag, URLs, hashes, package names, version pins) were reused, and the code is written separately. **Licensing question for the owner:** the bundled programs below are GPL/LGPL; they ship as separate executables in the APK's native libraries and are not linked into The Aive, but whether that is acceptable for each distribution is the owner's decision.
+
+| Component | Source | Licence | How it reaches the user |
+|---|---|---|---|
+| proot 5.1.107 (Termux build, with its loader) | packages.termux.dev, `proot_5.1.107.102_aarch64.deb`, SHA-256 `10a394b5...e030` | GPL-2.0-or-later | bundled in the APK (`libproot.so`, `libproot-loader.so`), fetched at build time by `androidApp/build.gradle.kts` |
+| libtalloc 2.5.0 | `libtalloc_2.5.0_aarch64.deb`, SHA-256 `556591f4...a5a7` | LGPL-3.0-or-later | bundled (`libtalloc.so`) |
+| libandroid-shmem 0.7 | `libandroid-shmem_0.7_aarch64.deb`, SHA-256 `0da3a24d...7ff6` | BSD-3-Clause | bundled |
+| Termux bootstrap `bootstrap-2026.08.16-r1+apt.android-7` (aarch64) and the Termux packages installed from it (bash, coreutils, apt, dpkg, git, node, ...) | github.com/termux/termux-packages releases; packages.termux.dev | GPL and others, per package | **downloaded at run time**, SHA-256 `ed83429f...e8f0`; not bundled |
+| The vendors' CLIs (npm or Termux packages) | npm registry / Termux repository | each vendor's own terms | downloaded when the keeper presses Install |
+
+The corresponding source of the bundled proot, libtalloc and libandroid-shmem is available from the Termux package repository (termux-packages, `packages/proot`, `packages/libtalloc`, `packages/libandroid-shmem`) and upstream (proot-me/proot, samba-team/talloc).
+
 ## Model weights (downloaded at run time, not bundled)
 
 | Model | Used for | License |
