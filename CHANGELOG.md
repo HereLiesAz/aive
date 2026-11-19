@@ -4,6 +4,8 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.91 — from 2026-11-19
 
+- **Change: in Edit, a tapped creature opens its job on the hive.** The objective, acceptance criteria, approval, tries, time allowed and where it runs were a long form of pills under the hive. They are now a card that rises from the foot of the tissue over the creature's field, scrolls if it is long, and edits the staged hive like before (undo and redo apply). The connection and creature actions (Rehearse, Cluster, Detach, Hold output, Duplicate, Remove, Add creature, Fed by, Feed it from, Delete swarm) stay below, unchanged. Seen in the desktop screenshot run (`2-hive-build`, phone size); not touch-tested, and on a short phone field the card hides the creature's lower body.
+
 - **Fix: creature names no longer collide with a neighbour's source badge.** Every creature wore an "Auto" badge above its head, and in a tight hive it landed on the next creature's name ("Implement" under "Auto"). The badge now shows on the tapped creature, and always for a Pinned source; "Auto" on the rest said nothing new. The source is still in the creature's panel and its description. Seen in the desktop screenshot run (`25-shell-hive`).
 
 - **Fix: a creature's Approval row no longer squeezes its label.** In the docked creature panel the Approval label shared a line with its wide pill and broke to "Appro / val" over a clipped row. The label now sits above the control. Seen in the desktop screenshot run (`27-shell-creature`).
