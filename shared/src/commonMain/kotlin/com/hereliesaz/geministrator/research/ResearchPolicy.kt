@@ -49,9 +49,6 @@ private fun namesAProduct(objective: String): Boolean {
 fun researchWanted(objective: String, context: ResearchContext = ResearchContext()): Boolean {
     val text = objective.trim()
     if (text.isEmpty()) return false
-    // The app teaching itself needs no directory: asking the keeper to let a lookup for "aive" leave the device, before their very
-    // first hive, is a question with no use (and a permission wall on the first screen).
-    if (com.hereliesaz.geministrator.intro.TutorialRouter.isTutorialGoal(text)) return false
     if (!(context.repositoryLinked || context.connectedServers > 0 || context.bridgeEnabled || context.lookupConfigured)) return false
     return TRIGGER.containsMatchIn(text) || namesAProduct(text)
 }
