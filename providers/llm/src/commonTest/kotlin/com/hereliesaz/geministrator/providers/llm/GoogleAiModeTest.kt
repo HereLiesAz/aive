@@ -91,6 +91,12 @@ class GoogleAiModeTest {
     }
 
     @Test
+    fun aQuestionTooLongForTheAddressIsRefusedNotCut() = runTest {
+        val e = assertFailsWith<GoogleAiModeUnavailable> { api(listOf("AI Mode")).generate("x".repeat(GoogleAiMode.MAX_QUESTION_CHARS + 1)) }
+        assertTrue("at most" in e.message.orEmpty())
+    }
+
+    @Test
     fun itNeverBillsAndNamesItself() {
         val api = api(listOf(""))
         assertFalse(api.billsPerToken)
