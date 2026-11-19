@@ -260,7 +260,7 @@ class ResearchTest {
                 },
             ),
         )
-        val out = step.run("teach me this app", ResearchContext(repositoryLinked = true, bridgeEnabled = true), "p")
+        val out = step.run("how do I integrate Stripe with this app", ResearchContext(repositoryLinked = true, bridgeEnabled = true), "p")
         assertEquals(listOf(ResearchSource.AppBridge), out.record.consulted)
         assertEquals(listOf(ResearchSkip(ResearchSource.Repository, ResearchSkipReason.Failed)), out.record.skipped)
         assertEquals(1, out.leads.size)
