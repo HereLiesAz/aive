@@ -186,10 +186,10 @@ object HostedLlmProviders {
      * last, after the keyless built-ins, for the same reason those do.
      */
     val entries: List<HostedLlmProviderSpec>
-        get() = builtInEntries + storeEntries() + a2aEntries()
+        get() = builtInEntries + storeEntries() + a2aEntries() + browserEntries()
 
     fun entry(id: String): HostedLlmProviderSpec? =
-        builtInById[id] ?: storeEntries().firstOrNull { it.id == id } ?: a2aEntries().firstOrNull { it.id == id }
+        builtInById[id] ?: storeEntries().firstOrNull { it.id == id } ?: a2aEntries().firstOrNull { it.id == id } ?: browserEntries().firstOrNull { it.id == id }
 
     /** Remote A2A agents connected by Agent Card; [baseUrl] is the card's URL (docs/A2A.md). */
     private fun a2aEntries(): List<HostedLlmProviderSpec> = A2aAgentConnections.all().map { agent ->
@@ -204,6 +204,22 @@ object HostedLlmProviders {
     }
 
     const val A2A_PROTOCOL = "a2a"
+
+    /** Gemini in Google Search through a browser view on the keeper's device ([GoogleAiMode]); chat only, never chosen automatically. */
+    const val GOOGLE_AI_MODE_PROTOCOL = "google-ai-mode"
+
+    /** Present only where the platform provides a browser view ([GoogleAiModeHost]). */
+    private fun browserEntries(): List<HostedLlmProviderSpec> =
+        if (GoogleAiModeHost.browser == null) emptyList() else listOf(
+            HostedLlmProviderSpec(
+                id = GoogleAiMode.ID,
+                displayName = "Google AI Mode",
+                baseUrl = "https://www.google.com/search",
+                defaultModel = "",
+                protocols = listOf(GOOGLE_AI_MODE_PROTOCOL),
+                keyOptional = true,
+            ),
+        )
 
     private fun storeEntries(): List<HostedLlmProviderSpec> = StoreLlmProviders.all().map { llm ->
         HostedLlmProviderSpec(
@@ -231,6 +247,16 @@ object HostedLlmProviders {
                 it.isEmpty() || it == ProviderCatalog.ANONYMOUS_CREDENTIAL
             },
         )
+        GOOGLE_AI_MODE_PROTOCOL in spec.protocols -> {
+            val browser = checkNotNull(GoogleAiModeHost.browser) { "Google AI Mode needs a browser view, which this device does not provide" }
+            val started = kotlin.time.TimeSource.Monotonic.markNow()
+            TextLlmProvider(
+                id = AgentProviderId(spec.id),
+                displayName = spec.displayName,
+                api = GoogleAiModeApi(browser, now = { started.elapsedNow().inWholeMilliseconds }),
+                tools = null,
+            )
+        }
         "moyai-session" in spec.protocols -> MoyaiProvider(
             id = AgentProviderId(spec.id),
             displayName = spec.displayName,

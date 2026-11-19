@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.providers.llm
 
 import kotlinx.coroutines.delay
+import kotlin.concurrent.Volatile
 
 /**
  * Gemini in Google Search ("AI Mode"), reached the way a person reaches it: the search page, in a browser view on the keeper's own
@@ -8,7 +9,10 @@ import kotlinx.coroutines.delay
  * one answer per question, no system prompt, no tools, no structured output. So it is a chat and research source, never a creature's model.
  */
 object GoogleAiMode {
-    const val ID = "google-ai-mode"
+    const val ID = com.hereliesaz.geministrator.ProviderCatalog.GOOGLE_AI_MODE_ID
+
+    /** The longest question the search page takes in its address; a longer one is refused rather than cut, so nothing is silently lost. */
+    const val MAX_QUESTION_CHARS = 1_800
 
     /** The page that shows the answer to [question] (`udm=50` is AI Mode). The question is percent-encoded; nothing else is added. */
     fun url(question: String): String = "https://www.google.com/search?udm=50&hl=en&q=" + percentEncode(question.trim())
@@ -99,6 +103,9 @@ class GoogleAiModeApi(
     override suspend fun generate(prompt: String): TextGenerationResult {
         val question = prompt.trim()
         require(question.isNotEmpty()) { "Google AI Mode needs a question" }
+        if (question.length > GoogleAiMode.MAX_QUESTION_CHARS) {
+            throw GoogleAiModeUnavailable("The question is ${question.length} characters; Google AI Mode takes at most ${GoogleAiMode.MAX_QUESTION_CHARS}.")
+        }
         val text = browser.withPage(GoogleAiMode.url(question)) { page ->
             val started = now()
             var last = ""
@@ -130,4 +137,13 @@ class GoogleAiModeApi(
         }
         return TextGenerationResult(text = text)
     }
+}
+
+/**
+ * The browser view this platform provides for Google AI Mode, or null where there is none (the Source then does not appear at all).
+ * Set once at start-up by the platform; read when the Sources list and the providers are built.
+ */
+object GoogleAiModeHost {
+    @Volatile
+    var browser: AiModeBrowser? = null
 }
