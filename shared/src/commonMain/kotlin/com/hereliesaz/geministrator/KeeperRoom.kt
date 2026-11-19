@@ -181,7 +181,10 @@ internal fun KeeperRoom(
 
     if (compact) {
         PlatformBackHandler(enabled = open) { open = false }
-        if (open) {
+        // The tapped part grows out of the list into the page and folds back into it on Back:
+        // h2g2's nest clock, so the part reads as opened from inside the room, not swapped in.
+        AzphaltNestSwap(open) { isOpen ->
+        if (isOpen) {
             // The breadcrumb's "Keeper's room" step, or Back, returns to the list.
             Column(modifier.fillMaxSize()) {
                 AppVersionLine(Modifier.padding(start = 16.dp, top = 8.dp, end = 16.dp))
@@ -199,6 +202,7 @@ internal fun KeeperRoom(
                     open = true
                 }
             }
+        }
         }
     } else {
         Column(modifier.fillMaxSize().padding(start = 28.dp, top = 27.dp, end = 28.dp, bottom = 40.dp)) {

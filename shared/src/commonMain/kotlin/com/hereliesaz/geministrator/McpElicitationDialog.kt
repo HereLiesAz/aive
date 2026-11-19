@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -99,12 +98,14 @@ private fun ElicitationFrame(
     body: @Composable () -> Unit,
 ) {
     MaterialTheme(colorScheme = GeministratorColors) {
+        val (growShape, grow) = rememberGrowFromPill()
         AlertDialog(
+            modifier = grow,
             onDismissRequest = onCancel,
             containerColor = Azphalt.Ink,
             titleContentColor = Azphalt.Ink.onOpposite(),
             textContentColor = Azphalt.Ink.onOpposite(),
-            shape = RoundedCornerShape(AzphaltShapes.dialogCorner),
+            shape = growShape,
             title = { Text(title, fontWeight = FontWeight.Black) },
             text = {
                 AzphaltThemedSurface(Azphalt.Ink) {

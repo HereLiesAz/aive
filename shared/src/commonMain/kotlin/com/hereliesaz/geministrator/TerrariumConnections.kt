@@ -308,7 +308,8 @@ private fun TerrariumAddCreature(
                 endCap = view.total.toString(),
                 onClick = { openGroups = if (open) openGroups - view.group.id else openGroups + view.group.id },
             )
-            if (open) {
+            // The group's steps grow out of its pill, one nest level in (h2g2 containment).
+            AzphaltChildBand(visible = open) {
                 val more = view.group.id in moreGroups
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     (if (more) view.shown + view.folded else view.shown).forEach { template ->

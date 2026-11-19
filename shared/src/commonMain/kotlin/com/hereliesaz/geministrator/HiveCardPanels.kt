@@ -154,60 +154,64 @@ internal fun HiveCardImportPanel(
             selected = open,
             onClick = { onOpenChange(!open) },
         )
-        if (!open) return@Column
-        Text(stringResource(Res.string.hive_card_import_explain), style = AzphaltType.body, color = azphaltOnSurface())
-        AzphaltTextField(
-            value = draft,
-            onValueChange = {
-                draft = it
-                result = null
-                failure = null
-            },
-            label = stringResource(Res.string.hive_card_label),
-            singleLine = false,
-        )
-        AzphaltPill(
-            label = stringResource(Res.string.hive_card_read),
-            seed = "hive-card-read",
-            tone = if (draft.isNotBlank() && result == null) PillTone.Primary else PillTone.Quiet,
-            onClick = { scope.launch { result = read() } },
-        )
-        when (val current = result) {
-            null -> Unit
-            is HiveCardImport.Refused -> Text(
-                hiveCardProblemText(current.problem),
-                style = AzphaltType.body,
-                color = azphaltOnSurface(),
-                modifier = Modifier.azphaltLiveRegion(),
-            )
-            is HiveCardImport.Ready -> {
-                HiveCardSummaryLines(current.summary)
-                AzphaltPill(
-                    label = stringResource(Res.string.hive_card_create),
-                    seed = "hive-card-create",
-                    tone = PillTone.Primary,
-                    onClick = {
-                        scope.launch {
-                            // Read again just before saving, so the new hive's id is still free.
-                            val fresh = read()
-                            val ready = fresh as? HiveCardImport.Ready
-                            if (ready == null || host == null) {
-                                result = fresh
-                                return@launch
-                            }
-                            runCatching { host.saveAuthored(ready.definition) }.fold(
-                                onSuccess = {
-                                    draft = ""
-                                    result = null
-                                    onOpenChange(false)
-                                    onCreated(it)
-                                },
-                                onFailure = { failure = it.message ?: getString(Res.string.hive_card_err_unreadable) },
-                            )
-                        }
+        // Grows out of the pill above it, on h2g2's nest clock: what the pill opens is inside it.
+        AzphaltChildBand(visible = open) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(Res.string.hive_card_import_explain), style = AzphaltType.body, color = azphaltOnSurface())
+                AzphaltTextField(
+                    value = draft,
+                    onValueChange = {
+                        draft = it
+                        result = null
+                        failure = null
                     },
+                    label = stringResource(Res.string.hive_card_label),
+                    singleLine = false,
                 )
-                failure?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface(), modifier = Modifier.azphaltLiveRegion()) }
+                AzphaltPill(
+                    label = stringResource(Res.string.hive_card_read),
+                    seed = "hive-card-read",
+                    tone = if (draft.isNotBlank() && result == null) PillTone.Primary else PillTone.Quiet,
+                    onClick = { scope.launch { result = read() } },
+                )
+                when (val current = result) {
+                    null -> Unit
+                    is HiveCardImport.Refused -> Text(
+                        hiveCardProblemText(current.problem),
+                        style = AzphaltType.body,
+                        color = azphaltOnSurface(),
+                        modifier = Modifier.azphaltLiveRegion(),
+                    )
+                    is HiveCardImport.Ready -> {
+                        HiveCardSummaryLines(current.summary)
+                        AzphaltPill(
+                            label = stringResource(Res.string.hive_card_create),
+                            seed = "hive-card-create",
+                            tone = PillTone.Primary,
+                            onClick = {
+                                scope.launch {
+                                    // Read again just before saving, so the new hive's id is still free.
+                                    val fresh = read()
+                                    val ready = fresh as? HiveCardImport.Ready
+                                    if (ready == null || host == null) {
+                                        result = fresh
+                                        return@launch
+                                    }
+                                    runCatching { host.saveAuthored(ready.definition) }.fold(
+                                        onSuccess = {
+                                            draft = ""
+                                            result = null
+                                            onOpenChange(false)
+                                            onCreated(it)
+                                        },
+                                        onFailure = { failure = it.message ?: getString(Res.string.hive_card_err_unreadable) },
+                                    )
+                                }
+                            },
+                        )
+                        failure?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface(), modifier = Modifier.azphaltLiveRegion()) }
+                    }
+                }
             }
         }
     }

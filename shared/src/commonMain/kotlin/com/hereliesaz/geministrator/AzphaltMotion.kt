@@ -8,12 +8,16 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
+import androidx.compose.animation.expandIn
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.shrinkOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -26,57 +30,12 @@ import kotlinx.coroutines.delay
 import kotlin.random.Random
 
 /**
- * HG2Gui-style stack arrivals. A stack chooses one entrance and its children inherit it; arrivals
- * may vary, but leaving remains consistent. This keeps the UI lively without making navigation
- * unpredictable.
+ * HG2Gui's stack arrivals, from h2g2 (one lottery for every HG2Gui app). A stack chooses one
+ * entrance and its children inherit it; arrivals vary, leaving stays the same.
  */
-internal enum class AzphaltEntrance(val weight: Int) {
-    Slide(4),
-    Unfold(3),
-    Drop(3),
-    Cascade(2),
-    Deal(2),
-    Telescope(2),
-    Split(1),
-    Rally(1),
-    Extend(2),
-    Unroll(2),
-    Tumble(2),
-    ;
+internal typealias AzphaltEntrance = com.hereliesaz.conveyance.h2g2.StackEntrance
 
-    companion object {
-        private var last: AzphaltEntrance? = null
-
-        fun roll(random: Random = Random.Default): AzphaltEntrance {
-            val pool = entries.filter { it != last }
-            var ticket = random.nextInt(pool.sumOf { it.weight })
-            for (candidate in pool) {
-                if (ticket < candidate.weight) {
-                    last = candidate
-                    return candidate
-                }
-                ticket -= candidate.weight
-            }
-            return pool.last().also { last = it }
-        }
-
-        fun childBand(random: Random = Random.Default): AzphaltEntrance {
-            val candidates = entries.filterNot { it == Unroll || it == Tumble }
-            val pool = candidates.filter { it != last }
-            var ticket = random.nextInt(pool.sumOf { it.weight })
-            for (candidate in pool) {
-                if (ticket < candidate.weight) {
-                    last = candidate
-                    return candidate
-                }
-                ticket -= candidate.weight
-            }
-            return pool.last().also { last = it }
-        }
-    }
-}
-
-private val HouseEase = CubicBezierEasing(0f, 0.9f, 0.1f, 1f)
+private val HouseEase = com.hereliesaz.conveyance.h2g2.H2g2Motion.Ease
 
 /** A composable modifier because each element owns its own arrival progress. */
 @Composable
@@ -94,8 +53,7 @@ internal fun Modifier.azphaltEntrance(
             return@LaunchedEffect
         }
         progress.snapTo(0f)
-        val interval = if (count > 6) 18L else 34L
-        delay(interval * index)
+        delay(com.hereliesaz.conveyance.h2g2.staggerDelayMs(index, count, com.hereliesaz.conveyance.h2g2.stackInterval(34, count)))
         progress.animateTo(1f, tween(durationMillis = 320, easing = HouseEase))
     }
     val p = progress.value
@@ -174,19 +132,29 @@ internal fun animatedRecordRadius(selected: Boolean): Dp {
     return radius
 }
 
-/** Child bands grow out of the record that owns them and collapse back into that same place. */
+/**
+ * A child band grows out of the record that owns it, from that record's own top-start corner on
+ * h2g2's nest clock, and collapses back into the same place: what belongs to the record is drawn
+ * inside it (h2g2 `Nest.kt`). Everything in the band is one nest level deeper, so a well inside it
+ * takes the next surface down (`nestSurface`) and its own bands go deeper still.
+ */
 @Composable
 internal fun AzphaltChildBand(
     visible: Boolean,
     content: @Composable () -> Unit,
 ) {
+    val ms = com.hereliesaz.conveyance.h2g2.NEST_MORPH_MS
+    val depth = com.hereliesaz.conveyance.h2g2.LocalNestDepth.current
     AnimatedVisibility(
         visible = visible,
         // Reduced motion: no growing or shrinking, just a quick fade.
-        enter = if (AzphaltMotion.reduceMotion) fadeIn(tween(80)) else expandVertically(animationSpec = tween(280, easing = HouseEase)) + fadeIn(tween(140)),
-        exit = if (AzphaltMotion.reduceMotion) fadeOut(tween(60)) else shrinkVertically(animationSpec = tween(240, easing = HouseEase)) + fadeOut(tween(110)),
+        enter = if (AzphaltMotion.reduceMotion) fadeIn(tween(80)) else expandIn(tween(ms, easing = HouseEase), expandFrom = Alignment.TopStart) + fadeIn(tween(ms / 2, delayMillis = ms / 3)),
+        exit = if (AzphaltMotion.reduceMotion) fadeOut(tween(60)) else shrinkOut(tween(ms, easing = HouseEase), shrinkTowards = Alignment.TopStart) + fadeOut(tween(ms / 3)),
     ) {
-        content()
+        // A column, so a band holding several children stacks them rather than overlapping them.
+        CompositionLocalProvider(com.hereliesaz.conveyance.h2g2.LocalNestDepth provides depth + 1) {
+            androidx.compose.foundation.layout.Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) { content() }
+        }
     }
 }
 
@@ -207,4 +175,71 @@ internal fun <T> AzphaltPlaceTransition(
     ) { state ->
         content(state)
     }
+}
+
+/**
+ * A card that arrives by growing out of a pill, h2g2's containment morph for a surface that opens
+ * on its own layer (a dialog, a menu): it starts as a capsule a fraction of its width and grows on
+ * the nest clock into a card of [openRadius], so it reads as the pill that was pressed opening up
+ * rather than a new window appearing. Returns the shape to clip the card to and a modifier for it.
+ */
+@Composable
+internal fun rememberGrowFromPill(openRadius: Dp = AzphaltShapes.dialogCorner): Pair<androidx.compose.ui.graphics.Shape, Modifier> {
+    val reduce = AzphaltMotion.reduceMotion
+    val grow = remember { Animatable(if (reduce) 1f else 0f) }
+    LaunchedEffect(reduce) {
+        if (reduce) grow.snapTo(1f) else grow.animateTo(1f, tween(com.hereliesaz.conveyance.h2g2.NEST_MORPH_MS, easing = HouseEase))
+    }
+    val p = grow.value
+    val shape = com.hereliesaz.conveyance.h2g2.NestMorphShape(p, openRadius)
+    val modifier = Modifier.graphicsLayer {
+        scaleX = 0.35f + 0.65f * p
+        scaleY = 0.2f + 0.8f * p
+        alpha = (p * 2f).coerceAtMost(1f)
+    }
+    return shape to modifier
+}
+
+/**
+ * Offers for a field (suggestions, recent entries) shown INSIDE the field's own band, growing out
+ * of it on the nest clock, instead of a popup floating over the page. Not focusable: the field
+ * keeps the keyboard while offers arrive.
+ */
+@Composable
+internal fun AzphaltOfferBand(visible: Boolean, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    AzphaltChildBand(visible = visible) {
+        androidx.compose.foundation.layout.Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(com.hereliesaz.conveyance.h2g2.nestSurface(com.hereliesaz.conveyance.h2g2.LocalNestDepth.current))
+                .background(AzphaltLiftedInk),
+            content = content,
+        )
+    }
+}
+
+/**
+ * A page that opens out of the one beneath it: going in, the new page grows from the top-start
+ * corner over the old on the nest clock; going back, it folds into the same corner. For places
+ * that cannot nest literally (a phone has room for one page), so the motion still says "inside".
+ */
+@OptIn(ExperimentalAnimationApi::class)
+@Composable
+internal fun AzphaltNestSwap(open: Boolean, modifier: Modifier = Modifier, content: @Composable (Boolean) -> Unit) {
+    val ms = com.hereliesaz.conveyance.h2g2.NEST_MORPH_MS
+    val reduce = AzphaltMotion.reduceMotion
+    AnimatedContent(
+        targetState = open,
+        modifier = modifier,
+        transitionSpec = {
+            if (reduce) {
+                fadeIn(tween(80)) togetherWith fadeOut(tween(60))
+            } else if (targetState) {
+                (expandIn(tween(ms, easing = HouseEase), expandFrom = Alignment.TopStart) + fadeIn(tween(ms / 2))) togetherWith fadeOut(tween(ms / 2))
+            } else {
+                fadeIn(tween(ms / 2)) togetherWith (shrinkOut(tween(ms, easing = HouseEase), shrinkTowards = Alignment.TopStart) + fadeOut(tween(ms)))
+            }.apply { targetContentZIndex = if (targetState) 1f else 0f }
+        },
+        label = "azphalt-nest-swap",
+    ) { state -> content(state) }
 }

@@ -164,37 +164,39 @@ internal fun LaunchLineagePicker(
                 )
             }
         }
-        if (state.mode == LaunchLineageMode.New) {
+        // Each mode's detail grows out of the mode pills above it (h2g2 nest clock).
+        AzphaltChildBand(visible = state.mode == LaunchLineageMode.New) {
             Text(
                 stringResource(Res.string.lineage_starts_a_new_line_of_work),
                 style = AzphaltType.body,
                 color = azphaltOnSurface(),
             )
-            return@Column
         }
-        Text(
-            if (state.mode == LaunchLineageMode.Continue) {
-                stringResource(Res.string.lineage_the_new_run_reads_the_chosen)
-            } else {
-                stringResource(Res.string.lineage_the_new_run_reads_every_chosen)
-            },
-            style = AzphaltType.body,
-            color = azphaltOnSurface(),
-        )
-        when {
-            runs == null -> Text(stringResource(Res.string.lineage_loading_runs), style = AzphaltType.body, color = azphaltOnSurface())
-            runs.isEmpty() -> Text(stringResource(Res.string.lineage_no_earlier_runs_yet), style = AzphaltType.body, color = azphaltOnSurface())
-            else -> runs.forEach { run ->
-                val order = state.selected.indexOf(run.id)
-                AzphaltRecord(
-                    seed = "lineage-${run.id.value}",
-                    eyebrow = "${run.projectName} · ${run.dateLabel}",
-                    title = run.workflowName,
-                    body = run.objective.take(80).let { if (run.objective.length > 80) "$it…" else it },
-                    endCap = if (order >= 0 && state.mode == LaunchLineageMode.Combine) "#${order + 1}" else run.status.name,
-                    selected = order >= 0,
-                    onClick = { onStateChange(state.toggle(run.id)) },
-                )
+        AzphaltChildBand(visible = state.mode != LaunchLineageMode.New) {
+            Text(
+                if (state.mode == LaunchLineageMode.Continue) {
+                    stringResource(Res.string.lineage_the_new_run_reads_the_chosen)
+                } else {
+                    stringResource(Res.string.lineage_the_new_run_reads_every_chosen)
+                },
+                style = AzphaltType.body,
+                color = azphaltOnSurface(),
+            )
+            when {
+                runs == null -> Text(stringResource(Res.string.lineage_loading_runs), style = AzphaltType.body, color = azphaltOnSurface())
+                runs.isEmpty() -> Text(stringResource(Res.string.lineage_no_earlier_runs_yet), style = AzphaltType.body, color = azphaltOnSurface())
+                else -> runs.forEach { run ->
+                    val order = state.selected.indexOf(run.id)
+                    AzphaltRecord(
+                        seed = "lineage-${run.id.value}",
+                        eyebrow = "${run.projectName} · ${run.dateLabel}",
+                        title = run.workflowName,
+                        body = run.objective.take(80).let { if (run.objective.length > 80) "$it…" else it },
+                        endCap = if (order >= 0 && state.mode == LaunchLineageMode.Combine) "#${order + 1}" else run.status.name,
+                        selected = order >= 0,
+                        onClick = { onStateChange(state.toggle(run.id)) },
+                    )
+                }
             }
         }
     }
@@ -221,46 +223,50 @@ internal fun ContinueRunPanel(
             onClick = { open = !open; error = null },
             modifier = Modifier.fillMaxWidth(),
         )
-        if (!open) return@Column
-        Text(
-            stringResource(Res.string.lineage_a_new_run_that_reads_this),
-            style = AzphaltType.body,
-            color = azphaltOnSurface(),
-        )
-        PromptSuggestBox(
-            kind = PromptKind.Objective,
-            value = objective,
-            onValueChange = { objective = it; error = null },
-            modifier = Modifier.fillMaxWidth(),
-            seed = PromptSuggestions.continueObjective(parentObjective),
-            onSeeded = { objective = it },
-            resetKey = runId,
-        ) { field ->
-            OutlinedTextField(
-                value = field.value,
-                onValueChange = field.onValueChange,
-                label = { Text(stringResource(Res.string.lineage_next_objective)) },
-                minLines = 2,
-                modifier = Modifier.fillMaxWidth().then(field.modifier),
-            )
-        }
-        AzphaltPill(
-            label = stringResource(Res.string.lineage_start_continuation),
-            seed = "continue-run-start",
-            selected = objective.isNotBlank(),
-            onClick = {
-                if (objective.isBlank()) {
-                    error = "Enter an objective to continue this run."
-                } else {
-                    objectiveHistory.record(objective)
-                    onContinue(objective.trim())
-                    open = false
-                    objective = ""
+        // Grows out of the pill above it, on h2g2's nest clock: what the pill opens is inside it.
+        AzphaltChildBand(visible = open) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    stringResource(Res.string.lineage_a_new_run_that_reads_this),
+                    style = AzphaltType.body,
+                    color = azphaltOnSurface(),
+                )
+                PromptSuggestBox(
+                    kind = PromptKind.Objective,
+                    value = objective,
+                    onValueChange = { objective = it; error = null },
+                    modifier = Modifier.fillMaxWidth(),
+                    seed = PromptSuggestions.continueObjective(parentObjective),
+                    onSeeded = { objective = it },
+                    resetKey = runId,
+                ) { field ->
+                    OutlinedTextField(
+                        value = field.value,
+                        onValueChange = field.onValueChange,
+                        label = { Text(stringResource(Res.string.lineage_next_objective)) },
+                        minLines = 2,
+                        modifier = Modifier.fillMaxWidth().then(field.modifier),
+                    )
                 }
-            },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        error?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface()) }
+                AzphaltPill(
+                    label = stringResource(Res.string.lineage_start_continuation),
+                    seed = "continue-run-start",
+                    selected = objective.isNotBlank(),
+                    onClick = {
+                        if (objective.isBlank()) {
+                            error = "Enter an objective to continue this run."
+                        } else {
+                            objectiveHistory.record(objective)
+                            onContinue(objective.trim())
+                            open = false
+                            objective = ""
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                error?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface()) }
+            }
+        }
     }
 }
 
@@ -309,87 +315,91 @@ internal fun RerunFromTaskPanel(
             onClick = { open = !open; error = null },
             modifier = Modifier.fillMaxWidth(),
         )
-        if (!open) return@Column
-        Text(stringResource(Res.string.lineage_rerun_hint), style = AzphaltType.body, color = azphaltOnSurface())
-        if (output != null) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AzphaltPill(
-                    label = stringResource(Res.string.lineage_rerun_change_objective),
-                    seed = "rerun-objective-$key",
-                    selected = !changingOutput,
-                    onClick = { changingOutput = false; error = null },
-                    modifier = Modifier.weight(1f),
-                )
-                AzphaltPill(
-                    label = stringResource(Res.string.lineage_rerun_change_output),
-                    seed = "rerun-output-$key",
-                    selected = changingOutput,
-                    onClick = { changingOutput = true; error = null },
-                    modifier = Modifier.weight(1f),
-                )
+        // Grows out of the pill above it, on h2g2's nest clock: what the pill opens is inside it.
+        AzphaltChildBand(visible = open) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(Res.string.lineage_rerun_hint), style = AzphaltType.body, color = azphaltOnSurface())
+                if (output != null) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AzphaltPill(
+                            label = stringResource(Res.string.lineage_rerun_change_objective),
+                            seed = "rerun-objective-$key",
+                            selected = !changingOutput,
+                            onClick = { changingOutput = false; error = null },
+                            modifier = Modifier.weight(1f),
+                        )
+                        AzphaltPill(
+                            label = stringResource(Res.string.lineage_rerun_change_output),
+                            seed = "rerun-output-$key",
+                            selected = changingOutput,
+                            onClick = { changingOutput = true; error = null },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+                if (changingOutput && output != null) {
+                    Text(stringResource(Res.string.lineage_rerun_output_hint), style = AzphaltType.body, color = azphaltOnSurface())
+                    OutlinedTextField(
+                        value = outputDraft,
+                        onValueChange = { outputDraft = it; error = null },
+                        label = { Text(stringResource(Res.string.lineage_rerun_output)) },
+                        minLines = 3,
+                        enabled = !working,
+                        colors = azphaltTextFieldColors(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    AzphaltPill(
+                        label = stringResource(Res.string.lineage_rerun_start_following),
+                        seed = "rerun-following-start-$key",
+                        tone = PillTone.Primary,
+                        onClick = {
+                            if (outputDraft.isBlank()) {
+                                error = outputRequired
+                            } else {
+                                submit(TaskRerunRequest(taskId, replacementOutput = outputDraft))
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
+                    // The step's own objective is already in the field. A step that stopped offers one choice: its
+                    // objective with "Retry with: <why it stopped>" added. Earlier hive goals are not offered here.
+                    val retryLine = PromptSuggestions.retryReason(failure)?.let { stringResource(Res.string.prompt_retry_with, it) }
+                    PromptSuggestBox(
+                        kind = PromptKind.Objective,
+                        value = objectiveDraft,
+                        onValueChange = { objectiveDraft = it; error = null },
+                        modifier = Modifier.fillMaxWidth(),
+                        choices = listOfNotNull(retryLine?.let { PromptChoice(it, objectiveDraft.trimEnd() + "\n\n" + it) }),
+                        resetKey = key,
+                        entryFilter = { false },
+                    ) { field ->
+                        OutlinedTextField(
+                            value = field.value,
+                            onValueChange = field.onValueChange,
+                            label = { Text(stringResource(Res.string.lineage_rerun_objective)) },
+                            minLines = 2,
+                            enabled = !working,
+                            colors = azphaltTextFieldColors(),
+                            modifier = Modifier.fillMaxWidth().then(field.modifier),
+                        )
+                    }
+                    AzphaltPill(
+                        label = stringResource(Res.string.lineage_rerun_start),
+                        seed = "rerun-start-$key",
+                        tone = PillTone.Primary,
+                        onClick = {
+                            if (objectiveDraft.isBlank()) {
+                                error = objectiveRequired
+                            } else {
+                                submit(TaskRerunRequest(taskId, editedObjective = objectiveDraft.trim()))
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                error?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface(), modifier = Modifier.azphaltLiveRegion()) }
             }
         }
-        if (changingOutput && output != null) {
-            Text(stringResource(Res.string.lineage_rerun_output_hint), style = AzphaltType.body, color = azphaltOnSurface())
-            OutlinedTextField(
-                value = outputDraft,
-                onValueChange = { outputDraft = it; error = null },
-                label = { Text(stringResource(Res.string.lineage_rerun_output)) },
-                minLines = 3,
-                enabled = !working,
-                colors = azphaltTextFieldColors(),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            AzphaltPill(
-                label = stringResource(Res.string.lineage_rerun_start_following),
-                seed = "rerun-following-start-$key",
-                tone = PillTone.Primary,
-                onClick = {
-                    if (outputDraft.isBlank()) {
-                        error = outputRequired
-                    } else {
-                        submit(TaskRerunRequest(taskId, replacementOutput = outputDraft))
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        } else {
-            // The step's own objective is already in the field. A step that stopped offers one choice: its
-            // objective with "Retry with: <why it stopped>" added. Earlier hive goals are not offered here.
-            val retryLine = PromptSuggestions.retryReason(failure)?.let { stringResource(Res.string.prompt_retry_with, it) }
-            PromptSuggestBox(
-                kind = PromptKind.Objective,
-                value = objectiveDraft,
-                onValueChange = { objectiveDraft = it; error = null },
-                modifier = Modifier.fillMaxWidth(),
-                choices = listOfNotNull(retryLine?.let { PromptChoice(it, objectiveDraft.trimEnd() + "\n\n" + it) }),
-                resetKey = key,
-                entryFilter = { false },
-            ) { field ->
-                OutlinedTextField(
-                    value = field.value,
-                    onValueChange = field.onValueChange,
-                    label = { Text(stringResource(Res.string.lineage_rerun_objective)) },
-                    minLines = 2,
-                    enabled = !working,
-                    colors = azphaltTextFieldColors(),
-                    modifier = Modifier.fillMaxWidth().then(field.modifier),
-                )
-            }
-            AzphaltPill(
-                label = stringResource(Res.string.lineage_rerun_start),
-                seed = "rerun-start-$key",
-                tone = PillTone.Primary,
-                onClick = {
-                    if (objectiveDraft.isBlank()) {
-                        error = objectiveRequired
-                    } else {
-                        submit(TaskRerunRequest(taskId, editedObjective = objectiveDraft.trim()))
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        error?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface(), modifier = Modifier.azphaltLiveRegion()) }
     }
 }

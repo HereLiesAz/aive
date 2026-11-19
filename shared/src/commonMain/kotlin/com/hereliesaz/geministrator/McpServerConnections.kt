@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -364,12 +363,14 @@ internal fun McpConsentDialog(
     val current = request ?: return
     if (hidden) return
     MaterialTheme(colorScheme = GeministratorColors) {
+        val (growShape, grow) = rememberGrowFromPill()
         AlertDialog(
+            modifier = grow,
             onDismissRequest = { gate.answer(McpConsentDecision.Deny) },
             containerColor = Azphalt.Ink,
             titleContentColor = Azphalt.Ink.onOpposite(),
             textContentColor = Azphalt.Ink.onOpposite(),
-            shape = RoundedCornerShape(AzphaltShapes.dialogCorner),
+            shape = growShape,
             title = { Text(stringResource(Res.string.mcp_consent_title, current.serverName), fontWeight = FontWeight.Black) },
             text = {
                 Column {

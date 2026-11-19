@@ -18,9 +18,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -261,17 +259,25 @@ internal fun NewHiveTray(
                 RoleCard(role, suggested = false, onPreview = { previewing = role }, onAdd = { add(role) })
             }
         }
-    }
-    previewing?.let { role ->
-        RolePreviewSheet(
-            role = role,
-            suggestion = suggestions.firstOrNull { it.role.id == role.id },
-            onAdd = {
-                previewing = null
-                add(role)
-            },
-            onClose = { previewing = null },
-        )
+        // The preview grows out of the tray that holds the role, inside it, not a sheet over the page
+        // (h2g2 containment). Closing never adds.
+        AzphaltChildBand(visible = previewing != null) {
+            previewing?.let { role ->
+                RolePreviewContent(
+                    role = role,
+                    suggestion = suggestions.firstOrNull { it.role.id == role.id },
+                    onAdd = {
+                        previewing = null
+                        add(role)
+                    },
+                    onClose = { previewing = null },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 520.dp)
+                        .clip(com.hereliesaz.conveyance.h2g2.nestSurface(com.hereliesaz.conveyance.h2g2.LocalNestDepth.current)),
+                )
+            }
+        }
     }
 }
 
@@ -283,20 +289,6 @@ private fun TrayHeading(text: String) {
         color = azphaltOnSurface(),
         modifier = Modifier.semantics { heading() },
     )
-}
-
-/** The preview as a bottom sheet, as the compact creature panel is. Closing never adds. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun RolePreviewSheet(role: RoleDefinition, suggestion: RoleSuggestion?, onAdd: () -> Unit, onClose: () -> Unit) {
-    ModalBottomSheet(
-        onDismissRequest = onClose,
-        containerColor = Azphalt.Ink,
-        contentColor = Azphalt.Ink.onOpposite(),
-        dragHandle = { BottomSheetDefaults.DragHandle(color = Azphalt.Ink.mutedOnOpposite()) },
-    ) {
-        RolePreviewContent(role, suggestion, onAdd, onClose, Modifier.fillMaxWidth())
-    }
 }
 
 /** What a role is, does and connects to, with **Add to hive** and **Close**. */
