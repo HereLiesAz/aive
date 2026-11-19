@@ -89,7 +89,7 @@ internal object TutorialLaunch {
             surface = TourControllerSurface,
             facts = facts(rows, opened = opening.isNotEmpty()),
             opening = opening,
-            closing = closing,
+            closingChapters = closing,
             loadComfort = { store.load() },
             saveComfort = { store.save(it) },
             nowMillis = nowMillis,

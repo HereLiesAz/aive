@@ -62,7 +62,11 @@ class GoogleAiModeTest {
     private fun api(pages: List<String>, clock: LongArray = longArrayOf(0L)): GoogleAiModeApi {
         var i = 0
         val browser = object : AiModeBrowser {
-            override suspend fun <T> withPage(url: String, read: suspend (AiModePage) -> T): T = read { pages[minOf(i++, pages.lastIndex)] }
+            override suspend fun <T> withPage(url: String, read: suspend (AiModePage) -> T): T = read(
+                object : AiModePage {
+                    override suspend fun text(): String = pages[minOf(i++, pages.lastIndex)]
+                },
+            )
         }
         return GoogleAiModeApi(browser, now = { clock[0] }, pause = { clock[0] += it })
     }

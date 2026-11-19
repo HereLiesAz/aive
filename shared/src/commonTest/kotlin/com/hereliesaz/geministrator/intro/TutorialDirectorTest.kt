@@ -63,7 +63,7 @@ class TutorialDirectorTest {
         opening: List<LessonPayload> = emptyList(),
         closing: List<LessonPayload> = emptyList(),
         tick: suspend () -> Unit,
-    ) = TutorialDirector(planner, reviewers, w, rows, { "somewhere" }, surface, saveComfort = save, nowMillis = clock, level = level, say = say, opening = opening, closing = closing, tick = tick)
+    ) = TutorialDirector(planner, reviewers, w, rows, { "somewhere" }, surface, saveComfort = save, nowMillis = clock, level = level, say = say, opening = opening, closingChapters = closing, tick = tick)
 
     /** The keeper's side of a quick walk: answer any open question with [answer], else go on to the next step. */
     private fun walk(surface: FakeSurface, answer: CheckInReply = CheckInReply.Yes) {
