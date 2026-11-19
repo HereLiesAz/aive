@@ -152,8 +152,45 @@ sqldelight {
     }
 }
 
+// The app's own written docs (README.md and the top-level docs folder's .md files), copied at build time into a generated
+// compose-resources root under files/aive-docs/ with an index.txt of their names (resources cannot be listed at run time), so
+// the queen can read how the app works (retrieval/AiveDocsChunkSource.kt). There is no checked-in copy. The directory is wired
+// through compose.resources.customDirectory with the task as its provider, so every resource task depends on it by itself.
+val aiveDocsResourcesRoot = layout.buildDirectory.dir("generated/aiveDocs/composeResources")
+val bundleAiveDocs = tasks.register("bundleAiveDocs") {
+    val readme = rootProject.layout.projectDirectory.file("README.md").asFile
+    val docsDir = rootProject.layout.projectDirectory.dir("docs").asFile
+    val rootDir = aiveDocsResourcesRoot
+    inputs.files(rootProject.fileTree("docs") { include("*.md") }).withPropertyName("aiveDocs")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    if (readme.isFile) inputs.file(readme).withPropertyName("aiveReadme")
+    outputs.dir(rootDir)
+    doLast {
+        val target = rootDir.get().asFile.resolve("files/aive-docs")
+        target.deleteRecursively()
+        target.mkdirs()
+        val names = mutableListOf<String>()
+        if (readme.isFile) {
+            readme.copyTo(target.resolve("README.md"), overwrite = true)
+            names += "README.md"
+        }
+        val docs = docsDir.listFiles { f -> f.isFile && f.extension == "md" }.orEmpty().sortedBy { it.name }
+        if (docs.isNotEmpty()) target.resolve("docs").mkdirs()
+        docs.forEach { f ->
+            val safe = f.name.replace(' ', '-')
+            f.copyTo(target.resolve("docs/$safe"), overwrite = true)
+            names += "docs/$safe"
+        }
+        target.resolve("index.txt").writeText(names.joinToString("\n") + "\n")
+    }
+}
+
 compose.resources {
     packageOfResClass = "com.hereliesaz.geministrator.resources"
+    customDirectory(
+        sourceSetName = "commonMain",
+        directoryProvider = bundleAiveDocs.map { aiveDocsResourcesRoot.get() },
+    )
 }
 
 // The compose-resource pipeline tasks must never be restored from build cache: stale entries
