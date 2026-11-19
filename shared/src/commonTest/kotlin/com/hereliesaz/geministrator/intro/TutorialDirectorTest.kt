@@ -61,8 +61,9 @@ class TutorialDirectorTest {
         level: () -> QueenLevel = { QueenLevel.Quiet },
         say: (TutorialSay) -> Unit = {},
         opening: List<LessonPayload> = emptyList(),
+        closing: List<LessonPayload> = emptyList(),
         tick: suspend () -> Unit,
-    ) = TutorialDirector(planner, reviewers, w, rows, { "somewhere" }, surface, saveComfort = save, nowMillis = clock, level = level, say = say, opening = opening, tick = tick)
+    ) = TutorialDirector(planner, reviewers, w, rows, { "somewhere" }, surface, saveComfort = save, nowMillis = clock, level = level, say = say, opening = opening, closing = closing, tick = tick)
 
     /** The keeper's side of a quick walk: answer any open question with [answer], else go on to the next step. */
     private fun walk(surface: FakeSurface, answer: CheckInReply = CheckInReply.Yes) {
@@ -103,6 +104,21 @@ class TutorialDirectorTest {
         }.run("goal", TutorialScope.Focused, null)
         // The two fixed chapters come first, then the two the swarm planned; the tour is one run of four.
         assertEquals(listOf("R1", "R2", "R1", "R2"), surface.state!!.lessons.map { it.target })
+        assertEquals(4, surface.state!!.stepTotal)
+        assertIs<TutorialOutcome.Ended>(outcome)
+        assertEquals(true, outcome.finished)
+    }
+
+    @Test
+    fun theClosingChapterComesLastOnceThePlannedOnesAreWritten() = runTest {
+        val surface = FakeSurface()
+        val outcome = director(
+            surface,
+            QueenModel { planOf(2) },
+            opening = listOf(openingLesson("R1")),
+            closing = listOf(openingLesson("R6")),
+        ) { walk(surface) }.run("goal", TutorialScope.Focused, null)
+        assertEquals(listOf("R1", "R1", "R2", "R6"), surface.state!!.lessons.map { it.target })
         assertEquals(4, surface.state!!.stepTotal)
         assertIs<TutorialOutcome.Ended>(outcome)
         assertEquals(true, outcome.finished)

@@ -542,6 +542,7 @@ fun App(
                     level = { active?.queenLevelNow() ?: com.hereliesaz.geministrator.queen.QueenLevel.Quiet },
                     say = { line -> scope.launch { active?.noteTutorial(line, tutorialRunId) } },
                     opening = com.hereliesaz.geministrator.intro.tutorialOpening(),
+                    closing = com.hereliesaz.geministrator.intro.tutorialClosing(),
                 )
                 appLog("AiveTutorial", "Tutorial ended: $outcome")
                 // Never shown a lesson: say so, rather than leaving the keeper waiting on a layer that will not come.

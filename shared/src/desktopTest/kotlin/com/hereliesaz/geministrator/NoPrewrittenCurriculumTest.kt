@@ -53,8 +53,11 @@ class NoPrewrittenCurriculumTest {
      */
     private val openingKeyPrefix = "tour_open_"
 
+    /** And one closing chapter after the swarm's own, so the last thing seen is the finished work (`tutorialClosing`). */
+    private val closingKeyPrefix = "tour_close_"
+
     private fun chromeProblems(strings: Map<String, String>, words: Set<String>): List<String> =
-        strings.filterKeys { k -> chromeKeyPrefixes.any { k.startsWith(it) } && !k.startsWith(openingKeyPrefix) }.mapNotNull { (k, v) ->
+        strings.filterKeys { k -> chromeKeyPrefixes.any { k.startsWith(it) } && !k.startsWith(openingKeyPrefix) && !k.startsWith(closingKeyPrefix) }.mapNotNull { (k, v) ->
             when {
                 v.length > 48 -> "$k is longer than 48 characters"
                 v.count { it == '.' || it == '!' || it == '?' } > 1 -> "$k is more than one sentence"
@@ -122,10 +125,14 @@ class NoPrewrittenCurriculumTest {
     }
 
     @Test
-    fun theFixedOpeningIsExactlyFourChaptersAndNothingElseIsFixed() {
-        val opening = allStrings().keys.filter { it.startsWith(openingKeyPrefix) }
-        assertEquals(setOf("hatch", "handoff", "work", "queen"), opening.map { it.removePrefix(openingKeyPrefix).substringBefore('_') }.toSet())
-        assertEquals(4 * 7, opening.size)
+    fun theFixedChaptersAreExactlyTheFiveOpeningOnesAndTheOneClosingAndNothingElseIsFixed() {
+        val strings = allStrings().keys
+        val opening = strings.filter { it.startsWith(openingKeyPrefix) }
+        assertEquals(setOf("hatch", "handoff", "work", "needs", "queen"), opening.map { it.removePrefix(openingKeyPrefix).substringBefore('_') }.toSet())
+        assertEquals(5 * 7, opening.size)
+        val closing = strings.filter { it.startsWith(closingKeyPrefix) }
+        assertEquals(setOf("made"), closing.map { it.removePrefix(closingKeyPrefix).substringBefore('_') }.toSet())
+        assertEquals(7, closing.size)
     }
 
     // Meta-tests: each rule must detect a violation. -----------------------------------------------------------------

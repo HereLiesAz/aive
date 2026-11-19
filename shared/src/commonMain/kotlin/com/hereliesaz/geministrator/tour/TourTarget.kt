@@ -126,6 +126,11 @@ enum class TourTargetId(
         place = "the hive on screen, where its creatures hatch and work",
         observable = setOf(ExpectKind.RunHatched, ExpectKind.RunHandedOff, ExpectKind.RunArtifact, ExpectKind.RunDone),
     ),
+    HIVE_MADE(
+        labelKey = "tour_target_made",
+        place = "under the hive, once creatures have made something",
+        observable = setOf(ExpectKind.RunDone, ExpectKind.Tapped),
+    ),
     CREATURE_TAB_NEEDS(
         labelKey = "creature_tab_needs",
         place = "on a creature's sheet, after a creature is opened",
