@@ -879,6 +879,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_active_of">%1$d / %2$d</string>
     <string name="hive_creatures_active">creatures active</string>
     <string name="hive_centre">Centre the swarm</string>
+    <string name="hive_show_all_creatures">Show every creature at once</string>
+    <string name="hive_show_growth">Show the hive growing</string>
     <string name="hive_status_line">%1$s: %2$s</string>
     <string name="hive_cost_so_far">%1$s spent so far</string>
     <string name="hive_legend_working">Working</string>
@@ -1122,7 +1124,6 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="memory_view_label">Memory view</string>
     <string name="view_setup">Setup</string>
     <string name="view_swarm">Swarm</string>
-    <string name="hive_view_label">Hive view</string>
     <string name="memory_simple_bank">Memory bank</string>
     <string name="memory_simple_stage_observe">Observe</string>
     <string name="memory_simple_stage_section">Section</string>
