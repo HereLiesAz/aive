@@ -92,6 +92,21 @@ class ProviderFailoverTest {
     }
 
     @Test
+    fun aRequestLongerThanTheSourceTakesFailsOverAndIsNeverRetriedThere() {
+        listOf(
+            "Executor failed. Last status: Google AI Mode: The question is 17436 characters; Google AI Mode takes at most 1800.",
+            "This model's maximum context length is 8192 tokens. However, your messages resulted in 20000 tokens.",
+            "prompt is too long: 250000 tokens > 200000 maximum",
+        ).forEach { raw ->
+            assertEquals(ErrorKind.InputTooLong, classifyError(raw), raw)
+            assertTrue(ProviderFailover.shouldFailOver(raw), raw)
+        }
+        assertEquals(0L, ProviderFailover.cooldownMillis(ErrorKind.InputTooLong))
+        val long = ProviderFailover.failureOf("google-ai-mode", "Google AI Mode", "The question is 17436 characters; Google AI Mode takes at most 1800.")
+        assertEquals("Google AI Mode cannot take a request this long; continued with Claude.", ProviderFailover.note(long, "Claude"))
+    }
+
+    @Test
     fun aReplyCutOffAtTheOutputLimitFailsOverButBenchesNobody() {
         listOf(
             "Compatible chat response was truncated because the provider reached its output-token limit",

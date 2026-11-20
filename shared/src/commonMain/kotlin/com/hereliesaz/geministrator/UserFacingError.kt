@@ -19,6 +19,7 @@ import com.hereliesaz.geministrator.resources.error_key_rejected
 import com.hereliesaz.geministrator.resources.error_no_agent
 import com.hereliesaz.geministrator.resources.error_offline
 import com.hereliesaz.geministrator.resources.error_other
+import com.hereliesaz.geministrator.resources.error_input_too_long
 import com.hereliesaz.geministrator.resources.error_output_too_long
 import com.hereliesaz.geministrator.resources.error_out_of_credit
 import com.hereliesaz.geministrator.resources.error_rate_limited
@@ -29,7 +30,7 @@ import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 
 /** Coarse cause of a raw failure message, enough to tell the user what to do next. */
-enum class ErrorKind { KeyRejected, OutOfCredit, RateLimited, Offline, TimedOut, ServerError, NoAgent, OutputTooLong, BadRequest, Other }
+enum class ErrorKind { KeyRejected, OutOfCredit, RateLimited, Offline, TimedOut, ServerError, NoAgent, OutputTooLong, InputTooLong, BadRequest, Other }
 
 private val unauthorizedCode = Regex("""(^|[^0-9])40[13]([^0-9]|$)""")
 private val paymentRequiredCode = Regex("""(^|[^0-9])402([^0-9]|$)""")
@@ -49,6 +50,11 @@ fun classifyError(raw: String?): ErrorKind {
 
         // A reply cut off at the provider's output limit: not a key, quota or outage problem.
         "truncated" in text && "token" in text -> ErrorKind.OutputTooLong
+
+        // The request is longer than this source takes (Google AI Mode's question limit, a context window): another source
+        // may take it, this one never will, so retrying it is pointless.
+        ("takes at most" in text && "characters" in text) || "maximum context length" in text || "context_length_exceeded" in text ||
+            "prompt is too long" in text || "input is too long" in text -> ErrorKind.InputTooLong
 
         // The app's own deadline sentences (CLI, A2A, Moyai), before the codes: a session id in them ("ab400cd1") must not read as a status.
         "did not finish in time" in text || "timed out and was stopped" in text -> ErrorKind.TimedOut
@@ -123,6 +129,7 @@ internal fun ErrorKind.messageResource(): StringResource = when (this) {
     ErrorKind.ServerError -> Res.string.error_server_error
     ErrorKind.NoAgent -> Res.string.error_no_agent
     ErrorKind.OutputTooLong -> Res.string.error_output_too_long
+    ErrorKind.InputTooLong -> Res.string.error_input_too_long
     ErrorKind.BadRequest -> Res.string.error_bad_request
     ErrorKind.Other -> Res.string.error_other
 }

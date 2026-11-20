@@ -50,6 +50,8 @@ object ProviderFailover {
         ErrorKind.TimedOut,
         ErrorKind.ServerError,
         ErrorKind.OutputTooLong,
+        // A request longer than this source takes: another source may take it.
+        ErrorKind.InputTooLong,
         -> true
         // A malformed request fails the same way on every provider, exactly as Other did before it was told apart.
         ErrorKind.NoAgent, ErrorKind.BadRequest, ErrorKind.Other -> false
@@ -67,7 +69,7 @@ object ProviderFailover {
         ErrorKind.ServerError -> 2 * MINUTE
         ErrorKind.RateLimited, ErrorKind.TimedOut, ErrorKind.Offline -> MINUTE
         // The provider is healthy; this prompt was just too big for its window. No benching.
-        ErrorKind.NoAgent, ErrorKind.OutputTooLong, ErrorKind.BadRequest, ErrorKind.Other -> 0L
+        ErrorKind.NoAgent, ErrorKind.OutputTooLong, ErrorKind.InputTooLong, ErrorKind.BadRequest, ErrorKind.Other -> 0L
     }
 
     private const val MINUTE = 60_000L
@@ -85,6 +87,7 @@ object ProviderFailover {
         ErrorKind.ServerError -> "is having trouble"
         ErrorKind.NoAgent -> "cannot do this work"
         ErrorKind.OutputTooLong -> "ran out of room for its answer"
+        ErrorKind.InputTooLong -> "cannot take a request this long"
         ErrorKind.BadRequest -> "did not accept the request"
         ErrorKind.Other -> "failed"
     }
@@ -97,6 +100,7 @@ object ProviderFailover {
         ErrorKind.Offline -> "Check your internet connection."
         ErrorKind.TimedOut, ErrorKind.ServerError -> "Try again in a moment."
         ErrorKind.OutputTooLong -> "Try a shorter description, or a source with a larger limit."
+        ErrorKind.InputTooLong -> "Use a source that takes longer requests, or shorten the task."
         ErrorKind.NoAgent, ErrorKind.BadRequest, ErrorKind.Other -> "Check it under Connections in the Keeper's room."
     }
 

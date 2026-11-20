@@ -8,6 +8,7 @@
     <string name="error_server_error">The service is having trouble right now. Retry in a moment, or switch to another source.</string>
     <string name="error_no_agent">No connected agent can do this work. Connect an AI source, or give the hive a repository its agent works in.</string>
     <string name="error_output_too_long">The plan was too long for the source's output limit. Try a shorter description, or a source with a larger limit.</string>
+    <string name="error_input_too_long">This source cannot take a request this long. Use a source that takes longer requests, or shorten the task.</string>
     <string name="error_bad_request">The source did not accept this request. Retry, or switch to another source.</string>
     <string name="error_other">Something went wrong. Retry, or check your source under Connections in the Keeper's room.</string>
     <string name="error_details_label">Technical details</string>

@@ -124,7 +124,8 @@ internal fun PillStack(
                         label = item.label,
                         seed = "$seedPrefix-${item.key}",
                         selected = item.key == selectedKey,
-                        endCap = item.endCap ?: if (item.children.isNotEmpty()) "›" else null,
+                        // "+": opens a layer. (A "›" glyph fell back to another font on some phones.)
+                        endCap = item.endCap ?: if (item.children.isNotEmpty()) "+" else null,
                         onClick = {
                             if (item.children.isNotEmpty()) path = shownPath + item.key else onSelect(item.key)
                         },
