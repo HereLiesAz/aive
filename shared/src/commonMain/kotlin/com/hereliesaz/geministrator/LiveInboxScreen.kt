@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -101,7 +103,17 @@ import com.hereliesaz.geministrator.resources.inspector_raise_budget
 import com.hereliesaz.geministrator.resources.inspector_reject_plan
 import com.hereliesaz.geministrator.resources.inspector_retry_task
 import com.hereliesaz.geministrator.resources.inspector_stop_workflow
+import com.hereliesaz.geministrator.resources.message_checkin_eyebrow
+import com.hereliesaz.geministrator.resources.message_checkin_note
+import com.hereliesaz.geministrator.resources.message_checkin_title
 import com.hereliesaz.geministrator.resources.queen_row_eyebrow
+import com.hereliesaz.geministrator.resources.tour_reply_lost
+import com.hereliesaz.geministrator.resources.tour_reply_show
+import com.hereliesaz.geministrator.resources.tour_reply_sort_of
+import com.hereliesaz.geministrator.resources.tour_reply_yes
+import com.hereliesaz.geministrator.tour.CheckInMessages
+import com.hereliesaz.geministrator.tour.CheckInReply
+import com.hereliesaz.geministrator.tour.TourController
 import com.hereliesaz.geministrator.resources.runs_attempt_of
 import com.hereliesaz.geministrator.resources.runs_authority
 import com.hereliesaz.geministrator.resources.runs_human_decision_required
@@ -168,6 +180,7 @@ internal fun LiveInboxScreen(
                 openConnections = onOpenConnections,
                 openRoster = onOpenRoster,
                 openRoleLibrary = onOpenRoleLibrary,
+                answerCheckIn = { reply -> TourController.reply(reply) },
             ),
             compact = compact,
             modifier = modifier,
@@ -220,6 +233,8 @@ internal class MessageActions(
     val openRoster: (() -> Unit)? = null,
     /** Opens the swarm library on a role's entry (where "Train a specialist" is). */
     val openRoleLibrary: ((roleId: String) -> Unit)? = null,
+    /** The keeper's quick reply to the tutorial's check-in: the same sink the overlay's pills feed ([TourController.reply]). */
+    val answerCheckIn: (CheckInReply) -> Unit = {},
 )
 
 /** Why an escalated step stopped, in one plain line (no internal code); null when the run recorded no reason. */
@@ -280,7 +295,9 @@ internal fun MessagesPage(
     modifier: Modifier = Modifier,
     readLog: InboxReadLog = remember { InboxReadLog(Settings()) },
 ) {
-    val rows = remember(presentation) { messageRows(presentation) }
+    // Read here (not inside remember) so the row opens and closes with the overlay's own check-in line.
+    val checkIn = CheckInMessages.of(TourController.state)
+    val rows = remember(presentation, checkIn) { messageRows(presentation, checkIn) }
     var selectedKey by rememberDurableStringState("inbox.selected")
     // Reject plan / Stop workflow are irreversible, so each asks first: (task id, is stop).
     var confirming by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
@@ -307,7 +324,7 @@ internal fun MessagesPage(
                     action = {
                         // Every item the run lists, whether or not it is on screen, is marked seen.
                         InkPagePill(stringResource(Res.string.inbox_mark_all_read)) {
-                            readLog.markRead(inboxItemKeys(presentation.run) + queenSuggestionKeys(presentation))
+                            readLog.markRead(inboxItemKeys(presentation.run) + queenSuggestionKeys(presentation) + listOfNotNull(checkIn?.key))
                         }
                     },
                 )
@@ -437,6 +454,11 @@ private fun messageListText(row: MessageRow, presentation: LiveWorkflowPresentat
         queenTitle(row.note),
         null,
     )
+    is MessageRow.TourCheckIn -> MessageListText(
+        stringResource(Res.string.message_checkin_eyebrow).uppercase(),
+        stringResource(Res.string.message_checkin_title),
+        row.message.line,
+    )
     is MessageRow.PracticeRun -> MessageListText(
         stringResource(Res.string.hall_monitor_isolated_counterfactual),
         presentation.definition.name,
@@ -489,6 +511,7 @@ private fun messageRowTone(row: MessageRow): Color = when (row) {
     is MessageRow.AllowanceStop -> AzphaltDanger
     is MessageRow.Freeze, is MessageRow.PracticeRun -> azphaltStrong()
     is MessageRow.Queen -> azphaltMutedOnSurface()
+    is MessageRow.TourCheckIn -> azphaltStrong()
 }
 
 @Composable
@@ -576,6 +599,16 @@ private fun MessageDetail(
                 }
             }
         }
+        is MessageRow.TourCheckIn -> Box(modifier.clip(RoundedCornerShape(19.dp)).background(ink)) {
+            AzphaltSurface(ink) {
+                Column(
+                    (if (wide) Modifier.fillMaxSize().verticalScroll(rememberScrollState()) else Modifier.fillMaxWidth())
+                        .padding(if (wide) 30.dp else 20.dp),
+                ) {
+                    TourCheckInDetail(row, actions)
+                }
+            }
+        }
         is MessageRow.Wait -> Box(modifier.clip(RoundedCornerShape(19.dp)).background(ink)) {
             AzphaltSurface(ink) {
                 val entry = row.entry
@@ -623,8 +656,53 @@ private fun MessageDetail(
                     says = { QueenSays(presentation.queen.filter { it.attachedTo == row.key }, actions, showLink = true, onSelect = onSelect) },
                 )
                 is MessageRow.PracticeRun -> HallMonitorTrialDetail(presentation)
-                is MessageRow.Wait, is MessageRow.Queen -> Unit
+                is MessageRow.Wait, is MessageRow.Queen, is MessageRow.TourCheckIn -> Unit
             }
+        }
+    }
+}
+
+/**
+ * The tutorial's check-in as a question: its line, and the same four quick replies as the lesson card. An answer here calls
+ * [MessageActions.answerCheckIn] (the tour's own reply sink); once the director has reacted the overlay's line is cleared and this row goes.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TourCheckInDetail(row: MessageRow.TourCheckIn, actions: MessageActions) {
+    Column(Modifier.azphaltLiveRegion()) {
+        Text(stringResource(Res.string.message_checkin_eyebrow).uppercase(), style = AzphaltType.eyebrow, color = azphaltStrong())
+        Spacer(Modifier.height(10.dp))
+        Text(
+            stringResource(Res.string.message_checkin_title),
+            style = AzphaltType.section,
+            color = azphaltOnSurface(),
+            modifier = Modifier.widthIn(max = 480.dp).semantics { heading() },
+        )
+        Spacer(Modifier.height(24.dp))
+        Text(row.message.line, style = AzphaltType.body, color = azphaltOnSurface(), modifier = Modifier.widthIn(max = 530.dp))
+        Spacer(Modifier.height(10.dp))
+        Text(
+            stringResource(Res.string.message_checkin_note),
+            style = AzphaltType.body,
+            color = azphaltMutedOnSurface(),
+            modifier = Modifier.widthIn(max = 530.dp),
+        )
+    }
+    Spacer(Modifier.height(18.dp))
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        CheckInMessages.replies.forEach { reply ->
+            AzphaltPill(
+                label = stringResource(
+                    when (reply) {
+                        CheckInReply.Yes -> Res.string.tour_reply_yes
+                        CheckInReply.SortOf -> Res.string.tour_reply_sort_of
+                        CheckInReply.Lost -> Res.string.tour_reply_lost
+                        CheckInReply.ShowMe -> Res.string.tour_reply_show
+                    },
+                ),
+                seed = "message-checkin-" + reply.name,
+                onClick = { actions.answerCheckIn(reply) },
+            )
         }
     }
 }

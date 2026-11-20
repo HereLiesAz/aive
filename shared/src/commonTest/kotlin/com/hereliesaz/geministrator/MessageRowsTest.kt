@@ -160,4 +160,25 @@ class MessageRowsTest {
         assertEquals(listOf(MessageAction.Answer), messageActions(InboxEntryKind.Question))
         assertEquals(listOf(MessageAction.RaiseBudget), messageActions(InboxEntryKind.BudgetSpent))
     }
+
+    @Test
+    fun theTutorialCheckInIsAQuestionRowAfterTheWaitsAndCountsToTheBadge() {
+        val live = presentation(taskRun(a, TaskRunStatus.Escalated))
+        val checkIn = com.hereliesaz.geministrator.tour.CheckInMessage(key = "tour-checkin|1|7", line = "With me so far?")
+        val rows = messageRows(live, checkIn)
+        assertEquals(2, rows.size)
+        assertTrue(rows[0] is MessageRow.Wait)
+        val row = rows[1] as MessageRow.TourCheckIn
+        assertEquals("tour-checkin|1|7", row.key)
+        assertTrue(row.countsToBadge)
+        // Closed (the overlay was answered): the row is gone.
+        assertEquals(1, messageRows(live, null).size)
+    }
+
+    @Test
+    fun aFreezeStillSpeaksAloneEvenWithACheckInOpen() {
+        val live = presentation(taskRun("a", TaskRunStatus.Blocked), pause = pause)
+        val rows = messageRows(live, com.hereliesaz.geministrator.tour.CheckInMessage("k", "With me so far?"))
+        assertTrue(rows.single() is MessageRow.Freeze)
+    }
 }
