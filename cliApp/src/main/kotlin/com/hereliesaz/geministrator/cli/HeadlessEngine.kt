@@ -200,6 +200,8 @@ private fun headlessProviders(
     credentials[ProviderCatalog.ANTHROPIC_ID]?.let { key -> add(AnthropicProvider(LlmApiKeyProvider { key })) }
     credentials[ProviderCatalog.GEMINI_ID]?.let { key -> add(GeminiProvider(LlmApiKeyProvider { key })) }
     credentials[ProviderCatalog.XAI_ID]?.let { key -> add(XaiProvider(LlmApiKeyProvider { key })) }
+    // The vendor CLIs the owner turned on with `aive agents enable`; they run only after a person-approved plan (docs/Local-CLI-Agents.md).
+    addAll(com.hereliesaz.geministrator.configuredCliProviders())
     repositories[RepositoryServiceCatalog.GITHUB_ID]?.let { token ->
         add(OpenCodeActionsAgentProvider(GitHubRestOpenCodeRunnerClient(GitHubTokenProvider { token }, client)))
     }

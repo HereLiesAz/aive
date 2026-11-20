@@ -57,7 +57,7 @@ Open points: proot may prove too slow for npm and git; the alternative is HG2Gui
 
 ## From a terminal
 
-`aive agents install|enable|disable|test <id>` does the same as the Keeper's room buttons, from the `aive` command line ([CLI](CLI.md)). It is local only: it needs an attached interactive terminal and `--yes` or a typed confirmation, and it is not reachable from the control API, MCP or any HTTP route, so an agent holding the token cannot install, enable or run a vendor CLI. The settings store and the install/test/status host live in `shared` (`desktopMain`), used by both the desktop and `aive`. `aive agents` alone lists them, read-only. The headless engine does not yet run enabled CLI agents as providers; when it does, approving their plans from outside needs `AIVE_ALLOW_REMOTE_APPROVAL=1` ([threat model](THREAT_MODEL.md), invariant 8).
+`aive agents install|enable|disable|test <id>` does the same as the Keeper's room buttons, from the `aive` command line ([CLI](CLI.md)). It is local only: it needs an attached interactive terminal and `--yes` or a typed confirmation, and it is not reachable from the control API, MCP or any HTTP route, so an agent holding the token cannot install, enable or run a vendor CLI. The settings store and the install/test/status host live in `shared` (`desktopMain`), used by both the desktop and `aive`. `aive agents` alone lists them, read-only. The headless engine (`aive serve`) runs the CLI agents you enabled, like the desktop does; their plans are approved at its attached keeper console or, from outside, only where `AIVE_ALLOW_REMOTE_APPROVAL=1` ([threat model](THREAT_MODEL.md), invariant 8).
 
 ## Test, and what is not verified
 
