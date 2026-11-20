@@ -276,7 +276,9 @@ private fun TourLayer(state: TourState, step: LessonPayload) {
         // The card sits on the half of the screen away from the ring, so the control stays clear.
         contentAlignment = if (hole != null && hole.center.y > height / 2f) Alignment.TopCenter else Alignment.BottomCenter,
     ) {
-        TourCard(state, step)
+        // On the top half the card hangs below the header, so the breadcrumb and the page title stay readable under it.
+        val onTop = hole != null && hole.center.y > height / 2f
+        Box(Modifier.padding(top = if (onTop) 64.dp else 0.dp)) { TourCard(state, step) }
     }
 }
 
