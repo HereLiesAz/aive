@@ -171,7 +171,7 @@ internal class AndroidCliRuntime(
             mutableState.value = initialState()
             throw cancelled
         } catch (failure: Exception) {
-            mutableState.value = CliRuntimeState.Failed((failure.message ?: "Preparing the Linux runtime failed.").take(300) + " Press Install to try again.")
+            mutableState.value = CliRuntimeState.Failed((failure.message ?: "Preparing the Linux runtime failed.").take(600) + " Press Install to try again.")
         }
     }
 

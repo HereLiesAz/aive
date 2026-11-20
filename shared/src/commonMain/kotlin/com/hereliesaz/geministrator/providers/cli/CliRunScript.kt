@@ -229,7 +229,7 @@ if [ "§CODE" = 0 ] && [ -n "§NPMSPEC" ]; then
   OUT="§OUT§(timeout -k 10 900 npm install -g --no-audit --no-fund -- "§NPMSPEC" 2>&1)"; CODE=§?
 fi
 printf 'AIVE-INSTALL %s %s\n' "§NONCE" "§CODE"
-printf '%s\n' "§OUT" | tail -c 400
+printf '%s\n' "§OUT" | tail -c 2000
 printf '\nAIVE-INSTALL-END %s\n' "§NONCE"
 """
 

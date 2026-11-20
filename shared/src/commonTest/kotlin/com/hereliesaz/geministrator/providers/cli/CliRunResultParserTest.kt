@@ -120,6 +120,19 @@ class CliRunResultParserTest {
         val failed = CliRunResultParser.parseInstall("AIVE-INSTALL $nonce 1\nE404 not found\nAIVE-INSTALL-END $nonce\n", nonce)
         assertFalse(failed.ok)
         assertTrue(failed.summary.contains("E404"))
+        // An installer's chatter comes first and its reason last: the reason is what is shown, never the chatter that preceded it.
+        val chatter = (1..40).joinToString("\n") { "Reading package lists... Building dependency tree... The following packages will be installed: lib$it" }
+        val apt = CliRunResultParser.parseInstall(
+            "AIVE-INSTALL $nonce 100\n$chatter\nErr:1 https://packages.example stable/main aarch64 npm 10\n  404  Not Found\nE: Failed to fetch https://packages.example/npm.deb  404  Not Found\nAIVE-INSTALL-END $nonce\n",
+            nonce,
+        )
+        assertFalse(apt.ok)
+        assertTrue(apt.summary.contains("E: Failed to fetch"), apt.summary)
+        assertFalse(apt.summary.contains("lib17"), apt.summary)
+        // With no error line, the last of the output is kept, not the first.
+        val quiet = CliRunResultParser.parseInstall("AIVE-INSTALL $nonce 2\n$chatter\nsomething odd happened last\nAIVE-INSTALL-END $nonce\n", nonce)
+        assertTrue(quiet.summary.contains("something odd happened last"), quiet.summary)
+        assertTrue(quiet.summary.startsWith("exit 2:"), quiet.summary)
         assertFalse(CliRunResultParser.parseInstall("AIVE-NONPM $nonce", nonce).ok)
         assertFalse(CliRunResultParser.parseInstall(null, nonce).ok)
         assertFalse(CliRunResultParser.parseInstall("AIVE-INSTALL $nonce x", nonce).ok)
