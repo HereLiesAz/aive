@@ -31,7 +31,7 @@ djl = "0.40.0"
 kmp-zip = "2.1.0"
 cryptography = "0.6.0"
 # cryptography-provider-jdk-bc 0.6.0 pulls bcprov 1.83 (GHSA-574f/9pwp/c3fc/p93r/qp49); pinned to a fixed release.
-bouncycastle = "1.86"
+bouncycastle = "1.87"
 sqldelight = "2.4.1"
 # MCP code execution on desktop (docs/architecture/MCP_HOST.md): QuickJS compiled to WebAssembly,
 # run by Endive (formerly Chicory), a pure-JVM WebAssembly runtime: no native code, no JNI, and a
