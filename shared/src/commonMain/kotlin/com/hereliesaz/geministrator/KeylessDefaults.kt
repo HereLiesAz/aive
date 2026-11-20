@@ -4,7 +4,7 @@ package com.hereliesaz.geministrator
  * Keyless Sources start enabled (docs/Keepers-Room.md, Connections).
  *
  * A keyless Source is a built-in one that works with no key ([ProviderCatalogEntry.keyOptional]): the free
- * gateways Kilo, LLM7 and OVHcloud, and the AI Horde image generator. Remote A2A agents, store models and
+ * gateways Kilo, LLM7, OVHcloud and BlockRun, and the AI Horde image generator. Remote A2A agents, store models and
  * vendor CLIs are never in this set: the keeper adds those on purpose, and they are used only by a role that
  * names them. Ollama Cloud is not keyless (it needs an account key, and from 2026-11-09 credits for its larger
  * models), so it is never turned on here.

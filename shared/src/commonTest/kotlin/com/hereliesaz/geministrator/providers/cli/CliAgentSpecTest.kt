@@ -96,6 +96,27 @@ class CliAgentSpecTest {
     }
 
     @Test
+    fun gooseTakesItsTaskOnStandardInputAndCrushAsTheLastArgumentAndNeitherEditsOrSkipsChecks() {
+        val goose = CliAgentSpecs.Goose
+        assertEquals(CliPromptChannel.Stdin, goose.promptChannel)
+        CliRunMode.entries.forEach { mode ->
+            val args = goose.arguments(mode, "/w", "do the task")
+            assertFalse("do the task" in args, "the task is not in the process list")
+            assertEquals(listOf("run", "--no-session", "-q", "--output-format", "text", "-i", "-"), args)
+            assertEquals(null, CliAgentSpecs.violation(args))
+            val crush = CliAgentSpecs.Crush.arguments(mode, "/w", "do the task")
+            assertEquals(listOf("run", "do the task"), crush)
+            assertEquals(null, CliAgentSpecs.violation(crush))
+        }
+        listOf(goose, CliAgentSpecs.Crush).forEach { spec ->
+            assertFalse(AgentCapability.RepositoryWrite in spec.capabilities, spec.id)
+            assertFalse(AgentCapability.ShellExecution in spec.capabilities, spec.id)
+        }
+        assertTrue(CliAgentSpecs.Goose.isProjectConfig(".goosehints"))
+        assertTrue(CliAgentSpecs.Crush.isProjectConfig("pkg/crush.json"))
+    }
+
+    @Test
     fun cursorAmpKiloOpenCodeAndAiderNeverSkipChecksAndTakeThePromptLast() {
         listOf(CliAgentSpecs.Cursor, CliAgentSpecs.Amp, CliAgentSpecs.Kilo, CliAgentSpecs.OpenCode, CliAgentSpecs.Aider).forEach { spec ->
             CliRunMode.entries.forEach { mode ->

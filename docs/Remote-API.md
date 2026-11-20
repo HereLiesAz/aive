@@ -31,7 +31,7 @@ Field details:
 ## Behavior
 
 - **Prompts** run in the background, without opening The Aive.
-  - With `providerId` set, the prompt uses that provider. Keyless providers (`kilo`, `llm7`, `ovhcloud`) need no linked key.
+  - With `providerId` set, the prompt uses that provider. Keyless providers (`kilo`, `llm7`, `ovhcloud`, `blockrun`) need no linked key.
   - Without `providerId`, the prompt uses the same provider planning picks. If no provider is linked, the request fails. The service never falls back to a keyless gateway the user hasn't linked, because those gateways may log prompts.
 - **Workflows** run on the runtime that belongs to The Aive's UI, so launching one only adds it to a queue. The client then opens The Aive (its launch intent), and The Aive starts each queued request through the same path as the launch form. If no planning provider is linked, The Aive runs the starter workflow.
   - The objective did not come from the keeper's own typing, so the run marks it as external content: a step that can change something waits at a context-taint gate for a person (docs/THREAT_MODEL.md, Context provenance).

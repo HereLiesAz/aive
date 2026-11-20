@@ -61,7 +61,7 @@ private const val GITHUB_TOKEN_STORAGE_KEY = "aive.githubToken"
 private const val GITLAB_TOKEN_STORAGE_KEY = "aive.gitlabToken"
 
 /** Free Sources a browser cannot call: their servers refuse the cross-origin preflight (found by running the web build in Chromium). */
-private val BROWSER_BLOCKED_SOURCE_IDS = setOf(ProviderCatalog.KILO_ID)
+private val BROWSER_BLOCKED_SOURCE_IDS = setOf(ProviderCatalog.KILO_ID, ProviderCatalog.BLOCKRUN_ID)
 
 /** True when the browser reports `prefers-reduced-motion: reduce`. */
 private fun prefersReducedMotion(): Boolean =
