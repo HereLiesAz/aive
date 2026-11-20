@@ -25,6 +25,15 @@ sealed interface TourAction {
     data object ToggleExplain : TourAction
     /** The checkpoint allowance passed without the event. */
     data object WaitElapsed : TourAction
+
+    /** The keeper answered a check-in (recorded for the queen; pacing itself is [CheckInTransitions]). */
+    data class Replied(val reply: CheckInReply) : TourAction
+
+    /**
+     * The queen revises lessons not yet played: [known] are passed over, [slower] open on their small steps. Only an arrived lesson after
+     * the current one that was never revised is touched; a lesson already played is never changed.
+     */
+    data class Revise(val known: Set<Int>, val slower: Set<Int>) : TourAction
 }
 
 /**
@@ -46,6 +55,14 @@ data class TourState(
     val smallerQueue: List<String> = emptyList(),
     /** An open check-in's line; the card shows the four quick replies while it is set. */
     val checkInLine: String? = null,
+    /** The keeper's check-in replies so far, oldest first, at most [MAX_REPLIES]. Feelings only; the queen reads them ([LessonRevision]). */
+    val replies: List<CheckInReply> = emptyList(),
+    /** Indexes of lessons not yet played that the queen marked "passed over": the keeper said they are comfortable with them. */
+    val known: Set<Int> = emptySet(),
+    /** Indexes of lessons not yet played that the queen marked smaller: they open on their small steps. */
+    val slower: Set<Int> = emptySet(),
+    /** Indexes of lessons the queen has already revised; a lesson is revised at most once. */
+    val revised: Set<Int> = emptySet(),
 ) {
     val current: LessonPayload? get() = lessons.getOrNull(index)
     val stepTotal: Int get() = maxOf(total, lessons.size)
@@ -60,8 +77,8 @@ data class TourState(
  */
 enum class CheckInReply { Yes, SortOf, Lost, ShowMe }
 
-private fun TourState.advance(outcome: StepOutcome): TourState =
-    copy(
+private fun TourState.advance(outcome: StepOutcome): TourState {
+    var next = copy(
         outcomes = outcomes + (index to outcome),
         index = index + 1,
         explainOpen = false,
@@ -70,6 +87,18 @@ private fun TourState.advance(outcome: StepOutcome): TourState =
         smallerQueue = emptyList(),
         checkInLine = null,
     )
+    // What the queen revised: a lesson the keeper said they are comfortable with is passed over, and one marked smaller opens on its small steps.
+    while (next.index in next.known && next.lessons.getOrNull(next.index) != null) {
+        next = next.copy(outcomes = next.outcomes + (next.index to StepOutcome.Skipped), index = next.index + 1)
+    }
+    val lesson = next.lessons.getOrNull(next.index)
+    if (lesson != null && next.index in next.slower && lesson.smaller.isNotEmpty()) {
+        next = next.copy(note = lesson.smaller.first(), smallerQueue = lesson.smaller.drop(1))
+    }
+    return next
+}
+
+private const val MAX_REPLIES = 8
 
 /** True when [event] is exactly what [expect] waits for. */
 fun expectationMet(expect: TourExpect, event: TourEvent): Boolean = when (event) {
@@ -100,6 +129,13 @@ fun reduceTour(state: TourState, action: TourAction): TourState = when (action) 
     TourAction.Resume -> if (state.phase != TourPhase.Showing) state.copy(phase = TourPhase.Showing) else state
     TourAction.Escape -> state.copy(phase = TourPhase.Dismissed)
     TourAction.ToggleExplain -> state.copy(explainOpen = !state.explainOpen)
+    is TourAction.Replied -> state.copy(replies = (state.replies + action.reply).takeLast(MAX_REPLIES))
+    is TourAction.Revise -> {
+        val open = { i: Int -> i > state.index && i < state.lessons.size && i !in state.revised }
+        val known = action.known.filter(open).toSet()
+        val slower = action.slower.filter(open).toSet() - known
+        state.copy(known = state.known + known, slower = state.slower + slower, revised = state.revised + known + slower)
+    }
     TourAction.WaitElapsed -> {
         if (state.phase == TourPhase.Showing && state.current != null && !state.missedShown) {
             state.copy(missedShown = true, outcomes = state.outcomes + (state.index to StepOutcome.Missed))

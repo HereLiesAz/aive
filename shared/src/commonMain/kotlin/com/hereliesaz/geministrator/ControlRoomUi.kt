@@ -299,14 +299,17 @@ fun ControlRoom(
     // The tour waits on what the swarm does as well as on taps: each publish of the live run is read against the last one
     // (tour/RunSignals.kt) and what changed is handed to the layer, only while a tour is showing.
     val seenByTour = remember { RunSeenByTour() }
-    LaunchedEffect(liveWorkflow?.run, liveWorkflow?.queen?.size) {
+    LaunchedEffect(liveWorkflow?.run, liveWorkflow?.queen?.size, liveWorkflow?.queen?.let { com.hereliesaz.geministrator.tour.disputeLines(it) }) {
         val live = liveWorkflow ?: return@LaunchedEffect
         val tour = com.hereliesaz.geministrator.tour.TourController
         val before = seenByTour.run?.takeIf { it.id == live.run.id }
         val queenBefore = if (before != null) seenByTour.queenLines else 0
         val queenNow = live.queen.size
+        val disputesBefore = if (before != null) seenByTour.disputeLines else 0
+        val disputesNow = com.hereliesaz.geministrator.tour.disputeLines(live.queen)
         seenByTour.run = live.run
         seenByTour.queenLines = queenNow
+        seenByTour.disputeLines = disputesNow
         if (tour.state == null) {
             tour.hive = emptyList()
             return@LaunchedEffect
@@ -315,7 +318,7 @@ fun ControlRoom(
         com.hereliesaz.geministrator.tour.CreatureSpots.focus =
             com.hereliesaz.geministrator.tour.spotlightFor(tour.hive, lines, com.hereliesaz.geministrator.tour.CreatureSpots.focus)
         tour.hive = lines
-        com.hereliesaz.geministrator.tour.runSignals(live.definition, before, live.run, queenBefore, queenNow)
+        com.hereliesaz.geministrator.tour.runSignals(live.definition, before, live.run, queenBefore, queenNow, disputesBefore, disputesNow)
             .forEach { tour.dispatch(com.hereliesaz.geministrator.tour.TourAction.Observed(com.hereliesaz.geministrator.tour.TourEvent.Run(it))) }
     }
     // Semantic zoom (docs/Swarm-OS.md): the district is all the way out; a neighbourhood is one workflow.
@@ -1786,4 +1789,5 @@ internal fun restingHiveAfterLoad(restingId: String, definitions: List<WorkflowD
 internal class RunSeenByTour {
     var run: com.hereliesaz.geministrator.domain.WorkflowRun? = null
     var queenLines: Int = 0
+    var disputeLines: Int = 0
 }

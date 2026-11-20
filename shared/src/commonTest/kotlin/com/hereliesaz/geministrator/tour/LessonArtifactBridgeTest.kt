@@ -95,6 +95,8 @@ class LessonArtifactBridgeTest {
         val lessons = LessonArtifactBridge.newLessons(run, rows, played)
         assertEquals(2, lessons.size)
         assertTrue(lessons.all { it.voice == "Teacher" })
+        // Each lesson carries the step that wrote it, so the queen can find the step to rebuild.
+        assertEquals(setOf("late", "early"), lessons.map { it.stepId }.toSet())
         // Taken once: a second pass over the same run plays nothing again.
         assertEquals(emptyList(), LessonArtifactBridge.newLessons(run, rows, played))
     }

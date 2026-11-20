@@ -22,4 +22,6 @@ data class LessonPayload(
     val bridge: String? = null,
     /** The creature that wrote it, named on the card; null for a fixed chapter or one the in-process writer made. Never model text from the payload itself. */
     val voice: String? = null,
+    /** The task (the creature's step) that wrote it, set by [LessonArtifactBridge] so the queen can find the step to rebuild; null otherwise. Never model text. */
+    val stepId: String? = null,
 )
