@@ -20,4 +20,6 @@ data class LessonPayload(
     val smaller: List<String>,
     /** An optional re-explanation of the previous concept, from a new angle. */
     val bridge: String? = null,
+    /** The creature that wrote it, named on the card; null for a fixed chapter or one the in-process writer made. Never model text from the payload itself. */
+    val voice: String? = null,
 )

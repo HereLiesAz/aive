@@ -98,6 +98,7 @@ internal object TutorialLaunch {
             nowMillis = nowMillis,
             level = level,
             say = say,
+            creaturesSupply = { com.hereliesaz.geministrator.tour.LessonArtifactBridge.supplied },
         )
         // Whatever tour was showing gives way to this run's.
         TourController.stop()
