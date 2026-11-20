@@ -16,6 +16,7 @@ protocol fields do not follow it.
 | **Hive** | the goal (today `Project` and the objective; D17: the project becomes the hive and gains a goal) | What the keeper wants done: **Your first hive**, **Feed the hive**, the **Hive** place and the **Hives** rail chip (the district, which still lists swarms grouped by the hive they last served). A hive can have many runs, and a swarm can serve many hives. |
 | **Run** | `WorkflowRun` (one execution of a swarm for a hive) | **Work**, **Stop run**, **Run log**, **RUN n**, Past runs. D3 is settled (below): "run" is only a secondary word for the verb form of swarm; these existing labels keep it as the name of one execution until the owner says otherwise. |
 | **Orphan** | drifter (`A2aDrifters`, `DrifterTrouble`, `drifter-` role ids) | A remote A2A agent you can bring in and connect. |
+| **Show engineering names** | `EngineeringNames`, `engineeringName` (D35) | One switch in the Keeper's room, Appearance. On, Nanny reads "Nanny (Hall Monitor)", Orphan "Orphan (A2A agent)" and Swarm "Swarm (workflow)" at the Nanny review title, the Orphans heading and the Swarm library; MCP servers are not renamed. Off by default. |
 
 Kept as they are: **Memory**, **Breed**.
 

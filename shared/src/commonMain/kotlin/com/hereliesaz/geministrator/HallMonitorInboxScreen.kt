@@ -65,7 +65,7 @@ internal fun HallMonitorPauseDetail(
         AzphaltRecord(
             seed = "hall-monitor-global-pause",
             eyebrow = stringResource(Res.string.hall_monitor_global_pause),
-            title = report?.title ?: stringResource(Res.string.hall_monitor_hall_monitor_review),
+            title = report?.title ?: engineeringName(stringResource(Res.string.hall_monitor_hall_monitor_review), ENGINEERING_NANNY, EngineeringNames.show),
             body = stringResource(Res.string.hall_monitor_the_original_run_remains_frozen_while).trim(),
             endCap = stringResource(Res.string.hall_monitor_paused),
             well = {

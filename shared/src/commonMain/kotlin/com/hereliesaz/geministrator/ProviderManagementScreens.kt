@@ -556,7 +556,7 @@ internal fun ProviderSettingsScreen(
             onToggle = { addingA2aAgent = !addingA2aAgent },
         )
         if (addingA2aAgent) {
-            ProviderSectionLabel(stringResource(Res.string.keeper_orphans_heading))
+            ProviderSectionLabel(engineeringName(stringResource(Res.string.keeper_orphans_heading), ENGINEERING_ORPHAN, EngineeringNames.show))
             Text(
                 stringResource(Res.string.keeper_a2a_agent_explain),
                 style = AzphaltType.body,

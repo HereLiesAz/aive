@@ -419,7 +419,7 @@ private fun messageListText(row: MessageRow, presentation: LiveWorkflowPresentat
     is MessageRow.Wait -> MessageListText(inboxKindLine(row.entry), row.entry.title, row.entry.role)
     is MessageRow.Freeze -> MessageListText(
         stringResource(Res.string.hall_monitor_global_pause).uppercase(),
-        stringResource(Res.string.hall_monitor_hall_monitor_review),
+        engineeringName(stringResource(Res.string.hall_monitor_hall_monitor_review), ENGINEERING_NANNY, EngineeringNames.show),
         stringResource(Res.string.hall_monitor_paused),
     )
     is MessageRow.AllowanceStop -> MessageListText(
