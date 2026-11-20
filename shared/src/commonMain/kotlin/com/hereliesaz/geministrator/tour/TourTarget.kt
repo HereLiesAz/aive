@@ -36,7 +36,13 @@ enum class ExpectKind(val wire: String) {
     RunHandedOff("runHandedOff"),
     RunArtifact("runArtifact"),
     RunDone("runDone"),
-    QueenSpoke("queenSpoke");
+    QueenSpoke("queenSpoke"),
+
+    /** A creature raised a need: it is waiting on the keeper (a question, an approval, or a step that stopped). */
+    RunNeedRaised("runNeedRaised"),
+
+    /** Two creatures disagreed and the queen opened a dispute (a dispute note reached Messages). */
+    RunDisputeOpened("runDisputeOpened");
 
     companion object {
         fun fromWire(text: String): ExpectKind? = entries.firstOrNull { it.wire == text }
@@ -124,7 +130,10 @@ enum class TourTargetId(
     HIVE_CREATURES(
         labelKey = "tour_target_creatures",
         place = "the hive on screen, where its creatures hatch and work",
-        observable = setOf(ExpectKind.RunHatched, ExpectKind.RunHandedOff, ExpectKind.RunArtifact, ExpectKind.RunDone),
+        observable = setOf(
+            ExpectKind.RunHatched, ExpectKind.RunHandedOff, ExpectKind.RunArtifact, ExpectKind.RunDone,
+            ExpectKind.RunNeedRaised, ExpectKind.RunDisputeOpened,
+        ),
     ),
     HIVE_MADE(
         labelKey = "tour_target_made",

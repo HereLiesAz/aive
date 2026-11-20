@@ -56,7 +56,7 @@ object LessonArtifactBridge {
         introduced = rows.map { it.id }.toSet(),
     )
 
-    fun inspect(output: String, rows: List<TargetRow>, voice: String? = null): LessonHandIn {
+    fun inspect(output: String, rows: List<TargetRow>, voice: String? = null, stepId: String? = null): LessonHandIn {
         if (rows.isEmpty()) return LessonHandIn.None
         val line = payloadLine(output) ?: return LessonHandIn.None
         val target = try {
@@ -65,7 +65,7 @@ object LessonArtifactBridge {
             null
         }
         return when (val result = LessonValidator.validate(line, contextFor(target.orEmpty(), rows))) {
-            is LessonValidation.Valid -> LessonHandIn.Play(result.payload.copy(voice = voice))
+            is LessonValidation.Valid -> LessonHandIn.Play(result.payload.copy(voice = voice, stepId = stepId))
             is LessonValidation.Invalid -> LessonHandIn.Turned(result.violations.map { "${it.rule}: ${it.message}" }.distinct())
         }
     }
@@ -96,7 +96,7 @@ object LessonArtifactBridge {
             val text = latestText(taskRun.artifacts) ?: continue
             val voice = run.roleSnapshot.firstOrNull { it.id == taskRun.assignedRoleId }?.name
                 ?: run.definitionSnapshot?.tasks?.firstOrNull { it.id == taskId }?.name
-            val hand = inspect(text, rows, voice)
+            val hand = inspect(text, rows, voice, taskId.value)
             if (hand is LessonHandIn.Play) {
                 found += (taskRun.artifacts.maxOfOrNull { it.createdAtEpochMillis } ?: 0L) to hand.payload
             }
