@@ -168,6 +168,9 @@ internal object AzphaltShapes {
 /** Smallest touch target (dp) for anything clickable. */
 internal val AzphaltMinTouchTarget: Dp = 48.dp
 
+/** The drawn height of a pill (HG2Gui's `PillMetrics.Height`); its hit box is [AzphaltMinTouchTarget]. */
+internal val AzphaltPillHeight: Dp = 32.dp
+
 /**
  * The app's two typefaces, bundled under composeResources/font (licences in THIRD_PARTY_NOTICES.md):
  * Archivo Black for titles, DM Sans for everything else. They start as the platform sans-serif and
@@ -310,7 +313,9 @@ internal fun AzphaltPill(
         else -> content
     }
     val pillRole = role
-    Row(
+    // HG2Gui's geometry (docs/DESIGN.md, 10): the drawn capsule is 32dp tall and the hit box around it
+    // 48dp, so two rows' boxes tile exactly and a thumb never falls between them.
+    Box(
         modifier = modifier
             .semantics {
                 this.role = pillRole
@@ -323,21 +328,28 @@ internal fun AzphaltPill(
             .azphaltSelectedTransform(selected)
             .defaultMinSize(minHeight = AzphaltMinTouchTarget)
             .clip(RoundedCornerShape(999.dp))
-            .background(fill)
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(start = 16.dp, top = 9.dp, bottom = 9.dp, end = if (endCap == null) 16.dp else 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
-        Text(label.uppercase(), style = AzphaltType.capsule, color = content)
-        if (endCap != null) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(cap)
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-            ) {
-                Text(endCap.uppercase(), style = AzphaltType.endCap, color = cap.onOpposite())
+        Row(
+            modifier = Modifier
+                .heightIn(min = AzphaltPillHeight)
+                .clip(RoundedCornerShape(999.dp))
+                .background(fill)
+                .padding(start = 16.dp, top = 5.dp, bottom = 5.dp, end = if (endCap == null) 16.dp else 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(label.uppercase(), style = AzphaltType.capsule, color = content)
+            if (endCap != null) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(cap)
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                ) {
+                    Text(endCap.uppercase(), style = AzphaltType.endCap, color = cap.onOpposite())
+                }
             }
         }
     }
