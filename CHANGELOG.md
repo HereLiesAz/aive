@@ -5,6 +5,7 @@ All notable changes to **The Aive** are documented here from the current product
 ## 0.91 — from 2026-11-19
 
 - **The orchestration decision model is no longer offered.** Settings → Local orchestration listed `aive-orchestration-decisions-int8.tar.gz`, from a release (`orchestration-decisions-v1`) that was never published and whose approach is set aside; its install could only fail. The catalog now lists nothing, so every utility uses its deterministic baseline (an empty catalog was already valid). The decision code and `tools/decision_training` are kept dormant, the README says so.
+- **A download whose file was never published stops at once and says so.** A 404 or 410 from a release address is permanent, so the resumable downloaders (desktop and Android) no longer retry it eight times; they fail with "<file> is not published at its release address". This is what Settings → Local orchestration showed for `aive-orchestration-decisions-int8.tar.gz`: the release `orchestration-decisions-v1` the catalog names does not exist (404), so the model itself still has to be trained and uploaded (`tools/decision_training`). Desktop test `DesktopDownloadNotPublishedTest`; the Android change is not run here.
 
 - **The hosted-provider count test knows about BlockRun.** Main run 44744901663 passed every shared test and the desktop tests, and failed one providers test that counts the built-in hosted providers (18, now 19 with BlockRun). Not run here; main CI is the compile.
 

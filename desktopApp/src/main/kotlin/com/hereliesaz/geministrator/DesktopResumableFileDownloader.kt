@@ -113,6 +113,10 @@ internal class DesktopResumableFileDownloader(
                         throw IOException("Server rejected resume range for ${output.name}")
                     }
 
+                    if (response.status == HttpStatusCode.NotFound || response.status == HttpStatusCode.Gone) {
+                        // Nothing is at that address (a release that was never published): trying again cannot change that.
+                        throw DownloadNotPublishedException("${output.name} is not published at its release address (${response.status.value}); nothing to download yet.")
+                    }
                     check(response.status.isSuccess()) {
                         "Download failed for ${output.name}: ${response.status}"
                     }
@@ -211,6 +215,9 @@ internal class DesktopResumableFileDownloader(
                 return@withContext output
             } catch (cancelled: CancellationException) {
                 throw cancelled
+            } catch (missing: DownloadNotPublishedException) {
+                partial.delete()
+                throw missing
             } catch (failure: Throwable) {
                 lastFailure = failure
                 if (attempt == maxAttempts) break
@@ -283,3 +290,6 @@ internal class DesktopResumableFileDownloader(
         val CONTENT_RANGE_REGEX = Regex("bytes\\s+(\\d+)-(\\d+)/(\\d+|\\*)")
     }
 }
+
+/** The file's release address answers "not found": a permanent absence, so the download stops at once and says so. */
+class DownloadNotPublishedException(message: String) : java.io.IOException(message)
