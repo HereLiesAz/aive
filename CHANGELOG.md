@@ -4,6 +4,8 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.91 — from 2026-11-19
 
+- **The run-amendment test follows the tightened rule.** Main run 44772524176 (the audit fixes, first compiled): 3,302 shared tests, one failure, `RunAmendTest` still expecting that a step that has not started may have its objective changed, which the audit fix refuses on purpose. It now expects the refusal, and that the swarm with an added step and nothing else changed is accepted. Not run here; main CI is the compile.
+
 - **The tour is not finished while the swarm is still writing its lessons.** With creature-made lessons the tour counted "finished" the moment the keeper had passed every lesson in hand, so a slow lesson creature could be skipped past and the closing question asked early. The collector now says whether the swarm is still running (`LessonArtifactBridge.writing`) and the director waits for it. Found by an adversarial audit. Not run here; main CI is the compile.
 
 - **The Story page's controls are the hive's round buttons.** Pause, Stop, Overview, Share and More editing were a row of pills on the Story (timeline) page and round glyph buttons on the hive. Both now come from the one list of the live hive's acts (`hiveActionsList`), drawn as round buttons on Ink, so the pages cannot differ in what they offer. The buttons are hexagons (`HexagonShape`) instead of circles, everywhere the hive's controls bar and the Story page draw them; the touch target is still the full 48dp. Nothing was removed: the same five acts, the same tour targets, Stop still red and only while the run is unfinished. Compiled on desktop only; not seen on a screen here.
