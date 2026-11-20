@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator
 
 import androidx.compose.runtime.snapshotFlow
 import com.hereliesaz.geministrator.domain.TaskRunStatus
+import com.hereliesaz.geministrator.domain.isUntrusted
 import com.hereliesaz.geministrator.intro.TutorialRouter
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
 import com.hereliesaz.geministrator.tour.ComfortRecord
@@ -29,7 +30,7 @@ internal suspend fun ApplicationRuntime.reviseLessons(planner: OrchestrationAgen
             val tour = TourController.state ?: return@collect
             val live = state.value as? ApplicationRuntimeState.Live ?: return@collect
             val run = live.presentation.run
-            if (!TutorialRouter.isTutorialGoal(run.objective)) return@collect
+            if (!TutorialRouter.isTutorialGoal(run.objective) || run.objectiveProvenance.isUntrusted()) return@collect
             if (runKey != run.id.value) {
                 runKey = run.id.value
                 used = 0
@@ -43,6 +44,9 @@ internal suspend fun ApplicationRuntime.reviseLessons(planner: OrchestrationAgen
                 is LessonRevisionDecision.Redo -> {
                     used += 1
                     rebuilt += decision.stepId
+                    val attempt = run.taskRuns[com.hereliesaz.geministrator.domain.TaskDefinitionId(decision.stepId)]?.attempt ?: 0
+                    // The mending collector may already be repairing this very attempt: one repair of a step at a time.
+                    if (!repairsStarted.add("${run.id.value}:${decision.stepId}:$attempt")) return@collect
                     try {
                         repairFailureEscalation(
                             com.hereliesaz.geministrator.domain.TaskDefinitionId(decision.stepId),

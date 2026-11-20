@@ -60,14 +60,15 @@ object RunAmend {
             if (status != TaskRunStatus.Created && status != TaskRunStatus.Blocked && status != TaskRunStatus.Ready) {
                 return RunAmendment.Refused("Step ${task.id.value} has started, so it is not changed.")
             }
-            if (!task.dependsOn.containsAll(old.dependsOn) || task.roleId != old.roleId || task.executor != old.executor ||
-                task.approvalPolicy != old.approvalPolicy || task.contract?.effects != old.contract?.effects ||
-                task.condition != old.condition
-            ) {
-                return RunAmendment.Refused("Step ${task.id.value} cannot lose a wait or an approval, or change its role or what it may do.")
+            // A step that has not started may only wait for more: every other field of it stays exactly as it was.
+            if (!task.dependsOn.containsAll(old.dependsOn) || old.copy(dependsOn = task.dependsOn) != task) {
+                return RunAmendment.Refused("Step ${task.id.value} can only be given more to wait for; nothing else about it changes.")
             }
         }
         for (task in added) {
+            if (task.executor != null && task.executor.withoutPlacement() !is TaskExecutor.RoleAgent) {
+                return RunAmendment.Refused("An added step is done by a creature, not by a script, an action or a service.")
+            }
             val operation = task.executor.withoutPlacement() as? TaskExecutor.RepositoryOperation
             if (operation != null && operation.isMutation()) {
                 return RunAmendment.Refused("An added step cannot change a repository.")

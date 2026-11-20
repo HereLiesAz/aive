@@ -188,7 +188,13 @@ internal object ArtifactSaver {
         var failed = 0
         val done = mutableListOf<String>()
         files.forEach { file ->
-            val name = runCatching { service.write(folder.ref, file.subfolder, file.fileName, file.content) }.getOrNull()
+            val name = try {
+                service.write(folder.ref, file.subfolder, file.fileName, file.content)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
             if (name != null) {
                 written += 1
                 done += file.artifactId
