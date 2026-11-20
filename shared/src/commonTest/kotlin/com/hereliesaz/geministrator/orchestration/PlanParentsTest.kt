@@ -101,6 +101,15 @@ class PlanParentsTest {
             listOf(PlannerCandidate("a", "A", Planner { chain }), PlannerCandidate("b", "B", Planner { chain })),
         )
         assertEquals(2, roomy.planners.size)
+        // One Source alone would draft all three plans itself: no companions. Kilo's 200 an hour is room enough.
+        assertTrue(FailoverOrchestrationAgentRuntime(listOf(PlannerCandidate("a", "A", Planner { chain }))).planners.isEmpty())
+        val kilo = FailoverOrchestrationAgentRuntime(
+            listOf(
+                PlannerCandidate(com.hereliesaz.geministrator.ProviderCatalog.KILO_ID, "Kilo", Planner { chain }),
+                PlannerCandidate("b", "B", Planner { chain }),
+            ),
+        )
+        assertEquals(2, kilo.planners.size)
     }
 
     @Test

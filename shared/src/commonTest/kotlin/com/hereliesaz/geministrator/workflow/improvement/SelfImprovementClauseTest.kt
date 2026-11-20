@@ -43,6 +43,19 @@ class SelfImprovementClauseTest {
     }
 
     @Test
+    fun onlyTheStockQueenStandsOutsideTheChainAndAnOrchestratorStepWithAnythingMoreIsJudgedLikeAnyStep() {
+        val stock = com.hereliesaz.geministrator.ensureQueen(loop)
+        assertEquals(emptyList(), LoopIntegrity.violations(stock), "the queen every hive gets leaves the loop whole")
+        val queen = stock.tasks.last()
+        val pushing = queen.copy(executor = TaskExecutor.RepositoryOperation("push"))
+        assertTrue(LoopIntegrity.violations(stock.copy(tasks = stock.tasks.dropLast(1) + pushing)).isNotEmpty(), "an Orchestrator step that pushes is not the queen")
+        val waiting = queen.copy(executor = TaskExecutor.HumanApproval("Wait"))
+        assertTrue(LoopIntegrity.violations(stock.copy(tasks = stock.tasks.dropLast(1) + waiting)).any { "approval" in it })
+        val asking = queen.copy(escalationPolicy = EscalationPolicy.RequireHumanDecision)
+        assertTrue(LoopIntegrity.violations(stock.copy(tasks = stock.tasks.dropLast(1) + asking)).any { "fail the run" in it })
+    }
+
+    @Test
     fun point1_aLoopThatDropsItsOwnExaminationItsChallengeOrItsMetaRequirementIsNamedAsViolating() {
         val withoutExamine = loop.copy(tasks = loop.tasks.filterNot { it.id.value == "examine-loop" }.map { it.copy(dependsOn = it.dependsOn.filterNot { d -> d.value == "examine-loop" }.toSet()) })
         assertTrue(LoopIntegrity.violations(withoutExamine).any { "examine itself" in it })
