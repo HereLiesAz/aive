@@ -49,6 +49,9 @@ import com.hereliesaz.geministrator.memory.deferredMemoryBanks
 import com.hereliesaz.geministrator.memory.openWebMemoryBanks
 import com.hereliesaz.geministrator.memory.WebMemoryDebugHook
 import com.hereliesaz.geministrator.providers.llm.memoryTextApi
+import com.hereliesaz.geministrator.providers.llm.configuredPlanReviewer
+import com.hereliesaz.geministrator.providers.llm.configuredPlanningRuntime
+import com.hereliesaz.geministrator.providers.llm.configuredQueenModel
 
 private const val OPENAI_API_KEY_STORAGE_KEY = "aive.openaiApiKey"
 private const val ANTHROPIC_API_KEY_STORAGE_KEY = "aive.anthropicApiKey"
@@ -160,6 +163,11 @@ fun main() {
                     )
             } ?: configured
         }
+        // The queen plans and a reviewer reads the plan before a run exists, as on desktop: without them the browser fell back to
+        // the default swarm, which asks for a repository, and a first hive ended in "can't reach its agents".
+        val planningRuntime = remember(credentials) { configuredPlanningRuntime(credentials) }
+        val planReviewer = remember(credentials) { configuredPlanReviewer(credentials) }
+        val queenModelFor = remember(credentials) { { pin: String? -> configuredQueenModel(credentials, pin) } }
         val repositoryDiscovery = remember(repositoryCredentials) {
             configuredWebRepositoryDiscovery(repositoryCredentials, repositoryHttpClient)
         }
@@ -192,6 +200,9 @@ fun main() {
             )
             else -> App(
                 providers = providers,
+                orchestrationRuntime = planningRuntime,
+                planReviewer = planReviewer,
+                queenModelFor = queenModelFor,
                 mcpHost = mcpHost,
                 mcpConsent = mcpConsent,
                 mcpElicitation = mcpElicitation,

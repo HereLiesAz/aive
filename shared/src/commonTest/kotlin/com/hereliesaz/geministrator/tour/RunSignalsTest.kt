@@ -16,6 +16,8 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
+import com.hereliesaz.geministrator.queen.QueenNote
+import com.hereliesaz.geministrator.queen.QueenVoice
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -93,5 +95,47 @@ class RunSignalsTest {
         assertTrue(expectationMet(step, TourEvent.Run(RunSignal.Hatched)))
         assertTrue(!expectationMet(step, TourEvent.Run(RunSignal.Done)))
         assertTrue(!expectationMet(step, TourEvent.Tapped(TourTargetId.GOAL_FIELD)))
+    }
+
+    @Test
+    fun aCreatureBeginningToWaitOnTheKeeperIsANeedRaised() {
+        val asking = run(
+            WorkflowRunStatus.Running,
+            taskRun("scout", TaskRunStatus.Running).copy(keeperQuestion = "Which one?"),
+            taskRun("write", TaskRunStatus.Blocked),
+        )
+        assertTrue(RunSignal.NeedRaised in runSignals(definition, scouting, asking))
+        assertTrue(RunSignal.NeedRaised !in runSignals(definition, asking, asking))
+        val stopped = run(WorkflowRunStatus.Running, taskRun("scout", TaskRunStatus.Escalated), taskRun("write", TaskRunStatus.Blocked))
+        assertTrue(RunSignal.NeedRaised in runSignals(definition, scouting, stopped))
+        val approval = run(WorkflowRunStatus.Running, taskRun("scout", TaskRunStatus.AwaitingApproval), taskRun("write", TaskRunStatus.Blocked))
+        assertTrue(RunSignal.NeedRaised in runSignals(definition, scouting, approval))
+        assertTrue(RunSignal.NeedRaised !in runSignals(definition, eggs, scouting))
+    }
+
+    @Test
+    fun aGrowingCountOfDisputeNotesIsADisputeOpened() {
+        assertEquals(setOf(RunSignal.DisputeOpened), runSignals(definition, scouting, scouting, disputesBefore = 0, disputesAfter = 1))
+        assertEquals(emptySet(), runSignals(definition, scouting, scouting, disputesBefore = 1, disputesAfter = 1))
+    }
+
+    @Test
+    fun onlyDisputeNotesAreCounted() {
+        val notes = listOf(
+            QueenNote("a", QueenVoice.DisputeNeedsYou),
+            QueenNote("b", QueenVoice.StatusIdle),
+            QueenNote("c", QueenVoice.DisputeResearching),
+        )
+        assertEquals(2, disputeLines(notes))
+        assertEquals(0, disputeLines(emptyList()))
+    }
+
+    @Test
+    fun theNewKindsMeetOnlyTheirOwnSteps() {
+        assertTrue(expectationMet(TourExpect(ExpectKind.RunNeedRaised, null), TourEvent.Run(RunSignal.NeedRaised)))
+        assertTrue(expectationMet(TourExpect(ExpectKind.RunDisputeOpened, null), TourEvent.Run(RunSignal.DisputeOpened)))
+        assertTrue(!expectationMet(TourExpect(ExpectKind.RunNeedRaised, null), TourEvent.Run(RunSignal.DisputeOpened)))
+        assertEquals(ExpectKind.RunNeedRaised, ExpectKind.fromWire("runNeedRaised"))
+        assertEquals(ExpectKind.RunDisputeOpened, ExpectKind.fromWire("runDisputeOpened"))
     }
 }

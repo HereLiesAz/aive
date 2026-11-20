@@ -704,6 +704,15 @@ fun App(
         com.hereliesaz.geministrator.tour.LessonArtifactBridge.rowsOf = rowsOf
         active.playLessonCreatures(rowsOf)
     }
+    // The queen revises lessons not yet played from the keeper's feelings and the run's events (LessonRevisions.kt).
+    LaunchedEffect(runtime, orchestrationRuntime) {
+        val active = runtime
+        val planner = orchestrationRuntime
+        if (active != null && planner != null) {
+            val store = com.hereliesaz.geministrator.tour.ComfortStore(DurableUiState.store, com.hereliesaz.geministrator.tour.TourTargetId.registeredIds)
+            active.reviseLessons(planner) { store.load() }
+        }
+    }
     LaunchedEffect(runtime, orchestrationRuntime) {
         onSwarmDrafterAvailable(
             orchestrationRuntime?.let { planner ->
