@@ -272,7 +272,7 @@ class MemoryLayerController(
         selectedOwnStore() ?: throw IllegalStateException("No workflow's memory bank is selected")
 
     /**
-     * The keeper's own memory, written in the Vault (docs/Memory-Vault.md), banked into the selected swarm's bank the way an agent's
+     * The keeper's own memory, written in the Memory Web (docs/Memory-Web.md), banked into the selected swarm's bank the way an agent's
      * deliberate note is: the same queue and consolidation, so afterwards it is an ordinary memory, recalled and linked like any other.
      * Null when no swarm's bank is selected or [text] is blank.
      */
