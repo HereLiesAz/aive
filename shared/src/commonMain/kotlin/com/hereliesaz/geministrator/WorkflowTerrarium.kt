@@ -31,6 +31,7 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import com.hereliesaz.geministrator.resources.Res
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -43,6 +44,7 @@ import com.hereliesaz.geministrator.resources.hive_new_empty
 import com.hereliesaz.geministrator.resources.terrarium_could_not_stage_workflow_edit
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.verticalScroll
@@ -185,17 +187,32 @@ internal fun GeministratorWorkflowTerrarium(
         }
     }
 
+    // Edits are staged one at a time, in the order they were made, and each shows at once: a second tap before the first
+    // has finished staging builds on the first's result, so neither is lost.
+    // What was typed in a job card and not yet applied survives the card going away (rehearsal turns the creature back).
+    val jobDrafts = remember(definition.id) { JobDrafts() }
+    val stagingLock = remember { kotlinx.coroutines.sync.Mutex() }
     fun applyEdit(edit: TerrariumDependencyEditResult) {
         when (edit) {
-            is TerrariumDependencyEditResult.Applied -> scope.launch {
-                runCatching { stageDefinition(edit.definition) }
-                    .onSuccess { persisted ->
-                        tide = tide.record(persisted)
-                        authoringMessage = null
+            is TerrariumDependencyEditResult.Applied -> {
+                val candidate = edit.definition
+                val before = tide
+                tide = tide.record(candidate)
+                authoringMessage = null
+                scope.launch {
+                    stagingLock.withLock {
+                        runCatching { stageDefinition(candidate) }
+                            .onSuccess { persisted ->
+                                // The staged copy carries the draft's own id: swap it in only while the edit is still the present.
+                                if (tide.present == candidate && persisted != candidate) tide = tide.copy(present = persisted)
+                            }
+                            .onFailure { failure ->
+                                // Not staged: take the edit back (if nothing was edited after it) and say so.
+                                if (tide.present == candidate) tide = before.copy(future = emptyList())
+                                authoringMessage = failure.message ?: getString(Res.string.terrarium_could_not_stage_workflow_edit)
+                            }
                     }
-                    .onFailure { failure ->
-                        authoringMessage = failure.message ?: getString(Res.string.terrarium_could_not_stage_workflow_edit)
-                    }
+                }
             }
             TerrariumDependencyEditResult.NoChange -> Unit
             is TerrariumDependencyEditResult.Rejected -> authoringMessage = edit.reason
@@ -234,6 +251,26 @@ internal fun GeministratorWorkflowTerrarium(
                 onShowStep = { other -> flipHost.send(CardFlipEvent.OtherNodeTapped(other)) },
                 modifier = detailModifier,
             )
+            // On a phone the shell's sheet carries the detail, and the job card rides in it with the creature's acts,
+            // where nothing can cover it; in the field the card would sit under the sheet's peek.
+            if (flipHost.sheetHosted) {
+                stagedDefinition.tasks.firstOrNull { it.id.value == taskId }?.let { sheetTask ->
+                    androidx.compose.foundation.layout.Column(
+                        detailModifier
+                            .heightIn(max = 420.dp)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        HiveJobEditor(definition = stagedDefinition, task = sheetTask, onEdit = ::applyEdit, drafts = jobDrafts)
+                        TerrariumCreatureActions(
+                            definition = stagedDefinition,
+                            selected = sheetTask,
+                            onEdit = ::applyEdit,
+                            removeBlocked = terrariumRemoveBlocked(liveRun),
+                        )
+                    }
+                }
+            }
         }
     }
     DisposableEffect(flipHost) {
@@ -478,11 +515,13 @@ internal fun GeministratorWorkflowTerrarium(
             )
           }
             // In Build the tapped creature opens its job on the tissue itself: a card grown from the foot of
+            // (the camera keeps the tapped creature centred, above the card; "under" means below the creature's card in the field, not
+            // beside the creature wherever it sits)
             // the field with the objective, approval, tries, time and the rest, so the settings are inside
             // the hive and not a form under it. Everything the form had is here; undo and redo apply to it.
             // It belongs to the creature that has turned over to its step's card (Edit's card flip), and rises
             // under that card, so the creature opens in place as card and settings together.
-            if (building && rehearsal == null && grouping == null) {
+            if (building && rehearsal == null && grouping == null && !flipHost.sheetHosted) {
                 stagedDefinition.tasks.firstOrNull { it.id.value == selectedTaskId && it.id.value == flippedId }?.let { openTask ->
                     // Keyed by the creature, so the next one opens at its own top and not at the last one's scroll.
                     androidx.compose.runtime.key(openTask.id) { Box(Modifier.fillMaxSize()) {
@@ -501,7 +540,7 @@ internal fun GeministratorWorkflowTerrarium(
                                     .verticalScroll(rememberScrollState())
                                     .padding(horizontal = 16.dp, vertical = 14.dp),
                             ) {
-                                HiveJobEditor(definition = stagedDefinition, task = openTask, onEdit = ::applyEdit)
+                                HiveJobEditor(definition = stagedDefinition, task = openTask, onEdit = ::applyEdit, drafts = jobDrafts)
                                 TerrariumCreatureActions(
                                     definition = stagedDefinition,
                                     selected = openTask,

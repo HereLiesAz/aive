@@ -117,9 +117,13 @@ internal fun HiveJobEditor(
     onOpenEdit: (() -> Unit)? = null,
     /** Opens Compute, where it is chosen where a job runs. Null leaves the row plain. */
     onOpenCompute: (() -> Unit)? = null,
+    /** Where unapplied text is kept, so it outlives this editor leaving the screen; null keeps it only while shown. */
+    drafts: JobDrafts? = null,
 ) {
-    var objective by remember(task.id, task.objective) { mutableStateOf(task.objective) }
-    var newCriterion by remember(task.id) { mutableStateOf("") }
+    val objectiveState = drafts?.objective(task.id, task.objective) ?: remember(task.id, task.objective) { mutableStateOf(task.objective) }
+    var objective by objectiveState
+    val criterionState = drafts?.criterion(task.id) ?: remember(task.id) { mutableStateOf("") }
+    var newCriterion by criterionState
     val criteria = task.acceptanceCriteria.map { it.description }
     val asksPerson = task.approvalPolicy == ApprovalPolicy.HumanApproval
     val addCriterion = {
@@ -532,4 +536,41 @@ private fun StepContractRows(
             }
         }
     }
+}
+
+/**
+ * Text typed into a job card and not yet applied (an objective, a criterion), by task. Held by whoever shows the card, so
+ * closing and reopening it (rehearsal turns the creature back) does not lose what was typed.
+ */
+internal class JobDrafts {
+    private val objectives = androidx.compose.runtime.mutableStateMapOf<com.hereliesaz.geministrator.domain.TaskDefinitionId, String>()
+    private val criteria = androidx.compose.runtime.mutableStateMapOf<com.hereliesaz.geministrator.domain.TaskDefinitionId, String>()
+
+    /** The objective as typed, else [current]; setting it back to [current] drops the draft. */
+    fun objective(id: com.hereliesaz.geministrator.domain.TaskDefinitionId, current: String): androidx.compose.runtime.MutableState<String> =
+        object : androidx.compose.runtime.MutableState<String> {
+            override var value: String
+                get() = objectives[id] ?: current
+                set(next) {
+                    if (next == current) objectives.remove(id) else objectives[id] = next
+                }
+
+            override fun component1() = value
+
+            override fun component2(): (String) -> Unit = { value = it }
+        }
+
+    /** The criterion being typed. */
+    fun criterion(id: com.hereliesaz.geministrator.domain.TaskDefinitionId): androidx.compose.runtime.MutableState<String> =
+        object : androidx.compose.runtime.MutableState<String> {
+            override var value: String
+                get() = criteria[id].orEmpty()
+                set(next) {
+                    if (next.isEmpty()) criteria.remove(id) else criteria[id] = next
+                }
+
+            override fun component1() = value
+
+            override fun component2(): (String) -> Unit = { value = it }
+        }
 }
