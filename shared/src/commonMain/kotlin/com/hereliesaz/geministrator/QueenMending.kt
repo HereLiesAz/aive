@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.domain.TaskRunStatus
+import com.hereliesaz.geministrator.domain.isUntrusted
 import com.hereliesaz.geministrator.intro.TutorialRouter
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
 import kotlinx.coroutines.CancellationException
@@ -21,10 +22,10 @@ internal suspend fun ApplicationRuntime.mendTeachingSwarms(planner: Orchestratio
     state.collect { current ->
         val live = current as? ApplicationRuntimeState.Live ?: return@collect
         val run = live.presentation.run
-        if (!TutorialRouter.isTutorialGoal(run.objective)) return@collect
+        if (!TutorialRouter.isTutorialGoal(run.objective) || run.objectiveProvenance.isUntrusted()) return@collect
         for ((taskId, taskRun) in run.taskRuns) {
             if (taskRun.status != TaskRunStatus.Escalated || taskRun.attempt >= MAX_MENDED_ATTEMPT) continue
-            if (!handled.add("${run.id.value}:${taskId.value}:${taskRun.attempt}")) continue
+            if (!handled.add("${run.id.value}:${taskId.value}:${taskRun.attempt}") || !repairsStarted.add("${run.id.value}:${taskId.value}:${taskRun.attempt}")) continue
             try {
                 repairFailureEscalation(taskId, planner, note = "The queen rebuilt the plan herself (a swarm that teaches the app)")
             } catch (cancelled: CancellationException) {

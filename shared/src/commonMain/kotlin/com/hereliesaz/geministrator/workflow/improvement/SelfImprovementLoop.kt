@@ -143,6 +143,19 @@ object LoopIntegrity {
     private const val NO_APPROVAL = "The loop must not hold anything up: it has no approval step."
     private const val READS_ONLY = "The loop only reads and reports: no repository, script, deployment, action, test, external-service, nested-workflow or distributed step."
 
+    /**
+     * The queen as every hive gets her (SwarmQueen.kt `ensureQueen`) and nothing more: the Orchestrator role run by an agent, no wait,
+     * no approval, no condition, no hold, failing the swarm rather than asking a person, changing nothing. Only such a creature
+     * stands outside the chain the rules below judge; an Orchestrator-role step with any other executor, gate or authority is judged
+     * like every step.
+     */
+    private fun isStockQueen(task: TaskDefinition): Boolean =
+        effectiveRole(task) == com.hereliesaz.geministrator.domain.BuiltInRoles.Orchestrator.id &&
+            (task.executor == null || (task.executor as? TaskExecutor.RoleAgent)?.roleId == com.hereliesaz.geministrator.domain.BuiltInRoles.Orchestrator.id) &&
+            task.dependsOn.isEmpty() && task.approvalPolicy == ApprovalPolicy.None && task.condition == TaskCondition.Always &&
+            !task.holdOutput && task.escalationPolicy == EscalationPolicy.FailWorkflow &&
+            task.requiredRoleAuthority !in changingAuthorities
+
     /** The role a step really runs as: the one dispatch uses ([TaskExecutor.RoleAgent]) before the step's own [TaskDefinition.roleId]. */
     private fun effectiveRole(task: TaskDefinition) = (task.executor as? TaskExecutor.RoleAgent)?.roleId ?: task.roleId
 
@@ -150,7 +163,7 @@ object LoopIntegrity {
     fun violations(definition: WorkflowDefinition, roles: Collection<RoleDefinition> = emptyList()): List<String> {
         val problems = linkedSetOf<String>()
         // Every hive has a queen (keeper ruling): she stewards the loop and is no step of its chain, so the rules below judge the rest.
-        val tasks = definition.tasks.filterNot { effectiveRole(it) == com.hereliesaz.geministrator.domain.BuiltInRoles.Orchestrator.id }
+        val tasks = definition.tasks.filterNot(::isStockQueen)
         val byId = tasks.associateBy { it.id.value }
         val examine = byId["examine-loop"]
         val challenge = byId["challenge-loop"]

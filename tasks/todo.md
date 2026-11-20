@@ -134,3 +134,6 @@ Built or already true: D1, D2, D3, D4, D5, D6, D7, D8, D9, D10, D11, D12 (the si
 ## Findings 2026-11-20 (run 3198, first green main since #957)
 - The desktop first hive now completes (6 creatures, plan approved by the Reviewer, then the tour plays with the lesson creatures' overlays).
 - The web app (aive-web-app artifact, Chromium via Playwright) renders the first-hive form with no page errors; pressing Work ends in "The swarm can't reach its agents" with Try again and Connections, although LLM7 and OVHcloud answer CORS preflights with `access-control-allow-origin: *`. Not traced: whether the web build links a free Source at all.
+
+- Web, after #981 and #990 (run for #993, green): the browser plans and calls the Sources it can reach (LLM7, OVHcloud; Kilo and BlockRun send no CORS headers and are left out). With both rate-limited from the test IP it ends in the plain "Out of credit with this source" line with Check connections. Not seen: a full web first hive to Completed.
+- Desktop, same run: the queen plans alone while a candidate Source is limited to five requests a minute or fewer; OVHcloud failed over to BlockRun on screen; the first hive completed with two creatures and the tour played in the lesson creature's voice.
