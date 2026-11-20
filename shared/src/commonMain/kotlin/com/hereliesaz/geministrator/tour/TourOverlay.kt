@@ -86,6 +86,7 @@ import com.hereliesaz.geministrator.resources.tour_reply_yes
 import com.hereliesaz.geministrator.resources.tour_resume
 import com.hereliesaz.geministrator.resources.tour_state_description
 import com.hereliesaz.geministrator.resources.tour_step_count
+import com.hereliesaz.geministrator.resources.tour_status_line
 import com.hereliesaz.geministrator.resources.tour_stop
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
@@ -320,6 +321,12 @@ private fun TourCard(state: TourState, step: LessonPayload) {
                 // Generated text is untrusted: plain Text only, never parsed or linked.
                 Text(plain(state.note ?: step.sentence), style = AzphaltType.body, color = azphaltOnSurface())
             }
+            // Where things stand, in the card's own words: what is done and what is left (never a score, never a question).
+            Text(
+                stringResource(Res.string.tour_status_line, (state.stepNumber - 1).coerceAtLeast(0), (state.stepTotal - state.stepNumber).coerceAtLeast(0)),
+                style = AzphaltType.eyebrow,
+                color = azphaltOnSurface(),
+            )
             hiveLineText(TourController.hive, CreatureSpots.focus)?.let { line ->
                 Text(line, style = AzphaltType.eyebrow, color = azphaltOnSurface(), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
