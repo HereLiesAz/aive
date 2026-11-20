@@ -4,6 +4,7 @@ import com.hereliesaz.geministrator.intro.TutorialRouter
 import com.hereliesaz.geministrator.tour.LessonArtifactBridge
 import com.hereliesaz.geministrator.tour.TargetRow
 import com.hereliesaz.geministrator.tour.TourController
+import com.hereliesaz.geministrator.workflow.isTerminal
 
 /**
  * The swarm's own lesson creatures hand in the overlays (tour/LessonArtifactBridge.kt). In a run for a goal to be taught the app, a
@@ -18,6 +19,7 @@ internal suspend fun ApplicationRuntime.playLessonCreatures(rowsOf: () -> List<T
         val live = current as? ApplicationRuntimeState.Live ?: return@collect
         val run = live.presentation.run
         if (!TutorialRouter.isTutorialGoal(run.objective)) return@collect
+        LessonArtifactBridge.writing = !run.status.isTerminal()
         if (TourController.state == null) return@collect
         val lessons = LessonArtifactBridge.newLessons(run, rowsOf(), played)
         if (lessons.isEmpty()) return@collect

@@ -37,6 +37,9 @@ object LessonArtifactBridge {
     /** True once a lesson creature of the current tour has had a lesson played; the in-process writer then steps aside. */
     var supplied: Boolean = false
 
+    /** True while the swarm that writes the lessons is still running: the tour is not finished however few lessons are in hand. */
+    var writing: Boolean = false
+
     private val json = Json { isLenient = false }
 
     /** The last line of [output] that is one JSON object holding both a target and a sentence, or null. */
