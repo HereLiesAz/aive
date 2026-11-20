@@ -4,6 +4,8 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.91 — from 2026-11-19
 
+- **A Source that answers a few requests a minute plans alone.** Running the CI desktop build, "Asking two more planners for their drafts" sat behind OVHcloud's two-requests-a-minute limit (LLM7 was out of credit and the plan failed over to it), so a first plan took minutes. While any Source the planners may use is limited to five requests a minute or fewer, the queen plans alone and the plan is reviewed as before (`FailoverOrchestrationAgentRuntime.planners`). Test added. Not run here; main CI is the compile.
+
 - **The web app leaves out the free Source a browser cannot call.** With the queen planning in the browser (main run 3209, first green), the first hive reached Kilo, whose server refuses the cross-origin preflight, and ended in "Fail to fetch" although LLM7 and OVHcloud, also linked, answer browsers. The web build now leaves Kilo out of the providers, the plan and the queen's model, so the next free Source answers. Found by running the CI web artifact in Chromium. Not run here; main CI is the compile.
 
 - **The Android unit tests pass again.** Run 3208 passed every shared, desktop and provider test and failed only `AndroidWorkflowLifecycleSmokeTest` (a null pointer and a launch timeout): the artifact-folder settings (#983) built a platform `Settings()` on the first publish, which has no store in a unit test, and that failure was outside any guard. The store is now optional there and the feature is simply off when it is missing. Not run here; main CI is the compile.

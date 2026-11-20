@@ -31,7 +31,7 @@ class FailoverOrchestrationAgentRuntime(
 
     /** One planner for each lens, each trying the Sources in an order turned one place further than the last, so the first Source it asks is not the queen's when there is another. */
     override val planners: List<OrchestrationAgentRuntime>
-        get() = if (candidates.isEmpty()) {
+        get() = if (candidates.isEmpty() || candidates.any { tightlyLimited(it.providerId) }) {
             emptyList()
         } else {
             PlannerLens.entries.indices.map { index ->
@@ -39,6 +39,14 @@ class FailoverOrchestrationAgentRuntime(
                 FailoverOrchestrationAgentRuntime(candidates.drop(turn) + candidates.take(turn), bench)
             }
         }
+
+    /**
+     * A Source that answers only a few requests a minute (a keyless one such as OVHcloud) cannot carry three more drafts and a merge:
+     * they would queue behind its limit for minutes. While any candidate is one, the queen plans alone and the plan is reviewed as before.
+     */
+    private fun tightlyLimited(providerId: String): Boolean =
+        com.hereliesaz.geministrator.ProviderCatalog.keylessRateLimit(providerId)
+            ?.let { limit -> limit.requests * 60_000L / limit.windowMillis <= TIGHT_REQUESTS_PER_MINUTE } == true
 
     override suspend fun plan(packet: OrchestrationPacket): OrchestrationPlan = attempt { it.plan(packet) }
 
@@ -80,3 +88,5 @@ class FailoverOrchestrationAgentRuntime(
         reportLaunchProgress(note)
     }
 }
+
+private const val TIGHT_REQUESTS_PER_MINUTE = 5L
