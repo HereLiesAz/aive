@@ -77,7 +77,7 @@ internal class RunLogSources(
     val integrity: suspend () -> ChainStatus = { ChainStatus.NoChain },
 )
 
-private const val LOG_SOURCE_KEY = "overview.timeline.log.source"
+internal const val LOG_SOURCE_KEY = "overview.timeline.log.source"
 private const val ALL_ROLES = "\u0000all-roles"
 
 /**
@@ -93,8 +93,12 @@ internal fun RunLogView(
     modifier: Modifier = Modifier,
     /** Opens the creature a run-event row is about; rows with a creature are links when set. */
     onTaskSelected: ((String) -> Unit)? = null,
+    /** The picked source, shared with whoever else picks it (the Story's stack under its breadcrumb step); null keeps its own. */
+    sourceState: androidx.compose.runtime.MutableState<String>? = null,
+    /** False when the sources are picked elsewhere (the Story's stack), so no row of them is drawn here. */
+    showSourceTabs: Boolean = true,
 ) {
-    var picked by rememberDurableStringState(LOG_SOURCE_KEY, LogSource.Run.name)
+    var picked by sourceState ?: rememberDurableStringState(LOG_SOURCE_KEY, LogSource.Run.name)
     val available = remember(sources.memory) {
         LogSource.entries.filter { it != LogSource.Memory || sources.memory != null }
     }
@@ -119,14 +123,16 @@ internal fun RunLogView(
     val roleShown = role?.takeIf { it in roles }
     val lines = remember(sourceLines, roleShown) { linesForRole(sourceLines, roleShown) }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        AzphaltTabs(
-            tabs = available.map { AzphaltTabItem(it.name, logSourceLabel(it)) },
-            selectedKey = source.name,
-            onSelected = { picked = it },
-            seedPrefix = "log-source",
-            keepSelectedInView = true,
-            wrap = true,
-        )
+        if (showSourceTabs) {
+            AzphaltTabs(
+                tabs = available.map { AzphaltTabItem(it.name, logSourceLabel(it)) },
+                selectedKey = source.name,
+                onSelected = { picked = it },
+                seedPrefix = "log-source",
+                keepSelectedInView = true,
+                wrap = true,
+            )
+        }
         Text(logSourceNote(source), style = AzphaltType.endCap, color = azphaltOnSurface())
         if (source == LogSource.Run) {
             val integrity by produceState<ChainStatus>(ChainStatus.NoChain, events) { value = runCatching { sources.integrity() }.getOrDefault(ChainStatus.NoChain) }
@@ -223,7 +229,7 @@ private fun LogRow(line: LogLine, onTaskSelected: ((String) -> Unit)?) {
 }
 
 @Composable
-private fun logSourceLabel(source: LogSource): String = stringResource(
+internal fun logSourceLabel(source: LogSource): String = stringResource(
     when (source) {
         LogSource.Activity -> Res.string.log_source_activity
         LogSource.Run -> Res.string.log_source_run
