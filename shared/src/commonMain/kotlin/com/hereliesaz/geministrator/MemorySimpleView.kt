@@ -8,10 +8,13 @@ import com.hereliesaz.geministrator.memory.MemoryRelationKind
 import com.hereliesaz.geministrator.memory.MemorySnapshot
 import com.hereliesaz.geministrator.memory.waitingToConsolidate
 
-/** The Memory swarm's two views: the memory field (Simple, the default) and every control (Technical). */
+/** The Memory swarm's views: the memory field (Simple, the default), every control (Technical) and the Memory Web. */
 internal enum class MemoryView {
     Simple,
     Technical,
+
+    /** The Memory Web: every memory as a mind map and as linked notes (docs/Memory-Web.md). */
+    Web,
     ;
 
     companion object {

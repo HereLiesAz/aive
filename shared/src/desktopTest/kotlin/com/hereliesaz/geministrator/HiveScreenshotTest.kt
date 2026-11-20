@@ -623,6 +623,9 @@ class HiveScreenshotTest {
         shoot("41-memory-simple-mid", 1400, 1700) { memory(MemoryView.Simple, false)() }
         shoot("42-memory-simple-phone", 824, 1830) { memory(MemoryView.Simple, true)() }
         shoot("43-memory-technical", 2400, 1500) { memory(MemoryView.Technical, false)() }
+        // The Memory Web reads the same bank off the main thread (a layout), so it is given real time to settle.
+        shootSettled("44-memory-web", 2400, 2600, 3_000) { memory(MemoryView.Web, false)() }
+        shootSettled("45-memory-web-phone", 824, 2400, 3_000) { memory(MemoryView.Web, true)() }
         DurableUiState.store.putString(MemoryView.STORAGE_KEY, MemoryView.Simple.name)
     }
 

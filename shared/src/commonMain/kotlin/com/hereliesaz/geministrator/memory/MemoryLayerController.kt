@@ -272,6 +272,18 @@ class MemoryLayerController(
         selectedOwnStore() ?: throw IllegalStateException("No workflow's memory bank is selected")
 
     /**
+     * Everything the selected swarm's memory layer holds, for the Memory Web (docs/Memory-Web.md): its bank (own and inherited), the
+     * habits and sequences its runs formed, and its procedures. Empty when no swarm's bank is selected.
+     */
+    suspend fun webSource(): MemoryWebSource {
+        val workflow = selectedWorkflow() ?: return MemoryWebSource(MemorySnapshot())
+        val habits = runCatchingCancellable { formedHabits(workflow) }.getOrDefault(emptyList())
+        val sequences = runCatchingCancellable { formedSequences(workflow) }.getOrDefault(emptyList())
+        val procedures = runCatchingCancellable { procedureCatalog?.visible(workflow).orEmpty().map { it.definition } }.getOrDefault(emptyList())
+        return MemoryWebSource(lineageStore(workflow).read(), habits, sequences, procedures)
+    }
+
+    /**
      * The keeper's own memory, written in the Memory Web (docs/Memory-Web.md), banked into the selected swarm's bank the way an agent's
      * deliberate note is: the same queue and consolidation, so afterwards it is an ordinary memory, recalled and linked like any other.
      * Null when no swarm's bank is selected or [text] is blank.
