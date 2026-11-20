@@ -41,7 +41,7 @@ class CheckInMessageTest {
 
     @Test
     fun theFourQuickRepliesAreTheOverlaysFour() {
-        assertEquals(CheckInReply.entries, CheckInMessages.replies)
+        assertEquals(CheckInReply.entries.toList(), CheckInMessages.replies.toList())
     }
 
     @Test
@@ -49,6 +49,6 @@ class CheckInMessageTest {
         val got = mutableListOf<CheckInReply>()
         TourController.checkInSink = { reply: CheckInReply -> got.add(reply); Unit }
         CheckInMessages.replies.forEach { TourController.reply(it) }
-        assertEquals(CheckInReply.entries, got)
+        assertEquals(CheckInReply.entries.toList(), got.toList())
     }
 }
