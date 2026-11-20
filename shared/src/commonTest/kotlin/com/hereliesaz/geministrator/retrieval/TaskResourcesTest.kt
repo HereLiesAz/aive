@@ -161,6 +161,14 @@ class TaskResourcesTest {
     )
 
     @Test
+    fun inASwarmThatTeachesTheAppOnlyAReviewingCreatureIsOptional() {
+        assertTrue(OrchestratedWorkflowFactory.teachingReview("Teach me how to use the Aive", "reviewer"))
+        assertTrue(OrchestratedWorkflowFactory.teachingReview("Teach me how to use the Aive", "adversarial-reviewer"))
+        assertFalse(OrchestratedWorkflowFactory.teachingReview("Teach me how to use the Aive", "researcher"))
+        assertFalse(OrchestratedWorkflowFactory.teachingReview("Fix the login bug", "reviewer"))
+    }
+
+    @Test
     fun aTutorialPlanWithNoDocsGetsThemOnItsFirstResearchLikeCreature() {
         val tasks = listOf(task("plan", "planner"), task("look", "researcher"), task("write", "writer"))
         val out = OrchestratedWorkflowFactory.withTutorialDocs("Teach me how to use the Aive", tasks)
