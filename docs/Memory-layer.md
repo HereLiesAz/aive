@@ -592,6 +592,7 @@ The **Memory** destination (every platform) is the whole layer in one place, dri
   summary (or that it is still pending), and its explicit history (`MemoryLayerController.history`:
   what it replaced and was condensed from). Each stored episode can open its whole summary tree,
   indented by level.
+- **Memory Web:** every memory the layer holds as a mind map (size by weight, line width by link strength, colour by kind) and as linked notes with backlinks; the keeper may write a memory of their own. See [Memory-Web.md](Memory-Web.md).
 - **Projects:** every project with swarm banks, its expansions, a control to expand it to include
   another project (`MemoryLayerController.expandProject`, a reason is required; add-only), and its own
   raw retention (`rawRetentionByProject`: global, keep all, cap by size, cap by age).
