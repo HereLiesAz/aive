@@ -198,7 +198,16 @@ jobs:
       # kotlin-stdlib-2.4.21.jar" while the installer jobs, with caches of their own, built fine. Re-resolving once
       # drops the stale lookups; the run that passes saves a clean cache.
       - name: Refresh cached dependency lookups
-        run: ./gradlew --refresh-dependencies help
+        # A download that fails here is retried twice; if it still fails the next step resolves for itself and says so
+        # if something is really missing, so this step alone never decides the run.
+        continue-on-error: true
+        run: |
+          for attempt in 1 2 3; do
+            ./gradlew --refresh-dependencies help && exit 0
+            echo "::warning::Refresh attempt $attempt failed"
+            sleep $((attempt * 20))
+          done
+          exit 1
 
       - name: Test shared domain
         run: ./gradlew :shared:desktopTest
