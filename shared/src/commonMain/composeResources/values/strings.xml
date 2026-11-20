@@ -2286,7 +2286,6 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="tour_close_made_small2">Wait for the swarm to finish.</string>
     <string name="tour_target_made">What it made</string>
     <string name="tour_step_count">Step %1$d of %2$d</string>
-    <string name="tour_status_line">Done: %1$d. Left: %2$d.</string>
     <string name="tour_state_description">Tour step %1$d of %2$d</string>
     <string name="tour_reply_yes">Yes, keep going</string>
     <string name="tour_reply_sort_of">Sort of, say it another way</string>
