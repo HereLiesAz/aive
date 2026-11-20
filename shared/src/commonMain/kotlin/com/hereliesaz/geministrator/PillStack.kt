@@ -53,7 +53,8 @@ internal fun rememberCrumbAnchors(): MutableMap<String, Float> = remember { muta
  * it is not right-anchored, it hangs under the breadcrumb step it belongs to, [anchorKey]).
  *
  * The stack is a column of pills at HG2Gui's 48dp pitch. Choosing a host moves the stack aside: the host
- * parks at the bottom as the anchor for the next layer, its children cascade upward from it, and the
+ * parks at the top as the anchor for the next layer, its children cascade downward from it (the keeper's
+ * choice, against HG2Gui's upward cascade), and the
  * path chosen so far rides beside it as overlapping trail crumbs. A crumb returns to that point; the host
  * itself steps back one layer. [selectedKey] is the leaf that is open now, drawn selected.
  */
@@ -84,10 +85,10 @@ internal fun PillStack(
         AnimatedContent(
             targetState = path,
             transitionSpec = {
-                // Structural, not a fade (DESIGN.md §4): a deeper layer's children rise from the host, a shallower one drops back.
+                // Structural, not a fade (DESIGN.md §4): a deeper layer's children drop from the host, a shallower one lifts back.
                 val deeper = targetState.size > initialState.size
-                (slideInVertically(tween(180)) { if (deeper) it / 3 else -it / 3 } togetherWith
-                    slideOutVertically(tween(150)) { if (deeper) -it / 3 else it / 3 })
+                (slideInVertically(tween(180)) { if (deeper) -it / 3 else it / 3 } togetherWith
+                    slideOutVertically(tween(150)) { if (deeper) it / 3 else -it / 3 })
                     .using(SizeTransform(clip = false))
             },
             label = "pill-stack",
@@ -95,19 +96,9 @@ internal fun PillStack(
             val hosts = hostsAlong(items, shownPath)
             val level = hosts.lastOrNull()?.children ?: items
             Column(Modifier.selectableGroup()) {
-                level.forEach { item ->
-                    AzphaltPill(
-                        label = item.label,
-                        seed = "$seedPrefix-${item.key}",
-                        selected = item.key == selectedKey,
-                        endCap = item.endCap ?: if (item.children.isNotEmpty()) "›" else null,
-                        onClick = {
-                            if (item.children.isNotEmpty()) path = shownPath + item.key else onSelect(item.key)
-                        },
-                    )
-                }
                 if (hosts.isNotEmpty()) {
-                    // The host parked below its children, with the trail of how it was reached beside it.
+                    // The host parks at the top as the anchor of the layer, with the trail of how it was reached beside it;
+                    // its children stack downward beneath it.
                     Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                         val host = hosts.last()
                         AzphaltPill(
@@ -127,6 +118,17 @@ internal fun PillStack(
                             )
                         }
                     }
+                }
+                level.forEach { item ->
+                    AzphaltPill(
+                        label = item.label,
+                        seed = "$seedPrefix-${item.key}",
+                        selected = item.key == selectedKey,
+                        endCap = item.endCap ?: if (item.children.isNotEmpty()) "›" else null,
+                        onClick = {
+                            if (item.children.isNotEmpty()) path = shownPath + item.key else onSelect(item.key)
+                        },
+                    )
                 }
             }
         }
