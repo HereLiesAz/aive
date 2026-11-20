@@ -108,7 +108,7 @@ class ShortFilmWorkflowTest {
         assertEquals(1, host.installCreativeSuite())
         val id = WorkflowDefinitionId("short-film")
         assertTrue(id in authored.all())
-        assertEquals(hive, persistence.definitions.get(id))
+        assertEquals(com.hereliesaz.geministrator.ensureQueen(hive), persistence.definitions.get(id), "the hive is stored with its queen")
         assertEquals(0, host.installCreativeSuite(), "a second install adds nothing")
 
         val edited = hive.copy(name = "My film")

@@ -149,7 +149,8 @@ object LoopIntegrity {
     /** The ways [definition] is not the loop. [roles] (the installed roles) lets the roles its steps use be checked too; empty skips that. */
     fun violations(definition: WorkflowDefinition, roles: Collection<RoleDefinition> = emptyList()): List<String> {
         val problems = linkedSetOf<String>()
-        val tasks = definition.tasks
+        // Every hive has a queen (keeper ruling): she stewards the loop and is no step of its chain, so the rules below judge the rest.
+        val tasks = definition.tasks.filterNot { effectiveRole(it) == com.hereliesaz.geministrator.domain.BuiltInRoles.Orchestrator.id }
         val byId = tasks.associateBy { it.id.value }
         val examine = byId["examine-loop"]
         val challenge = byId["challenge-loop"]
