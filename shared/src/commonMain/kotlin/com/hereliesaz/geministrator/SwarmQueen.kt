@@ -1,6 +1,8 @@
 package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.domain.BuiltInRoles
+import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.RoleExecutionSource
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
@@ -43,3 +45,10 @@ internal fun ensureQueen(definition: WorkflowDefinition): WorkflowDefinition {
     )
     return definition.copy(tasks = definition.tasks + queen)
 }
+
+/**
+ * Whether the queen is run by a model under [roles] (the keeper's own Orchestrator, else the built-in one). A swarm that
+ * teaches the app needs one (keeper ruling): a queen who runs as code may steer other swarms, never the first lesson.
+ */
+internal fun queenRunsOnModel(roles: Collection<RoleDefinition>): Boolean =
+    (roles.firstOrNull { it.id == BuiltInRoles.Orchestrator.id } ?: BuiltInRoles.Orchestrator).executionSource == RoleExecutionSource.Agent
