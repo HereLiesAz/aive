@@ -555,6 +555,7 @@ fun main() {
                     lan = A2aLanSetting(
                         enabled = a2aLan,
                         agentCardUrls = if (a2aStatus is A2aServerStatus.Listening) a2aServer.lanAgentCardUrls() else emptyList(),
+                        certificateFingerprint = if (a2aStatus is A2aServerStatus.Listening) a2aServer.tlsFingerprint else null,
                         allowedClients = a2aAllowedClients,
                         waitingClients = a2aWaitingClients,
                         onEnabledChange = { open ->

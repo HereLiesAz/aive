@@ -2,11 +2,12 @@
     const failStartup = (message, error) => {
         console.error(message, error || "");
         globalThis.__aiveStartupError = error ? `${message} ${error}` : message;
-        const splash = document.getElementById("aiveSplash");
-        if (splash) {
-            splash.setAttribute("aria-label", "The Aive failed to start");
-            splash.dataset.startupError = globalThis.__aiveStartupError;
-        }
+        // With no splash to carry it, a failed start says so in the page itself.
+        const notice = document.createElement("p");
+        notice.setAttribute("role", "alert");
+        notice.textContent = "The Aive failed to start. " + globalThis.__aiveStartupError;
+        notice.style.cssText = "font-family:sans-serif;color:#F2E8D9;background:#1E1A17;margin:0;padding:16px;white-space:pre-wrap";
+        document.body.appendChild(notice);
     };
 
     const normalizeBrowserLocale = () => {

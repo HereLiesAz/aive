@@ -300,6 +300,18 @@ jobs:
       - name: Build Web Wasm
         run: ./gradlew :webApp:wasmJsBrowserProductionWebpack
 
+      # The runnable web app: the bundle plus index.html, styles and the manifest, assembled the way
+      # a browser needs them. Published by deploy-pages under /app/.
+      - name: Assemble web app distribution
+        run: ./gradlew :webApp:wasmJsBrowserDistribution
+
+      - name: Upload web app
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: aive-web-app
+          path: webApp/build/dist/wasmJs/productionExecutable/
+          if-no-files-found: error
+
       - name: Generate release notes
         shell: bash
         run: |
@@ -673,9 +685,13 @@ jobs:
           make-latest: "true"
           migrate-legacy-build-releases: "true"
 
-  # Standalone puppet-rig PWA until the full Aive browser app is connected.
-  # Deliberately independent of Android/Desktop/Wasm build success.
+  # The Pages site: the Aive web app under /app/, the puppet-rig editor at the root (its URL is
+  # unchanged) and the privacy page the Android manifest names. The puppet-rig and privacy page are
+  # deliberately independent of the builds: when the web app was not built or its artifact is missing,
+  # the site still deploys without /app/.
   deploy-pages:
+    needs: build
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -722,6 +738,28 @@ jobs:
               exit 1
             fi
           done
+
+      - name: Download web app
+        id: web-app
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: aive-web-app
+          path: ${{ runner.temp }}/aive-web-app
+
+      - name: Stage web app under /app/
+        if: steps.web-app.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for needed in index.html aive.js manifest.webmanifest; do
+            if [ ! -s "$RUNNER_TEMP/aive-web-app/$needed" ]; then
+              echo "::error::The web app artifact is missing $needed"
+              exit 1
+            fi
+          done
+          mkdir -p "$RUNNER_TEMP/aive-pages/app"
+          cp -R "$RUNNER_TEMP/aive-web-app/." "$RUNNER_TEMP/aive-pages/app/"
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6

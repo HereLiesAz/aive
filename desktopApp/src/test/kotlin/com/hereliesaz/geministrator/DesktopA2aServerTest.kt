@@ -32,21 +32,29 @@ class DesktopA2aServerTest {
 
     private val started = mutableListOf<DesktopA2aServer>()
 
+    /** A certificate kept in a temporary folder with its password in memory, so no test touches the keychain. */
+    private fun testTls() = DesktopA2aTls(
+        directory = java.nio.file.Files.createTempDirectory("aive-a2a-tls").toFile(),
+        passwordStore = MemoryTokenStore(),
+    )
+
     private fun server(
         store: DesktopA2aServerTokenStore = MemoryTokenStore(),
         port: Int = 0,
         networkAddresses: List<String> = emptyList(),
+        tls: DesktopA2aTls = testTls(),
     ) = DesktopA2aServer(
         store,
         port,
         // Preferences are never touched: reads fall back to defaults and the allowlist stays in memory.
         preferencesNode = { error("tests never use preferences") },
         networkAddresses = { networkAddresses },
+        tls = tls,
     ).also { started += it }
 
     /** A raw HTTP/1.1 GET over loopback with any Host header (HttpURLConnection will not set one). */
-    private fun rawGet(port: Int, path: String, host: String): Pair<Int, String> =
-        Socket(InetAddress.getLoopbackAddress(), port).use { socket ->
+    private fun rawGet(port: Int, path: String, host: String, tls: Boolean = false): Pair<Int, String> =
+        (if (tls) trustingSocket(port) else Socket(InetAddress.getLoopbackAddress(), port)).use { socket ->
             socket.soTimeout = 5_000
             socket.getOutputStream().apply {
                 write("GET $path HTTP/1.1\r\nHost: $host\r\nConnection: close\r\n\r\n".toByteArray())
@@ -55,6 +63,23 @@ class DesktopA2aServerTest {
             val text = socket.getInputStream().readBytes().decodeToString()
             text.substringAfter(' ').substringBefore(' ').toInt() to text.substringAfter("\r\n\r\n")
         }
+
+    private var seenFingerprint: String? = null
+
+    /** A TLS socket that accepts any certificate and records the fingerprint it was shown. */
+    private fun trustingSocket(port: Int): Socket {
+        val trustAll = object : javax.net.ssl.X509TrustManager {
+            override fun checkClientTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) = Unit
+            override fun checkServerTrusted(chain: Array<java.security.cert.X509Certificate>, authType: String) {
+                seenFingerprint = DesktopA2aTls.fingerprintOf(chain[0].encoded)
+            }
+            override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = emptyArray()
+        }
+        val context = javax.net.ssl.SSLContext.getInstance("TLS").apply { init(null, arrayOf(trustAll), null) }
+        return context.socketFactory.createSocket(InetAddress.getLoopbackAddress(), port).also {
+            (it as javax.net.ssl.SSLSocket).startHandshake()
+        }
+    }
 
     @AfterTest
     fun stopAll() = started.forEach { it.stop() }
@@ -163,14 +188,47 @@ class DesktopA2aServerTest {
         assertTrue(a2a.openToNetwork)
         assertTrue(assertNotNull(a2a.listeningAddress).address.isAnyLocalAddress)
         val port = a2a.boundPort
-        assertEquals(listOf("http://10.1.2.3:$port" + A2aCodec.WELL_KNOWN_CARD_PATH), a2a.lanAgentCardUrls())
+        assertEquals(listOf("https://10.1.2.3:$port" + A2aCodec.WELL_KNOWN_CARD_PATH), a2a.lanAgentCardUrls())
 
-        val (status, body) = rawGet(port, A2aCodec.WELL_KNOWN_CARD_PATH, "10.1.2.3:$port")
+        val (status, body) = rawGet(port, A2aCodec.WELL_KNOWN_CARD_PATH, "10.1.2.3:$port", tls = true)
         assertEquals(200, status)
-        assertTrue("http://10.1.2.3:$port/a2a" in body, body)
-        // This computer still reaches it on loopback, and is told the loopback address.
-        assertTrue("http://127.0.0.1:$port/a2a" in rawGet(port, A2aCodec.WELL_KNOWN_CARD_PATH, "127.0.0.1:$port").second)
-        assertEquals(403, rawGet(port, A2aCodec.WELL_KNOWN_CARD_PATH, "10.9.9.9:$port").first)
+        assertTrue("https://10.1.2.3:$port/a2a" in body, body)
+        // The certificate the other computer is shown is the one the keeper is told to pin.
+        assertEquals(a2a.tlsFingerprint, seenFingerprint)
+        // This computer still reaches it on loopback (over TLS too), and is told the loopback address.
+        assertTrue("https://127.0.0.1:$port/a2a" in rawGet(port, A2aCodec.WELL_KNOWN_CARD_PATH, "127.0.0.1:$port", tls = true).second)
+        assertEquals(403, rawGet(port, A2aCodec.WELL_KNOWN_CARD_PATH, "10.9.9.9:$port", tls = true).first)
+    }
+
+    @Test
+    fun openToTheNetworkRefusesPlainHttp() {
+        val a2a = server(networkAddresses = listOf("10.1.2.3"))
+        a2a.apply(enabled = true, lan = true, order = 1)
+        // A plain request to the TLS port never gets an answer a client could read as HTTP 200.
+        val plain = runCatching { rawGet(a2a.boundPort, A2aCodec.WELL_KNOWN_CARD_PATH, "127.0.0.1:${a2a.boundPort}") }
+        assertTrue(plain.isFailure || plain.getOrThrow().first != 200, plain.toString())
+    }
+
+    @Test
+    fun noCertificateMeansNoNetworkListener() {
+        val broken = DesktopA2aTls(
+            directory = java.nio.file.Files.createTempDirectory("aive-a2a-tls").toFile(),
+            passwordStore = MemoryTokenStore(),
+            keytool = java.io.File("/nonexistent/keytool"),
+        )
+        val a2a = server(tls = broken, networkAddresses = listOf("10.1.2.3"))
+        assertIs<A2aServerStatus.Failed>(a2a.apply(enabled = true, lan = true, order = 1))
+        assertNull(a2a.listeningAddress)
+        assertFalse(a2a.openToNetwork)
+    }
+
+    @Test
+    fun theCertificateIsKeptAcrossStartsWhileTheKeychainHoldsItsPassword() {
+        val directory = java.nio.file.Files.createTempDirectory("aive-a2a-tls").toFile()
+        val passwords = MemoryTokenStore()
+        val first = DesktopA2aTls(directory, passwords).load(listOf("10.1.2.3")).fingerprint
+        val second = DesktopA2aTls(directory, passwords).load(listOf("10.1.2.3")).fingerprint
+        assertEquals(first, second)
     }
 
     @Test

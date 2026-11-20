@@ -84,6 +84,7 @@ import com.hereliesaz.geministrator.resources.keeper_add_a2a_agent_hint
 import com.hereliesaz.geministrator.resources.settings_a2a_lan_allow
 import com.hereliesaz.geministrator.resources.settings_a2a_lan_allowed
 import com.hereliesaz.geministrator.resources.settings_a2a_lan_card_url
+import com.hereliesaz.geministrator.resources.settings_a2a_lan_fingerprint
 import com.hereliesaz.geministrator.resources.settings_a2a_lan_no_address
 import com.hereliesaz.geministrator.resources.settings_a2a_lan_none_allowed
 import com.hereliesaz.geministrator.resources.settings_a2a_lan_off
@@ -1823,6 +1824,14 @@ private fun A2aLanControls(lan: A2aLanSetting) {
             onValueChange = {},
             readOnly = true,
             label = stringResource(Res.string.settings_a2a_lan_card_url),
+        )
+    }
+    lan.certificateFingerprint?.let { fingerprint ->
+        AzphaltTextField(
+            value = fingerprint,
+            onValueChange = {},
+            readOnly = true,
+            label = stringResource(Res.string.settings_a2a_lan_fingerprint),
         )
     }
     lan.waitingClients.forEach { address ->

@@ -13,10 +13,6 @@ import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -27,13 +23,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.colorResource
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.App
 import com.hereliesaz.geministrator.AzphaltAlertDialog
 import com.hereliesaz.geministrator.AzphaltMotion
@@ -246,9 +237,8 @@ class MainActivity : ComponentActivity() {
                 updateCoordinator.checkForUpdates()
             }
 
-            if (!startupReady) {
-                AiveSplashScreen()
-            } else {
+            // Until startup is ready nothing of the app's own is drawn (no custom splash).
+            if (startupReady) {
                 var credentials by remember { mutableStateOf(initialCredentials) }
                 var repositoryCredentials by remember { mutableStateOf(initialRepositoryCredentials) }
                 var configuringProviderId by remember { mutableStateOf<String?>(null) }
@@ -863,24 +853,6 @@ class MainActivity : ComponentActivity() {
         }
         repositoryHttpClient.close()
         super.onDestroy()
-    }
-}
-
-/** The static logo shown until startup is ready. */
-@Composable
-fun AiveSplashScreen() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(colorResource(R.color.aive_icon_background)), // Azphalt Ink (colors.xml)
-        contentAlignment = Alignment.Center,
-    ) {
-        Image(
-            painter = painterResource(R.drawable.aive_splash_logo),
-            contentDescription = stringResource(R.string.splash_logo_description),
-            modifier = Modifier.size(280.dp),
-            contentScale = ContentScale.Fit,
-        )
     }
 }
 

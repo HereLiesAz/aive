@@ -281,8 +281,8 @@ internal fun TechnicalInspector(
         modifier = modifier
             .background(Azphalt.Ink)
             .verticalScroll(rememberScrollState())
-            .padding(if (onClose != null) 20.dp else 18.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(if (onClose != null) 20.dp else 14.dp),
+        verticalArrangement = Arrangement.spacedBy(if (onClose != null) 14.dp else 8.dp),
     ) {
         val place = planPlace(liveWorkflow.definition.tasks, taskId)
         val providerName = taskRun.assignedProviderId?.value?.let(::providerDisplayName)
@@ -329,7 +329,16 @@ internal fun TechnicalInspector(
         )
         }
         // Work holds its objective in its job, below.
-        if (tab != CreatureTab.Work) Text(task.objective, style = AzphaltType.body, color = azphaltOnSurface())
+        if (tab != CreatureTab.Work) {
+            // On the compact sheet the objective is one glance, not a page: two lines, the whole of it on Work.
+            Text(
+                task.objective,
+                style = AzphaltType.body,
+                color = azphaltOnSurface(),
+                maxLines = if (onClose == null) 2 else Int.MAX_VALUE,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         if (onClose != null) {
             CreatureUnderlineTabs(tab, onTabChange, pendingProposals = pendingRoleInstructionProposals(role?.id))
         }
@@ -1008,8 +1017,8 @@ private fun CreaturePanelTop(
     onTabChange: (CreatureTab) -> Unit,
     pendingProposals: Int,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             NodeMascotSurface(
                 roleLabel = identity,
                 hueSeed = identity,
@@ -1023,17 +1032,19 @@ private fun CreaturePanelTop(
             )
             Text(
                 identity,
-                style = AzphaltType.section.copy(fontSize = 22.sp, lineHeight = 28.sp),
+                style = AzphaltType.section.copy(fontSize = 20.sp, lineHeight = 24.sp),
                 color = azphaltOnSurface(),
-                modifier = Modifier.weight(1f).padding(bottom = 8.dp).semantics { heading() },
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).semantics { heading() },
             )
         }
         CreatureTabs(tab, onTabChange, pendingProposals)
     }
 }
 
-private const val CREATURE_PANEL_SCALE = 1.35f
-private val CREATURE_PANEL_SIZE = 96.dp
+private const val CREATURE_PANEL_SCALE = 1.3f
+private val CREATURE_PANEL_SIZE = 56.dp
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

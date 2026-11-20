@@ -647,7 +647,7 @@ fun ControlRoom(
             flippedId?.let { id ->
                 flipHost.detail?.invoke(id, Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
                 if (inspectorVisible && selectedTaskId == id) {
-                    creaturePanel(id, Modifier.fillMaxWidth().fillMaxHeight(0.72f), false)
+                    creaturePanel(id, Modifier.fillMaxWidth().fillMaxHeight(COMPACT_CREATURE_SHEET_HEIGHT), false)
                 }
             }
         },
@@ -843,7 +843,7 @@ fun ControlRoom(
                         taskId,
                         Modifier
                             .fillMaxWidth()
-                            .fillMaxHeight(0.72f),
+                            .fillMaxHeight(COMPACT_CREATURE_SHEET_HEIGHT),
                         false,
                     )
                 }
@@ -853,6 +853,9 @@ fun ControlRoom(
     }
     }
 }
+
+/** How much of the screen the compact creature sheet fills: half, so the hive stays in sight above it. */
+private const val COMPACT_CREATURE_SHEET_HEIGHT = 0.5f
 
 /** Opens the spend caps in the Keeper's room: its Allowance part. */
 internal fun openSpendLimits(

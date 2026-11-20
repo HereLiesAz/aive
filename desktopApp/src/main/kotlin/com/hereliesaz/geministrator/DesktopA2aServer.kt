@@ -16,6 +16,8 @@ import com.hereliesaz.geministrator.domain.activeRoles
 import com.hereliesaz.geministrator.domain.resolveRoleCollection
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
+import com.sun.net.httpserver.HttpsConfigurator
+import com.sun.net.httpserver.HttpsServer
 import java.io.File
 import java.net.BindException
 import java.net.Inet4Address
@@ -40,7 +42,8 @@ import kotlinx.coroutines.runBlocking
  * **Open to this network** (off by default, even while the server is on) binds every IPv4
  * interface instead, so other computers can reach it. A caller from another computer then needs
  * the token *and* its address on the keeper's allowlist; one that has the token but is not listed
- * is refused and shown in the Keeper's room to allow. Plain HTTP: nothing is encrypted.
+ * is refused and shown in the Keeper's room to allow. Open to the network it speaks HTTPS only, with a
+ * self-signed certificate the keeper gives the other computer to pin ([DesktopA2aTls]); loopback only it is plain HTTP.
  */
 internal class DesktopA2aServer(
     private val tokenStore: DesktopA2aServerTokenStore = DesktopA2aServerTokenStore(),
@@ -49,6 +52,8 @@ internal class DesktopA2aServer(
     preferencesNode: () -> Preferences = { Preferences.userRoot().node(PREFERENCES_NODE) },
     /** This computer's IPv4 network addresses (not loopback, not link-local); replaced in tests. */
     private val networkAddresses: () -> List<String> = ::localNetworkAddresses,
+    /** The certificate presented while open to the network; replaced in tests. */
+    private val tls: DesktopA2aTls = DesktopA2aTls(),
 ) {
     private val preferences by lazy(preferencesNode)
     private val runtime = AtomicReference<ApplicationRuntime?>(null)
@@ -84,7 +89,15 @@ internal class DesktopA2aServer(
     /** The port it listens on while running (differs from [port] only when that is 0). */
     val boundPort: Int get() = http?.address?.port ?: port
 
-    val baseUrl: String get() = "http://127.0.0.1:$boundPort"
+    /** SHA-256 fingerprint of the certificate while open to the network (the other computer pins it); null otherwise. */
+    @Volatile
+    var tlsFingerprint: String? = null
+        private set
+
+    /** Open to the network the server speaks HTTPS only, on loopback too; otherwise plain HTTP on loopback. */
+    private val scheme: String get() = if (openToNetwork) "https" else "http"
+
+    val baseUrl: String get() = "$scheme://127.0.0.1:$boundPort"
 
     val agentCardUrl: String get() = baseUrl + A2aCodec.WELL_KNOWN_CARD_PATH
 
@@ -118,7 +131,7 @@ internal class DesktopA2aServer(
         nowIso = { Instant.now().toString() },
         lanOpen = { openToNetwork },
         lanHosts = { if (openToNetwork) lanHosts() else emptySet() },
-        lanBaseUrl = { host -> "http://$host:$boundPort".takeIf { openToNetwork && host in lanHosts() } },
+        lanBaseUrl = { host -> "https://$host:$boundPort".takeIf { openToNetwork && host in lanHosts() } },
         isAllowedClient = { address -> address in allowedClients() },
         describeProviders = { describesProviders },
         webhooks = { com.hereliesaz.geministrator.workflow.schedule.ScheduleTriggerHub.intake },
@@ -193,7 +206,7 @@ internal class DesktopA2aServer(
 
     /** Where other computers read the Agent Card while open to the network; empty otherwise. */
     fun lanAgentCardUrls(): List<String> =
-        if (!openToNetwork) emptyList() else lanHosts().sorted().map { "http://$it:$boundPort" + A2aCodec.WELL_KNOWN_CARD_PATH }
+        if (!openToNetwork) emptyList() else lanHosts().sorted().map { "https://$it:$boundPort" + A2aCodec.WELL_KNOWN_CARD_PATH }
 
     /** This computer's network addresses, re-read at most every 30 seconds (they change with Wi-Fi). */
     private fun lanHosts(): Set<String> {
@@ -253,7 +266,14 @@ internal class DesktopA2aServer(
         token.set(loadOrCreateToken())
         val bindAddress = if (lan) InetAddress.getByName("0.0.0.0") else InetAddress.getLoopbackAddress()
         HttpRequestGuard.applyRequestTimeout()
-        val server = HttpServer.create(InetSocketAddress(bindAddress, port), 0)
+        // Open to the network is HTTPS or nothing: no certificate, no listener.
+        val material = if (lan) tls.load(runCatching { networkAddresses() }.getOrDefault(emptyList())) else null
+        val server = if (material != null) {
+            HttpsServer.create(InetSocketAddress(bindAddress, port), 0).apply { httpsConfigurator = HttpsConfigurator(material.context) }
+        } else {
+            HttpServer.create(InetSocketAddress(bindAddress, port), 0)
+        }
+        tlsFingerprint = material?.fingerprint
         val pool = Executors.newFixedThreadPool(4) { runnable -> Thread(runnable, "aive-a2a").apply { isDaemon = true } }
         server.executor = pool
         server.createContext("/") { exchange -> serve(exchange) }
@@ -270,6 +290,7 @@ internal class DesktopA2aServer(
         http?.stop(0)
         http = null
         openToNetwork = false
+        tlsFingerprint = null
         executor?.shutdownNow()
         executor = null
         status = A2aServerStatus.Off
@@ -374,11 +395,11 @@ internal class DesktopA2aServer(
  * DPAPI). Never in plain preferences: without a keychain the token is kept in memory for the
  * session only, and the Keeper's room says so.
  */
-internal open class DesktopA2aServerTokenStore {
+internal open class DesktopA2aServerTokenStore(private val account: String = DEFAULT_ACCOUNT) {
     open fun read(): String? = runCatching {
         val os = System.getProperty("os.name", "").lowercase()
         val result = when {
-            os.contains("mac") -> CredentialTool.run(listOf("security", "find-generic-password", "-s", SERVICE, "-a", ACCOUNT, "-w"))
+            os.contains("mac") -> CredentialTool.run(listOf("security", "find-generic-password", "-s", SERVICE, "-a", account, "-w"))
             os.contains("win") -> {
                 val file = windowsTokenFile()
                 if (!file.isFile) return@runCatching null
@@ -390,7 +411,7 @@ internal open class DesktopA2aServerTokenStore {
                 )
             }
             os.contains("nux") || os.contains("nix") || os.contains("bsd") ->
-                CredentialTool.run(listOf("secret-tool", "lookup", "service", SERVICE, "account", ACCOUNT))
+                CredentialTool.run(listOf("secret-tool", "lookup", "service", SERVICE, "account", account))
             else -> null
         }
         result?.takeIf { it.ok }?.output?.trim()?.takeIf(String::isNotEmpty)
@@ -402,8 +423,8 @@ internal open class DesktopA2aServerTokenStore {
         val stored = runCatching {
             when {
                 os.contains("mac") -> {
-                    CredentialTool.run(listOf("security", "delete-generic-password", "-s", SERVICE, "-a", ACCOUNT))
-                    MacKeychain.addGenericPassword(SERVICE, ACCOUNT, token)
+                    CredentialTool.run(listOf("security", "delete-generic-password", "-s", SERVICE, "-a", account))
+                    MacKeychain.addGenericPassword(SERVICE, account, token)
                 }
                 os.contains("win") -> CredentialTool.run(
                     DesktopDistributedComputeCredentialStore.windowsPowerShell(
@@ -413,7 +434,7 @@ internal open class DesktopA2aServerTokenStore {
                     stdin = token,
                 )?.ok == true
                 os.contains("nux") || os.contains("nix") || os.contains("bsd") -> CredentialTool.run(
-                    listOf("secret-tool", "store", "--label", "Aive A2A server", "service", SERVICE, "account", ACCOUNT),
+                    listOf("secret-tool", "store", "--label", "Aive A2A server", "service", SERVICE, "account", account),
                     stdin = token,
                 )?.ok == true
                 else -> false
@@ -423,10 +444,13 @@ internal open class DesktopA2aServerTokenStore {
     }
 
     private fun windowsTokenFile(): File =
-        File(DesktopDistributedComputeCredentialStore.windowsTokenFile().parentFile, "a2a-server-token.dpapi")
+        File(
+            DesktopDistributedComputeCredentialStore.windowsTokenFile().parentFile,
+            if (account == DEFAULT_ACCOUNT) "a2a-server-token.dpapi" else "a2a-server-$account.dpapi",
+        )
 
     private companion object {
         const val SERVICE = "com.hereliesaz.aive.a2a-server"
-        const val ACCOUNT = "a2a-token"
+        const val DEFAULT_ACCOUNT = "a2a-token"
     }
 }
