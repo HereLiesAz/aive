@@ -204,7 +204,23 @@ class AgentProviderRegistry(
         if (provider.keyless) healthMutex.withLock { keylessPacer.record(provider.id.value) }
     }
 
-    suspend fun select(request: ProviderSelectionRequest): AgentProvider {
+    /**
+     * The provider for [request]. A source that has every capability asked for is preferred, as ever. With no repository linked,
+     * though, a role built for repository work does not need that access (there is nothing to read or change): if no source has
+     * it, any connected source that has the rest is chosen, so a repository is never required to run a hive.
+     */
+    suspend fun select(request: ProviderSelectionRequest): AgentProvider = try {
+        selectWith(request)
+    } catch (strict: IllegalStateException) {
+        val relaxed = request.requiredCapabilities.withoutRepositoryAccessUnless(request.repository)
+        if (relaxed == request.requiredCapabilities || !strict.message.orEmpty().startsWith("No agent provider satisfies")) {
+            throw strict
+        }
+        // If this fails too, its own message names what is still missing.
+        selectWith(request.copy(requiredCapabilities = relaxed))
+    }
+
+    private suspend fun selectWith(request: ProviderSelectionRequest): AgentProvider {
         val required = buildSet {
             addAll(request.requiredCapabilities)
             val constraints = request.constraints
@@ -377,6 +393,14 @@ class AgentProviderRegistry(
         error("No agent provider satisfies required capabilities $required$repositorySuffix$explicitOnlyHint$unreadableHint")
     }
 }
+
+/**
+ * [this] without the repository capabilities when no repository is linked: with nothing linked there is nothing for a role built for
+ * repository work to read or change, and it answers in text. A repository is never required to run a hive. Used by [select] only
+ * after no source had them; a task's own explicit capability constraint is not filtered (that is the keeper's word).
+ */
+internal fun Set<AgentCapability>.withoutRepositoryAccessUnless(repository: RepositoryRef?): Set<AgentCapability> =
+    if (repository != null) this else this - setOf(AgentCapability.RepositoryRead, AgentCapability.RepositoryWrite)
 
 private const val HEALTH_WINDOW = 20
 private const val MAX_FAILOVER_NOTES = 20

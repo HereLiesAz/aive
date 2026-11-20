@@ -55,6 +55,30 @@ class AgentProviderRegistryRepositoryTest {
     }
 
     @Test
+    fun aRoleBuiltForRepositoryWorkIsStaffedWithNoRepositoryLinked(): Unit = runBlocking {
+        // A source that only chats and researches: it has no repository access to offer.
+        val textOnly = SourceAwareProvider(
+            id = AgentProviderId("text-only"),
+            supportedSources = emptySet(),
+            capabilities = setOf(AgentCapability.Research, AgentCapability.Messaging),
+        )
+        val registry = AgentProviderRegistry(listOf(textOnly), inferenceSettings = InMemorySettings())
+        val repoRole = setOf(AgentCapability.RepositoryRead, AgentCapability.RepositoryWrite)
+
+        // No repository linked and no source with repository access: the role still gets a source, and works in text.
+        assertEquals(textOnly.id, registry.select(ProviderSelectionRequest(requiredCapabilities = repoRole, repository = null)).id)
+
+        // A source that does have repository access is still preferred over one that does not.
+        val capable = SourceAwareProvider(id = AgentProviderId("capable"), supportedSources = setOf(RepositorySource.GitHub))
+        val both = AgentProviderRegistry(listOf(textOnly, capable), inferenceSettings = InMemorySettings())
+        assertEquals(capable.id, both.select(ProviderSelectionRequest(requiredCapabilities = repoRole, repository = null)).id)
+
+        // With one linked, repository access is asked of the source again, as it always was.
+        val linked = RepositoryRef(owner = "team", name = "project", source = RepositorySource.GitHub, remoteUrl = "https://github.com/team/project")
+        assertFailsWith<IllegalStateException> { registry.select(ProviderSelectionRequest(requiredCapabilities = repoRole, repository = linked)) }
+    }
+
+    @Test
     fun repositoryWorkFailsWhenNoProviderSupportsLinkedSource() = runBlocking {
         val registry = AgentProviderRegistry(
             listOf(
