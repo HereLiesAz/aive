@@ -1537,6 +1537,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_creature_labels_always">Always show labels</string>
     <string name="settings_creature_labels_crowded">Always show labels</string>
     <string name="settings_reduce_motion">Reduce motion</string>
+    <string name="settings_engineering_names">Show engineering names</string>
+    <string name="settings_engineering_names_explain">Shows the engineering name beside the plain one: Nanny (Hall Monitor), Orphan (A2A agent), Swarm (workflow). MCP servers always keep their engineering name. Remembered on this device.</string>
     <string name="settings_always_show_labels">Always show creature labels</string>
     <string name="settings_automatic_crash_reports_off">Automatic crash reports</string>
     <string name="settings_automatic_crash_reports_on">Automatic crash reports</string>

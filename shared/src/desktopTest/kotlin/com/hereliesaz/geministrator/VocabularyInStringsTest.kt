@@ -37,6 +37,8 @@ class VocabularyInStringsTest {
         // "job" as a compute job (work sent to another machine), never a creature's step (decisions page, D1).
         "settings_maximum_simultaneous_remote_jobs" to "a compute job sent to another machine",
         "settings_compute_node_jobs" to "a compute job sent to another machine",
+        // The engineering-names switch names the retired words on purpose: that is what it shows (D35).
+        "settings_engineering_names_explain" to "lists the engineering names the switch reveals",
         // "project" in a path the keeper types.
         "repositories_entire_reference_hint" to "a path example the keeper types",
     )

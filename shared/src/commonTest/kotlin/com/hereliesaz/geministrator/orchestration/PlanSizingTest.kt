@@ -49,6 +49,12 @@ class PlanSizingTest {
     }
 
     @Test
+    fun aGoalToBeTaughtTheAppIsShortAndWideAndNeverFlaggedBig() {
+        assertFalse(PlanSizing.bigForSmallGoal("Teach me how to use the Aive", 7))
+        assertTrue(PlanSizing.bigForSmallGoal("Fix the login bug", 7))
+    }
+
+    @Test
     fun overrideAndStoryText() {
         assertEquals(PlanSizeChoice.Swarm, PlanSizeChoice.One.opposite)
         assertTrue("ONE creature" in PlanSizing.overrideInstruction(PlanSizeChoice.One))

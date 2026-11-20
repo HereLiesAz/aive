@@ -128,7 +128,8 @@ import org.jetbrains.compose.resources.stringResource
 
 /** The place's name as the keeper reads it, from the string resources (the enum's own `label` is only an English fallback). */
 @Composable
-internal fun ControlRoomDestination.displayLabel(): String = stringResource(
+internal fun ControlRoomDestination.displayLabel(): String {
+    val plain = stringResource(
     when (this) {
         ControlRoomDestination.Overview -> Res.string.place_overview
         ControlRoomDestination.Workflows -> Res.string.place_swarm_library
@@ -140,7 +141,9 @@ internal fun ControlRoomDestination.displayLabel(): String = stringResource(
         ControlRoomDestination.AddOns -> Res.string.rail_store
         ControlRoomDestination.Settings -> Res.string.keeper_room
     },
-)
+    )
+    return if (this == ControlRoomDestination.Workflows) engineeringName(plain, ENGINEERING_SWARM, EngineeringNames.show) else plain
+}
 
 internal object ControlRoomBreakpoints {
     /** The width from which a phone, or any device that is not desktop-class, shows the wide layouts. */

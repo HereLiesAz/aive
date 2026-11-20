@@ -25,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -67,7 +68,6 @@ import com.hereliesaz.geministrator.resources.tour_stage_needs_you
 import com.hereliesaz.geministrator.resources.tour_stage_done
 import com.hereliesaz.geministrator.resources.tour_stage_failed
 import com.hereliesaz.geministrator.resources.tour_stage_cancelled
-import com.hereliesaz.geministrator.resources.tour_hive_title
 import com.hereliesaz.geministrator.resources.tour_hive_egg_growth
 import com.hereliesaz.geministrator.resources.tour_hive_more
 import com.hereliesaz.geministrator.resources.tour_failed_line
@@ -170,36 +170,39 @@ private fun HiveLines(lines: List<CreatureLine>, focus: String?) {
     // The keeper can always put it away: it never stays over the messages and options it sits beside.
     var hidden by remember { mutableStateOf(false) }
     if (hidden) return
-    // Below the header, never over the breadcrumb and the page title.
+    // Below the header, never over the breadcrumb, the page title or the creature count beside it: one line, not a list.
     Box(Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 132.dp), contentAlignment = Alignment.TopEnd) {
         AzphaltSurface(Azphalt.Ink) {
-            Column(
-                Modifier.widthIn(max = 260.dp).clip(RoundedCornerShape(16.dp)).background(Azphalt.Ink).padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+            Row(
+                Modifier.widthIn(max = 380.dp).clip(RoundedCornerShape(999.dp)).background(Azphalt.Ink).padding(start = 16.dp, end = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(stringResource(Res.string.tour_hive_title).uppercase(), style = AzphaltType.eyebrow, color = azphaltOnSurface())
-                AzphaltPill(label = stringResource(Res.string.tour_hide), seed = "tour-hive-hide", onClick = { hidden = true })
-                // Only what is still going on, at most four, so the card stays small over the swarm it describes.
+                // The creature the tour is on, else the first still going on (else the first), and how many more there are.
                 val finished = setOf(CreatureStage.Done, CreatureStage.Cancelled, CreatureStage.Withered)
-                val shown = lines.filter { it.stage !in finished }.ifEmpty { lines }.take(4)
-                shown.forEach { line ->
-                    val stage = when (line.stage) {
-                        CreatureStage.Egg -> stringResource(Res.string.tour_hive_egg_growth, ((line.growth ?: 0f) * 100).toInt())
-                        CreatureStage.Withered -> stringResource(Res.string.tour_stage_withered)
-                        CreatureStage.Waiting -> stringResource(Res.string.tour_stage_waiting)
-                        CreatureStage.Working -> stringResource(Res.string.tour_stage_working)
-                        CreatureStage.Checking -> stringResource(Res.string.tour_stage_checking)
-                        CreatureStage.Retrying -> stringResource(Res.string.tour_stage_retrying)
-                        CreatureStage.NeedsYou -> stringResource(Res.string.tour_stage_needs_you)
-                        CreatureStage.Done -> stringResource(Res.string.tour_stage_done)
-                        CreatureStage.Failed -> stringResource(Res.string.tour_stage_failed)
-                        CreatureStage.Cancelled -> stringResource(Res.string.tour_stage_cancelled)
-                    }
-                    Text("${if (line.id == focus) "› " else ""}${plain(line.name)} · $stage", style = AzphaltType.body, color = azphaltOnSurface(), maxLines = 1)
+                val line = lines.firstOrNull { it.id == focus } ?: lines.firstOrNull { it.stage !in finished } ?: lines.first()
+                val stage = when (line.stage) {
+                    CreatureStage.Egg -> stringResource(Res.string.tour_hive_egg_growth, ((line.growth ?: 0f) * 100).toInt())
+                    CreatureStage.Withered -> stringResource(Res.string.tour_stage_withered)
+                    CreatureStage.Waiting -> stringResource(Res.string.tour_stage_waiting)
+                    CreatureStage.Working -> stringResource(Res.string.tour_stage_working)
+                    CreatureStage.Checking -> stringResource(Res.string.tour_stage_checking)
+                    CreatureStage.Retrying -> stringResource(Res.string.tour_stage_retrying)
+                    CreatureStage.NeedsYou -> stringResource(Res.string.tour_stage_needs_you)
+                    CreatureStage.Done -> stringResource(Res.string.tour_stage_done)
+                    CreatureStage.Failed -> stringResource(Res.string.tour_stage_failed)
+                    CreatureStage.Cancelled -> stringResource(Res.string.tour_stage_cancelled)
                 }
-                if (lines.size > shown.size) {
-                    Text(stringResource(Res.string.tour_hive_more, lines.size - shown.size), style = AzphaltType.body, color = azphaltOnSurface())
-                }
+                val more = if (lines.size > 1) ", " + stringResource(Res.string.tour_hive_more, lines.size - 1) else ""
+                Text(
+                    "${plain(line.name)} · $stage$more",
+                    style = AzphaltType.body,
+                    color = azphaltOnSurface(),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                AzphaltPill(label = stringResource(Res.string.tour_hide), seed = "tour-hive-hide", onClick = { hidden = true })
             }
         }
     }
