@@ -163,7 +163,7 @@ class MessageRowsTest {
 
     @Test
     fun theTutorialCheckInIsAQuestionRowAfterTheWaitsAndCountsToTheBadge() {
-        val live = presentation(taskRun(a, TaskRunStatus.Escalated))
+        val live = presentation(taskRun("a", TaskRunStatus.Escalated))
         val checkIn = com.hereliesaz.geministrator.tour.CheckInMessage(key = "tour-checkin|1|7", line = "With me so far?")
         val rows = messageRows(live, checkIn)
         assertEquals(2, rows.size)
