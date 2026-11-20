@@ -30,6 +30,8 @@ Turn one on in **Keeper's room › Local agents**. It is off until you do. It th
 | OpenCode | `opencode run <prompt>` | its own permission settings | Reading and planning only; its other flags are undocumented. |
 | Aider | `aider --no-auto-commits --no-pretty --no-stream [--dry-run] --message <prompt>` | asks before changing; never answered yes | Read-only runs are dry runs. |
 | GitHub Copilot CLI | `copilot --no-auto-update --no-ask-user -s --deny-tool=shell (--allow-tool=write \| --deny-tool=write) -p <prompt>` | file writes only when the role may edit; shell denied | Never `--allow-all` or `--yolo`. |
+| Goose | `goose run --no-session -q --output-format text -i -`, task on stdin | its own permission mode, which the app never changes | Reading and planning only. Provider keys may be passed if you choose. |
+| Crush | `crush run <prompt>`, prompt as an argument | its own permission rules; never `--yolo` | Reading and planning only; installs with `npm install -g @charmland/crush`. |
 
 A CLI that has an npm package shows **Install** when it is missing: one `npm install -g <package>`, run when you press it. Adding another CLI is adding a spec (`CliAgentSpecs`): its binary, its headless flags, how to read its output.
 

@@ -43,6 +43,7 @@ object ProviderCatalog {
     const val KILO_ID = "kilo"
     const val LLM7_ID = "llm7"
     const val OVHCLOUD_ID = "ovhcloud"
+    const val BLOCKRUN_ID = "blockrun"
 
     /** Gemini in Google Search through a browser view on the device (providers/llm GoogleAiMode); not a built-in entry: see [browserEntries]. */
     const val GOOGLE_AI_MODE_ID = "google-ai-mode"
@@ -58,7 +59,7 @@ object ProviderCatalog {
     private val IMAGE_ONLY_IDS = setOf(AI_HORDE_ID, FAL_ID)
 
     /** Most generous free limits first (Kilo: 200 requests an hour; LLM7: tight; OVHcloud: 2 a minute). */
-    private val FREE_RELIABILITY_ORDER = listOf(KILO_ID, LLM7_ID, OVHCLOUD_ID)
+    private val FREE_RELIABILITY_ORDER = listOf(KILO_ID, LLM7_ID, OVHCLOUD_ID, BLOCKRUN_ID)
 
     /** True for a built-in Source that makes pictures, not text. */
     fun isImageOnly(id: String): Boolean = id in IMAGE_ONLY_IDS
@@ -270,6 +271,16 @@ object ProviderCatalog {
             apiKeyUrl = "https://www.ovhcloud.com/en/public-cloud/ai-endpoints/",
             credentialLabel = "OVHcloud AI token (optional)",
             description = "Qwen, Llama, Mistral and gpt-oss models. No key needed, but limited to 2 requests a minute per IP address.",
+            keyOptional = true,
+        ),
+        ProviderCatalogEntry(
+            id = BLOCKRUN_ID,
+            displayName = "BlockRun",
+            apiKeyUrl = "https://blockrun.ai/",
+            credentialLabel = "BlockRun key (optional)",
+            description = "Free Nvidia, Poolside and Cohere models with long context. No key needed, limited per IP address with no number stated. " +
+                "It may answer with a different model than the one named, and says nothing about logging, so keep confidential data out. " +
+                "Desktop and Android only: a browser cannot call it.",
             keyOptional = true,
         ),
     )

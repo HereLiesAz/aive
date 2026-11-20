@@ -51,6 +51,7 @@ object HostedLlmProviders {
     const val KILO_ID = ProviderCatalog.KILO_ID
     const val LLM7_ID = ProviderCatalog.LLM7_ID
     const val OVHCLOUD_ID = ProviderCatalog.OVHCLOUD_ID
+    const val BLOCKRUN_ID = ProviderCatalog.BLOCKRUN_ID
 
     private const val ACCOUNT_PLACEHOLDER = "{accountId}"
     private val ACCOUNT_ID_PATTERN = Regex("[A-Za-z0-9_-]{1,64}")
@@ -174,6 +175,15 @@ object HostedLlmProviders {
             // Qwen3-Coder-30B-A3B-Instruct was retired (HTTP 404 model_not_found on 2026-10-15);
             // gpt-oss-120b answers anonymously with tool calls.
             defaultModel = "gpt-oss-120b",
+            keyOptional = true,
+        ),
+        HostedLlmProviderSpec(
+            id = BLOCKRUN_ID,
+            displayName = "BlockRun",
+            baseUrl = "https://blockrun.ai/api/v1",
+            // Free-tier model (billing_mode "free"; 131k context; tool calls answered on 2026-11-20). The gateway may route to another
+            // free model and says which in the response's model field.
+            defaultModel = "nvidia/nemotron-3-super-120b",
             keyOptional = true,
         ),
     )
