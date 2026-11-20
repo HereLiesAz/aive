@@ -14,6 +14,15 @@ object GoogleAiMode {
     /** The longest question the search page takes in its address; a longer one is refused rather than cut, so nothing is silently lost. */
     const val MAX_QUESTION_CHARS = 1_800
 
+    /** AI Mode with no question yet, for a request that goes in as an attached document instead of in the address. */
+    const val BLANK_URL = "https://www.google.com/search?udm=50&hl=en"
+
+    /** What is asked of the page when the request itself is the attached document. */
+    const val ATTACHED_REQUEST_QUESTION = "Please read the attached file, request.md, and answer the request in it."
+
+    /** The attached document's name. */
+    const val ATTACHED_REQUEST_FILE = "request.md"
+
     /** The page that shows the answer to [question] (`udm=50` is AI Mode). The question is percent-encoded; nothing else is added. */
     fun url(question: String): String = "https://www.google.com/search?udm=50&hl=en&q=" + percentEncode(question.trim())
 
@@ -74,6 +83,16 @@ object GoogleAiMode {
 fun interface AiModePage {
     /** The visible text of the page now (`document.body.innerText`). */
     suspend fun text(): String
+
+    /**
+     * Attaches a document of [content] named [fileName] to the page's question box, the way a person attaches a file, and returns
+     * whether the page took it (its name showed on the page). False where this view cannot (the default): the caller then says so
+     * and does not send the text another way. The document goes only to the page it is attached on, and is deleted when the view closes.
+     */
+    suspend fun attachDocument(fileName: String, content: String): Boolean = false
+
+    /** Types [question] into the page's question box and sends it; whether the box was found. False where this view cannot (the default). */
+    suspend fun typeAndSend(question: String): Boolean = false
 }
 
 /** A browser view the platform provides: opens [url] on the keeper's connection and lets the caller read the page as it renders. */
@@ -103,37 +122,57 @@ class GoogleAiModeApi(
     override suspend fun generate(prompt: String): TextGenerationResult {
         val question = prompt.trim()
         require(question.isNotEmpty()) { "Google AI Mode needs a question" }
-        if (question.length > GoogleAiMode.MAX_QUESTION_CHARS) {
-            throw GoogleAiModeUnavailable("The question is ${question.length} characters; Google AI Mode takes at most ${GoogleAiMode.MAX_QUESTION_CHARS}.")
-        }
-        val text = browser.withPage(GoogleAiMode.url(question)) { page ->
-            val started = now()
-            var last = ""
-            var stableSince = started
-            var done: String? = null
-            while (done == null) {
-                val seen = page.text()
-                GoogleAiMode.refusal(seen)?.let { throw GoogleAiModeUnavailable(it) }
-                val answer = GoogleAiMode.answer(seen, question)
-                if (answer != null) {
-                    if (answer != last) {
-                        last = answer
-                        stableSince = now()
-                    }
-                    // Done once Google marks it finished, or once it has stopped changing for a good while.
-                    if (GoogleAiMode.finished(seen, question) || now() - stableSince >= settleMillis * 3) {
-                        done = answer
-                        continue
-                    }
+        if (question.length > GoogleAiMode.MAX_QUESTION_CHARS) return generateFromAttachedDocument(question)
+        val text = browser.withPage(GoogleAiMode.url(question)) { page -> readAnswer(page, question) }
+        return TextGenerationResult(text = text)
+    }
+
+    /** Waits on [page] for the finished answer to [asked] and returns it. */
+    private suspend fun readAnswer(page: AiModePage, asked: String): String {
+        val started = now()
+        var last = ""
+        var stableSince = started
+        var done: String? = null
+        while (done == null) {
+            val seen = page.text()
+            GoogleAiMode.refusal(seen)?.let { throw GoogleAiModeUnavailable(it) }
+            val answer = GoogleAiMode.answer(seen, asked)
+            if (answer != null) {
+                if (answer != last) {
+                    last = answer
+                    stableSince = now()
                 }
-                if (now() - started >= timeoutMillis) {
-                    if (last.isEmpty()) throw GoogleAiModeUnavailable("Google did not answer in time.")
-                    done = last
+                // Done once Google marks it finished, or once it has stopped changing for a good while.
+                if (GoogleAiMode.finished(seen, asked) || now() - stableSince >= settleMillis * 3) {
+                    done = answer
                     continue
                 }
-                pause(pollMillis)
             }
-            checkNotNull(done)
+            if (now() - started >= timeoutMillis) {
+                if (last.isEmpty()) throw GoogleAiModeUnavailable("Google did not answer in time.")
+                done = last
+                continue
+            }
+            pause(pollMillis)
+        }
+        return checkNotNull(done)
+    }
+
+    /**
+     * A request over the address's limit goes as an attached document: the blank AI Mode page, the request attached as a file, then
+     * a short question pointing at it. Where the view cannot attach (or the page does not take it) it fails the same way an over-long
+     * question always has, in words that let another source take the work; the text is never cut and never sent another way.
+     */
+    private suspend fun generateFromAttachedDocument(request: String): TextGenerationResult {
+        val tooLong = "The question is ${request.length} characters; Google AI Mode takes at most ${GoogleAiMode.MAX_QUESTION_CHARS}"
+        val text = browser.withPage(GoogleAiMode.BLANK_URL) { page ->
+            if (!page.attachDocument(GoogleAiMode.ATTACHED_REQUEST_FILE, request)) {
+                throw GoogleAiModeUnavailable("$tooLong, and it could not be attached as a file here.")
+            }
+            if (!page.typeAndSend(GoogleAiMode.ATTACHED_REQUEST_QUESTION)) {
+                throw GoogleAiModeUnavailable("$tooLong, and the page's question box was not found to ask about the attached file.")
+            }
+            readAnswer(page, GoogleAiMode.ATTACHED_REQUEST_QUESTION)
         }
         return TextGenerationResult(text = text)
     }

@@ -90,6 +90,68 @@ class GoogleAiModeTest {
         assertFailsWith<GoogleAiModeUnavailable> { api(listOf("AI Mode")).generate(question) }
     }
 
+    /** A page that can take a file, recording what it was given. */
+    private class FilePage(
+        private val pages: List<String>,
+        private val takesFile: Boolean = true,
+        private val findsBox: Boolean = true,
+    ) : AiModePage {
+        var url: String? = null
+        var attached: Pair<String, String>? = null
+        var typed: String? = null
+        private var i = 0
+        override suspend fun text(): String = pages[minOf(i++, pages.lastIndex)]
+        override suspend fun attachDocument(fileName: String, content: String): Boolean {
+            if (takesFile) attached = fileName to content
+            return takesFile
+        }
+        override suspend fun typeAndSend(question: String): Boolean {
+            if (findsBox) typed = question
+            return findsBox
+        }
+    }
+
+    private fun fileApi(page: FilePage): GoogleAiModeApi {
+        val clock = longArrayOf(0L)
+        val browser = object : AiModeBrowser {
+            override suspend fun <T> withPage(url: String, read: suspend (AiModePage) -> T): T {
+                page.url = url
+                return read(page)
+            }
+        }
+        return GoogleAiModeApi(browser, now = { clock[0] }, pause = { clock[0] += it })
+    }
+
+    @Test
+    fun aRequestOverTheAddressLimitIsAttachedAsAFileAndAskedAboutBriefly() = runTest {
+        val long = "Summarise this: " + "word ".repeat(5_000)
+        val asked = GoogleAiMode.ATTACHED_REQUEST_QUESTION
+        val answerPage = "$asked\nThe summary is short.\nAI responses may include mistakes."
+        val page = FilePage(listOf("AI Mode", answerPage))
+        val result = fileApi(page).generate(long)
+        assertEquals(GoogleAiMode.BLANK_URL, page.url)
+        assertEquals(GoogleAiMode.ATTACHED_REQUEST_FILE to long.trim(), page.attached)
+        assertEquals(asked, page.typed)
+        assertTrue(result.text.startsWith("The summary is short."), result.text)
+        // The request itself is in the file, not in the address or the box.
+        assertTrue(page.typed!!.length < GoogleAiMode.MAX_QUESTION_CHARS)
+    }
+
+    @Test
+    fun aViewThatCannotAttachFailsAsOverLongSoAnotherSourceCanTakeIt() = runTest {
+        val e = assertFailsWith<GoogleAiModeUnavailable> { fileApi(FilePage(listOf("AI Mode"), takesFile = false)).generate("x".repeat(5_000)) }
+        assertTrue("takes at most" in e.message.orEmpty(), e.message)
+        assertTrue("attached as a file" in e.message.orEmpty(), e.message)
+    }
+
+    @Test
+    fun aPageWithNoQuestionBoxFailsTheSameWayAndSendsNothing() = runTest {
+        val page = FilePage(listOf("AI Mode"), findsBox = false)
+        val e = assertFailsWith<GoogleAiModeUnavailable> { fileApi(page).generate("x".repeat(5_000)) }
+        assertTrue("takes at most" in e.message.orEmpty(), e.message)
+        assertNull(page.typed)
+    }
+
     @Test
     fun aQuestionTooLongForTheAddressIsRefusedNotCut() = runTest {
         val e = assertFailsWith<GoogleAiModeUnavailable> { api(listOf("AI Mode")).generate("x".repeat(GoogleAiMode.MAX_QUESTION_CHARS + 1)) }
