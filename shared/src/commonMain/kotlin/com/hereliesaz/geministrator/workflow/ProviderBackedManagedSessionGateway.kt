@@ -196,7 +196,7 @@ class ProviderBackedManagedSessionGateway(
 
     private suspend fun startSession(request: ManagedSessionRequest, chosen: AgentProvider?): ManagedSessionHandle {
         val requiredCapabilities = buildSet {
-            addAll(request.providerSelection.requiredCapabilities)
+            addAll(request.providerSelection.requiredCapabilities.withoutRepositoryAccessUnless(request.providerSelection.repository))
             val constraints = request.providerSelection.constraints
             if (constraints is com.hereliesaz.geministrator.domain.ProviderConstraints.RequireCapabilities) {
                 addAll(constraints.capabilities)
