@@ -696,6 +696,8 @@ fun App(
         val planner = orchestrationRuntime
         if (active != null && planner != null) active.mendTeachingSwarms(planner)
     }
+    // The queen gives a blocker with a starting template its own step in the swarm that is running (QueenBlockers.kt).
+    LaunchedEffect(runtime) { runtime?.assignQueenBlockerSteps() }
     // The swarm's own lesson creatures hand in the overlays; the tour plays them (LessonCreatures.kt).
     LaunchedEffect(runtime) {
         val active = runtime ?: return@LaunchedEffect
