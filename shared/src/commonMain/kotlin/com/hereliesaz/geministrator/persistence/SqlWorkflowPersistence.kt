@@ -330,17 +330,22 @@ class SqlWorkflowPersistence(
     private suspend fun writeEvent(event: WorkflowEvent) {
         val runId = event.workflowRunId.value
         val payload = event.encode(WorkflowEvent.serializer())
-        val before = queries.eventCountForRun(runId).awaitAsOne()
-        val recorded = queries.meta(chainKey(runId)).awaitAsOneOrNull()?.let(ChainTip::parse)
-        queries.appendEvent(runId, event.occurredAtEpochMillis, payload)
-        // The chain continues from the recorded tip, or starts with a run's first event. A run that already had events
-        // before the chain existed has none recorded and stays without one: its old events cannot be vouched for.
-        val tip = when {
-            recorded != null -> ChainTip(recorded.count + 1, EventChain.next(recorded.tip, payload))
-            before == 0L -> ChainTip(1, EventChain.next(EventChain.GENESIS, payload))
-            else -> null
+        // The event and its chain tip commit together or not at all: a stop between them would leave a chain that reads Altered
+        // with no edit made, or a run that stays unchained for good.
+        database.transaction {
+            val recorded = queries.meta(chainKey(runId)).awaitAsOneOrNull()?.let(ChainTip::parse)
+            // Only a run with no recorded chain needs to know whether it had events before (a bounded look, never a count).
+            val hadEvents = recorded == null && queries.eventExistsForRun(runId).awaitAsOneOrNull() != null
+            queries.appendEvent(runId, event.occurredAtEpochMillis, payload)
+            // The chain continues from the recorded tip, or starts with a run's first event. A run that already had events
+            // before the chain existed has none recorded and stays without one: its old events cannot be vouched for.
+            val tip = when {
+                recorded != null -> ChainTip(recorded.count + 1, EventChain.next(recorded.tip, payload))
+                !hadEvents -> ChainTip(1, EventChain.next(EventChain.GENESIS, payload))
+                else -> null
+            }
+            if (tip != null) queries.putMeta(chainKey(runId), tip.encode())
         }
-        if (tip != null) queries.putMeta(chainKey(runId), tip.encode())
     }
 
     override suspend fun eventChainStatus(runId: WorkflowRunId): ChainStatus = locked {
@@ -348,8 +353,14 @@ class SqlWorkflowPersistence(
         if (recorded == null) {
             ChainStatus.NoChain
         } else {
-            val actual = EventChain.fold(queries.eventPayloadsForRunBySeq(runId.value).awaitAsList())
-            if (actual == recorded) ChainStatus.Intact(actual.count) else ChainStatus.Altered(recorded, actual)
+            val rows = queries.eventRowsForRunBySeq(runId.value).awaitAsList()
+            val actual = EventChain.fold(rows.map { it.payload })
+            // The Log orders events by their time column, which the payload hash does not cover: a column that no longer
+            // matches the time inside its own authenticated payload is an edit too.
+            val timesAgree = rows.all { row ->
+                row.payload.decode(WorkflowEvent.serializer())?.occurredAtEpochMillis?.let { it == row.occurred_at } ?: true
+            }
+            if (actual == recorded && timesAgree) ChainStatus.Intact(actual.count) else ChainStatus.Altered(recorded, actual)
         }
     }
 

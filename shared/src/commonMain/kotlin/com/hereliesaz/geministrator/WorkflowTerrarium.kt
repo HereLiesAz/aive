@@ -204,10 +204,13 @@ internal fun GeministratorWorkflowTerrarium(
 
     // Live watches the run; Build holds the field still and opens the wiring to edits.
     var building by remember(definition.id) { mutableStateOf(startInBuild) }
-    // A link elsewhere (a creature's job) asks for the editor: open it, the creature stays selected.
+    // A link elsewhere (a creature's job) asks for the editor: open it, the creature stays selected, and (once Edit
+    // is on) it is turned over to its card, since the job card belongs to the flipped creature.
+    var turnSelectedOver by remember(definition.id) { mutableStateOf(false) }
     LaunchedEffect(SwarmEditRequests.pending) {
         if (SwarmEditRequests.take() && !readOnly) {
             building = true
+            turnSelectedOver = true
         }
     }
     // While grouping, taps gather creatures instead of selecting one.
@@ -241,6 +244,12 @@ internal fun GeministratorWorkflowTerrarium(
         }
     }
     val flippedId = flipHost.state.flippedId
+    LaunchedEffect(turnSelectedOver, flipping, selectedTaskId) {
+        if (turnSelectedOver && flipping) {
+            selectedTaskId?.let { id -> if (flipHost.state.flippedId != id) flipHost.send(CardFlipEvent.Tap(id)) }
+            turnSelectedOver = false
+        }
+    }
     // Leaving Edit, or the selection moving off the flipped creature (bare ground, a link to another), turns it back.
     LaunchedEffect(selectedTaskId, flipping) {
         val flipped = flipHost.state.flippedId
@@ -475,11 +484,14 @@ internal fun GeministratorWorkflowTerrarium(
             // under that card, so the creature opens in place as card and settings together.
             if (building && rehearsal == null && grouping == null) {
                 stagedDefinition.tasks.firstOrNull { it.id.value == selectedTaskId && it.id.value == flippedId }?.let { openTask ->
-                    Box(Modifier.fillMaxSize()) {
+                    // Keyed by the creature, so the next one opens at its own top and not at the last one's scroll.
+                    androidx.compose.runtime.key(openTask.id) { Box(Modifier.fillMaxSize()) {
                         AzphaltThemedSurface(Azphalt.Ink) {
                             Column(
                                 Modifier
                                     .align(Alignment.BottomCenter)
+                                    // In the wide frame the legend is drawn along the field's foot: the card stands above it.
+                                    .padding(bottom = if (frame != null) 56.dp else 0.dp)
                                     .fillMaxWidth()
                                     .fillMaxHeight(0.4f)
                                     .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
@@ -499,7 +511,7 @@ internal fun GeministratorWorkflowTerrarium(
                                 )
                             }
                         }
-                    }
+                    } }
                 }
             }
             // An empty hive in Build says how it fills (mockup H6).

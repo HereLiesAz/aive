@@ -349,7 +349,7 @@ private val JOB_TRY_CHOICES = 1..5
 private val JOB_TIME_CHOICES: List<TimeLimit> =
     listOf(TimeLimit.Auto) + listOf(5, 15, 30, 60).map(TimeLimit::minutes) + TimeLimit.Off
 
-/** A label on the left and its control on the right. */
+/** A label with its control under it: a wide control beside its label squeezed the label to a letter a line. */
 @Composable
 private fun JobControlRow(label: String, control: @Composable () -> Unit) {
     // The control is often wide (a pill with its own state); beside the label it squeezed the label to a
