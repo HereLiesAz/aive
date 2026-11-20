@@ -299,7 +299,11 @@ private suspend fun ApplicationRuntime.startPlannedWorkflow(
     val skippedMissing = com.hereliesaz.geministrator.queen.missingForSkippedReviewer(notes?.record?.skipped, providerRegistry.linkedSourceIds().size)
     rememberMissing("run-$stamp", inputs.missing + listOfNotNull(skippedMissing))
     rememberHiveSigns("run-$stamp", com.hereliesaz.geministrator.queen.HiveSigns.nominated(plan))
-    rememberBlockers("run-$stamp", com.hereliesaz.geministrator.queen.Blockers.nominated(plan))
+    // What the parent runs left unmet is still missing for this one: it is carried in, after what this plan names (no duplicates).
+    val carried = carriedBlockers(inputs.parentRunIds).fold(com.hereliesaz.geministrator.queen.Blockers.nominated(plan)) { acc, blocker ->
+        com.hereliesaz.geministrator.queen.Blockers.add(acc, "", blocker.sentence, blocker.templateId, null, byKeeper = false)
+    }
+    rememberBlockers("run-$stamp", carried)
     notes?.let { recordPlanning(WorkflowRunId("run-$stamp"), definition.id.value, inputs.objectiveProvenance.isUntrusted(), it, now) }
     inputs.research?.let { record ->
         val runId = WorkflowRunId("run-$stamp")

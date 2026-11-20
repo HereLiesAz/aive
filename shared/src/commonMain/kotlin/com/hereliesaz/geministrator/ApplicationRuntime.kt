@@ -329,6 +329,12 @@ class ApplicationRuntime private constructor(
         }
     }
 
+    /** What the parent runs of a new hive left unmet, open again and without a step (the carry-forward of queen/Blockers.kt). */
+    internal fun carriedBlockers(parentRunIds: List<WorkflowRunId>): List<com.hereliesaz.geministrator.queen.Blocker> {
+        loadBlockerBook()
+        return parentRunIds.flatMap { com.hereliesaz.geministrator.queen.Blockers.carryForward(blockerBook[it.value].orEmpty()) }
+    }
+
     internal fun rememberBlockers(runId: String, blockers: List<com.hereliesaz.geministrator.queen.Blocker>) {
         if (blockers.isEmpty()) return
         storeBlockers(runId, blockers)
