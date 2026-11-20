@@ -118,7 +118,7 @@ class AzphaltStoreService(
         val llms = runCatchingCancellable { repository.search(query = query, kinds = setOf("llm"), page = page) }
             .getOrNull()?.packages.orEmpty()
         val packages = (orchestration.packages + models.packages + llms)
-            .filter { it.kind == "workflow" || it.kind == "role" || it.isModelAssetPackage() || it.isDirectLlmPackage() }
+            .forShop()
             .distinctBy(AzphaltPackageSummary::id)
         // total and pages are derived from the deduplicated merged list.
         // Summing the two individual totals would overcount packages that appear in both result sets.
