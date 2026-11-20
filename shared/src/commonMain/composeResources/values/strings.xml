@@ -16,17 +16,17 @@
 
     <string name="app_done">Done</string>
     <string name="app_done_approved">Approved. The creature carries on.</string>
-    <string name="app_done_paused">Paused. What is running finishes; nothing new starts.</string>
-    <string name="app_done_resumed">Resumed. The swarm carries on.</string>
-    <string name="app_done_spend_stop_lifted">Spend stop lifted. Runs can start again.</string>
+    <string name="app_done_paused">Rested. What is running finishes; nothing new starts.</string>
+    <string name="app_done_resumed">Awake. The swarm carries on.</string>
+    <string name="app_done_spend_stop_lifted">Spend stop lifted. Swarms can start again.</string>
     <string name="app_approval_failed">Approval failed</string>
     <string name="app_clear_failed">Clear failed</string>
     <string name="app_escalation_decision_failed">Escalation decision failed</string>
     <string name="app_rerun_failed">Couldn't run it again</string>
     <string name="app_import_failed">Import failed</string>
     <string name="app_lift_spend_stop_failed">Lifting the spend stop failed</string>
-    <string name="app_stop_run_failed">Stopping the run failed</string>
-    <string name="app_launch_already_in_progress">Another run is starting. Try again when it has started.</string>
+    <string name="app_stop_run_failed">Stopping the swarm failed</string>
+    <string name="app_launch_already_in_progress">Another swarm is starting. Try again when it has started.</string>
     <string name="app_plan_rejection_failed">Plan rejection failed</string>
     <string name="app_provider_message_failed">Source message failed</string>
     <string name="app_reachable_capabilities">Reachable · %1$s capabilities</string>
@@ -37,10 +37,10 @@
     <string name="app_runtime_bootstrap_failed">Runtime bootstrap failed</string>
     <string name="app_runtime_is_unavailable">Runtime is unavailable</string>
     <string name="app_save_swarm_failed">Save swarm failed</string>
-    <string name="app_switch_run_failed">Switch run failed</string>
+    <string name="app_switch_run_failed">Switch swarm failed</string>
     <string name="app_task_delegation_failed">Trusting the step failed</string>
     <string name="app_workflow_delegation_failed">Trusting the swarm failed</string>
-    <string name="app_workflow_launch_failed">Run launch failed</string>
+    <string name="app_workflow_launch_failed">Swarm launch failed</string>
 
 
     <string name="common_approve">Approve</string>
@@ -48,7 +48,7 @@
     <string name="common_connect">Connect</string>
     <string name="common_connected">Connected</string>
     <string name="common_off">Off</string>
-    <string name="memory_swarm_lead">A swarm of its own, running beside every other: it banks what each run learns. Each stage works programmatically, or on a model you choose.</string>
+    <string name="memory_swarm_lead">A swarm of its own, running beside every other: it banks what each swarm learns. Each stage works programmatically, or on a model you choose.</string>
     <string name="keeper_room">Keeper's room</string>
     <string name="keeper_feeds_the_hive">Feeds the hive</string>
     <string name="keeper_the_keeper">The keeper</string>
@@ -60,7 +60,7 @@
     <string name="keeper_group_sources">Sources and tools</string>
     <string name="keeper_group_sources_lead">What your creatures think with, the tools they may use, and where their work lands.</string>
     <string name="keeper_group_allowance">Allowance</string>
-    <string name="keeper_group_allowance_lead">The most real money a run, or an hour, may spend. When it is reached every creature rests until you raise it.</string>
+    <string name="keeper_group_allowance_lead">The most real money a swarm, or an hour, may spend. When it is reached every creature rests until you raise it.</string>
     <string name="keeper_group_hosts">Hosts</string>
     <string name="devices_card_title">Your other devices</string>
     <string name="devices_host_eyebrow">Host</string>
@@ -148,7 +148,7 @@
     <string name="keeper_a2a_agent_checking">Reading its Agent Card…</string>
     <string name="keeper_local_git_note">Local Git folders need no account: pick one when you launch.</string>
     <string name="mcp_servers">MCP servers</string>
-    <string name="mcp_servers_lead">MCP servers your agents can call while they work. Each server's tools run only after you allow them, once per run or always.</string>
+    <string name="mcp_servers_lead">MCP servers your agents can call while they work. Each server's tools run only after you allow them, once per swarm or always.</string>
     <string name="mcp_registry_search_query">Find MCP servers (3+ characters)</string>
     <string name="mcp_registry_search">Search catalog</string>
     <string name="mcp_registry_searching">Searching catalog…</string>
@@ -172,7 +172,7 @@
     <string name="mcp_tool_count">%1$d tools</string>
     <string name="mcp_check_failed">Could not reach it: %1$s</string>
     <string name="mcp_always_allow">Always allow</string>
-    <string name="mcp_ask_each_run">Ask each run</string>
+    <string name="mcp_ask_each_run">Ask each swarm</string>
     <string name="mcp_status_allowed">Allowed</string>
     <string name="mcp_status_asks">Asks</string>
     <string name="mcp_remove_title">Remove %1$s?</string>
@@ -183,7 +183,7 @@
 %4$s
 
 What the server returns is treated as outside content, not instructions.</string>
-    <string name="mcp_consent_allow_run">Allow for this run</string>
+    <string name="mcp_consent_allow_run">Allow for this swarm</string>
     <string name="mcp_consent_allow_always">Always allow</string>
     <string name="mcp_consent_deny">Don't allow</string>
     <string name="mcp_script_sandbox">Script sandbox</string>
@@ -248,7 +248,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="compute_entire_graph">Entire graph</string>
     <string name="compute_fleet">Fleet</string>
     <string name="compute_idle">Idle</string>
-    <string name="compute_launch_or_select_a_workflow_run">Launch or select a run, then return here to assign its work to connected hardware.</string>
+    <string name="compute_launch_or_select_a_workflow_run">Launch or select a swarm, then return here to assign its work to connected hardware.</string>
     <string name="compute_local">Local</string>
     <string name="compute_logical_cpus"> logical CPUs · </string>
     <string name="compute_mixed_assignment">Mixed assignment</string>
@@ -287,14 +287,14 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hall_monitor_global_pause">FROZEN BY THE NANNY</string>
     <string name="hall_monitor_hall_monitor_review">Nanny review</string>
     <string name="hall_monitor_isolated">On a copy</string>
-    <string name="hall_monitor_isolated_counterfactual">PRACTICE RUN</string>
+    <string name="hall_monitor_isolated_counterfactual">PRACTICE SWARM</string>
     <string name="hall_monitor_paused">FROZEN</string>
     <string name="hall_monitor_progress">PROGRESS</string>
     <string name="hall_monitor_stop">Stop</string>
     <string name="hall_monitor_test_solution">Try it on a copy</string>
     <string name="hall_monitor_the_hall_monitor_report_cannot_be">The Nanny report cannot be parsed into testable solutions.</string>
     <string name="hall_monitor_the_original_run_remains_frozen_while">The Nanny froze this swarm because she noticed a problem. It stays frozen while you read her recommendations or try them out; trying one out does not approve or apply anything.</string>
-    <string name="hall_monitor_the_paused_source_run_is_unchanged">The frozen swarm is not touched. This practice run is a separate copy that you start by hand; it only shows what the change would do.</string>
+    <string name="hall_monitor_the_paused_source_run_is_unchanged">The frozen swarm is not touched. This practice swarm is a separate copy that you start by hand; it only shows what the change would do.</string>
     <string name="hall_monitor_trial_history">TRIAL HISTORY</string>
     <string name="hall_monitor_validation">CHECKS</string>
 
@@ -302,10 +302,10 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inbox_badge_unread">Messages, %1$d unread</string>
     <string name="inbox_badge_unread_many">Messages, more than %1$d unread</string>
     <string name="inbox_loading_runtime">Loading runtime…</string>
-    <string name="inbox_no_active_run_there_are_no">No active run. There are no swarm decisions to review.</string>
+    <string name="inbox_no_active_run_there_are_no">No active swarm. There are no decisions to review.</string>
     <string name="inbox_no_pending_decisions">No pending decisions.</string>
     <string name="inbox_no_project_yet_there_are_no">No neighborhood yet. There are no swarm decisions to review.</string>
-    <string name="inbox_run_unavailable">Run unavailable: %1$s</string>
+    <string name="inbox_run_unavailable">Swarm unavailable: %1$s</string>
     <string name="inbox_runtime_disconnected">Runtime disconnected: %1$s</string>
     <string name="inbox_page_eyebrow">Keeper attention</string>
     <string name="inbox_page_title">Messages</string>
@@ -345,7 +345,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inspector_default_runner">default runner</string>
     <string name="inspector_executor">EXECUTOR</string>
     <string name="inspector_executor_ref">RUNS WITH</string>
-    <string name="inspector_external_run">EXTERNAL RUN ID</string>
+    <string name="inspector_external_run">EXTERNAL SWARM ID</string>
     <string name="inspector_github_actions">GitHub Actions</string>
     <string name="inspector_inline_evidence">inline evidence</string>
     <string name="inspector_inputs">INPUTS</string>
@@ -366,7 +366,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inspector_local_sandbox">local sandbox</string>
     <string name="inspector_message">MESSAGE</string>
     <string name="inspector_message_agent">Message agent</string>
-    <string name="inspector_no_run_is_loaded">No run is loaded.</string>
+    <string name="inspector_no_run_is_loaded">No swarm is loaded.</string>
     <string name="inspector_now">NOW</string>
     <string name="inspector_open_trace">Open its trace</string>
     <string name="inspector_payload_context">PAYLOAD CONTEXT</string>
@@ -379,13 +379,13 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inspector_proceed">Proceed</string>
     <string name="inspector_progress">PROGRESS</string>
     <string name="inspector_provider">SOURCE</string>
-    <string name="inspector_provider_run">SOURCE'S RUN ID</string>
+    <string name="inspector_provider_run">SOURCE'S SWARM ID</string>
     <string name="inspector_provider_target">SOURCE TARGET</string>
     <string name="inspector_reject_plan">Reject plan</string>
     <string name="inspector_remote">Remote · </string>
     <string name="inspector_responsible_role">RESPONSIBLE ROLE</string>
     <string name="inspector_retry_task">Retry task</string>
-    <string name="inspector_budget_spent">Budget spent: its role used %1$s tokens in this run, all of its budget. It takes no more work until you raise the budget.</string>
+    <string name="inspector_budget_spent">Budget spent: its role used %1$s tokens in this swarm, all of its budget. It takes no more work until you raise the budget.</string>
     <string name="inspector_raise_budget">Raise its budget</string>
     <string name="inspector_role">Role: %1$s</string>
     <string name="inspector_role_instructions_redacted_by_policy">\nRole instructions: [redacted by policy]</string>
@@ -398,7 +398,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inspector_technical_details">Technical details</string>
     <string name="mind_instructions">ITS MIND · INSTRUCTIONS</string>
     <string name="mind_tools">TOOLS</string>
-    <string name="mind_budget">TOKEN BUDGET PER RUN</string>
+    <string name="mind_budget">TOKEN BUDGET PER SWARM</string>
     <string name="mind_no_budget">none</string>
     <string name="mind_proposals_title">PROPOSED CHANGES TO ITS INSTRUCTIONS</string>
     <string name="mind_proposals_hint">Drafted from its past work. Nothing changes until you approve. Approving saves the new text below to this role in every swarm that uses it.</string>
@@ -407,9 +407,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="mind_proposal_kind_repeated_failure">Recurring failure</string>
     <string name="mind_proposal_kind_failures_then_fix">Failed, then fixed</string>
     <string name="mind_proposal_kind_keeper_correction">Your corrections</string>
-    <string name="mind_proposal_evidence_failure">Run %1$s · %2$s, attempt %3$d failed: %4$s</string>
-    <string name="mind_proposal_evidence_fix">Run %1$s · %2$s then passed</string>
-    <string name="mind_proposal_evidence_keeper">Run %1$s · %2$s, you told it: %3$s</string>
+    <string name="mind_proposal_evidence_failure">Swarm %1$s · %2$s, attempt %3$d failed: %4$s</string>
+    <string name="mind_proposal_evidence_fix">Swarm %1$s · %2$s then passed</string>
+    <string name="mind_proposal_evidence_keeper">Swarm %1$s · %2$s, you told it: %3$s</string>
     <string name="mind_proposal_approve">Approve and apply</string>
     <string name="mind_proposal_dismiss">Dismiss</string>
     <string name="mind_proposal_stale">Its instructions changed since that proposal was drafted, so nothing was applied. A fresh one will follow if the pattern still holds.</string>
@@ -472,15 +472,15 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="scar_hatched">Done</string>
     <string name="scar_withered">Failed</string>
     <string name="scar_stopped">Stopped</string>
-    <string name="run_all_pill">All runs</string>
+    <string name="run_all_pill">All swarms</string>
     <string name="run_all_filter_all">All</string>
     <string name="run_all_filter_running">Running</string>
-    <string name="run_all_filter_paused">Paused</string>
+    <string name="run_all_filter_paused">Rested</string>
     <string name="run_all_filter_done">Done</string>
     <string name="run_all_filter_failed">Failed</string>
     <string name="run_all_filter_stopped">Stopped</string>
     <string name="run_all_open_now">Open now</string>
-    <string name="run_all_empty">No runs in this group.</string>
+    <string name="run_all_empty">No swarms in this group.</string>
     <string name="hive_new">New swarm</string>
     <string name="hive_new_name">New swarm</string>
     <string name="hive_new_empty">An empty swarm. Describe the work below and the queen drafts it, or add roles yourself and draw a strand from one creature’s tail to another.</string>
@@ -555,7 +555,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="keeper_local_agents_lead">The vendors' own command-line tools, run on this computer under your own login.</string>
     <string name="keeper_chat_bots">Chat bots</string>
     <string name="keeper_chat_bots_lead">Reach The Aive from Telegram or Discord direct messages. Desktop only.</string>
-    <string name="chat_bots_note">A bot tells your paired chat what needs you and answers /status, /hives, /runs, /run and /stop. It can never approve anything: plans and approvals are decided here, in the app. Each bot is off until you turn it on, and only the one account you pair is answered. A run started from chat still waits at its plan approval.</string>
+    <string name="chat_bots_note">A bot tells your paired chat what needs you and answers /status, /hives, /runs, /run and /stop. It can never approve anything: plans and approvals are decided here, in the app. Each bot is off until you turn it on, and only the one account you pair is answered. A swarm started from chat still waits at its plan approval.</string>
     <string name="chat_bots_token_none">No token yet. Make a bot with its platform, then paste its token here.</string>
     <string name="chat_bots_token_saved">A token is saved on this computer. It is never shown again.</string>
     <string name="chat_bots_token_label">Bot token</string>
@@ -606,7 +606,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="schedule_on">On</string>
     <string name="schedule_off">Off</string>
     <string name="schedule_run_now">Run now</string>
-    <string name="schedule_run_now_note">Run now: it starts once within a minute, when no other run is active. The schedule itself stays as it is (off stays off).</string>
+    <string name="schedule_run_now_note">Run now: it starts once within a minute, when no other swarm is active. The schedule itself stays as it is (off stays off).</string>
     <string name="schedule_remove">Remove</string>
     <string name="schedule_kind_hours">Every few hours</string>
     <string name="schedule_kind_daily">Daily</string>
@@ -668,14 +668,14 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="schedule_poll_more">Look less often</string>
     <string name="keeper_improvement">Evolution</string>
     <string name="keeper_improvement_lead">What the swarm's evolution cycle proposes. Nothing changes until you evolve it.</string>
-    <string name="improvement_lead_note">The evolution cycle reads the swarm's run history and examines itself too. It only proposes. A proposal changes a role, a swarm or a schedule when you evolve it here, with the exact text shown; Undo puts it back.</string>
+    <string name="improvement_lead_note">The evolution cycle reads the swarm's history and examines itself too. It only proposes. A proposal changes a role, a swarm or a schedule when you evolve it here, with the exact text shown; Undo puts it back.</string>
     <string name="improvement_standing_examined">The swarm reviewed its own review process recently.</string>
     <string name="improvement_standing_never">No review of the swarm has finished yet. Add the coding suite above, then run a review.</string>
     <string name="improvement_standing_overdue">The swarm has not reviewed its own review process for three weeks or more. Run a review.</string>
     <string name="improvement_standing_skipped">The last review did not look at the review process itself. Each review must suggest a change to it, or show it needs none.</string>
     <string name="improvement_no_loop">The evolution cycle is not on this device. Keeper's room › Schedules › Add the coding suite adds it.</string>
     <string name="improvement_run_cycle">Run a cycle now</string>
-    <string name="improvement_run_cycle_note">The cycle starts once, within a minute, when no other run is active. This does not turn its schedule on.</string>
+    <string name="improvement_run_cycle_note">The cycle starts once, within a minute, when no other swarm is active. This does not turn its schedule on.</string>
     <string name="improvement_none">No proposals yet.</string>
     <string name="improvement_meta">about the loop itself</string>
     <string name="improvement_body">Expected effect: %1$s\nUndo: %2$s\nExact text: %3$s\nProposed %4$s</string>
@@ -693,7 +693,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="improvement_manual_noted">Noted. The app does not apply this kind by itself; do it by hand.</string>
     <string name="improvement_cannot">It cannot be applied as written: %1$s</string>
     <string name="improvement_source_loop">from the loop</string>
-    <string name="improvement_source_role">from run history</string>
+    <string name="improvement_source_role">from swarm history</string>
     <string name="improvement_source_habit">from a habit</string>
     <string name="improvement_source_nanny">from the Nanny</string>
 
@@ -701,11 +701,11 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="improvement_source_queen">from the queen</string>
     <string name="queen_title_suggestion">A suggestion from the queen</string>
     <string name="queen_say_suggest_redo_step">Step %3$s has failed %4$s times, and it builds on step %1$s (%2$s). I can count the failures but I cannot tell which step is at fault. I can redo step %1$s and everything after it; finished work before it stays.</string>
-    <string name="queen_say_suggest_swap_source">Step %1$s (%2$s) moved to another Source after the first one failed. Later steps may use the first one too. You change a creature's Source on its Mind, and the change applies from the next run.</string>
+    <string name="queen_say_suggest_swap_source">Step %1$s (%2$s) moved to another Source after the first one failed. Later steps may use the first one too. You change a creature's Source on its Mind, and the change applies from the next swarm.</string>
     <string name="queen_say_suggest_raise_budget">The %1$s has used %2$s percent of its token budget and still has steps to do. Raising its budget on its Mind now avoids a stop.</string>
-    <string name="queen_say_suggest_raise_allowance">This run has counted %1$s percent of its %2$s allowance, and many steps are still to do. You can change the allowance in the Keeper's room.</string>
-    <string name="queen_say_suggest_rest_nanny">The nanny's report is with a second creature for checking. I can rest the swarm until that is settled: what is running finishes, nothing new starts, and you can resume it.</string>
-    <string name="queen_say_suggest_nanny_finding">The Nanny found something about step %1$s (%2$s): another Source may serve it better. She works for the next run, and I am passing it on now so you can decide. You change a creature's Source on its Mind, and the change applies from the next run.</string>
+    <string name="queen_say_suggest_raise_allowance">This swarm has counted %1$s percent of its %2$s allowance, and many steps are still to do. You can change the allowance in the Keeper's room.</string>
+    <string name="queen_say_suggest_rest_nanny">The nanny's report is with a second creature for checking. I can rest the swarm until that is settled: what is running finishes, nothing new starts, and you can wake it.</string>
+    <string name="queen_say_suggest_nanny_finding">The Nanny found something about step %1$s (%2$s): another Source may serve it better. She works for the next swarm, and I am passing it on now so you can decide. You change a creature's Source on its Mind, and the change applies from the next swarm.</string>
     <string name="queen_say_watch_stalled">Nothing has moved for %1$s minutes, no creature is working, and nothing waits on you. I am still watching. The Story shows where it stopped, and you can rest the swarm.</string>
     <string name="queen_say_watch_repeated_block">%1$s steps are blocked for the same reason (%2$s). Fixing it once may free them all; start with step %3$s.</string>
     <string name="queen_say_suggest_add_check">Step %1$s (%2$s) has failed several times after earlier work finished. A check between them would catch it sooner. This swarm keeps running as it is; I can keep the idea for next time.</string>
@@ -748,10 +748,10 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_draft_problem_unreadable">The keeper’s answer could not be read. Try again.</string>
     <string name="hive_draft_unavailable">No queen is linked to draft with.</string>
     <string name="hive_not_yet_run">Not yet run</string>
-    <string name="hive_objective">Objective for the next run</string>
+    <string name="hive_objective">Objective for the next swarm</string>
     <string name="hive_repository">Repository: owner/repo or URL</string>
     <string name="hive_launch">Work</string>
-    <string name="hive_launch_failed">The run could not start.</string>
+    <string name="hive_launch_failed">The swarm could not start.</string>
     <string name="hive_timeline">STORY</string>
     <string name="hive_timeline_empty">Nothing has happened in this swarm yet.</string>
     <string name="hive_timeline_loading">Loading the story…</string>
@@ -763,8 +763,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="planning_drafting">%1$s is drafting the plan.</string>
     <string name="planning_reviewing">%1$s is reading the plan, round %2$d of %3$d.</string>
     <string name="planning_reworking">%1$s is reworking the plan, round %2$d of %3$d.</string>
-    <string name="planning_awaiting">The review is over. The run waits for you.</string>
-    <string name="planning_started">Starting the run.</string>
+    <string name="planning_awaiting">The review is over. The swarm waits for you.</string>
+    <string name="planning_started">Starting the swarm.</string>
     <string name="plan_decision_title">THE PLAN, REVIEWED</string>
     <string name="plan_decision_approved_first">%1$s approved the plan.</string>
     <string name="plan_decision_approved_after">%1$s approved the plan after %2$d rounds.</string>
@@ -790,16 +790,16 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="creature_egg_action">Egg, %1$d of %2$d feeders done</string>
     <string name="creature_egg_withered">Withered egg</string>
     <string name="hive_stop_run">Stop</string>
-    <string name="hive_pause_run">Pause</string>
+    <string name="hive_pause_run">Rest</string>
     <string name="launch_error_check_connections">Check connections</string>
     <string name="inspector_rewind">Rewind to here</string>
     <string name="inspector_rewind_note">This creature and what follows it start again as a new attempt. Everything else keeps running, and what this one already spent stays on the record.</string>
-    <string name="hive_resume_run">Paused · Resume</string>
-    <string name="app_pause_run_failed">Pausing or resuming the run failed</string>
-    <string name="hive_paused_note">Paused: nothing new starts. What is running finishes. Change anything, then Resume.</string>
-    <string name="hive_stop_title">Stop this run?</string>
+    <string name="hive_resume_run">Rested · Wake</string>
+    <string name="app_pause_run_failed">Resting or waking the swarm failed</string>
+    <string name="hive_paused_note">Rested: nothing new starts. What is running finishes. Change anything, then Wake.</string>
+    <string name="hive_stop_title">Stop this swarm?</string>
     <string name="hive_stop_text">Every creature still working stops and its source sessions close. What has finished is kept.</string>
-    <string name="hive_stop_confirm">Stop run</string>
+    <string name="hive_stop_confirm">Stop swarm</string>
     <string name="hive_stop_cancel">Keep running</string>
     <string name="timeline_view_waterfall">Waterfall</string>
     <string name="timeline_view_events">Events</string>
@@ -807,9 +807,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="timeline_view_log">Log</string>
     <string name="swarm_activity_show">Show activity</string>
     <string name="swarm_activity_hide">Hide activity</string>
-    <string name="swarm_activity_none">This role has not done anything in any run yet.</string>
+    <string name="swarm_activity_none">This role has not done anything in any swarm yet.</string>
     <string name="swarm_activity_no_cost">none reported</string>
-    <string name="swarm_activity_summary">Steps: %1$s, in %2$s run(s). Completed: %3$s. Failed or escalated: %4$s. Tokens reported: %5$s. Cost reported: %6$s. Newest first, from the runs kept on this device.</string>
+    <string name="swarm_activity_summary">Steps: %1$s, in %2$s swarm(s). Completed: %3$s. Failed or escalated: %4$s. Tokens reported: %5$s. Cost reported: %6$s. Newest first, from the swarms kept on this device.</string>
     <string name="flowchart_detail_working">Working: %1$s</string>
     <string name="flowchart_detail_waiting_approval">Waiting for your approval.</string>
     <string name="flowchart_detail_question">Its agent asked you a question and is waiting for your answer.</string>
@@ -824,7 +824,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="flowchart_detail_no_provider">No connected source can do this step.</string>
     <string name="flowchart_detail_gate_turned_back">A review turned this work back.</string>
     <string name="flowchart_detail_waiting_on">Waiting for %1$s to finish.</string>
-    <string name="flowchart_detail_keeper_paused">You paused the swarm.</string>
+    <string name="flowchart_detail_keeper_paused">You rested the swarm.</string>
     <string name="flowchart_detail_provider_failed_plain">%1$s could not do this step.</string>
     <string name="flowchart_detail_failed">It failed.</string>
     <string name="flowchart_detail_failed_with">It failed: %1$s</string>
@@ -844,7 +844,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="log_note_activity">Everything in this swarm in one list: its events and what its agents thought and did, by time. Pick a role to see only its steps. Agent lines are kept in memory, this launch only. Times are UTC.</string>
     <string name="log_empty_activity">Nothing has happened in this swarm yet.</string>
     <string name="log_roles_all">All roles</string>
-    <string name="log_source_run">Run log</string>
+    <string name="log_source_run">Swarm log</string>
     <string name="log_source_agents">Agent actions</string>
     <string name="log_source_app">App log</string>
     <string name="log_source_memory">Memory log</string>
@@ -869,13 +869,13 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="waterfall_outcome_failed">failed</string>
     <string name="waterfall_outcome_cancelled">cancelled</string>
     <string name="waterfall_outcome_ongoing">still going</string>
-    <string name="waterfall_outcome_ended">ended with the run</string>
+    <string name="waterfall_outcome_ended">ended with the swarm</string>
     <string name="waterfall_usage">%1$s tokens in, %2$s out</string>
     <string name="waterfall_cost">cost %1$s</string>
     <string name="waterfall_avoided">about %1$s tokens avoided by reusing a habit</string>
     <string name="waterfall_no_usage">No usage reported</string>
     <string name="hive_more_editing">More editing</string>
-    <string name="hive_run_number">RUN %1$d</string>
+    <string name="hive_run_number">SWARM %1$d</string>
     <string name="hive_active_of">%1$d / %2$d</string>
     <string name="hive_creatures_active">creatures active</string>
     <string name="log_integrity_intact">Record intact: %1$d events, none changed since they were written.</string>
@@ -895,7 +895,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_feed_placeholder">What should this hive do next?</string>
     <string name="hive_feed_launch">Work</string>
     <string name="hive_feed_queue">Add to queue</string>
-    <string name="hive_feed_queued">Next: %1$s · it starts when this run finishes</string>
+    <string name="hive_feed_queued">Next: %1$s · it starts when this swarm finishes</string>
     <string name="hive_feed_unqueue">Take it back</string>
     <string name="creature_panel_place">CREATURE · %1$d OF %2$d</string>
     <string name="creature_panel_close">Close the creature panel</string>
@@ -950,7 +950,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="job_runs_any">Any paired device</string>
     <string name="job_runs_chosen">A chosen device</string>
     <string name="job_add">Add</string>
-    <string name="job_saved">Saved. A creature that has not started takes it now; one that is running or done, from its next run.</string>
+    <string name="job_saved">Saved. A creature that has not started takes it now; one that is running or done, from its next swarm.</string>
     <string name="job_not_saved">Its step could not be saved</string>
     <string name="build_redo">Redo</string>
     <string name="build_cut">Cut</string>
@@ -960,16 +960,16 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="build_release_output">Release output</string>
     <string name="build_remove">Remove</string>
     <string name="build_remove_cluster">Remove %1$d creatures</string>
-    <string name="build_remove_blocked">A run of this swarm is live, so creatures cannot be removed. Remove is back when it stops.</string>
+    <string name="build_remove_blocked">This swarm is live, so creatures cannot be removed. Remove is back when it stops.</string>
     <string name="hive_menu_open">Open</string>
     <string name="hive_menu_options">Swarm options</string>
     <string name="hive_menu_close">Close</string>
     <string name="hive_delete_understood">OK</string>
     <string name="hive_delete">Delete swarm</string>
     <string name="hive_delete_title">Delete “%1$s”?</string>
-    <string name="hive_delete_body">The swarm and its %1$d creatures will be deleted from this device. This cannot be undone. Its past runs stay in history, but can only be viewed, not resumed. Your memory, your repositories and your other swarms are not touched.</string>
+    <string name="hive_delete_body">The swarm and its %1$d creatures will be deleted from this device. This cannot be undone. Its past swarms stay in history, but can only be viewed, not resumed. Your memory, your repositories and your other swarms are not touched.</string>
     <string name="hive_delete_keep">Keep it</string>
-    <string name="hive_delete_refused_live">A run of this swarm is live. Delete is back when it stops.</string>
+    <string name="hive_delete_refused_live">This swarm is live. Delete is back when it stops.</string>
     <string name="hive_delete_refused_circuit">Another swarm uses this one as a circuit, so it stays. Nothing was deleted.</string>
     <string name="hive_delete_refused_package">This swarm came from a package, so it goes when the package is removed. Nothing was deleted.</string>
     <string name="hive_delete_open_store">Open the Shop</string>
@@ -989,14 +989,14 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="build_step_repo_status">Repository status</string>
     <string name="build_step_repo_fetch">Fetch repository</string>
     <string name="build_step_chat_post">Post to my chat</string>
-    <string name="swarm_token_budget">Token budget per run</string>
+    <string name="swarm_token_budget">Token budget per swarm</string>
     <string name="swarm_token_budget_hint">Leave empty for no budget.</string>
     <string name="needs_echo">ECHO · %1$s</string>
     <string name="needs_echo_grounded">GROUNDED</string>
     <string name="needs_echo_self_absorbed">SELF-ABSORBED</string>
     <string name="needs_echo_fevered">FEVERED</string>
     <string name="needs_echo_insane">INSANE</string>
-    <string name="needs_integrity">INTEGRITY (reliable this run)</string>
+    <string name="needs_integrity">INTEGRITY (reliable this swarm)</string>
     <string name="needs_budget">BUDGET (its specialty's token budget)</string>
     <string name="needs_output_used">OUTPUT USED</string>
     <string name="needs_not_reported">not reported</string>
@@ -1006,9 +1006,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="needs_reviewed_by_itself">REVIEWED BY ITS OWN CONFIG</string>
     <string name="needs_reviews_of">%1$d of %2$d reviews</string>
     <string name="inspector_state">STATE</string>
-    <string name="inspector_stop_workflow">Stop run</string>
+    <string name="inspector_stop_workflow">Stop swarm</string>
     <string name="inspector_stored_evidence">stored evidence</string>
-    <string name="inspector_task_is_not_part_of">Task %1$s is not part of the current run.</string>
+    <string name="inspector_task_is_not_part_of">Task %1$s is not part of the current swarm.</string>
 
     <string name="library_tasks">%1$s tasks</string>
     <string name="library_active">Active</string>
@@ -1036,9 +1036,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="library_reset_edits">Reset edits</string>
     <string name="library_reusable_role">Reusable role</string>
     <string name="library_reusable_role_1">Reusable role · %1$s</string>
-    <string name="library_run_loaded">Run loaded</string>
-    <string name="library_swarm_needs_queen">This swarm has no queen, so it cannot start. Add the queen to it, then start it again. Her approval is how a swarm is steered.</string>
-    <string name="library_run_objective_inputs">Run objective / inputs</string>
+    <string name="library_run_loaded">Swarm loaded</string>
+    <string name="library_run_objective_inputs">Swarm objective / inputs</string>
     <string name="library_save_composition">SAVE COMPOSITION</string>
     <string name="library_save_reusable_workflow">Save reusable swarm</string>
     <string name="library_saved">Saved %1$s.</string>
@@ -1047,7 +1046,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="library_unassigned">Unassigned</string>
     <string name="library_workflow_could_not_be_saved">Swarm could not be saved.</string>
     <string name="library_workflow_id">Swarm id</string>
-    <string name="library_workflow_launch_failed">Run launch failed.</string>
+    <string name="library_workflow_launch_failed">Swarm launch failed.</string>
     <string name="library_workflow_library_could_not_be_loaded">Swarm library could not be loaded.</string>
     <string name="library_workflow_name">Swarm name</string>
     <string name="library_workflows">SWARMS</string>
@@ -1066,15 +1065,15 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="lineage_cancel_continue">Not now</string>
     <string name="lineage_continue_this_run">Feed it more</string>
     <string name="lineage_lineage">LINEAGE</string>
-    <string name="lineage_loading_runs">Loading runs…</string>
+    <string name="lineage_loading_runs">Loading swarms…</string>
     <string name="lineage_next_objective">What next?</string>
-    <string name="lineage_no_earlier_runs_yet">No earlier runs yet.</string>
+    <string name="lineage_no_earlier_runs_yet">No earlier swarms yet.</string>
     <string name="lineage_start_continuation">Feed it</string>
     <string name="lineage_starts_a_new_line_of_work">Starts a new line of work with its own memory.</string>
-    <string name="lineage_the_new_run_reads_every_chosen">The new run reads every chosen run's memory; where they disagree, both answers are kept.</string>
-    <string name="lineage_the_new_run_reads_the_chosen">The new run reads the chosen run's memory and adds to its own.</string>
+    <string name="lineage_the_new_run_reads_every_chosen">The new swarm reads every chosen swarm's memory; where they disagree, both answers are kept.</string>
+    <string name="lineage_the_new_run_reads_the_chosen">The new swarm reads the chosen swarm's memory and adds to its own.</string>
     <string name="lineage_rerun_from_here">Run again from here</string>
-    <string name="lineage_rerun_hint">A new run starts from this creature. The work before it keeps its results; this creature and everything after it work again. This run stays as it was.</string>
+    <string name="lineage_rerun_hint">A new swarm starts from this creature. The work before it keeps its results; this creature and everything after it work again. This swarm stays as it was.</string>
     <string name="lineage_rerun_change_objective">Change what it's asked</string>
     <string name="lineage_rerun_change_output">Change what it made</string>
     <string name="lineage_rerun_objective">What should it work on?</string>
@@ -1156,7 +1155,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="memory_simple_latest_none_body">Finished sessions are banked here, then consolidated into memories.</string>
     <string name="memory_simple_keeper_eyebrow">Good to know</string>
     <string name="memory_simple_keeper_title">Memory is shared across the hive</string>
-    <string name="memory_simple_keeper_body">Every creature in a run reads and adds to one bank, and each run reads through the runs it came from.</string>
+    <string name="memory_simple_keeper_body">Every creature in a swarm reads and adds to one bank, and each swarm reads through the swarms it came from.</string>
     <string name="memory_counted_since_this_bank_s_layer">\nCounted since this bank's layer was last built (a settings change rebuilds it).</string>
     <string name="memory_source_not_connected">%1$s is not connected. Tap to connect it.</string>
     <string name="memory_default_provider">Default source</string>
@@ -1222,9 +1221,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="memory_habits_hint">What the swarm keeps doing, learned from what finished: an operation done three or more times is offered to the agents whose task names it, as counts and facts. A habit runs only after you approve it here, and every step it proposes still waits at its own approval. A flag, a decision or an override is only information; the habit can always be chosen.</string>
     <string name="memory_habits_learning">Habits: learning</string>
     <string name="memory_habits_off">Habits: off</string>
-    <string name="memory_habits_none">No habit has formed yet. It takes three finished runs of the same named operation.</string>
+    <string name="memory_habits_none">No habit has formed yet. It takes three finished swarms of the same named operation.</string>
     <string name="memory_habits_sequences">Done together, in this order (observed, not a dependency)</string>
-    <string name="memory_habits_sequence_line">%1$s: in %2$s runs, %3$s with every step clean</string>
+    <string name="memory_habits_sequence_line">%1$s: in %2$s swarms, %3$s with every step clean</string>
     <string name="memory_habits_flag">Flag it</string>
     <string name="memory_habits_stands">It stands</string>
     <string name="memory_habits_replace">Replace it</string>
@@ -1303,7 +1302,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="agent_question_plain">Its question could not be shown as a form, so here is what it sent:</string>
     <string name="agent_question_not_a_number">A number field holds something that is not a number.</string>
 
-    <string name="overview_has_no_persisted_workflow_run">%1$s has no run yet. Define an objective below to start one.</string>
+    <string name="overview_has_no_persisted_workflow_run">%1$s has no swarm yet. Define an objective below to start one.</string>
     <string name="overview_a_workflow_gate_is_waiting_for">A swarm approval is waiting for human input.</string>
     <string name="overview_aive_automatically_reopens_the_last_saved">The Aive automatically reopens the last saved neighborhood it knows about.</string>
     <string name="overview_blocked">Blocked</string>
@@ -1417,7 +1416,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="repositories_entire_install">Install Entire</string>
     <string name="repositories_entire_log_in">Log in to Entire</string>
     <string name="repositories_entire_logging_in">Finish signing in in your browser…</string>
-    <string name="repositories_entire_record_runs">Record runs as checkpoints</string>
+    <string name="repositories_entire_record_runs">Record swarms as checkpoints</string>
     <string name="repositories_entire_on">On</string>
     <string name="repositories_entire_off">Off</string>
     <string name="repositories_entire_repository">Entire repository</string>
@@ -1488,23 +1487,23 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="runs_marketplace_security">Marketplace · Security</string>
     <string name="runs_needs_you">Needs you</string>
     <string name="runs_no_pending_decisions">No pending decisions.</string>
-    <string name="runs_no_projects_yet">No neighborhoods yet. Open the District and start a run to create one.</string>
-    <string name="runs_no_runs">No runs yet. Open the District, enter an objective and start a run.</string>
+    <string name="runs_no_projects_yet">No neighborhoods yet. Open the District and start a swarm to create one.</string>
+    <string name="runs_no_runs">No swarms yet. Open the District, enter an objective and start a swarm.</string>
     <string name="runs_plan_approval">Plan Approval</string>
     <string name="runs_policy_allowed">Policy allowed</string>
     <string name="runs_policy_denied">Policy denied</string>
     <string name="runs_policy_requires_approval">Policy requires approval</string>
     <string name="runs_reject_reassigns_to"> · Reject reassigns to %1$s</string>
-    <string name="runs_reject_stops_the_workflow"> · Reject stops the run</string>
+    <string name="runs_reject_stops_the_workflow"> · Reject stops the swarm</string>
     <string name="runs_rejected">Rejected</string>
     <string name="runs_release_failed_after_3_attempts">Release failed after 3 attempts</string>
     <string name="runs_retry_scheduled_attempt">Retry scheduled · attempt %1$s</string>
-    <string name="runs_run">Run · %1$s</string>
+    <string name="runs_run">Swarm · %1$s</string>
     <string name="runs_running">Running</string>
     <string name="runs_security_risk">Security risk</string>
     <string name="runs_stop">Stop</string>
     <string name="runs_task_cancelled">Task cancelled</string>
-    <string name="runs_external_cancel_failed">Remote run not cancelled</string>
+    <string name="runs_external_cancel_failed">Remote swarm not cancelled</string>
     <string name="runs_task_rerun">Run again from a task</string>
     <string name="runs_task_completed">Task completed</string>
     <string name="runs_task_escalated">Task escalated</string>
@@ -1516,10 +1515,10 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="runs_usage_recorded">Usage recorded</string>
     <string name="runs_verification_failed">Verification failed</string>
     <string name="runs_waiting">Waiting</string>
-    <string name="runs_workflow_cancelled">Run cancelled</string>
-    <string name="runs_workflow_completed">Run completed</string>
-    <string name="runs_workflow_created">Run created</string>
-    <string name="runs_workflow_failed">Run failed</string>
+    <string name="runs_workflow_cancelled">Swarm cancelled</string>
+    <string name="runs_workflow_completed">Swarm completed</string>
+    <string name="runs_workflow_created">Swarm created</string>
+    <string name="runs_workflow_failed">Swarm failed</string>
 
     <string name="settings_chars">%1$s chars</string>
     <string name="settings_download_and_a_capable_machine">%1$s download and a capable machine. The linked LLM still plans </string>
@@ -1590,16 +1589,16 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_local_planner">Queen on this device</string>
     <string name="settings_spend_caps">Spend caps</string>
     <string name="settings_spend_caps_description">Stop the swarm when known spend reaches a cap. Only cost a source reports counts: keyless and free sources, and ones that report tokens only, never trip a cap. Leave a cap blank for none. A creature's token budget is set on its Mind.</string>
-    <string name="settings_spend_run_cap">Cost cap per run (USD)</string>
-    <string name="settings_spend_hourly_cap">Spend cap per hour, across runs (USD)</string>
+    <string name="settings_spend_run_cap">Cost cap per swarm (USD)</string>
+    <string name="settings_spend_hourly_cap">Spend cap per hour, across swarms (USD)</string>
     <string name="settings_spend_cap_invalid">Enter a dollar amount above zero, or leave it blank.</string>
-    <string name="settings_budget_classes_description">A creature's role names a size of token budget, not a number: small, medium or large. Set what each size means here, in tokens one creature may spend in one run. Leave a size blank for its starting number. A budget typed on a creature's Mind is used instead of its size.</string>
-    <string name="settings_budget_class_small">Small budget (tokens per creature per run)</string>
-    <string name="settings_budget_class_medium">Medium budget (tokens per creature per run)</string>
-    <string name="settings_budget_class_large">Large budget (tokens per creature per run)</string>
+    <string name="settings_budget_classes_description">A creature's role names a size of token budget, not a number: small, medium or large. Set what each size means here, in tokens one creature may spend in one swarm. Leave a size blank for its starting number. A budget typed on a creature's Mind is used instead of its size.</string>
+    <string name="settings_budget_class_small">Small budget (tokens per creature per swarm)</string>
+    <string name="settings_budget_class_medium">Medium budget (tokens per creature per swarm)</string>
+    <string name="settings_budget_class_large">Large budget (tokens per creature per swarm)</string>
     <string name="settings_budget_class_invalid">Enter a whole number of tokens above zero, or leave it blank.</string>
     <string name="spend_stop_eyebrow">SPEND CAP</string>
-    <string name="spend_stop_title_run">This run reached its cost cap</string>
+    <string name="spend_stop_title_run">This swarm reached its cost cap</string>
     <string name="spend_stop_title_hourly">The swarm reached its hourly spend cap</string>
     <string name="spend_stop_spent">%1$s of %2$s in known cost. Every creature is parked and no session is running.</string>
     <string name="spend_stop_how_to_lift">Raise or clear the cap in the Keeper's room, under %1$s, then lift the stop. If the cap is still reached, the swarm stops again.</string>
@@ -1656,7 +1655,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_compute_node_revoke_body">Its key stops working at once. Work it is running goes back to the queue and work it sent out is cancelled. It cannot rejoin the pool under the same device ID.</string>
     <string name="settings_compute_this_device_revoked">Another device in the pool revoked this one. To rejoin, give it a new device ID.</string>
     <string name="settings_paste_exported_json">Paste exported JSON</string>
-    <string name="settings_permanently_removes_all_projects_runs_events">Permanently removes all neighborhoods, runs, events, and artifacts from this device. Source credentials are managed separately.</string>
+    <string name="settings_permanently_removes_all_projects_runs_events">Permanently removes all neighborhoods, swarms, events, and artifacts from this device. Source credentials are managed separately.</string>
     <string name="settings_plans_workflows_on_this_computer_instead">Plans swarms on this computer instead of the linked LLM. Needs a </string>
     <string name="settings_pool_configured">Pool configured</string>
     <string name="settings_portable_project_state_remains_separate_from">Portable neighborhood state remains separate from source API keys and repository tokens.</string>
@@ -1668,7 +1667,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_project_save_failed">Neighborhood save failed</string>
     <string name="settings_projects">Neighborhoods</string>
     <string name="settings_setup_file">Setup file</string>
-    <string name="settings_setup_file_intro">A setup file holds what you filled in during setup: sources, repository accounts, Remote access and compute settings, swarms, roles, neighborhoods, memory settings and appearance. Use it to set up a fresh install. Credentials in it are encrypted with a passphrase you choose; run history is not included.</string>
+    <string name="settings_setup_file_intro">A setup file holds what you filled in during setup: sources, repository accounts, Remote access and compute settings, swarms, roles, neighborhoods, memory settings and appearance. Use it to set up a fresh install. Credentials in it are encrypted with a passphrase you choose; swarm history is not included.</string>
     <string name="settings_setup_no_credentials_here">Credentials are not included on this platform.</string>
     <string name="settings_setup_export">Export setup file</string>
     <string name="settings_setup_import">Import setup file</string>
@@ -1699,14 +1698,14 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_refresh_health">Refresh health</string>
     <string name="settings_remote_access">Remote Access</string>
     <string name="settings_a2a_server">A2A server</string>
-    <string name="settings_a2a_server_description">Lets other agents on this computer start swarms here over the Agent2Agent protocol. Off until you turn it on. Once on, it listens only on this computer, and every call needs the token. Those runs still wait for your approvals.</string>
+    <string name="settings_a2a_server_description">Lets other agents on this computer start swarms here over the Agent2Agent protocol. Off until you turn it on. Once on, it listens only on this computer, and every call needs the token. Those swarms still wait for your approvals.</string>
     <string name="settings_a2a_server_on">Let other programs start swarms (A2A server)</string>
     <string name="settings_a2a_server_off">Let other programs start swarms (A2A server)</string>
     <string name="settings_a2a_server_card_url">Agent Card URL</string>
     <string name="settings_a2a_server_listening">Listening on %1$s</string>
     <string name="settings_a2a_server_port_in_use">Another program is using port %1$s, so the A2A server is not running. Everything else works. Close that program, or set AIVE_A2A_PORT to another port and restart The Aive.</string>
     <string name="settings_a2a_server_failed">The A2A server could not start. Another program may be using its port.</string>
-    <string name="settings_a2a_server_warning">Anyone with the token can start runs on your linked AI sources. Treat it like a password. Reset it to lock out everyone who has it.</string>
+    <string name="settings_a2a_server_warning">Anyone with the token can start swarms on your linked AI sources. Treat it like a password. Reset it to lock out everyone who has it.</string>
     <string name="settings_a2a_server_copy_token">Copy token</string>
     <string name="settings_a2a_server_reset_token">New token</string>
     <string name="hive_card_share">Share swarm card</string>
@@ -1747,7 +1746,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_a2a_providers_explicit">You chose this, so it stays as set, even on the network. The card is public: anyone who can reach the server can read it. It never holds keys, tokens, accounts or models.</string>
     <string name="settings_a2a_lan_on">Open to this network</string>
     <string name="settings_a2a_lan_off">Open to this network</string>
-    <string name="settings_a2a_lan_warning">Off unless you turn it on. When on, other computers on this network can reach the A2A server, over HTTPS only (on this computer too). Each needs the token, and you must allow it here first. The certificate is one this computer made for itself, so nothing else vouches for it: give the fingerprint below to the other computer and have it pin that, or it cannot tell this server from an impostor. Each computer can start at most 6 runs a minute.</string>
+    <string name="settings_a2a_lan_warning">Off unless you turn it on. When on, other computers on this network can reach the A2A server, over HTTPS only (on this computer too). Each needs the token, and you must allow it here first. The certificate is one this computer made for itself, so nothing else vouches for it: give the fingerprint below to the other computer and have it pin that, or it cannot tell this server from an impostor. Each computer can start at most 6 swarms a minute.</string>
     <string name="settings_a2a_lan_card_url">Agent Card URL on this network</string>
     <string name="settings_a2a_lan_fingerprint">Certificate fingerprint (SHA-256), to pin</string>
     <string name="settings_a2a_lan_no_address">This computer has no network address right now.</string>
@@ -1757,11 +1756,11 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_a2a_lan_remove">Remove</string>
     <string name="settings_a2a_lan_none_allowed">No other computer is allowed yet. One that tries with the token shows up here.</string>
     <string name="settings_a2a_server_temporary_token">This computer has no keychain to keep the token in, so it changes every time The Aive starts.</string>
-    <string name="settings_remote_access_description">Let your own IDEaz (the companion Android coding app from the same developer) on another device run prompts on your linked AI sources and start runs here, through an end-to-end encrypted relay. Off by default. The relay sees only encrypted data, the room name and your IP address.</string>
+    <string name="settings_remote_access_description">Let your own IDEaz (the companion Android coding app from the same developer) on another device run prompts on your linked AI sources and start swarms here, through an end-to-end encrypted relay. Off by default. The relay sees only encrypted data, the room name and your IP address.</string>
     <string name="settings_remote_access_on">Remote access</string>
     <string name="settings_remote_access_off">Remote access</string>
     <string name="settings_trace_export">Trace export (OpenTelemetry)</string>
-    <string name="settings_trace_export_intro">Off unless you turn it on. When on, each run that finishes is sent as a trace to the OpenTelemetry collector you name here, over OTLP/HTTP: the run, each creature's attempts and each source report, with token counts and cost. Prompts, outputs and failure reasons are left out. Runs that finished before you turned it on are not sent.</string>
+    <string name="settings_trace_export_intro">Off unless you turn it on. When on, each swarm that finishes is sent as a trace to the OpenTelemetry collector you name here, over OTLP/HTTP: the swarm, each creature's attempts and each source report, with token counts and cost. Prompts, outputs and failure reasons are left out. Swarms that finished before you turned it on are not sent.</string>
     <string name="settings_trace_export_endpoint">Collector endpoint</string>
     <string name="settings_trace_export_endpoint_invalid">Use an https:// address with no query or user name. Plain http:// works only for a collector on this device (localhost).</string>
     <string name="settings_trace_export_headers">Headers (name=value, separated by commas)</string>
@@ -1771,10 +1770,10 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_trace_export_off">Trace export</string>
     <string name="settings_trace_export_content_on">Include prompts and outputs</string>
     <string name="settings_trace_export_content_off">Include prompts and outputs</string>
-    <string name="settings_trace_export_content_warning">Turning this on adds each run's objective, its artifacts' text and its failure and approval reasons to the traces. They can hold code, secrets and personal data, and the collector keeps whatever it receives.</string>
+    <string name="settings_trace_export_content_warning">Turning this on adds each swarm's objective, its artifacts' text and its failure and approval reasons to the traces. They can hold code, secrets and personal data, and the collector keeps whatever it receives.</string>
     <string name="settings_remote_access_relay_url">Relay URL</string>
     <string name="settings_remote_access_pairing_code">Pairing code</string>
-    <string name="settings_remote_access_warning">Anyone with this code can run prompts on your linked AI sources and start runs. Treat it like a password. Turn off to revoke.</string>
+    <string name="settings_remote_access_warning">Anyone with this code can run prompts on your linked AI sources and start swarms. Treat it like a password. Turn off to revoke.</string>
     <string name="settings_remote_access_copy">Copy code</string>
     <string name="settings_remote_access_share">Share code</string>
     <string name="settings_remote_access_reset">Reset pairing</string>
@@ -1801,7 +1800,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_unreleased_roles_keep_the_deterministic_implementation">without it, or when it is unsure, the built-in rules decide.</string>
     <string name="settings_whenever_the_local_planner_is_not">whenever the queen on this device is not installed or fails, and always handles plan repair.</string>
 
-    <string name="steps_starting_run">STARTING RUN</string>
+    <string name="steps_starting_run">STARTING SWARM</string>
 
     <string name="store_files"> · %1$s files</string>
     <string name="store_installed">%1$s installed</string>
@@ -2122,7 +2121,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_say_watch_repeated_failure">I noticed step %1$s (%2$s) has failed %3$s times. I am watching it; you do not need to do anything yet.</string>
     <string name="queen_say_watch_budget">I noticed the %1$s has used %2$s percent of its token budget. If it runs out, its work waits until you raise it.</string>
     <string name="queen_say_watch_failed_over">I noticed step %1$s (%2$s) moved to another Source after the first one failed. It carries on there.</string>
-    <string name="queen_say_allowance_stop_run">I stopped the swarm: this run reached its %1$s allowance (%2$s counted). Change the allowance, then lift the stop.</string>
+    <string name="queen_say_allowance_stop_run">I stopped the swarm: this swarm reached its %1$s allowance (%2$s counted). Change the allowance, then lift the stop.</string>
     <string name="queen_say_allowance_stop_hour">I stopped the swarm: the hourly allowance of %1$s was reached (%2$s counted this hour). Change the allowance, then lift the stop.</string>
     <string name="queen_say_allowance_stop_unpriced">I stopped the swarm: some of its work could not be priced, and an allowance of %1$s cannot count what it cannot price. Raise or clear the allowance, then lift the stop.</string>
     <string name="queen_say_nanny_report">The nanny wrote a report. A second creature is checking it before anything is frozen.</string>
@@ -2135,9 +2134,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_say_queen_rejects">I read it too and I am not convinced.</string>
     <string name="queen_say_queen_could_not_read">I could not finish my own read. The decision is yours.</string>
     <string name="queen_say_nanny_you_decide">You decide. Nothing changes until you do.</string>
-    <string name="queen_say_practice_running">A practice run of one of her solutions is under way. It never changes the frozen swarm.</string>
-    <string name="queen_say_practice_done">A practice run of one of her solutions has finished.</string>
-    <string name="queen_say_practice_ended">A practice run of one of her solutions ended before it finished.</string>
+    <string name="queen_say_practice_running">A practice swarm of one of her solutions is under way. It never changes the frozen swarm.</string>
+    <string name="queen_say_practice_done">A practice swarm of one of her solutions has finished.</string>
+    <string name="queen_say_practice_ended">A practice swarm of one of her solutions ended before it finished.</string>
     <string name="queen_say_research_consulted">Before planning I looked at %1$s places and found %2$s leads. Nothing was connected or run.</string>
     <string name="queen_say_research_skipped">Before planning I looked at %1$s places and could not use %2$s of them (declined, switched off or too slow), so I planned without them. Nothing was connected or run.</string>
 
@@ -2163,8 +2162,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_say_missing_queen_away">I have no Source to think with, so I cannot plan, teach or settle a dispute right now. Connect a Source in Connections and I will start.</string>
     <string name="queen_say_tutorial_progress">You have done %1$s of %2$s steps of the tour. Answer any check-in with Lost me and I make the next steps smaller.</string>
     <string name="queen_say_tutorial_slower">You said you were lost, so I wrote the next steps smaller and I will ask again sooner.</string>
-    <string name="queen_say_tutorial_hive_yours">That is the tour, and you showed me you are following. This hive is yours: it is your first hive, with your own swarm and your own run, and it goes on from here. Feed it more any time, or open a creature to see what it did.</string>
-    <string name="queen_say_tutorial_hive_yours_shaky">That is the tour, and some of it still felt shaky. This hive is yours all the same: it is your first hive, with your own swarm and your own run. Feed it a goal that begins with Teach me and I will go over any part again.</string>
+    <string name="queen_say_tutorial_hive_yours">That is the tour, and you showed me you are following. This hive is yours: it is your first hive, with your own swarm, and it goes on from here. Feed it more any time, or open a creature to see what it did.</string>
+    <string name="queen_say_tutorial_hive_yours_shaky">That is the tour, and some of it still felt shaky. This hive is yours all the same: it is your first hive, with your own swarm. Feed it a goal that begins with Teach me and I will go over any part again.</string>
     <string name="queen_title_tutorial">Following your tour</string>
     <string name="queen_title_tutorial_done">The tour is over</string>
     <string name="queen_say_missing_no_source">I have no Source to plan or review with, so I could not ask a planner or a reviewer. Connect a Source and I will use it. Until then I check only what I can check myself.</string>
@@ -2182,7 +2181,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_link_story">See what happened</string>
     <string name="queen_link_creature">Open that step</string>
     <string name="queen_link_message">Show me</string>
-    <string name="queen_link_run">Open the practice run</string>
+    <string name="queen_link_run">Open the practice swarm</string>
     <string name="queen_quote_nanny_finding">Her main finding, quoted:</string>
     <string name="queen_quote_queen_reason">From my review, quoted:</string>
     <string name="queen_quote_practice_solution">The solution, quoted:</string>
@@ -2399,7 +2398,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="improvement_new_generation">new generation</string>
     <string name="step_always_asks">Always asks you first, and tries once</string>
     <string name="memory_habits_replay_summary">Replay: %1$s habits approved to run, %2$s replays with no model call, about %3$s tokens avoided, %4$s times an agent chose a habit the matcher had missed.</string>
-    <string name="memory_habits_replay_text_line">Text habit %1$s, version %2$s: generalised from %3$s accepted runs. %4$s. Replayed %5$s times, about %6$s tokens avoided.</string>
+    <string name="memory_habits_replay_text_line">Text habit %1$s, version %2$s: generalised from %3$s accepted swarms. %4$s. Replayed %5$s times, about %6$s tokens avoided.</string>
     <string name="memory_habits_replay_step_line">Steps habit %1$s, version %2$s: %3$s. %4$s. Approving it lets it be proposed as steps; each step still waits for your approval.</string>
     <string name="memory_habits_replay_approved">Approved to run</string>
     <string name="memory_habits_replay_unapproved">Not approved</string>

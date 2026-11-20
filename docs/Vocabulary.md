@@ -14,13 +14,14 @@ protocol fields do not follow it.
 | **Host** | where an agent runs (`TaskExecutor`, the Hosts part of the Keeper's room, an orphan's endpoint host) | A creature's **Runs on** row and an orphan's **Host:** line: your device, a paired machine, or the orphan's own server. Different from its **Source** (what it thinks with). |
 | **Swarm** | workflow (`WorkflowDefinition`, `WorkflowRun` for one execution; `workflow` in code, files and persisted keys) | The saved, editable plan: the queen, her creatures and the strands between them. The swarm library (the Workflows destination), **New swarm**, **Delete swarm**, **Swarm options**, **Share swarm card**, the Store's **Swarms** tab, Schedules. |
 | **Hive** | the goal (today `Project` and the objective; D17: the project becomes the hive and gains a goal) | What the keeper wants done: **Your first hive**, **Feed the hive**, the **Hive** place and the **Hives** rail chip (the district, which still lists swarms grouped by the hive they last served). A hive can have many runs, and a swarm can serve many hives. |
-| **Run** | `WorkflowRun` (one execution of a swarm for a hive) | **Work**, **Stop run**, **Run log**, **RUN n**, Past runs. D3 is settled (below): "run" is only a secondary word for the verb form of swarm; these existing labels keep it as the name of one execution until the owner says otherwise. |
+| **Swarm** (one execution) | `WorkflowRun` (one execution of a swarm for a hive) | **Work**, **Stop swarm**, **Swarm log**, **SWARM n**, Past swarms. D3 (ruled): the noun for one execution is "swarm"; "run" is not a noun in user text. |
+| **Rest** / **Wake** | the keeper's pause of a swarm (`keeperPause`, `hive_pause_run`, `hive_resume_run`) | **Rest** beside Stop; the pill then reads **Rested · Wake**. D4 (ruled). The Nanny's freeze (Resume after her review), the tour's Pause, a paused consolidation and a spend stop are different things and keep their words. |
 | **Orphan** | drifter (`A2aDrifters`, `DrifterTrouble`, `drifter-` role ids) | A remote A2A agent you can bring in and connect. |
 | **Show engineering names** | `EngineeringNames`, `engineeringName` (D35) | One switch in the Keeper's room, Appearance. On, Nanny reads "Nanny (Hall Monitor)", Orphan "Orphan (A2A agent)" and Swarm "Swarm (workflow)" at the Nanny review title, the Orphans heading and the Swarm library; MCP servers are not renamed. Off by default. |
 
 Kept as they are: **Memory**, **Breed**.
 
-## The settled ruling on swarm, hive, breeding and run (resolves D3)
+## The settled ruling on swarm, hive, breeding and run (resolves D3, D4)
 
 The owner's words: "swarm is both a noun and verb and to use it for more than one thing. Hive an overall swarm's goal,
 where breeding are the goals within a swarm. Run is acceptable as a secondary word for the swarm verb form." And, on
@@ -32,12 +33,18 @@ breeding: "Where there are eggs hatching, that is breeding."
   inside a swarm, not the swarm and not the hive.
 - **Run** is allowed as a secondary word for the verb form only ("run the swarm"). It is not a noun for the workflow.
   D3 (Run or another word) is closed by this.
+- **D3, the keeper's later ruling:** the noun for ONE execution is also **swarm** ("It's a verb and a noun"), not
+  "run". User text says "Stopping the swarm failed", "SWARM 3", "Past swarms", "Swarms can start again". "Run" stays
+  only as a verb (execute or operate: "runs on this computer", "models that run here", "Run a cycle now", "Run tests"),
+  in shell commands and version numbers, and in GitHub's own terms. Code identifiers and persisted keys keep `run`.
+- **D4:** the keeper's pause of a swarm is **Rest** and **Wake** ("Rest", "Rested · Wake"). Stop stays Stop. The
+  Nanny's freeze keeps Resume (it is her review, not the keeper's rest), and the tour's Pause, a paused consolidation
+  and a spend stop are not this and keep their words.
 
 What the UI strings do today (audited, `values/*.xml`): no string says "breeding" (the hatching strings say hatched,
 hatches, Nursery); no string uses "hive" for the workflow or "swarm" for the goal in a way that is plainly wrong. "Run"
-is still used as a noun for one execution of a swarm ("Stop run", "Past runs", "Run log", "The run could not start"),
-which is a different thing from the workflow; whether that noun should also give way to the verb form is left to the
-owner and nothing was changed.
+was used as a noun for one execution of a swarm ("Stop run", "Past runs", "Run log"); the keeper's later ruling
+(D3, above) replaced it with "swarm" everywhere in user text.
 
 Settled earlier: the **keeper** is you; the **queen** is the planner that drafts a swarm for your approval. Settled
 now: a **swarm** is the workflow (the saved definition and its plan), a **hive** is the goal the keeper wants achieved
