@@ -1168,6 +1168,60 @@ class ApplicationRuntime private constructor(
         null
     }
 
+    /**
+     * Amends the run on screen that has already started to the task list [tasks] (see [com.hereliesaz.geministrator.workflow.RunAmend]):
+     * added steps, and changes to steps that have not started, never a running or settled one. Returns null when it was applied, or
+     * why it was not (nothing changes then). Only the app calls it; no remote interface reaches it.
+     */
+    suspend fun amendRun(tasks: List<com.hereliesaz.geministrator.domain.TaskDefinition>): String? = runtimeMutex.withLock {
+        amendRunLocked(tasks)
+    }
+
+    private suspend fun amendRunLocked(tasks: List<com.hereliesaz.geministrator.domain.TaskDefinition>): String? {
+        val snapshot = current ?: return "No active workflow is loaded."
+        val run = newestRun(snapshot.state.run)
+        if (run.globalPause != null || run.spendPause != null || run.keeperPause != null) return "The swarm is paused or stopped."
+        val rolesNow = run.roleSnapshot.filter(RoleDefinition::enabled)
+            .ifEmpty { com.hereliesaz.geministrator.template.LaunchRoles.resolve(activeRoles(resolveRoleCollection(persistence.roles.all()))) }
+        val now = decisionTime(nowEpochMillis(), run)
+        val amended = when (
+            val result = com.hereliesaz.geministrator.workflow.RunAmend.amend(snapshot.definition, run, tasks, rolesNow, now)
+        ) {
+            is com.hereliesaz.geministrator.workflow.RunAmendment.Refused -> return result.reason
+            is com.hereliesaz.geministrator.workflow.RunAmendment.Amended -> result
+        }
+        persistence.runs.put(amended.run)
+        amended.events.forEach { persistence.events.append(it) }
+        replaceCurrent(snapshot.copy(definition = amended.definition, state = snapshot.state.copy(run = amended.run)))
+        publishCurrent()
+        return null
+    }
+
+    /**
+     * The queen gives blocker [blockerId] of run [runId] a step made from its starting template, in the swarm that is running
+     * ([com.hereliesaz.geministrator.queen.Blockers.assignStep] with `byKeeper` false, so only a template that changes nothing outside its
+     * output), through [amendRun]. On success the blocker records its step and is in progress; Messages says it from the blocker book.
+     * Returns null when done, or why not: an effectful template, a swarm that fails validation, or a blocker that already has a step
+     * leaves everything as it was and the blocker open.
+     */
+    suspend fun assignBlockerStep(runId: WorkflowRunId, blockerId: String): String? = runtimeMutex.withLock {
+        val snapshot = current ?: return@withLock "No active workflow is loaded."
+        if (snapshot.state.run.id != runId) return@withLock "That swarm is not the one running."
+        loadBlockerBook()
+        val blocker = blockerBook[runId.value].orEmpty().firstOrNull { it.id == blockerId }
+            ?: return@withLock "There is no such blocker."
+        if (!blocker.unmet) return@withLock "This blocker is already settled."
+        val assignment = com.hereliesaz.geministrator.queen.Blockers.assignStep(snapshot.definition, blocker, byKeeper = false)
+        val assigned = when (assignment) {
+            is com.hereliesaz.geministrator.queen.BlockerAssignment.Rejected -> return@withLock assignment.reason
+            is com.hereliesaz.geministrator.queen.BlockerAssignment.Assigned -> assignment
+        }
+        amendRunLocked(assigned.definition.tasks)?.let { return@withLock it }
+        storeBlockers(runId.value, blockerBook[runId.value].orEmpty().map { if (it.id == blockerId) assigned.blocker else it })
+        publishCurrent()
+        null
+    }
+
     private val habitFiring by lazy {
         com.hereliesaz.geministrator.workflow.HabitLiveFiring(
             events = RepositoryWorkflowEventSink(persistence.events),

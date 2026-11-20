@@ -1608,3 +1608,23 @@ A reviewed plan has three parents (`orchestration/PlanParents.kt`). Arguments fr
 - **A planner that fails is no parent.** With no one else to ask (a local planner alone, or no second Source) the queen's draft is the plan.
 - **The Story** says how the plan was raised (`PlanningRecord.parentsLine`): the merge, with how many steps came from each parent, or which draft was kept and why.
 - Cost: up to four planning calls for a launch (three drafts and the merge), against one before. Tests: `PlanParentsTest`.
+
+## Amending a run that has started
+
+`workflow/RunAmend.kt` is the engine's one way to change a run after it began, and `ApplicationRuntime.amendRun(tasks)` applies it under the runtime lock (only the app calls it; no remote route reaches it). It is pure: given the run's definition, the run and the wanted task list, it answers with the new definition, run and events to save together, or a refusal that changes nothing.
+
+~~~text
+amend(definition, run, tasks):
+  refuse when the run is finished, a step id repeats, or any step is taken away
+  refuse a change to a step that is running or settled
+  a step that has not started may only wait for more, never lose a wait, approval, condition,
+    role, executor or declared effect
+  an added step may not change a repository, and one that changes something outside its own
+    output must carry the plan gate (an injected step never bypasses an approval)
+  WorkflowGraphValidator.validate the whole; refuse with its words on any error
+  create the TaskRuns of added steps, keep every other TaskRun as it is,
+    WorkflowRunFactory.refreshReadiness, emit TaskBecameReady for added steps that are ready
+    and the policy decisions made on the way; save run and events together
+~~~
+
+The queen's blocker flow uses it: `ApplicationRuntime.assignBlockerStep(runId, blockerId)` builds the step with `Blockers.assignStep(definition, blocker, byKeeper = false)` (so only a template that changes nothing outside its output), amends the running swarm, and then records the step on the blocker in the blocker book; Messages says it from the existing blocker notes. An effectful template, or a swarm that fails validation, changes nothing and leaves the blocker open. Not built yet: the Orchestrator's task returning a plan the coordinator applies through this call (todo 3d).
