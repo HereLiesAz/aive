@@ -140,6 +140,7 @@ class HeadlessEngine private constructor(
                             put("control", "loopback")
                         }
                     },
+                    allowRemoteApproval = { env["AIVE_ALLOW_REMOTE_APPROVAL"] == "1" },
                 )
                 return HeadlessEngine(runtime, host, planner, reviewer, scope, httpClient, channel, lock, chatPoster)
             } catch (failure: Throwable) {
@@ -199,6 +200,8 @@ private fun headlessProviders(
     credentials[ProviderCatalog.ANTHROPIC_ID]?.let { key -> add(AnthropicProvider(LlmApiKeyProvider { key })) }
     credentials[ProviderCatalog.GEMINI_ID]?.let { key -> add(GeminiProvider(LlmApiKeyProvider { key })) }
     credentials[ProviderCatalog.XAI_ID]?.let { key -> add(XaiProvider(LlmApiKeyProvider { key })) }
+    // The vendor CLIs the owner turned on with `aive agents enable`; they run only after a person-approved plan (docs/Local-CLI-Agents.md).
+    addAll(com.hereliesaz.geministrator.configuredCliProviders())
     repositories[RepositoryServiceCatalog.GITHUB_ID]?.let { token ->
         add(OpenCodeActionsAgentProvider(GitHubRestOpenCodeRunnerClient(GitHubTokenProvider { token }, client)))
     }

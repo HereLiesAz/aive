@@ -73,7 +73,11 @@ class RuntimeControlHost(
     private val sourcesView: () -> JsonObject = { JsonObject(emptyMap()) },
     /** The vendor CLI agents, read-only; empty where the host cannot run programs. */
     private val agentsView: suspend () -> JsonObject = { JsonObject(emptyMap()) },
+    /** Whether the owner switched remote approval on (never on by default); read each time, so turning it off takes effect at once. */
+    private val allowRemoteApproval: () -> Boolean = { false },
 ) : ControlHost {
+
+    override val remoteApprovalAllowed: Boolean get() = allowRemoteApproval()
 
     companion object {
         const val MAX_CREATURES = 24
@@ -211,10 +215,33 @@ class RuntimeControlHost(
         }
     }
 
+    override suspend fun approveCreature(runId: String, creatureId: String): JsonObject {
+        if (!allowRemoteApproval()) {
+            fail(ControlErrorCode.PolicyDenied, "Remote approval is off on this computer. The owner turns it on; until then approvals are decided in the app.")
+        }
+        val r = rt()
+        if (r.currentRunId() != runId) fail(ControlErrorCode.NotFound, "That run is not the one the app has open.")
+        try {
+            r.approveTask(com.hereliesaz.geministrator.domain.TaskDefinitionId(creatureId))
+        } catch (failure: kotlinx.coroutines.CancellationException) {
+            throw failure
+        } catch (failure: IllegalArgumentException) {
+            fail(ControlErrorCode.InvalidArgument, failure.message ?: "That creature is not waiting for approval.")
+        } catch (failure: IllegalStateException) {
+            fail(ControlErrorCode.InvalidArgument, failure.message ?: "That creature is not waiting for approval.")
+        }
+        return buildJsonObject {
+            put("approved", true)
+            put("runId", runId)
+            put("creatureId", creatureId)
+            put("note", "Approved remotely by the owner's token; the run's record shows an approval decision like any other.")
+        }
+    }
+
     override suspend fun listApprovals(): JsonElement {
         val r = rt()
         return buildJsonObject {
-            put("note", "Approvals are decided in the app. This list is read-only.")
+            put("note", "Approvals are decided in the app, or by POST /approvals/{run}/{creature}/approve where the owner turned remote approval on.")
             put(
                 "gates",
                 buildJsonArray {

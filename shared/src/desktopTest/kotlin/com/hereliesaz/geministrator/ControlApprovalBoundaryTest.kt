@@ -27,14 +27,16 @@ class ControlApprovalBoundaryTest {
                 t.startsWith("*") || t.startsWith("//") || t.startsWith("/*")
             }
             for (pattern in forbidden) {
-                val hit = code.firstOrNull { pattern.containsMatchIn(it) }
+                // The one owner-gated call (THREAT_MODEL invariant 8): RuntimeControlHost.approveCreature approves, never rejects.
+                val allowed = file.name == "RuntimeControlHost.kt" && pattern.pattern == "approveTask"
+                val hit = code.filter { pattern.containsMatchIn(it) }.let { if (allowed) it.drop(1) else it }.firstOrNull()
                 assertTrue(hit == null, "${file.name} uses ${pattern.pattern}: $hit")
             }
         }
     }
 
     @Test
-    fun theHostInterfaceHasNoMemberThatDecidesAnApproval() {
+    fun theHostInterfaceHasNoMemberThatDecidesAnApprovalButTheOneOwnerGatedApprove() {
         val verbs = Regex("approve|reject|resolve|decide|release|lift|grant|allow", RegexOption.IGNORE_CASE)
         val names = com.hereliesaz.geministrator.control.ControlHost::class.java.methods.map { it.name }
         assertTrue(names.none { verbs.containsMatchIn(it) && it != "listApprovals" }, "ControlHost members: $names")

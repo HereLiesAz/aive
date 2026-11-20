@@ -19,6 +19,9 @@ import kotlin.test.assertTrue
 class FakeControlHost : ControlHost {
     val calls = mutableListOf<String>()
     var leak = "nothing"
+    var remoteApproval = false
+    override val remoteApprovalAllowed: Boolean get() = remoteApproval
+    override suspend fun approveCreature(runId: String, creatureId: String) = obj("approved" to "true").also { calls += "approveCreature $runId $creatureId" }
     private val hives = mutableMapOf("h1" to "First hive")
 
     private fun obj(vararg pairs: Pair<String, String>) = buildJsonObject { pairs.forEach { (k, v) -> put(k, v) } }
@@ -164,9 +167,13 @@ class ControlApiTest {
     fun theRouteTableOffersNothingThatDecidesAGate() {
         val forbidden = Regex("approv|reject|resolve|decide|release|lift|grant|allow|deny", RegexOption.IGNORE_CASE)
         val offending = ControlApi.routes.filter { forbidden.containsMatchIn(it.name + it.pattern) }
-        // The one place the word appears is the read-only list.
-        assertEquals(listOf(ControlMethod.GET to "/approvals"), offending.map { it.method to it.pattern })
-        assertFalse(offending.single().mutating)
+        // The word appears twice: the read-only list, and the one owner-gated approve (off unless the owner turned it on).
+        assertEquals(
+            listOf(ControlMethod.GET to "/approvals", ControlMethod.POST to "/approvals/{id}/{cid}/approve"),
+            offending.map { it.method to it.pattern },
+        )
+        assertFalse(offending.first().mutating)
+        assertTrue(offending.last().mutating)
     }
 
     /** Installing, switching on or off, and running a vendor CLI or a Source is local-only (`aive agents|sources ...` in a terminal); no route offers it. */
@@ -195,9 +202,10 @@ class ControlApiTest {
     }
 
     @Test
-    fun noRequestCanReachAnApprovalExceptToReadIt() = runTest {
+    fun noRequestCanReachAnApprovalExceptToReadItOrApproveWhereTheOwnerAllows() = runTest {
         val paths = listOf(
             "/approvals", "/approvals/g1", "/approvals/g1/approve", "/approvals/g1/reject", "/approvals/g1/decision",
+            "/approvals/r1/c1/reject", "/approvals/r1/c1/decision",
             "/gates/g1/approve", "/runs/r1/approve", "/runs/r1/approvals/g1", "/runs/r1/gates/g1/resolve", "/hives/h1/approve",
         )
         for (path in paths) for (method in listOf("POST", "PUT", "PATCH", "DELETE")) {
@@ -206,5 +214,16 @@ class ControlApiTest {
         }
         assertEquals(200, call("GET", "/approvals").status)
         assertEquals(emptyList(), host.calls.filter { "approv" in it.lowercase() })
+    }
+
+    @Test
+    fun approvingACreatureIsRefusedUntilTheOwnerTurnsItOn() = runTest {
+        val denied = call("POST", "/approvals/r1/c1/approve")
+        assertEquals(403, denied.status)
+        assertTrue("policy_denied" in denied.body)
+        assertEquals(emptyList(), host.calls.filter { it.startsWith("approveCreature") })
+        host.remoteApproval = true
+        assertEquals(200, call("POST", "/approvals/r1/c1/approve").status)
+        assertEquals(listOf("approveCreature r1 c1"), host.calls.filter { it.startsWith("approveCreature") })
     }
 }
