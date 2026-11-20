@@ -73,6 +73,7 @@ object TourController {
 
     /** The keeper's quick reply to the open check-in; the transition itself is [CheckInTransitions]. */
     fun reply(reply: CheckInReply) {
+        dispatch(TourAction.Replied(reply))
         checkInSink?.invoke(reply)
     }
 
