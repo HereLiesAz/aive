@@ -77,4 +77,111 @@ class VocabularyInStringsTest {
         }.toSet()
         assertEquals(emptySet<String>(), allowed.keys - live, "allowlisted strings that no longer contain a retired word")
     }
+
+    /**
+     * D3 (the keeper's ruling): the noun for one execution of a swarm is "swarm", never "run". "Run" stays only as a verb
+     * (execute, operate), in a typed bot command, and as the label of an action. Resource name -> why "run" legitimately
+     * stays in that string. A string that names one execution must say swarm instead.
+     */
+    private val runNoun = Regex("""\bruns?\b""", RegexOption.IGNORE_CASE)
+
+    private val runAllowed: Map<String, String> = buildMap {
+        for (key in listOf(
+            "keeper_connections_lead",
+            "keeper_group_hosts_lead",
+            "keeper_device_lead",
+            "keeper_device_lead_wide",
+            "keeper_a2a_agent_explain",
+            "keeper_orphan_unverified_explain",
+            "mcp_servers_lead",
+            "mcp_server_command_note",
+            "compute_coordinate_where_work_runs_assign_the",
+            "compute_runs_on_the_originating_device",
+            "inspector_executor_ref",
+            "district_state_idle",
+            "hive_can_select_environment",
+            "keeper_local_agents_lead",
+            "local_agents_note",
+            "schedule_note",
+            "hive_not_yet_run",
+            "plan_size_reason_parallel",
+            "flowchart_detail_compute_unavailable",
+            "flowchart_detail_skipped",
+            "job_runs_on",
+            "build_add_from_steps",
+            "memory_runs_on",
+            "memory_habits_hint",
+            "memory_refinement_empty",
+            "memory_habits_proposed",
+            "memory_summaries_categories_and_associations_that_agents",
+            "memory_this_platform_has_no_on_device",
+            "overview_paste_the_repository_url_or_shorthand",
+            "settings_connect_as_many_providers_as_you",
+            "settings_app_integration_adapter",
+            "settings_on_device_small_tasks_runtime",
+            "hive_card_share_explain",
+            "hive_card_pinned",
+            "hive_card_left_out",
+            "hive_card_err_nothing_usable",
+            "settings_remote_access_description",
+            "settings_remote_access_warning",
+            "settings_runs_released_orchestration_utility_specialists_on",
+            "store_aive_calls_this_model_directly_the",
+            "swarm_python_runs_through_a_github_actions",
+            "swarm_keeper_instructions_hint",
+            "swarm_the_role_runs_as_an_ai",
+            "swarm_these_are_aive_s_semantic_orchestration",
+            "queen_say_wait_escalation",
+            "queen_say_watch_budget",
+            "queen_say_nanny_froze",
+            "queen_say_research_consulted",
+            "queen_say_research_skipped",
+            "queen_level_helpful_line",
+            "memory_habits_replay_summary",
+            "memory_habits_replay_approved",
+            "confirm_reject_plan_body",
+            "remote_access_advanced_explain",
+            "job_approval_off_body",
+            "gemini_bridge_disclosure_body",
+        )) put(key, "verb: something runs on a host or model, or a person runs it (execute, operate), not one execution")
+        put("chat_bots_note", "the chat bot's typed commands /runs and /run are protocol, not user prose")
+        for (key in listOf(
+            "app_rerun_failed",
+            "build_step_tests",
+            "hive_draft_hint",
+            "improvement_run_cycle",
+            "improvement_standing_never",
+            "improvement_standing_overdue",
+            "lineage_rerun_from_here",
+            "lineage_rerun_start",
+            "lineage_rerun_start_following",
+            "local_agents_login_note",
+            "local_agents_never_tested",
+            "runs_task_rerun",
+            "schedule_run_now",
+            "schedule_run_now_note",
+            "settings_run_diagnostic_bundle",
+        )) put(key, "the verb on an action (Run now, Run a cycle now, Run again, Run tests, Run a review)")
+    }
+
+    @Test
+    fun noUserStringUsesRunAsTheNounForOneExecution() {
+        val hits = resourceFiles().flatMap { file ->
+            stringElement.findAll(file.readText()).mapNotNull { m ->
+                val key = m.groupValues[1]
+                val text = m.groupValues[2]
+                if (key in runAllowed) null
+                else runNoun.find(text)?.let { "${file.name}: $key: '${it.value}' in ${text.trim().take(80)}" }
+            }.toList()
+        }
+        assertEquals(emptyList<String>(), hits)
+    }
+
+    @Test
+    fun theRunAllowlistHoldsNothingStale() {
+        val live = resourceFiles().flatMap { file ->
+            stringElement.findAll(file.readText()).filter { runNoun.containsMatchIn(it.groupValues[2]) }.map { it.groupValues[1] }.toList()
+        }.toSet()
+        assertEquals(emptySet<String>(), runAllowed.keys - live, "allowlisted strings that no longer contain run")
+    }
 }

@@ -462,7 +462,7 @@ internal fun LiveWorkflowLibraryScreen(
                                                     seed = "workflow-run-loaded",
                                                     onClick = {
                                                         scope.launch {
-                                                            runCatching { host.run(currentDraft, runObjective) }
+                                                            runCatching { host.run(currentDraft, runObjective, requireQueen = selectedEntry?.origin != WorkflowLibraryOrigin.Role) }
                                                                 .onSuccess {
                                                                     runObjectiveHistory.record(runObjective)
                                                                     status = getString(Res.string.library_started, currentDraft.name)

@@ -39,8 +39,10 @@ import com.hereliesaz.geministrator.azphalt.InstalledAzphaltModelPackage
 import com.hereliesaz.geministrator.azphalt.InstalledAzphaltWorkflowPackage
 import com.hereliesaz.geministrator.azphalt.InstalledStoreLlm
 import com.hereliesaz.geministrator.azphalt.describePromptHandling
+import com.hereliesaz.geministrator.azphalt.forShop
 import com.hereliesaz.geministrator.azphalt.isDirectLlmPackage
 import com.hereliesaz.geministrator.azphalt.isModelAssetPackage
+import com.hereliesaz.geministrator.azphalt.packName
 import com.hereliesaz.geministrator.azphalt.storeFailureDetails
 import com.hereliesaz.geministrator.azphalt.storeStep
 import kotlinx.coroutines.CancellationException
@@ -343,7 +345,7 @@ internal fun AzphaltStoreScreen(
     val installedIds = snapshot?.let { loaded ->
         loaded.installed.map { it.packageId } + loaded.installedModels.map { it.packageId } + loaded.installedLlms.map { it.packageId }
     }.orEmpty().toSet()
-    val visiblePackages = packages.filter { item ->
+    val visiblePackages = packages.forShop().filter { item ->
         when (category) {
             AzphaltStoreCategory.All -> true
             AzphaltStoreCategory.Workflows -> item.kind == "workflow"
@@ -528,6 +530,7 @@ internal fun AzphaltStoreScreen(
                     update?.updateAvailable == true -> stringResource(Res.string.store_update, update.latest ?: item.latest)
                     installed != null -> stringResource(Res.string.store_installed_1, installed.version)
                     installedModel != null -> stringResource(Res.string.store_installed_1, installedModel.version)
+                    item.packName() != null -> item.packName().orEmpty()
                     item.priceStatus != "free" -> item.priceStatus
                     modelAsset -> stringResource(Res.string.store_model_1, item.latest)
                     else -> item.latest

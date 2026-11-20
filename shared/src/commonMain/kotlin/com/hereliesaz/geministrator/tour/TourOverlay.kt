@@ -117,8 +117,6 @@ fun TourOverlayHost() {
         return
     }
     if (state == null || state.phase == TourPhase.Dismissed) return
-    // What is happening to each creature and egg, beside whatever step is showing.
-    HiveLines(TourController.hive, CreatureSpots.focus)
     // After the last step the layer is gone, except while the closing question (do you feel you know what you are doing now) is open.
     val closing = state.finished && state.checkInLine != null
     if (state.finished && !closing) return
@@ -163,49 +161,30 @@ private fun ClosingCard(line: String) {
     }
 }
 
-/** Each creature and egg of the hive on screen with where it is now, so the keeper watches the swarm work while the tour speaks. */
+/**
+ * One line on the step's own card about the swarm the tour sits beside: the creature the tour is on, else the first still going
+ * on, its stage, and how many more there are. It rides the card instead of floating over the page, so it never covers the
+ * breadcrumb, the creature count, a creature's sheet or the keeper's messages. Null when there are no creatures yet.
+ */
 @Composable
-private fun HiveLines(lines: List<CreatureLine>, focus: String?) {
-    if (lines.isEmpty()) return
-    // The keeper can always put it away: it never stays over the messages and options it sits beside.
-    var hidden by remember { mutableStateOf(false) }
-    if (hidden) return
-    // Below the header, never over the breadcrumb, the page title or the creature count beside it: one line, not a list.
-    Box(Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 132.dp), contentAlignment = Alignment.TopEnd) {
-        AzphaltSurface(Azphalt.Ink) {
-            Row(
-                Modifier.widthIn(max = 380.dp).clip(RoundedCornerShape(999.dp)).background(Azphalt.Ink).padding(start = 16.dp, end = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                // The creature the tour is on, else the first still going on (else the first), and how many more there are.
-                val finished = setOf(CreatureStage.Done, CreatureStage.Cancelled, CreatureStage.Withered)
-                val line = lines.firstOrNull { it.id == focus } ?: lines.firstOrNull { it.stage !in finished } ?: lines.first()
-                val stage = when (line.stage) {
-                    CreatureStage.Egg -> stringResource(Res.string.tour_hive_egg_growth, ((line.growth ?: 0f) * 100).toInt())
-                    CreatureStage.Withered -> stringResource(Res.string.tour_stage_withered)
-                    CreatureStage.Waiting -> stringResource(Res.string.tour_stage_waiting)
-                    CreatureStage.Working -> stringResource(Res.string.tour_stage_working)
-                    CreatureStage.Checking -> stringResource(Res.string.tour_stage_checking)
-                    CreatureStage.Retrying -> stringResource(Res.string.tour_stage_retrying)
-                    CreatureStage.NeedsYou -> stringResource(Res.string.tour_stage_needs_you)
-                    CreatureStage.Done -> stringResource(Res.string.tour_stage_done)
-                    CreatureStage.Failed -> stringResource(Res.string.tour_stage_failed)
-                    CreatureStage.Cancelled -> stringResource(Res.string.tour_stage_cancelled)
-                }
-                val more = if (lines.size > 1) ", " + stringResource(Res.string.tour_hive_more, lines.size - 1) else ""
-                Text(
-                    "${plain(line.name)} · $stage$more",
-                    style = AzphaltType.body,
-                    color = azphaltOnSurface(),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                AzphaltPill(label = stringResource(Res.string.tour_hide), seed = "tour-hive-hide", onClick = { hidden = true })
-            }
-        }
+private fun hiveLineText(lines: List<CreatureLine>, focus: String?): String? {
+    if (lines.isEmpty()) return null
+    val finished = setOf(CreatureStage.Done, CreatureStage.Cancelled, CreatureStage.Withered)
+    val line = lines.firstOrNull { it.id == focus } ?: lines.firstOrNull { it.stage !in finished } ?: lines.first()
+    val stage = when (line.stage) {
+        CreatureStage.Egg -> stringResource(Res.string.tour_hive_egg_growth, ((line.growth ?: 0f) * 100).toInt())
+        CreatureStage.Withered -> stringResource(Res.string.tour_stage_withered)
+        CreatureStage.Waiting -> stringResource(Res.string.tour_stage_waiting)
+        CreatureStage.Working -> stringResource(Res.string.tour_stage_working)
+        CreatureStage.Checking -> stringResource(Res.string.tour_stage_checking)
+        CreatureStage.Retrying -> stringResource(Res.string.tour_stage_retrying)
+        CreatureStage.NeedsYou -> stringResource(Res.string.tour_stage_needs_you)
+        CreatureStage.Done -> stringResource(Res.string.tour_stage_done)
+        CreatureStage.Failed -> stringResource(Res.string.tour_stage_failed)
+        CreatureStage.Cancelled -> stringResource(Res.string.tour_stage_cancelled)
     }
+    val more = if (lines.size > 1) ", " + stringResource(Res.string.tour_hive_more, lines.size - 1) else ""
+    return "${plain(line.name)} · $stage$more"
 }
 
 @Composable
@@ -338,6 +317,9 @@ private fun TourCard(state: TourState, step: LessonPayload) {
                 Text(count, style = AzphaltType.eyebrow, color = azphaltOnSurface())
                 // Generated text is untrusted: plain Text only, never parsed or linked.
                 Text(plain(state.note ?: step.sentence), style = AzphaltType.body, color = azphaltOnSurface())
+            }
+            hiveLineText(TourController.hive, CreatureSpots.focus)?.let { line ->
+                Text(line, style = AzphaltType.eyebrow, color = azphaltOnSurface(), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (state.explainOpen) Text(plain(step.explain), style = AzphaltType.body, color = azphaltOnSurface())
             if (state.missedShown) Text(plain(step.ifMissed), style = AzphaltType.body, color = azphaltOnSurface())
