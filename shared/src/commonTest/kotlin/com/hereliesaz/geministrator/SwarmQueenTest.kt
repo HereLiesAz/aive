@@ -69,4 +69,13 @@ class SwarmQueenTest {
         assertTrue(hasQueen(has))
         assertSame(has, ensureQueen(has))
     }
+
+    @Test
+    fun theLessonNeedsAQueenAModelRuns() {
+        assertTrue(queenRunsOnModel(emptyList()))
+        val coded = BuiltInRoles.Orchestrator.copy(
+            executionSource = com.hereliesaz.geministrator.domain.RoleExecutionSource.GitHubAction("w.yml"),
+        )
+        assertFalse(queenRunsOnModel(listOf(coded)))
+    }
 }

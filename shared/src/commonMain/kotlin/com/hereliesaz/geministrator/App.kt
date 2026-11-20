@@ -448,7 +448,8 @@ fun App(
             null
         } else {
             com.hereliesaz.geministrator.queen.DisputeModelSource { roles ->
-                val base = modelFor(com.hereliesaz.geministrator.queen.orchestratorPin(roles))
+                // The lesson is taught by a queen a model runs: one who runs as code is no teacher (keeper ruling).
+                val base = if (queenRunsOnModel(roles)) modelFor(com.hereliesaz.geministrator.queen.orchestratorPin(roles)) else null
                 if (base == null) {
                     null
                 } else {
