@@ -92,7 +92,7 @@ A blocker is anything that must be created or obtained for a particular hive to 
 - [x] Starting points: presets of the six templates, the diagram step and the files-on-a-branch step, with typed outputs and tests (`template/StepPresets.kt`, `ArtifactStepCoverage.kt`, `StepPresetsTest`).
 - [x] Blockers: data, the planner's `blockers`, state following the run, `hiveReached` held by an open one, Messages and finish sentences (`queen/Blockers.kt`, `BlockersTest`).
 - [x] Keep a run's blockers across a restart (`BlockerStore`, already saved at every change).
-- [ ] The queen adds a blocker mid-run, and calls `assignStep` for one that has a starting template (the swarm change goes through the existing repair/validation path).
+- [x] The queen and the Nanny add blockers mid-run (`Blockers` origin Queen/Nanny, `BlockerAddedQueen/Nanny` notes). Not built: the queen calling `assignStep`, which needs the repair/validation path.
 - [ ] The keeper adds, marks done or drops a blocker in the existing hive form.
 - [x] `Blockers.carryForward` is read when a continuation is planned (`carriedBlockers`: the parent runs' unmet blockers join the new run's). The Nanny's findings still do not add blockers.
 - [ ] Nothing was compiled or run; CI verifies.
@@ -129,3 +129,8 @@ Built or already true: D1, D2, D3, D4, D5, D6, D7, D8, D9, D10, D11, D12 (the si
 - [x] N13: retired by the keeper (page default): milestones 4, 6 and 8 of the procedural-memory plan are marked retired in docs; their code names never shipped, so no code was removed.
 - [x] Headless engine (`aive serve`) takes only environment keys as providers; enabled CLI agents are not used there, by design: a CLI agent runs only after a person approved a plan, and the control API has no route that approves, so a headless swarm could never start one. Source switches (Use/Off) are still not read by the headless engine.
 - [ ] Tutorial D16, D19: check-ins are only in the overlay; they should ride the existing question path into Messages. D12: the extra "Teach me" controls (About, the first form's pill) contradict "first run only". D21, D22, D30 to D34, D39, D41, D42: the queen as a creature in the tutorial (Bring: role, optional creatures, rulings, call budget, degrade ladder); blocked on the keeper's D40 question ("how does the queen keep up with progress and know when to ask?"). D37 and D38 are met: the tutorial hive is the first hive and a lesson goal is never a question.
+
+
+## Findings 2026-11-20 (run 3198, first green main since #957)
+- The desktop first hive now completes (6 creatures, plan approved by the Reviewer, then the tour plays with the lesson creatures' overlays).
+- The web app (aive-web-app artifact, Chromium via Playwright) renders the first-hive form with no page errors; pressing Work ends in "The swarm can't reach its agents" with Try again and Connections, although LLM7 and OVHcloud answer CORS preflights with `access-control-allow-origin: *`. Not traced: whether the web build links a free Source at all.
