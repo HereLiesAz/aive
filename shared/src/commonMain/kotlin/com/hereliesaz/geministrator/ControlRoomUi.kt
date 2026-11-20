@@ -1111,7 +1111,8 @@ private fun Breadcrumb(crumbs: List<ShellCrumb>, openMenu: String?, onMenu: (Str
         verticalAlignment = Alignment.CenterVertically,
     ) {
         crumbs.forEachIndexed { index, crumb ->
-            if (index > 0) CrumbChevron(azphaltOnSurface())
+            // ">" and not "›": that glyph fell back to another font on some phones and dropped a line below its steps.
+            if (index > 0) Text(">", style = AzphaltType.lead, color = azphaltOnSurface(), modifier = Modifier.clearAndSetSemantics {})
             val last = index == crumbs.lastIndex
             // A step with a stack opens it under itself; one without goes where it always went.
             val onClick = if (crumb.menu != null) ({ onMenu(if (openMenu == crumb.seed) null else crumb.seed) }) else crumb.onClick
