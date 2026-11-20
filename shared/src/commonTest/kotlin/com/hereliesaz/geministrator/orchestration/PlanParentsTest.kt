@@ -89,6 +89,21 @@ class PlanParentsTest {
     }
 
     @Test
+    fun aSourceThatAnswersAFewRequestsAMinuteGetsNoCompanionPlanners() {
+        val limited = FailoverOrchestrationAgentRuntime(
+            listOf(
+                PlannerCandidate("other", "Other", Planner { chain }),
+                PlannerCandidate(com.hereliesaz.geministrator.ProviderCatalog.OVHCLOUD_ID, "OVHcloud", Planner { chain }),
+            ),
+        )
+        assertTrue(limited.planners.isEmpty())
+        val roomy = FailoverOrchestrationAgentRuntime(
+            listOf(PlannerCandidate("a", "A", Planner { chain }), PlannerCandidate("b", "B", Planner { chain })),
+        )
+        assertEquals(2, roomy.planners.size)
+    }
+
+    @Test
     fun planOfIdenticalShapeIsNotUnusualAndOneWithNothingInCommonIsAsUnusualAsCanBe() {
         assertEquals(0.0, distance(chain, chain))
         assertEquals(1.0, distance(plan(step("x", "eng")), plan(step("y", "qa", "x"))))
