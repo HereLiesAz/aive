@@ -9,6 +9,7 @@ import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TestDesignPolicy
+import com.hereliesaz.geministrator.domain.VerificationPolicy
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.orchestration.OrchestrationPlan
@@ -78,6 +79,7 @@ object OrchestratedWorkflowFactory {
                     resources = stepResources(step),
                     optional = teachingReview(objective, step.roleId),
                     escalationPolicy = teachingEscalation(objective, step.roleId),
+                    verificationPolicy = teachingLessonCheck(objective, step.roleId),
                 )
             }),
             testDesignPolicy = TestDesignPolicy.BeforeAndAfterImplementation,
@@ -90,6 +92,18 @@ object OrchestratedWorkflowFactory {
      */
     internal fun teachingReview(objective: String, roleId: String): Boolean =
         com.hereliesaz.geministrator.intro.TutorialRouter.isTutorialGoal(objective) && roleId.lowercase().contains("review")
+
+    /**
+     * In a swarm that teaches the app, a creature that is not a reviewer may end its output with one lesson payload line
+     * ([com.hereliesaz.geministrator.tour.LessonArtifactBridge]); a payload that breaks the lesson rules turns the attempt back with
+     * the rules it broke as the reason, so the usual retry and the queen's mending redo it. Output with no payload line passes.
+     */
+    internal fun teachingLessonCheck(objective: String, roleId: String): VerificationPolicy =
+        if (com.hereliesaz.geministrator.intro.TutorialRouter.isTutorialGoal(objective) && !teachingReview(objective, roleId)) {
+            VerificationPolicy.Deterministic(com.hereliesaz.geministrator.tour.LessonArtifactBridge.VALIDATOR_ID)
+        } else {
+            VerificationPolicy.None
+        }
 
     /**
      * In a swarm that teaches the app, a lesson that cannot be done does not fail the swarm: it waits as an escalation, and the queen

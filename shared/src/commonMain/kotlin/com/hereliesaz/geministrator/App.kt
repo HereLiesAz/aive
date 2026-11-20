@@ -522,6 +522,8 @@ fun App(
 
     fun startTutorialIfAsked(objective: String) {
         if (!com.hereliesaz.geministrator.intro.TutorialRouter.isTutorialGoal(objective)) return
+        // A new tour: no lesson creature has supplied one yet, so the in-process writer is the fallback until one does.
+        com.hereliesaz.geministrator.tour.LessonArtifactBridge.supplied = false
         val modelFor = queenModelFor
         if (modelFor == null) {
             scope.launch {
@@ -693,6 +695,14 @@ fun App(
         val active = runtime
         val planner = orchestrationRuntime
         if (active != null && planner != null) active.mendTeachingSwarms(planner)
+    }
+    // The swarm's own lesson creatures hand in the overlays; the tour plays them (LessonCreatures.kt).
+    LaunchedEffect(runtime) {
+        val active = runtime ?: return@LaunchedEffect
+        val labels = com.hereliesaz.geministrator.intro.tutorialLabels()
+        val rowsOf = { com.hereliesaz.geministrator.intro.TutorialLaunch.rows(labels) }
+        com.hereliesaz.geministrator.tour.LessonArtifactBridge.rowsOf = rowsOf
+        active.playLessonCreatures(rowsOf)
     }
     LaunchedEffect(runtime, orchestrationRuntime) {
         onSwarmDrafterAvailable(

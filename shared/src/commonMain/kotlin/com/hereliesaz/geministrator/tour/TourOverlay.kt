@@ -316,7 +316,7 @@ private fun TourCard(state: TourState, step: LessonPayload) {
                 Modifier.azphaltLiveRegion().semantics { stateDescription = stateText },
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text(count, style = AzphaltType.eyebrow, color = azphaltOnSurface())
+                Text(step.voice?.let { plain(it, 40) + " · " + count } ?: count, style = AzphaltType.eyebrow, color = azphaltOnSurface())
                 // Generated text is untrusted: plain Text only, never parsed or linked.
                 Text(plain(state.note ?: step.sentence), style = AzphaltType.body, color = azphaltOnSurface())
             }
