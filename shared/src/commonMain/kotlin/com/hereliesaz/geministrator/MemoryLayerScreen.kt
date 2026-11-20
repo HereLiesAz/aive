@@ -47,6 +47,7 @@ import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.memory_web
 import com.hereliesaz.geministrator.resources.memory_swarm_lead
 import com.hereliesaz.geministrator.resources.common_cancel
 import com.hereliesaz.geministrator.resources.common_dismiss
@@ -215,7 +216,18 @@ internal fun MemoryLayerScreen(
             Text(stringResource(Res.string.memory_swarm_lead), style = AzphaltType.body, color = azphaltOnSurface(), modifier = m)
         }
         val toggle: @Composable () -> Unit = {
-            if (controller != null) MemoryViewToggle(view, onView = { storedView = it.name })
+            if (controller != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    MemoryViewToggle(view, onView = { storedView = it.name })
+                    // A third place beside the two views: leaving it is the switch beside it.
+                    AzphaltPill(
+                        label = stringResource(Res.string.memory_web),
+                        seed = "memory-web",
+                        selected = view == MemoryView.Web,
+                        onClick = { storedView = (if (view == MemoryView.Web) MemoryView.Simple else MemoryView.Web).name },
+                    )
+                }
+            }
         }
         if (compact) {
             lead(Modifier)
@@ -237,6 +249,7 @@ internal fun MemoryLayerScreen(
         when (view) {
             MemoryView.Simple -> MemorySimpleView(controller, onOpenTechnical = { storedView = MemoryView.Technical.name })
             MemoryView.Technical -> MemoryLayerControls(controller, connectedProviderIds)
+            MemoryView.Web -> MemoryWebView(controller)
         }
     }
 }
