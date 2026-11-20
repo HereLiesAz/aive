@@ -890,48 +890,63 @@ private fun MascotNodeTerrarium(
                 // Which provider answers for it: Pinned never switches; Auto fails over. Ink and Yellow only.
                 // "Auto" is the default and said nothing new while it sat on every creature and collided with
                 // its neighbours' names; it shows for the tapped creature, and a Pinned source always shows.
-                LocalProviderBadges.current[node.id]
+                val providerBadge = LocalProviderBadges.current[node.id]
                     ?.takeIf { birth == null && (isSelected || it.routing is CreatureProviderRouting.Pinned) }
-                    ?.let { badge ->
-                    val pinned = badge.routing is CreatureProviderRouting.Pinned
-                    Text(
-                        text = creatureProviderBadgeText(badge.routing, badge.pinnedName),
+                val showsLabel = creatureWearsLabel(isSelected, subjects.size, CreatureLabels.alwaysShow)
+                val badgeChip: @Composable (Modifier) -> Unit = { chipModifier ->
+                    providerBadge?.let { badge ->
+                        val pinned = badge.routing is CreatureProviderRouting.Pinned
+                        Text(
+                            text = creatureProviderBadgeText(badge.routing, badge.pinnedName),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = AzphaltType.endCap,
+                            color = if (pinned) Azphalt.Yellow.contrastingText else Azphalt.Ink.onOpposite(),
+                            modifier = chipModifier
+                                .widthIn(max = creatureSize)
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(if (pinned) Azphalt.Yellow else Azphalt.Ink.copy(alpha = 0.82f))
+                                .then(
+                                    // Its Source is chosen on its role: the badge opens that role in the Roster.
+                                    badge.roleId?.let { id ->
+                                        val links = LocalPlaceLinks.current
+                                        if (links.open != null || links.openRole != null) {
+                                            Modifier.clickable(role = Role.Button) { links.openRoleAt(id, RoleField.Source) }
+                                        } else {
+                                            null
+                                        }
+                                    } ?: Modifier,
+                                )
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                    }
+                }
+                val labelChip: @Composable (Modifier) -> Unit = { chipModifier ->
+                    if (showsLabel) Text(
+                        text = taskLabel.ifEmpty { node.label },
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         style = AzphaltType.endCap,
-                        color = if (pinned) Azphalt.Yellow.contrastingText else Azphalt.Ink.onOpposite(),
-                        modifier = Modifier
-                            .align(if (carriesEgg) Alignment.TopEnd else Alignment.TopCenter)
+                        color = stateColor.contrastingText,
+                        modifier = chipModifier
                             .widthIn(max = creatureSize)
                             .clip(RoundedCornerShape(999.dp))
-                            .background(if (pinned) Azphalt.Yellow else Azphalt.Ink.copy(alpha = 0.82f))
-                            .then(
-                                // Its Source is chosen on its role: the badge opens that role in the Roster.
-                                badge.roleId?.let { id ->
-                                    val links = LocalPlaceLinks.current
-                                    if (links.open != null || links.openRole != null) {
-                                        Modifier.clickable(role = Role.Button) { links.openRoleAt(id, RoleField.Source) }
-                                    } else {
-                                        null
-                                    }
-                                } ?: Modifier,
-                            )
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                            .background(if (isSelected) stateColor else stateColor.copy(alpha = 0.82f))
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
                     )
                 }
-                if (creatureWearsLabel(isSelected, subjects.size, CreatureLabels.alwaysShow)) Text(
-                    text = taskLabel.ifEmpty { node.label },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = AzphaltType.endCap,
-                    color = stateColor.contrastingText,
-                    modifier = Modifier
-                        .align(if (carriesEgg) Alignment.TopCenter else Alignment.BottomCenter)
-                        .widthIn(max = creatureSize)
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(if (isSelected) stateColor else stateColor.copy(alpha = 0.82f))
-                        .padding(horizontal = 8.dp, vertical = 3.dp),
-                )
+                if (carriesEgg) {
+                    // The egg hangs from the tail tip: the name rides on top and the source badge at the top corner.
+                    badgeChip(Modifier.align(Alignment.TopEnd))
+                    labelChip(Modifier.align(Alignment.TopCenter))
+                } else {
+                    // The source badge stands just above the creature's own name, in the creature's own column, so it
+                    // never lands on a neighbour's name.
+                    Column(Modifier.align(Alignment.BottomCenter), horizontalAlignment = Alignment.CenterHorizontally) {
+                        badgeChip(Modifier)
+                        labelChip(Modifier)
+                    }
+                }
               }
               // The back: the step's card, turned a half-turn so it reads true once the creature is gone.
               if (card != null && turn > 0f) {

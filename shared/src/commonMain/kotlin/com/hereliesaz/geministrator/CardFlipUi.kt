@@ -46,6 +46,9 @@ internal const val CARD_FLIP_REDUCED_MS = 90
 internal class CardFlipHost {
     var state by mutableStateOf(CardFlip())
     var editing by mutableStateOf(false)
+
+    /** True while a shell's bottom sheet carries the flipped creature's detail (a phone); the job card then rides in it. */
+    var sheetHosted by mutableStateOf(false)
     var detail: (@Composable (taskId: String, modifier: Modifier) -> Unit)? = null
 
     fun send(event: CardFlipEvent) {
@@ -128,6 +131,10 @@ internal fun CardFlipSheetHost(
     sheet: @Composable ColumnScope.() -> Unit,
     content: @Composable () -> Unit,
 ) {
+    androidx.compose.runtime.DisposableEffect(host, enabled) {
+        host.sheetHosted = enabled
+        onDispose { host.sheetHosted = false }
+    }
     if (!enabled) {
         content()
         return
