@@ -17,9 +17,6 @@ import com.hereliesaz.geministrator.domain.resolveRoleCollection
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
 import com.hereliesaz.geministrator.workflow.WorkflowComposer
 import com.hereliesaz.geministrator.workflow.WorkflowCompositionService
-import com.hereliesaz.geministrator.resources.Res
-import com.hereliesaz.geministrator.resources.library_swarm_needs_queen
-import org.jetbrains.compose.resources.getString
 
 enum class WorkflowLibraryOrigin {
     Installed,
@@ -121,7 +118,7 @@ class WorkflowLibraryHost(
 
     suspend fun saveAuthored(definition: WorkflowDefinition): WorkflowDefinition {
         val wasAuthored = definition.id in authoredStore.all()
-        val saved = composition.save(definition)
+        val saved = composition.save(ensureQueen(definition))
         authoredStore.add(saved.id)
         if (!wasAuthored) onWorkflowCreated(saved)
         onDefinitionSaved(saved)
@@ -219,7 +216,7 @@ class WorkflowLibraryHost(
             .toSet()
         require(id.value !in installedIds) { "Cannot overwrite an installed workflow definition" }
         val wasAuthored = id in authoredStore.all()
-        val saved = composition.saveAs(definition, id, name.trim())
+        val saved = composition.saveAs(ensureQueen(definition), id, name.trim())
         authoredStore.add(saved.id)
         if (!wasAuthored) onWorkflowCreated(saved)
         return saved
@@ -265,9 +262,10 @@ class WorkflowLibraryHost(
         /** True for a swarm; false only for a single role launched on its own from the library. */
         requireQueen: Boolean = true,
     ) {
+        // Every swarm has a queen (D16): one without her is given her before it starts, never refused.
+        @Suppress("NAME_SHADOWING")
+        val definition = if (requireQueen) ensureQueen(definition) else definition
         composition.validated(definition)
-        // Every swarm has a queen (D16): a swarm without one is not started.
-        require(!requireQueen || hasQueen(definition)) { getString(Res.string.library_swarm_needs_queen) }
         val neededRoleIds = buildSet {
             definition.tasks.forEach { task ->
                 task.roleId?.let(::add)
