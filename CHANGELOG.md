@@ -4,6 +4,8 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.91 — from 2026-11-19
 
+- **Change: the breadcrumb mark is ">".** The drawn chevron from the last fix is replaced by a plain ">" at the keeper's word; it is in every font, so it cannot fall back to one with a taller line box. The pill stack's host mark stays "+".
+
 - **Fix: a request longer than a source takes is no longer retried on that source, and moves to another.** A long task sent to Google AI Mode (which takes questions up to 1,800 characters) failed with "The question is 17436 characters; Google AI Mode takes at most 1800" and was retried five times with the same message. That message, and the usual "maximum context length" / "prompt is too long" ones, are now a failure kind of their own (`InputTooLong`): it fails over to another connected source when the creature is not pinned, is never benched, and when there is no other source it is not retried on the same one. The keeper is told in words ("cannot take a request this long. Use a source that takes longer requests, or shorten the task."). New test in `ProviderFailoverTest`; the retry skip itself is not covered by a test.
 
 - **Fix: the breadcrumb's "›" no longer drops a line.** On a phone the mark between two steps (District › Nursery) sat a line below its steps. The "›" was a text glyph, which falls back to another font on some phones with a taller line box; it is now drawn (`CrumbChevron`), at a step's own height, in both headers. The pill stack's host mark is "+" for the same reason. I could not reproduce the drop in the desktop render (it looked right before and after), so this removes the likely cause and is not confirmed on a device.

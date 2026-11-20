@@ -408,7 +408,7 @@ private fun WideCrumbs(crumbs: List<ShellCrumb>, modifier: Modifier = Modifier) 
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         crumbs.forEachIndexed { index, crumb ->
-            if (index > 0) CrumbChevron(azphaltMutedOnSurface())
+            if (index > 0) Text(">", style = AzphaltType.body, color = azphaltMutedOnSurface(), modifier = Modifier.clearAndSetSemantics {})
             val last = index == crumbs.lastIndex
             val style = if (last) AzphaltType.body.copy(fontWeight = FontWeight.ExtraBold) else AzphaltType.body.copy(fontWeight = FontWeight.Medium)
             val onClick = crumb.onClick
@@ -459,34 +459,5 @@ internal fun AzphaltPageTitle(
             }
         }
         action?.invoke()
-    }
-}
-
-/**
- * The mark between two breadcrumb steps, drawn and not typeset: the text glyph "›" fell back to another font on some
- * phones, whose taller line box dropped it a line below its steps. Same height as a step's touch target, so it always sits level.
- */
-@Composable
-internal fun CrumbChevron(color: androidx.compose.ui.graphics.Color) {
-    androidx.compose.foundation.Canvas(
-        Modifier.size(width = 10.dp, height = AzphaltMinTouchTarget).clearAndSetSemantics {},
-    ) {
-        val stroke = 2.dp.toPx()
-        val midY = size.height / 2f
-        val half = 5.dp.toPx()
-        val path = androidx.compose.ui.graphics.Path().apply {
-            moveTo(size.width * 0.25f, midY - half)
-            lineTo(size.width * 0.75f, midY)
-            lineTo(size.width * 0.25f, midY + half)
-        }
-        drawPath(
-            path,
-            color,
-            style = androidx.compose.ui.graphics.drawscope.Stroke(
-                width = stroke,
-                cap = androidx.compose.ui.graphics.StrokeCap.Round,
-                join = androidx.compose.ui.graphics.StrokeJoin.Round,
-            ),
-        )
     }
 }
