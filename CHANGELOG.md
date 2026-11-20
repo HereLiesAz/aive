@@ -4,6 +4,8 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.91 — from 2026-11-19
 
+- **The web app leaves out the free Source a browser cannot call.** With the queen planning in the browser (main run 3209, first green), the first hive reached Kilo, whose server refuses the cross-origin preflight, and ended in "Fail to fetch" although LLM7 and OVHcloud, also linked, answer browsers. The web build now leaves Kilo out of the providers, the plan and the queen's model, so the next free Source answers. Found by running the CI web artifact in Chromium. Not run here; main CI is the compile.
+
 - **The Android unit tests pass again.** Run 3208 passed every shared, desktop and provider test and failed only `AndroidWorkflowLifecycleSmokeTest` (a null pointer and a launch timeout): the artifact-folder settings (#983) built a platform `Settings()` on the first publish, which has no store in a unit test, and that failure was outside any guard. The store is now optional there and the feature is simply off when it is missing. Not run here; main CI is the compile.
 
 - **The queen keeps watching the keeper while the lesson creatures supply the chapters.** The director used to end the moment a creature handed in a lesson, so nothing asked "With me so far?" or reported progress for creature-made lessons. It now stays in its loop in that mode: it reads the played lessons from the tour's state, asks, updates and slows down as before, and writes no lesson and adds no closing chapter itself. Not run here; main CI is the compile.

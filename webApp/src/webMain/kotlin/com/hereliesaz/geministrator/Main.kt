@@ -60,6 +60,9 @@ private const val XAI_API_KEY_STORAGE_KEY = "aive.xaiApiKey"
 private const val GITHUB_TOKEN_STORAGE_KEY = "aive.githubToken"
 private const val GITLAB_TOKEN_STORAGE_KEY = "aive.gitlabToken"
 
+/** Free Sources a browser cannot call: their servers refuse the cross-origin preflight (found by running the web build in Chromium). */
+private val BROWSER_BLOCKED_SOURCE_IDS = setOf(ProviderCatalog.KILO_ID)
+
 /** True when the browser reports `prefers-reduced-motion: reduce`. */
 private fun prefersReducedMotion(): Boolean =
     js("typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches")
@@ -142,7 +145,7 @@ fun main() {
             )
         }
         val providers = remember(credentials, repositoryCredentials) {
-            configuredWebProviders(credentials, repositoryCredentials, mcpHost)
+            configuredWebProviders(credentials - BROWSER_BLOCKED_SOURCE_IDS, repositoryCredentials, mcpHost)
         }
         val executorIntegrations = remember(repositoryCredentials, credentials) {
             val configured = configuredWebExecutorIntegrations(
@@ -165,9 +168,12 @@ fun main() {
         }
         // The queen plans and a reviewer reads the plan before a run exists, as on desktop: without them the browser fell back to
         // the default swarm, which asks for a repository, and a first hive ended in "can't reach its agents".
-        val planningRuntime = remember(credentials) { configuredPlanningRuntime(credentials) }
-        val planReviewer = remember(credentials) { configuredPlanReviewer(credentials) }
-        val queenModelFor = remember(credentials) { { pin: String? -> configuredQueenModel(credentials, pin) } }
+        // A Source whose server does not answer a browser's cross-origin preflight (Kilo) cannot be called from here: it is left
+        // out of what the queen plans and speaks with, so the next free Source answers instead of "Fail to fetch".
+        val callableHere = remember(credentials) { credentials - BROWSER_BLOCKED_SOURCE_IDS }
+        val planningRuntime = remember(callableHere) { configuredPlanningRuntime(callableHere) }
+        val planReviewer = remember(callableHere) { configuredPlanReviewer(callableHere) }
+        val queenModelFor = remember(callableHere) { { pin: String? -> configuredQueenModel(callableHere, pin) } }
         val repositoryDiscovery = remember(repositoryCredentials) {
             configuredWebRepositoryDiscovery(repositoryCredentials, repositoryHttpClient)
         }
