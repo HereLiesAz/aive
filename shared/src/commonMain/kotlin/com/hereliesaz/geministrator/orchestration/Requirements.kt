@@ -65,6 +65,12 @@ object Requirements {
     /** True when the keeper's own words ask for the work to be reviewed. Pure; the queen decides otherwise. */
     fun asksForReview(objective: String): Boolean = reviewWords.containsMatchIn(objective)
 
+    /** A step that asks the swarm to judge the keeper: a quiz check, "verify understanding", "the user completes the tasks". */
+    private val judgesKeeper = Regex(
+        """\b(?:quiz\s+check|(?:verify|check|confirm|assess|test)\w*\s+(?:the\s+|their\s+)?(?:(?:user|keeper|learner|student)'?s?\s+)?understanding|(?:user|keeper|learner|student)\s+(?:completes?|answers?|demonstrates?|performs?|passes))\b""",
+        RegexOption.IGNORE_CASE,
+    )
+
     private val clauseWords = Regex("""\b(must|should|never|only|without|at most|no more than|at least|within|before)\b""", RegexOption.IGNORE_CASE)
     private val stepLimit = Regex("""\b(?:at most|no more than|up to|max(?:imum)?(?: of)?)\s+(\d{1,2})\s+steps?\b""", RegexOption.IGNORE_CASE)
     private val retired = Regex("""\b(timelines?|providers?|inbox(es)?|hall[ -]monitors?|drifters?)\b""", RegexOption.IGNORE_CASE)
@@ -86,6 +92,13 @@ object Requirements {
         items += Requirement("R-words", RequirementSource.Vocabulary, "Step names are at most $MAX_NAME_WORDS words and use the keeper's words.", RequirementCheck.Pure)
         if (inputs.requireReview || (!inputs.objectiveExternal && asksForReview(inputs.objective))) {
             items += Requirement(REVIEW_ID, RequirementSource.Review, "Every step that makes something a reviewer can review is followed by a check of the work.", RequirementCheck.Pure)
+        }
+        if (com.hereliesaz.geministrator.intro.TutorialRouter.isTutorialGoal(inputs.objective)) {
+            items += Requirement(
+                "R-keeper-unseen", RequirementSource.Structure,
+                "No step judges the keeper: a swarm cannot see what the keeper does or answers, so no quiz check, no verification of understanding and no check of a task the keeper does.",
+                RequirementCheck.Pure,
+            )
         }
         if (inputs.objectiveExternal) {
             items += Requirement("R-outside", RequirementSource.Safety, "The goal came from outside: no step may change anything without approval.", RequirementCheck.Pure)
@@ -135,6 +148,8 @@ object Requirements {
                                     r.templateInputs.values.any { v -> com.hereliesaz.geministrator.template.StepInstantiation.boundTask(v)?.value == s.id })
                         }
                 }?.let { "Step ${it.id} makes something to be reviewed and no check of the work follows it." }
+                "R-keeper-unseen" -> plan.steps.firstOrNull { s -> judgesKeeper.containsMatchIn(s.name + " " + s.objective) }
+                    ?.let { "Step ${it.id} asks the swarm to judge the keeper, and no step can see or test the keeper." }
                 "R-roles" -> plan.steps.firstOrNull { it.roleId !in inputs.availableRoleIds }?.let { "Step ${it.id} uses a role that is not available." }
                 "R-words" -> plan.steps.firstOrNull { s ->
                     s.name.trim().split(Regex("\\s+")).size > MAX_NAME_WORDS || retired.containsMatchIn(s.name)
