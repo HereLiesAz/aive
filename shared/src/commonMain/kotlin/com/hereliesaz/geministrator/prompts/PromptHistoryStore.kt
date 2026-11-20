@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.hereliesaz.geministrator.DurableUiState
 import com.hereliesaz.geministrator.DurableUiStateStore
+import com.hereliesaz.geministrator.tour.ComfortStore
 import com.russhwolf.settings.Settings
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -63,6 +64,8 @@ internal class PromptHistoryStore(
 
     private fun removeAll() {
         PromptKind.entries.forEach { store.remove(keyOf(it)) }
+        // The tutorial's comfort record is remembered, too: closed ids and two states, no text (docs/PRIVACY.md).
+        store.remove(ComfortStore.KEY)
     }
 
     companion object {

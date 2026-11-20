@@ -8,14 +8,15 @@ import kotlin.test.assertTrue
 /**
  * The owner renamed five words in everything the keeper reads: Timeline -> Story, Provider -> Source,
  * Inbox -> Messages, Hall Monitor -> Nanny, Drifter -> Orphan, the Build view of a swarm -> Edit, and workflow -> swarm (a swarm is the saved workflow, a hive is the goal; docs/Vocabulary.md).
- * The rulings of the decisions page add: the creature meter is Integrity (never HP or Mood), the Stable is the Nursery, the Roster is Breeds,
+ * The rulings of the decisions page add: the creature meter is Integrity (never HP or Mood), a creature does a step (never a job), a project is a neighborhood,
+ * trusted steps are Trust (not Delegations), the local queen is "Queen on this device", the app's own notes are "Good to know" (not Keeper note), the Stable is the Nursery, the Roster is Breeds,
  * the Azphalt Store is the Shop. A project is a neighborhood; MCP servers keep their engineering name. This scans the user-visible
  * string resources (every `values*` folder of the shared module and of the Android app) for the old words, like
  * [PlaceNamesInStringsTest]. Code identifiers, resource keys, persisted keys and protocol terms are not user text
  * and are not scanned: only the text between `<string ...>` and `</string>` is.
  */
 class VocabularyInStringsTest {
-    private val retired = Regex("""\b(timelines?|providers?|inbox(es)?|hall[ -]monitors?|drifters?|build|workflows?|hp|mood|stable|roster|azphalt store)\b""", RegexOption.IGNORE_CASE)
+    private val retired = Regex("""\b(timelines?|providers?|inbox(es)?|hall[ -]monitors?|drifters?|build|workflows?|hp|mood|stable|roster|azphalt store|jobs?|projects?|delegations?|local planner|keeper note)\b""", RegexOption.IGNORE_CASE)
 
     /**
      * Resource name -> why the old word legitimately stays in that string. Add an entry only for a word that names
@@ -33,6 +34,11 @@ class VocabularyInStringsTest {
         "swarm_workflow_file_or_id" to "a GitHub Actions workflow file or id (GitHub's term)",
         // "stable" as an ordinary adjective: a device id that does not change, never the Nursery.
         "settings_stable_device_id" to "adjective: a device ID that stays the same",
+        // "job" as a compute job (work sent to another machine), never a creature's step (decisions page, D1).
+        "settings_maximum_simultaneous_remote_jobs" to "a compute job sent to another machine",
+        "settings_compute_node_jobs" to "a compute job sent to another machine",
+        // "project" in a path the keeper types.
+        "repositories_entire_reference_hint" to "a path example the keeper types",
     )
 
     private val stringElement = Regex("""<string\s+name="([^"]+)"[^>]*>(.*?)</string>""", RegexOption.DOT_MATCHES_ALL)

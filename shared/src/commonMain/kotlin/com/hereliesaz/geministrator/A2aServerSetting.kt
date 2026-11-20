@@ -68,13 +68,13 @@ sealed interface A2aServerStatus {
 
 /**
  * Whether the A2A server should run, from the keeper's stored choice. [storedChoice] is null when
- * the keeper never touched the switch: such a device gets the default (on), including existing
- * installs from when the default was off. An explicit choice, on or off, is always kept.
+ * the keeper never touched the switch: such a device gets the default (off: the server opens a port, so the keeper turns it on;
+ * decisions page, N8). An explicit choice, on or off, is always kept.
  */
 fun a2aServerEnabled(storedChoice: Boolean?): Boolean = storedChoice ?: A2A_SERVER_ENABLED_BY_DEFAULT
 
-/** The server runs unless the keeper turned it off; it is reachable only on this computer by default. */
-const val A2A_SERVER_ENABLED_BY_DEFAULT: Boolean = true
+/** The server runs only when the keeper turned it on; once on, it is reachable only on this computer unless opened to the network. */
+const val A2A_SERVER_ENABLED_BY_DEFAULT: Boolean = false
 
 /**
  * Whether the server is open to the local network, from the keeper's stored choice: only an
