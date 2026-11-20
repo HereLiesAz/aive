@@ -5,6 +5,7 @@ import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -16,30 +17,46 @@ import kotlin.math.sqrt
  * Repulsion only looks at nodes in neighbouring cells of a grid, so a bank of thousands of memories costs a few passes of
  * near-linear work, not every pair. Pure and UI-free: it returns positions in a unit-less plane centred on the origin.
  */
-class WebLayout(val positions: Map<String, WebPoint>, val radius: Float)
+class WebLayout(
+    val positions: Map<String, WebPoint>,
+    /** Everything fits inside this. */
+    val radius: Float,
+    /** What Fit frames: the web without its few far-flung outliers, which would otherwise shrink the rest. */
+    val fitRadius: Float = radius,
+)
 
 data class WebPoint(val x: Float, val y: Float)
 
 object MemoryWebLayout {
-    /** [iterations] passes of the simulation; more settles larger webs more fully, and costs time linearly. */
-    fun layout(graph: WebGraph, iterations: Int = 160): WebLayout {
+    /** A node's radius in layout units: small, so the web reads as clusters of dots and not as a field of blobs. */
+    fun nodeRadius(size: Float): Float = 2f + 7f * sqrt(size.coerceIn(0.05f, 1.5f))
+
+    /**
+     * [iterations] ticks of a cooling simulation (the usual force-directed model): every pair repels with a force that falls with
+     * distance, every link is a spring whose stiffness falls with how many links its ends have (so a hub does not drag its whole
+     * neighbourhood into a line), a weak gravity keeps clusters on one canvas, and overlapping nodes are pushed apart. More ticks
+     * settle a bigger web more fully, at a cost that grows linearly.
+     */
+    fun layout(graph: WebGraph, iterations: Int = 240): WebLayout {
         val n = graph.nodes.size
-        if (n == 0) return WebLayout(emptyMap(), 0f)
+        if (n == 0) return WebLayout(emptyMap(), 0f, 0f)
         val index = HashMap<String, Int>(n * 2)
         graph.nodes.forEachIndexed { i, node -> index[node.id] = i }
         val x = FloatArray(n)
         val y = FloatArray(n)
+        val vx = FloatArray(n)
+        val vy = FloatArray(n)
         // A sunflower spiral: spread evenly and the same every time, so no randomness decides the picture.
         val golden = (PI * (3.0 - sqrt(5.0))).toFloat()
-        val spread = 40f * sqrt(n.toFloat())
         for (i in 0 until n) {
-            val r = spread * sqrt((i + 0.5f) / n)
+            val r = 10f * sqrt(i + 0.5f)
             x[i] = r * cos(i * golden)
             y[i] = r * sin(i * golden)
         }
         val from = IntArray(graph.edges.size)
         val to = IntArray(graph.edges.size)
-        val strength = FloatArray(graph.edges.size)
+        val weight = FloatArray(graph.edges.size)
+        val degree = IntArray(n)
         var edgeCount = 0
         graph.edges.forEach { edge ->
             val a = index[edge.from] ?: return@forEach
@@ -47,89 +64,92 @@ object MemoryWebLayout {
             if (a == b) return@forEach
             from[edgeCount] = a
             to[edgeCount] = b
-            strength[edgeCount] = 0.25f + 0.75f * edge.weight.coerceIn(0f, 1f)
+            weight[edgeCount] = edge.weight.coerceIn(0f, 1f)
+            degree[a] += 1
+            degree[b] += 1
             edgeCount += 1
         }
-        val radiusOf = FloatArray(n) { 8f + 26f * sqrt(graph.nodes[it].size.coerceIn(0.05f, 1.5f)) }
-        val ideal = 120f
-        val cell = ideal * 2f
-        val dx = FloatArray(n)
-        val dy = FloatArray(n)
-        var temperature = ideal * 2f
+        val radius = FloatArray(n) { nodeRadius(graph.nodes[it].size) }
+        val cutoff = 150f
+        val charge = 70f
+        var alpha = 1f
+        val alphaDecay = 1f - 0.001f.pow(1f / iterations.coerceAtLeast(1))
 
         repeat(iterations) {
-            dx.fill(0f)
-            dy.fill(0f)
-            // Repulsion between neighbours in a grid of cells.
+            // Repulsion between nodes near each other, found through a grid of cells.
             val grid = HashMap<Long, MutableList<Int>>(n)
-            for (i in 0 until n) grid.getOrPut(cellKey(x[i], y[i], cell)) { mutableListOf() } += i
+            for (i in 0 until n) grid.getOrPut(cellKey(x[i], y[i], cutoff)) { mutableListOf() } += i
             for (i in 0 until n) {
-                val cx = cellOf(x[i], cell)
-                val cy = cellOf(y[i], cell)
+                val cx = cellOf(x[i], cutoff)
+                val cy = cellOf(y[i], cutoff)
                 for (gx in cx - 1..cx + 1) for (gy in cy - 1..cy + 1) {
                     val bucket = grid[key(gx, gy)] ?: continue
                     for (j in bucket) {
                         if (j <= i) continue
-                        var ddx = x[i] - x[j]
-                        var ddy = y[i] - y[j]
-                        var d2 = ddx * ddx + ddy * ddy
+                        var dx = x[i] - x[j]
+                        var dy = y[i] - y[j]
+                        var d2 = dx * dx + dy * dy
                         if (d2 < 0.01f) {
                             // Exactly stacked: part them along a fixed direction by index.
-                            ddx = 0.1f * ((i - j) % 7 + 1)
-                            ddy = 0.1f * ((j + i) % 5 + 1)
-                            d2 = ddx * ddx + ddy * ddy
+                            dx = 0.1f * ((i - j) % 7 + 1)
+                            dy = 0.1f * ((j + i) % 5 + 1)
+                            d2 = dx * dx + dy * dy
                         }
+                        if (d2 > cutoff * cutoff) continue
                         val d = sqrt(d2)
-                        val minimum = radiusOf[i] + radiusOf[j] + 6f
-                        val force = (ideal * ideal) / d + if (d < minimum) (minimum - d) * 4f else 0f
-                        val fx = ddx / d * force
-                        val fy = ddy / d * force
-                        dx[i] += fx
-                        dy[i] += fy
-                        dx[j] -= fx
-                        dy[j] -= fy
+                        val minimum = radius[i] + radius[j] + 2f
+                        // Charge falls as 1/d; touching nodes also push apart outright.
+                        val push = charge * alpha / d + if (d < minimum) (minimum - d) * 0.5f else 0f
+                        val fx = dx / d * push
+                        val fy = dy / d * push
+                        vx[i] += fx
+                        vy[i] += fy
+                        vx[j] -= fx
+                        vy[j] -= fy
                     }
                 }
             }
-            // Attraction along connections; a stronger connection pulls harder.
+            // Springs along links: a stronger link wants to be shorter, a hub's links are each softer.
             for (e in 0 until edgeCount) {
                 val a = from[e]
                 val b = to[e]
-                val ddx = x[a] - x[b]
-                val ddy = y[a] - y[b]
-                val d = max(0.01f, sqrt(ddx * ddx + ddy * ddy))
-                val force = d * d / ideal * strength[e]
-                val fx = ddx / d * force
-                val fy = ddy / d * force
-                dx[a] -= fx
-                dy[a] -= fy
-                dx[b] += fx
-                dy[b] += fy
-            }
-            // Gravity keeps unconnected clusters on the canvas.
-            for (i in 0 until n) {
-                dx[i] -= x[i] * 0.4f
-                dy[i] -= y[i] * 0.4f
+                val dx = (x[b] + vx[b]) - (x[a] + vx[a])
+                val dy = (y[b] + vy[b]) - (y[a] + vy[a])
+                val l = max(0.01f, sqrt(dx * dx + dy * dy))
+                val rest = 22f + 40f * (1f - weight[e])
+                val stiffness = 1f / min(degree[a], degree[b]).coerceAtLeast(1)
+                val k = (l - rest) / l * alpha * stiffness
+                val fx = dx * k
+                val fy = dy * k
+                val bias = degree[a].toFloat() / (degree[a] + degree[b]).coerceAtLeast(1)
+                vx[b] -= fx * bias
+                vy[b] -= fy * bias
+                vx[a] += fx * (1f - bias)
+                vy[a] += fy * (1f - bias)
             }
             for (i in 0 until n) {
-                val d = max(0.01f, sqrt(dx[i] * dx[i] + dy[i] * dy[i]))
-                val step = min(d, temperature)
-                x[i] += dx[i] / d * step
-                y[i] += dy[i] / d * step
+                // A weak gravity keeps unconnected clusters on the canvas.
+                vx[i] -= x[i] * 0.01f * alpha
+                vy[i] -= y[i] * 0.01f * alpha
+                vx[i] *= 0.6f
+                vy[i] *= 0.6f
+                x[i] += vx[i]
+                y[i] += vy[i]
             }
-            temperature = max(1f, temperature * 0.97f)
+            alpha -= alpha * alphaDecay
         }
-        var radius = 0f
+        var maxRadius = 0f
         val positions = HashMap<String, WebPoint>(n * 2)
         for (i in 0 until n) {
             positions[graph.nodes[i].id] = WebPoint(x[i], y[i])
-            radius = max(radius, sqrt(x[i] * x[i] + y[i] * y[i]) + radiusOf[i])
+            maxRadius = max(maxRadius, sqrt(x[i] * x[i] + y[i] * y[i]) + radius[i])
         }
-        return WebLayout(positions, radius)
+        val distances = FloatArray(n) { sqrt(x[it] * x[it] + y[it] * y[it]) }.also { it.sort() }
+        val fit = min(maxRadius, distances[min(n - 1, (n * 0.96f).toInt())] + 20f)
+        return WebLayout(positions, maxRadius, fit)
     }
 
-    private fun cellKey(px: Float, py: Float, cell: Float): Long =
-        key(cellOf(px, cell), cellOf(py, cell))
+    private fun cellKey(px: Float, py: Float, cell: Float): Long = key(cellOf(px, cell), cellOf(py, cell))
 
     private fun cellOf(p: Float, cell: Float): Int = floor(p / cell).toInt()
 
