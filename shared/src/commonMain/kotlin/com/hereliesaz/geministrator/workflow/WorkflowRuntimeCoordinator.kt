@@ -1,5 +1,7 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.ErrorKind
+import com.hereliesaz.geministrator.classifyError
 import com.hereliesaz.geministrator.domain.ApprovalGateId
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.BlockingReason
@@ -421,6 +423,10 @@ class WorkflowRuntimeCoordinator(
                     failover.stopMessage?.let { failureReason = "Executor failed. $it" }
                 }
             }
+            // A request longer than the source takes is no better on the next try: with no other source to move to, it is
+            // not retried on this one (it was, five times over, with the same message).
+            val neverFitsThisSource = retryReason == RetryReason.ProviderFailure &&
+                classifyError(nextRun.taskRuns[taskId]?.progressMessage) == ErrorKind.InputTooLong
             nextRun = engine.handleFailure(
                 definition = definition,
                 run = nextRun,
@@ -428,6 +434,7 @@ class WorkflowRuntimeCoordinator(
                 retryReason = retryReason,
                 reason = failureReason,
                 nowEpochMillis = nowEpochMillis,
+                allowRetry = !neverFitsThisSource,
             )
             if (nextRun.taskRuns[taskId]?.status == TaskRunStatus.Escalated) {
                 ensureFailureEscalationGate(

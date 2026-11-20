@@ -558,6 +558,7 @@ class HiveScreenshotTest {
             DurableUiState.store.putString("overview.timeline.view", "waterfall")
             shell(ControlRoomDestination.Overview, live, true)()
         }
+        shoot("26f-shell-phone-nursery", 824, 900) { shell(ControlRoomDestination.Stable, live, true)() }
         shoot("27-shell-creature", 2400, 1500) { shell(ControlRoomDestination.Overview, live, false, selected = "build")() }
         shoot("28-shell-first-launch", 824, 1830) { shell(ControlRoomDestination.Overview, ApplicationRuntimeState.NoProject(), true)() }
         shoot("29-shell-swarm", 2400, 1500) { shell(ControlRoomDestination.Company, live, false)() }
