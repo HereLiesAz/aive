@@ -62,6 +62,8 @@ data class PendingPlanLaunch(
     val objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
     /** What planning did and the ideas the reviewer had beyond the requirements, held until the keeper starts the run. Absent in an older blob. */
     val notes: com.hereliesaz.geministrator.queen.PlanningNotes? = null,
+    /** The keeper's "have every result reviewed" switch when the plan was made, so a restart resumes with the same checklist. Absent in an older blob. */
+    val requireReview: Boolean = false,
 )
 
 /** Settings-backed store for the one [PendingPlanLaunch]. Unreadable state is no state: the keeper is simply asked afresh. */

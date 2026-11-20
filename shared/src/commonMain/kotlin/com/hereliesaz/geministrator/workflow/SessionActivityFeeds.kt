@@ -142,9 +142,13 @@ fun Map<SessionActivityKey, List<SessionActivityLine>>.attemptsOf(taskRunId: Tas
         .map { (key, lines) -> CreatureActivityAttempt(key, lines) }
         .sortedWith(compareBy({ it.lines.first().atEpochMillis }, { it.key.providerRunId.value }))
 
-/** One short line for the hive's "doing now": whitespace flattened, at most [maxChars]. */
+/**
+ * One short line for the hive's "doing now": whitespace flattened, markdown emphasis and a leading list, heading or colon marker
+ * dropped (a creature's text that opens with a list read "Worker: : - Introduction - Hives"), at most [maxChars].
+ */
 fun SessionActivityLine.doingNowText(maxChars: Int = 120): String {
     require(maxChars > 1) { "maxChars must be greater than one" }
-    val flat = text.split(Regex("\\s+")).filter(String::isNotEmpty).joinToString(" ")
+    val plain = text.replace("**", "").replace("__", "").replace("`", "")
+    val flat = plain.split(Regex("\\s+")).filter(String::isNotEmpty).joinToString(" ").trimStart('#', '*', '-', '>', ':', ' ')
     return if (flat.length > maxChars) flat.take(maxChars - 1).trimEnd() + "…" else flat
 }

@@ -217,8 +217,10 @@ internal fun newWorkflowInstruction(objective: String, repository: RepositoryRef
     }
     if (TEACHING_WORDS.containsMatchIn(objective)) {
         append(" The objective is to teach: plan a survey of the material, a curriculum ordered by prerequisites, then one step per major part")
-        append(" that explains it with examples and a check of understanding (size the plan to the material). Each step's result is text the keeper reads,")
-        append(" so require no approval unless a step changes something.")
+        append(" that explains it with examples and ends with a few questions the keeper can answer for themselves (size the plan to the material).")
+        append(" Each step's result is text the keeper reads, so require no approval unless a step changes something.")
+        append(" No step can see or test the keeper: plan no quiz, no verification of understanding and no step that judges whether the keeper did a task or answered,")
+        append(" because a reviewer asked to judge that can only reject it and the swarm fails.")
     }
     if (availableTools.isNotEmpty()) append(com.hereliesaz.geministrator.research.RESEARCH_PLAN_INSTRUCTION)
 }
@@ -493,6 +495,7 @@ private suspend fun ApplicationRuntime.planAndDecide(
                 design = inputs.design,
                 objectiveProvenance = inputs.objectiveProvenance,
                 notes = notes,
+                requireReview = inputs.requireReview,
             ),
         )
         // The keeper may ask once for the other size: the card's button sets [resize] and answers "do not start", and the plan is made again with that constraint.
@@ -640,6 +643,7 @@ suspend fun ApplicationRuntime.resumePendingPlanLaunch(
             design = saved,
             supplementalRoles = pending.supplementalRoles,
             objectiveProvenance = pending.objectiveProvenance,
+            requireReview = pending.requireReview,
         )
     } catch (cancelled: kotlinx.coroutines.CancellationException) {
         throw cancelled

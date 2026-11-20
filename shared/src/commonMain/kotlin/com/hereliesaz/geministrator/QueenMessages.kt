@@ -162,8 +162,8 @@ internal fun queenTitle(note: QueenNote): String = stringResource(
     if (note.suggestion != null) Res.string.queen_title_suggestion else when (note.voice) {
         QueenVoice.StatusWorking, QueenVoice.StatusWorkingClear, QueenVoice.StatusIdle, QueenVoice.StatusIdleClear -> Res.string.queen_title_status
         // Any swarm's ending is "finished" (it was headed "The tour is over", which was wrong for a swarm that is not the tour).
-        QueenVoice.FinishedAll, QueenVoice.FinishedAllCost, QueenVoice.FinishedFailed,
-        QueenVoice.FinishedFailedNoStep, QueenVoice.FinishedStopped, QueenVoice.FinishedNotReached, QueenVoice.FinishedBlockersOpen -> Res.string.queen_title_finished
+        QueenVoice.FinishedFailed, QueenVoice.FinishedFailedNoStep, QueenVoice.FinishedStopped -> Res.string.queen_title_stopped
+        QueenVoice.FinishedAll, QueenVoice.FinishedAllCost, QueenVoice.FinishedNotReached, QueenVoice.FinishedBlockersOpen -> Res.string.queen_title_finished
         QueenVoice.TutorialHiveYours, QueenVoice.TutorialHiveYoursShaky -> Res.string.queen_title_tutorial_done
         QueenVoice.BlockerMade -> Res.string.queen_title_blocker_made
         QueenVoice.TutorialProgress, QueenVoice.TutorialSlower -> Res.string.queen_title_tutorial

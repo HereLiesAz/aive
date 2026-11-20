@@ -212,3 +212,18 @@ The keeper's founding picture is a living flowchart that does not look like a fl
 ## A redesign keeps every function
 
 The keeper's rule for the hive redesign: it MUST have ALL functionality available. In step 1 I removed the Setup/Swarm switch and with it the only way to see every creature at once during a live run. Before deleting or merging any control, list what it did and where that is reachable afterwards; a control that goes away must come back somewhere (a button, a gesture, a state of the organism), not be dropped. Check it in the running screens, not only in the code.
+
+## Read what the keeper sends before naming it
+The keeper sent a tall screenshot with no words and I called it the Starting Templates page; it was Spec Decisions ("thats spec decisions"). An image or a file with no words is still a request: open it, read its title and body, say what it is only after, and when the file turns out to hold less than the keeper meant (the attached Spec_Decisions.md was only the page's intro), say so and go to the source (the artifact's database).
+
+## When asked to describe one half of the product, describe only that half
+Asked for "only the game aspect", I added the tutorial and three UI defects; asked again, I still called the creatures "agents" and "tasks". Use the half's own words and leave the other half's out of every sentence, not only the headings. Where a rule is in the docs and not in the code, read the code before describing it (the docs described Echo and kinship, the code ran a Fibonacci pace and a lottery).
+
+## A "fix" for one red job can make the main build red for hours
+#939 and #940 changed buildSrc's repositories to fix a one-off central run and made every `build` job fail in six seconds (runs 3167 to 3178) while the installer and Android jobs stayed green, so nothing looked broken but no test ran. After any build-script change, look at the Test shared domain step of the next main run, not only at the artifacts. A failing job that finishes in seconds is a configuration failure: read its first "What went wrong" before anything else.
+
+## Parallel sessions all prepend to CHANGELOG.md
+Every rebase conflicts in CHANGELOG.md at the top. Keep both sides (`/tmp/aivedesk/resolve.py` does it) and never rewrite the other side's entry.
+
+## Look at the running app for what the keeper sees, then fix the class of defect
+Run the desktop build from the CI artifact under Xvfb with `JAVA_TOOL_OPTIONS=-Duser.home=<fresh dir> -Djavax.net.ssl.trustStore=<jks with the proxy CA>`: a fresh profile shows the first form, and the free source answers. That found, in one pass, a pill that swelled past its row, a "big plan" warning on the teaching goal, a creature card over the count, a stray backslash in generated text and a "tour is over" heading on every swarm's ending.
