@@ -165,7 +165,7 @@ class OpenAiCompatibleChatApiTest {
     fun hostedRegistryHasUniqueStableIds() {
         val entries = HostedLlmProviders.builtInEntries
         assertEquals(entries.size, entries.map { it.id }.toSet().size)
-        assertEquals(18, entries.size)
+        assertEquals(19, entries.size)
         entries.forEach { spec ->
             check(spec.id.isNotBlank())
             check(spec.displayName.isNotBlank())
