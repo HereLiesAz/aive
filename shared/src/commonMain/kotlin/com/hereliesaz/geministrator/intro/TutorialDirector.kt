@@ -238,7 +238,7 @@ class TutorialDirector(
                     lastIndex = now.index
                 }
 
-                if (now.finished && closingAdded && lessons.size + dropped >= planned) {
+                if (now.finished && closingAdded && lessons.size + dropped >= planned && !(creatures && com.hereliesaz.geministrator.tour.LessonArtifactBridge.writing)) {
                     val last = lessons.lastOrNull()
                     if (last != null && !closingAnswered) {
                         if (!closing) {
