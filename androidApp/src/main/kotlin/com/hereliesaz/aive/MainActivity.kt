@@ -824,6 +824,7 @@ class MainActivity : ComponentActivity() {
             com.hereliesaz.geministrator.ErrorKind.NoAgent,
             com.hereliesaz.geministrator.ErrorKind.BadRequest,
             com.hereliesaz.geministrator.ErrorKind.OutputTooLong,
+            com.hereliesaz.geministrator.ErrorKind.InputTooLong,
             com.hereliesaz.geministrator.ErrorKind.Other,
             -> R.string.remote_problem_other
         },
