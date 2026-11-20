@@ -227,6 +227,9 @@ internal fun newWorkflowInstruction(objective: String, repository: RepositoryRef
             append(" {\"target\":\"<a registered control id>\",\"sentence\":\"<one short instruction>\",\"expect\":{\"type\":\"tapped\",\"target\":\"<the same id>\"},")
             append("\"explain\":\"<a few sentences>\",\"ifMissed\":\"<a hint>\",\"checkIn\":\"<one short question ending in ?>\",\"anotherWay\":\"<the same, said another way>\",")
             append("\"smaller\":[\"<tiny move one>\",\"<tiny move two>\"]}.")
+            append(" The registered control ids are: ")
+            append(com.hereliesaz.geministrator.tour.TourTargetId.entries.map { it.name }.filter { it != "HIVE_CREATURES" && it != "HIVE_MADE" }.joinToString(", "))
+            append(". Use only those.")
             append(" The checkIn only asks how the keeper feels (for example \"With me so far?\"), never what they know. A payload that breaks the lesson rules is turned back and the step is done again.")
         }
     }
