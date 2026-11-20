@@ -196,4 +196,14 @@
     <string name="memory_web_group_keeper">Yours</string>
     <string name="memory_web_group_habit">Habit</string>
     <string name="memory_web_group_procedure">Procedure</string>
+    <string name="memory_web_export_title">Open in Obsidian</string>
+    <string name="memory_web_export_hint">Write the web as a folder of markdown notes with [[links]]. It is a copy: changes made in Obsidian do not come back.</string>
+    <string name="memory_web_export_none">No folder chosen.</string>
+    <string name="memory_web_export_current">Exporting into %1$s</string>
+    <string name="memory_web_export_choose">Choose a folder</string>
+    <string name="memory_web_export_change">Change folder</string>
+    <string name="memory_web_export_go">Export notes</string>
+    <string name="memory_web_exported">Exported %1$d notes into “%2$s”</string>
+    <string name="memory_web_exported_partial">Exported %1$d notes, %2$d could not be written</string>
+    <string name="memory_web_export_failed">Could not export to the folder</string>
 </resources>
