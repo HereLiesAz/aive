@@ -385,8 +385,43 @@ object CliAgentSpecs {
         },
     )
 
+    /**
+     * Block's goose (`goose run`). The task goes to standard input (`-i -`, documented as "use - for stdin"), with no session stored and
+     * only the model's answer on stdout (`-q`). Goose's permission mode (autonomous, approve, smart approve) is the keeper's own
+     * configuration, which the app cannot narrow from the command line, so it is declared for reading and planning only and the app
+     * never changes the mode. Flags from the goose CLI reference (goose-docs.ai, guides/goose-cli-commands); not run by this project
+     * against every version, and the Test button shows what the installed one did.
+     */
+    val Goose = CliAgentSpec(
+        id = "cli-goose", displayName = "Goose", binaries = listOf("goose"),
+        promptChannel = CliPromptChannel.Stdin, outputFormat = CliOutputFormat.PlainText,
+        capabilities = setOf(AgentCapability.RepositoryRead, AgentCapability.PlanGeneration, AgentCapability.PlanApproval),
+        optionalKeyEnvironment = listOf("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY"),
+        sandboxNote = "Run with its own permission mode, which the app cannot narrow from the command line and never changes; declared for reading and planning only. " +
+            "A repository that tracks Goose settings (hints, extensions) is refused unless you allow project settings.",
+        projectConfig = listOf(".goosehints", ".goose/"),
+        build = { _, _, _ -> listOf("run", "--no-session", "-q", "--output-format", "text", "-i", "-") },
+    )
+
+    /**
+     * Charm's Crush (`crush run <prompt>`, the documented non-interactive form). Its permissions are the keeper's own rules (allowed
+     * and denied tools in its configuration); the app passes none of them and never passes `--yolo`, which skips every prompt. Declared
+     * for reading and planning only.
+     */
+    val Crush = CliAgentSpec(
+        id = "cli-crush", displayName = "Crush", binaries = listOf("crush"),
+        npmPackage = "@charmland/crush",
+        promptChannel = CliPromptChannel.Argument, outputFormat = CliOutputFormat.PlainText,
+        capabilities = setOf(AgentCapability.RepositoryRead, AgentCapability.PlanGeneration, AgentCapability.PlanApproval),
+        optionalKeyEnvironment = listOf("ANTHROPIC_API_KEY", "OPENAI_API_KEY"),
+        sandboxNote = "Run with its own permission rules, which the app cannot narrow from the command line; it never passes --yolo. Declared for reading and planning only. " +
+            "A repository that tracks Crush settings (a crushrc or crush.json file, or a .crush folder) is refused unless you allow project settings.",
+        projectConfig = listOf(".crushrc", "crushrc", "crush.json", ".crush/"),
+        build = { _, _, _ -> listOf("run") },
+    )
+
     /** Every CLI the app knows how to drive. Adding one is adding a spec here. */
-    val all: List<CliAgentSpec> = listOf(Claude, Codex, Gemini, Qwen, Antigravity, Grok, Copilot, Cursor, Amp, Kilo, OpenCode, Aider)
+    val all: List<CliAgentSpec> = listOf(Claude, Codex, Gemini, Qwen, Antigravity, Grok, Copilot, Cursor, Amp, Kilo, OpenCode, Aider, Goose, Crush)
 
     fun byId(id: String): CliAgentSpec? = all.firstOrNull { it.id == id }
 }

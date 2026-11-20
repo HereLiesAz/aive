@@ -35,7 +35,7 @@ This document identifies the trust boundaries, threat actors, attack surfaces, a
 ## Threat Actors
 
 - **Compromised provider**: A provider returns malicious content disguised as task output. Examples include code that overwrites secrets, instructions injected into artifact text, and a fabricated approval status.
-- **Logging free-tier gateway**: A keyless or free model gateway (Kilo, LLM7, OVHcloud anonymous tier, OpenCode Zen free models) retains or trains on prompts.
+- **Logging free-tier gateway**: A keyless or free model gateway (Kilo, LLM7, OVHcloud anonymous tier, BlockRun free tier, OpenCode Zen free models) retains or trains on prompts.
 - **Malicious workflow definition**: A definition author (or import) injects a task objective, role instruction, or acceptance criterion designed to exfiltrate data or execute privileged operations.
 - **Malicious artifact**: A prior task produces an artifact (code, text, data) whose content is interpreted as instructions by a downstream provider or executor.
 - **Malicious repository content**: Files in the target repository contain prompt-injection aimed at an agent that reads them (OpenCode, GitLab/Local workspace agents).
