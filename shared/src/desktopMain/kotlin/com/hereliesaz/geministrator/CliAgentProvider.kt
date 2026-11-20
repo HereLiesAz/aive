@@ -284,7 +284,7 @@ internal class CliAgentProvider(
 }
 
 /** The CLI providers that are on and installed, ready to join the provider list. */
-internal fun configuredCliProviders(
+fun configuredCliProviders(
     settings: CliAgentSettings = CliAgentSettings(),
     locate: (CliAgentSpec) -> File? = { CliLocator.locate(it) },
 ): List<AgentProvider> =
