@@ -47,7 +47,7 @@ class CheckInMessageTest {
     @Test
     fun aReplyFromMessagesReachesTheSameSinkAsTheOverlay() {
         val got = mutableListOf<CheckInReply>()
-        TourController.checkInSink = { got += it }
+        TourController.checkInSink = { reply: CheckInReply -> got.add(reply); Unit }
         CheckInMessages.replies.forEach { TourController.reply(it) }
         assertEquals(CheckInReply.entries, got)
     }
