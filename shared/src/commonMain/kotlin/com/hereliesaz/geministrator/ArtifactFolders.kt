@@ -42,48 +42,49 @@ object ArtifactFolderHost {
 
 /** Each project's folder and switch, on this device. */
 object ArtifactFolderSettings {
-    private val settings by lazy { Settings() }
+    // Null where the platform has no settings store yet (a unit test without an Android context): the feature is then simply off.
+    private val settings: Settings? by lazy { runCatching { Settings() }.getOrNull() }
 
     /** Bumped on every change, so a screen reading the settings redraws. */
     var changes: Int by mutableStateOf(0)
         private set
 
     fun folder(projectId: String): ArtifactFolderRef? {
-        val ref = settings.getStringOrNull(key(projectId, "ref"))?.takeIf(String::isNotBlank) ?: return null
-        return ArtifactFolderRef(ref, settings.getStringOrNull(key(projectId, "name")).orEmpty().ifBlank { ref })
+        val ref = settings?.getStringOrNull(key(projectId, "ref"))?.takeIf(String::isNotBlank) ?: return null
+        return ArtifactFolderRef(ref, settings?.getStringOrNull(key(projectId, "name")).orEmpty().ifBlank { ref })
     }
 
     fun setFolder(projectId: String, folder: ArtifactFolderRef?) {
         if (folder == null) {
-            settings.remove(key(projectId, "ref"))
-            settings.remove(key(projectId, "name"))
-            settings.remove(key(projectId, "auto"))
+            settings?.remove(key(projectId, "ref"))
+            settings?.remove(key(projectId, "name"))
+            settings?.remove(key(projectId, "auto"))
         } else {
-            settings.putString(key(projectId, "ref"), folder.ref)
-            settings.putString(key(projectId, "name"), folder.displayName)
+            settings?.putString(key(projectId, "ref"), folder.ref)
+            settings?.putString(key(projectId, "name"), folder.displayName)
         }
         changes += 1
     }
 
     /** Whether artifacts are saved as they are made (only ever true with a folder). */
-    fun automatic(projectId: String): Boolean = folder(projectId) != null && settings.getBoolean(key(projectId, "auto"), false)
+    fun automatic(projectId: String): Boolean = folder(projectId) != null && settings?.getBoolean(key(projectId, "auto"), false) == true
 
     fun setAutomatic(projectId: String, on: Boolean) {
-        settings.putBoolean(key(projectId, "auto"), on)
+        settings?.putBoolean(key(projectId, "auto"), on)
         changes += 1
     }
 
     /** The artifacts of [runId] already written, so saving as they are made never writes one twice. */
     fun saved(runId: String): Set<String> =
-        settings.getStringOrNull("aive.artifacts.saved.$runId").orEmpty().split('\n').filter(String::isNotBlank).toSet()
+        settings?.getStringOrNull("aive.artifacts.saved.$runId").orEmpty().split('\n').filter(String::isNotBlank).toSet()
 
     fun markSaved(runId: String, ids: Collection<String>) {
         if (ids.isEmpty()) return
-        settings.putString("aive.artifacts.saved.$runId", (saved(runId) + ids).joinToString("\n"))
+        settings?.putString("aive.artifacts.saved.$runId", (saved(runId) + ids).joinToString("\n"))
     }
 
     /** Forgets what was written for [runId] (so a test, or a keeper who emptied the folder, starts clean). */
-    internal fun forgetSaved(runId: String) = settings.remove("aive.artifacts.saved.$runId")
+    internal fun forgetSaved(runId: String) = settings?.remove("aive.artifacts.saved.$runId")
 
     private fun key(projectId: String, part: String) = "aive.artifacts.folder.$projectId.$part"
 }

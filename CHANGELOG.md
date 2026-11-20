@@ -4,6 +4,8 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.91 — from 2026-11-19
 
+- **The Android unit tests pass again.** Run 3208 passed every shared, desktop and provider test and failed only `AndroidWorkflowLifecycleSmokeTest` (a null pointer and a launch timeout): the artifact-folder settings (#983) built a platform `Settings()` on the first publish, which has no store in a unit test, and that failure was outside any guard. The store is now optional there and the feature is simply off when it is missing. Not run here; main CI is the compile.
+
 - **The tour card says where things stand.** Under its eyebrow the card now reads "Done: N. Left: M." (what is done and what is left, never a score or a question), the way the keeper's own mural app states what a surface still needs. Not run here; main CI is the compile.
 
 - **The queen keeps watching the keeper while the lesson creatures supply the chapters.** The director used to end the moment a creature handed in a lesson, so nothing asked "With me so far?" or reported progress for creature-made lessons. It now stays in its loop in that mode: it reads the played lessons from the tour's state, asks, updates and slows down as before, and writes no lesson and adds no closing chapter itself. Not run here; main CI is the compile.
