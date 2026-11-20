@@ -2035,7 +2035,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="swarm_the_role_runs_as_an_ai">The role runs as an AI agent. Choose a source or leave it on Auto.</string>
     <string name="swarm_the_runner_receives_aive_context_aive">The runner receives aive_context, aive_script, and aive_language by default. aive_context includes attached surfaces; aive-result.json may return surfaceMutations.</string>
     <string name="swarm_the_workflow_receives_the_role_task">The workflow receives the role/task payload as JSON in the configured context input.</string>
-    <string name="swarm_these_are_aive_s_semantic_orchestration">These are The Aive's semantic orchestration roles. Each role can run through an AI source, GitHub Actions, local JavaScript, or a JavaScript/Python GitHub runner while keeping the same role identity and task contract.</string>
+    <string name="swarm_these_are_aive_s_semantic_orchestration">These are the roles your creatures can take. Each can think with an AI source, work in GitHub Actions, or run local JavaScript or Python, and keeps the same job and the same promise of what it delivers.</string>
     <string name="swarm_this_id_is_reserved_by_the">This ID is reserved by The Aive.</string>
     <string name="swarm_this_restores_aive_s_default_role">This restores The Aive's default role definitions and default order. Custom roles are removed from the active roles but kept internally for historical swarm compatibility.</string>
     <string name="swarm_unnamed_surface">Unnamed surface</string>
