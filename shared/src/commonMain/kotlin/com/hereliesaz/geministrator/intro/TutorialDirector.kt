@@ -181,7 +181,17 @@ class TutorialDirector(
             while (true) {
                 val st = surface.state ?: return TutorialOutcome.Ended(lessons.size, dropped, finished = false)
                 if (st.phase == TourPhase.Dismissed) return TutorialOutcome.Ended(lessons.size, dropped, finished = false)
-                if (creaturesSupply()) return TutorialOutcome.Ended(lessons.size, dropped, finished = false)
+                // The swarm's own lesson creatures supply the chapters (tour/LessonArtifactBridge.kt): they are played from the tour's state, and
+                // this loop only keeps the queen's attention on the keeper (check-ins, progress, pace); it writes no lesson and adds no closing one.
+                val creatures = creaturesSupply()
+                if (creatures) {
+                    lessons.clear()
+                    lessons.addAll(st.lessons)
+                    total = st.total
+                    closingAdded = true
+                    dropped = 0
+                }
+                val planned = if (creatures) st.total else head + steps.size + tail
 
                 // Answers to an open check-in: plain transitions, no model.
                 var repliedNow = false
@@ -228,7 +238,7 @@ class TutorialDirector(
                     lastIndex = now.index
                 }
 
-                if (now.finished && closingAdded && lessons.size + dropped >= head + steps.size + tail) {
+                if (now.finished && closingAdded && lessons.size + dropped >= planned) {
                     val last = lessons.lastOrNull()
                     if (last != null && !closingAnswered) {
                         if (!closing) {
@@ -255,7 +265,7 @@ class TutorialDirector(
                     return TutorialOutcome.Ended(lessons.size, dropped, finished = true, reached = reached)
                 }
                 // Every step was dropped: nothing to show, and nothing is invented in its place.
-                if (total == 0 && closingAdded && lessons.size + dropped >= head + steps.size + tail) return TutorialOutcome.Ended(lessons.size, dropped, finished = false)
+                if (total == 0 && closingAdded && lessons.size + dropped >= planned) return TutorialOutcome.Ended(lessons.size, dropped, finished = false)
 
                 // The queen's attention: say nothing, update, ask, or slow down, from signals alone (pure; no model call).
                 val shownIndex = now.index - 1
@@ -309,7 +319,7 @@ class TutorialDirector(
                     closingChapters.forEach { chapter -> lessons += chapter; surface.addLesson(chapter) }
                     continue
                 }
-                if (next < steps.size && now.index >= lessons.size - 1) {
+                if (!creatures && next < steps.size && now.index >= lessons.size - 1) {
                     val step = steps[next]
                     val row = rows.first { it.id == step.target }
                     val ctx = LessonContext(
