@@ -41,4 +41,6 @@ The keeper may write a memory of their own. It is banked into the selected swarm
 
 `memory/MemoryWeb.kt` (the model: graph, notes, markdown, files), `memory/MemoryWebLayout.kt` (a deterministic force layout with grid-based repulsion), `MemoryWebView.kt` (the screen), `MemoryLayerController.webSource` and `bankKeeperMemory`.
 
-The model also writes each note as a markdown file with front matter and `[[links]]` (`MemoryWeb.files`), one folder per family, for opening in Obsidian; a button for that is not in the screen yet.
+## Open in Obsidian
+
+The Memory Web's **Open in Obsidian** section exports the web as a folder of markdown notes: one `<title>.md` per memory, with front matter (id, group, kind, size, sources) and `[[links]]` and backlinks. Choose a folder once (the same folder picker as artifact folders, kept under its own key on this device); each **Export notes** writes into a new subfolder of it, `Memory Web <UTC date and time>`, so a later export never numbers a file and breaks the first one's links. Open the folder as a vault in Obsidian. It is a read-only copy: the bank stays the source of truth and changes made in Obsidian do not come back. Not offered on the web, which has no folder service. The code is `MemoryWebExport.kt` over `MemoryWeb.notes` / `MemoryWeb.markdown`.

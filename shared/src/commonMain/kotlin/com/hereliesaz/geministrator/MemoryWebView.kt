@@ -53,6 +53,16 @@ import com.hereliesaz.geministrator.resources.memory_web_backlinks
 import com.hereliesaz.geministrator.resources.memory_web_close
 import com.hereliesaz.geministrator.resources.memory_web_count
 import com.hereliesaz.geministrator.resources.memory_web_empty
+import com.hereliesaz.geministrator.resources.memory_web_export_failed
+import com.hereliesaz.geministrator.resources.memory_web_exported_partial
+import com.hereliesaz.geministrator.resources.memory_web_exported
+import com.hereliesaz.geministrator.resources.memory_web_export_go
+import com.hereliesaz.geministrator.resources.memory_web_export_change
+import com.hereliesaz.geministrator.resources.memory_web_export_choose
+import com.hereliesaz.geministrator.resources.memory_web_export_current
+import com.hereliesaz.geministrator.resources.memory_web_export_none
+import com.hereliesaz.geministrator.resources.memory_web_export_hint
+import com.hereliesaz.geministrator.resources.memory_web_export_title
 import com.hereliesaz.geministrator.resources.memory_web_filter
 import com.hereliesaz.geministrator.resources.memory_web_fit
 import com.hereliesaz.geministrator.resources.memory_web_group_category
@@ -193,6 +203,7 @@ internal fun MemoryWebContent(source: com.hereliesaz.geministrator.memory.Memory
         }
         selected?.let { id -> notes[id] }?.let { note -> NotePanel(note, onSelect = { selected = it }, onClose = { selected = null }) }
         WriteMemory(onBank)
+        if (source != null && ArtifactFolderHost.service != null) ExportControls(source)
     }
 }
 
@@ -433,5 +444,51 @@ private fun LinkSection(title: String, links: List<com.hereliesaz.geministrator.
         links.take(LINKS_SHOWN).forEachIndexed { index, link ->
             AzphaltPill(label = link.title.take(40), seed = "web-link-$title-$index", endCap = link.relation, onClick = { onSelect(link.target) })
         }
+    }
+}
+
+/** Open in Obsidian: choose a folder once, then export the web into a new subfolder of it each time. */
+@OptIn(ExperimentalLayoutApi::class, kotlin.time.ExperimentalTime::class)
+@Composable
+private fun ExportControls(source: com.hereliesaz.geministrator.memory.MemoryWebSource) {
+    // Read through the counter so a change anywhere redraws this.
+    @Suppress("UNUSED_VARIABLE") val changes = ArtifactFolderSettings.changes
+    val service = ArtifactFolderHost.service ?: return
+    val folder = ArtifactFolderSettings.folder(MemoryWebExport.FOLDER_KEY)
+    val scope = rememberCoroutineScope()
+    var message by remember { mutableStateOf<String?>(null) }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(Res.string.memory_web_export_title).uppercase(), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+        Text(stringResource(Res.string.memory_web_export_hint), style = AzphaltType.body, color = azphaltOnSurface())
+        Text(
+            if (folder == null) stringResource(Res.string.memory_web_export_none) else stringResource(Res.string.memory_web_export_current, folder.displayName),
+            style = AzphaltType.body,
+            color = azphaltOnSurface(),
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            AzphaltPill(
+                label = stringResource(if (folder == null) Res.string.memory_web_export_choose else Res.string.memory_web_export_change),
+                seed = "web-export-folder",
+                onClick = { scope.launch { service.chooseFolder()?.let { ArtifactFolderSettings.setFolder(MemoryWebExport.FOLDER_KEY, it) } } },
+            )
+            if (folder != null) {
+                AzphaltPill(
+                    label = stringResource(Res.string.memory_web_export_go),
+                    seed = "web-export-go",
+                    onClick = {
+                        scope.launch {
+                            val subfolder = MemoryWebExport.subfolderFor(MemoryWebExport.stampOf(kotlin.time.Clock.System.now().toEpochMilliseconds()))
+                            val result = MemoryWebExport.export(source, subfolder)
+                            message = when {
+                                result.noFolder || result.written == 0 -> getString(Res.string.memory_web_export_failed)
+                                result.failed == 0 -> getString(Res.string.memory_web_exported, result.written, subfolder)
+                                else -> getString(Res.string.memory_web_exported_partial, result.written, result.failed)
+                            }
+                        }
+                    },
+                )
+            }
+        }
+        message?.let { Text(it, style = AzphaltType.body, color = azphaltOnSurface(), modifier = Modifier.azphaltLiveRegion()) }
     }
 }
