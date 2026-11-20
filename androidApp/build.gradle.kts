@@ -11,21 +11,6 @@ plugins {
 }
 
 val brandSourceLogo = rootProject.layout.projectDirectory.file("branding/aive_logo.png")
-val generatedAndroidBrandResDir = layout.buildDirectory.dir("generated/brand/android/res")
-val generateAndroidBrandAssets = tasks.register("generateAndroidBrandAssets") {
-    inputs.files(brandSourceLogo)
-    outputs.dir(generatedAndroidBrandResDir)
-    doLast {
-        // Start clean so assets dropped from the pipeline never linger.
-        generatedAndroidBrandResDir.get().asFile.deleteRecursively()
-        val outputDir = generatedAndroidBrandResDir.get().asFile.resolve("drawable")
-        BrandAssets.generateSplashLogo(
-            logoSource = brandSourceLogo.asFile,
-            outputDir = outputDir,
-        )
-    }
-}
-
 /** Registers a `cargo ndk` build of the Rust crate in [crateDir] for the app's Android ABIs. */
 fun registerAndroidRustLibrary(
     name: String,
@@ -193,7 +178,6 @@ android {
     // AGP 9.4 no longer permits Provider instances through the legacy SourceSet API.
     // Resolve only deterministic build-directory paths here; task dependencies are declared below.
     sourceSets.getByName("main").apply {
-        res.srcDir(generatedAndroidBrandResDir.get().asFile)
         jniLibs.srcDir(generatedAndroidBitcosJniDir.get().asFile)
         jniLibs.srcDir(generatedAndroidDjlTokenizerJniDir.get().asFile)
         jniLibs.srcDir(generatedAndroidProotJniDir.get().asFile)
@@ -269,10 +253,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
     }
-}
-
-tasks.named("preBuild") {
-    dependsOn(generateAndroidBrandAssets)
 }
 
 // BITCOS is the only Android native runtime. Mascots are pure Compose 2D puppets.

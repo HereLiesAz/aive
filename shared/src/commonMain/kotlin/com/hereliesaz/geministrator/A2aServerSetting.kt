@@ -37,7 +37,7 @@ data class A2aProviderCardSetting(
 /**
  * **Open to this network** (docs/A2A.md): off by default even while the server is on. While on,
  * other computers can reach the server, each needing the token and the keeper's allowance.
- * Traffic is plain HTTP, so the warning beside the switch is always shown.
+ * Traffic is HTTPS with a self-signed certificate, so the other computer must pin [A2aLanSetting.certificateFingerprint].
  */
 data class A2aLanSetting(
     val enabled: Boolean,
@@ -50,6 +50,8 @@ data class A2aLanSetting(
     val onEnabledChange: (Boolean) -> Unit,
     val onAllowClient: (String) -> Unit,
     val onForgetClient: (String) -> Unit,
+    /** SHA-256 fingerprint of the certificate to pin; null while off. */
+    val certificateFingerprint: String? = null,
 )
 
 sealed interface A2aServerStatus {

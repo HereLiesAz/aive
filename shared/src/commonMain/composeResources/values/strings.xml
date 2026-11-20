@@ -1739,8 +1739,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="settings_a2a_providers_explicit">You chose this, so it stays as set, even on the network. The card is public: anyone who can reach the server can read it. It never holds keys, tokens, accounts or models.</string>
     <string name="settings_a2a_lan_on">Open to this network</string>
     <string name="settings_a2a_lan_off">Open to this network</string>
-    <string name="settings_a2a_lan_warning">Off unless you turn it on. When on, other computers on this network can reach the A2A server. Each needs the token, and you must allow it here first. The connection is not encrypted: the token and the work sent travel as plain text, so anyone else on this network can read them. Use it only on a network you trust. Each computer can start at most 6 runs a minute.</string>
+    <string name="settings_a2a_lan_warning">Off unless you turn it on. When on, other computers on this network can reach the A2A server, over HTTPS only (on this computer too). Each needs the token, and you must allow it here first. The certificate is one this computer made for itself, so nothing else vouches for it: give the fingerprint below to the other computer and have it pin that, or it cannot tell this server from an impostor. Each computer can start at most 6 runs a minute.</string>
     <string name="settings_a2a_lan_card_url">Agent Card URL on this network</string>
+    <string name="settings_a2a_lan_fingerprint">Certificate fingerprint (SHA-256), to pin</string>
     <string name="settings_a2a_lan_no_address">This computer has no network address right now.</string>
     <string name="settings_a2a_lan_waiting">%1$s has the token and wants to send work. It is refused until you allow it.</string>
     <string name="settings_a2a_lan_allow">Allow %1$s</string>

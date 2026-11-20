@@ -12,12 +12,12 @@ Source: five read-only audits on 2026-11-19. They were fast passes and have gaps
 - [ ] **Apple Developer ID and notarization** for the .dmg. Gatekeeper blocks an unsigned .dmg. Needs your certificate and Apple secrets in CI.
 - [ ] **Windows code signing** for the .msi (SmartScreen "unknown publisher"). Needs a certificate or Azure Trusted Signing.
 - [ ] **Play production track.** The central workflow only reaches the internal track (`publish_play`, default false). Confirm it can promote, or plan a manual promotion in the Play Console. Write the Data safety form.
-- [ ] **CI on pull requests.** The CHANGELOG records "CI builds only on a merge to main" as deliberate. Auditors recommend a `pull_request` build and test run. Your call.
-- [ ] **Keyless free sources on by default** (`KeylessDefaults.kt`): they may log or train on prompts. Keep default-on, or require a switch or a "confidential" flag.
-- [ ] **Desktop A2A server** serves plain HTTP when opened to the network. Keep it out of 1.0, or add TLS.
-- [ ] **Compact creature sheet and `CardFlipSheetHost`** stay bottom sheets (docs/Containment.md). Accept for 1.0?
-- [ ] **Localization:** English only (about 2,281 strings). Accept for 1.0, or add a locale?
-- [ ] **Web app hosting:** deploy to GitHub Pages (or elsewhere), and where.
+- [x] **CI on pull requests.** Decided 2026-11-20: keep (merge to main only).
+- [x] **Keyless free sources on by default.** Decided 2026-11-20: keep default-on.
+- [x] **Desktop A2A server TLS.** Decided 2026-11-20: add TLS. Done: HTTPS with a pinned self-signed certificate (docs/A2A.md).
+- [ ] **Compact creature sheet and `CardFlipSheetHost`** stay bottom sheets. Decided 2026-11-20: accept, but shorten the sheet's height and condense the info on it (in progress).
+- [x] **Localization.** Decided 2026-11-20: keep English only for 1.0.
+- [x] **Web app hosting.** Decided 2026-11-20: GitHub Pages. Wired at `/app/` (first real run is the next merge to main).
 
 ## Blockers
 Release

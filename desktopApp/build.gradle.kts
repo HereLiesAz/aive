@@ -45,10 +45,6 @@ val generateDesktopBrandAssets = tasks.register("generateDesktopBrandAssets") {
             source = brandSourceLogo.asFile,
             outputDir = outputDir,
         )
-        BrandAssets.generateSplashLogo(
-            logoSource = brandSourceLogo.asFile,
-            outputDir = outputDir,
-        )
     }
 }
 

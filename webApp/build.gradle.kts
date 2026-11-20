@@ -20,11 +20,6 @@ val generateWebBrandAssets = tasks.register("generateWebBrandAssets") {
             source = brandSourceLogo.asFile,
             outputDir = outputDir,
         )
-        BrandAssets.generateSplashLogo(
-            logoSource = brandSourceLogo.asFile,
-            outputDir = outputDir,
-            maxDimension = 256,
-        )
     }
 }
 
