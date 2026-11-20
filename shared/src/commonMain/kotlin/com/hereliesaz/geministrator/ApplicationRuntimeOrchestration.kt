@@ -217,10 +217,9 @@ internal fun newWorkflowInstruction(objective: String, repository: RepositoryRef
     }
     if (TEACHING_WORDS.containsMatchIn(objective)) {
         append(" The objective is to teach: plan a survey of the material, a curriculum ordered by prerequisites, then one step per major part")
-        append(" that explains it with examples and ends with a few questions the keeper can answer for themselves (size the plan to the material).")
-        append(" Each step's result is text the keeper reads, so require no approval unless a step changes something.")
-        append(" No step can see or test the keeper: plan no quiz, no verification of understanding and no step that judges whether the keeper did a task or answered,")
-        append(" because a reviewer asked to judge that can only reject it and the swarm fails.")
+        append(" that explains it with examples (size the plan to the material). Each step's result is text the keeper reads, so require no approval unless a step changes something.")
+        append(" The keeper is never asked to answer, do or prove anything: plan no quiz, no questions for the keeper, no verification of understanding and no step that judges")
+        append(" whether the keeper did a task or answered, because no step can see the keeper and a reviewer asked to judge that can only reject it, which fails the swarm.")
     }
     if (availableTools.isNotEmpty()) append(com.hereliesaz.geministrator.research.RESEARCH_PLAN_INSTRUCTION)
 }
