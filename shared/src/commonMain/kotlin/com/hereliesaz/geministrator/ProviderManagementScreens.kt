@@ -50,6 +50,7 @@ import com.hereliesaz.geministrator.resources.keeper_a2a_agent_card_url
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_explain
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_remove
 import com.hereliesaz.geministrator.resources.keeper_a2a_agent_suggestions
+import com.hereliesaz.geministrator.resources.keeper_a2a_seed_seen
 import com.hereliesaz.geministrator.resources.keeper_agent_directory_query
 import com.hereliesaz.geministrator.resources.keeper_agent_directory_help
 import com.hereliesaz.geministrator.resources.keeper_agent_directory_search
@@ -662,7 +663,7 @@ internal fun ProviderSettingsScreen(
                     val example = AgentDirectoryEntry(
                         cardUrl = seed.cardUrl,
                         name = seed.name,
-                        description = "${seed.about} · Run by ${seed.runBy}",
+                        description = "${seed.about} · Run by ${seed.runBy} · ${stringResource(Res.string.keeper_a2a_seed_seen, seed.verified.substringBefore(':'))}",
                         skills = emptyList(),
                         source = "",
                     )
