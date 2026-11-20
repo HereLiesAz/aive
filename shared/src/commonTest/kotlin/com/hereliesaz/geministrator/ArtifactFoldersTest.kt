@@ -119,6 +119,7 @@ class ArtifactFoldersTest {
     fun savingAsTheyAreMadeNeverWritesTheSameArtifactTwice() = runBlocking {
         val recorder = Recorder().also { ArtifactFolderHost.service = it }
         ArtifactFolderSettings.setFolder("p", ArtifactFolderRef("/chosen", "chosen"))
+        ArtifactFolderSettings.forgetSaved(run.id.value)
         val first = listOf(entry("a", "Implement", "one"))
         ArtifactSaver.save("p", definition, run, 1, first, onlyUnsaved = true)
         ArtifactSaver.save("p", definition, run, 1, first + entry("b", "Implement", "two"), onlyUnsaved = true)

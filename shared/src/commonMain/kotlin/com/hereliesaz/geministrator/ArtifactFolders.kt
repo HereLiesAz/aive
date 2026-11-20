@@ -82,6 +82,9 @@ object ArtifactFolderSettings {
         settings.putString("aive.artifacts.saved.$runId", (saved(runId) + ids).joinToString("\n"))
     }
 
+    /** Forgets what was written for [runId] (so a test, or a keeper who emptied the folder, starts clean). */
+    internal fun forgetSaved(runId: String) = settings.remove("aive.artifacts.saved.$runId")
+
     private fun key(projectId: String, part: String) = "aive.artifacts.folder.$projectId.$part"
 }
 
