@@ -127,14 +127,26 @@ object CliRunResultParser {
             val at = lines.indexOfLast { it.startsWith("AIVE-INSTALL $nonce ") }
             if (at < 0) return CliInstallOutcome(false, "The install printed no result.")
             val code = lines[at].substringAfterLast(' ').toIntOrNull() ?: -1
-            val tail = oneLine(lines.drop(at + 1).takeWhile { it != "AIVE-INSTALL-END $nonce" }.joinToString(" "))
-            if (code == 0) CliInstallOutcome(true, "Installed.") else CliInstallOutcome(false, "npm exit $code: ${tail.ifBlank { "no output" }}")
+            val body = lines.drop(at + 1).takeWhile { it != "AIVE-INSTALL-END $nonce" }
+            // What failed is at the end of an installer's output, after its progress chatter: the error lines if there are any, else the
+            // last of it. Cutting from the start would keep the chatter and lose the reason.
+            val errors = body.filter { line -> ERROR_LINE.containsMatchIn(line) }
+            val tail = oneLine((if (errors.isNotEmpty()) errors else body.takeLast(LAST_LINES)).joinToString(" "), fromEnd = true)
+            if (code == 0) CliInstallOutcome(true, "Installed.") else CliInstallOutcome(false, "exit $code: ${tail.ifBlank { "no output" }}")
         } catch (failure: Exception) {
             CliInstallOutcome(false, "The install result could not be read.")
         }
     }
 
-    private fun oneLine(text: String): String = text.map { if (it.isISOControl()) ' ' else it }.joinToString("").replace(Regex("\\s+"), " ").trim().take(MAX_FIELD_CHARS)
+    private fun oneLine(text: String, fromEnd: Boolean = false): String {
+        val flat = text.map { if (it.isISOControl()) ' ' else it }.joinToString("").replace(Regex("\\s+"), " ").trim()
+        return if (fromEnd) flat.takeLast(MAX_FIELD_CHARS) else flat.take(MAX_FIELD_CHARS)
+    }
+
+    /** apt's and npm's own error lines ("E: Unable to locate package", "Err:1 ...", "npm ERR! ...", "dpkg: error ..."). */
+    private val ERROR_LINE = Regex("^(E:|Err:|W: Failed|npm ERR|dpkg: error)|\\bE404\\b|\\bENOTFOUND\\b|\\bETIMEDOUT\\b|\\bEAI_AGAIN\\b")
+
+    private const val LAST_LINES = 6
 
     private fun malformed(reason: String) = CliRunResult(
         status = CliRunStatus.Malformed, exitCode = -1, reason = reason, branch = "", commit = "", answer = "", answerIsError = true,
