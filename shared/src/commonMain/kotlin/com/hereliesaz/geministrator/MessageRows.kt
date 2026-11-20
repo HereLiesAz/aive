@@ -100,6 +100,15 @@ internal sealed interface MessageRow {
         override val countsToBadge: Boolean get() = note.countsToBadge
     }
 
+    /**
+     * The tutorial's "With me so far?" check-in, asked as a question that waits on the keeper, answered with the same four
+     * quick replies as the overlay ([com.hereliesaz.geministrator.tour.CheckInMessages]). It waits on the keeper's feeling only.
+     */
+    data class TourCheckIn(val message: com.hereliesaz.geministrator.tour.CheckInMessage) : MessageRow {
+        override val key: String get() = message.key
+        override val countsToBadge: Boolean get() = true
+    }
+
     /** The run shown is an isolated practice run of one of the Nanny's solutions: progress only, no decision. */
     data class PracticeRun(override val key: String) : MessageRow {
         override val countsToBadge: Boolean get() = false
@@ -111,15 +120,19 @@ internal sealed interface MessageRow {
  * swarm and is listed alone (as the badge's keys are: [inboxItemKeys]); otherwise the practice run
  * comes first, then each creature that waits, in plan order.
  */
-internal fun messageRows(presentation: LiveWorkflowPresentation): List<MessageRow> {
+internal fun messageRows(
+    presentation: LiveWorkflowPresentation,
+    checkIn: com.hereliesaz.geministrator.tour.CheckInMessage? = null,
+): List<MessageRow> {
     val run = presentation.run
     val stop = run.spendPause
     if (stop != null && !run.status.isTerminal()) return listOf(MessageRow.AllowanceStop(spendStopInboxKey(run, stop)))
     val pause = run.globalPause
     if (pause != null) return listOf(MessageRow.Freeze(pauseInboxKey(run, pause)))
     val waits = inboxEntries(presentation).map { MessageRow.Wait(it) }
+    val tour = listOfNotNull(checkIn?.let { MessageRow.TourCheckIn(it) })
     val queen = presentation.queen.filter { it.attachedTo == null }.map { MessageRow.Queen(it) }
-    return if (isHallMonitorTrial(presentation)) listOf(MessageRow.PracticeRun("practice|${run.id.value}")) + waits + queen else waits + queen
+    return if (isHallMonitorTrial(presentation)) listOf(MessageRow.PracticeRun("practice|${run.id.value}")) + waits + tour + queen else waits + tour + queen
 }
 
 /** The row to show: the one remembered as selected while it is listed, else the first. */

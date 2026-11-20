@@ -116,7 +116,9 @@ private fun inboxKey(run: WorkflowRun, taskRun: com.hereliesaz.geministrator.dom
 
 /** The Inbox items for whatever the application is showing; none unless a run is live. */
 internal fun inboxItemKeys(state: ApplicationRuntimeState): List<String> =
-    (state as? ApplicationRuntimeState.Live)?.presentation?.let { inboxItemKeys(it.run) + queenSuggestionKeys(it) }.orEmpty()
+    (state as? ApplicationRuntimeState.Live)?.presentation
+        ?.let { inboxItemKeys(it.run) + queenSuggestionKeys(it) + listOfNotNull(com.hereliesaz.geministrator.tour.CheckInMessages.of(com.hereliesaz.geministrator.tour.TourController.state)?.key) }
+        .orEmpty()
 
 /**
  * The Messages keys of the queen's open suggestions: each one waits on the keeper's decision, so it counts toward the
