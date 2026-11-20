@@ -221,6 +221,17 @@ internal fun newWorkflowInstruction(objective: String, repository: RepositoryRef
         append(" The keeper is never tested: the only thing ever asked of them is qualitative, like \"With me so far?\", and that is asked outside the plan.")
         append(" Plan no quiz, no question about what the keeper knows, no verification of understanding and no step that judges whether the keeper did a task or answered,")
         append(" because no step can see the keeper and a reviewer asked to judge that can only reject it, which fails the swarm.")
+        if (com.hereliesaz.geministrator.intro.TutorialRouter.isTutorialGoal(objective)) {
+            // The tutorial hive is both the lesson and its writer: each lesson creature hands in the overlay itself (tour/LessonArtifactBridge.kt).
+            append(" Each step that teaches one control of the app must END its output with exactly one JSON line, a lesson payload, and nothing after it:")
+            append(" {\"target\":\"<a registered control id>\",\"sentence\":\"<one short instruction>\",\"expect\":{\"type\":\"tapped\",\"target\":\"<the same id>\"},")
+            append("\"explain\":\"<a few sentences>\",\"ifMissed\":\"<a hint>\",\"checkIn\":\"<one short question ending in ?>\",\"anotherWay\":\"<the same, said another way>\",")
+            append("\"smaller\":[\"<tiny move one>\",\"<tiny move two>\"]}.")
+            append(" The registered control ids are: ")
+            append(com.hereliesaz.geministrator.tour.TourTargetId.entries.map { it.name }.filter { it != "HIVE_CREATURES" && it != "HIVE_MADE" }.joinToString(", "))
+            append(". Use only those.")
+            append(" The checkIn only asks how the keeper feels (for example \"With me so far?\"), never what they know. A payload that breaks the lesson rules is turned back and the step is done again.")
+        }
     }
     if (availableTools.isNotEmpty()) append(com.hereliesaz.geministrator.research.RESEARCH_PLAN_INSTRUCTION)
 }

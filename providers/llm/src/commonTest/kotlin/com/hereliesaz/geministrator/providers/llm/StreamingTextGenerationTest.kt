@@ -99,7 +99,9 @@ class StreamingTextGenerationTest {
             when {
                 "adaptive" in body -> {
                     if (++firstRound == 2) bothArrived.complete(Unit)
-                    bothArrived.await()
+                    // Bounded: an engine that handles one request at a time never lets the second arrive, and then the streams
+                    // simply run one after the other (virtual time, so this costs nothing) instead of waiting for each other forever.
+                    kotlinx.coroutines.withTimeoutOrNull(5_000) { bothArrived.await() }
                     respond("""{"error":{"message":"thinking.type adaptive is not supported"}}""", HttpStatusCode.BadRequest)
                 }
                 "budget_tokens" in body -> sse(

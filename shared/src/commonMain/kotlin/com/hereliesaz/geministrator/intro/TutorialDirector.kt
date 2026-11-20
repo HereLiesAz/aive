@@ -96,6 +96,11 @@ class TutorialDirector(
     /** The chapter that ends the tour, added once every chapter the swarm planned has been written. */
     private val closingChapters: List<LessonPayload> = emptyList(),
     private val tick: suspend () -> Unit = { delay(POLL_MILLIS) },
+    /**
+     * True once a lesson creature of the run has handed in a lesson (tour/LessonArtifactBridge.kt): the swarm then writes the lessons
+     * and this in-process writer steps aside. It stays the fallback when no creature supplies one.
+     */
+    private val creaturesSupply: () -> Boolean = { false },
 ) {
     suspend fun run(goal: String, scope: TutorialScope, runKey: String?): TutorialOutcome {
         val head = opening.size
@@ -176,6 +181,7 @@ class TutorialDirector(
             while (true) {
                 val st = surface.state ?: return TutorialOutcome.Ended(lessons.size, dropped, finished = false)
                 if (st.phase == TourPhase.Dismissed) return TutorialOutcome.Ended(lessons.size, dropped, finished = false)
+                if (creaturesSupply()) return TutorialOutcome.Ended(lessons.size, dropped, finished = false)
 
                 // Answers to an open check-in: plain transitions, no model.
                 var repliedNow = false
