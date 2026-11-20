@@ -112,3 +112,18 @@ Today: a hint layer rings static controls while the hive fed the same goal is an
 Decisions (keeper, 2026-11-18): a fixed opening begins at once while the swarm writes the rest, and the swarm continues the tour on its own. "Fully immersive, not simple written text": a chapter is something the keeper sees and does in the real app (creature cards moving, hand-offs lighting up, a real decision to make, a real artifact to open), with the narration beside it, never a card of text.
 - Opening (fixed, instant): the tour hive hatches on screen with the keeper watching; the opening chapters are the real hatching, first hand-off and first message, spotlit.
 - Continuation (swarm-made): the Planner and Writer extend the chapter list from what the run has shown so far, paced by the Source.
+
+## Spec decisions page: audit of 2026-11-20 (90 items; the keeper's answers over the recommended option)
+Built or already true: D5, D7, D8, D11, D13, D14, D18, D19, D21, D32, D33, D34 and, from this pass, D1 (steps, not jobs), D2 (project strings), D6 (Trust, approval), D9, D10, D20, D26, D27, D31, N8, N14, tutorial D18 and D24. No code by decision: D22, D23.
+- [ ] D3: the noun for one execution is "swarm" (verb and noun); about 120 strings still say "run" (`hive_run_number`, `hive_stop_run`, `runs_workflow_*`, ...). A string-by-string pass: verb uses of "run" stay.
+- [ ] D4: Rest and Wake for the keeper's pause (`hive_pause_run`, `hive_resume_run` say Pause and Resume); Feed must state its amount, and Feed is still the objective verb ("Feed it").
+- [ ] D12 and D35: a "More" group in the Keeper's room, and one "Show engineering names" switch in Appearance that shows Hall Monitor, A2A and workflow beside the plain names.
+- [ ] D16: the queen is a required creature: auto-added on a new swarm, added when an imported swarm without one is opened, validation blocks launch without one (`RoleSuggestions.kt` only suggests one today).
+- [ ] D17: the neighborhood (Project) gains a `goal`; the keeper's D2 ruling (project = neighborhood) conflicts with "project becomes the hive", so ask which entity carries the goal.
+- [ ] D24, D25: the registry's "saw it answer on <date>" needs a health date from searcha2a; check that an orphan-backed creature's budget reads "not reported" and that an orphan counts as unpriced in the Allowance.
+- [ ] D29, D30: pack support in the Shop's All list (`pack` is parsed in `AzphaltStoreModels.kt` and nothing reads it); hide companion app, script, composable, font and editor kinds.
+- [ ] D15: decide whether trusted creatures skipping the in-run approval satisfies "later runs auto-start only for trusted creatures".
+- [ ] N5: seven role ids ship in two Azphalt packages with different instructions; keep the longer one and rename the other as a variant.
+- [ ] N10: the Ollama default `gpt-oss:120b` needs credits; pick a smaller model that runs free and say on the card that it is local.
+- [ ] N13: retire the typed-procedure milestones (`memory/procedural/ProcedureStore` and friends) now that habits are memory; the keeper's rule is to consolidate and justify rather than remove, so propose before deleting.
+- [ ] Tutorial D16, D19: check-ins are only in the overlay; they should ride the existing question path into Messages. D12: the extra "Teach me" controls (About, the first form's pill) contradict "first run only". D21, D22, D30 to D34, D39, D41, D42: the queen as a creature in the tutorial (Bring: role, optional creatures, rulings, call budget, degrade ladder); blocked on the keeper's D40 question ("how does the queen keep up with progress and know when to ask?"). D37 and D38 are met: the tutorial hive is the first hive and a lesson goal is never a question.

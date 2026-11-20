@@ -27,12 +27,15 @@ internal object TutorialLaunch {
         return TutorialVoice(role.name, voiceModel(base, role.name, role.instructions))
     }
 
-    /** The Reviewer and, when the keeper has not switched her off, the Antagonist. */
-    fun reviewers(base: QueenModel, roles: Collection<RoleDefinition>): List<TutorialVoice> = buildList {
+    /**
+     * The Reviewer, and the Antagonist only when the queen brings her ([bringAntagonist], decisions page D24 and N11): a blunt
+     * reader is not the first thing a first-timer meets. Nothing in the teaching launch asks for her yet, so she is not here
+     * by default; a keeper who has switched her off in the Roster never gets her.
+     */
+    fun reviewers(base: QueenModel, roles: Collection<RoleDefinition>, bringAntagonist: Boolean = false): List<TutorialVoice> = buildList {
         add(voice(base, roles, BuiltInRoles.Reviewer))
-        // The Antagonist reads the plan too, unless the keeper has switched her off in the Roster.
         val mine = roles.firstOrNull { it.id == BuiltInRoles.Antagonist.id }
-        if (mine == null || mine.enabled) add(voice(base, roles, BuiltInRoles.Antagonist))
+        if (bringAntagonist && (mine == null || mine.enabled)) add(voice(base, roles, BuiltInRoles.Antagonist))
     }
 
     fun planner(base: QueenModel, roles: Collection<RoleDefinition>): QueenModel = voice(base, roles, BuiltInRoles.Planner).model

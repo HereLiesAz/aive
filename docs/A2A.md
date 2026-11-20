@@ -3,7 +3,7 @@
 The Aive speaks Google's [Agent2Agent protocol](https://a2a-protocol.org) over its JSON-RPC binding, in both directions:
 
 - **Client:** a role can delegate its task to a remote A2A agent.
-- **Server (desktop only, on by default, this computer only):** other agents on the same computer that hold its token can start runs in The Aive. **Open to this network** (off by default) lets allowed computers on the local network do the same.
+- **Server (desktop only, off until the keeper turns it on, this computer only):** other agents on the same computer that hold its token can start runs in The Aive. **Open to this network** (off by default) lets allowed computers on the local network do the same.
 
 The Aive writes the current specification (1.0): `SendMessage`/`GetTask`/`CancelTask`, ProtoJSON enums such as `TASK_STATE_COMPLETED`, and parts without `kind`. It reads both 1.0 and the widely deployed 0.3 (`message/send`, `tasks/get`, `tasks/cancel`, lowercase states, `kind` members). The codec is `shared/.../a2a/A2aProtocol.kt`.
 
@@ -75,7 +75,7 @@ If the agent answers `SendMessage` with a message instead of a task, that messag
 
 It runs on desktop unless the keeper turns it off in **Keeper's room › This device › A2A server**. That row shows the address it listens on, and has **Copy token** and **New token**.
 
-- **On by default, and the choice is kept.** The switch is stored only when the keeper presses it (Java preferences node `com/hereliesaz/aive/a2a-server`, key `enabled`). A device that never pressed it, including one installed while the default was off, gets the server on. A keeper who turned it off keeps it off. The default lives in `a2aServerEnabled` (`A2aServerSetting.kt`).
+- **Off by default, and the choice is kept.** The switch is stored only when the keeper presses it (Java preferences node `com/hereliesaz/aive/a2a-server`, key `enabled`). A device that never pressed it gets the server off, because it opens a port (decisions page, N8); this includes a device that ran it on while the default was on. A keeper who turned it on keeps it on. The default lives in `a2aServerEnabled` (`A2aServerSetting.kt`).
 - **Address.** It listens on loopback only, `http://127.0.0.1:41241`. Set `AIVE_A2A_PORT` to use a different port (1024 to 65535).
 - **Port in use.** If another program holds the port, the server stays off for this session and the row says so in plain words. The rest of The Aive works as usual. It starts off the UI thread, so a slow keychain does not hold up the window.
 - **Requests from browsers.** Requests whose `Host` header is not `127.0.0.1`, `localhost` or `[::1]` are refused, against DNS rebinding. No CORS headers are sent.
@@ -143,7 +143,7 @@ The record (`params`): `format: "aive-hive-card"`, `version: 1`, `hive.name`, `i
 
 - `shared/src/commonTest/.../a2a/A2aProtocolTest.kt`: card JSON shape, both message/task shapes, state and method mapping.
 - `A2aServerTest.kt`: auth refusal, Host check, launch/get/cancel, legacy names, busy rejection, error codes.
-- `A2aServerSettingTest.kt`: on by default, an explicit choice kept.
+- `A2aServerSettingTest.kt`: off by default, an explicit choice kept.
 - `desktopApp/src/test/.../DesktopA2aServerTest.kt`: binds loopback on a free port, serves the card, refuses calls without the token, keeps the token across starts, reports a port in use; open to the network it binds every interface and advertises the network URL, closing it rebinds loopback, an older switch change cannot undo a newer one, and only addresses can be allowed.
 - `A2aServerLanTest.kt`: network callers refused while closed, the card's URL per caller, Host checks, the allowlist and waiting list, the per-client `SendMessage` limit, address normalization.
 - `A2aAgentConnectionsTest.kt`: URL rules and catalog entries.
