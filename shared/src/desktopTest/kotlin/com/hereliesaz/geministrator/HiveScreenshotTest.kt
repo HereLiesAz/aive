@@ -624,8 +624,14 @@ class HiveScreenshotTest {
         shoot("42-memory-simple-phone", 824, 1830) { memory(MemoryView.Simple, true)() }
         shoot("43-memory-technical", 2400, 1500) { memory(MemoryView.Technical, false)() }
         // The Memory Web reads the same bank off the main thread (a layout), so it is given real time to settle.
-        shootSettled("44-memory-web", 2400, 2600, 3_000) { memory(MemoryView.Web, false)() }
+        // A folder service that writes nowhere, so the Open in Obsidian section is drawn.
+        ArtifactFolderHost.service = object : ArtifactFolderService {
+            override suspend fun chooseFolder() = ArtifactFolderRef("/vault", "Obsidian vault")
+            override suspend fun write(folder: String, subfolder: String, fileName: String, content: String): String? = fileName
+        }
+        shootSettled("44-memory-web", 2400, 3000, 3_000) { memory(MemoryView.Web, false)() }
         shootSettled("45-memory-web-phone", 824, 2400, 3_000) { memory(MemoryView.Web, true)() }
+        ArtifactFolderHost.service = null
         DurableUiState.store.putString(MemoryView.STORAGE_KEY, MemoryView.Simple.name)
     }
 
@@ -636,9 +642,9 @@ class HiveScreenshotTest {
         val project = com.hereliesaz.geministrator.domain.Project(ProjectId("aive"), "The Aive", createdAtEpochMillis = 1, updatedAtEpochMillis = 2)
         val live = ApplicationRuntimeState.Live(LiveWorkflowPresentation(project, definition, liveRun, roles))
         val fresh = StableHost(DurableUiStateStore(rootKey = "aive.stable.shot.${System.nanoTime()}")).also { runBlocking { it.load() } }
-        fun page(selected: String?, tab: CreatureTab = CreatureTab.Needs, state: ApplicationRuntimeState = live) = @androidx.compose.runtime.Composable {
+        fun page(selected: String?, tab: CreatureTab = CreatureTab.Needs, state: ApplicationRuntimeState = live, story: Boolean = false) = @androidx.compose.runtime.Composable {
             DurableUiState.store.putBoolean("overview.zoom.district", false)
-            DurableUiState.store.putBoolean("overview.timeline", false)
+            DurableUiState.store.putBoolean("overview.timeline", story)
             DurableUiState.store.putString("overview.resting-hive", "")
             DurableUiState.store.putString("creature.panel.tab", tab.name)
             DurableUiState.store.putString("creature.panel.task", selected.orEmpty())
@@ -669,6 +675,8 @@ class HiveScreenshotTest {
         } finally {
             DurableUiState.store.putBoolean("hive.view.swarm", false)
         }
+        // The Story (timeline) page of a live hive: its controls are the hive's acts as labelled capsules.
+        shoot("36c-story-live", 2880, 1800) { page(null, story = true)() }
         shoot("37-workspace-creature-needs", 2880, 1800) { page("build", CreatureTab.Needs)() }
         shoot("38-workspace-creature-mind", 2880, 1800) { page("build", CreatureTab.Mind)() }
         shoot("39-workspace-creature-gated", 1900, 1500) { page("review", CreatureTab.Needs)() }

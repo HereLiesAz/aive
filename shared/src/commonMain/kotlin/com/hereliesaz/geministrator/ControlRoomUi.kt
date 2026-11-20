@@ -1282,11 +1282,11 @@ private fun MainDestination(
             onDestinationSelected(ControlRoomDestination.Workflows)
         }
     }
-    // On a wide window the live hive's acts ride on the hive's own controls bar; the row above keeps them only for a phone or the timeline.
+    // The live hive's acts ride on the hive's own controls bar as buttons; the Story (timeline) page shows the same acts as labelled capsules.
     val hiveActionsList = run {
         val live = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
             ?.takeIf { destination == ControlRoomDestination.Overview && !district.value && restingHive.value.isBlank() }
-        if (live == null || showTimeline) emptyList() else buildList {
+        if (live == null) emptyList() else buildList {
             if (!live.run.status.isFinished()) {
                 val paused = live.run.keeperPause != null
                 add(
@@ -1308,7 +1308,14 @@ private fun MainDestination(
                     ),
                 )
             }
-            add(HiveAction(HiveGlyph.Timeline, stringResource(Res.string.hive_show_timeline), onClick = { showTimeline = true }))
+            add(
+                HiveAction(
+                    HiveGlyph.Timeline,
+                    stringResource(if (showTimeline) Res.string.hive_show_hive else Res.string.hive_show_timeline),
+                    onClick = { showTimeline = !showTimeline },
+                    selected = showTimeline,
+                ),
+            )
             add(HiveAction(HiveGlyph.Share, hiveCardShareLabel(), onClick = { sharingHiveCard = !sharingHiveCard }, selected = sharingHiveCard))
             add(HiveAction(HiveGlyph.Edit, stringResource(Res.string.hive_more_editing), onClick = { openHiveInWorkflows(null) }))
         }

@@ -16,7 +16,13 @@ import kotlin.math.sqrt
  * Repulsion only looks at nodes in neighbouring cells of a grid, so a bank of thousands of memories costs a few passes of
  * near-linear work, not every pair. Pure and UI-free: it returns positions in a unit-less plane centred on the origin.
  */
-class WebLayout(val positions: Map<String, WebPoint>, val radius: Float)
+class WebLayout(
+    val positions: Map<String, WebPoint>,
+    /** Everything fits inside this. */
+    val radius: Float,
+    /** What Fit frames: the web without its few far-flung outliers, which would otherwise shrink the rest. */
+    val fitRadius: Float = radius,
+)
 
 data class WebPoint(val x: Float, val y: Float)
 
@@ -24,7 +30,7 @@ object MemoryWebLayout {
     /** [iterations] passes of the simulation; more settles larger webs more fully, and costs time linearly. */
     fun layout(graph: WebGraph, iterations: Int = 160): WebLayout {
         val n = graph.nodes.size
-        if (n == 0) return WebLayout(emptyMap(), 0f)
+        if (n == 0) return WebLayout(emptyMap(), 0f, 0f)
         val index = HashMap<String, Int>(n * 2)
         graph.nodes.forEachIndexed { i, node -> index[node.id] = i }
         val x = FloatArray(n)
@@ -125,7 +131,9 @@ object MemoryWebLayout {
             positions[graph.nodes[i].id] = WebPoint(x[i], y[i])
             radius = max(radius, sqrt(x[i] * x[i] + y[i] * y[i]) + radiusOf[i])
         }
-        return WebLayout(positions, radius)
+        val distances = FloatArray(n) { sqrt(x[it] * x[it] + y[it] * y[it]) }.also { it.sort() }
+        val fit = min(radius, distances[min(n - 1, (n * 0.96f).toInt())] + 40f)
+        return WebLayout(positions, radius, fit)
     }
 
     private fun cellKey(px: Float, py: Float, cell: Float): Long =

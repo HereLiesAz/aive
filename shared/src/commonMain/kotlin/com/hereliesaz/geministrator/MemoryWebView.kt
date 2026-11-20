@@ -279,7 +279,7 @@ private fun WebMap(graph: WebGraph, layout: WebLayout?, matching: Set<String>?, 
     val labelStyle = TextStyle(color = Color.White, fontSize = 11.sp)
 
     // Fit the whole web into the canvas, then let the keeper move from there.
-    fun baseScale(): Float = if (layout.radius <= 0f || canvasSize.x <= 0f) 1f else min(canvasSize.x, canvasSize.y) / 2f / layout.radius * 0.95f
+    fun baseScale(): Float = if (layout.fitRadius <= 0f || canvasSize.x <= 0f) 1f else min(canvasSize.x, canvasSize.y) / 2f / layout.fitRadius * 0.95f
     fun toScreen(p: com.hereliesaz.geministrator.memory.WebPoint): Offset {
         val s = baseScale() * scale
         return Offset(canvasSize.x / 2f + pan.x + p.x * s, canvasSize.y / 2f + pan.y + p.y * s)
@@ -371,7 +371,7 @@ private fun WebMap(graph: WebGraph, layout: WebLayout?, matching: Set<String>?, 
             if (at.x < 0f || at.y < 0f || at.x > size.width || at.y > size.height) continue
             if (r < 9f && node.id != selected) continue
             if (matching != null && node.id !in matching) continue
-            val text = measurer.measure(node.title.take(28), labelStyle, maxLines = 1)
+            val text = measurer.measure(node.title, labelStyle, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, constraints = androidx.compose.ui.unit.Constraints(maxWidth = 190))
             val topLeft = Offset(at.x - text.size.width / 2f, at.y + r + 2f)
             val box = androidx.compose.ui.geometry.Rect(topLeft, androidx.compose.ui.geometry.Size(text.size.width.toFloat(), text.size.height.toFloat()))
             // A name that would sit on another name is left out; zoom in and it has room.
