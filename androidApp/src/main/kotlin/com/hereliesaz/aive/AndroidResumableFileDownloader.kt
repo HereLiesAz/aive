@@ -94,6 +94,10 @@ internal class AndroidResumableFileDownloader(
                         throw IOException("Server rejected resume range for ${output.name}")
                     }
 
+                    if (response.status == HttpStatusCode.NotFound || response.status == HttpStatusCode.Gone) {
+                        // Nothing is at that address (a release that was never published): trying again cannot change that.
+                        throw DownloadNotPublishedException("${output.name} is not published at its release address (${response.status.value}); nothing to download yet.")
+                    }
                     check(response.status.isSuccess()) {
                         "Download failed for ${output.name}: ${response.status}"
                     }
@@ -199,6 +203,9 @@ internal class AndroidResumableFileDownloader(
                 return@withContext output
             } catch (cancelled: CancellationException) {
                 throw cancelled
+            } catch (missing: DownloadNotPublishedException) {
+                partial.delete()
+                throw missing
             } catch (failure: Throwable) {
                 lastFailure = failure
                 if (attempt == maxAttempts) break
@@ -282,3 +289,6 @@ internal fun downloadByteLimit(declaredTotal: Long?): Long =
 /** Whether [freeBytes] holds [neededBytes] and still leaves a reserve for the device. */
 internal fun hasRoomFor(neededBytes: Long, freeBytes: Long): Boolean =
     neededBytes <= 0L || freeBytes - FREE_SPACE_RESERVE_BYTES >= neededBytes
+
+/** The file's release address answers "not found": a permanent absence, so the download stops at once and says so. */
+class DownloadNotPublishedException(message: String) : java.io.IOException(message)

@@ -4,6 +4,8 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.91 — from 2026-11-19
 
+- **A download whose file was never published stops at once and says so.** A 404 or 410 from a release address is permanent, so the resumable downloaders (desktop and Android) no longer retry it eight times; they fail with "<file> is not published at its release address". This is what Settings → Local orchestration showed for `aive-orchestration-decisions-int8.tar.gz`: the release `orchestration-decisions-v1` the catalog names does not exist (404), so the model itself still has to be trained and uploaded (`tools/decision_training`). Desktop test `DesktopDownloadNotPublishedTest`; the Android change is not run here.
+
 - **The hosted-provider count test knows about BlockRun.** Main run 44744901663 passed every shared test and the desktop tests, and failed one providers test that counts the built-in hosted providers (18, now 19 with BlockRun). Not run here; main CI is the compile.
 
 - **Goose and Crush join the LLM CLIs the app can drive.** Goose (`goose run --no-session -q --output-format text -i -`, task on stdin; flags from its CLI reference) and Crush (`crush run <prompt>`; npm package `@charmland/crush`) are specs like the others: read and plan only (their permission modes and rules are the keeper's own, which the app cannot narrow and never changes), no `--yolo`, project settings files refused unless allowed (`.goosehints`, `.goose/`, `.crushrc`, `crush.json`, `.crush/`). No phone install route is known for either. Not run here; main CI is the compile, and the Test button shows what an installed one does.
