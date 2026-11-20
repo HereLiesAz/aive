@@ -59,7 +59,7 @@ Every event has `type`, `runId`, `eventSeq` (long) and `at` (epoch milliseconds)
 
 Limits: `preview` and `planPreview` hold at most 4,096 UTF-8 bytes, `reason` and `objective` 1,024, names and labels 256, never splitting a character. Artifact URIs are not sent. A task that holds its output sends no preview (`withheld` true).
 
-The stream is read-only. Gates are approved or rejected only on the device: a remote client cannot decide one, because the pairing code is a bearer secret that cannot be told apart from its owner (see `docs/THREAT_MODEL.md`).
+The stream is read-only. Gates are approved or rejected only on the device: a remote client cannot decide one, because the pairing code is a bearer secret that cannot be told apart from its owner (see `docs/THREAT_MODEL.md`). The one exception is the local control API on a headless engine the owner started with `AIVE_ALLOW_REMOTE_APPROVAL=1`: `POST /approvals/{run}/{creature}/approve` approves a creature that waits for a person. Off otherwise (403 `policy_denied`); it never rejects.
 
 The Aive reads the run's timeline only while some client watches events, so it costs nothing otherwise. The constants are in `RemoteRunEvents.kt` (`RemoteRunEventFields`, `RemoteRunEventLimits`).
 

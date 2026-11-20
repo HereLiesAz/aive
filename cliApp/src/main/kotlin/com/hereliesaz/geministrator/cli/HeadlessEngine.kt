@@ -140,6 +140,7 @@ class HeadlessEngine private constructor(
                             put("control", "loopback")
                         }
                     },
+                    allowRemoteApproval = { env["AIVE_ALLOW_REMOTE_APPROVAL"] == "1" },
                 )
                 return HeadlessEngine(runtime, host, planner, reviewer, scope, httpClient, channel, lock, chatPoster)
             } catch (failure: Throwable) {
