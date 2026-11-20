@@ -27,6 +27,7 @@ class KeylessDefaultsTest {
         ProviderCatalog.KILO_ID,
         ProviderCatalog.LLM7_ID,
         ProviderCatalog.OVHCLOUD_ID,
+        ProviderCatalog.BLOCKRUN_ID,
         ProviderCatalog.AI_HORDE_ID,
     )
 
@@ -60,7 +61,7 @@ class KeylessDefaultsTest {
         // The keeper disconnected Kilo after its default was applied.
         val plan = defaultsToApply(KeylessDefaultsState(emptySet(), setOf(ProviderCatalog.KILO_ID)))
         assertFalse(ProviderCatalog.KILO_ID in plan.connect)
-        assertEquals(listOf(ProviderCatalog.LLM7_ID, ProviderCatalog.OVHCLOUD_ID, ProviderCatalog.AI_HORDE_ID), plan.connect)
+        assertEquals(listOf(ProviderCatalog.LLM7_ID, ProviderCatalog.OVHCLOUD_ID, ProviderCatalog.BLOCKRUN_ID, ProviderCatalog.AI_HORDE_ID), plan.connect)
     }
 
     @Test
@@ -109,7 +110,7 @@ class KeylessDefaultsTest {
         KeylessDefaults.setAllOff(true)
         val connected = mutableListOf<String>()
         KeylessDefaults.setAll(on = true, connectedIds = setOf(ProviderCatalog.LLM7_ID), connect = { connected += it }, disconnect = { error("no") })
-        assertEquals(listOf(ProviderCatalog.KILO_ID, ProviderCatalog.OVHCLOUD_ID, ProviderCatalog.AI_HORDE_ID), connected)
+        assertEquals(listOf(ProviderCatalog.KILO_ID, ProviderCatalog.OVHCLOUD_ID, ProviderCatalog.BLOCKRUN_ID, ProviderCatalog.AI_HORDE_ID), connected)
         assertFalse(KeylessDefaults.allOff())
         assertTrue(KeylessDefaults.pending(setOf(ProviderCatalog.KILO_ID)).connect.isEmpty())
     }
