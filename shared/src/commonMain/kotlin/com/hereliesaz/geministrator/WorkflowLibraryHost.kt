@@ -116,9 +116,14 @@ class WorkflowLibraryHost(
             .filter(RoleDefinition::enabled)
             .sortedBy { it.name.lowercase() }
 
-    suspend fun saveAuthored(definition: WorkflowDefinition): WorkflowDefinition {
+    /** The self-improvement loop is read-only by its own rules (LoopIntegrity): a queen with approval authority is never added to it. */
+    private fun withQueenUnlessLoop(definition: WorkflowDefinition): WorkflowDefinition =
+        if (definition.id.value == com.hereliesaz.geministrator.workflow.improvement.SelfImprovementLoop.HIVE_ID) definition else ensureQueen(definition)
+
+    /** [withQueen] false saves a shipped hive as it ships (the suites): the queen is added when it starts, never to its stored form. */
+    suspend fun saveAuthored(definition: WorkflowDefinition, withQueen: Boolean = true): WorkflowDefinition {
         val wasAuthored = definition.id in authoredStore.all()
-        val saved = composition.save(ensureQueen(definition))
+        val saved = composition.save(if (withQueen) withQueenUnlessLoop(definition) else definition)
         authoredStore.add(saved.id)
         if (!wasAuthored) onWorkflowCreated(saved)
         onDefinitionSaved(saved)
@@ -160,7 +165,7 @@ class WorkflowLibraryHost(
         var added = 0
         for (entry in CodingWorkflowSuite.all()) {
             if (entry.definition.id !in present) {
-                saveAuthored(entry.definition)
+                saveAuthored(entry.definition, withQueen = false)
                 added += 1
             }
             val suggestion = entry.schedule ?: continue
@@ -196,7 +201,7 @@ class WorkflowLibraryHost(
         var added = 0
         for (entry in CreativeWorkflowSuite.all()) {
             if (entry.definition.id !in present) {
-                saveAuthored(entry.definition)
+                saveAuthored(entry.definition, withQueen = false)
                 added += 1
             }
         }
@@ -264,7 +269,7 @@ class WorkflowLibraryHost(
     ) {
         // Every swarm has a queen (D16): one without her is given her before it starts, never refused.
         @Suppress("NAME_SHADOWING")
-        val definition = if (requireQueen) ensureQueen(definition) else definition
+        val definition = if (requireQueen) withQueenUnlessLoop(definition) else definition
         composition.validated(definition)
         val neededRoleIds = buildSet {
             definition.tasks.forEach { task ->
