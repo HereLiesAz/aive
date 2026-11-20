@@ -1,5 +1,7 @@
 # Orchestration decision model
 
+> **Dormant.** The release this describes, `orchestration-decisions-v1`, was never published and the approach is set aside; the app's catalog lists nothing (`OrchestrationSpecialistCatalog.RELEASED`). The code and this tool are kept in case it is taken up again.
+
 The orchestration utilities are exact code (`DeterministicLocalOrchestrationUtilities`). The few
 calls that need judgement are typed questions (`OrchestrationQuestion` in
 `shared/.../orchestration/OrchestrationDecisions.kt`), answered by one tiny encoder with one linear

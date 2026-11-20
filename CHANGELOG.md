@@ -4,6 +4,8 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.91 — from 2026-11-19
 
+- **The orchestration decision model is no longer offered.** Settings → Local orchestration listed `aive-orchestration-decisions-int8.tar.gz`, from a release (`orchestration-decisions-v1`) that was never published and whose approach is set aside; its install could only fail. The catalog now lists nothing, so every utility uses its deterministic baseline (an empty catalog was already valid). The decision code and `tools/decision_training` are kept dormant, the README says so.
+
 - **A Source that answers a few requests a minute plans alone.** Running the CI desktop build, "Asking two more planners for their drafts" sat behind OVHcloud's two-requests-a-minute limit (LLM7 was out of credit and the plan failed over to it), so a first plan took minutes. While any Source the planners may use is limited to five requests a minute or fewer, the queen plans alone and the plan is reviewed as before (`FailoverOrchestrationAgentRuntime.planners`). Test added. Not run here; main CI is the compile.
 
 - **The web app leaves out the free Source a browser cannot call.** With the queen planning in the browser (main run 3209, first green), the first hive reached Kilo, whose server refuses the cross-origin preflight, and ended in "Fail to fetch" although LLM7 and OVHcloud, also linked, answer browsers. The web build now leaves Kilo out of the providers, the plan and the queen's model, so the next free Source answers. Found by running the CI web artifact in Chromium. Not run here; main CI is the compile.

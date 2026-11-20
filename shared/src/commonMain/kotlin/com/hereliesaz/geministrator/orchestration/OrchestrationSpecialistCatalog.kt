@@ -31,10 +31,14 @@ import kotlinx.serialization.json.doubleOrNull
  * deterministic baseline itself and the runtime guards only accepted answers equal to or stricter than
  * it, so they cost a download and added nothing. What needs judgement is now asked of the small
  * decision model ([DECISIONS_SPECIALIST_ID], [DecisionInformedOrchestrationUtilities]).
+ *
+ * The decision model was never published and is abandoned for now (`orchestration-decisions-v1` does not exist), so [RELEASED]
+ * lists nothing and every utility uses its deterministic baseline. The decision code and `tools/decision_training` are kept dormant
+ * in case the approach is taken up again; re-register a release with `register_catalog.py` to bring it back.
  */
 object OrchestrationSpecialistCatalog {
     // register_catalog.py:begin
-    const val RELEASED: String = """{"specialists":[{"specialistId":"orchestration:decisions","mergedVariants":[{"logicalArtifactId":"orchestration:decisions:int8","foundationModelId":"google/bert_uncased_L-4_H-256_A-4","releaseRepository":"HereLiesAz/aive","releaseTag":"orchestration-decisions-v1","assetName":"aive-orchestration-decisions-int8.tar.gz","sha256":"8b6c7014691bb14793faafe465c1f76e5fe099b737b55bbad8e02d81cc058fe3","format":"onnx","precision":"int8","kind":"MergedModel","capabilities":["orchestration-decisions"]}]}]}"""
+    const val RELEASED: String = """{"specialists":[]}"""
     // register_catalog.py:end
 
     private val json = Json { ignoreUnknownKeys = true }
