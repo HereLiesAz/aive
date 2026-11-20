@@ -126,5 +126,8 @@ class TourStateTest {
     fun plainKeepsMarkupLiteralButStripsControlCharactersAndCaps() {
         assertEquals("<b>hi</b> [x](y)", plain("<b>hi</b>\u0007 [x](y)"))
         assertEquals(10, plain("a".repeat(50), maxChars = 10).length)
+        // An escaped apostrophe or quote from a model never shows its backslash.
+        assertEquals("It is like opening a worker's notebook.", plain("It is like opening a worker\\'s notebook."))
+        assertEquals("say \"hi\"", plain("say \\\"hi\\\""))
     }
 }

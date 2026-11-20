@@ -369,6 +369,10 @@ private fun ReplyPill(label: String, seed: String, reply: CheckInReply) {
     AzphaltPill(label = label, seed = seed, onClick = { TourController.reply(reply) })
 }
 
-/** Control characters out and a length cap, so a model's text can never break the card; it is shown as literal text. */
+/**
+ * Control characters out and a length cap, so a model's text can never break the card; it is shown as literal text. A model that
+ * escapes an apostrophe or a quote the way a shell or a JSON writer does leaves a stray backslash the keeper would read, so an
+ * escaped apostrophe or quote reads as the plain character.
+ */
 internal fun plain(text: String, maxChars: Int = TeachingLimits.PAYLOAD_MAX_CHARS): String =
-    text.filter { it == '\n' || !it.isISOControl() }.take(maxChars)
+    text.filter { it == '\n' || !it.isISOControl() }.replace("\\'", "'").replace("\\\"", "\"").take(maxChars)
