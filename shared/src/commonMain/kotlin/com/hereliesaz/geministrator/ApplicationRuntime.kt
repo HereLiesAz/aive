@@ -335,6 +335,12 @@ class ApplicationRuntime private constructor(
         return parentRunIds.flatMap { com.hereliesaz.geministrator.queen.Blockers.carryForward(blockerBook[it.value].orEmpty()) }
     }
 
+    /** The blockers of [runId] that are still unmet and have a starting template but no step yet (what the queen may give a step). */
+    internal fun blockersWaitingForAStep(runId: String): List<com.hereliesaz.geministrator.queen.Blocker> {
+        loadBlockerBook()
+        return blockerBook[runId].orEmpty().filter { it.unmet && it.templateId != null && it.stepId == null }
+    }
+
     internal fun rememberBlockers(runId: String, blockers: List<com.hereliesaz.geministrator.queen.Blocker>) {
         if (blockers.isEmpty()) return
         storeBlockers(runId, blockers)
