@@ -1322,23 +1322,24 @@ private fun MainDestination(
             ?.takeIf { destination == ControlRoomDestination.Overview && !district.value && restingHive.value.isBlank() }
         // Wide windows have the rail; the row stays only for a live hive's own pills.
         if (destination.navigationItem == ControlRoomDestination.Overview && !firstLaunch && liveHive != null && showTimeline) {
-            // The Story page's own controls: the same round buttons as on the hive (Pause, Stop, Overview, Share, More editing),
-            // from the one list the page offers, so the two pages never differ in what they can do.
+            // The Story page's own controls: the hive's acts (Pause, Stop, Overview, Share, More editing) from the one list the page offers,
+            // so the two pages never differ in what they can do. Here they are labelled capsules; the hive's controls bar keeps its glyph buttons.
             OverviewSectionTabs(
                 compact,
                 destination,
                 onDestinationSelected,
                 showControls = hiveActionsList.isNotEmpty(),
             ) {
-                AzphaltThemedSurface(Azphalt.Ink) {
-                    Row(
-                        Modifier.clip(RoundedCornerShape(28.dp)).background(Azphalt.Ink).padding(horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        hiveActionsList.forEach { action ->
-                            RoundGlyphButton(action.glyph, action.label, onClick = action.onClick, selected = action.selected, danger = action.danger, modifier = action.modifier)
-                        }
-                    }
+                // HG2Gui's one small button (DESIGN.md §10): a labelled capsule, 32dp drawn in a 48dp target, state by fill and weight.
+                hiveActionsList.forEachIndexed { index, action ->
+                    AzphaltPill(
+                        label = action.label,
+                        seed = "story-act-$index",
+                        selected = action.selected,
+                        tone = if (action.danger) PillTone.Danger else PillTone.Quiet,
+                        onClick = action.onClick,
+                        modifier = action.modifier,
+                    )
                 }
             }
         }
