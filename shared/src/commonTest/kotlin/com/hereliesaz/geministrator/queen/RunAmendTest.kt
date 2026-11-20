@@ -43,8 +43,10 @@ class RunAmendTest {
         assertIs<RunAmendment.Refused>(RunAmend.amend(definition, run, tasks.filter { it.id.value != "b" }, emptyList(), 10L))
         val changedRunning = tasks.map { if (it.id.value == "a") it.copy(objective = "Something else") else it }
         assertIs<RunAmendment.Refused>(RunAmend.amend(definition, run, changedRunning, emptyList(), 10L))
+        // A step that has not started may only be given more to wait for: its objective, like every other field, stays as it was.
         val changedWaiting = tasks.map { if (it.id.value == "b") it.copy(objective = "Something else") else it }
-        assertIs<RunAmendment.Amended>(RunAmend.amend(definition, run, changedWaiting, emptyList(), 10L))
+        assertIs<RunAmendment.Refused>(RunAmend.amend(definition, run, changedWaiting, emptyList(), 10L))
+        assertIs<RunAmendment.Amended>(RunAmend.amend(definition, run, tasks, emptyList(), 10L))
     }
 
     @Test
