@@ -58,4 +58,15 @@ class SwarmQueenTest {
         val once = ensureQueen(swarm(task("build", BuiltInRoles.ImplementationEngineer)))
         assertSame(once, ensureQueen(once))
     }
+
+    @Test
+    fun aQueenWhoRunsAsCodeRatherThanAModelIsStillTheQueen() {
+        val coded = TaskDefinition(
+            id = TaskDefinitionId("queen"), name = "queen", objective = "queen", roleId = BuiltInRoles.Orchestrator.id,
+            executor = TaskExecutor.TestRunner(),
+        )
+        val has = swarm(coded, task("build", BuiltInRoles.ImplementationEngineer))
+        assertTrue(hasQueen(has))
+        assertSame(has, ensureQueen(has))
+    }
 }
