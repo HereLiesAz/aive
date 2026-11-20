@@ -163,7 +163,7 @@ internal fun MemoryWebContent(source: com.hereliesaz.geministrator.memory.Memory
         value = null
         val g = graph ?: return@produceState
         // Off the main thread: a big bank takes a moment, and the notes below are readable meanwhile.
-        value = withContext(Dispatchers.Default) { MemoryWebLayout.layout(g, iterations = if (g.nodes.size > 2_000) 60 else 160) }
+        value = withContext(Dispatchers.Default) { MemoryWebLayout.layout(g, iterations = if (g.nodes.size > 2_000) 90 else 240) }
     }
     var tab by remember { mutableStateOf(WebTab.Map) }
     var filter by remember { mutableStateOf("") }
@@ -284,7 +284,7 @@ private fun WebMap(graph: WebGraph, layout: WebLayout?, matching: Set<String>?, 
         val s = baseScale() * scale
         return Offset(canvasSize.x / 2f + pan.x + p.x * s, canvasSize.y / 2f + pan.y + p.y * s)
     }
-    fun radiusOf(node: WebNode): Float = (8f + 26f * sqrt(node.size.coerceIn(0.05f, 1.5f))) * baseScale() * scale
+    fun radiusOf(node: WebNode): Float = MemoryWebLayout.nodeRadius(node.size) * baseScale() * scale
 
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         AzphaltPill(stringResource(Res.string.memory_web_zoom_in), "web-zoom-in", onClick = { scale = min(40f, scale * 1.4f) })
@@ -369,7 +369,7 @@ private fun WebMap(graph: WebGraph, layout: WebLayout?, matching: Set<String>?, 
             val at = toScreen(layout.positions.getValue(node.id))
             val r = radiusOf(node)
             if (at.x < 0f || at.y < 0f || at.x > size.width || at.y > size.height) continue
-            if (r < 9f && node.id != selected) continue
+            if (r < 6f && node.id != selected) continue
             if (matching != null && node.id !in matching) continue
             val text = measurer.measure(node.title, labelStyle, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, constraints = androidx.compose.ui.unit.Constraints(maxWidth = 190))
             val topLeft = Offset(at.x - text.size.width / 2f, at.y + r + 2f)
