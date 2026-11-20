@@ -1322,57 +1322,23 @@ private fun MainDestination(
             ?.takeIf { destination == ControlRoomDestination.Overview && !district.value && restingHive.value.isBlank() }
         // Wide windows have the rail; the row stays only for a live hive's own pills.
         if (destination.navigationItem == ControlRoomDestination.Overview && !firstLaunch && liveHive != null && showTimeline) {
-            val inDistrictNow = destination == ControlRoomDestination.Overview && district.value
-            // Only while the run is unfinished; red, since it ends the work. It leads the row on a phone,
-            // where the hive's own pills scroll off the end, and heads them on a wide window.
-            val stopPill: @Composable () -> Unit = {
-                liveHive?.takeUnless { it.run.status.isFinished() }?.let {
-                    // Pause lets what runs finish and starts nothing new, with no creature stopped; the
-                    // pill then reads Resume. Everything stays open to change while it is paused.
-                    val paused = it.run.keeperPause != null
-                    AzphaltPill(
-                        label = stringResource(if (paused) Res.string.hive_resume_run else Res.string.hive_pause_run),
-                        seed = "hive-pause-run",
-                        selected = paused,
-                        onClick = { onPauseRun(!paused) },
-                        modifier = Modifier.tourTarget(TourTargetId.HIVE_PAUSE),
-                    )
-                    AzphaltPill(
-                        label = stringResource(Res.string.hive_stop_run),
-                        seed = "hive-stop-run",
-                        tone = PillTone.Danger,
-                        onClick = { confirmingStopRun = true },
-                        modifier = Modifier.tourTarget(TourTargetId.HIVE_STOP),
-                    )
-                }
-            }
+            // The Story page's own controls: the same round buttons as on the hive (Pause, Stop, Overview, Share, More editing),
+            // from the one list the page offers, so the two pages never differ in what they can do.
             OverviewSectionTabs(
                 compact,
                 destination,
                 onDestinationSelected,
-                showControls = liveHive != null && showTimeline,
+                showControls = hiveActionsList.isNotEmpty(),
             ) {
-                // The hive's own controls, on their own row under the places.
-                stopPill()
-                liveHive?.let { live ->
-                    AzphaltPill(
-                        label = stringResource(if (showTimeline) Res.string.hive_show_hive else Res.string.hive_show_timeline),
-                        seed = "hive-timeline",
-                        selected = showTimeline,
-                        onClick = { showTimeline = !showTimeline },
-                    )
-                    AzphaltPill(
-                        label = hiveCardShareLabel(),
-                        seed = "hive-card-share",
-                        selected = sharingHiveCard,
-                        onClick = { sharingHiveCard = !sharingHiveCard },
-                    )
-                    // Combine, Save as and the rest live in Workflows, opened on this hive's workflow.
-                    AzphaltPill(
-                        label = stringResource(Res.string.hive_more_editing),
-                        seed = "hive-more-editing",
-                        onClick = { openHiveInWorkflows(null) },
-                    )
+                AzphaltThemedSurface(Azphalt.Ink) {
+                    Row(
+                        Modifier.clip(RoundedCornerShape(28.dp)).background(Azphalt.Ink).padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        hiveActionsList.forEach { action ->
+                            RoundGlyphButton(action.glyph, action.label, onClick = action.onClick, selected = action.selected, danger = action.danger, modifier = action.modifier)
+                        }
+                    }
                 }
             }
         }

@@ -1,5 +1,8 @@
 package com.hereliesaz.geministrator
 
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 import com.hereliesaz.geministrator.tour.tourTarget
 import com.hereliesaz.geministrator.tour.TourTargetId
 import com.hereliesaz.geministrator.prompts.PromptKind
@@ -787,7 +790,21 @@ internal fun MindDefinitionList(identity: String, provider: String?, role: RoleD
     }
 }
 
-/** A round, outlined control on Ink: a 48dp target around a 34dp ring. */
+/** A regular hexagon, point up, filling its box: the hive's own shape for a control. */
+internal val HexagonShape: androidx.compose.ui.graphics.Shape = androidx.compose.foundation.shape.GenericShape { size, _ ->
+    val cx = size.width / 2f
+    val cy = size.height / 2f
+    val r = minOf(cx, cy)
+    for (i in 0 until 6) {
+        val angle = (PI / 180.0 * (60.0 * i - 90.0)).toFloat()
+        val x = cx + r * cos(angle)
+        val y = cy + r * sin(angle)
+        if (i == 0) moveTo(x, y) else lineTo(x, y)
+    }
+    close()
+}
+
+/** A hexagonal, outlined control on Ink: a 48dp target around a 34dp hexagon. (Still named for the round button it replaced.) */
 @Composable
 internal fun RoundGlyphButton(
     glyph: HiveGlyph,
@@ -806,15 +823,16 @@ internal fun RoundGlyphButton(
     Box(
         modifier
             .size(AzphaltMinTouchTarget)
-            .clip(CircleShape)
+            // The target stays the full 48dp square (a hexagon clip would shrink what a finger can hit).
+            .clip(RoundedCornerShape(10.dp))
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = label; if (selected) this.selected = true },
         contentAlignment = Alignment.Center,
     ) {
         Box(
-            Modifier.size(34.dp).clip(CircleShape)
+            Modifier.size(34.dp).clip(HexagonShape)
                 .then(if (selected) Modifier.background(azphaltOnSurface().copy(alpha = 0.18f)) else Modifier)
-                .border(1.dp, if (danger && enabled) AzphaltDanger else azphaltMutedOnSurface().copy(alpha = 0.5f), CircleShape),
+                .border(1.dp, if (danger && enabled) AzphaltDanger else azphaltMutedOnSurface().copy(alpha = 0.5f), HexagonShape),
             contentAlignment = Alignment.Center,
         ) {
             Glyph(glyph, ink, Modifier.size(17.dp))
