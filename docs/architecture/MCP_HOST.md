@@ -53,7 +53,7 @@ A modern server may answer `tools/call` with `resultType: "task"` and a task (`t
 
 ## Configuration
 
-Keeper's room › Connections › **MCP servers** (`McpServerConnections`). A server is added by address and an optional bearer token on every platform, or by command on the desktop. Each row has **Check** (connect and count its tools), **Always allow** or **Ask each run**, and **Remove** (which deletes its token).
+Keeper's room › Connections › **MCP servers** (`McpServerConnections`). A server is added by address and an optional bearer token on every platform, or by command on the desktop. Each row has **Check** (connect and count its tools), **Always allow** or **Ask each swarm**, and **Remove** (which deletes its token).
 
 - An address must be `https://`, or `http://` to this device or a private network (`CleartextPolicy`), and may not embed a user name or password.
 - A command is split into a fixed argument list (`McpCommandLine`: quotes only; no variables, globs, pipes or redirection) and started directly in the home folder, never through a shell. Its stderr is discarded.
@@ -123,7 +123,7 @@ runtime or privileged control plane for Aive.
 
 ## Authority
 
-- **Consent is per server, per run.** A server's tools run only if it is **Always allow**, or if the keeper answered the gate for it in this run (the workflow run id, or the task run id outside one). The first call asks. The question names the tool, the server and the arguments that would leave the device. The answers are **Allow for this run**, **Always allow** and **Don't allow**. An unanswered question is refused after 10 minutes. Platforms without a UI use `McpConsentGate.DenyUnasked`. A refusal reaches the model as an error result, and nothing is sent to the server.
+- **Consent is per server, per swarm.** A server's tools run only if it is **Always allow**, or if the keeper answered the gate for it in this run (the workflow run id, or the task run id outside one). The first call asks. The question names the tool, the server and the arguments that would leave the device. The answers are **Allow for this run**, **Always allow** and **Don't allow**. An unanswered question is refused after 10 minutes. Platforms without a UI use `McpConsentGate.DenyUnasked`. A refusal reaches the model as an error result, and nothing is sent to the server.
 - Listing a server's tools is not consent: listing sends no task content.
 - **Elicitation is the keeper's own disclosure.** It reaches only calls the keeper already allowed. The Aive sends what the keeper types or picks to that server only, never to the model or into run artifacts (a result the server returns may repeat it, and is fenced like any other). A URL is opened only on the keeper's tap, in the system browser.
 - **Results are external content.** Each one is fenced (`⟦external tool result · MCP server "…" · tool "…"⟧ … ⟦end external tool result⟧`), so a server cannot close the fence early, and the model is told to treat it as data. The Aive never executes it (invariant 3).

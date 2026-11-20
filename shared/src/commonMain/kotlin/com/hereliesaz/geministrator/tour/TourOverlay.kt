@@ -25,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -67,7 +68,6 @@ import com.hereliesaz.geministrator.resources.tour_stage_needs_you
 import com.hereliesaz.geministrator.resources.tour_stage_done
 import com.hereliesaz.geministrator.resources.tour_stage_failed
 import com.hereliesaz.geministrator.resources.tour_stage_cancelled
-import com.hereliesaz.geministrator.resources.tour_hive_title
 import com.hereliesaz.geministrator.resources.tour_hive_egg_growth
 import com.hereliesaz.geministrator.resources.tour_hive_more
 import com.hereliesaz.geministrator.resources.tour_failed_line
@@ -117,8 +117,6 @@ fun TourOverlayHost() {
         return
     }
     if (state == null || state.phase == TourPhase.Dismissed) return
-    // What is happening to each creature and egg, beside whatever step is showing.
-    HiveLines(TourController.hive, CreatureSpots.focus)
     // After the last step the layer is gone, except while the closing question (do you feel you know what you are doing now) is open.
     val closing = state.finished && state.checkInLine != null
     if (state.finished && !closing) return
@@ -163,46 +161,30 @@ private fun ClosingCard(line: String) {
     }
 }
 
-/** Each creature and egg of the hive on screen with where it is now, so the keeper watches the swarm work while the tour speaks. */
+/**
+ * One line on the step's own card about the swarm the tour sits beside: the creature the tour is on, else the first still going
+ * on, its stage, and how many more there are. It rides the card instead of floating over the page, so it never covers the
+ * breadcrumb, the creature count, a creature's sheet or the keeper's messages. Null when there are no creatures yet.
+ */
 @Composable
-private fun HiveLines(lines: List<CreatureLine>, focus: String?) {
-    if (lines.isEmpty()) return
-    // The keeper can always put it away: it never stays over the messages and options it sits beside.
-    var hidden by remember { mutableStateOf(false) }
-    if (hidden) return
-    // Below the header, never over the breadcrumb and the page title.
-    Box(Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 132.dp), contentAlignment = Alignment.TopEnd) {
-        AzphaltSurface(Azphalt.Ink) {
-            Column(
-                Modifier.widthIn(max = 260.dp).clip(RoundedCornerShape(16.dp)).background(Azphalt.Ink).padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(stringResource(Res.string.tour_hive_title).uppercase(), style = AzphaltType.eyebrow, color = azphaltOnSurface())
-                AzphaltPill(label = stringResource(Res.string.tour_hide), seed = "tour-hive-hide", onClick = { hidden = true })
-                // Only what is still going on, at most four, so the card stays small over the swarm it describes.
-                val finished = setOf(CreatureStage.Done, CreatureStage.Cancelled, CreatureStage.Withered)
-                val shown = lines.filter { it.stage !in finished }.ifEmpty { lines }.take(4)
-                shown.forEach { line ->
-                    val stage = when (line.stage) {
-                        CreatureStage.Egg -> stringResource(Res.string.tour_hive_egg_growth, ((line.growth ?: 0f) * 100).toInt())
-                        CreatureStage.Withered -> stringResource(Res.string.tour_stage_withered)
-                        CreatureStage.Waiting -> stringResource(Res.string.tour_stage_waiting)
-                        CreatureStage.Working -> stringResource(Res.string.tour_stage_working)
-                        CreatureStage.Checking -> stringResource(Res.string.tour_stage_checking)
-                        CreatureStage.Retrying -> stringResource(Res.string.tour_stage_retrying)
-                        CreatureStage.NeedsYou -> stringResource(Res.string.tour_stage_needs_you)
-                        CreatureStage.Done -> stringResource(Res.string.tour_stage_done)
-                        CreatureStage.Failed -> stringResource(Res.string.tour_stage_failed)
-                        CreatureStage.Cancelled -> stringResource(Res.string.tour_stage_cancelled)
-                    }
-                    Text("${if (line.id == focus) "› " else ""}${plain(line.name)} · $stage", style = AzphaltType.body, color = azphaltOnSurface(), maxLines = 1)
-                }
-                if (lines.size > shown.size) {
-                    Text(stringResource(Res.string.tour_hive_more, lines.size - shown.size), style = AzphaltType.body, color = azphaltOnSurface())
-                }
-            }
-        }
+private fun hiveLineText(lines: List<CreatureLine>, focus: String?): String? {
+    if (lines.isEmpty()) return null
+    val finished = setOf(CreatureStage.Done, CreatureStage.Cancelled, CreatureStage.Withered)
+    val line = lines.firstOrNull { it.id == focus } ?: lines.firstOrNull { it.stage !in finished } ?: lines.first()
+    val stage = when (line.stage) {
+        CreatureStage.Egg -> stringResource(Res.string.tour_hive_egg_growth, ((line.growth ?: 0f) * 100).toInt())
+        CreatureStage.Withered -> stringResource(Res.string.tour_stage_withered)
+        CreatureStage.Waiting -> stringResource(Res.string.tour_stage_waiting)
+        CreatureStage.Working -> stringResource(Res.string.tour_stage_working)
+        CreatureStage.Checking -> stringResource(Res.string.tour_stage_checking)
+        CreatureStage.Retrying -> stringResource(Res.string.tour_stage_retrying)
+        CreatureStage.NeedsYou -> stringResource(Res.string.tour_stage_needs_you)
+        CreatureStage.Done -> stringResource(Res.string.tour_stage_done)
+        CreatureStage.Failed -> stringResource(Res.string.tour_stage_failed)
+        CreatureStage.Cancelled -> stringResource(Res.string.tour_stage_cancelled)
     }
+    val more = if (lines.size > 1) ", " + stringResource(Res.string.tour_hive_more, lines.size - 1) else ""
+    return "${plain(line.name)} · $stage$more"
 }
 
 @Composable
@@ -336,6 +318,9 @@ private fun TourCard(state: TourState, step: LessonPayload) {
                 // Generated text is untrusted: plain Text only, never parsed or linked.
                 Text(plain(state.note ?: step.sentence), style = AzphaltType.body, color = azphaltOnSurface())
             }
+            hiveLineText(TourController.hive, CreatureSpots.focus)?.let { line ->
+                Text(line, style = AzphaltType.eyebrow, color = azphaltOnSurface(), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
             if (state.explainOpen) Text(plain(step.explain), style = AzphaltType.body, color = azphaltOnSurface())
             if (state.missedShown) Text(plain(step.ifMissed), style = AzphaltType.body, color = azphaltOnSurface())
             state.checkInLine?.let { line ->
@@ -384,6 +369,10 @@ private fun ReplyPill(label: String, seed: String, reply: CheckInReply) {
     AzphaltPill(label = label, seed = seed, onClick = { TourController.reply(reply) })
 }
 
-/** Control characters out and a length cap, so a model's text can never break the card; it is shown as literal text. */
+/**
+ * Control characters out and a length cap, so a model's text can never break the card; it is shown as literal text. A model that
+ * escapes an apostrophe or a quote the way a shell or a JSON writer does leaves a stray backslash the keeper would read, so an
+ * escaped apostrophe or quote reads as the plain character.
+ */
 internal fun plain(text: String, maxChars: Int = TeachingLimits.PAYLOAD_MAX_CHARS): String =
-    text.filter { it == '\n' || !it.isISOControl() }.take(maxChars)
+    text.filter { it == '\n' || !it.isISOControl() }.replace("\\'", "'").replace("\\\"", "\"").take(maxChars)

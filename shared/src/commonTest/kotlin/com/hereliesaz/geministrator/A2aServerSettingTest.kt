@@ -8,9 +8,9 @@ import kotlin.test.assertTrue
 
 class A2aServerSettingTest {
     @Test
-    fun aDeviceThatNeverChoseGetsTheServerOn() {
-        assertTrue(A2A_SERVER_ENABLED_BY_DEFAULT)
-        assertTrue(a2aServerEnabled(storedChoice = null))
+    fun aDeviceThatNeverChoseGetsTheServerOff() {
+        assertFalse(A2A_SERVER_ENABLED_BY_DEFAULT)
+        assertFalse(a2aServerEnabled(storedChoice = null))
     }
 
     @Test
@@ -26,8 +26,8 @@ class A2aServerSettingTest {
         assertNull(parseA2aServerChoice(null))
         assertNull(parseA2aServerChoice(""))
         assertNull(parseA2aServerChoice("maybe"))
-        // An unreadable value falls back to the default rather than to off.
-        assertTrue(a2aServerEnabled(parseA2aServerChoice("garbage")))
+        // An unreadable value falls back to the default (off).
+        assertFalse(a2aServerEnabled(parseA2aServerChoice("garbage")))
     }
 
     @Test

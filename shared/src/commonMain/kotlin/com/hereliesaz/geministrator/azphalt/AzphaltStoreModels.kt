@@ -2,6 +2,9 @@ package com.hereliesaz.geministrator.azphalt
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 const val AZPHALT_STORE_URL: String = "https://azphalt.store"
 const val AIVE_AZPHALT_HOST_ID: String = "com.hereliesaz.aive"
@@ -63,6 +66,8 @@ data class AzphaltPackageSummary(
     val llm: AzphaltLlm? = null,
     /** Archive size as the repository publishes it (`bytes`); [byteSize] is the older spelling. */
     val bytes: Long? = null,
+    /** The pack this package belongs to, when the index says so: a name, or an object with a name or id. Read through [packName]. */
+    val pack: JsonElement? = null,
 ) {
     /** The package size from whichever field the repository sent, or null when it published none. */
     val sizeInBytes: Long? get() = byteSize ?: bytes
@@ -157,6 +162,45 @@ internal fun AzphaltPackageSummary.isModelAssetPackage(): Boolean =
         mediaDomains.any { it.equals("model", ignoreCase = true) } ||
             types.any { type -> AZPHALT_MODEL_ASSET_TYPES.any { it.equals(type, ignoreCase = true) } }
         )
+
+/** Package kinds the Shop never shows in Aive (decision D30): companion apps, scripts, composables, fonts and editors. */
+private val AZPHALT_SHOP_HIDDEN_KINDS: Set<String> = setOf("app", "script", "composable", "font", "editor")
+
+/** Asset types that are fonts or editor parts, never model assets. */
+private val AZPHALT_SHOP_HIDDEN_ASSET_TYPES: Set<String> = setOf("font", "editor")
+
+/** The name of the pack this package belongs to, or null when it belongs to none. */
+fun AzphaltPackageSummary.packName(): String? {
+    val value = pack
+    val text = when (value) {
+        null, is JsonNull -> null
+        is JsonPrimitive -> value.content
+        is JsonObject -> ((value["name"] ?: value["id"]) as? JsonPrimitive)?.content
+        else -> null
+    }
+    return text?.trim()?.takeIf { it.isNotEmpty() }
+}
+
+/** True when the index puts this package in a pack. */
+fun AzphaltPackageSummary.isPackMember(): Boolean = packName() != null
+
+/**
+ * Whether the Shop lists this package (decisions D29 and D30): specialties, swarms, model and
+ * language-model sources and pack members. Companion apps, scripts, composables, fonts and editors,
+ * and a pack's own container record (its members are listed instead), are never shown.
+ */
+fun AzphaltPackageSummary.isShownInShop(): Boolean = when {
+    kind in AZPHALT_SHOP_HIDDEN_KINDS -> false
+    kind == "pack" -> false
+    kind == "asset" && !isModelAssetPackage() &&
+        types.any { type -> AZPHALT_SHOP_HIDDEN_ASSET_TYPES.any { it.equals(type, ignoreCase = true) } } -> false
+    kind == "workflow" || kind == "role" -> true
+    isModelAssetPackage() || isDirectLlmPackage() -> true
+    else -> isPackMember()
+}
+
+/** The one place the Shop's lists are filtered: every list in the Shop starts from this. */
+fun List<AzphaltPackageSummary>.forShop(): List<AzphaltPackageSummary> = filter { it.isShownInShop() }
 
 @Serializable
 data class AzphaltPreview(

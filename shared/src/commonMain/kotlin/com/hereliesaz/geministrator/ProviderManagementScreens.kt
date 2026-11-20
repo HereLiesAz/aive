@@ -556,7 +556,7 @@ internal fun ProviderSettingsScreen(
             onToggle = { addingA2aAgent = !addingA2aAgent },
         )
         if (addingA2aAgent) {
-            ProviderSectionLabel(stringResource(Res.string.keeper_orphans_heading))
+            ProviderSectionLabel(engineeringName(stringResource(Res.string.keeper_orphans_heading), ENGINEERING_ORPHAN, EngineeringNames.show))
             Text(
                 stringResource(Res.string.keeper_a2a_agent_explain),
                 style = AzphaltType.body,
@@ -1708,6 +1708,8 @@ internal fun ProviderSettingsScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AzphaltPill(stringResource(Res.string.settings_delete_everything), "clear-data-confirm", onClick = {
                     onClearWorkflowData()
+                    // What the tutorial remembers of the keeper's comfort goes with everything else.
+                    com.hereliesaz.geministrator.tour.ComfortStore(DurableUiState.store, emptySet()).clear()
                     clearConfirm = false
                 }, tone = PillTone.Danger)
                 AzphaltPill(stringResource(Res.string.common_cancel), "clear-data-cancel", onClick = { clearConfirm = false })

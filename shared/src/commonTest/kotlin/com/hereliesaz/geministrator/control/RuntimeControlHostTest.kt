@@ -230,11 +230,18 @@ class RuntimeControlHostTest {
 
     @Test
     fun aRunStartedOverTheControlApiTreatsItsObjectiveAsExternalContent() = withHost(providers = listOf(StaffingProvider())) { host, persistence, _ ->
-        val id = host.makeHive("Go", agent("a"))["id"]!!.jsonPrimitive.content
+        val queen = buildJsonObject { put("id", "queen"); put("name", "Queen"); put("roleId", "orchestrator") }
+        val id = host.makeHive("Go", agent("a"), queen)["id"]!!.jsonPrimitive.content
         host.startRun(buildJsonObject { put("hiveId", id); put("objective", "Do the thing") })
 
         val run = persistence.projects.all().flatMap { persistence.runs.byProject(it.id) }.single()
         assertEquals(ContextProvenance.ExternalContent, run.objectiveProvenance)
+    }
+
+    @Test
+    fun aSwarmWithoutAQueenIsNotStartedOverTheControlApi() = withHost(providers = listOf(StaffingProvider())) { host, _, _ ->
+        val id = host.makeHive("Go", agent("a"))["id"]!!.jsonPrimitive.content
+        denied(ControlErrorCode.InvalidArgument) { host.startRun(buildJsonObject { put("hiveId", id); put("objective", "Do the thing") }) }
     }
 
     @Test

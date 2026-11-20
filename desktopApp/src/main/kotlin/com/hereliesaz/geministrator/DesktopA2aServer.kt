@@ -138,7 +138,7 @@ internal class DesktopA2aServer(
     )
 
     /**
-     * The keeper's switch. Never pressed: on ([a2aServerEnabled]). The key is written only when the
+     * The keeper's switch. Never pressed: off ([a2aServerEnabled]). The key is written only when the
      * keeper presses it, so an explicit off (also from builds where off was the default) is kept.
      */
     var enabledPreference: Boolean
