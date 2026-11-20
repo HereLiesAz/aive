@@ -74,7 +74,9 @@ fun classifyError(raw: String?): ErrorKind {
 
         // A provider that is up but failing: failing over to another one is the right answer (ProviderFailover.kt).
         serverErrorCode.containsMatchIn(text) ||
-            "internal server error" in text || "bad gateway" in text || "service unavailable" in text -> ErrorKind.ServerError
+            "internal server error" in text || "bad gateway" in text || "service unavailable" in text ||
+            // A free Source that answered with no text (only its reasoning, or nothing): up but failing, so another Source is the answer.
+            "did not contain assistant text" in text -> ErrorKind.ServerError
 
         // A request the provider refused as malformed: its wording says which field, the keeper cannot fix that.
         badRequestCode.containsMatchIn(text) || "invalid_request" in text || "missing required parameter" in text ||

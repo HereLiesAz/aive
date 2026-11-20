@@ -99,4 +99,9 @@ class UserFacingErrorTest {
         assertEquals(ErrorKind.TimedOut, classifyError("Moyai session x502y timed out: it did not finish in time"))
         assertTrue(com.hereliesaz.geministrator.workflow.ProviderFailover.shouldFailOver("Moyai session ab400cd1 timed out: it did not finish in time"))
     }
+
+    @Test
+    fun aReplyWithNoAssistantTextIsAProviderThatIsUpButFailingSoAnotherSourceTakesOver() {
+        assertEquals(ErrorKind.ServerError, classifyError("Compatible chat response did not contain assistant text"))
+    }
 }
