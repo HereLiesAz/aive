@@ -114,6 +114,7 @@
     <string name="keeper_a2a_agent_add">Connect...</string>
     <string name="keeper_a2a_agent_remove">Release</string>
     <string name="keeper_a2a_agent_invalid_url">Use an https:// address (plain http:// only for this computer or the local network).</string>
+    <string name="keeper_a2a_seed_seen">Saw it answer on %1$s</string>
     <string name="keeper_a2a_agent_suggestions">Orphans to try. Two examples that answered when last checked; they may have stopped. Their cards are read only if you choose to connect.</string>
     <string name="keeper_agent_directory_query">What do you need done?</string>
     <string name="keeper_agent_directory_help">Found by a public directory. These orphans belong to other people and live on their own servers. Nobody has checked who they are, whether they are online, or whether they are safe. You cannot install them. You can connect one to work for you from where it lives. The words you type go to a public directory when you press Look for orphans. It never sees your goal or your keys.</string>
