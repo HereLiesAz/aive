@@ -493,6 +493,7 @@ private suspend fun ApplicationRuntime.planAndDecide(
                 design = inputs.design,
                 objectiveProvenance = inputs.objectiveProvenance,
                 notes = notes,
+                requireReview = inputs.requireReview,
             ),
         )
         // The keeper may ask once for the other size: the card's button sets [resize] and answers "do not start", and the plan is made again with that constraint.
@@ -640,6 +641,7 @@ suspend fun ApplicationRuntime.resumePendingPlanLaunch(
             design = saved,
             supplementalRoles = pending.supplementalRoles,
             objectiveProvenance = pending.objectiveProvenance,
+            requireReview = pending.requireReview,
         )
     } catch (cancelled: kotlinx.coroutines.CancellationException) {
         throw cancelled
