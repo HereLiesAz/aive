@@ -91,6 +91,8 @@ fun main() {
         com.hereliesaz.geministrator.providers.llm.GoogleAiModeHost.install(DesktopAiModeBrowser(chromium))
     }
     val projectFileService = DesktopProjectFileService()
+    // A folder the keeper picks for a project's artifacts (docs/Artifact-Folders.md).
+    ArtifactFolderHost.service = DesktopArtifactFolderService()
     val repositoryCredentialStore = DesktopRepositoryCredentialStore()
     // Keyless sources start on, once each: a source the keeper disconnects later stays off (docs/Keepers-Room.md).
     KeylessDefaults.pending(readDesktopProviderCredentials(providerCredentialStore).keys).let { plan ->

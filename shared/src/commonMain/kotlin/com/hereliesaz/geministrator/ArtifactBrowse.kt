@@ -24,6 +24,7 @@ import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.artifact_save
 import com.hereliesaz.geministrator.resources.artifact_copied
 import com.hereliesaz.geministrator.resources.artifact_copy
 import com.hereliesaz.geministrator.resources.artifact_copy_failed
@@ -130,7 +131,12 @@ internal const val ARTIFACT_PREVIEW_CHARS = 2_400
 @OptIn(ExperimentalLayoutApi::class)
 @Suppress("DEPRECATION")
 @Composable
-internal fun ArtifactActions(artifact: ArtifactRef, seed: String) {
+internal fun ArtifactActions(
+    artifact: ArtifactRef,
+    seed: String,
+    /** Saves this artifact to the project's folder (docs/Artifact-Folders.md); null where no folder is chosen. */
+    onSave: (suspend () -> ArtifactSaveResult)? = null,
+) {
     val clipboard = LocalClipboardManager.current
     val uriHandler = LocalUriHandler.current
     val scope = rememberCoroutineScope()
@@ -154,6 +160,13 @@ internal fun ArtifactActions(artifact: ArtifactRef, seed: String) {
         }
         if (text != null || uri != null) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (onSave != null) {
+                    AzphaltPill(
+                        label = stringResource(Res.string.artifact_save),
+                        seed = "$seed-save",
+                        onClick = { scope.launch { message = saveMessage(onSave()) } },
+                    )
+                }
                 if (text != null) {
                     AzphaltPill(
                         label = stringResource(Res.string.artifact_copy),
@@ -205,6 +218,9 @@ internal fun HiveMadeSection(
     definition: WorkflowDefinition,
     run: WorkflowRun,
     onOpenWork: (String) -> Unit,
+    /** The project and the run's number, for saving into its folder; a null [projectId] leaves saving out. */
+    projectId: String? = null,
+    runNumber: Int? = null,
 ) {
     val entries = remember(definition, run) { artifactEntries(definition, run) }
     if (entries.isEmpty()) return
@@ -223,6 +239,8 @@ internal fun HiveMadeSection(
         style = AzphaltType.body,
         color = azphaltOnSurface(),
     )
+    val folderReady = projectId != null && ArtifactFolderHost.service != null
+    if (projectId != null && folderReady) ArtifactFolderControls(projectId, definition, run, runNumber, entries)
     if (entries.size > 1) {
         OutlinedTextField(
             value = query,
@@ -263,7 +281,13 @@ internal fun HiveMadeSection(
                                         onClick = { expanded = if (isExpanded) expanded - id else expanded + id },
                                     )
                                 }
-                                ArtifactActions(artifact, "made-$id")
+                                ArtifactActions(
+                                    artifact,
+                                    "made-$id",
+                                    onSave = projectId?.takeIf { folderReady && ArtifactFolderSettings.folder(it) != null }?.let { project ->
+                                        { ArtifactSaver.save(project, definition, run, runNumber, listOf(entry)) }
+                                    },
+                                )
                             }
                         },
                     )

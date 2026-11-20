@@ -150,4 +150,17 @@
     <string name="memory_advanced">Advanced: engines, habits and tuning</string>
     <string name="launch_review_every_result_on">Every result will be reviewed</string>
     <string name="launch_review_every_result_off">Have every result reviewed</string>
+    <string name="artifact_folder_title">Save to a folder</string>
+    <string name="artifact_folder_none">No folder chosen. Saving is off.</string>
+    <string name="artifact_folder_current">Saving into %1$s</string>
+    <string name="artifact_folder_choose">Choose a folder</string>
+    <string name="artifact_folder_change">Change folder</string>
+    <string name="artifact_folder_stop">Stop saving</string>
+    <string name="artifact_folder_auto">Save automatically</string>
+    <string name="artifact_folder_save_all">Save all</string>
+    <string name="artifact_save">Save</string>
+    <string name="artifact_saved_count">Saved %1$d to the folder</string>
+    <string name="artifact_saved_partial">Saved %1$d, %2$d could not be written</string>
+    <string name="artifact_save_failed">Could not save to the folder</string>
+    <string name="artifact_save_nothing">Nothing to save</string>
 </resources>

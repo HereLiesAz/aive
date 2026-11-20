@@ -972,7 +972,16 @@ internal fun MindMapRunScreen(
         // opening that creature's Work, with Show all, a filter, Copy and Open (ArtifactBrowse.kt). The
         // result is never three taps deep in a creature's panel, and a failed or cancelled run keeps its work.
         // Every hive presents its creation here, growing as creatures finish, not only once the whole run is done.
-        HiveMadeSection(definition = liveWorkflow.definition, run = run, onOpenWork = openCreatureWork)
+        val madeRunNumber by produceState<Int?>(null, run.id) {
+            value = runCatching { hiveRunNumber(run, onLoadRuns()) }.getOrNull()
+        }
+        HiveMadeSection(
+            definition = liveWorkflow.definition,
+            run = run,
+            onOpenWork = openCreatureWork,
+            projectId = liveWorkflow.project.id.value,
+            runNumber = madeRunNumber,
+        )
 
         if (compact && run.status.isFinished()) {
             ContinueRunPanel(

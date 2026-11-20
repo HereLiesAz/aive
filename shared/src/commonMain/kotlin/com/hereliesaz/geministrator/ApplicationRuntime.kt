@@ -1817,6 +1817,25 @@ class ApplicationRuntime private constructor(
                 ),
             ),
         )
+        saveArtifactsAsMade(snapshot.project, snapshot.definition, snapshot.state.run)
+    }
+
+    /**
+     * Saves the active run's new artifacts to the project's folder when the keeper switched that on (docs/Artifact-Folders.md).
+     * Only the run in hand, never a historical one being viewed; what was already written is skipped.
+     */
+    private fun saveArtifactsAsMade(project: Project, definition: WorkflowDefinition, run: WorkflowRun) {
+        if (!ArtifactFolderSettings.automatic(project.id.value)) return
+        val entries = artifactEntries(definition, run)
+        val written = ArtifactFolderSettings.saved(run.id.value)
+        // Publishing is frequent: nothing new to write means nothing is loaded or launched.
+        if (entries.none { it.artifact.id.value !in written }) return
+        runtimeScope.launch {
+            runCatching {
+                val number = hiveRunNumber(run, persistence.runs.byProject(project.id))
+                ArtifactSaver.save(project.id.value, definition, run, number, entries, onlyUnsaved = true)
+            }
+        }
     }
 
     internal fun publishFailure(failure: Throwable) {

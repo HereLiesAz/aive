@@ -188,6 +188,8 @@ class MainActivity : ComponentActivity() {
         // Register file pickers before the Activity reaches STARTED.
         val projectFileService = AndroidProjectFileService(this)
         val localRepositoryPicker = AndroidLocalRepositoryPicker(this, localRepositories)
+        // A folder the keeper picks for a project's artifacts (docs/Artifact-Folders.md).
+        com.hereliesaz.geministrator.ArtifactFolderHost.service = AndroidArtifactFolderService(this)
         updateCoordinator = AndroidUpdateCoordinator(this)
         // Keyless sources start on, once each: a source the keeper disconnects later stays off (docs/Keepers-Room.md).
         KeylessDefaults.pending(providerCredentialStore.readAll().keys).let { plan ->
