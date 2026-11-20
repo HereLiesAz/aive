@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -1075,6 +1076,7 @@ private fun ShellHeader(
         if (compact) Breadcrumb(crumbs, openMenu, { openMenu = it }, Modifier.fillMaxWidth())
         crumbs.firstOrNull { it.seed == openMenu && it.menu != null }?.let { crumb ->
             PillStack(
+                modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
                 items = crumb.menu.orEmpty(),
                 selectedKey = crumb.menuSelected,
                 onSelect = { key ->
@@ -1293,6 +1295,7 @@ private fun MainDestination(
                     HiveAction(
                         HiveGlyph.Stop,
                         stringResource(Res.string.hive_stop_run),
+                        danger = true,
                         onClick = { confirmingStopRun = true },
                         modifier = Modifier.tourTarget(TourTargetId.HIVE_STOP),
                     ),
@@ -1492,7 +1495,8 @@ private fun MainDestination(
                                     queenNotes = live.queen,
                                     viewState = timelineViewState,
                                     logSourceState = logSourceState,
-                                    showViewTabs = false,
+                                    // The wide header has no breadcrumb stack yet, so the views stay as tabs there.
+                                    showViewTabs = !compact,
                                     logSources = remember(
                                         live.run.id,
                                         live.definition,

@@ -106,6 +106,10 @@ eventCountForRun:
 SELECT COUNT(*) FROM event WHERE run_id = ?;
 eventPayloadsForRunBySeq:
 SELECT payload FROM event WHERE run_id = ? ORDER BY seq;
+eventRowsForRunBySeq:
+SELECT occurred_at, payload FROM event WHERE run_id = ? ORDER BY seq;
+eventExistsForRun:
+SELECT 1 FROM event WHERE run_id = ? LIMIT 1;
 deleteChainMeta:
 DELETE FROM meta WHERE key = ?;
 deleteAllChainMeta:

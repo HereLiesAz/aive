@@ -68,6 +68,19 @@ class EventChainTest {
     }
 
     @Test
+    fun aTimeColumnEditedAwayFromItsPayloadIsDetected(): Unit = runBlocking {
+        val file = tempDatabase()
+        val persistence = desktopSqlWorkflowPersistence(file)
+        (1..3).forEach { persistence.events.append(started("t$it", it.toLong())) }
+        assertEquals(ChainStatus.Intact(3), persistence.eventChainStatus(runId))
+
+        // The Log orders by this column, which the payload hash does not cover.
+        sql(file, "UPDATE event SET occurred_at = 99 WHERE seq = 1")
+
+        assertIs<ChainStatus.Altered>(desktopSqlWorkflowPersistence(file).eventChainStatus(runId))
+    }
+
+    @Test
     fun aDeletedEventIsDetected(): Unit = runBlocking {
         val file = tempDatabase()
         val persistence = desktopSqlWorkflowPersistence(file)

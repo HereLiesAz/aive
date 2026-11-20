@@ -404,8 +404,9 @@ internal fun HiveControlsBar(
             }
             val hiveActions = LocalHiveActions.current
             val buttons: @Composable () -> Unit = {
-                if (!building) hiveActions.forEach { action ->
-                    RoundGlyphButton(action.glyph, action.label, onClick = action.onClick, selected = action.selected, modifier = action.modifier)
+                // In Edit too: the run goes on while its wiring is edited, so Pause and Stop stay in reach.
+                hiveActions.forEach { action ->
+                    RoundGlyphButton(action.glyph, action.label, onClick = action.onClick, selected = action.selected, danger = action.danger, modifier = action.modifier)
                 }
                 if (building) {
                     RoundGlyphButton(HiveGlyph.Undo, stringResource(Res.string.build_undo), enabled = canUndo, onClick = onUndo)
@@ -459,6 +460,8 @@ internal class HiveAction(
     val onClick: () -> Unit,
     val selected: Boolean = false,
     val modifier: Modifier = Modifier,
+    /** A destructive act (Stop): drawn in the danger colour so it is not taken for an ordinary control. */
+    val danger: Boolean = false,
 )
 
 /** The live hive's acts, offered by the page to the controls bar of the hive frame drawn inside it. */
@@ -793,8 +796,13 @@ internal fun RoundGlyphButton(
     enabled: Boolean = true,
     selected: Boolean = false,
     modifier: Modifier = Modifier,
+    danger: Boolean = false,
 ) {
-    val ink = if (enabled) azphaltOnSurface() else azphaltMutedOnSurface().copy(alpha = 0.5f)
+    val ink = when {
+        !enabled -> azphaltMutedOnSurface().copy(alpha = 0.5f)
+        danger -> AzphaltDanger
+        else -> azphaltOnSurface()
+    }
     Box(
         modifier
             .size(AzphaltMinTouchTarget)
@@ -806,7 +814,7 @@ internal fun RoundGlyphButton(
         Box(
             Modifier.size(34.dp).clip(CircleShape)
                 .then(if (selected) Modifier.background(azphaltOnSurface().copy(alpha = 0.18f)) else Modifier)
-                .border(1.dp, azphaltMutedOnSurface().copy(alpha = 0.5f), CircleShape),
+                .border(1.dp, if (danger && enabled) AzphaltDanger else azphaltMutedOnSurface().copy(alpha = 0.5f), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Glyph(glyph, ink, Modifier.size(17.dp))
