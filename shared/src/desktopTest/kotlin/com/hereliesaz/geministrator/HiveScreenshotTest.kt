@@ -61,6 +61,35 @@ class HiveScreenshotTest {
         }
     }
 
+    /** A shot taken after a tap at each of [taps] (pixels), for a menu that opens on a touch. */
+    private fun shootTapping(
+        name: String,
+        width: Int,
+        height: Int,
+        taps: List<androidx.compose.ui.geometry.Offset>,
+        content: @androidx.compose.runtime.Composable () -> Unit,
+    ) {
+        ImageComposeScene(width = width, height = height, density = Density(2f)) {
+            LoadAzphaltFonts()
+            Box(Modifier.fillMaxSize().background(Azphalt.currentGround.page).padding(12.dp)) { content() }
+        }.use { scene ->
+            var clock = 0L
+            fun frame(ms: Int) = scene.render((ms * 1_000_000L).also { clock = it })
+            frame(0); frame(400); frame(900)
+            var ms = 1_000
+            for (tap in taps) {
+                scene.sendPointerEvent(androidx.compose.ui.input.pointer.PointerEventType.Press, tap)
+                frame(ms); ms += 100
+                scene.sendPointerEvent(androidx.compose.ui.input.pointer.PointerEventType.Release, tap)
+                for (i in 0 until 8) { frame(ms); ms += 100 }
+            }
+            val image = frame(ms)
+            val bytes = image.encodeToData()!!.bytes
+            ScreenshotChecks.check(name, bytes, width, height)
+            File(out, "$name.png").writeBytes(bytes)
+        }
+    }
+
     private val engineer = BuiltInRoles.ImplementationEngineer
     private val qa = BuiltInRoles.QaEngineer
     private val architect = BuiltInRoles.Architect
@@ -512,6 +541,23 @@ class HiveScreenshotTest {
         }
         shoot("25-shell-hive", 2400, 1500) { shell(ControlRoomDestination.Overview, live, false)() }
         shoot("26-shell-phone-hive", 824, 1830) { shell(ControlRoomDestination.Overview, live, true)() }
+        shootTapping("26b-shell-phone-places", 824, 1830, listOf(androidx.compose.ui.geometry.Offset(110f, 209f))) {
+            shell(ControlRoomDestination.Overview, live, true)()
+        }
+        shoot("26c-shell-phone-story", 824, 1830) {
+            DurableUiState.store.putBoolean("overview.timeline", true)
+            shell(ControlRoomDestination.Overview, live, true)()
+        }
+        shootTapping("26d-shell-phone-story-stack", 824, 1830, listOf(androidx.compose.ui.geometry.Offset(520f, 209f))) {
+            DurableUiState.store.putBoolean("overview.timeline", true)
+            DurableUiState.store.putString("overview.timeline.view", "waterfall")
+            shell(ControlRoomDestination.Overview, live, true)()
+        }
+        shootTapping("26e-shell-phone-story-log", 824, 1830, listOf(androidx.compose.ui.geometry.Offset(520f, 209f), androidx.compose.ui.geometry.Offset(540f, 608f))) {
+            DurableUiState.store.putBoolean("overview.timeline", true)
+            DurableUiState.store.putString("overview.timeline.view", "waterfall")
+            shell(ControlRoomDestination.Overview, live, true)()
+        }
         shoot("27-shell-creature", 2400, 1500) { shell(ControlRoomDestination.Overview, live, false, selected = "build")() }
         shoot("28-shell-first-launch", 824, 1830) { shell(ControlRoomDestination.Overview, ApplicationRuntimeState.NoProject(), true)() }
         shoot("29-shell-swarm", 2400, 1500) { shell(ControlRoomDestination.Company, live, false)() }

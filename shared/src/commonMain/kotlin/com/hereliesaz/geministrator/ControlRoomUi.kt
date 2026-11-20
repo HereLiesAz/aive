@@ -44,6 +44,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
@@ -102,6 +104,10 @@ import com.hereliesaz.geministrator.resources.nav_runtime_no_project
 import com.hereliesaz.geministrator.resources.nav_runtime_no_run
 import com.hereliesaz.geministrator.resources.nav_runtime_resume_failed
 import com.hereliesaz.geministrator.resources.places_hives
+import com.hereliesaz.geministrator.resources.timeline_view_log
+import com.hereliesaz.geministrator.resources.timeline_view_memory
+import com.hereliesaz.geministrator.resources.timeline_view_events
+import com.hereliesaz.geministrator.resources.timeline_view_waterfall
 import com.hereliesaz.geministrator.resources.keeper_room
 import com.hereliesaz.geministrator.resources.keeper_compute
 import com.hereliesaz.geministrator.resources.rail_inbox
@@ -516,6 +522,62 @@ fun ControlRoom(
         enabled = destination == ControlRoomDestination.Overview && !district.value && !inspectorVisible &&
             liveWorkflow != null && restingHive.value.isBlank() && showTimeline.value,
     ) { showTimeline.value = false }
+    // The Story's views and the Log's sources: one choice, made from the stack under its breadcrumb step.
+    val timelineView = rememberDurableStringState(TIMELINE_VIEW_KEY, TIMELINE_WATERFALL)
+    val logSourceChoice = rememberDurableStringState(LOG_SOURCE_KEY, com.hereliesaz.geministrator.log.LogSource.Run.name)
+    val waterfallLabel = stringResource(Res.string.timeline_view_waterfall)
+    val eventsLabel = stringResource(Res.string.timeline_view_events)
+    val memoryViewLabel = stringResource(Res.string.timeline_view_memory)
+    val logLabel = stringResource(Res.string.timeline_view_log)
+    val logSourceLabels = com.hereliesaz.geministrator.log.LogSource.entries.associateWith { logSourceLabel(it) }
+    val storyStack = listOf(
+        PillStackItem(TIMELINE_WATERFALL, waterfallLabel),
+        PillStackItem(TIMELINE_EVENTS, eventsLabel),
+        PillStackItem(TIMELINE_MEMORY, memoryViewLabel),
+        PillStackItem(
+            TIMELINE_LOG, logLabel,
+            children = com.hereliesaz.geministrator.log.LogSource.entries
+                .filter { it != com.hereliesaz.geministrator.log.LogSource.Memory || memoryLayer?.journal != null }
+                .map { PillStackItem("log:${it.name}", logSourceLabels.getValue(it)) },
+        ),
+    )
+    val storySelected = if (timelineView.value == TIMELINE_LOG) "log:${logSourceChoice.value}" else timelineView.value
+    val onStory: (String) -> Unit = { key ->
+        when {
+            key.startsWith("log:") -> {
+                timelineView.value = TIMELINE_LOG
+                logSourceChoice.value = key.removePrefix("log:")
+            }
+            else -> timelineView.value = key
+        }
+    }
+    // A phone's places hang under the first step: Hives, then the sections of ControlRoomDestination.OverviewSections.
+    val hivesLabel = stringResource(Res.string.places_hives)
+    val sectionsList = ControlRoomDestination.OverviewSections.filter { it != ControlRoomDestination.Memory }
+    val sectionLabels = sectionsList.map { it.displayLabel() }
+    val placesStack = if (compact) {
+        listOf(PillStackItem("hives", hivesLabel)) + sectionsList.mapIndexed { i, section -> PillStackItem(section.name, sectionLabels[i]) }
+    } else {
+        null
+    }
+    val placesSelected = when {
+        destination == ControlRoomDestination.Overview && district.value -> "hives"
+        else -> sectionsList.firstOrNull { it == destination }?.name
+    }
+    val onPlace: (String) -> Unit = { key ->
+        if (key == "hives") {
+            if (destination == ControlRoomDestination.Overview && district.value) {
+                district.value = false
+            } else {
+                zoomOut()
+                onDestinationSelected(ControlRoomDestination.Overview)
+            }
+        } else {
+            sectionsList.firstOrNull { it.name == key }?.let { section ->
+                onDestinationSelected(if (section == destination) ControlRoomDestination.Overview else section)
+            }
+        }
+    }
     val crumbs = shellCrumbs(
         destination = destination,
         inDistrict = district.value,
@@ -563,6 +625,13 @@ fun ControlRoom(
         onCloseKeeperPart = if (compact && keeperOpen.value) ({ keeperOpen.value = false }) else null,
         // The repository is linked and changed in Connections.
         onOpenRepository = openConnections,
+        places = placesStack,
+        placesSelected = placesSelected,
+        onPlace = onPlace,
+        story = storyStack,
+        storySelected = storySelected,
+        onStory = onStory,
+        storyPath = if (timelineView.value == TIMELINE_LOG) listOf(TIMELINE_LOG) else emptyList(),
     )
 
     // The creature's panel: in a sheet on a phone, docked beside the page on wide screens.
@@ -798,6 +867,8 @@ fun ControlRoom(
                 keeperSectionName = keeperSectionName,
                 keeperOpen = keeperOpen,
                 showTimelineState = showTimeline,
+                timelineViewState = timelineView,
+                logSourceState = logSourceChoice,
                 runtimeState = runtimeState,
             )
             if (inspectorVisible && !compact) selectedTaskId?.let { taskId -> key(taskId) {
@@ -881,7 +952,18 @@ internal fun shellHiveLabel(definition: WorkflowDefinition, run: WorkflowRun, pr
     definition.name.takeUnless { it.isBlank() || it == run.objective.take(80) } ?: project.name
 
 /** One step of the breadcrumb: where the keeper is, and the way back up. */
-internal data class ShellCrumb(val label: String, val seed: String, val onClick: (() -> Unit)?)
+internal data class ShellCrumb(
+    val label: String,
+    val seed: String,
+    val onClick: (() -> Unit)?,
+    /** A stack that hangs under this step when it is opened (HG2Gui's pill menu, PillStack.kt); null for a plain step. */
+    val menu: List<PillStackItem>? = null,
+    /** The menu's leaf that is open now. */
+    val menuSelected: String? = null,
+    val onMenuSelect: ((String) -> Unit)? = null,
+    /** Hosts the menu starts opened on, outermost first. */
+    val menuPath: List<String> = emptyList(),
+)
 
 /**
  * The breadcrumb (docs/Keepers-Room.md, stage 2): Hive › repository › hive › creature, or Hive › a place
@@ -902,14 +984,30 @@ private fun shellCrumbs(
     onCloseCreature: () -> Unit,
     onCloseKeeperPart: (() -> Unit)?,
     onOpenRepository: (() -> Unit)? = null,
+    /** The places (Hives, Breeds, Nursery, Shop) that hang under the first step on a phone; null where the rail holds them. */
+    places: List<PillStackItem>? = null,
+    placesSelected: String? = null,
+    onPlace: ((String) -> Unit)? = null,
+    /** The Story's views (and the Log's sources) that hang under its step. */
+    story: List<PillStackItem>? = null,
+    storySelected: String? = null,
+    onStory: ((String) -> Unit)? = null,
+    storyPath: List<String> = emptyList(),
 ): List<ShellCrumb> = buildList {
-    add(ShellCrumb(stringResource(Res.string.crumb_hive), "crumb-hive", onOpenDistrict))
+    add(
+        ShellCrumb(
+            stringResource(Res.string.crumb_hive), "crumb-hive", onOpenDistrict,
+            menu = places, menuSelected = placesSelected, onMenuSelect = onPlace,
+        ),
+    )
     when {
         destination == ControlRoomDestination.Overview -> {
             if (inDistrict) return@buildList
             repositoryName?.takeIf(String::isNotBlank)?.let { add(ShellCrumb(it, "crumb-repository", onOpenRepository)) }
             hiveName?.takeIf(String::isNotBlank)?.let { add(ShellCrumb(it, "crumb-a-hive", onOpenHive)) }
-            if (creatureName == null) timelineName?.let { add(ShellCrumb(it, "crumb-timeline", null)) }
+            if (creatureName == null) timelineName?.let {
+                add(ShellCrumb(it, "crumb-timeline", null, menu = story, menuSelected = storySelected, onMenuSelect = onStory, menuPath = storyPath))
+            }
             creatureName?.let { add(ShellCrumb(it, "crumb-creature", onCloseCreature)) }
             if (creatureName != null) creatureTab?.let { add(ShellCrumb(it, "crumb-creature-tab", null)) }
         }
@@ -950,6 +1048,12 @@ private fun ShellHeader(
     onOpenKeeper: () -> Unit,
     compact: Boolean,
 ) {
+    // The step whose stack is open, and where each step stands, so the stack hangs under its own step.
+    var openMenu by remember { mutableStateOf<String?>(null) }
+    val anchors = rememberCrumbAnchors()
+    // A stack belongs to the page it was opened on: leaving the step closes it.
+    LaunchedEffect(crumbs.map { it.seed }) { if (crumbs.none { it.seed == openMenu }) openMenu = null }
+    androidx.compose.runtime.CompositionLocalProvider(LocalCrumbAnchors provides anchors) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = if (compact) 12.dp else 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -964,16 +1068,31 @@ private fun ShellHeader(
                     modifier = Modifier.azphaltLiveRegion(),
                 )
             }
-            if (!compact) Breadcrumb(crumbs, Modifier.weight(1f)) else Spacer(Modifier.weight(1f))
+            if (!compact) Breadcrumb(crumbs, openMenu, { openMenu = it }, Modifier.weight(1f)) else Spacer(Modifier.weight(1f))
             InboxBadge(unread = unreadInbox, onClick = onOpenInbox, modifier = Modifier.tourTarget(TourTargetId.MESSAGES_BUTTON))
             KeeperButton(selected = keeperOpen, onClick = onOpenKeeper, modifier = Modifier.tourTarget(TourTargetId.KEEPERS_ROOM_GEAR))
         }
-        if (compact) Breadcrumb(crumbs, Modifier.fillMaxWidth())
+        if (compact) Breadcrumb(crumbs, openMenu, { openMenu = it }, Modifier.fillMaxWidth())
+        crumbs.firstOrNull { it.seed == openMenu && it.menu != null }?.let { crumb ->
+            PillStack(
+                items = crumb.menu.orEmpty(),
+                selectedKey = crumb.menuSelected,
+                onSelect = { key ->
+                    openMenu = null
+                    crumb.onMenuSelect?.invoke(key)
+                },
+                seedPrefix = crumb.seed,
+                anchorKey = crumb.seed,
+                initialPath = crumb.menuPath,
+            )
+        }
+    }
     }
 }
 
 @Composable
-private fun Breadcrumb(crumbs: List<ShellCrumb>, modifier: Modifier = Modifier) {
+private fun Breadcrumb(crumbs: List<ShellCrumb>, openMenu: String?, onMenu: (String?) -> Unit, modifier: Modifier = Modifier) {
+    val anchors = LocalCrumbAnchors.current
     val label = stringResource(Res.string.crumb_label)
     val here = stringResource(Res.string.crumb_here)
     val scroll = rememberScrollState()
@@ -989,7 +1108,8 @@ private fun Breadcrumb(crumbs: List<ShellCrumb>, modifier: Modifier = Modifier) 
         crumbs.forEachIndexed { index, crumb ->
             if (index > 0) Text("›", style = AzphaltType.lead, color = azphaltOnSurface(), modifier = Modifier.clearAndSetSemantics {})
             val last = index == crumbs.lastIndex
-            val onClick = crumb.onClick
+            // A step with a stack opens it under itself; one without goes where it always went.
+            val onClick = if (crumb.menu != null) ({ onMenu(if (openMenu == crumb.seed) null else crumb.seed) }) else crumb.onClick
             Text(
                 text = crumb.label,
                 style = AzphaltType.body.copy(fontWeight = if (last) FontWeight.ExtraBold else FontWeight.Medium),
@@ -1001,8 +1121,10 @@ private fun Breadcrumb(crumbs: List<ShellCrumb>, modifier: Modifier = Modifier) 
                     // The text sits in the middle of its touch target, level with the chevrons beside it.
                     .defaultMinSize(minHeight = AzphaltMinTouchTarget)
                     .wrapContentHeight(Alignment.CenterVertically)
+                    .onGloballyPositioned { anchors?.put(crumb.seed, it.positionInRoot().x) }
                     .semantics(mergeDescendants = true) {
                         contentDescription = crumb.label
+                        if (crumb.menu != null) stateDescription = if (openMenu == crumb.seed) "open" else "closed"
                         if (last) {
                             heading()
                             stateDescription = here
@@ -1023,33 +1145,11 @@ private fun OverviewSectionTabs(
     compact: Boolean,
     destination: ControlRoomDestination,
     onDestinationSelected: (ControlRoomDestination) -> Unit,
-    leading: @Composable () -> Unit = {},
-    /** Whether the live hive's own controls (Pause, Stop and the rest) have a row of their own under the places. */
+    /** Whether the live hive's own controls (Pause, Stop and the rest) have a row of their own. */
     showControls: Boolean = false,
     trailing: @Composable () -> Unit = {},
 ) {
-    // On a wide window the rail holds the places; the row keeps only the hive's own pills.
-    val places = compact
-    // Places (Hives, Team, Stable, Store) on one row; what the live hive does (Pause, Stop, Timeline, Share, More editing) on the next.
-    if (places) Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = hiveGutter(compact), vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        leading()
-        // The Memory swarm is not a pill here: it is the last view in a live hive's Timeline row
-        // (RunTimeline's memoryContent). The index stays the section's own, so the others keep their colours.
-        if (places) ControlRoomDestination.OverviewSections.forEachIndexed { index, section ->
-            if (section == ControlRoomDestination.Memory) return@forEachIndexed
-            AzphaltPill(
-                label = section.displayLabel(),
-                seed = "overview-section-$index-${section.name}",
-                selected = section == destination,
-                onClick = {
-                    onDestinationSelected(if (section == destination) ControlRoomDestination.Overview else section)
-                },
-            )
-        }
-    }
+    // The places (Hives, Breeds, Nursery, Shop) hang under the first breadcrumb step (PillStack.kt); this holds only the hive's own pills.
     if (showControls) Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = hiveGutter(compact), vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1146,6 +1246,9 @@ private fun MainDestination(
     keeperSectionName: MutableState<String> = remember { mutableStateOf(KeeperSection.Connections.name) },
     keeperOpen: MutableState<Boolean> = remember { mutableStateOf(false) },
     showTimelineState: MutableState<Boolean> = rememberDurableBooleanState("overview.timeline"),
+    /** The Story's view and Log source, chosen from its stack under the breadcrumb (see ControlRoom). */
+    timelineViewState: MutableState<String> = rememberDurableStringState(TIMELINE_VIEW_KEY, TIMELINE_WATERFALL),
+    logSourceState: MutableState<String> = rememberDurableStringState(LOG_SOURCE_KEY, com.hereliesaz.geministrator.log.LogSource.Run.name),
 ) {
     // Held above the places row: a live hive's own pills (Timeline, More editing) ride in it.
     var showTimeline by showTimelineState
@@ -1208,7 +1311,7 @@ private fun MainDestination(
         val liveHive = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
             ?.takeIf { destination == ControlRoomDestination.Overview && !district.value && restingHive.value.isBlank() }
         // Wide windows have the rail; the row stays only for a live hive's own pills.
-        if (destination.navigationItem == ControlRoomDestination.Overview && !firstLaunch && (compact || (liveHive != null && showTimeline))) {
+        if (destination.navigationItem == ControlRoomDestination.Overview && !firstLaunch && liveHive != null && showTimeline) {
             val inDistrictNow = destination == ControlRoomDestination.Overview && district.value
             // Only while the run is unfinished; red, since it ends the work. It leads the row on a phone,
             // where the hive's own pills scroll off the end, and heads them on a wide window.
@@ -1237,22 +1340,6 @@ private fun MainDestination(
                 compact,
                 destination,
                 onDestinationSelected,
-                leading = {
-                    // Hives: the district, every hive at once, with New hive, the Stable and drifters.
-                    AzphaltPill(
-                        label = stringResource(Res.string.places_hives),
-                        seed = "places-hives",
-                        selected = inDistrictNow,
-                        onClick = {
-                            if (inDistrictNow) {
-                                district.value = false
-                            } else {
-                                onZoomOut()
-                                onDestinationSelected(ControlRoomDestination.Overview)
-                            }
-                        },
-                    )
-                },
                 showControls = liveHive != null && showTimeline,
             ) {
                 // The hive's own controls, on their own row under the places.
@@ -1403,6 +1490,9 @@ private fun MainDestination(
                                     onTaskSelected = onOpenCreature,
                                     onShowHive = { showTimeline = false },
                                     queenNotes = live.queen,
+                                    viewState = timelineViewState,
+                                    logSourceState = logSourceState,
+                                    showViewTabs = false,
                                     logSources = remember(
                                         live.run.id,
                                         live.definition,

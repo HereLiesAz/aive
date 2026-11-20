@@ -189,6 +189,11 @@ internal fun RunTimeline(
     logSources: RunLogSources? = null,
     /** What the queen says about this run, as her place in the Story (sentences only; what needs the keeper is in Messages). */
     queenNotes: List<com.hereliesaz.geministrator.queen.QueenNote> = emptyList(),
+    /** The chosen view and Log source, shared with the Story's stack under its breadcrumb step; null keeps their own. */
+    viewState: androidx.compose.runtime.MutableState<String>? = null,
+    logSourceState: androidx.compose.runtime.MutableState<String>? = null,
+    /** False when the views are picked elsewhere (that stack), so no row of them is drawn here. */
+    showViewTabs: Boolean = true,
 ) {
     var events by remember(runKey) { mutableStateOf<List<WorkflowEvent>?>(null) }
     // Reload on every change of the run, but keep showing the last events meanwhile: only a different
@@ -207,7 +212,7 @@ internal fun RunTimeline(
     }
     // Sorted once per load, not on every recomposition.
     val sortedEvents = remember(events) { events?.sortedBy { it.occurredAtEpochMillis } }
-    var view by rememberDurableStringState("overview.timeline.view", TIMELINE_WATERFALL)
+    var view by viewState ?: rememberDurableStringState(TIMELINE_VIEW_KEY, TIMELINE_WATERFALL)
     val shown = when {
         view == TIMELINE_MEMORY && memoryContent == null -> TIMELINE_WATERFALL
         view == TIMELINE_LOG && logSources == null -> TIMELINE_WATERFALL
@@ -223,20 +228,22 @@ internal fun RunTimeline(
         val overview: (@Composable () -> Unit)? = onShowHive?.let { show ->
             { AzphaltPill(label = stringResource(Res.string.hive_show_hive), seed = "timeline-show-hive", onClick = show) }
         }
-        AzphaltTabs(
-            tabs = buildList {
-                add(AzphaltTabItem(TIMELINE_WATERFALL, stringResource(Res.string.timeline_view_waterfall)))
-                add(AzphaltTabItem(TIMELINE_EVENTS, stringResource(Res.string.timeline_view_events)))
-                if (memoryContent != null) add(AzphaltTabItem(TIMELINE_MEMORY, stringResource(Res.string.timeline_view_memory)))
-                if (logSources != null) add(AzphaltTabItem(TIMELINE_LOG, stringResource(Res.string.timeline_view_log)))
-            },
-            selectedKey = shown,
-            onSelected = { view = it },
-            seedPrefix = "timeline-view",
-            leading = overview,
-            keepSelectedInView = true,
-            wrap = true,
-        )
+        if (showViewTabs) {
+            AzphaltTabs(
+                tabs = buildList {
+                    add(AzphaltTabItem(TIMELINE_WATERFALL, stringResource(Res.string.timeline_view_waterfall)))
+                    add(AzphaltTabItem(TIMELINE_EVENTS, stringResource(Res.string.timeline_view_events)))
+                    if (memoryContent != null) add(AzphaltTabItem(TIMELINE_MEMORY, stringResource(Res.string.timeline_view_memory)))
+                    if (logSources != null) add(AzphaltTabItem(TIMELINE_LOG, stringResource(Res.string.timeline_view_log)))
+                },
+                selectedKey = shown,
+                onSelected = { view = it },
+                seedPrefix = "timeline-view",
+                leading = overview,
+                keepSelectedInView = true,
+                wrap = true,
+            )
+        }
         // Memory scrolls itself; the timeline's own views share one scrolling body under the fixed row.
         if (shown == TIMELINE_MEMORY) {
             Box(Modifier.weight(1f).fillMaxWidth()) { memoryContent?.invoke() }
@@ -250,6 +257,8 @@ internal fun RunTimeline(
                 sources = logSources,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 onTaskSelected = onTaskSelected,
+                sourceState = logSourceState,
+                showSourceTabs = showViewTabs,
             )
             return@Column
         }
@@ -307,10 +316,11 @@ internal fun RunTimeline(
     }
 }
 
-private const val TIMELINE_WATERFALL = "waterfall"
-private const val TIMELINE_EVENTS = "events"
-private const val TIMELINE_MEMORY = "memory"
-private const val TIMELINE_LOG = "log"
+internal const val TIMELINE_VIEW_KEY = "overview.timeline.view"
+internal const val TIMELINE_WATERFALL = "waterfall"
+internal const val TIMELINE_EVENTS = "events"
+internal const val TIMELINE_MEMORY = "memory"
+internal const val TIMELINE_LOG = "log"
 
 /**
  * A hive that has never run (mockups H2, H6): its workflow at rest, editable in Build, with the
