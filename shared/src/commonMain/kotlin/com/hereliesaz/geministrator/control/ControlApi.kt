@@ -17,7 +17,8 @@ import kotlinx.serialization.json.put
  * Answers are `{"ok":true,"result":...}` or `{"ok":false,"error":{"code","message"}}`, and every
  * answer is scrubbed of the token and of key shapes ([ControlRedaction]).
  *
- * There is no route that approves, rejects or releases a gate, and [routes] lists everything.
+ * The only route that decides anything is `POST /approvals/{run}/{creature}/approve`, which answers only where the owner switched
+ * remote approval on; no route rejects or releases a gate or lifts a spend stop. [routes] lists everything.
  */
 class ControlApi(
     private val host: ControlHost,
@@ -50,6 +51,7 @@ class ControlApi(
             ControlRoute(ControlMethod.POST, "/runs", "start_run", mutating = true),
             ControlRoute(ControlMethod.POST, "/runs/{id}/stop", "stop_run", mutating = true, destructive = true),
             ControlRoute(ControlMethod.GET, "/approvals", "list_approvals"),
+            ControlRoute(ControlMethod.POST, "/approvals/{id}/{cid}/approve", "approve_creature", mutating = true),
             ControlRoute(ControlMethod.GET, "/providers", "list_providers"),
             ControlRoute(ControlMethod.GET, "/settings", "get_settings"),
             ControlRoute(ControlMethod.GET, "/sources", "list_sources"),
@@ -167,6 +169,12 @@ class ControlApi(
             "start_run" -> host.startRun(obj())
             "stop_run" -> host.stopRun(p.getValue("id"))
             "list_approvals" -> host.listApprovals()
+            "approve_creature" -> {
+                if (!host.remoteApprovalAllowed) {
+                    controlError(ControlErrorCode.PolicyDenied, "Remote approval is off on this computer. The owner turns it on; until then approvals are decided in the app.")
+                }
+                host.approveCreature(p.getValue("id"), p.getValue("cid"))
+            }
             "list_providers" -> host.listProviders()
             "get_settings" -> host.settings()
             "list_sources" -> host.listSources()

@@ -74,7 +74,7 @@ The words are the app's: a **hive** is a workflow, a **creature** is one of its 
 | `aive_list_roles`, `aive_get_role` | `aive://roles`, `aive://roles/{id}` | roles, their authorities and preferred provider; instructions on the single role |
 | `aive_list_runs`, `aive_get_run` | `aive://runs`, `aive://runs/{id}` | runs; one run with each step: status, attempt, provider, providers it failed over from, progress, blocking reason, artifacts |
 | `aive_list_events` | `aive://runs/{id}/events` | the run's log, in order, paged with `after` |
-| `aive_list_approvals` | `aive://approvals` | what waits on a person. **Read-only.** |
+| `aive_list_approvals` | `aive://approvals` | what waits on a person. **Read-only**: the bridge offers no approve tool; only a control API call, and only where the owner set `AIVE_ALLOW_REMOTE_APPROVAL=1` on a headless engine, approves. |
 | `aive_list_providers` | `aive://providers` | each provider, whether it is connected, what it can do, and recent failover notes |
 | `aive_get_settings` | `aive://settings` | settings that hold no key |
 

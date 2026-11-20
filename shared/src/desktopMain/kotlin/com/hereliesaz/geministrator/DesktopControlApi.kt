@@ -206,6 +206,8 @@ internal abstract class ControlHostDelegate : ControlHost {
     override suspend fun getRun(id: String) = target().getRun(id)
     override suspend fun listEvents(runId: String, afterMillis: Long?, limit: Int) = target().listEvents(runId, afterMillis, limit)
     override suspend fun listApprovals() = target().listApprovals()
+    override val remoteApprovalAllowed: Boolean get() = target().remoteApprovalAllowed
+    override suspend fun approveCreature(runId: String, creatureId: String) = target().approveCreature(runId, creatureId)
     override suspend fun listProviders() = target().listProviders()
     override suspend fun settings() = target().settings()
     override suspend fun createHive(spec: kotlinx.serialization.json.JsonObject) = target().createHive(spec)
