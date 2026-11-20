@@ -1037,6 +1037,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="library_reusable_role">Reusable role</string>
     <string name="library_reusable_role_1">Reusable role · %1$s</string>
     <string name="library_run_loaded">Run loaded</string>
+    <string name="library_swarm_needs_queen">This swarm has no queen, so it cannot start. Add the queen to it, then start it again. Her approval is how a swarm is steered.</string>
     <string name="library_run_objective_inputs">Run objective / inputs</string>
     <string name="library_save_composition">SAVE COMPOSITION</string>
     <string name="library_save_reusable_workflow">Save reusable swarm</string>
