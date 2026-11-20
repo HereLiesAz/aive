@@ -890,7 +890,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="hive_legend_waiting">Waiting</string>
     <string name="hive_legend_needs_you">Needs you, or failed</string>
     <string name="hive_legend_note">A dot between two creatures: green if the first one finished, red if it did not</string>
-    <string name="hive_feed_eyebrow">FEED THE HIVE</string>
+    <string name="hive_feed_eyebrow">GIVE THE HIVE WORK</string>
     <string name="hive_feed_title">Give the swarm an objective</string>
     <string name="hive_feed_placeholder">What should this hive do next?</string>
     <string name="hive_feed_launch">Work</string>
@@ -1064,12 +1064,12 @@ What the server returns is treated as outside content, not instructions.</string
 
     <string name="lineage_a_new_run_that_reads_this">It keeps what it learned here and builds on it.</string>
     <string name="lineage_cancel_continue">Not now</string>
-    <string name="lineage_continue_this_run">Feed it more</string>
+    <string name="lineage_continue_this_run">Give it more work</string>
     <string name="lineage_lineage">LINEAGE</string>
     <string name="lineage_loading_runs">Loading swarms…</string>
     <string name="lineage_next_objective">What next?</string>
     <string name="lineage_no_earlier_runs_yet">No earlier swarms yet.</string>
-    <string name="lineage_start_continuation">Feed it</string>
+    <string name="lineage_start_continuation">Work</string>
     <string name="lineage_starts_a_new_line_of_work">Starts a new line of work with its own memory.</string>
     <string name="lineage_the_new_run_reads_every_chosen">The new swarm reads every chosen swarm's memory; where they disagree, both answers are kept.</string>
     <string name="lineage_the_new_run_reads_the_chosen">The new swarm reads the chosen swarm's memory and adds to its own.</string>
@@ -1361,7 +1361,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="first_hive_options">More: name, repository</string>
     <string name="first_hive_teach_seed">Teach me how to use the Aive</string>
     <string name="first_hive_teach_me">Teach me</string>
-    <string name="tutorial_needs_source_line">The lessons are planned by the queen, who thinks with a Source, and none is connected yet. Connect one below, then feed this again.</string>
+    <string name="tutorial_needs_source_line">The lessons are planned by the queen, who thinks with a Source, and none is connected yet. Connect one below, then work this again.</string>
     <string name="queen_away_notice_label">The queen</string>
     <string name="first_hive_free_line">Free to start: a free source is picked for you. Free sources may log what you write. Prompts and repository text leave this device.</string>
     <string name="first_hive_own_key">Use my own key</string>
@@ -2035,7 +2035,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="swarm_the_role_runs_as_an_ai">The role runs as an AI agent. Choose a source or leave it on Auto.</string>
     <string name="swarm_the_runner_receives_aive_context_aive">The runner receives aive_context, aive_script, and aive_language by default. aive_context includes attached surfaces; aive-result.json may return surfaceMutations.</string>
     <string name="swarm_the_workflow_receives_the_role_task">The workflow receives the role/task payload as JSON in the configured context input.</string>
-    <string name="swarm_these_are_aive_s_semantic_orchestration">These are The Aive's semantic orchestration roles. Each role can run through an AI source, GitHub Actions, local JavaScript, or a JavaScript/Python GitHub runner while keeping the same role identity and task contract.</string>
+    <string name="swarm_these_are_aive_s_semantic_orchestration">These are the roles your creatures can take. Each can think with an AI source, work in GitHub Actions, or run local JavaScript or Python, and keeps the same duties and the same promise of what it delivers.</string>
     <string name="swarm_this_id_is_reserved_by_the">This ID is reserved by The Aive.</string>
     <string name="swarm_this_restores_aive_s_default_role">This restores The Aive's default role definitions and default order. Custom roles are removed from the active roles but kept internally for historical swarm compatibility.</string>
     <string name="swarm_unnamed_surface">Unnamed surface</string>
@@ -2164,9 +2164,10 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="queen_say_tutorial_progress">You have done %1$s of %2$s steps of the tour. Answer any check-in with Lost me and I make the next steps smaller.</string>
     <string name="queen_say_tutorial_slower">You said you were lost, so I wrote the next steps smaller and I will ask again sooner.</string>
     <string name="queen_say_tutorial_hive_yours">That is the tour, and you showed me you are following. This hive is yours: it is your first hive, with your own swarm, and it goes on from here. Feed it more any time, or open a creature to see what it did.</string>
-    <string name="queen_say_tutorial_hive_yours_shaky">That is the tour, and some of it still felt shaky. This hive is yours all the same: it is your first hive, with your own swarm. Feed it a goal that begins with Teach me and I will go over any part again.</string>
+    <string name="queen_say_tutorial_hive_yours_shaky">That is the tour, and some of it still felt shaky. This hive is yours all the same: it is your first hive, with your own swarm. Give it a goal that begins with Teach me and I will go over any part again.</string>
     <string name="queen_title_tutorial">Following your tour</string>
     <string name="queen_title_finished">The swarm has finished</string>
+    <string name="queen_title_stopped">The swarm stopped</string>
     <string name="queen_title_tutorial_done">The tour is over</string>
     <string name="queen_say_missing_no_source">I have no Source to plan or review with, so I could not ask a planner or a reviewer. Connect a Source and I will use it. Until then I check only what I can check myself.</string>
     <string name="queen_say_missing_no_planner">My planner, %1$s, is switched off, so I have no one to break the hive into steps. Switch it on in Breeds.</string>

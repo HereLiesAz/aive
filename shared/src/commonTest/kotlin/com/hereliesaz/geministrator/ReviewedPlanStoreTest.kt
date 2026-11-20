@@ -99,6 +99,15 @@ class ReviewedPlanStoreTest {
     }
 
     @Test
+    fun theKeepersReviewSwitchSurvivesARestartAndAnOlderBlobReadsAsOff() {
+        val settings = InMemorySettings()
+        ReviewedPlanStore(settings).setPending(pending(now = 1_000).copy(requireReview = true))
+        assertEquals(true, ReviewedPlanStore(settings).pending(nowEpochMillis = 2_000)?.requireReview)
+        ReviewedPlanStore(settings).setPending(pending(now = 1_000))
+        assertEquals(false, ReviewedPlanStore(settings).pending(nowEpochMillis = 2_000)?.requireReview)
+    }
+
+    @Test
     fun aDecisionLeftWaitingForTooLongIsNotOffered() {
         val store = ReviewedPlanStore(InMemorySettings())
         store.setPending(pending(now = 1_000))

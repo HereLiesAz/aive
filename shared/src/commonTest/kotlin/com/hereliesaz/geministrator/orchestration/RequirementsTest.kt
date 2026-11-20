@@ -60,6 +60,21 @@ class RequirementsTest {
     }
 
     @Test
+    fun aPlanToTeachTheAppMayNotHaveAStepThatJudgesTheKeeper() {
+        val goal = "Teach me how to use the Aive"
+        val quiz = OrchestrationPlan(listOf(step("a", researcher, name = "Survey docs"), step("b", researcher, listOf("a"), name = "Quiz check")))
+        assertEquals(listOf("R-keeper-unseen"), unmet(goal, quiz))
+        val verify = OrchestrationPlan(listOf(step("a", researcher, name = "Verify understanding")))
+        assertEquals(listOf("R-keeper-unseen"), unmet(goal, verify))
+        val judged = OrchestrationPlan(listOf(OrchestrationPlanStep("a", "Lessons", "User completes example tasks and answers quiz questions", researcher)))
+        assertEquals(listOf("R-keeper-unseen"), unmet(goal, judged))
+        // Lessons that explain are fine, and the rule belongs to a teaching goal only.
+        val lessons = OrchestrationPlan(listOf(OrchestrationPlanStep("a", "Write lessons", "Explain each part of the app with examples", researcher)))
+        assertTrue(unmet(goal, lessons).isEmpty())
+        assertTrue(unmet("Summarise the docs", quiz).isEmpty())
+    }
+
+    @Test
     fun aModelYesNeverOverrulesAnUnmetResult() {
         val unmetResult = RequirementResult("R-1", RequirementVerdict.Unmet, "x", byCode = false)
         assertFalse(Requirements.approves(listOf(unmetResult)))

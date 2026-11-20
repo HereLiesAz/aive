@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.ApprovalPolicy
 import com.hereliesaz.geministrator.domain.EnvironmentPlanningPolicy
+import com.hereliesaz.geministrator.domain.EscalationPolicy
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.TaskDefinition
@@ -75,11 +76,32 @@ object OrchestratedWorkflowFactory {
                     },
                     environmentPlanningPolicy = EnvironmentPlanningPolicy.NotRequired,
                     resources = stepResources(step),
+                    optional = teachingReview(objective, step.roleId),
+                    escalationPolicy = teachingEscalation(objective, step.roleId),
                 )
             }),
             testDesignPolicy = TestDesignPolicy.BeforeAndAfterImplementation,
         )
     }
+
+    /**
+     * In a swarm that teaches the app, a creature that only reviews is optional: a reviewer that rejects (or cannot judge) skips itself
+     * and the swarm goes on, instead of failing the whole swarm, which is what ended the first hive twice. The lessons stay required.
+     */
+    internal fun teachingReview(objective: String, roleId: String): Boolean =
+        com.hereliesaz.geministrator.intro.TutorialRouter.isTutorialGoal(objective) && roleId.lowercase().contains("review")
+
+    /**
+     * In a swarm that teaches the app, a lesson that cannot be done does not fail the swarm: it waits as an escalation, and the queen
+     * rebuilds the remainder herself ([mendTeachingSwarms]). Every other swarm keeps failing the swarm, and a reviewing creature
+     * skips itself ([teachingReview]).
+     */
+    internal fun teachingEscalation(objective: String, roleId: String): EscalationPolicy =
+        if (com.hereliesaz.geministrator.intro.TutorialRouter.isTutorialGoal(objective) && !teachingReview(objective, roleId)) {
+            EscalationPolicy.RequireHumanDecision
+        } else {
+            EscalationPolicy.FailWorkflow
+        }
 
     /**
      * A safety net only: a plan for a goal to be taught the app that gave no creature the app's docs gets them on its first

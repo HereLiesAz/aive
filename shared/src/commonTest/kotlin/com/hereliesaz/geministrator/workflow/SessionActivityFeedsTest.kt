@@ -128,6 +128,9 @@ class SessionActivityFeedsTest {
         val line = SessionActivityLine(0L, SessionActivityKind.Thinking, "Checking\nthe   tests\tfirst")
         assertEquals("Checking the tests first", line.doingNowText())
         assertEquals("Checking…", line.doingNowText(maxChars = 9))
+        // A creature's text that opens with a list, a heading or a colon reads as a sentence, not as markdown.
+        assertEquals("Introduction - Hives - Queen", line.copy(text = ": - **Introduction** - Hives - Queen").doingNowText())
+        assertEquals("Plan", line.copy(text = "## Plan").doingNowText())
     }
 
     @Test

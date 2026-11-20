@@ -687,6 +687,12 @@ fun App(
         observer(timeline)
     }
     LaunchedEffect(runtime) { onRuntimeAvailable(runtime) }
+    // The queen mends a swarm that teaches the app while it runs (QueenMending.kt).
+    LaunchedEffect(runtime, orchestrationRuntime) {
+        val active = runtime
+        val planner = orchestrationRuntime
+        if (active != null && planner != null) active.mendTeachingSwarms(planner)
+    }
     LaunchedEffect(runtime, orchestrationRuntime) {
         onSwarmDrafterAvailable(
             orchestrationRuntime?.let { planner ->
