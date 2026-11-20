@@ -17,6 +17,9 @@ import com.hereliesaz.geministrator.domain.resolveRoleCollection
 import com.hereliesaz.geministrator.persistence.WorkflowPersistence
 import com.hereliesaz.geministrator.workflow.WorkflowComposer
 import com.hereliesaz.geministrator.workflow.WorkflowCompositionService
+import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.library_swarm_needs_queen
+import org.jetbrains.compose.resources.getString
 
 enum class WorkflowLibraryOrigin {
     Installed,
@@ -259,8 +262,12 @@ class WorkflowLibraryHost(
         definition: WorkflowDefinition,
         objective: String? = null,
         repository: com.hereliesaz.geministrator.domain.RepositoryRef? = null,
+        /** True for a swarm; false only for a single role launched on its own from the library. */
+        requireQueen: Boolean = true,
     ) {
         composition.validated(definition)
+        // Every swarm has a queen (D16): a swarm without one is not started.
+        require(!requireQueen || hasQueen(definition)) { getString(Res.string.library_swarm_needs_queen) }
         val neededRoleIds = buildSet {
             definition.tasks.forEach { task ->
                 task.roleId?.let(::add)

@@ -39,9 +39,14 @@ object PlanSizing {
 
     fun goalWords(objective: String): Int = objective.trim().split(Regex("\\s+")).count { it.isNotEmpty() }
 
-    /** True when [creatures] is more than a goal of this length justifies: a goal under [SMALL_GOAL_WORDS] words and more than [SMALL_GOAL_MAX_CREATURES] creatures. */
+    /**
+     * True when [creatures] is more than a goal of this length justifies: a goal under [SMALL_GOAL_WORDS] words and more than
+     * [SMALL_GOAL_MAX_CREATURES] creatures. A goal to be taught the app is short and wide ("Teach me how to use the Aive"),
+     * so its length says nothing about its size and it is never flagged.
+     */
     fun bigForSmallGoal(objective: String, creatures: Int): Boolean =
-        goalWords(objective) < SMALL_GOAL_WORDS && creatures > SMALL_GOAL_MAX_CREATURES
+        goalWords(objective) < SMALL_GOAL_WORDS && creatures > SMALL_GOAL_MAX_CREATURES &&
+            !com.hereliesaz.geministrator.intro.TutorialRouter.isTutorialGoal(objective)
 
     fun measure(objective: String, plan: OrchestrationPlan): PlanSize {
         val steps = plan.steps

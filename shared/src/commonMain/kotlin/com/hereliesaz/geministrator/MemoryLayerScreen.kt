@@ -53,6 +53,11 @@ import com.hereliesaz.geministrator.resources.common_dismiss
 import com.hereliesaz.geministrator.resources.common_remove
 import com.hereliesaz.geministrator.resources.common_retry
 import com.hereliesaz.geministrator.resources.memory_chunks
+import com.hereliesaz.geministrator.resources.memory_episode_age_days
+import com.hereliesaz.geministrator.resources.memory_episode_age_hours
+import com.hereliesaz.geministrator.resources.memory_episode_age_just_now
+import com.hereliesaz.geministrator.resources.memory_episode_age_minutes
+import com.hereliesaz.geministrator.resources.memory_episode_part
 import com.hereliesaz.geministrator.resources.memory_episodes
 import com.hereliesaz.geministrator.resources.memory_failed
 import com.hereliesaz.geministrator.resources.memory_late
@@ -663,6 +668,7 @@ private fun ModelsSection(controller: MemoryLayerController) {
     }
 }
 
+@OptIn(ExperimentalTime::class)
 @Composable
 private fun DataSection(controller: MemoryLayerController) {
     val scope = rememberCoroutineScope()
@@ -681,12 +687,31 @@ private fun DataSection(controller: MemoryLayerController) {
         title = stringResource(Res.string.memory_episodes, snapshot.episodes.size),
         body = stringResource(Res.string.memory_sections_memories_links, snapshot.sections.size, snapshot.nodes.size, snapshot.edges.size),
     )
+    // A session sent to memory in parts shows one row for each, titled by its part and told apart by its age (decisions page, N14).
+    var now by remember { mutableStateOf(Clock.System.now().toEpochMilliseconds()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(30_000)
+            now = Clock.System.now().toEpochMilliseconds()
+        }
+    }
+    val partsBySession = snapshot.episodes.groupBy { it.sourceSessionId }
+        .mapValues { (_, list) -> list.sortedBy { it.createdAtEpochMillis }.map { it.id } }
     snapshot.episodes.sortedByDescending { it.createdAtEpochMillis }.take(RECENT_EPISODES).forEach { episode ->
+        val parts = partsBySession[episode.sourceSessionId].orEmpty()
+        val prompt = episode.userPrompt.lineSequence().firstOrNull().orEmpty().take(120).ifBlank { episode.id.value }
+        val age = memoryElapsed(episode.createdAtEpochMillis, maxOf(now, episode.createdAtEpochMillis))
+        val ageText = when (age.unit) {
+            MemoryElapsedUnit.JustNow -> stringResource(Res.string.memory_episode_age_just_now)
+            MemoryElapsedUnit.Minutes -> stringResource(Res.string.memory_episode_age_minutes, age.amount)
+            MemoryElapsedUnit.Hours -> stringResource(Res.string.memory_episode_age_hours, age.amount)
+            MemoryElapsedUnit.Days -> stringResource(Res.string.memory_episode_age_days, age.amount)
+        }
         AzphaltRecord(
             seed = "memory-episode-${episode.id.value}",
             eyebrow = episode.projectId ?: stringResource(Res.string.memory_episode),
-            title = episode.userPrompt.lineSequence().firstOrNull().orEmpty().take(120).ifBlank { episode.id.value },
-            body = stringResource(Res.string.memory_chunks, episode.chunks.size),
+            title = if (parts.size > 1) stringResource(Res.string.memory_episode_part, prompt, parts.indexOf(episode.id) + 1, parts.size) else prompt,
+            body = stringResource(Res.string.memory_chunks, episode.chunks.size) + " · " + ageText,
             well = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

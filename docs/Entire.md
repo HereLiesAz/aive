@@ -6,7 +6,7 @@ The Aive finds `entire` on `PATH` (absolute entries only) or where its installer
 
 ## The Aive as an Entire agent
 
-With **Record runs as checkpoints** on (Repositories → Entire), each Local Git coding task in a repository where Entire is set up (`entire enable`) becomes a checkpoint, one per DAG node that changed the repository (`Local-Git-Repository-Operations.md`, "A checkpoint per task"); a task that changed nothing makes none:
+With **Record swarms as checkpoints** on (Repositories → Entire), each Local Git coding task in a repository where Entire is set up (`entire enable`) becomes a checkpoint, one per DAG node that changed the repository (`Local-Git-Repository-Operations.md`, "A checkpoint per task"); a task that changed nothing makes none:
 
 1. While the run works, The Aive writes its transcript to `~/.aive/entire/sessions/<session>.jsonl`: the task, the plan, the diff, the files changed and the tokens used. Transcripts not written for 30 days are deleted when the next run starts.
 2. It commits in its isolated worktree as before, with git hooks still disabled, so no repository code runs on the host.

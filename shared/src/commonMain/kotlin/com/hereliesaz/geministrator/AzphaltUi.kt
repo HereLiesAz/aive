@@ -325,14 +325,16 @@ internal fun AzphaltPill(
                 if (!enabled) disabled()
             }
             .alpha(if (enabled) 1f else 0.5f)
-            .azphaltSelectedTransform(selected)
             .defaultMinSize(minHeight = AzphaltMinTouchTarget)
             .clip(RoundedCornerShape(999.dp))
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
+        // Only the drawn capsule grows when selected, never the hit box around it: a pill that fills its row would
+        // otherwise swell past the fields above and below it (seen on the first form's Work).
         Row(
             modifier = Modifier
+                .azphaltSelectedTransform(selected)
                 .heightIn(min = AzphaltPillHeight)
                 .clip(RoundedCornerShape(999.dp))
                 .background(fill)

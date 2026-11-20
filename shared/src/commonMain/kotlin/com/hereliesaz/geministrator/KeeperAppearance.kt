@@ -27,6 +27,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.russhwolf.settings.Settings
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +41,8 @@ import com.hereliesaz.geministrator.resources.settings_creature_labels
 import com.hereliesaz.geministrator.resources.settings_creature_labels_always
 import com.hereliesaz.geministrator.resources.settings_creature_labels_crowded
 import com.hereliesaz.geministrator.resources.settings_creature_labels_explain
+import com.hereliesaz.geministrator.resources.settings_engineering_names
+import com.hereliesaz.geministrator.resources.settings_engineering_names_explain
 import com.hereliesaz.geministrator.resources.settings_ground
 import com.hereliesaz.geministrator.resources.settings_ground_explain
 import com.hereliesaz.geministrator.resources.settings_motion
@@ -70,6 +76,50 @@ internal fun KeeperAppearance(wide: Boolean = false) {
     )
     ReduceMotionSwitch()
     CreatureLabelsSwitch()
+    EngineeringNamesSwitch()
+}
+
+/** The plain name, with its engineering name beside it when the keeper asked for engineering names (D35). Tools are never passed through this: MCP servers keep their engineering name. */
+internal fun engineeringName(plain: String, engineering: String, show: Boolean): String =
+    if (show) "$plain ($engineering)" else plain
+
+/** The engineering names, kept out of the string resources (they are retired words in user text). */
+internal const val ENGINEERING_NANNY = "Hall Monitor"
+internal const val ENGINEERING_ORPHAN = "A2A agent"
+internal const val ENGINEERING_SWARM = "workflow"
+
+/** The keeper's "Show engineering names" switch (Keeper's room > Appearance), off by default, stored on this device. */
+internal object EngineeringNames {
+    private val settings by lazy { Settings() }
+
+    var show: Boolean by mutableStateOf(settings.getBoolean(SHOW_KEY, false))
+        private set
+
+    fun updateShow(on: Boolean) {
+        show = on
+        settings.putBoolean(SHOW_KEY, on)
+    }
+
+    private const val SHOW_KEY = "aive.appearance.show-engineering-names.v1"
+}
+
+/** Shows the Nanny, Orphan and Swarm names with their engineering names beside them. */
+@Composable
+private fun EngineeringNamesSwitch() {
+    val on = EngineeringNames.show
+    ProviderSectionLabel(stringResource(Res.string.settings_engineering_names))
+    Text(
+        stringResource(Res.string.settings_engineering_names_explain),
+        style = AzphaltType.body,
+        color = azphaltOnSurface(),
+    )
+    AzphaltToggle(
+        label = stringResource(Res.string.settings_engineering_names),
+        seed = "engineering-names-toggle",
+        selected = on,
+        onClick = { EngineeringNames.updateShow(!on) },
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 /** Lifts the [NAMED_CREATURE_LIMIT] so every creature keeps its label however full the hive is. */
@@ -199,6 +249,12 @@ private fun WideKeeperAppearance() {
         line = stringResource(Res.string.settings_creature_labels_explain, NAMED_CREATURE_LIMIT),
         on = labelsOn,
         onChange = { CreatureLabels.updateAlwaysShow(it) },
+    )
+    SwitchRow(
+        title = stringResource(Res.string.settings_engineering_names),
+        line = stringResource(Res.string.settings_engineering_names_explain),
+        on = EngineeringNames.show,
+        onChange = { EngineeringNames.updateShow(it) },
     )
 }
 

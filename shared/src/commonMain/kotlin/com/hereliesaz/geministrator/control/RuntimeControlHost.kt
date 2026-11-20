@@ -485,6 +485,7 @@ class RuntimeControlHost(
         val definition = r.persistence.definitions.get(WorkflowDefinitionId(hiveId)) ?: fail(ControlErrorCode.NotFound, "No hive $hiveId")
         val objective = spec.str("objective")?.trim().orEmpty()
         if (objective.isEmpty() || objective.length > 20_000) fail(ControlErrorCode.InvalidArgument, "objective is required (at most 20000 characters)")
+        if (!com.hereliesaz.geministrator.hasQueen(definition)) fail(ControlErrorCode.InvalidArgument, "This swarm has no queen, so it cannot start. Add her in the app first.")
         if (r.hasUnfinishedActiveRun()) fail(ControlErrorCode.Conflict, "A run is already unfinished; a new launch would replace it")
         try {
             WorkflowCompositionService(r.persistence).validated(definition)

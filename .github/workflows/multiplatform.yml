@@ -193,6 +193,13 @@ jobs:
           # A notebook the generator no longer writes must not linger either.
           test -z "$(git status --porcelain -- tools/orchestration_training/notebooks tools/memory_training/notebooks)"
 
+      # Gradle caches a dependency it could not find (a 404) for a day, and this job's Gradle home is restored from the
+      # previous run's cache, so one failed lookup (run 3167) kept every later run red at "Could not find
+      # kotlin-stdlib-2.4.21.jar" while the installer jobs, with caches of their own, built fine. Re-resolving once
+      # drops the stale lookups; the run that passes saves a clean cache.
+      - name: Refresh cached dependency lookups
+        run: ./gradlew --refresh-dependencies help
+
       - name: Test shared domain
         run: ./gradlew :shared:desktopTest
 

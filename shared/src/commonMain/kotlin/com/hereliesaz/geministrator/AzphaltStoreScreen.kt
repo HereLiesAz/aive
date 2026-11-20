@@ -39,8 +39,10 @@ import com.hereliesaz.geministrator.azphalt.InstalledAzphaltModelPackage
 import com.hereliesaz.geministrator.azphalt.InstalledAzphaltWorkflowPackage
 import com.hereliesaz.geministrator.azphalt.InstalledStoreLlm
 import com.hereliesaz.geministrator.azphalt.describePromptHandling
+import com.hereliesaz.geministrator.azphalt.forShop
 import com.hereliesaz.geministrator.azphalt.isDirectLlmPackage
 import com.hereliesaz.geministrator.azphalt.isModelAssetPackage
+import com.hereliesaz.geministrator.azphalt.packName
 import com.hereliesaz.geministrator.azphalt.storeFailureDetails
 import com.hereliesaz.geministrator.azphalt.storeStep
 import kotlinx.coroutines.CancellationException
@@ -118,9 +120,8 @@ import com.hereliesaz.geministrator.resources.store_tab_agents
 import com.hereliesaz.geministrator.resources.store_tab_all
 import com.hereliesaz.geministrator.resources.store_tab_breeds
 import com.hereliesaz.geministrator.resources.store_tab_hives
-import com.hereliesaz.geministrator.resources.store_tab_llms
 import com.hereliesaz.geministrator.resources.store_tab_installed
-import com.hereliesaz.geministrator.resources.store_tab_models
+import com.hereliesaz.geministrator.resources.store_tab_sources
 import com.hereliesaz.geministrator.resources.store_store_error
 import com.hereliesaz.geministrator.resources.store_failed_while
 import com.hereliesaz.geministrator.resources.store_step_index
@@ -171,8 +172,8 @@ private enum class AzphaltStoreCategory(val label: StringResource) {
     Workflows(Res.string.store_tab_hives),
     Breeds(Res.string.store_tab_breeds),
     Installed(Res.string.store_tab_installed),
-    Models(Res.string.store_tab_models),
-    Llms(Res.string.store_tab_llms),
+    /** One tab for what a creature thinks with: model assets and direct LLM packages (spec decision D26). A tab remembered as Models or Llms opens it. */
+    Sources(Res.string.store_tab_sources),
 }
 
 private fun AzphaltStoreStep.labelResource(): StringResource = when (this) {
@@ -225,7 +226,10 @@ internal fun AzphaltStoreScreen(
     var packages by remember(service) { mutableStateOf<List<AzphaltPackageSummary>>(emptyList()) }
     var query by rememberDurableStringState("azphalt-store.query")
     var categoryName by rememberDurableStringState("azphalt-store.category", AzphaltStoreCategory.All.name)
-    val category = AzphaltStoreCategory.entries.firstOrNull { it.name == categoryName } ?: AzphaltStoreCategory.All
+    val category = when (categoryName) {
+        "Models", "Llms" -> AzphaltStoreCategory.Sources
+        else -> AzphaltStoreCategory.entries.firstOrNull { it.name == categoryName } ?: AzphaltStoreCategory.All
+    }
     var selectedPackageIdValue by rememberDurableStringState("azphalt-store.selected-package")
     val selectedPackageId = selectedPackageIdValue.takeIf(String::isNotBlank)
     var prepared by remember { mutableStateOf<AzphaltPreparedInstall?>(null) }
@@ -341,13 +345,12 @@ internal fun AzphaltStoreScreen(
     val installedIds = snapshot?.let { loaded ->
         loaded.installed.map { it.packageId } + loaded.installedModels.map { it.packageId } + loaded.installedLlms.map { it.packageId }
     }.orEmpty().toSet()
-    val visiblePackages = packages.filter { item ->
+    val visiblePackages = packages.forShop().filter { item ->
         when (category) {
             AzphaltStoreCategory.All -> true
             AzphaltStoreCategory.Workflows -> item.kind == "workflow"
             AzphaltStoreCategory.Roles -> item.kind == "role"
-            AzphaltStoreCategory.Models -> item.isModelAssetPackage()
-            AzphaltStoreCategory.Llms -> item.isDirectLlmPackage()
+            AzphaltStoreCategory.Sources -> item.isModelAssetPackage() || item.isDirectLlmPackage()
             AzphaltStoreCategory.Breeds -> false
             AzphaltStoreCategory.Installed -> item.id in installedIds
         }
@@ -527,6 +530,7 @@ internal fun AzphaltStoreScreen(
                     update?.updateAvailable == true -> stringResource(Res.string.store_update, update.latest ?: item.latest)
                     installed != null -> stringResource(Res.string.store_installed_1, installed.version)
                     installedModel != null -> stringResource(Res.string.store_installed_1, installedModel.version)
+                    item.packName() != null -> item.packName().orEmpty()
                     item.priceStatus != "free" -> item.priceStatus
                     modelAsset -> stringResource(Res.string.store_model_1, item.latest)
                     else -> item.latest
