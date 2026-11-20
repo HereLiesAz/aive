@@ -4,6 +4,8 @@ All notable changes to **The Aive** are documented here from the current product
 
 ## 0.91 — from 2026-11-19
 
+- **A download whose file was never published stops at once and says so.** A 404 or 410 from a release address is permanent, so the resumable downloaders (desktop and Android) no longer retry it eight times; they fail with "<file> is not published at its release address". This is what Settings → Local orchestration showed for `aive-orchestration-decisions-int8.tar.gz`: the release `orchestration-decisions-v1` the catalog names does not exist (404), so the model itself still has to be trained and uploaded (`tools/decision_training`). Desktop test `DesktopDownloadNotPublishedTest`; the Android change is not run here.
+
 - **A Source that answers a few requests a minute plans alone.** Running the CI desktop build, "Asking two more planners for their drafts" sat behind OVHcloud's two-requests-a-minute limit (LLM7 was out of credit and the plan failed over to it), so a first plan took minutes. While any Source the planners may use is limited to five requests a minute or fewer, the queen plans alone and the plan is reviewed as before (`FailoverOrchestrationAgentRuntime.planners`). Test added. Not run here; main CI is the compile.
 
 - **The web app leaves out the free Source a browser cannot call.** With the queen planning in the browser (main run 3209, first green), the first hive reached Kilo, whose server refuses the cross-origin preflight, and ended in "Fail to fetch" although LLM7 and OVHcloud, also linked, answer browsers. The web build now leaves Kilo out of the providers, the plan and the queen's model, so the next free Source answers. Found by running the CI web artifact in Chromium. Not run here; main CI is the compile.
