@@ -71,9 +71,10 @@ kotlin {
             implementation(compose.material3)
             implementation(compose.ui)
             implementation(compose.components.resources)
-            // Tracks h2g2's main (JitPack main-SNAPSHOT), never a commit. Builds that have the checkout under
-            // vendor/conveyance-h2g2 (CI, and local builds with it cloned) include it instead (settings.gradle.kts).
-            implementation("com.github.HereLiesAz:conveyance-h2g2:main-SNAPSHOT")
+            // Pinned to h2g2's release tag (JitPack), so a build is reproducible; bump it by hand when h2g2 ships what aive needs.
+            // Builds that have the checkout under vendor/conveyance-h2g2 (CI, and local builds with it cloned) include it
+            // instead (settings.gradle.kts), whatever this says. Keep the version in build.gradle.kts's substitution the same.
+            implementation("com.github.HereLiesAz:conveyance-h2g2:0.6.0")
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.multiplatform.settings.no.arg)

@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.conveyance.h2g2.H2g2
 import com.russhwolf.settings.Settings
 
 import androidx.compose.foundation.background
@@ -68,23 +69,14 @@ internal fun Modifier.azphaltLiveRegion(): Modifier =
     semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }
 
 internal object Azphalt {
-    val Ink = Color(0xFF1E1A17)
-    val Yellow = Color(0xFFF0D42A)
-    val White = Color(0xFFFFFFFF)
+    // The palette is conveyance-h2g2's (HG2Gui's own values), not a second copy that can drift from it.
+    val Ink = H2g2.ink
+    val Yellow = H2g2.yellow
+    val White = H2g2.white
 
-    val hues = listOf(
-        Color(0xFF6B4FBB), Color(0xFF2FA9C4), Color(0xFF1F9E86), Color(0xFF5AAE34),
-        Color(0xFFD9A21C), Color(0xFFD9762A), Color(0xFFC6392F), Color(0xFFB03A6E),
-        Color(0xFF8E4FA8), Color(0xFF2E6FB7), Color(0xFF8A9296), Color(0xFF4E7D6E),
-        Color(0xFFC9A45C), Color(0xFF8C6E4E),
-    )
+    val hues: List<Color> = H2g2.hues
 
-    val caps = listOf(
-        Color(0xFF4B3489), Color(0xFF1F7B90), Color(0xFF137060), Color(0xFF3E7D22),
-        Color(0xFFA2760F), Color(0xFFA6551A), Color(0xFF93251D), Color(0xFF7F2A4D),
-        Color(0xFF653578), Color(0xFF1E4E85), Color(0xFF616A6E), Color(0xFF365A4E),
-        Color(0xFF96762F), Color(0xFF634B31),
-    )
+    val caps: List<Color> = H2g2.caps
 
     data class Ground(
         val name: String,
@@ -94,14 +86,10 @@ internal object Azphalt {
         val weight: Int = 1,
     )
 
-    val grounds = listOf(
-        Ground("Mustard", Color(0xFFE8C81E), Color(0xFFF2D82C), Color(0xFFD9B615), weight = 6),
-        Ground("Maroon", Color(0xFF8F1F34), Color(0xFFA22940), Color(0xFF7A1A2C)),
-        Ground("Navy", Color(0xFF163A63), Color(0xFF204B7C), Color(0xFF0F2C4C)),
-        Ground("Cerulean", Color(0xFF2D6EA8), Color(0xFF3C82C2), Color(0xFF215A8C)),
-        Ground("Teal", Color(0xFF1D6B62), Color(0xFF267F74), Color(0xFF14554E)),
-        Ground("Pink", Color(0xFFD4728F), Color(0xFFDD879F), Color(0xFFC15D7A)),
-    )
+    /** The library's grounds, in its order and weights, as aive's own [Ground] (which [currentGround] persists by name). */
+    val grounds: List<Ground> = com.hereliesaz.conveyance.h2g2.grounds.map {
+        Ground(it.name, it.page, it.foldLight, it.foldDark, it.weight)
+    }
 
     private val settings = Settings()
     private const val GROUND_STORAGE_KEY = "aive.appearance.ground.v1"
