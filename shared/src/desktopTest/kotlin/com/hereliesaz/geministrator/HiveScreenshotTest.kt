@@ -635,6 +635,27 @@ class HiveScreenshotTest {
         DurableUiState.store.putString(MemoryView.STORAGE_KEY, MemoryView.Simple.name)
     }
 
+    /** Text fields are a borderless wash (HG2Gui has no borders): on the ground, in an Ink well, with a value, a hint and an error. */
+    @Test
+    fun shootsTheTextFields() {
+        shoot("46-text-fields", 1400, 1100) {
+            androidx.compose.foundation.layout.Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)) {
+                AzphaltTextField("", {}, "API key", placeholder = "Paste it here")
+                AzphaltTextField("a value that was typed", {}, "Name")
+                AzphaltTextField("bad", {}, "Address", errorMessage = "That is not an address")
+                AzphaltThemedSurface(Azphalt.Ink) {
+                    androidx.compose.foundation.layout.Column(
+                        Modifier.fillMaxSize().background(Azphalt.Ink).padding(16.dp),
+                        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp),
+                    ) {
+                        AzphaltTextField("", {}, "API key", placeholder = "Paste it here")
+                        AzphaltTextField("a value that was typed", {}, "Name")
+                    }
+                }
+            }
+        }
+    }
+
     /** The wide hive page (Figma desktop): title row, framed hive with its feed bar, and the docked creature panel. */
     @Test
     fun shootsTheWorkspace() {

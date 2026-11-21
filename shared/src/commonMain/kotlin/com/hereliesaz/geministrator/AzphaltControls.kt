@@ -1,5 +1,7 @@
 package com.hereliesaz.geministrator
 
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TextField
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.defaultMinSize
@@ -110,7 +112,9 @@ internal fun AzphaltTextField(
 ) {
     var revealed by remember { mutableStateOf(false) }
     val onGround = azphaltOnSurface()
-    OutlinedTextField(
+    // HG2Gui has no borders: a field is a 14% wash of the content colour (the "well"), its label floats inside it,
+    // and focus is the cursor, so no outline and no indicator line.
+    TextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
@@ -132,8 +136,53 @@ internal fun AzphaltTextField(
         },
         isError = errorMessage != null,
         supportingText = errorMessage?.let { message -> { Text(message, modifier = Modifier.azphaltLiveRegion()) } },
-        colors = azphaltTextFieldColors(),
+        colors = azphaltWellFieldColors(),
+        shape = RoundedCornerShape(AZPHALT_FIELD_CORNER),
         modifier = modifier.fillMaxWidth(),
+    )
+}
+
+/** The wash [AzphaltTextField] is filled with (HG2Gui: a 14% well), and its corner (the 20dp note radius, one of the four radii). */
+private const val FIELD_WASH = 0.14f
+private val AZPHALT_FIELD_CORNER = 20.dp
+
+/** [azphaltTextFieldColors]' text, label, cursor and icon colours on a [FIELD_WASH] container, with no indicator line. */
+@Composable
+internal fun azphaltWellFieldColors(): TextFieldColors {
+    val onGround = azphaltOnSurface()
+    val muted = azphaltMutedOnSurface()
+    val wash = onGround.copy(alpha = FIELD_WASH)
+    return TextFieldDefaults.colors(
+        focusedTextColor = onGround,
+        unfocusedTextColor = onGround,
+        disabledTextColor = muted,
+        errorTextColor = onGround,
+        focusedContainerColor = wash,
+        unfocusedContainerColor = wash,
+        disabledContainerColor = wash,
+        errorContainerColor = wash,
+        focusedIndicatorColor = Color.Transparent,
+        unfocusedIndicatorColor = Color.Transparent,
+        disabledIndicatorColor = Color.Transparent,
+        errorIndicatorColor = Color.Transparent,
+        focusedLabelColor = onGround,
+        unfocusedLabelColor = onGround,
+        disabledLabelColor = muted,
+        errorLabelColor = onGround,
+        cursorColor = onGround,
+        errorCursorColor = onGround,
+        focusedPlaceholderColor = muted,
+        unfocusedPlaceholderColor = muted,
+        disabledPlaceholderColor = muted,
+        errorPlaceholderColor = muted,
+        focusedSupportingTextColor = onGround,
+        unfocusedSupportingTextColor = onGround,
+        disabledSupportingTextColor = muted,
+        errorSupportingTextColor = onGround,
+        focusedTrailingIconColor = onGround,
+        unfocusedTrailingIconColor = onGround,
+        disabledTrailingIconColor = muted,
+        errorTrailingIconColor = onGround,
     )
 }
 
