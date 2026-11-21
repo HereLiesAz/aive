@@ -120,7 +120,7 @@ internal fun MermaidFlowchartPreview(
             edge.label?.takeIf(String::isNotBlank)?.let { label ->
                 val measured = textMeasurer.measure(
                     text = label,
-                    style = TextStyle(color = lineColor, fontSize = 10.sp),
+                    style = TextStyle(color = lineColor, fontSize = 11.sp),
                 )
                 val midpoint = Offset((start.x + end.x) / 2, (start.y + end.y) / 2)
                 drawText(

@@ -730,7 +730,7 @@ private fun StateChip(status: TaskRunStatus) {
     }
     Text(
         status.label().uppercase(),
-        style = AzphaltType.endCap.copy(fontSize = 10.sp),
+        style = AzphaltType.endCap.copy(fontSize = 11.sp),
         color = fill.onOpposite(),
         modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(fill).padding(horizontal = 8.dp, vertical = 4.dp),
     )

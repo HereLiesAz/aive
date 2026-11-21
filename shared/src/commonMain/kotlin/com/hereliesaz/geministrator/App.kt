@@ -1563,7 +1563,14 @@ private fun GeministratorTheme(content: @Composable () -> Unit) {
     // local and H2g2Motion's scale; both follow AzphaltMotion, the one switch the keeper sees.
     val reduce = AzphaltMotion.reduceMotion
     LaunchedEffect(reduce) { com.hereliesaz.conveyance.h2g2.H2g2Motion.updateDurationScale(if (reduce) 0f else 1f) }
-    CompositionLocalProvider(com.hereliesaz.conveyance.compose.LocalReducedMotion provides reduce) {
+    // The library's own pieces (status colours, the job progress bar) read the page ground from here. H2g2Theme itself is
+    // not used: it would roll its own ground and write the system animator scale over the keeper's Reduce motion switch.
+    val h2g2Ground = com.hereliesaz.conveyance.h2g2.grounds.firstOrNull { it.name == Azphalt.currentGround.name }
+        ?: com.hereliesaz.conveyance.h2g2.grounds.first()
+    CompositionLocalProvider(
+        com.hereliesaz.conveyance.compose.LocalReducedMotion provides reduce,
+        com.hereliesaz.conveyance.h2g2.LocalH2g2Ground provides h2g2Ground,
+    ) {
         MaterialTheme(
             colorScheme = GeministratorColors,
             content = content,
