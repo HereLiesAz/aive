@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -503,7 +502,7 @@ internal fun CustomCompanyProviderScreen(
                 style = AzphaltType.eyebrow,
                 color = azphaltOnSurface(),
             )
-            OutlinedTextField(
+            AzphaltWellField(
                 colors = azphaltTextFieldColors(),
                 value = roleNameDraft,
                 onValueChange = { roleNameDraft = it },
@@ -513,7 +512,7 @@ internal fun CustomCompanyProviderScreen(
             )
             val reservedRoleId = isRoleCollectionMarkerId(roleIdDraft.trim())
             // A creature's mind keeps its id: its creature, its breeds and its tasks hang on it.
-            if (focusRole == null) OutlinedTextField(
+            if (focusRole == null) AzphaltWellField(
                 colors = azphaltTextFieldColors(),
                 value = roleIdDraft,
                 onValueChange = { roleIdDraft = it },
@@ -527,7 +526,7 @@ internal fun CustomCompanyProviderScreen(
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            AzphaltWellField(
                 colors = azphaltTextFieldColors(),
                 value = roleDescDraft,
                 onValueChange = { roleDescDraft = it },
@@ -557,7 +556,7 @@ internal fun CustomCompanyProviderScreen(
                 choices = lessonChoices,
                 resetKey = editingRoleId,
             ) { field ->
-                OutlinedTextField(
+                AzphaltWellField(
                     colors = azphaltTextFieldColors(),
                     value = field.value,
                     onValueChange = field.onValueChange,
@@ -567,7 +566,7 @@ internal fun CustomCompanyProviderScreen(
                 )
             }
             // The keeper's own words for this role (the queen's too): added to every step it runs, never able to relax an approval, budget or permission.
-            OutlinedTextField(
+            AzphaltWellField(
                 colors = azphaltTextFieldColors(),
                 value = roleKeeperInstructionsDraft,
                 onValueChange = { roleKeeperInstructionsDraft = it.take(KeeperInstructions.MAX_CHARS) },
@@ -578,7 +577,7 @@ internal fun CustomCompanyProviderScreen(
                 minLines = 2,
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            AzphaltWellField(
                 colors = azphaltTextFieldColors(),
                 value = roleTokenBudgetDraft,
                 onValueChange = { input -> roleTokenBudgetDraft = input.filter(Char::isDigit) },
@@ -706,7 +705,7 @@ internal fun CustomCompanyProviderScreen(
                         )
                     }
 
-                    OutlinedTextField(
+                    AzphaltWellField(
                         colors = azphaltTextFieldColors(),
                         value = source.source,
                         onValueChange = { roleExecutionSourceDraft = source.copy(source = it) },
@@ -1179,7 +1178,7 @@ private fun CompanyRoleSurfaceEditor(
         selected = true,
         well = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
+                AzphaltWellField(
                     colors = azphaltTextFieldColors(),
                     value = surface.alias,
                     onValueChange = { value ->
@@ -1290,7 +1289,7 @@ private fun CompanySpreadsheetSurfaceFields(
     }
 
     when (val source = surface.source) {
-        is SpreadsheetSource.AppFile -> OutlinedTextField(
+        is SpreadsheetSource.AppFile -> AzphaltWellField(
             colors = azphaltTextFieldColors(),
             value = source.name,
             onValueChange = { onChange(surface.copy(source = source.copy(name = it))) },
@@ -1299,7 +1298,7 @@ private fun CompanySpreadsheetSurfaceFields(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        is SpreadsheetSource.Inline -> OutlinedTextField(
+        is SpreadsheetSource.Inline -> AzphaltWellField(
             colors = azphaltTextFieldColors(),
             value = source.text,
             onValueChange = { onChange(surface.copy(source = source.copy(text = it))) },
@@ -1307,7 +1306,7 @@ private fun CompanySpreadsheetSurfaceFields(
             minLines = 6,
             modifier = Modifier.fillMaxWidth(),
         )
-        is SpreadsheetSource.Https -> OutlinedTextField(
+        is SpreadsheetSource.Https -> AzphaltWellField(
             colors = azphaltTextFieldColors(),
             value = source.url,
             onValueChange = { onChange(surface.copy(source = source.copy(url = it), writable = false)) },
@@ -1315,7 +1314,7 @@ private fun CompanySpreadsheetSurfaceFields(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        is SpreadsheetSource.DocumentUri -> OutlinedTextField(
+        is SpreadsheetSource.DocumentUri -> AzphaltWellField(
             colors = azphaltTextFieldColors(),
             value = source.uri,
             onValueChange = { onChange(surface.copy(source = source.copy(uri = it))) },
@@ -1324,7 +1323,7 @@ private fun CompanySpreadsheetSurfaceFields(
             modifier = Modifier.fillMaxWidth(),
         )
         is SpreadsheetSource.GoogleSheet -> {
-            OutlinedTextField(
+            AzphaltWellField(
                 colors = azphaltTextFieldColors(),
                 value = source.spreadsheetId,
                 onValueChange = {
@@ -1341,7 +1340,7 @@ private fun CompanySpreadsheetSurfaceFields(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            AzphaltWellField(
                 colors = azphaltTextFieldColors(),
                 value = source.gid,
                 onValueChange = {
@@ -1439,7 +1438,7 @@ private fun CompanySqlSurfaceFields(
     }
 
     when (val source = surface.source) {
-        is SqlDatabaseSource.AppDatabase -> OutlinedTextField(
+        is SqlDatabaseSource.AppDatabase -> AzphaltWellField(
             colors = azphaltTextFieldColors(),
             value = source.name,
             onValueChange = { onChange(surface.copy(source = source.copy(name = it))) },
@@ -1448,7 +1447,7 @@ private fun CompanySqlSurfaceFields(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        is SqlDatabaseSource.DocumentUri -> OutlinedTextField(
+        is SqlDatabaseSource.DocumentUri -> AzphaltWellField(
             colors = azphaltTextFieldColors(),
             value = source.uri,
             onValueChange = { onChange(surface.copy(source = source.copy(uri = it), writable = false)) },
@@ -1457,7 +1456,7 @@ private fun CompanySqlSurfaceFields(
             modifier = Modifier.fillMaxWidth(),
         )
     }
-    OutlinedTextField(
+    AzphaltWellField(
         colors = azphaltTextFieldColors(),
         value = surface.query,
         onValueChange = { onChange(surface.copy(query = it)) },
@@ -1488,7 +1487,7 @@ private fun CompanyFlowchartSurfaceFields(
     surface: RoleSurface.Flowchart,
     onChange: (RoleSurface) -> Unit,
 ) {
-    OutlinedTextField(
+    AzphaltWellField(
         colors = azphaltTextFieldColors(),
         value = surface.source,
         onValueChange = { onChange(surface.copy(source = it)) },
@@ -1529,7 +1528,7 @@ private fun CompanyMaxRowsField(
     seed: String,
     onChange: (Int) -> Unit,
 ) {
-    OutlinedTextField(
+    AzphaltWellField(
         colors = azphaltTextFieldColors(),
         value = value.toString(),
         onValueChange = { raw ->
@@ -1555,7 +1554,7 @@ private fun CompanyGitHubActionFields(
     contextInput: String,
     onChange: (workflow: String, ref: String, contextInput: String) -> Unit,
 ) {
-    OutlinedTextField(
+    AzphaltWellField(
         colors = azphaltTextFieldColors(),
         value = workflow,
         onValueChange = { onChange(it, ref, contextInput) },
@@ -1564,7 +1563,7 @@ private fun CompanyGitHubActionFields(
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )
-    OutlinedTextField(
+    AzphaltWellField(
         colors = azphaltTextFieldColors(),
         value = ref,
         onValueChange = { onChange(workflow, it, contextInput) },
@@ -1573,7 +1572,7 @@ private fun CompanyGitHubActionFields(
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )
-    OutlinedTextField(
+    AzphaltWellField(
         colors = azphaltTextFieldColors(),
         value = contextInput,
         onValueChange = { onChange(workflow, ref, it) },
@@ -1602,7 +1601,7 @@ private fun CompanyGitHubScriptRunnerFields(
             )
         },
     )
-    OutlinedTextField(
+    AzphaltWellField(
         colors = azphaltTextFieldColors(),
         value = runner.scriptInput,
         onValueChange = { onChange(runner.copy(scriptInput = it.ifBlank { "aive_script" })) },
@@ -1610,7 +1609,7 @@ private fun CompanyGitHubScriptRunnerFields(
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )
-    OutlinedTextField(
+    AzphaltWellField(
         colors = azphaltTextFieldColors(),
         value = runner.languageInput,
         onValueChange = { onChange(runner.copy(languageInput = it.ifBlank { "aive_language" })) },

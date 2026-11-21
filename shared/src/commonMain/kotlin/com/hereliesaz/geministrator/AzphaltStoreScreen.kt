@@ -13,7 +13,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -429,7 +428,7 @@ internal fun AzphaltStoreScreen(
             // Breeds are not packages: no search, no install plan, only what each costs.
             StoreBreeds()
         } else {
-            OutlinedTextField(
+            AzphaltWellField(
                 value = query,
                 onValueChange = { query = it },
                 label = { Text(stringResource(Res.string.store_search_workflows_roles_models_and_llms)) },
@@ -994,7 +993,7 @@ private fun PreparedStoreLlmPanel(
                     )
                 }
                 configurationInputs.forEach { input ->
-                    OutlinedTextField(
+                    AzphaltWellField(
                         value = inputValues[input.id].orEmpty(),
                         onValueChange = { onInputChanged(input.id, it) },
                         label = { Text(input.description ?: input.id) },

@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -186,7 +185,7 @@ internal fun MemoryWebContent(source: com.hereliesaz.geministrator.memory.Memory
             color = azphaltOnSurface(),
         )
         Legend(graph)
-        OutlinedTextField(
+        AzphaltWellField(
             value = filter,
             onValueChange = { filter = it },
             label = { Text(stringResource(Res.string.memory_web_filter)) },
@@ -234,7 +233,7 @@ private fun WriteMemory(onBank: suspend (String) -> Boolean) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(Res.string.memory_web_write_title).uppercase(), style = AzphaltType.eyebrow, color = azphaltOnSurface())
         Text(stringResource(Res.string.memory_web_write_hint), style = AzphaltType.body, color = azphaltOnSurface())
-        OutlinedTextField(
+        AzphaltWellField(
             value = text,
             onValueChange = { text = it },
             label = { Text(stringResource(Res.string.memory_web_write_label)) },

@@ -3,7 +3,6 @@ package com.hereliesaz.geministrator
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -109,7 +108,7 @@ internal fun SetupFileSection(
         }
         SetupFileMode.Export, SetupFileMode.Import -> {
             val exporting = mode == SetupFileMode.Export
-            OutlinedTextField(
+            AzphaltWellField(
                 value = passphrase,
                 onValueChange = { passphrase = it; validation = null },
                 label = { Text(stringResource(Res.string.settings_setup_passphrase)) },
@@ -118,7 +117,7 @@ internal fun SetupFileSection(
                 modifier = Modifier.fillMaxWidth(),
             )
             if (exporting) {
-                OutlinedTextField(
+                AzphaltWellField(
                     value = confirmation,
                     onValueChange = { confirmation = it; validation = null },
                     label = { Text(stringResource(Res.string.settings_setup_passphrase_confirm)) },

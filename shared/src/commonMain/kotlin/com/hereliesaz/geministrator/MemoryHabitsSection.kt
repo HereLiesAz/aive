@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -165,7 +164,7 @@ internal fun MemoryHabitsSection(controller: MemoryLayerController, settings: Me
         )
     }
     if (habits.isNotEmpty()) {
-        OutlinedTextField(
+        AzphaltWellField(
             value = query,
             onValueChange = { query = it },
             label = { Text(stringResource(Res.string.memory_habits_find)) },
@@ -336,19 +335,19 @@ private fun HabitWordsEditor(
     var note by remember { mutableStateOf("") }
     var alternative by remember { mutableStateOf("") }
     var alternativeOperation by remember { mutableStateOf("") }
-    OutlinedTextField(
+    AzphaltWellField(
         value = note,
         onValueChange = { note = it },
         label = { Text(stringResource(Res.string.memory_habits_note)) },
         modifier = Modifier.fillMaxWidth(),
     )
-    OutlinedTextField(
+    AzphaltWellField(
         value = alternative,
         onValueChange = { alternative = it },
         label = { Text(stringResource(Res.string.memory_habits_alternative)) },
         modifier = Modifier.fillMaxWidth(),
     )
-    OutlinedTextField(
+    AzphaltWellField(
         value = alternativeOperation,
         onValueChange = { alternativeOperation = it },
         label = { Text(stringResource(Res.string.memory_habits_alternative_operation)) },

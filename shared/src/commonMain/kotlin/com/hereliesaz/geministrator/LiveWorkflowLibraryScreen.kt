@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -359,7 +358,7 @@ internal fun LiveWorkflowLibraryScreen(
                         WorkflowLibraryTab.Library -> when (val loaded = entries) {
                             null -> Text(stringResource(Res.string.library_loading_workflow_library), style = AzphaltType.body, color = azphaltOnSurface())
                             else -> {
-                                OutlinedTextField(
+                                AzphaltWellField(
                                     value = query,
                                     onValueChange = { query = it },
                                     label = { Text(stringResource(Res.string.library_filter_installed_workflows_and_roles)) },
@@ -447,7 +446,7 @@ internal fun LiveWorkflowLibraryScreen(
                                             onSeeded = { seededRunObjective = it },
                                             resetKey = currentDraft.id.value,
                                         ) { field ->
-                                            OutlinedTextField(
+                                            AzphaltWellField(
                                                 value = field.value,
                                                 onValueChange = field.onValueChange,
                                                 label = { Text(stringResource(Res.string.library_run_objective_inputs)) },
@@ -553,7 +552,7 @@ internal fun LiveWorkflowLibraryScreen(
                                                 )
                                                 if (roles.isNotEmpty()) {
                                                     Text(stringResource(Res.string.library_reassign_role), style = AzphaltType.eyebrow, color = azphaltOnSurface())
-                                                    OutlinedTextField(
+                                                    AzphaltWellField(
                                                         value = roleQuery,
                                                         onValueChange = { roleQuery = it },
                                                         label = { Text(stringResource(Res.string.library_filter_roles)) },
@@ -629,7 +628,7 @@ internal fun LiveWorkflowLibraryScreen(
 
                         WorkflowLibraryTab.Combine -> if (currentDraft != null) {
                             Text(stringResource(Res.string.library_combine_workflows), style = AzphaltType.section, color = azphaltOnSurface())
-                            OutlinedTextField(
+                            AzphaltWellField(
                                 value = composeQuery,
                                 onValueChange = { composeQuery = it },
                                 label = { Text(stringResource(Res.string.library_find_workflow_or_role_to_add)) },
@@ -672,14 +671,14 @@ internal fun LiveWorkflowLibraryScreen(
 
                         WorkflowLibraryTab.Save -> if (currentDraft != null && host != null) {
                             Text(stringResource(Res.string.library_save_composition), style = AzphaltType.section, color = azphaltOnSurface())
-                            OutlinedTextField(
+                            AzphaltWellField(
                                 value = saveName,
                                 onValueChange = { saveName = it },
                                 label = { Text(stringResource(Res.string.library_workflow_name)) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                             )
-                            OutlinedTextField(
+                            AzphaltWellField(
                                 value = saveId,
                                 onValueChange = { saveId = it },
                                 label = { Text(stringResource(Res.string.library_workflow_id)) },
