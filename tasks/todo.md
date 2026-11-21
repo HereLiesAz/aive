@@ -65,7 +65,7 @@ Decided: unborn creatures beyond the next generation stay hidden (no ghost nodes
 - [ ] Not offered yet: rename, duplicate, share hive card from the menu (each needs its own design); say which you want.
 
 ## Unpinning h2g2 and Conveyance (keeper: h2g2 must not pin; everything updated as soon as possible)
-- [x] aive: CI checks out h2g2 and Conveyance at their latest `main` (no `ref:`), and the Gradle dependency is `main-SNAPSHOT`, not a commit hash.
+- [x] aive: CI checks out h2g2 and Conveyance at their latest `main` (no `ref:`), and the Gradle dependency is `main-SNAPSHOT`, not a commit hash. (Superseded 2026-11-21: the coordinate is now the release tag `0.6.0`, a tag not a commit; CI still builds the `vendor/` checkout of `main`, which the substitution matches by module and, in the root build.gradle.kts, by this version, so the two must change together.)
 - [x] (aive is on AGP 9.5.1 in `gradle/libs.versions.toml`) HereLiesAz/Conveyance#80 and HereLiesAz/conveyance-h2g2#17: AGP 9.5.1 (Gradle refuses two AGP versions in one composite). Verified locally with all three on 9.5.1. h2g2#17 also adds Dependabot (h2g2 had none).
 - [x] aive#650 (tokenizers) merged; #648 closed, its change already in main.
 - [x] (done: catalog entry `conveyance`, aive reads it from the checkout) Decide h2g2's own pin: `build.gradle.kts` hard-codes `conveyanceRevision = "0.5.0"` (comment: a floating main-SNAPSHOT can resolve stale per-target publications through JitPack). Dependabot cannot track it. aive's root `build.gradle.kts` mirrors it (`conveyanceRevision`) and must follow.
