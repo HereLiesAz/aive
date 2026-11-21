@@ -34,7 +34,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
@@ -604,7 +603,7 @@ internal fun HiveFeedBar(
                     onSeeded = { objective = it },
                     resetKey = run.id,
                 ) { field ->
-                    OutlinedTextField(
+                    AzphaltWellField(
                         value = field.value,
                         onValueChange = field.onValueChange,
                         placeholder = { Text(stringResource(Res.string.hive_feed_placeholder), style = AzphaltType.body.copy(fontSize = 14.sp)) },
@@ -730,7 +729,7 @@ private fun StateChip(status: TaskRunStatus) {
     }
     Text(
         status.label().uppercase(),
-        style = AzphaltType.endCap.copy(fontSize = 10.sp),
+        style = AzphaltType.endCap.copy(fontSize = 11.sp),
         color = fill.onOpposite(),
         modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(fill).padding(horizontal = 8.dp, vertical = 4.dp),
     )

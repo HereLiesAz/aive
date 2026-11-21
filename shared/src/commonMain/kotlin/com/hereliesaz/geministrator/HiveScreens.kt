@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -98,7 +97,7 @@ internal fun HiveLaunchBar(
             onSeeded = { objective = it },
             resetKey = key,
         ) { field ->
-            OutlinedTextField(
+            AzphaltWellField(
                 value = field.value,
                 onValueChange = field.onValueChange,
                 label = { Text(stringResource(Res.string.hive_objective)) },
@@ -116,7 +115,7 @@ internal fun HiveLaunchBar(
             resetKey = key,
             entryFilter = { PromptSuggestions.locatorSource(it.text) != PromptSuggestions.LocatorSource.Local },
         ) { field ->
-            OutlinedTextField(
+            AzphaltWellField(
                 value = field.value,
                 onValueChange = field.onValueChange,
                 label = { Text(stringResource(Res.string.hive_repository)) },

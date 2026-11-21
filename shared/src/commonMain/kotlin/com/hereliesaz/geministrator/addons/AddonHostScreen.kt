@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.addons
 
+import com.hereliesaz.geministrator.AzphaltWellField
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,7 +13,6 @@ import com.hereliesaz.geministrator.AzphaltButton
 import com.hereliesaz.conveyance.h2g2.H2g2Nest
 import com.hereliesaz.conveyance.h2g2.Option
 import com.hereliesaz.geministrator.Azphalt
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -159,7 +159,7 @@ fun AddonScreenRenderer(
                                 onClick = { actionDispatcher(item.actionId) },
                             )
                             is AddonScreenItem.TextInput -> {
-                                OutlinedTextField(
+                                AzphaltWellField(
                                     value = bindingProvider(item.bindingId),
                                     onValueChange = { onInputUpdate(item.bindingId, it) },
                                     label = { Text(item.label) },

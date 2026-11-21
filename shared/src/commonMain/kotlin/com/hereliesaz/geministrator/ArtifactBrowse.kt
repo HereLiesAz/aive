@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -242,7 +241,7 @@ internal fun HiveMadeSection(
     val folderReady = projectId != null && ArtifactFolderHost.service != null
     if (projectId != null && folderReady) ArtifactFolderControls(projectId, definition, run, runNumber, entries)
     if (entries.size > 1) {
-        OutlinedTextField(
+        AzphaltWellField(
             value = query,
             onValueChange = { query = it },
             label = { Text(stringResource(Res.string.hive_made_filter)) },

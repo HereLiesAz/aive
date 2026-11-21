@@ -52,14 +52,16 @@ default that might not match the surface it lands on.
 Hues belong to living things: creatures, hives and the tissue they live in. Controls and cards are
 calm, so colour on them always says something (`AzphaltUi.kt`):
 
-- **Pills** (`AzphaltPill`, `tone`): `Quiet` (the default) is outlined in the surface's content
-  colour; `Primary`, the one main action in view (Launch, Connect), and any selected pill are filled
+- **Pills** (`AzphaltPill`, `tone`): `Quiet` (the default) is filled with a hue chosen by hashing its
+  seed (HG2Gui: a stack reads as a stack; the hue carries no meaning), with the hue's darker mate on its end cap;
+  `Primary`, the one main action in view (Launch, Connect), and any selected pill are filled
   with the surface's strong colour (Ink, or Yellow on a dark surface); `Danger` is red, and only for
   the final step of something irreversible (delete everything, reject, remove a role). A pill that
   merely opens a confirmation stays `Quiet`; the confirmation is where it turns red.
 - **Cards** (`AzphaltRecord`, `AzphaltNote`, `ConnectionRow`) are Ink, lifted Ink on an Ink surface,
   and Yellow outlined in the content colour when selected. Their wells are the other Ink.
-- No control takes its colour from a hash of its name.
+- Only red (and Ink for selected) means something on a control: a pill's hash is never allowed to land on red where a
+  neighbouring control is the danger one (`HiveControl`).
 
 ## Ground and the shell header
 

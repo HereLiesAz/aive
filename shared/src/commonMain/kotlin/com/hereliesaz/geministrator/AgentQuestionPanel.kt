@@ -10,7 +10,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -141,7 +140,7 @@ internal fun AgentQuestionPanel(
                 SelectionContainer {
                     Text(parsed.text, style = AzphaltType.body, color = azphaltOnSurface())
                 }
-                OutlinedTextField(
+                AzphaltWellField(
                     value = plainAnswer,
                     onValueChange = {
                         plainAnswer = it
@@ -235,7 +234,7 @@ private fun AgentUiNode(
                 }
             }
         }
-        is AgentUiComponent.Field -> OutlinedTextField(
+        is AgentUiComponent.Field -> AzphaltWellField(
             value = fieldText(component, values),
             onValueChange = { values[component.id] = AgentUiValue.Text(it.take(AgentUi.MAX_TEXT_CHARS)) },
             label = { Text(component.label) },
