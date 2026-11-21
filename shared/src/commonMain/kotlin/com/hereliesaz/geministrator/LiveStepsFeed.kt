@@ -1,7 +1,6 @@
 package com.hereliesaz.geministrator
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -173,24 +171,7 @@ fun LiveStepsFeed(
 }
 
 /**
- * Blurs whatever this modifier is applied to while a launch is in flight.
- *
- * [blur] is a real Gaussian blur on Android 12+ (RenderEffect) and on Skia targets (desktop/web);
- * on Android 11 and below Compose silently ignores it, which is why [LaunchStepsOverlay] also
- * draws a dark scrim -- legibility never depends on the blur alone.
- */
-@Composable
-internal fun Modifier.launchBackdrop(active: Boolean): Modifier {
-    val radius by animateDpAsState(
-        targetValue = if (active) 14.dp else 0.dp,
-        animationSpec = Motion.spec(Weight.Medium),
-        label = "launch-backdrop-blur",
-    )
-    return if (radius > 0.dp) blur(radius) else this
-}
-
-/**
- * The launch-in-progress overlay: a darkening scrim over the (blurred) app that swallows taps,
+ * The launch-in-progress overlay: a darkening scrim over the app that swallows taps (no blur: HG2Gui has none anywhere; the scrim alone carries legibility),
  * with the white [LiveStepsFeed] centred on it.
  */
 @Composable

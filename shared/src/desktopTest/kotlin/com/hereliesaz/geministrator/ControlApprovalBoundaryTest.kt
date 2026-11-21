@@ -38,7 +38,14 @@ class ControlApprovalBoundaryTest {
     @Test
     fun theHostInterfaceHasNoMemberThatDecidesAnApprovalButTheOneOwnerGatedApprove() {
         val verbs = Regex("approve|reject|resolve|decide|release|lift|grant|allow", RegexOption.IGNORE_CASE)
-        val names = com.hereliesaz.geministrator.control.ControlHost::class.java.methods.map { it.name }
-        assertTrue(names.none { verbs.containsMatchIn(it) && it != "listApprovals" }, "ControlHost members: $names")
+        // Since #1006 a plan may be approved over the control API, but only through one member, and only when the owner has
+        // allowed it (AIVE_ALLOW_REMOTE_APPROVAL): approveCreature, gated by remoteApprovalAllowed. Nothing else decides.
+        val allowed = setOf("listApprovals", "approveCreature", "getRemoteApprovalAllowed")
+        // The compiler adds synthetic accessors and default-method bridges (access$x$jd, x$suspendImpl): same member, not a new one.
+        val names = com.hereliesaz.geministrator.control.ControlHost::class.java.methods
+            .map { it.name.removePrefix("access$").substringBefore('$') }
+            .toSet()
+        assertTrue(names.none { verbs.containsMatchIn(it) && it !in allowed }, "ControlHost members: $names")
+        assertTrue("approveCreature" in names, "the one owner-gated approve is gone: $names")
     }
 }

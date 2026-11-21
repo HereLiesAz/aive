@@ -249,7 +249,7 @@ private fun RailBrand(labelled: Boolean) {
             ShellGlyph(ShellIcon.Hive, azphaltStrong(), size = 38.dp)
             if (labelled) {
                 Column(Modifier.clearAndSetSemantics {}) {
-                    Text(stringResource(Res.string.rail_brand_the), style = AzphaltType.eyebrow.copy(fontSize = 9.sp, lineHeight = 10.sp, letterSpacing = 0.28.em), color = on)
+                    Text(stringResource(Res.string.rail_brand_the), style = AzphaltType.eyebrow.copy(fontSize = 11.sp, lineHeight = 12.sp, letterSpacing = 0.28.em), color = on)
                     Text(stringResource(Res.string.rail_brand_aive), style = AzphaltType.section.copy(fontSize = 24.sp, lineHeight = 24.sp, letterSpacing = (-0.04).em), color = on)
                 }
             }
@@ -345,7 +345,7 @@ private fun RailKeeper(labelled: Boolean) {
             }
             if (labelled) {
                 Column(Modifier.clearAndSetSemantics {}) {
-                    Text(keeper.uppercase(), style = AzphaltType.eyebrow.copy(fontSize = 9.sp, lineHeight = 11.sp, letterSpacing = 0.18.em), color = azphaltMutedOnSurface())
+                    Text(keeper.uppercase(), style = AzphaltType.eyebrow.copy(fontSize = 11.sp, lineHeight = 13.sp, letterSpacing = 0.18.em), color = azphaltMutedOnSurface())
                     Text(you, style = AzphaltType.body.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold), color = azphaltOnSurface())
                 }
             }

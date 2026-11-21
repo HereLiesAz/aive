@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -533,7 +532,7 @@ private fun StageEngineEditor(
                                 )
                             }
                     }
-                    OutlinedTextField(
+                    AzphaltWellField(
                         value = modelDraft,
                         onValueChange = { modelDraft = it },
                         label = { Text(stringResource(Res.string.memory_model_blank_for_the_provider_s)) },
@@ -600,7 +599,7 @@ private fun TuningSection(settings: MemoryLayerSettings, onApply: (com.hereliesa
 
     MemorySectionLabel(stringResource(Res.string.memory_tuning))
     @Composable
-    fun field(label: String, value: String, onValue: (String) -> Unit) = OutlinedTextField(
+    fun field(label: String, value: String, onValue: (String) -> Unit) = AzphaltWellField(
         value = value,
         onValueChange = onValue,
         label = { Text(label) },
@@ -768,7 +767,7 @@ private fun DataSection(controller: MemoryLayerController) {
             scope.launch { exported = controller.exportJson() }
         }, modifier = Modifier.fillMaxWidth())
     } else {
-        OutlinedTextField(
+        AzphaltWellField(
             value = currentExport,
             onValueChange = {},
             readOnly = true,
@@ -782,7 +781,7 @@ private fun DataSection(controller: MemoryLayerController) {
     if (draft == null) {
         AzphaltPill(stringResource(Res.string.memory_import_memory_from_json), "memory-import", onClick = { importDraft = "" }, modifier = Modifier.fillMaxWidth())
     } else {
-        OutlinedTextField(
+        AzphaltWellField(
             value = draft,
             onValueChange = { importDraft = it },
             label = { Text(stringResource(Res.string.memory_paste_exported_memory_it_replaces_what)) },
@@ -963,7 +962,7 @@ private fun ProjectsSection(controller: MemoryLayerController, settings: MemoryL
                     }
                     val others = projects.filter { other -> other != project && includes.none { it.incorporatesProjectId == other } }
                     if (others.isNotEmpty()) {
-                        OutlinedTextField(
+                        AzphaltWellField(
                             value = reason,
                             onValueChange = { reason = it },
                             label = { Text(stringResource(Res.string.memory_why_include_another_project_required)) },

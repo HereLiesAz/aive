@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -1244,35 +1243,35 @@ internal fun ProviderSettingsScreen(
                 else -> stringResource(Res.string.settings_setup)
             },
         )
-        OutlinedTextField(
+        AzphaltWellField(
             value = relayUrlDraft,
             onValueChange = { relayUrlDraft = it },
             label = { Text(stringResource(Res.string.settings_relay_url_wss)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        OutlinedTextField(
+        AzphaltWellField(
             value = poolIdDraft,
             onValueChange = { poolIdDraft = it },
             label = { Text(stringResource(Res.string.settings_compute_pool_id)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        OutlinedTextField(
+        AzphaltWellField(
             value = nodeNameDraft,
             onValueChange = { nodeNameDraft = it },
             label = { Text(stringResource(Res.string.settings_this_device_name)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        OutlinedTextField(
+        AzphaltWellField(
             value = nodeIdDraft,
             onValueChange = { nodeIdDraft = it },
             label = { Text(stringResource(Res.string.settings_stable_device_id)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        OutlinedTextField(
+        AzphaltWellField(
             value = tokenDraft,
             onValueChange = { tokenDraft = it },
             label = {
@@ -1288,7 +1287,7 @@ internal fun ProviderSettingsScreen(
             modifier = Modifier.fillMaxWidth(),
         )
         if (distributedComputeState.ownerTokenSettable) {
-            OutlinedTextField(
+            AzphaltWellField(
                 value = ownerTokenDraft,
                 onValueChange = { ownerTokenDraft = it },
                 label = {
@@ -1304,7 +1303,7 @@ internal fun ProviderSettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        OutlinedTextField(
+        AzphaltWellField(
             value = maxParallelDraft,
             onValueChange = { value -> maxParallelDraft = value.filter(Char::isDigit).take(2) },
             label = { Text(stringResource(Res.string.settings_maximum_simultaneous_remote_jobs)) },
@@ -1618,7 +1617,7 @@ internal fun ProviderSettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
         } else {
-            OutlinedTextField(
+            AzphaltWellField(
                 value = exportedJson!!,
                 onValueChange = {},
                 readOnly = true,
@@ -1636,7 +1635,7 @@ internal fun ProviderSettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
         } else {
-            OutlinedTextField(
+            AzphaltWellField(
                 value = importDraft,
                 onValueChange = { importDraft = it },
                 label = { Text(stringResource(Res.string.settings_paste_exported_json)) },

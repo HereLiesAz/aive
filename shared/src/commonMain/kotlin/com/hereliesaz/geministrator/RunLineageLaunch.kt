@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -240,7 +239,7 @@ internal fun ContinueRunPanel(
                     onSeeded = { objective = it },
                     resetKey = runId,
                 ) { field ->
-                    OutlinedTextField(
+                    AzphaltWellField(
                         value = field.value,
                         onValueChange = field.onValueChange,
                         label = { Text(stringResource(Res.string.lineage_next_objective)) },
@@ -339,7 +338,7 @@ internal fun RerunFromTaskPanel(
                 }
                 if (changingOutput && output != null) {
                     Text(stringResource(Res.string.lineage_rerun_output_hint), style = AzphaltType.body, color = azphaltOnSurface())
-                    OutlinedTextField(
+                    AzphaltWellField(
                         value = outputDraft,
                         onValueChange = { outputDraft = it; error = null },
                         label = { Text(stringResource(Res.string.lineage_rerun_output)) },
@@ -374,7 +373,7 @@ internal fun RerunFromTaskPanel(
                         resetKey = key,
                         entryFilter = { false },
                     ) { field ->
-                        OutlinedTextField(
+                        AzphaltWellField(
                             value = field.value,
                             onValueChange = field.onValueChange,
                             label = { Text(stringResource(Res.string.lineage_rerun_objective)) },

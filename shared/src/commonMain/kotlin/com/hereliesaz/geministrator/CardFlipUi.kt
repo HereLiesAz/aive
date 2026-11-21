@@ -106,9 +106,9 @@ internal fun FlowCardFace(node: FlowNode, selected: Boolean, modifier: Modifier 
     ) {
         Text(node.name, style = AzphaltType.body.copy(fontSize = 13.sp), color = text, maxLines = 2, overflow = TextOverflow.Ellipsis)
         if (who.isNotEmpty()) {
-            Text(who, style = AzphaltType.endCap.copy(fontSize = 10.sp), color = text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(who, style = AzphaltType.endCap.copy(fontSize = 11.sp), color = text, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        state?.let { Text(it.uppercase(), style = AzphaltType.endCap.copy(fontSize = 10.sp), color = text, maxLines = 1) }
+        state?.let { Text(it.uppercase(), style = AzphaltType.endCap.copy(fontSize = 11.sp), color = text, maxLines = 1) }
     }
 }
 

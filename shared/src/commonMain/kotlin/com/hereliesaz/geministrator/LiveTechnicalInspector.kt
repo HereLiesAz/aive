@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -541,7 +540,7 @@ internal fun TechnicalInspector(
                         onSeeded = { seededMessage = it },
                         resetKey = "${liveWorkflow.run.id.value}/$selectedTaskId",
                     ) { field ->
-                        OutlinedTextField(
+                        AzphaltWellField(
                             value = field.value,
                             onValueChange = field.onValueChange,
                             label = { Text(stringResource(Res.string.inspector_message_agent)) },

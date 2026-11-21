@@ -1071,7 +1071,7 @@ fun App(
                     )
                 }
                 mcpElicitation?.let { McpElicitationDialog(it) }
-                BoxWithConstraints(modifier = Modifier.fillMaxSize().launchBackdrop(launching)) {
+                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     ControlRoom(
                         destination = destination,
                         destinations = destinations,
@@ -1563,11 +1563,20 @@ private fun GeministratorTheme(content: @Composable () -> Unit) {
     // local and H2g2Motion's scale; both follow AzphaltMotion, the one switch the keeper sees.
     val reduce = AzphaltMotion.reduceMotion
     LaunchedEffect(reduce) { com.hereliesaz.conveyance.h2g2.H2g2Motion.updateDurationScale(if (reduce) 0f else 1f) }
-    CompositionLocalProvider(com.hereliesaz.conveyance.compose.LocalReducedMotion provides reduce) {
+    // The library's own pieces (status colours, the job progress bar) read the page ground from here. H2g2Theme itself is
+    // not used: it would roll its own ground and write the system animator scale over the keeper's Reduce motion switch.
+    val h2g2Ground = com.hereliesaz.conveyance.h2g2.grounds.firstOrNull { it.name == Azphalt.currentGround.name }
+        ?: com.hereliesaz.conveyance.h2g2.grounds.first()
+    CompositionLocalProvider(
+        com.hereliesaz.conveyance.compose.LocalReducedMotion provides reduce,
+        com.hereliesaz.conveyance.h2g2.LocalH2g2Ground provides h2g2Ground,
+    ) {
         MaterialTheme(
             colorScheme = GeministratorColors,
-            content = content,
-        )
+        ) {
+            // HG2Gui has no press, hover or focus state: the capsule's own motion is the feedback, so no ripple under any control.
+            CompositionLocalProvider(androidx.compose.foundation.LocalIndication provides NoPressIndication, content)
+        }
     }
 }
 
@@ -1600,3 +1609,14 @@ private class PendingPlanDecision(
 
 /** How long the field stays on screen after the keeper starts a reviewed plan, so the first step's egg is seen to hatch. */
 private const val HATCH_HOLD_MILLIS = 1_400L
+
+/** An [androidx.compose.foundation.Indication] that draws nothing (HG2Gui: no press, hover or focus state). */
+private object NoPressIndication : androidx.compose.foundation.IndicationNodeFactory {
+    override fun create(interactionSource: androidx.compose.foundation.interaction.InteractionSource): androidx.compose.ui.node.DelegatableNode =
+        object : androidx.compose.ui.Modifier.Node(), androidx.compose.ui.node.DrawModifierNode {
+            override fun androidx.compose.ui.graphics.drawscope.ContentDrawScope.draw() = drawContent()
+        }
+
+    override fun equals(other: Any?): Boolean = other === this
+    override fun hashCode(): Int = -1
+}

@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -427,7 +426,7 @@ internal fun MindMapRunScreen(
                         )
                     }
 
-                    OutlinedTextField(
+                    AzphaltWellField(
                         colors = azphaltTextFieldColors(),
                         value = projectName,
                         onValueChange = { projectName = it },
@@ -540,7 +539,7 @@ internal fun MindMapRunScreen(
                         limit = 3,
                     )
                     Box(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedTextField(
+                        AzphaltWellField(
                             colors = azphaltTextFieldColors(),
                             value = field.value,
                             onValueChange = field.onValueChange,
@@ -622,7 +621,7 @@ internal fun MindMapRunScreen(
                         resetKey = draftScope,
                         entryFilter = repositoryEntryFilter,
                     ) { field ->
-                    OutlinedTextField(
+                    AzphaltWellField(
                         colors = azphaltTextFieldColors(),
                         value = field.value,
                         onValueChange = field.onValueChange,
@@ -644,7 +643,7 @@ internal fun MindMapRunScreen(
                     )
                     }
                 }
-                if (!repositoryGated) OutlinedTextField(
+                if (!repositoryGated) AzphaltWellField(
                     colors = azphaltTextFieldColors(),
                     value = defaultBranch,
                     onValueChange = { defaultBranch = it },
@@ -698,7 +697,7 @@ internal fun MindMapRunScreen(
                     onSeeded = { seededObjective = it },
                     resetKey = draftScope,
                 ) { field ->
-                    OutlinedTextField(
+                    AzphaltWellField(
                         colors = azphaltTextFieldColors(),
                         value = field.value,
                         onValueChange = field.onValueChange,

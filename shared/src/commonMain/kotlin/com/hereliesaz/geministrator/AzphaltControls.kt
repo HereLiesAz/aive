@@ -1,5 +1,10 @@
 package com.hereliesaz.geministrator
 
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TextField
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.defaultMinSize
@@ -7,8 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldColors
@@ -61,8 +64,9 @@ internal fun AzphaltButton(
 }
 
 /**
- * Secondary Azphalt button: transparent, so its outline and label are the exact opposite of the
- * surface it sits on. Disabled, both soften but stay at 3:1 or better.
+ * Secondary Azphalt button: a capsule washed 14% with the surface's own content colour (HG2Gui has no borders, so
+ * "secondary" is a quieter fill, not an outline), the label the exact opposite of the surface. Disabled, the label
+ * softens but stays at 3:1 or better.
  */
 @Composable
 internal fun AzphaltOutlinedButton(
@@ -73,14 +77,15 @@ internal fun AzphaltOutlinedButton(
 ) {
     val onSurface = azphaltOnSurface()
     val muted = azphaltMutedOnSurface()
-    OutlinedButton(
+    Button(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.defaultMinSize(minHeight = AzphaltMinTouchTarget),
         shape = RoundedCornerShape(999.dp),
-        border = BorderStroke(2.dp, if (enabled) onSurface else muted),
-        colors = ButtonDefaults.outlinedButtonColors(
+        colors = ButtonDefaults.buttonColors(
+            containerColor = onSurface.copy(alpha = FIELD_WASH),
             contentColor = onSurface,
+            disabledContainerColor = onSurface.copy(alpha = FIELD_WASH),
             disabledContentColor = muted,
         ),
         contentPadding = PaddingValues(horizontal = AzphaltSpacing.xl, vertical = AzphaltSpacing.m),
@@ -110,7 +115,9 @@ internal fun AzphaltTextField(
 ) {
     var revealed by remember { mutableStateOf(false) }
     val onGround = azphaltOnSurface()
-    OutlinedTextField(
+    // HG2Gui has no borders: a field is a 14% wash of the content colour (the "well"), its label floats inside it,
+    // and focus is the cursor, so no outline and no indicator line.
+    AzphaltWellField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
@@ -132,30 +139,38 @@ internal fun AzphaltTextField(
         },
         isError = errorMessage != null,
         supportingText = errorMessage?.let { message -> { Text(message, modifier = Modifier.azphaltLiveRegion()) } },
-        colors = azphaltTextFieldColors(),
         modifier = modifier.fillMaxWidth(),
     )
 }
 
+/** The wash [AzphaltTextField] is filled with (HG2Gui: a 14% well), and its corner (the 20dp note radius, one of the four radii). */
+private const val FIELD_WASH = 0.14f
+private val AZPHALT_FIELD_CORNER = 20.dp
+
 /**
- * Outlined text field colours for the surface the field sits on: text, label, outline, cursor and
- * icons are the exact opposite of it; placeholder and disabled states are softened but never drop
- * under 3:1 against it. Error states keep the same colours (the error is carried by the message,
- * not by a red that can vanish on the ground).
+ * Text field colours for the surface the field sits on: a [FIELD_WASH] container of the content colour (HG2Gui has no
+ * borders: the field is a "well"), no outline and no indicator line; text, label, cursor and icons are the exact opposite
+ * of the surface; placeholder and disabled states are softened but never drop under 3:1 against it. Error states keep
+ * the same colours (the error is carried by the message, not by a red that can vanish on the ground).
  */
 @Composable
 internal fun azphaltTextFieldColors(): TextFieldColors {
     val onGround = azphaltOnSurface()
     val muted = azphaltMutedOnSurface()
-    return OutlinedTextFieldDefaults.colors(
+    val wash = onGround.copy(alpha = FIELD_WASH)
+    return TextFieldDefaults.colors(
         focusedTextColor = onGround,
         unfocusedTextColor = onGround,
         disabledTextColor = muted,
         errorTextColor = onGround,
-        focusedBorderColor = onGround,
-        unfocusedBorderColor = onGround,
-        disabledBorderColor = muted,
-        errorBorderColor = onGround,
+        focusedContainerColor = wash,
+        unfocusedContainerColor = wash,
+        disabledContainerColor = wash,
+        errorContainerColor = wash,
+        focusedIndicatorColor = Color.Transparent,
+        unfocusedIndicatorColor = Color.Transparent,
+        disabledIndicatorColor = Color.Transparent,
+        errorIndicatorColor = Color.Transparent,
         focusedLabelColor = onGround,
         unfocusedLabelColor = onGround,
         disabledLabelColor = muted,
@@ -174,6 +189,101 @@ internal fun azphaltTextFieldColors(): TextFieldColors {
         unfocusedTrailingIconColor = onGround,
         disabledTrailingIconColor = muted,
         errorTrailingIconColor = onGround,
+    )
+}
+
+/**
+ * The one text field: [TextField] in the well colours, the 20dp note radius, its label floating inside it. Every field in
+ * the app is this (the call sites used to be outlined `OutlinedTextField`s).
+ */
+@Composable
+internal fun AzphaltWellField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    readOnly: Boolean = false,
+    label: @Composable (() -> Unit)? = null,
+    placeholder: @Composable (() -> Unit)? = null,
+    leadingIcon: @Composable (() -> Unit)? = null,
+    trailingIcon: @Composable (() -> Unit)? = null,
+    supportingText: @Composable (() -> Unit)? = null,
+    isError: Boolean = false,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+    singleLine: Boolean = false,
+    maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
+    minLines: Int = 1,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(AZPHALT_FIELD_CORNER),
+    colors: TextFieldColors = azphaltTextFieldColors(),
+) {
+    TextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier,
+        enabled = enabled,
+        readOnly = readOnly,
+        label = label,
+        placeholder = placeholder,
+        leadingIcon = leadingIcon,
+        trailingIcon = trailingIcon,
+        supportingText = supportingText,
+        isError = isError,
+        visualTransformation = visualTransformation,
+        keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
+        singleLine = singleLine,
+        maxLines = maxLines,
+        minLines = minLines,
+        shape = shape,
+        colors = colors,
+    )
+}
+
+/** [AzphaltWellField] for a field that keeps its selection and composition ([TextFieldValue]). */
+@Composable
+internal fun AzphaltWellField(
+    value: TextFieldValue,
+    onValueChange: (TextFieldValue) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    readOnly: Boolean = false,
+    label: @Composable (() -> Unit)? = null,
+    placeholder: @Composable (() -> Unit)? = null,
+    leadingIcon: @Composable (() -> Unit)? = null,
+    trailingIcon: @Composable (() -> Unit)? = null,
+    supportingText: @Composable (() -> Unit)? = null,
+    isError: Boolean = false,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+    singleLine: Boolean = false,
+    maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
+    minLines: Int = 1,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(AZPHALT_FIELD_CORNER),
+    colors: TextFieldColors = azphaltTextFieldColors(),
+) {
+    TextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier,
+        enabled = enabled,
+        readOnly = readOnly,
+        label = label,
+        placeholder = placeholder,
+        leadingIcon = leadingIcon,
+        trailingIcon = trailingIcon,
+        supportingText = supportingText,
+        isError = isError,
+        visualTransformation = visualTransformation,
+        keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
+        singleLine = singleLine,
+        maxLines = maxLines,
+        minLines = minLines,
+        shape = shape,
+        colors = colors,
     )
 }
 
