@@ -63,8 +63,9 @@ internal fun AzphaltButton(
 }
 
 /**
- * Secondary Azphalt button: transparent, so its outline and label are the exact opposite of the
- * surface it sits on. Disabled, both soften but stay at 3:1 or better.
+ * Secondary Azphalt button: a capsule washed 14% with the surface's own content colour (HG2Gui has no borders, so
+ * "secondary" is a quieter fill, not an outline), the label the exact opposite of the surface. Disabled, the label
+ * softens but stays at 3:1 or better.
  */
 @Composable
 internal fun AzphaltOutlinedButton(
@@ -75,14 +76,15 @@ internal fun AzphaltOutlinedButton(
 ) {
     val onSurface = azphaltOnSurface()
     val muted = azphaltMutedOnSurface()
-    OutlinedButton(
+    Button(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.defaultMinSize(minHeight = AzphaltMinTouchTarget),
         shape = RoundedCornerShape(999.dp),
-        border = BorderStroke(2.dp, if (enabled) onSurface else muted),
-        colors = ButtonDefaults.outlinedButtonColors(
+        colors = ButtonDefaults.buttonColors(
+            containerColor = onSurface.copy(alpha = FIELD_WASH),
             contentColor = onSurface,
+            disabledContainerColor = onSurface.copy(alpha = FIELD_WASH),
             disabledContentColor = muted,
         ),
         contentPadding = PaddingValues(horizontal = AzphaltSpacing.xl, vertical = AzphaltSpacing.m),
