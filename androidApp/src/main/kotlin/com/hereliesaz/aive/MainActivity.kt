@@ -37,6 +37,7 @@ import com.hereliesaz.geministrator.LocalOrchestrationSpecialistStatus
 import com.hereliesaz.geministrator.OnDeviceSmallTaskPreference
 import com.hereliesaz.geministrator.OnDeviceSmallTaskSetting
 import com.hereliesaz.geministrator.ProviderCatalog
+import com.hereliesaz.geministrator.ProviderEnablement
 import com.hereliesaz.geministrator.SetupSecretStore
 import com.hereliesaz.geministrator.SetupSecrets
 import com.hereliesaz.geministrator.ProviderCredentialSetup
@@ -409,6 +410,8 @@ class MainActivity : ComponentActivity() {
                         HostedImageGenerationExecutorIntegration(
                             falKey = { credentials.cleanKey(ProviderCatalog.FAL_ID) },
                             hordeKey = { credentials.cleanKey(ProviderCatalog.AI_HORDE_ID)?.takeUnless { it == ProviderCatalog.ANONYMOUS_CREDENTIAL } },
+                            // Sources and tools' In use switch: a Source switched off runs no image task.
+                            enabled = { ProviderEnablement.isEnabled(it) },
                         ),
                     )
                     credentials.cleanKey(ProviderCatalog.OPENAI_ID)?.let { key ->
@@ -641,6 +644,7 @@ class MainActivity : ComponentActivity() {
                             repositoryCredentialStore.clear(serviceId)
                             repositoryCredentials = repositoryCredentialStore.readAll()
                         },
+                        linkedImageProviderIds = ProviderCatalog.linkedImageProviderIds(credentials),
                         onReconfigureProvider = { id ->
                             configuringGeminiApiKey = false
                             configuringProviderId = id

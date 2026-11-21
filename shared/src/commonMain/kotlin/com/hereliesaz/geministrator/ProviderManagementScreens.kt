@@ -423,7 +423,7 @@ internal fun ProviderSettingsScreen(
         Text(stringResource(Res.string.credential_keyless_hint), style = AzphaltType.body, color = azphaltOnSurface())
         // No AI provider yet (a linked GitHub's OpenCode is no brain for a hive without a repository,
         // nor is a remote A2A agent, which runs only for roles that prefer it).
-        if (ProviderCatalog.entries.none { it.id in connectedProviderIds && !ProviderCatalog.isA2aAgent(it.id) }) {
+        if (ProviderCatalog.entries.none { it.id in connectedProviderIds && !ProviderCatalog.isA2aAgent(it.id) && !ProviderCatalog.isImageOnly(it.id) }) {
             Text(
                 stringResource(Res.string.settings_connect_as_many_providers_as_you),
                 style = AzphaltType.body,

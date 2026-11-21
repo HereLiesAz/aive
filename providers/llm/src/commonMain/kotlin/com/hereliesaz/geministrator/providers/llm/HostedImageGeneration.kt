@@ -70,6 +70,8 @@ object HostedImageModels {
 class HostedImageGenerationExecutorIntegration(
     private val falKey: () -> String? = { null },
     private val hordeKey: () -> String? = { null },
+    /** Whether the keeper has this Source (by its provider id, "aihorde" or "fal") switched on in Sources and tools; off means it runs nothing. */
+    private val enabled: (String) -> Boolean = { true },
     client: HttpClient = HttpClient {
         expectSuccess = false
         followRedirects = false
@@ -86,12 +88,11 @@ class HostedImageGenerationExecutorIntegration(
     // Remote image generation may bill or queue work. Never auto-resubmit an unknown outcome.
     override val retryDispatchFailures: Boolean = false
 
-    override fun supports(executor: TaskExecutor): Boolean =
-        executor is TaskExecutor.ExternalService &&
-            executor.service == HostedImageModels.SERVICE &&
-            HostedImageModels.resolve(executor.operation) != null &&
-            (HostedImageModels.resolve(executor.operation)?.anonymous == true ||
-                !falKey().isNullOrBlank())
+    override fun supports(executor: TaskExecutor): Boolean {
+        if (executor !is TaskExecutor.ExternalService || executor.service != HostedImageModels.SERVICE) return false
+        val model = HostedImageModels.resolve(executor.operation) ?: return false
+        return enabled(model.provider) && (model.anonymous || !falKey().isNullOrBlank())
+    }
 
     override suspend fun dispatch(context: TaskExecutorContext): TaskExecutorExecution {
         val model = HostedImageModels.resolve(

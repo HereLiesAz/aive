@@ -89,6 +89,15 @@ class HostedImageGenerationTest {
     }
 
     @Test
+    fun aSourceSwitchedOffInSourcesAndToolsRunsNothing() {
+        val off = HostedImageGenerationExecutorIntegration(falKey = { "test" }, enabled = { it != "aihorde" })
+        assertFalse(off.supports(context("aihorde|auto").executor), "AI Horde switched off")
+        assertTrue(off.supports(context("fal|fal-ai/flux/schnell").executor), "fal is still on")
+        val allOff = HostedImageGenerationExecutorIntegration(falKey = { "test" }, enabled = { false })
+        assertFalse(allOff.supports(context("fal|fal-ai/flux/schnell").executor))
+    }
+
+    @Test
     fun hordeDispatchAndReconcileReturnVerifiedRemoteArtifacts() = runTest {
         val requests = mutableListOf<String>()
         val http = trackedClient(MockEngine { request ->

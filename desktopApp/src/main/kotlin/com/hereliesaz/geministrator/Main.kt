@@ -637,6 +637,7 @@ fun main() {
                                 suppressedEnvironmentRepositoryServiceIds,
                             )
                         },
+                        linkedImageProviderIds = ProviderCatalog.linkedImageProviderIds(credentials),
                         onReconfigureProvider = { configuringProviderId = it },
                         onConnectFreeProvider = { freeProviderId ->
                             providerCredentialStore.write(freeProviderId, ProviderCatalog.ANONYMOUS_CREDENTIAL)
