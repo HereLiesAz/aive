@@ -412,6 +412,8 @@ internal fun ProviderSettingsScreen(
                     connectedIds = connectedProviderIds,
                     connect = onConnectFreeProvider,
                     disconnect = { id ->
+                        // An image Source may hold a saved key; the switch must not erase it (its own row's Disconnect does).
+                        if (ProviderCatalog.isImageOnly(id)) return@setAll
                         ProviderEnablement.set(id, true)
                         onDisconnectProvider(id)
                     },

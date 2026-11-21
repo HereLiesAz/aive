@@ -70,8 +70,6 @@ object HostedImageModels {
 class HostedImageGenerationExecutorIntegration(
     private val falKey: () -> String? = { null },
     private val hordeKey: () -> String? = { null },
-    /** Whether the keeper has this Source (by its provider id, "aihorde" or "fal") switched on in Sources and tools; off means it runs nothing. */
-    private val enabled: (String) -> Boolean = { true },
     client: HttpClient = HttpClient {
         expectSuccess = false
         followRedirects = false
@@ -81,6 +79,8 @@ class HostedImageGenerationExecutorIntegration(
             socketTimeoutMillis = 240_000
         }
     },
+    /** Whether the keeper has this Source (by its provider id, "aihorde" or "fal") switched on in Sources and tools; off means it submits nothing new. Last, so positional callers keep compiling. */
+    private val enabled: (String) -> Boolean = { true },
 ) : TaskExecutorIntegration {
     private val http = client
     private val json = Json { ignoreUnknownKeys = true }
@@ -91,13 +91,15 @@ class HostedImageGenerationExecutorIntegration(
     override fun supports(executor: TaskExecutor): Boolean {
         if (executor !is TaskExecutor.ExternalService || executor.service != HostedImageModels.SERVICE) return false
         val model = HostedImageModels.resolve(executor.operation) ?: return false
-        return enabled(model.provider) && (model.anonymous || !falKey().isNullOrBlank())
+        // Not gated on [enabled]: a job already submitted must stay reconcilable and cancellable after its Source is switched off.
+        return model.anonymous || !falKey().isNullOrBlank()
     }
 
     override suspend fun dispatch(context: TaskExecutorContext): TaskExecutorExecution {
         val model = HostedImageModels.resolve(
             (context.executor as? TaskExecutor.ExternalService)?.operation,
         ) ?: return failed("Unknown hosted image model")
+        if (!enabled(model.provider)) return failed("${model.name} is switched off in Sources and tools")
         val prompt = context.task.objective.trim()
         if (prompt.isBlank()) return failed("Image prompt is empty")
         return try {

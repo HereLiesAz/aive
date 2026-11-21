@@ -220,7 +220,6 @@ fun main() {
                     WebCredentialStore.remove(repositoryStorageKey(serviceId))
                     repositoryCredentials = repositoryCredentials - serviceId
                 },
-                linkedImageProviderIds = ProviderCatalog.linkedImageProviderIds(credentials),
                 onReconfigureProvider = { configuringProviderId = it },
                 onConnectFreeProvider = { freeProviderId ->
                     // One at a time: the keyless switch connects several, and each re-reads what is stored.
