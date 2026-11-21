@@ -137,6 +137,8 @@ fun App(
     onReconfigureProvider: (String) -> Unit = {},
     /** Links a keyless provider at once, with no key (the feed screen's one-tap free start). */
     onConnectFreeProvider: ((String) -> Unit)? = null,
+    /** The image-only Sources linked ([ProviderCatalog.linkedImageProviderIds]): run by an executor, so not among [providers], yet connected. */
+    linkedImageProviderIds: Set<String> = emptySet(),
     onDisconnectProvider: (String) -> Unit = {},
     distributedComputeState: DistributedComputeUiState = DistributedComputeUiState(),
     onSaveDistributedCompute: (DistributedComputeConfiguration, String?) -> Unit = { _, _ -> },
@@ -1500,7 +1502,7 @@ fun App(
                         compact = maxWidth < ControlRoomBreakpoints.Wide,
                         contentPadding = paddingValues,
                         runtimeState = runtimeState,
-                        connectedProviderIds = providers.map { it.id.value }.toSet() + ProviderEnablement.disabled,
+                        connectedProviderIds = providers.map { it.id.value }.toSet() + linkedImageProviderIds + ProviderEnablement.disabled,
                         providerReach = providerReach,
                         onConnectFreeProvider = onConnectFreeProvider ?: onReconfigureProvider,
                         launchError = launchError,

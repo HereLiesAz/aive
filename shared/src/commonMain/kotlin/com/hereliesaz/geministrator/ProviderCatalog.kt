@@ -64,6 +64,14 @@ object ProviderCatalog {
     /** True for a built-in Source that makes pictures, not text. */
     fun isImageOnly(id: String): Boolean = id in IMAGE_ONLY_IDS
 
+    /**
+     * The image-only Sources [credentials] has linked (a key, or [ANONYMOUS_CREDENTIAL] for a keyless one). An image generator is run by an
+     * executor, not a provider, so it never appears among the providers a platform builds: this is how the Sources screen learns it is
+     * connected (without it, AI Horde and fal stayed on "Connect" however often a key was saved).
+     */
+    fun linkedImageProviderIds(credentials: Map<String, String>): Set<String> =
+        IMAGE_ONLY_IDS.filterTo(linkedSetOf()) { credentials[it]?.isNotBlank() == true }
+
     /** Position of [id] among the free gateways, best limits first; the rest sort after. */
     fun freeReliabilityRank(id: String): Int = FREE_RELIABILITY_ORDER.indexOf(id).let { if (it < 0) Int.MAX_VALUE else it }
 

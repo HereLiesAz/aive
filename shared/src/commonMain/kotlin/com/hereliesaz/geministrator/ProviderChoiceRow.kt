@@ -30,7 +30,7 @@ internal fun ProviderChoiceRow(
             selected = selectedProviderId == null,
             onClick = { onSelected(null) },
         )
-        val listed = ProviderCatalog.entries.filter { it.id in connectedProviderIds }
+        val listed = ProviderCatalog.entries.filter { it.id in connectedProviderIds && !ProviderCatalog.isImageOnly(it.id) }
         listed.forEach { entry ->
             AzphaltPill(
                 label = entry.displayName,

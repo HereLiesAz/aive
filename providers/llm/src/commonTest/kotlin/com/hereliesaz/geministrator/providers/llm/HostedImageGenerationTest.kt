@@ -89,6 +89,16 @@ class HostedImageGenerationTest {
     }
 
     @Test
+    fun aSourceSwitchedOffSubmitsNothingButStaysRoutableForCleanup() = runTest {
+        val off = HostedImageGenerationExecutorIntegration(falKey = { "test" }, enabled = { it != "aihorde" })
+        // Still supported, so an already-submitted job can be reconciled and cancelled...
+        assertTrue(off.supports(context("aihorde|auto").executor))
+        // ...but a new dispatch is refused.
+        assertEquals(TaskRunStatus.Failed, off.dispatch(context("aihorde|auto")).status)
+        assertTrue(off.supports(context("fal|fal-ai/flux/schnell").executor), "fal is still on")
+    }
+
+    @Test
     fun hordeDispatchAndReconcileReturnVerifiedRemoteArtifacts() = runTest {
         val requests = mutableListOf<String>()
         val http = trackedClient(MockEngine { request ->
