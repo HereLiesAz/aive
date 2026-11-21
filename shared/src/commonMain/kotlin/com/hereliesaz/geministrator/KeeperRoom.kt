@@ -225,7 +225,7 @@ internal fun KeeperRoom(
                         KeeperNav(groups, sections, selected.group, statusOf) { selectGroup(it) }
                     }
                 }
-                Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(19.dp)).background(ink)) {
+                Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(18.dp)).background(ink)) {
                     AzphaltThemedSurface(ink) {
                         Column(Modifier.fillMaxSize()) {
                             KeeperCardHeading(selected.group)
@@ -414,7 +414,7 @@ internal fun ConnectionRow(
     } else {
         androidx.compose.ui.graphics.Color.Transparent
     }
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(18.dp)
     Box(
         modifier
             .fillMaxWidth()
@@ -466,7 +466,7 @@ private fun ConnectionStatus(status: String) {
 /** "+ Add a provider": opens the list of what isn't connected yet. */
 @Composable
 internal fun AddConnectionRow(label: String, hint: String, open: Boolean, onToggle: () -> Unit) {
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(18.dp)
     @OptIn(ExperimentalLayoutApi::class)
     FlowRow(
         Modifier

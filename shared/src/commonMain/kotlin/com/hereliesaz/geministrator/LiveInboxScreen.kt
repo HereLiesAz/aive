@@ -385,7 +385,7 @@ private fun MessageList(
     modifier: Modifier = Modifier,
 ) {
     val ink = Azphalt.Ink
-    Box(modifier.clip(RoundedCornerShape(19.dp)).background(ink)) {
+    Box(modifier.clip(RoundedCornerShape(18.dp)).background(ink)) {
         AzphaltSurface(ink) {
             Column(Modifier.fillMaxSize().padding(13.dp)) {
                 val strong = azphaltStrong()
@@ -570,7 +570,7 @@ private fun MessageDetail(
 ) {
     val ink = Azphalt.Ink
     when (row) {
-        null -> Box(modifier.clip(RoundedCornerShape(19.dp)).background(ink)) {
+        null -> Box(modifier.clip(RoundedCornerShape(18.dp)).background(ink)) {
             AzphaltSurface(ink) {
                 Text(
                     stringResource(Res.string.runs_no_pending_decisions),
@@ -580,7 +580,7 @@ private fun MessageDetail(
                 )
             }
         }
-        is MessageRow.Queen -> Box(modifier.clip(RoundedCornerShape(19.dp)).background(ink)) {
+        is MessageRow.Queen -> Box(modifier.clip(RoundedCornerShape(18.dp)).background(ink)) {
             AzphaltSurface(ink) {
                 Column(
                     (if (wide) Modifier.fillMaxSize().verticalScroll(rememberScrollState()) else Modifier.fillMaxWidth())
@@ -599,7 +599,7 @@ private fun MessageDetail(
                 }
             }
         }
-        is MessageRow.TourCheckIn -> Box(modifier.clip(RoundedCornerShape(19.dp)).background(ink)) {
+        is MessageRow.TourCheckIn -> Box(modifier.clip(RoundedCornerShape(18.dp)).background(ink)) {
             AzphaltSurface(ink) {
                 Column(
                     (if (wide) Modifier.fillMaxSize().verticalScroll(rememberScrollState()) else Modifier.fillMaxWidth())
@@ -609,7 +609,7 @@ private fun MessageDetail(
                 }
             }
         }
-        is MessageRow.Wait -> Box(modifier.clip(RoundedCornerShape(19.dp)).background(ink)) {
+        is MessageRow.Wait -> Box(modifier.clip(RoundedCornerShape(18.dp)).background(ink)) {
             AzphaltSurface(ink) {
                 val entry = row.entry
                 val task = presentation.definition.tasks.first { it.id.value == entry.taskId }

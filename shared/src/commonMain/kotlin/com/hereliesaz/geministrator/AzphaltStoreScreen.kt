@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -1189,17 +1187,12 @@ private fun PreparedAzphaltInstall(
                     plan.requestedHostPermissions.sorted().forEach { permission ->
                         val supported = permission !in plan.unsupportedHostPermissions
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(
+                            AzphaltCheck(
                                 checked = permission in approvedPermissions,
                                 onCheckedChange = if (supported) {
                                     { checked -> onPermissionChanged(permission, checked) }
                                 } else null,
                                 enabled = supported,
-                                colors = CheckboxDefaults.colors(
-                                    disabledCheckedColor = azphaltMutedOnSurface(),
-                                    disabledUncheckedColor = azphaltMutedOnSurface(),
-                                    disabledIndeterminateColor = azphaltMutedOnSurface(),
-                                ),
                             )
                             Text(
                                 if (supported) permission else stringResource(Res.string.store_unsupported_denied, permission),
@@ -1288,7 +1281,7 @@ private fun ConfirmationRow(
     text: String,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
+        AzphaltCheck(checked = checked, onCheckedChange = onCheckedChange)
         Text(text, style = AzphaltType.body, color = azphaltOnSurface())
     }
 }

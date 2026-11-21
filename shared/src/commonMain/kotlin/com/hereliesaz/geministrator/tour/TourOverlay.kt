@@ -148,7 +148,7 @@ private fun ClosingCard(line: String) {
             Column(
                 Modifier
                     .widthIn(max = 520.dp)
-                    .clip(RoundedCornerShape(19.dp))
+                    .clip(RoundedCornerShape(18.dp))
                     .background(Azphalt.Ink)
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -306,7 +306,7 @@ private fun TourCard(state: TourState, step: LessonPayload) {
             Modifier
                 .padding(16.dp)
                 .widthIn(max = 520.dp)
-                .clip(RoundedCornerShape(19.dp))
+                .clip(RoundedCornerShape(18.dp))
                 .background(Azphalt.Ink)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),

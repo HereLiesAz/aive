@@ -308,7 +308,7 @@ private fun DraftField(prompt: String, field: PromptFieldState, busy: Boolean, o
             modifier = Modifier
                 .fillMaxWidth()
                 .defaultMinSize(minHeight = 56.dp)
-                .clip(RoundedCornerShape(28.dp))
+                .clip(RoundedCornerShape(26.dp))
                 .background(Azphalt.Ink)
                 .padding(start = 18.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,

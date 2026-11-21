@@ -1,5 +1,10 @@
 package com.hereliesaz.geministrator
 
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -342,6 +347,33 @@ internal fun AzphaltToggle(
     }
 }
 
+/**
+ * A yes/no a row asks next to its words (the permission list, "install anyway"): the switch track in a 48dp target, announced
+ * as a checkbox. HG2Gui has no outlined boxes and no check glyphs. Null [onCheckedChange], or [enabled] false, is a track
+ * that is shown but does nothing.
+ */
+@Composable
+internal fun AzphaltCheck(
+    checked: Boolean,
+    onCheckedChange: ((Boolean) -> Unit)?,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val active = enabled && onCheckedChange != null
+    Box(
+        modifier
+            .size(AzphaltMinTouchTarget)
+            .then(
+                if (active) Modifier.toggleable(value = checked, role = Role.Checkbox, onValueChange = { onCheckedChange?.invoke(it) })
+                else Modifier.semantics { role = Role.Checkbox; stateDescription = if (checked) "On" else "Off"; disabled() },
+            )
+            .alpha(if (active) 1f else 0.5f),
+        contentAlignment = Alignment.Center,
+    ) {
+        AzphaltSwitchTrack(checked)
+    }
+}
+
 /** The switch itself, drawn: on is the strong colour with a thumb in its opposite, off is muted. */
 @Composable
 internal fun AzphaltSwitchTrack(on: Boolean) {
@@ -349,7 +381,7 @@ internal fun AzphaltSwitchTrack(on: Boolean) {
     val track = if (on) strong else azphaltMutedOnSurface().copy(alpha = 0.45f)
     val thumb = if (on) strong.onOpposite() else azphaltOnSurface()
     Box(
-        Modifier.size(width = 43.dp, height = 24.dp).clip(RoundedCornerShape(14.dp)).background(track).padding(3.dp),
+        Modifier.size(width = 43.dp, height = 24.dp).clip(RoundedCornerShape(18.dp)).background(track).padding(3.dp),
         contentAlignment = if (on) Alignment.CenterEnd else Alignment.CenterStart,
     ) {
         Box(Modifier.size(18.dp).clip(CircleShape).background(thumb))

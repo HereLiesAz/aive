@@ -56,7 +56,7 @@ internal fun StoreTabsRow(wide: Boolean, tabs: @Composable () -> Unit) {
     Box(
         Modifier
             .widthIn(max = 960.dp)
-            .clip(RoundedCornerShape(30.dp))
+            .clip(RoundedCornerShape(26.dp))
             .background(Azphalt.Ink)
             .padding(5.dp),
     ) {
@@ -87,7 +87,7 @@ internal fun FeaturedStoreHive(hive: AzphaltPackageSummary, onView: () -> Unit) 
         Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = 245.dp)
-            .clip(RoundedCornerShape(19.dp))
+            .clip(RoundedCornerShape(18.dp))
             .background(Azphalt.Ink)
             .padding(29.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -156,7 +156,7 @@ private fun StoreCard(
     onInspect: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(18.dp)
     val panel = Azphalt.hue("store-${item.id}")
     // The card is another library hue than its art panel; Ink when picked. No border.
     val fill = azphaltTileFill("store-card-${item.id}", selected, avoid = panel)

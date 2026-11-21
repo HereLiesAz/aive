@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Checkbox
 import com.hereliesaz.geministrator.AzphaltButton
 import com.hereliesaz.conveyance.h2g2.H2g2Nest
 import com.hereliesaz.conveyance.h2g2.Option
@@ -193,7 +192,7 @@ fun AddonScreenRenderer(
                             is AddonScreenItem.Toggle -> {
                                 Row {
                                     Text(item.label)
-                                    Checkbox(
+                                    com.hereliesaz.geministrator.AzphaltCheck(
                                         checked = bindingProvider(item.bindingId) == "true",
                                         onCheckedChange = {
                                             onInputUpdate(item.bindingId, it.toString())

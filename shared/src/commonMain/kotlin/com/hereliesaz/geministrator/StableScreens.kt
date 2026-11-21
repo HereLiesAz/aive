@@ -236,7 +236,7 @@ private val RARITY_ORDER = listOf("Common", "Uncommon", "Rare", "Very rare", "My
 /** One card of the wide stable grid: the art panel in the creature's own hue, then its copy. */
 @Composable
 private fun StableGridCard(rig: String, title: String, eyebrow: String, count: String, generation: Int?, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(19.dp)
+    val shape = RoundedCornerShape(18.dp)
     val art = Azphalt.hue(rig)
     Column(modifier.heightIn(min = 300.dp).clip(shape).background(Azphalt.Ink).semantics(mergeDescendants = true) {}) {
         Box(Modifier.fillMaxWidth().height(184.dp).background(art), contentAlignment = Alignment.Center) {
@@ -455,7 +455,7 @@ private fun StableHeading(text: String) {
         Modifier
             .semantics { heading() }
             .heightIn(min = AzphaltMinTouchTarget)
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(26.dp))
             .background(fill)
             .padding(horizontal = 18.dp),
         contentAlignment = Alignment.CenterStart,
@@ -506,7 +506,7 @@ private fun StableTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(24.dp)
+    val shape = RoundedCornerShape(26.dp)
     // One of the library's hues by creature; Ink when picked (HG2Gui: selection is a fill, not a border).
     val fill = azphaltTileFill("stable-$rig", selected)
     Column(
@@ -618,7 +618,7 @@ private fun PickerRow(rig: String, title: String, caption: String, selected: Boo
                 .fillMaxWidth()
                 .alpha(if (enabled) 1f else DIMMED)
                 .heightIn(min = AzphaltMinTouchTarget)
-                .clip(RoundedCornerShape(24.dp))
+                .clip(RoundedCornerShape(26.dp))
                 .background(fill)
                 .selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick)
                 .padding(start = 6.dp, top = 6.dp, bottom = 6.dp, end = 14.dp),

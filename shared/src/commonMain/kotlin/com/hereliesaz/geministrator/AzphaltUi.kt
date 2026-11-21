@@ -150,7 +150,7 @@ internal object AzphaltSpacing {
 
 /** Shape tokens shared by Azphalt surfaces. */
 internal object AzphaltShapes {
-    val dialogCorner: Dp = 28.dp
+    val dialogCorner: Dp = 26.dp
 }
 
 /** Smallest touch target (dp) for anything clickable. */
@@ -556,7 +556,7 @@ internal fun AzphaltNote(
     val hue = recordFill(seed, selected = false)
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(18.dp))
             .background(hue)
             .then(
                 if (onClick != null) {

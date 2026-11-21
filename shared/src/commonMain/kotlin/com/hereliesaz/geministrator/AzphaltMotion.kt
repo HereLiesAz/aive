@@ -125,7 +125,7 @@ internal fun Modifier.azphaltSelectedTransform(selected: Boolean): Modifier {
 @Composable
 internal fun animatedRecordRadius(selected: Boolean): Dp {
     val radius by animateDpAsState(
-        targetValue = if (selected) 30.dp else 22.dp,
+        targetValue = 26.dp, // HG2Gui's record tile radius; selection is a fill now, so the radius no longer breathes
         animationSpec = tween(220, easing = HouseEase),
         label = "azphalt-record-radius",
     )
