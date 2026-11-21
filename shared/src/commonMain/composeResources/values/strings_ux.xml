@@ -206,4 +206,19 @@
     <string name="memory_web_exported">Exported %1$d notes into “%2$s”</string>
     <string name="memory_web_exported_partial">Exported %1$d notes, %2$d could not be written</string>
     <string name="memory_web_export_failed">Could not export to the folder</string>
+    <string name="hive_cap_rest">Rest</string>
+    <string name="hive_cap_wake">Wake</string>
+    <string name="hive_cap_stop">Stop</string>
+    <string name="hive_cap_story">Story</string>
+    <string name="hive_cap_overview">Overview</string>
+    <string name="hive_cap_share">Share</string>
+    <string name="hive_cap_edit">Edit</string>
+    <string name="hive_cap_swarm">Swarm</string>
+    <string name="hive_cap_growth">Growth</string>
+    <string name="hive_cap_centre">Centre</string>
+    <string name="hive_cap_zoom_out">Zoom out</string>
+    <string name="hive_cap_zoom_in">Zoom in</string>
+    <string name="hive_cap_undo">Undo</string>
+    <string name="hive_cap_redo">Redo</string>
+    <string name="hive_cap_close">Close</string>
 </resources>

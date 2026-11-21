@@ -5,6 +5,13 @@ import com.hereliesaz.geministrator.resources.first_hive_teach_seed
 import com.hereliesaz.geministrator.resources.queen_away_notice_label
 import com.hereliesaz.geministrator.resources.queen_say_missing_queen_away
 import com.hereliesaz.geministrator.resources.hive_more_editing
+import com.hereliesaz.geministrator.resources.hive_cap_edit
+import com.hereliesaz.geministrator.resources.hive_cap_share
+import com.hereliesaz.geministrator.resources.hive_cap_story
+import com.hereliesaz.geministrator.resources.hive_cap_overview
+import com.hereliesaz.geministrator.resources.hive_cap_stop
+import com.hereliesaz.geministrator.resources.hive_cap_rest
+import com.hereliesaz.geministrator.resources.hive_cap_wake
 import com.hereliesaz.geministrator.resources.hive_show_hive
 import com.hereliesaz.geministrator.resources.hive_stop_cancel
 import com.hereliesaz.geministrator.resources.hive_stop_confirm
@@ -1296,6 +1303,7 @@ private fun MainDestination(
                         onClick = { onPauseRun(!paused) },
                         selected = paused,
                         modifier = Modifier.tourTarget(TourTargetId.HIVE_PAUSE),
+                        caption = stringResource(if (paused) Res.string.hive_cap_wake else Res.string.hive_cap_rest),
                     ),
                 )
                 add(
@@ -1305,6 +1313,7 @@ private fun MainDestination(
                         danger = true,
                         onClick = { confirmingStopRun = true },
                         modifier = Modifier.tourTarget(TourTargetId.HIVE_STOP),
+                        caption = stringResource(Res.string.hive_cap_stop),
                     ),
                 )
             }
@@ -1314,10 +1323,11 @@ private fun MainDestination(
                     stringResource(if (showTimeline) Res.string.hive_show_hive else Res.string.hive_show_timeline),
                     onClick = { showTimeline = !showTimeline },
                     selected = showTimeline,
+                    caption = stringResource(if (showTimeline) Res.string.hive_cap_overview else Res.string.hive_cap_story),
                 ),
             )
-            add(HiveAction(HiveGlyph.Share, hiveCardShareLabel(), onClick = { sharingHiveCard = !sharingHiveCard }, selected = sharingHiveCard))
-            add(HiveAction(HiveGlyph.Edit, stringResource(Res.string.hive_more_editing), onClick = { openHiveInWorkflows(null) }))
+            add(HiveAction(HiveGlyph.Share, hiveCardShareLabel(), onClick = { sharingHiveCard = !sharingHiveCard }, selected = sharingHiveCard, caption = stringResource(Res.string.hive_cap_share)))
+            add(HiveAction(HiveGlyph.Edit, stringResource(Res.string.hive_more_editing), onClick = { openHiveInWorkflows(null) }, caption = stringResource(Res.string.hive_cap_edit)))
         }
     }
     CompositionLocalProvider(LocalHiveActions provides hiveActionsList) {

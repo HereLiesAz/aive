@@ -73,6 +73,14 @@ import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.hive_cap_close
+import com.hereliesaz.geministrator.resources.hive_cap_swarm
+import com.hereliesaz.geministrator.resources.hive_cap_growth
+import com.hereliesaz.geministrator.resources.hive_cap_zoom_in
+import com.hereliesaz.geministrator.resources.hive_cap_zoom_out
+import com.hereliesaz.geministrator.resources.hive_cap_centre
+import com.hereliesaz.geministrator.resources.hive_cap_redo
+import com.hereliesaz.geministrator.resources.hive_cap_undo
 import com.hereliesaz.geministrator.resources.build_build
 import com.hereliesaz.geministrator.resources.build_live
 import com.hereliesaz.geministrator.resources.build_redo
@@ -409,22 +417,23 @@ internal fun HiveControlsBar(
             val buttons: @Composable () -> Unit = {
                 // In Edit too: the run goes on while its wiring is edited, so Pause and Stop stay in reach.
                 hiveActions.forEach { action ->
-                    RoundGlyphButton(action.glyph, action.label, onClick = action.onClick, selected = action.selected, danger = action.danger, modifier = action.modifier)
+                    RoundGlyphButton(action.glyph, action.label, onClick = action.onClick, selected = action.selected, danger = action.danger, modifier = action.modifier, caption = action.caption)
                 }
                 if (building) {
-                    RoundGlyphButton(HiveGlyph.Undo, stringResource(Res.string.build_undo), enabled = canUndo, onClick = onUndo)
-                    RoundGlyphButton(HiveGlyph.Redo, stringResource(Res.string.build_redo), enabled = canRedo, onClick = onRedo)
+                    RoundGlyphButton(HiveGlyph.Undo, stringResource(Res.string.build_undo), enabled = canUndo, onClick = onUndo, caption = stringResource(Res.string.hive_cap_undo))
+                    RoundGlyphButton(HiveGlyph.Redo, stringResource(Res.string.build_redo), enabled = canRedo, onClick = onRedo, caption = stringResource(Res.string.hive_cap_redo))
                 }
                 onSwarmChange?.let { change ->
                     RoundGlyphButton(
                         HiveGlyph.Swarm,
                         stringResource(if (swarm) Res.string.hive_show_growth else Res.string.hive_show_all_creatures),
                         onClick = { change(!swarm) },
+                        caption = stringResource(if (swarm) Res.string.hive_cap_growth else Res.string.hive_cap_swarm),
                     )
                 }
-                RoundGlyphButton(HiveGlyph.Target, stringResource(Res.string.hive_centre), onClick = camera::centre)
-                RoundGlyphButton(HiveGlyph.ZoomOut, stringResource(Res.string.terrarium_zoom_out), onClick = { camera.stepOut(onSurface) })
-                RoundGlyphButton(HiveGlyph.ZoomIn, stringResource(Res.string.terrarium_zoom_in), onClick = camera::stepIn)
+                RoundGlyphButton(HiveGlyph.Target, stringResource(Res.string.hive_centre), onClick = camera::centre, caption = stringResource(Res.string.hive_cap_centre))
+                RoundGlyphButton(HiveGlyph.ZoomOut, stringResource(Res.string.terrarium_zoom_out), onClick = { camera.stepOut(onSurface) }, caption = stringResource(Res.string.hive_cap_zoom_out))
+                RoundGlyphButton(HiveGlyph.ZoomIn, stringResource(Res.string.terrarium_zoom_in), onClick = camera::stepIn, caption = stringResource(Res.string.hive_cap_zoom_in))
             }
             val frameModifier = Modifier
                 .fillMaxWidth()
@@ -465,6 +474,8 @@ internal class HiveAction(
     val modifier: Modifier = Modifier,
     /** A destructive act (Stop): drawn in the danger colour so it is not taken for an ordinary control. */
     val danger: Boolean = false,
+    /** The word under its button on the controls bar. */
+    val caption: String? = null,
 )
 
 /** The live hive's acts, offered by the page to the controls bar of the hive frame drawn inside it. */
@@ -669,7 +680,7 @@ internal fun DockedCreatureHead(position: Int?, of: Int, title: String, onClose:
             }
             Text(title, style = AzphaltType.section.copy(fontSize = 24.sp, lineHeight = 26.sp), color = azphaltOnSurface(), modifier = Modifier.semantics { heading() })
         }
-        RoundGlyphButton(HiveGlyph.Close, stringResource(Res.string.creature_panel_close), onClick = onClose)
+        RoundGlyphButton(HiveGlyph.Close, stringResource(Res.string.creature_panel_close), onClick = onClose, caption = stringResource(Res.string.hive_cap_close))
     }
 }
 
@@ -814,20 +825,22 @@ internal fun RoundGlyphButton(
     selected: Boolean = false,
     modifier: Modifier = Modifier,
     danger: Boolean = false,
+    /** A word or two under the hexagon, so a glyph is never the only thing that says what the control does (hg2gui DESIGN.md §9, §10). */
+    caption: String? = null,
 ) {
     val ink = when {
         !enabled -> azphaltMutedOnSurface().copy(alpha = 0.5f)
         danger -> AzphaltDanger
         else -> azphaltOnSurface()
     }
-    Box(
+    Column(
         modifier
-            .size(AzphaltMinTouchTarget)
-            // The target stays the full 48dp square (a hexagon clip would shrink what a finger can hit).
+            .defaultMinSize(minWidth = AzphaltMinTouchTarget, minHeight = AzphaltMinTouchTarget)
             .clip(RoundedCornerShape(10.dp))
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = label; if (selected) this.selected = true },
-        contentAlignment = Alignment.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
         Box(
             Modifier.size(34.dp).clip(HexagonShape)
@@ -836,6 +849,16 @@ internal fun RoundGlyphButton(
             contentAlignment = Alignment.Center,
         ) {
             Glyph(glyph, ink, Modifier.size(17.dp))
+        }
+        if (caption != null) {
+            Text(
+                caption,
+                style = AzphaltType.body.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium),
+                color = if (danger && enabled) AzphaltDanger else azphaltMutedOnSurface(),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 4.dp).padding(top = 2.dp, bottom = 2.dp).clearAndSetSemantics {},
+            )
         }
     }
 }
