@@ -420,7 +420,7 @@ internal fun ConnectionRow(
             .fillMaxWidth()
             .clip(shape)
             .background(card)
-            .then(if (connected) Modifier else Modifier.border(2.dp, azphaltMutedOnSurface(), shape))
+            .then(if (connected) Modifier else Modifier.background(azphaltOnSurface().copy(alpha = 0.14f)))
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         AzphaltThemedSurface(card) {
@@ -473,7 +473,7 @@ internal fun AddConnectionRow(label: String, hint: String, open: Boolean, onTogg
             .fillMaxWidth()
             .defaultMinSize(minHeight = AzphaltMinTouchTarget)
             .clip(shape)
-            .border(2.dp, azphaltMutedOnSurface(), shape)
+            .background(azphaltOnSurface().copy(alpha = 0.14f))
             .semantics(mergeDescendants = true) {
                 role = Role.Button
                 selected = open

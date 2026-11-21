@@ -515,7 +515,7 @@ internal fun HiveTissueFrame(height: Dp, building: Boolean, modifier: Modifier =
         Box(
             Modifier
                 .fillMaxSize()
-                .then(if (building) Modifier.border(3.dp, Azphalt.Yellow) else Modifier),
+                .then(if (building) Modifier.background(AzphaltLiftedInk) else Modifier),
         ) {
             // The tissue is Ink whatever the page ground: its content reads against Ink, not the ground.
             AzphaltThemedSurface(Azphalt.Ink) { field() }
