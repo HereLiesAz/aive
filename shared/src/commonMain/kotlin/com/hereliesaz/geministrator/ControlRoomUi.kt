@@ -1298,7 +1298,6 @@ private fun MainDestination(
                 val paused = live.run.keeperPause != null
                 add(
                     HiveAction(
-                        if (paused) HiveGlyph.Play else HiveGlyph.Pause,
                         stringResource(if (paused) Res.string.hive_resume_run else Res.string.hive_pause_run),
                         onClick = { onPauseRun(!paused) },
                         selected = paused,
@@ -1308,7 +1307,6 @@ private fun MainDestination(
                 )
                 add(
                     HiveAction(
-                        HiveGlyph.Stop,
                         stringResource(Res.string.hive_stop_run),
                         danger = true,
                         onClick = { confirmingStopRun = true },
@@ -1319,15 +1317,14 @@ private fun MainDestination(
             }
             add(
                 HiveAction(
-                    HiveGlyph.Timeline,
                     stringResource(if (showTimeline) Res.string.hive_show_hive else Res.string.hive_show_timeline),
                     onClick = { showTimeline = !showTimeline },
                     selected = showTimeline,
                     caption = stringResource(if (showTimeline) Res.string.hive_cap_overview else Res.string.hive_cap_story),
                 ),
             )
-            add(HiveAction(HiveGlyph.Share, hiveCardShareLabel(), onClick = { sharingHiveCard = !sharingHiveCard }, selected = sharingHiveCard, caption = stringResource(Res.string.hive_cap_share)))
-            add(HiveAction(HiveGlyph.Edit, stringResource(Res.string.hive_more_editing), onClick = { openHiveInWorkflows(null) }, caption = stringResource(Res.string.hive_cap_edit)))
+            add(HiveAction(hiveCardShareLabel(), onClick = { sharingHiveCard = !sharingHiveCard }, selected = sharingHiveCard, caption = stringResource(Res.string.hive_cap_share)))
+            add(HiveAction(stringResource(Res.string.hive_more_editing), onClick = { openHiveInWorkflows(null) }, caption = stringResource(Res.string.hive_cap_edit)))
         }
     }
     CompositionLocalProvider(LocalHiveActions provides hiveActionsList) {

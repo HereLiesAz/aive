@@ -417,23 +417,21 @@ internal fun HiveControlsBar(
             val buttons: @Composable () -> Unit = {
                 // In Edit too: the run goes on while its wiring is edited, so Pause and Stop stay in reach.
                 hiveActions.forEach { action ->
-                    RoundGlyphButton(action.glyph, action.label, onClick = action.onClick, selected = action.selected, danger = action.danger, modifier = action.modifier, caption = action.caption)
+                    HiveControl(action.label, onClick = action.onClick, selected = action.selected, danger = action.danger, modifier = action.modifier, caption = action.caption)
                 }
                 if (building) {
-                    RoundGlyphButton(HiveGlyph.Undo, stringResource(Res.string.build_undo), enabled = canUndo, onClick = onUndo, caption = stringResource(Res.string.hive_cap_undo))
-                    RoundGlyphButton(HiveGlyph.Redo, stringResource(Res.string.build_redo), enabled = canRedo, onClick = onRedo, caption = stringResource(Res.string.hive_cap_redo))
+                    HiveControl(stringResource(Res.string.build_undo), enabled = canUndo, onClick = onUndo, caption = stringResource(Res.string.hive_cap_undo))
+                    HiveControl(stringResource(Res.string.build_redo), enabled = canRedo, onClick = onRedo, caption = stringResource(Res.string.hive_cap_redo))
                 }
                 onSwarmChange?.let { change ->
-                    RoundGlyphButton(
-                        HiveGlyph.Swarm,
-                        stringResource(if (swarm) Res.string.hive_show_growth else Res.string.hive_show_all_creatures),
+                    HiveControl(stringResource(if (swarm) Res.string.hive_show_growth else Res.string.hive_show_all_creatures),
                         onClick = { change(!swarm) },
                         caption = stringResource(if (swarm) Res.string.hive_cap_growth else Res.string.hive_cap_swarm),
                     )
                 }
-                RoundGlyphButton(HiveGlyph.Target, stringResource(Res.string.hive_centre), onClick = camera::centre, caption = stringResource(Res.string.hive_cap_centre))
-                RoundGlyphButton(HiveGlyph.ZoomOut, stringResource(Res.string.terrarium_zoom_out), onClick = { camera.stepOut(onSurface) }, caption = stringResource(Res.string.hive_cap_zoom_out))
-                RoundGlyphButton(HiveGlyph.ZoomIn, stringResource(Res.string.terrarium_zoom_in), onClick = camera::stepIn, caption = stringResource(Res.string.hive_cap_zoom_in))
+                HiveControl(stringResource(Res.string.hive_centre), onClick = camera::centre, caption = stringResource(Res.string.hive_cap_centre))
+                HiveControl(stringResource(Res.string.terrarium_zoom_out), onClick = { camera.stepOut(onSurface) }, caption = stringResource(Res.string.hive_cap_zoom_out))
+                HiveControl(stringResource(Res.string.terrarium_zoom_in), onClick = camera::stepIn, caption = stringResource(Res.string.hive_cap_zoom_in))
             }
             val frameModifier = Modifier
                 .fillMaxWidth()
@@ -465,17 +463,16 @@ internal fun HiveControlsBar(
     }
 }
 
-/** One of the live hive's own acts (Pause, Stop, Timeline, Share, More editing), drawn as a round button on the hive's controls bar. */
+/** One of the live hive's own acts (Pause, Stop, Timeline, Share, More editing), drawn as a capsule on the hive's controls bar. */
 internal class HiveAction(
-    val glyph: HiveGlyph,
     val label: String,
     val onClick: () -> Unit,
     val selected: Boolean = false,
     val modifier: Modifier = Modifier,
     /** A destructive act (Stop): drawn in the danger colour so it is not taken for an ordinary control. */
     val danger: Boolean = false,
-    /** The word under its button on the controls bar. */
-    val caption: String? = null,
+    /** The word on its capsule on the controls bar. */
+    val caption: String,
 )
 
 /** The live hive's acts, offered by the page to the controls bar of the hive frame drawn inside it. */
@@ -680,7 +677,7 @@ internal fun DockedCreatureHead(position: Int?, of: Int, title: String, onClose:
             }
             Text(title, style = AzphaltType.section.copy(fontSize = 24.sp, lineHeight = 26.sp), color = azphaltOnSurface(), modifier = Modifier.semantics { heading() })
         }
-        RoundGlyphButton(HiveGlyph.Close, stringResource(Res.string.creature_panel_close), onClick = onClose, caption = stringResource(Res.string.hive_cap_close))
+        HiveControl(stringResource(Res.string.creature_panel_close), onClick = onClose, caption = stringResource(Res.string.hive_cap_close))
     }
 }
 
@@ -801,66 +798,35 @@ internal fun MindDefinitionList(identity: String, provider: String?, role: RoleD
     }
 }
 
-/** A regular hexagon, point up, filling its box: the hive's own shape for a control. */
-internal val HexagonShape: androidx.compose.ui.graphics.Shape = androidx.compose.foundation.shape.GenericShape { size, _ ->
-    val cx = size.width / 2f
-    val cy = size.height / 2f
-    val r = minOf(cx, cy)
-    for (i in 0 until 6) {
-        val angle = (PI / 180.0 * (60.0 * i - 90.0)).toFloat()
-        val x = cx + r * cos(angle)
-        val y = cy + r * sin(angle)
-        if (i == 0) moveTo(x, y) else lineTo(x, y)
-    }
-    close()
-}
-
-/** A hexagonal, outlined control on Ink: a 48dp target around a 34dp hexagon. (Still named for the round button it replaced.) */
+/**
+ * One of the hive's controls: a capsule with its word on it, per HG2Gui (docs/design: the capsule is the one small
+ * button; no icons, no borders, no hexagons). The drawn capsule is 32dp tall inside a 48dp target ([AzphaltPill]);
+ * [label] is what a screen reader says (the longer words), [caption] what the capsule shows. A danger control is
+ * the run's red, a selected one is Ink, and a control that cannot be used is dimmed and announced as disabled.
+ */
 @Composable
-internal fun RoundGlyphButton(
-    glyph: HiveGlyph,
+internal fun HiveControl(
     label: String,
+    caption: String,
     onClick: () -> Unit,
     enabled: Boolean = true,
     selected: Boolean = false,
     modifier: Modifier = Modifier,
     danger: Boolean = false,
-    /** A word or two under the hexagon, so a glyph is never the only thing that says what the control does (hg2gui DESIGN.md §9, §10). */
-    caption: String? = null,
 ) {
-    val ink = when {
-        !enabled -> azphaltMutedOnSurface().copy(alpha = 0.5f)
-        danger -> AzphaltDanger
-        else -> azphaltOnSurface()
-    }
-    Column(
-        modifier
-            .defaultMinSize(minWidth = AzphaltMinTouchTarget, minHeight = AzphaltMinTouchTarget)
-            .clip(RoundedCornerShape(10.dp))
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = label; if (selected) this.selected = true },
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Box(
-            Modifier.size(34.dp).clip(HexagonShape)
-                .then(if (selected) Modifier.background(azphaltOnSurface().copy(alpha = 0.18f)) else Modifier)
-                .border(1.dp, if (danger && enabled) AzphaltDanger else azphaltMutedOnSurface().copy(alpha = 0.5f), HexagonShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Glyph(glyph, ink, Modifier.size(17.dp))
-        }
-        if (caption != null) {
-            Text(
-                caption,
-                style = AzphaltType.body.copy(fontSize = 11.sp, fontWeight = FontWeight.Medium),
-                color = if (danger && enabled) AzphaltDanger else azphaltMutedOnSurface(),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 4.dp).padding(top = 2.dp, bottom = 2.dp).clearAndSetSemantics {},
-            )
-        }
-    }
+    // Red is the run's own colour (Stop): no other control's hash may land on it, or Zoom out reads as a second Stop.
+    var seed = "hive-control-$caption"
+    while (!danger && Azphalt.hue(seed) == AzphaltDanger) seed += "-"
+    AzphaltPill(
+        label = caption,
+        seed = seed,
+        selected = selected,
+        onClick = onClick,
+        modifier = modifier,
+        tone = if (danger) PillTone.Danger else PillTone.Quiet,
+        enabled = enabled,
+        description = label,
+    )
 }
 
 /** Line glyphs on a 24-unit grid, drawn in the surface's own colour. */
