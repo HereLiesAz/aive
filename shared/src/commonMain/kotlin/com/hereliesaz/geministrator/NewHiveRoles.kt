@@ -160,14 +160,15 @@ internal fun RoleCard(
     val cardDescription = stringResource(Res.string.hive_role_card, role.keeperName(), purpose)
     val addDescription = stringResource(Res.string.hive_new_bring_in, role.keeperName())
     val shape = RoundedCornerShape(20.dp)
-    AzphaltThemedSurface(Azphalt.Ink) {
+    // A library hue by role (not the mascot's own, which is drawn on it); Ink when the queen suggests it. No border.
+    val fill = azphaltTileFill("role-card-${role.id.value}", selected = suggested, avoid = Azphalt.hue(role.id.value))
+    AzphaltThemedSurface(fill) {
         Box(modifier = modifier.width(CardWidth)) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(shape)
-                    .background(Azphalt.Ink)
-                    .then(if (suggested) Modifier.border(2.dp, Azphalt.Yellow, shape) else Modifier)
+                    .background(fill)
                     .semantics(mergeDescendants = true) {
                         this.role = Role.Button
                         contentDescription = cardDescription

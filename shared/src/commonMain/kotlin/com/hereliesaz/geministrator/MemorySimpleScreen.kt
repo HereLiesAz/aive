@@ -374,7 +374,7 @@ private fun MemoryNoteCard(eyebrow: String, title: String, body: String?, modifi
         modifier = modifier
             .semantics(mergeDescendants = true) {}
             .clip(RoundedCornerShape(20.dp))
-            .border(2.dp, content, RoundedCornerShape(20.dp))
+            .background(content.copy(alpha = 0.14f))
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {

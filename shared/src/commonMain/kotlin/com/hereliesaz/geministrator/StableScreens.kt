@@ -496,7 +496,7 @@ private fun CreatureBox(rig: String, size: Int, description: String? = null) {
 /** How much of its box a creature's rig takes before [STABLE_CREATURE_SCALE] grows it into the margin. */
 private const val CREATURE_IN_BOX = 0.8f
 
-/** One starter to pick (B1): the creature, its name and rarity; Yellow, outlined, when picked. */
+/** One starter to pick (B1): the creature, its name and rarity; a library hue, Ink when picked. */
 @Composable
 private fun StableTile(
     rig: String,
@@ -507,17 +507,14 @@ private fun StableTile(
     modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(24.dp)
-    // Records (docs/BRANDING.md): dark, and Yellow outlined in the surface's content colour when
-    // selected, so the chosen one stands off the mustard ground rather than melting into it.
-    val fill = if (selected) Azphalt.Yellow else stableRowFill()
-    val outline = azphaltOnSurface()
+    // One of the library's hues by creature; Ink when picked (HG2Gui: selection is a fill, not a border).
+    val fill = azphaltTileFill("stable-$rig", selected)
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = modifier
             .clip(shape)
             .background(fill)
-            .then(if (selected) Modifier.border(3.dp, outline, shape) else Modifier)
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = 6.dp, vertical = 10.dp),
     ) {
