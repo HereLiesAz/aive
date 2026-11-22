@@ -1,5 +1,10 @@
 package com.hereliesaz.geministrator
 
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -187,10 +192,13 @@ private fun GroundSwatches(current: Azphalt.Ground, onSelect: (Azphalt.Ground) -
     ) {
         Azphalt.grounds.forEach { ground ->
             val selected = ground == current
+            // A sample of the ground on a tile: Ink, and Yellow when it is the one in use (selection is a fill, never a ring).
+            val tile = if (selected) Azphalt.Yellow else Azphalt.Ink
             Column(
                 modifier = Modifier
                     .azphaltSelectedTransform(selected)
                     .clip(RoundedCornerShape(AzphaltSpacing.m))
+                    .background(tile)
                     .selectable(selected = selected, role = Role.RadioButton, onClick = { onSelect(ground) })
                     .padding(AzphaltSpacing.xs),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -199,16 +207,16 @@ private fun GroundSwatches(current: Azphalt.Ground, onSelect: (Azphalt.Ground) -
                 Box(
                     modifier = Modifier
                         .size(AzphaltMinTouchTarget)
-                        .then(if (selected) Modifier.border(3.dp, line, CircleShape).padding(5.dp) else Modifier)
                         .clip(CircleShape)
-                        .background(ground.page)
-                        .border(2.dp, line, CircleShape),
+                        .background(ground.page),
                 )
-                Text(
-                    ground.name.uppercase(),
-                    style = AzphaltType.endCap,
-                    color = if (selected) line else azphaltMutedOnSurface(),
-                )
+                AzphaltSurface(tile) {
+                    Text(
+                        ground.name.uppercase(),
+                        style = AzphaltType.endCap,
+                        color = if (selected) azphaltOnSurface() else azphaltMutedOnSurface(),
+                    )
+                }
             }
         }
     }
@@ -263,18 +271,19 @@ private fun WideKeeperAppearance() {
 private fun GroundCard(ground: Azphalt.Ground, selected: Boolean, modifier: Modifier, onSelect: () -> Unit) {
     val shape = RoundedCornerShape(12.dp)
     val strong = azphaltStrong()
+    // Picked is Yellow (HG2Gui: selection is a fill, never a border); the rest are lifted Ink.
+    val cardFill = if (selected) Azphalt.Yellow else AzphaltLiftedInk
     Box(
         modifier
             .height(92.dp)
             .clip(shape)
-            .background(AzphaltLiftedInk)
-            .border(if (selected) 2.dp else 1.dp, if (selected) strong else azphaltMutedOnSurface().copy(alpha = 0.4f), shape)
+            .background(cardFill)
             .selectable(selected = selected, role = Role.RadioButton, onClick = onSelect)
             .padding(10.dp),
     ) {
-        AzphaltSurface(AzphaltLiftedInk) {
+        AzphaltSurface(cardFill) {
             Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(Modifier.size(49.dp).clip(CircleShape).background(ground.page).border(1.dp, azphaltMutedOnSurface(), CircleShape))
+                Box(Modifier.size(49.dp).clip(CircleShape).background(ground.page))
                 Text(ground.name, style = AzphaltType.lead, color = azphaltOnSurface())
             }
             if (selected) {
@@ -338,6 +347,33 @@ internal fun AzphaltToggle(
     }
 }
 
+/**
+ * A yes/no a row asks next to its words (the permission list, "install anyway"): the switch track in a 48dp target, announced
+ * as a checkbox. HG2Gui has no outlined boxes and no check glyphs. Null [onCheckedChange], or [enabled] false, is a track
+ * that is shown but does nothing.
+ */
+@Composable
+internal fun AzphaltCheck(
+    checked: Boolean,
+    onCheckedChange: ((Boolean) -> Unit)?,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val active = enabled && onCheckedChange != null
+    Box(
+        modifier
+            .size(AzphaltMinTouchTarget)
+            .then(
+                if (active) Modifier.toggleable(value = checked, role = Role.Checkbox, onValueChange = { onCheckedChange?.invoke(it) })
+                else Modifier.semantics { role = Role.Checkbox; stateDescription = if (checked) "On" else "Off"; disabled() },
+            )
+            .alpha(if (active) 1f else 0.5f),
+        contentAlignment = Alignment.Center,
+    ) {
+        AzphaltSwitchTrack(checked)
+    }
+}
+
 /** The switch itself, drawn: on is the strong colour with a thumb in its opposite, off is muted. */
 @Composable
 internal fun AzphaltSwitchTrack(on: Boolean) {
@@ -345,7 +381,7 @@ internal fun AzphaltSwitchTrack(on: Boolean) {
     val track = if (on) strong else azphaltMutedOnSurface().copy(alpha = 0.45f)
     val thumb = if (on) strong.onOpposite() else azphaltOnSurface()
     Box(
-        Modifier.size(width = 43.dp, height = 24.dp).clip(RoundedCornerShape(14.dp)).background(track).padding(3.dp),
+        Modifier.size(width = 43.dp, height = 24.dp).clip(RoundedCornerShape(18.dp)).background(track).padding(3.dp),
         contentAlignment = if (on) Alignment.CenterEnd else Alignment.CenterStart,
     ) {
         Box(Modifier.size(18.dp).clip(CircleShape).background(thumb))

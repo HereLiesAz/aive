@@ -67,14 +67,14 @@ internal fun PlanningOverlay(
                 modifier = Modifier
                     .widthIn(max = 640.dp)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
+                    .clip(RoundedCornerShape(26.dp))
                     .background(Azphalt.Ink)
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(stringResource(Res.string.planning_title), style = AzphaltType.eyebrow, color = azphaltOnSurface())
                 Text(planningCaption(stage), style = AzphaltType.lead, color = azphaltOnSurface())
-                Box(Modifier.fillMaxWidth().heightIn(min = 240.dp, max = 340.dp).clip(RoundedCornerShape(16.dp))) {
+                Box(Modifier.fillMaxWidth().heightIn(min = 240.dp, max = 340.dp).clip(RoundedCornerShape(18.dp))) {
                     GeministratorWorkflowTerrarium(
                         definition = scene.definition,
                         liveRun = scene.run,

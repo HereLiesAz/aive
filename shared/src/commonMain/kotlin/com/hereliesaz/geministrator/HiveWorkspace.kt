@@ -380,7 +380,7 @@ internal fun HiveControlsBar(
             val modeSwitch: @Composable () -> Unit = {
                 Row(
                     Modifier
-                        .clip(RoundedCornerShape(28.dp))
+                        .clip(RoundedCornerShape(26.dp))
                         .background(AzphaltLiftedInk)
                         .padding(4.dp)
                         .selectableGroup(),
@@ -485,7 +485,7 @@ private fun ModeSegment(label: String, selected: Boolean, modifier: Modifier = M
     Box(
         modifier = modifier
             .heightIn(min = AzphaltMinTouchTarget)
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(26.dp))
             .background(if (selected) azphaltStrong() else Color.Transparent)
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = 18.dp),
@@ -515,7 +515,7 @@ internal fun HiveTissueFrame(height: Dp, building: Boolean, modifier: Modifier =
         Box(
             Modifier
                 .fillMaxSize()
-                .then(if (building) Modifier.border(3.dp, Azphalt.Yellow) else Modifier),
+                .then(if (building) Modifier.background(AzphaltLiftedInk) else Modifier),
         ) {
             // The tissue is Ink whatever the page ground: its content reads against Ink, not the ground.
             AzphaltThemedSurface(Azphalt.Ink) { field() }
@@ -608,7 +608,7 @@ internal fun HiveFeedBar(
                         onValueChange = field.onValueChange,
                         placeholder = { Text(stringResource(Res.string.hive_feed_placeholder), style = AzphaltType.body.copy(fontSize = 14.sp)) },
                         singleLine = true,
-                        shape = RoundedCornerShape(28.dp),
+                        shape = RoundedCornerShape(26.dp),
                         colors = azphaltTextFieldColors(),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
                         keyboardActions = KeyboardActions(onGo = { submit() }),
@@ -695,7 +695,7 @@ internal fun DockedCreatureCard(
         Modifier
             .fillMaxWidth()
             .height(138.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(18.dp))
             .background(AzphaltLiftedInk)
             .then(if (onClick != null) Modifier.clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick) else Modifier),
         verticalAlignment = Alignment.CenterVertically,

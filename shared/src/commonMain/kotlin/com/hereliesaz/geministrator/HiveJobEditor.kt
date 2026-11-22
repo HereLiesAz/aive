@@ -414,7 +414,7 @@ private fun JobRow(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = AzphaltMinTouchTarget)
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(26.dp))
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .then(semantics)
             .background(fill)

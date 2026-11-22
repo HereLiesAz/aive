@@ -84,7 +84,7 @@ private fun StorePanel(content: @Composable () -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
+            .clip(RoundedCornerShape(26.dp))
             .background(Azphalt.Ink)
             .padding(16.dp),
     ) {

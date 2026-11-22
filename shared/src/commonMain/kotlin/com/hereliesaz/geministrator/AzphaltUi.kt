@@ -150,7 +150,7 @@ internal object AzphaltSpacing {
 
 /** Shape tokens shared by Azphalt surfaces. */
 internal object AzphaltShapes {
-    val dialogCorner: Dp = 28.dp
+    val dialogCorner: Dp = 26.dp
 }
 
 /** Smallest touch target (dp) for anything clickable. */
@@ -438,11 +438,9 @@ internal fun AzphaltRecord(
     /** A styled body (an agent's Markdown, read), shown instead of [body]. */
     richBody: androidx.compose.ui.text.AnnotatedString? = null,
 ) {
-    // A card, not a creature: Ink (lifted Ink on a dark surface), and Yellow when selected.
-    val hue = recordFill(selected)
+    // A tile in one of the library's hues (by seed); Ink when selected (Yellow on a dark surface), with no border.
+    val hue = recordFill(seed, selected)
     val content = hue.onOpposite()
-    // Selected Yellow can sit on a yellow ground: outline it in the ground's content colour.
-    val outline = azphaltOnSurface()
     val radius = animatedRecordRadius(selected)
     val description = recordDescription(title, eyebrow, endCap, richBody?.text ?: body)
     // A clickable record is one button: its text reads as one label. A record that is not clickable is
@@ -469,7 +467,6 @@ internal fun AzphaltRecord(
             .fillMaxWidth()
             .clip(RoundedCornerShape(radius))
             .background(hue)
-            .then(if (selected) Modifier.border(2.dp, outline, RoundedCornerShape(radius)) else Modifier)
             .padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -528,13 +525,20 @@ internal fun recordDescription(title: String, eyebrow: String, endCap: String?, 
 internal val AzphaltLiftedInk = Color(0xFF2E2723)
 
 @Composable
-private fun recordFill(selected: Boolean): Color {
+private fun recordFill(seed: String, selected: Boolean): Color = azphaltTileFill(seed, selected)
+
+/**
+ * A tile's fill (HG2Gui: a stack reads as a stack, and selection is a fill, never a border): one of the library's hues,
+ * picked by hashing [seed] and never landing on red (red is the danger colour) nor on [avoid] (a creature drawn on the
+ * tile in that hue); Ink when [selected], or Yellow when the surface is Ink, so the chosen one stands off either ground.
+ */
+@Composable
+internal fun azphaltTileFill(seed: String, selected: Boolean, avoid: Color? = null): Color {
     val surface = azphaltSurface()
-    return when {
-        selected -> Azphalt.Yellow
-        surface == Azphalt.Ink || surface == AzphaltLiftedInk -> AzphaltLiftedInk
-        else -> Azphalt.Ink
-    }
+    if (selected) return if (surface == Azphalt.Ink || surface == AzphaltLiftedInk) Azphalt.Yellow else Azphalt.Ink
+    var s = seed
+    while (Azphalt.hue(s) == AzphaltDanger || Azphalt.hue(s) == avoid) s += "-"
+    return Azphalt.hue(s)
 }
 
 /** The dark panel a record's [AzphaltRecord] `well` sits on: set apart from the card around it. */
@@ -549,10 +553,10 @@ internal fun AzphaltNote(
     /** Set, the note is a link: it takes the keeper to where what it says can be acted on. */
     onClick: (() -> Unit)? = null,
 ) {
-    val hue = recordFill(selected = false)
+    val hue = recordFill(seed, selected = false)
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(18.dp))
             .background(hue)
             .then(
                 if (onClick != null) {

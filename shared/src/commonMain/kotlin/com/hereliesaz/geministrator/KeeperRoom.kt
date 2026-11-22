@@ -225,7 +225,7 @@ internal fun KeeperRoom(
                         KeeperNav(groups, sections, selected.group, statusOf) { selectGroup(it) }
                     }
                 }
-                Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(19.dp)).background(ink)) {
+                Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(18.dp)).background(ink)) {
                     AzphaltThemedSurface(ink) {
                         Column(Modifier.fillMaxSize()) {
                             KeeperCardHeading(selected.group)
@@ -414,13 +414,13 @@ internal fun ConnectionRow(
     } else {
         androidx.compose.ui.graphics.Color.Transparent
     }
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(18.dp)
     Box(
         modifier
             .fillMaxWidth()
             .clip(shape)
             .background(card)
-            .then(if (connected) Modifier else Modifier.border(2.dp, azphaltMutedOnSurface(), shape))
+            .then(if (connected) Modifier else Modifier.background(azphaltOnSurface().copy(alpha = 0.14f)))
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         AzphaltThemedSurface(card) {
@@ -466,14 +466,14 @@ private fun ConnectionStatus(status: String) {
 /** "+ Add a provider": opens the list of what isn't connected yet. */
 @Composable
 internal fun AddConnectionRow(label: String, hint: String, open: Boolean, onToggle: () -> Unit) {
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(18.dp)
     @OptIn(ExperimentalLayoutApi::class)
     FlowRow(
         Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = AzphaltMinTouchTarget)
             .clip(shape)
-            .border(2.dp, azphaltMutedOnSurface(), shape)
+            .background(azphaltOnSurface().copy(alpha = 0.14f))
             .semantics(mergeDescendants = true) {
                 role = Role.Button
                 selected = open

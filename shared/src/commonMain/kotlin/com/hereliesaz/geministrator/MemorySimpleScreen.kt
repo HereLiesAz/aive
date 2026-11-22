@@ -130,7 +130,7 @@ internal fun MemorySimpleView(controller: MemoryLayerController, onOpenTechnical
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
+                    .clip(RoundedCornerShape(26.dp))
                     .background(Azphalt.Ink)
                     .padding(if (narrow) 16.dp else 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -282,7 +282,7 @@ private fun MemoryStageCard(number: String, name: String, figure: String, workin
     Column(
         modifier = modifier
             .semantics(mergeDescendants = true) { contentDescription = description }
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(18.dp))
             .background(AzphaltLiftedInk)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -374,7 +374,7 @@ private fun MemoryNoteCard(eyebrow: String, title: String, body: String?, modifi
         modifier = modifier
             .semantics(mergeDescendants = true) {}
             .clip(RoundedCornerShape(20.dp))
-            .border(2.dp, content, RoundedCornerShape(20.dp))
+            .background(content.copy(alpha = 0.14f))
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {

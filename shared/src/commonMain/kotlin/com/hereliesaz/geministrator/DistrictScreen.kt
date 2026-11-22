@@ -113,7 +113,7 @@ internal fun DistrictScreen(
         }
     }
     val scroll = rememberScrollState()
-    Box(modifier.clip(RoundedCornerShape(32.dp))) {
+    Box(modifier.clip(RoundedCornerShape(26.dp))) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -218,7 +218,7 @@ private fun NeighbourhoodCell(neighbourhood: Neighbourhood, onClick: () -> Unit,
         verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier
             .size(width = 150.dp, height = 214.dp)
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(26.dp))
             .combinedClickable(
                 role = Role.Button,
                 onLongClickLabel = hiveOptionsLabel,

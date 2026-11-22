@@ -56,7 +56,7 @@ internal fun StoreTabsRow(wide: Boolean, tabs: @Composable () -> Unit) {
     Box(
         Modifier
             .widthIn(max = 960.dp)
-            .clip(RoundedCornerShape(30.dp))
+            .clip(RoundedCornerShape(26.dp))
             .background(Azphalt.Ink)
             .padding(5.dp),
     ) {
@@ -87,7 +87,7 @@ internal fun FeaturedStoreHive(hive: AzphaltPackageSummary, onView: () -> Unit) 
         Modifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = 245.dp)
-            .clip(RoundedCornerShape(19.dp))
+            .clip(RoundedCornerShape(18.dp))
             .background(Azphalt.Ink)
             .padding(29.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -156,22 +156,24 @@ private fun StoreCard(
     onInspect: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(18.dp)
+    val panel = Azphalt.hue("store-${item.id}")
+    // The card is another library hue than its art panel; Ink when picked. No border.
+    val fill = azphaltTileFill("store-card-${item.id}", selected, avoid = panel)
     Column(
         modifier
             .clip(shape)
-            .background(Azphalt.Ink)
-            .then(if (selected) Modifier.border(2.dp, Azphalt.Yellow, shape) else Modifier),
+            .background(fill),
     ) {
         Box(
-            Modifier.fillMaxWidth().height(130.dp).background(Azphalt.hue("store-${item.id}")),
+            Modifier.fillMaxWidth().height(130.dp).background(panel),
             contentAlignment = Alignment.Center,
         ) {
             StableCreature(edgeCreatureFor("store:${item.id}"), 110)
         }
-        AzphaltThemedSurface(Azphalt.Ink) {
+        AzphaltThemedSurface(fill) {
             Column(Modifier.padding(horizontal = 15.dp).padding(top = 13.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(storeCardEyebrow(item).uppercase(), style = AzphaltType.eyebrow, color = Azphalt.Yellow, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(storeCardEyebrow(item).uppercase(), style = AzphaltType.eyebrow, color = azphaltStrong(), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(item.name, style = AzphaltType.lead.copy(fontWeight = FontWeight.Black), color = azphaltOnSurface(), maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(
                     item.description?.takeIf(String::isNotBlank) ?: item.id,
@@ -198,7 +200,7 @@ private fun StoreCard(
                         .padding(horizontal = 11.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(inspect.uppercase(), style = AzphaltType.capsule, color = Azphalt.Yellow)
+                    Text(inspect.uppercase(), style = AzphaltType.capsule, color = azphaltStrong())
                 }
             }
         }

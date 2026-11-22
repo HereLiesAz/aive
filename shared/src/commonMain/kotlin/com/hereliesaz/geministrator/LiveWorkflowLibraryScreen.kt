@@ -737,7 +737,7 @@ private fun PinnedWorkflowHeader(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(18.dp))
             .background(Azphalt.Ink)
             .padding(horizontal = AzphaltSpacing.l, vertical = AzphaltSpacing.m),
         verticalArrangement = Arrangement.spacedBy(AzphaltSpacing.s),

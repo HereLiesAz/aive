@@ -294,7 +294,7 @@ private fun WebMap(graph: WebGraph, layout: WebLayout?, matching: Set<String>?, 
         Modifier
             .fillMaxWidth()
             .height(560.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(18.dp))
             .background(Azphalt.Ink)
             .semantics { contentDescription = mapDescription }
             .pointerInput(layout) {
@@ -415,7 +415,7 @@ private fun NoteList(graph: WebGraph, matching: Set<String>?, selected: String?,
 private fun NotePanel(note: WebNote, onSelect: (String) -> Unit, onClose: () -> Unit) {
     val node = note.node
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Azphalt.Ink).padding(16.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Azphalt.Ink).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         androidx.compose.foundation.layout.Row(

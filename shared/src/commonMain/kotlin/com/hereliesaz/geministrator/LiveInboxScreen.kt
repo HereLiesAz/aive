@@ -385,7 +385,7 @@ private fun MessageList(
     modifier: Modifier = Modifier,
 ) {
     val ink = Azphalt.Ink
-    Box(modifier.clip(RoundedCornerShape(19.dp)).background(ink)) {
+    Box(modifier.clip(RoundedCornerShape(18.dp)).background(ink)) {
         AzphaltSurface(ink) {
             Column(Modifier.fillMaxSize().padding(13.dp)) {
                 val strong = azphaltStrong()
@@ -481,7 +481,7 @@ private fun MessageListRow(row: MessageRow, presentation: LiveWorkflowPresentati
                 drawLine(divider, Offset(0f, size.height - 0.5f), Offset(size.width, size.height - 0.5f), strokeWidth = 1f)
             })
             .clip(shape)
-            .then(if (isSelected) Modifier.background(AzphaltLiftedInk).border(1.dp, strong, shape) else Modifier)
+            .then(if (isSelected) Modifier.background(AzphaltLiftedInk) else Modifier)
             .selectable(selected = isSelected, role = Role.Tab, onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 13.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -570,7 +570,7 @@ private fun MessageDetail(
 ) {
     val ink = Azphalt.Ink
     when (row) {
-        null -> Box(modifier.clip(RoundedCornerShape(19.dp)).background(ink)) {
+        null -> Box(modifier.clip(RoundedCornerShape(18.dp)).background(ink)) {
             AzphaltSurface(ink) {
                 Text(
                     stringResource(Res.string.runs_no_pending_decisions),
@@ -580,7 +580,7 @@ private fun MessageDetail(
                 )
             }
         }
-        is MessageRow.Queen -> Box(modifier.clip(RoundedCornerShape(19.dp)).background(ink)) {
+        is MessageRow.Queen -> Box(modifier.clip(RoundedCornerShape(18.dp)).background(ink)) {
             AzphaltSurface(ink) {
                 Column(
                     (if (wide) Modifier.fillMaxSize().verticalScroll(rememberScrollState()) else Modifier.fillMaxWidth())
@@ -599,7 +599,7 @@ private fun MessageDetail(
                 }
             }
         }
-        is MessageRow.TourCheckIn -> Box(modifier.clip(RoundedCornerShape(19.dp)).background(ink)) {
+        is MessageRow.TourCheckIn -> Box(modifier.clip(RoundedCornerShape(18.dp)).background(ink)) {
             AzphaltSurface(ink) {
                 Column(
                     (if (wide) Modifier.fillMaxSize().verticalScroll(rememberScrollState()) else Modifier.fillMaxWidth())
@@ -609,7 +609,7 @@ private fun MessageDetail(
                 }
             }
         }
-        is MessageRow.Wait -> Box(modifier.clip(RoundedCornerShape(19.dp)).background(ink)) {
+        is MessageRow.Wait -> Box(modifier.clip(RoundedCornerShape(18.dp)).background(ink)) {
             AzphaltSurface(ink) {
                 val entry = row.entry
                 val task = presentation.definition.tasks.first { it.id.value == entry.taskId }
@@ -882,7 +882,7 @@ private fun InboxAction(label: String, primary: Boolean, onClick: () -> Unit, mo
         modifier
             .defaultMinSize(minHeight = AzphaltMinTouchTarget)
             .clip(shape)
-            .then(if (primary) Modifier.background(strong) else Modifier.border(2.dp, line, shape))
+            .then(if (primary) Modifier.background(strong) else Modifier.background(line.copy(alpha = 0.14f)))
             .semantics { role = Role.Button }
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 8.dp),
