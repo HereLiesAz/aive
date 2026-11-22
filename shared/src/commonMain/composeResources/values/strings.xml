@@ -1846,6 +1846,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="store_model_1">Model · %1$s</string>
     <string name="store_model_installation_failed">Model installation failed.</string>
     <string name="store_model_license"> · model license: </string>
+    <string name="store_model_license_accept">I have read this model\'s licence, and my use is allowed by it.</string>
+    <string name="store_model_license_required">This model\'s licence has to be accepted before it installs.</string>
     <string name="store_model_package_preparation_failed">Could not download and verify this model.</string>
     <string name="store_model_removal_failed">Model removal failed.</string>
     <string name="store_needs_a_key">Needs a key</string>

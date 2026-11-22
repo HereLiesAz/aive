@@ -1,5 +1,6 @@
 package com.hereliesaz.aive
 
+import com.hereliesaz.geministrator.inference.LiteRtLmContainer
 import ai.onnxruntime.OrtEnvironment
 import android.content.Context
 import com.hereliesaz.geministrator.azphalt.AzphaltAssetEntry
@@ -256,6 +257,14 @@ internal class AndroidAzphaltModelPackageInstaller(
         }
     }
 
+    /** A `.litertlm` is the LiteRT-LM container (starts with `LITERTLM`), not a TFLite flatbuffer. */
+    private fun validateLiteRtLm(file: File) {
+        require(file.isFile && file.length() >= 8L) { "${file.name} is not a valid model file" }
+        val header = ByteArray(8)
+        FileInputStream(file).use { input -> require(input.read(header) == header.size) { "${file.name} is truncated" } }
+        require(LiteRtLmContainer.looksLikeContainer(header)) { "${file.name} is not a LiteRT-LM (.litertlm) model" }
+    }
+
     private fun validateTask(file: File) {
         if (isTflite(file)) return
         require(file.isFile && file.length() > 0L) { "${file.name} is an empty task bundle" }
@@ -301,6 +310,10 @@ internal class AndroidAzphaltModelPackageInstaller(
         val declaredRuntime = runCatching {
             asset.requirements?.jsonObject?.get("runtime")?.jsonPrimitive?.content?.lowercase()
         }.getOrNull()
+        if (LiteRtLmContainer.isRuntime(declaredRuntime)) {
+            validateLiteRtLm(choosePrimaryFile(asset, files))
+            return BACKEND_LITERTLM
+        }
         when (declaredRuntime) {
             "onnxruntime" -> {
                 validateOnnx(files)
@@ -326,6 +339,10 @@ internal class AndroidAzphaltModelPackageInstaller(
 
         val names = files.map { it.file.name.lowercase() }
         return when {
+            names.any { it.endsWith(".${LiteRtLmContainer.FILE_EXTENSION}") } -> {
+                validateLiteRtLm(files.first { it.file.extension.equals(LiteRtLmContainer.FILE_EXTENSION, true) }.file)
+                BACKEND_LITERTLM
+            }
             names.count { it.endsWith(".onnx") } > 1 && names.any { it.contains("tokens") } -> {
                 validateSherpa(files)
                 BACKEND_SHERPA
@@ -358,7 +375,7 @@ internal class AndroidAzphaltModelPackageInstaller(
             "onnx" -> listOf("onnx")
             "tflite", "litert" -> listOf("tflite", "lite")
             "task" -> listOf("task", "tflite")
-            "model" -> listOf("onnx", "tflite", "lite", "task")
+            "model" -> listOf(LiteRtLmContainer.FILE_EXTENSION, "onnx", "tflite", "lite", "task")
             else -> emptyList()
         }
         preferredExtensions.forEach { extension ->
@@ -480,6 +497,7 @@ internal class AndroidAzphaltModelPackageInstaller(
         const val BACKEND_ONNX = "onnxruntime-android"
         const val BACKEND_TFLITE = "tflite-android"
         const val BACKEND_LITERT = "litert-android"
+        const val BACKEND_LITERTLM = "litertlm-android"
         const val BACKEND_TASK = "mediapipe-task-android"
         const val BACKEND_SHERPA = "sherpa-onnx-android"
         const val BACKEND_VOSK = "vosk-android"

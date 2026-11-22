@@ -35,6 +35,7 @@ import com.hereliesaz.geministrator.azphalt.AzphaltStoreSnapshot
 import com.hereliesaz.geministrator.azphalt.InstalledAzphaltModelPackage
 import com.hereliesaz.geministrator.azphalt.InstalledAzphaltWorkflowPackage
 import com.hereliesaz.geministrator.azphalt.InstalledStoreLlm
+import com.hereliesaz.geministrator.azphalt.license
 import com.hereliesaz.geministrator.azphalt.describePromptHandling
 import com.hereliesaz.geministrator.azphalt.forShop
 import com.hereliesaz.geministrator.azphalt.isDirectLlmPackage
@@ -94,6 +95,8 @@ import com.hereliesaz.geministrator.resources.store_model
 import com.hereliesaz.geministrator.resources.store_model_1
 import com.hereliesaz.geministrator.resources.store_model_installation_failed
 import com.hereliesaz.geministrator.resources.store_model_license
+import com.hereliesaz.geministrator.resources.store_model_license_accept
+import com.hereliesaz.geministrator.resources.store_model_license_required
 import com.hereliesaz.geministrator.resources.store_model_package_preparation_failed
 import com.hereliesaz.geministrator.resources.store_model_removal_failed
 import com.hereliesaz.geministrator.resources.store_needs_a_key
@@ -1070,6 +1073,9 @@ private fun PreparedAzphaltModelInstallPanel(
     onInstall: () -> Unit,
 ) {
     val verification = prepared.verification
+    // A model whose licence is not a plain yes is accepted before it installs (the keeper decides whether their use is allowed).
+    val licenseGated = prepared.assets.any { it.license()?.needsAcceptance == true }
+    var licenseAccepted by remember(prepared.detail.id, prepared.version) { mutableStateOf(false) }
     AzphaltRecord(
         seed = "azphalt-model-prepared-${prepared.detail.id}",
         eyebrow = stringResource(Res.string.store_verified_model_install),
@@ -1099,9 +1105,9 @@ private fun PreparedAzphaltModelInstallPanel(
                         value = buildString {
                             append(asset.type)
                             if (asset.files.isNotEmpty()) append(stringResource(Res.string.store_files, asset.files.size))
-                            asset.modelLicense?.let {
+                            asset.license()?.let {
                                 append(stringResource(Res.string.store_model_license))
-                                append(it.toString())
+                                append(it.summary())
                             }
                         },
                     )
@@ -1128,9 +1134,17 @@ private fun PreparedAzphaltModelInstallPanel(
                     )
                 }
 
+                if (licenseGated) {
+                    ConfirmationRow(
+                        checked = licenseAccepted,
+                        onCheckedChange = { licenseAccepted = it },
+                        text = stringResource(Res.string.store_model_license_accept),
+                    )
+                }
                 val trustReady = verification.trusted || allowUntrustedSigner
                 val publisherReady = !verification.publisherChanged || allowPublisherChange
-                if (trustReady && publisherReady) {
+                val licenseReady = !licenseGated || licenseAccepted
+                if (trustReady && publisherReady && licenseReady) {
                     AzphaltPill(
                         label = stringResource(Res.string.store_install_verified_model),
                         seed = "azphalt-model-install-${prepared.detail.id}",
@@ -1139,10 +1153,10 @@ private fun PreparedAzphaltModelInstallPanel(
                     )
                 } else {
                     Text(
-                        if (!publisherReady) {
-                            stringResource(Res.string.store_publisher_key_change_requires_explicit_approval)
-                        } else {
-                            stringResource(Res.string.store_the_package_signature_is_valid_but)
+                        when {
+                            !publisherReady -> stringResource(Res.string.store_publisher_key_change_requires_explicit_approval)
+                            !trustReady -> stringResource(Res.string.store_the_package_signature_is_valid_but)
+                            else -> stringResource(Res.string.store_model_license_required)
                         },
                         style = AzphaltType.body,
                         color = azphaltOnSurface(),
