@@ -168,6 +168,8 @@ The corresponding source of the bundled proot, libtalloc and libandroid-shmem is
 |---|---|---|
 | Qwen/Qwen2.5-0.5B-Instruct and the memory / orchestration LoRA adapters trained on it | Local memory clerks and orchestration utilities | Apache License 2.0 (base model) |
 | Qwen2.5-0.5B-Instruct as a LiteRT-LM `.task` bundle (litert-community, pinned by SHA-256) | Small tasks on this device | Apache License 2.0 |
+| Liquid AI LFM3-1.7B as a LiteRT-LM `.litertlm` file (litert-community, offered in the Shop, pinned by commit, size and SHA-256) | A creature's mind on this device | LFM Open License v1.0: not licensed for commercial use by an organization with annual revenue of 10 million US dollars or more |
+| Liquid AI LFM3-VL-2B as a LiteRT-LM `.litertlm` file (litert-community, offered in the Shop, pinned by commit, size and SHA-256) | A creature's mind on this device that can read an image | LFM Open License v1.0, as above |
 | MiniLM sentence-embedding model (Association Linker) | Memory associations and summary embeddings | Apache License 2.0 — verify against the exact upstream model before release |
 
 ## Libraries

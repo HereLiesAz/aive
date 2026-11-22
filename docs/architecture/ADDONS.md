@@ -54,6 +54,14 @@ On Android, The Aive currently accepts every model asset type defined by Azphalt
 Generic model packages are routed from their materialized contents when a known concrete format is
 detectable.
 
+A LiteRT-LM model (`.litertlm`, the container the on-device runtime runs; it starts with the bytes `LITERTLM`, not a TFLite
+header) installs as a generic `model` asset that declares `requirements.runtime: "litert-lm"` (or whose file is named
+`*.litertlm`). The installer checks the container header and registers the backend `litertlm-android`. The asset's `params`
+tell the runtime how to talk to it: `chatFormat`, `toolFormat`, `contextTokens`, `modalities`. A model whose
+`modelLicense.commercialUse` is anything but `true` shows its licence terms and must be accepted before the install pill
+appears. The two LFM3 packages (`lfm3-1-7b`, `lfm3-vl-2b`, in `docs/azphalt-packages/`) are examples; see
+[`docs/Liquid-LFM3.md`](../Liquid-LFM3.md). Installing one does not yet make it run: nothing reads a store-installed model.
+
 Model installation:
 - verifies the signed `.azp` package and revocation state before mutation;
 - verifies every remote model member against its declared SHA-256 digest and supports resumable downloads;

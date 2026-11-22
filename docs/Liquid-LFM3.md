@@ -51,10 +51,20 @@ and the result goes back as a `tool` turn holding `<tool_response>\n...\n</tool_
 that template run through Jinja, nine cases). `LfmToolCallParser` reads the model's output: thought, text and calls, tolerant of
 cut-off calls and a stray `</think>`, with `argumentsJson` typing the all-text values by the tool's JSON Schema.
 
+## The Shop packages (built: `docs/azphalt-packages/lfm3-1-7b`, `lfm3-vl-2b`)
+
+Two `kind: "asset"` packages, each one remote `.litertlm` pinned by Hugging Face commit, exact size and SHA-256 (the Hub's
+LFS ids), with the licence file shipped and its terms in `modelLicense`. `tools/azp/build.mjs` packs and verifies them like
+the workflow packages (unsigned; signing is central). The installer (Android) accepts a `model` asset with
+`requirements.runtime: "litert-lm"` or a `*.litertlm` file, checks the `LITERTLM` header and registers the backend
+`litertlm-android`; the install pill waits for the keeper to accept a licence that is not freely commercial.
+
+Not done here: publishing the packages to `azphalt.store` (the Shop list is remote, outside this repository, and signing is
+central), and installing on a device. The installer change is Android-only and could not be compiled here (no Android SDK);
+CI compiles it.
+
 ## Not built yet
 
-- A `.litertlm` cannot be installed from the Shop today as `litert` or `task` (the installer checks for a TFLite header);
-  `model` installs it unchecked. The Shop list comes from `azphalt.store`, outside this repository.
 - Nothing runs a store-installed model: the LiteRT-LM generator is fixed to Qwen2.5-0.5B (template, 1,280-token context).
 - The on-device provider is a small-task helper, not a selectable creature mind.
 
