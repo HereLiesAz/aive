@@ -17,7 +17,7 @@ on:
 # shared concurrent-job limit for other repositories.
 concurrency:
   group: ${{ github.repository }}-dependency-submission
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 # Dependency submission always runs in the target repository (HereLiesAz/workflows
 # policy); the ci-report step registers it as target-local CI (`local`, `ci: true`).
