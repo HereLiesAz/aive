@@ -711,6 +711,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
+      actions: read
       contents: read
       pages: write
       id-token: write
@@ -784,6 +785,26 @@ jobs:
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: ${{ runner.temp }}/aive-pages
+
+      # Upload succeeds before the Actions artifact API always exposes the new entry.
+      # Verify it is visible under this run before deploy-pages attempts to resolve it.
+      - name: Wait for Pages artifact visibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            artifact_id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?per_page=100" \
+              --jq '[.artifacts[] | select(.name == "github-pages" and .expired == false) | .id] | first // empty')"
+            if [[ -n "$artifact_id" ]]; then
+              echo "Pages artifact visible: $artifact_id"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::Uploaded github-pages artifact never became visible in this run"
+          exit 1
 
       - name: Deploy GitHub Pages
         id: deployment
