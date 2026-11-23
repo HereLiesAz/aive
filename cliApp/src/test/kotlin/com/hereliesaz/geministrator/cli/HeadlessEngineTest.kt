@@ -1,5 +1,9 @@
 package com.hereliesaz.geministrator.cli
 
+import com.hereliesaz.geministrator.launchSavedWorkflow
+import com.hereliesaz.geministrator.control.ControlErrorCode
+import com.hereliesaz.geministrator.control.ControlException
+import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowRunId
@@ -88,12 +92,27 @@ class HeadlessEngineTest {
                     })
                 })
                 val id = hive["id"]!!.jsonPrimitive.content
-                val run = engine.controlHost.startRun(buildJsonObject {
-                    put("hiveId", id)
-                    put("objective", "Check the approval boundary")
-                    put("projectName", "Headless test")
-                })
-                val runId = WorkflowRunId(run["id"]!!.jsonPrimitive.content)
+                // The control API requires a queen for every swarm. This single-gate fixture
+                // deliberately has no model or queen, so it cannot launch through that boundary.
+                val denial = assertFailsWith<ControlException> {
+                    engine.controlHost.startRun(buildJsonObject {
+                        put("hiveId", id)
+                        put("objective", "Check the approval boundary")
+                        put("projectName", "Headless test")
+                    })
+                }
+                assertEquals(ControlErrorCode.InvalidArgument, denial.code)
+
+                // Exercise the provider-free approval engine directly, without relaxing
+                // the public control API's queen requirement.
+                val definition = engine.runtime.persistence.definitions.get(WorkflowDefinitionId(id))!!
+                engine.runtime.launchSavedWorkflow(
+                    definition = definition,
+                    projectName = "Headless test",
+                    objective = "Check the approval boundary",
+                )
+                val runId = engine.runtime.persistence.projects.all()
+                    .flatMap { engine.runtime.persistence.runs.byProject(it.id) }.single().id
                 withTimeout(15_000) {
                     while (engine.runtime.persistence.runs.get(runId)?.taskRuns
                         ?.get(TaskDefinitionId("gate"))?.status != TaskRunStatus.AwaitingApproval
