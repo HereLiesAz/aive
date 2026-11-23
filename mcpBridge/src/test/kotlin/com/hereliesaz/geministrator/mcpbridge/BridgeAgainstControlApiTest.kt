@@ -128,7 +128,9 @@ class BridgeAgainstControlApiTest {
             assertNotNull(t["annotations"]!!.jsonObject["readOnlyHint"])
         }
         // Every tool is one control API route, with the same method and path shape, and the other way round.
-        val routeKeys = ControlApi.routes.map { it.method.name to it.pattern.replace("{cid}", "{creatureId}") }.toSet()
+        // The one exception is the owner-gated approval route: the bridge never decides an approval, so it has no tool.
+        val routeKeys = ControlApi.routes.filter { it.name != "approve_creature" }
+            .map { it.method.name to it.pattern.replace("{cid}", "{creatureId}") }.toSet()
         val toolKeys = Tools.all.map { it.method to it.path }.toSet()
         assertEquals(routeKeys, toolKeys)
         // The only approval tool reads.
