@@ -10,6 +10,9 @@ import com.hereliesaz.geministrator.azphalt.InstalledAzphaltModelFile
 import com.hereliesaz.geministrator.azphalt.InstalledAzphaltModelPackage
 import com.hereliesaz.geministrator.inference.InferenceModelDescriptor
 import com.hereliesaz.geministrator.inference.SettingsInferenceStateStore
+import com.hereliesaz.geministrator.providers.lfm.InstalledLocalLlm
+import com.hereliesaz.geministrator.providers.lfm.InstalledLocalLlms
+import com.hereliesaz.geministrator.providers.lfm.LfmModelProfile
 import io.ktor.client.HttpClient
 import java.io.BufferedInputStream
 import java.io.File
@@ -140,6 +143,14 @@ internal class AndroidAzphaltModelPackageInstaller(
             )
             val next = readInstalled().filterNot { it.packageId == packageId } + installed
             check(writeInstalled(next)) { "Could not persist installed Azphalt model package" }
+            // An LFM3 model in the XML tool format can be a creature's mind (providers/lfm); list it where providers are chosen.
+            InstalledLocalLlms.remove(packageId)
+            prepared.assets.forEachIndexed { index, asset ->
+                val profile = LfmModelProfile.fromAsset(asset) ?: return@forEachIndexed
+                val descriptor = descriptors.getOrNull(index)?.takeIf { it.backend == BACKEND_LITERTLM } ?: return@forEachIndexed
+                val path = descriptor.artifactPath ?: return@forEachIndexed
+                InstalledLocalLlms.put(InstalledLocalLlm(packageId, prepared.detail.name, path, profile))
+            }
 
             previous?.files.orEmpty()
                 .filterNot { old -> installedArtifacts.any { it.logicalModelId == old.logicalModelId } }
@@ -163,6 +174,7 @@ internal class AndroidAzphaltModelPackageInstaller(
         val installed = readInstalled()
         val target = installed.firstOrNull { it.packageId == packageId } ?: return@withContext
         target.files.forEach { inferenceState.removeModel(it.logicalModelId) }
+        InstalledLocalLlms.remove(packageId)
         File(root, safeSegment(packageId)).deleteRecursively()
         check(writeInstalled(installed.filterNot { it.packageId == packageId })) {
             "Could not persist Azphalt model removal"

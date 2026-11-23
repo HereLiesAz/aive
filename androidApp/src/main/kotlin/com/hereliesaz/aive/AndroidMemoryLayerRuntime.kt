@@ -37,6 +37,8 @@ import com.hereliesaz.geministrator.inference.LiteRtLmModelCatalog
 import com.hereliesaz.geministrator.inference.LiteRtLmModelSelection
 import com.hereliesaz.geministrator.providers.AppIntegrationAdapterSelector
 import com.hereliesaz.geministrator.providers.LiteRtLmTextGenerator
+import com.hereliesaz.geministrator.providers.lfm.LocalLiteRtLmHost
+import com.hereliesaz.geministrator.providers.lfm.LocalLiteRtLmRuntime
 import com.hereliesaz.geministrator.providers.OnDeviceTextRuntime
 import com.hereliesaz.geministrator.providers.SelectingOnDeviceTextGenerator
 import io.ktor.client.HttpClient
@@ -685,6 +687,13 @@ internal class AndroidMemoryLayerRuntime(
         resources = resourceProbe,
         scope = scope,
     )
+
+    init {
+        // Store-installed LFM3 models run on the same native runtime, each through its own generator (providers/llm LocalLfmModels).
+        if (liteRtLmAbiSupported()) {
+            LocalLiteRtLmHost.runtime = LocalLiteRtLmRuntime(AndroidLiteRtLmEngineLoader(File(cacheDirectory, "litertlm")), resourceProbe, scope)
+        }
+    }
 
     /** LiteRT-LM first, the ONNX instruct model second; a hot phone declines both. */
     val onDeviceTextGenerator: SelectingOnDeviceTextGenerator = SelectingOnDeviceTextGenerator(
