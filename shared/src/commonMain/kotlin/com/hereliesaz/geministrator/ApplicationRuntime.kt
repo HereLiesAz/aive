@@ -234,9 +234,13 @@ class ApplicationRuntime private constructor(
     internal suspend fun reviewGateFor(
         reviewer: com.hereliesaz.geministrator.orchestration.PlanReviewer,
         callsSoFar: Int,
+    ): com.hereliesaz.geministrator.queen.CallDecision = directAdvisoryGateFor(reviewer.uses, callsSoFar)
+
+    /** Reuse the same fail-closed price, hourly allowance, call and Source-room gate for advisory chats. */
+    internal suspend fun directAdvisoryGateFor(
+        uses: List<com.hereliesaz.geministrator.queen.ModelUse>, callsSoFar: Int,
     ): com.hereliesaz.geministrator.queen.CallDecision {
         val caps = queenCaps()
-        val uses = reviewer.uses
         val read = com.hereliesaz.geministrator.queen.priceRead(
             uses,
             com.hereliesaz.geministrator.providers.ModelPriceTable.Default,
