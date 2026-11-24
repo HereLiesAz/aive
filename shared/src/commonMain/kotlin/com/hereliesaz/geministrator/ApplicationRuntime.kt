@@ -66,6 +66,7 @@ import com.hereliesaz.geministrator.workflow.NestedWorkflowExecutorIntegration
 import com.hereliesaz.geministrator.workflow.ProviderBackedManagedSessionGateway
 import com.hereliesaz.geministrator.workflow.RoleSurfaceRuntimeRegistry
 import com.hereliesaz.geministrator.workflow.SpendCaps
+import com.hereliesaz.geministrator.workflow.roleTokensSpent
 import com.hereliesaz.geministrator.workflow.reserveAutonomousAdvisory
 import com.hereliesaz.geministrator.workflow.settleAutonomousAdvisory
 import com.hereliesaz.geministrator.workflow.improvement.ImprovementSource
@@ -512,13 +513,28 @@ class ApplicationRuntime private constructor(
                     true
                 }
                 if (!reserved || !authorized()) return ""
+                // The reservation itself is now counted, so recheck lifecycle and budget without
+                // applying a second preflight price estimate to the already reserved call.
+                val stillAdmitted = runtimeMutex.withLock {
+                    val run = current?.state?.run ?: return@withLock false
+                    val fresh = activeRoles(resolveRoleCollection(persistence.roles.all())).singleOrNull { it.id == role.id }
+                    run.id.value == mail.run && run.projectId.value == mail.project &&
+                        run.status == WorkflowRunStatus.Running && run.globalPause == null &&
+                        run.keeperPause == null && run.spendPause == null && !run.objectiveProvenance.isUntrusted() &&
+                        fresh == role && fresh.effectiveTokenBudget()?.let {
+                            run.roleTokensSpent(role.id) <= it
+                        } == true && com.hereliesaz.geministrator.workflow.runCostTrip(run, queenCaps()) == null &&
+                        run.autonomousAdvisoryCharges.any { it == reservation }
+                }
+                if (!stillAdmitted || !queenCallAllowed() || !authorized()) return ""
                 // No retry. Missing usage, provider error, cancellation or process death keeps the
                 // durable reservation rather than claiming that ambiguous paid work cost nothing.
                 val result = bounded.answerBounded(prompt, output)
                 val usedInput = result.inputTokens ?: return ""
                 val usedOutput = result.outputTokens ?: return ""
                 if (usedInput < 0 || usedOutput < 0 || usedInput > Long.MAX_VALUE - usedOutput) return ""
-                val actualCost = price.costUsd(usedInput, usedOutput)
+                val actualCost = price.costUsd(usedInput, usedOutput,
+                    result.cachedInputTokens?.takeIf { it in 0L..usedInput } ?: 0L)
                 val settled = withContext(NonCancellable) {
                     runtimeMutex.withLock {
                         val snapshot = current

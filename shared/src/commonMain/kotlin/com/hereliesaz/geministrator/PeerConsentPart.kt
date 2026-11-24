@@ -37,7 +37,7 @@ internal fun PeerConsentPart(host: WorkflowLibraryHost) {
         catch (_: Exception) { status = "Could not read consultation grants." }
     }
     ProviderSectionLabel("Specialist consultation and activation")
-    Text("Cross-run messages (including expertise recruitment when no local live peer is eligible) and same-run dormant activation require separate exact directional grants. Cross-run replies need their own reverse grant; disclosure never grants memory-bank access. Enter the same run ID twice to permit one bounded, non-billed advisory activation of an idle receiving role. Messages may contain sensitive project information. No tool or execution authority is granted.",
+    Text("Cross-run messages (including expertise recruitment when no local live peer is eligible) and same-run dormant activation require separate exact directional grants. Cross-run replies need their own reverse grant; disclosure never grants memory-bank access. Enter the same run ID twice to review a free or separately paid advisory activation grant for an idle receiving role. Messages may contain sensitive project information. No tool or execution authority is granted.",
         style = AzphaltType.body, color = azphaltOnSurface())
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         routes.forEach { route ->

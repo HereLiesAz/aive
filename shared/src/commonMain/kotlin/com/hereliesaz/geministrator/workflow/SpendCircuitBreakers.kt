@@ -54,14 +54,14 @@ data class SpendCapTrip(
     val unknownCost: Boolean = false,
 )
 
-/** The cost providers have reported (or the app priced) for this run. Unpriced usage adds nothing here: see [hasUnpricedUsage]. */
+/** Reported/priced run usage plus conservative unsettled autonomous reservations. Unpriced usage adds nothing: see [hasUnpricedUsage]. */
 fun WorkflowRun.knownCostUsd(): Double = taskRuns.values.sumOf { it.usage?.costUsd ?: 0.0 } +
     autonomousAdvisoryCharges.sumOf { it.costUsd }
 
 /** Whether some of this run's usage was billed but could not be priced, so [knownCostUsd] is only a floor. */
 fun WorkflowRun.hasUnpricedUsage(): Boolean = taskRuns.values.any { it.usage?.costUnknown == true }
 
-/** Tokens reported for every task [roleId] has worked in this run: the role's spend against its budget. */
+/** Reported task tokens plus settled or conservatively reserved autonomous tokens for this role. */
 fun WorkflowRun.roleTokensSpent(roleId: RoleDefinitionId): Long =
     taskRuns.values.filter { it.assignedRoleId == roleId }.sumOf { it.usage?.totalTokens ?: 0L } +
         autonomousAdvisoryCharges.filter { it.roleId == roleId }.sumOf { it.inputTokens + it.outputTokens }

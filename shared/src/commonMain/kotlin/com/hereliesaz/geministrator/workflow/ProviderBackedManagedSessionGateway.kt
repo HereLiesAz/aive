@@ -1501,12 +1501,15 @@ class ProviderBackedManagedSessionGateway(
             emptyList()
         }
         val crossRun = routes.filterNot { it.activation }
-        val wake = routes.filter { it.activation && it.targetRole !in available && dormantSpecialistAnswer != null }
+        val wake = routes.filter { it.activation && !it.paidActivation && it.targetRole !in available && dormantSpecialistAnswer != null }
+        val paidWake = routes.filter { it.activation && it.paidActivation && it.targetRole !in available && dormantSpecialistAnswer != null }
         val directory = (if (available.isEmpty()) "" else "\nCurrently available peer role IDs: " + available.joinToString(", ")) +
             (if (crossRun.isEmpty()) "" else "\nKeeper-consented cross-run routes (run ID, role ID): " +
                 crossRun.joinToString("; ") { "${it.targetRun}, ${it.targetRole}" }) +
             (if (wake.isEmpty()) "" else "\nKeeper-consented dormant activation role IDs: " +
-                wake.joinToString(", ") { it.targetRole })
+                wake.joinToString(", ") { it.targetRole }) +
+            (if (paidWake.isEmpty()) "" else "\nKeeper-consented paid dormant activation role IDs (WAKE-PAID): " +
+                paidWake.joinToString(", ") { it.targetRole })
         return copy(promptContext = promptContext.copy(stablePrefix = promptContext.stablePrefix +
             PromptContextBlock("Peer consultation", PeerConsultationNote.INSTRUCTIONS + directory)))
     }

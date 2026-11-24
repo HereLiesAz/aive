@@ -33,7 +33,13 @@ interface BoundedAdvisoryModel : QueenModel {
     suspend fun answerBounded(prompt: String, maxOutputTokens: Int): BoundedAdvisoryResult
 }
 
-data class BoundedAdvisoryResult(val text: String, val inputTokens: Long?, val outputTokens: Long?)
+/** A failed or truncated generation may return no advice but still carry chargeable usage. */
+data class BoundedAdvisoryResult(
+    val text: String,
+    val inputTokens: Long?,
+    val outputTokens: Long?,
+    val cachedInputTokens: Long? = null,
+)
 
 private const val MAX_REASON_CHARS = 400
 
