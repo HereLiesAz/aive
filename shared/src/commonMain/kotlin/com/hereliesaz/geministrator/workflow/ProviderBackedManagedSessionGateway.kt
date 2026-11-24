@@ -31,6 +31,8 @@ import com.hereliesaz.geministrator.retrieval.ContextRetriever
 import com.hereliesaz.geministrator.retrieval.SimilarityContextRetriever
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
@@ -38,6 +40,9 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
@@ -79,6 +84,8 @@ class ProviderBackedManagedSessionGateway(
         const val MAX_OBSERVER_FAILURES = 10
         const val MAX_FAILURE_MESSAGE_CHARS = 500
         const val MAX_RECORDED_FAILURES = 32
+        const val MAX_PEER_SENDS = 4
+        const val PEER_SEND_TIMEOUT_MILLIS = 30_000L
     }
 
     private data class SessionSnapshot(
@@ -99,6 +106,9 @@ class ProviderBackedManagedSessionGateway(
     private val progressCounts = mutableMapOf<ManagedSessionHandle, Long>()
     private val consultationContexts = mutableMapOf<ManagedSessionHandle, PeerConsultationContext>()
     private val consultationCounts = mutableMapOf<ManagedSessionHandle, Int>()
+    private val peerDeliveryJobs = mutableMapOf<ManagedSessionHandle, Job>()
+    private val peerDeliverySignals = mutableSetOf<ManagedSessionHandle>()
+    private val peerSendSlots = Semaphore(MAX_PEER_SENDS)
 
     /** Each session's observer, kept so a cancel stops the generation it is watching ([cancel]) and a release frees it. */
     private val observerJobs = mutableMapOf<ManagedSessionHandle, Job>()
@@ -531,6 +541,8 @@ class ProviderBackedManagedSessionGateway(
                 val observer = mutex.withLock {
                     val current = snapshots[handle] ?: SessionSnapshot(ManagedSessionStatus.Unknown)
                     snapshots[handle] = current.copy(status = ManagedSessionStatus.Failed)
+                    peerDeliverySignals.remove(handle)
+                    peerDeliveryJobs.remove(handle)?.cancel()
                     observerJobs.remove(handle)
                 }
                 // The provider was told to stop; the observer is what keeps a generation streaming or a
@@ -558,6 +570,8 @@ class ProviderBackedManagedSessionGateway(
             progressCounts.remove(handle)
             consultationContexts.remove(handle)
             consultationCounts.remove(handle)
+            peerDeliverySignals.remove(handle)
+            peerDeliveryJobs.remove(handle)?.cancel()
             observerJobs.remove(handle)
         }
         observer?.cancel()
@@ -583,7 +597,6 @@ class ProviderBackedManagedSessionGateway(
             }
         }
         if (!shouldObserve) return
-        if (initialStatus == ManagedSessionStatus.Running) drainPeerMailbox(handle)
         // Only a configured task binding may participate, and attachment failures never fail work.
         recordMemory { duplexAttachment?.onSessionStarted(handle, this) }
 
@@ -610,6 +623,8 @@ class ProviderBackedManagedSessionGateway(
                             if (current.status != ManagedSessionStatus.Completed && !current.status.isTerminal()) {
                                 // Recorded before the failure is visible, so the engine's failover question about it is told.
                                 recordSessionFailureLocked(handle.providerId, failure.message)
+                                peerDeliverySignals.remove(handle)
+                                peerDeliveryJobs.remove(handle)?.cancel()
                                 snapshots[handle] = current.copy(
                                     status = ManagedSessionStatus.Failed,
                                     progress = ManagedSessionProgress(
@@ -644,6 +659,7 @@ class ProviderBackedManagedSessionGateway(
             // A session released or cancelled while it was being registered has no snapshot to watch for.
             if (snapshots.containsKey(handle)) observerJobs[handle] = observer else observer.cancel()
         }
+        if (initialStatus == ManagedSessionStatus.Running) schedulePeerDelivery(handle)
     }
 
     /** Records a provider's failure for one session; [adviseFailover] is later told it was recorded. */
@@ -872,13 +888,17 @@ class ProviderBackedManagedSessionGateway(
         // Nothing but usage is recorded about a session that had already ended.
         if (alreadyTerminal) return
         activity.record(handle, effectiveEvent)
-        if (effectiveEvent is AgentEvent.PlanApproved) drainPeerMailbox(handle)
+        if (effectiveEvent is AgentEvent.PlanApproved) schedulePeerDelivery(handle)
         if (effectiveEvent is AgentEvent.Message) {
             routePeerConsultation(handle, effectiveEvent.content)
         }
         recordMemory { memoryObserver.onSessionEvent(handle, effectiveEvent) { text -> message(handle, text) } }
         recordMemory { duplexAttachment?.onSessionEvent(handle, effectiveEvent) }
         terminalStatus?.let { status ->
+            mutex.withLock {
+                peerDeliverySignals.remove(handle)
+                peerDeliveryJobs.remove(handle)?.cancel()
+            }
             inferenceFabric.recordTerminal(
                 providerId = handle.providerId,
                 providerRunId = handle.providerRunId,
@@ -936,7 +956,7 @@ class ProviderBackedManagedSessionGateway(
                         context.roleId == note.roleId
                 }.singleOrNull()?.key
             }
-            if (recipient != null) drainPeerMailbox(recipient)
+            if (recipient != null) schedulePeerDelivery(recipient)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
@@ -987,6 +1007,48 @@ class ProviderBackedManagedSessionGateway(
         return request.copy(roleId = selected)
     }
 
+    /**
+     * Coalesce wake signals into one runtime-owned delivery worker per live recipient. A slow peer
+     * never holds the sender's observer, and no worker starts a provider session. The signal and
+     * worker removal share the gateway mutex so an enqueue cannot be lost at worker shutdown.
+     */
+    private suspend fun schedulePeerDelivery(handle: ManagedSessionHandle) {
+        mutex.withLock {
+            if (snapshots[handle]?.status != ManagedSessionStatus.Running ||
+                handle !in consultationContexts) return@withLock
+            peerDeliverySignals.add(handle)
+            if (handle in peerDeliveryJobs) return@withLock
+            val worker = scope.launch(start = CoroutineStart.LAZY) {
+                val self = coroutineContext[Job]
+                try {
+                    while (isActive) {
+                        val shouldDrain = mutex.withLock {
+                            if (peerDeliveryJobs[handle] != self) return@withLock false
+                            if (peerDeliverySignals.remove(handle)) true
+                            else {
+                                peerDeliveryJobs.remove(handle)
+                                false
+                            }
+                        }
+                        if (!shouldDrain) break
+                        peerSendSlots.withPermit { drainPeerMailbox(handle) }
+                    }
+                } finally {
+                    withContext(NonCancellable) {
+                        mutex.withLock {
+                            if (peerDeliveryJobs[handle] == self) {
+                                peerDeliveryJobs.remove(handle)
+                                peerDeliverySignals.remove(handle)
+                            }
+                        }
+                    }
+                }
+            }
+            peerDeliveryJobs[handle] = worker
+            worker.start()
+        }
+    }
+
     /** Claim only for an unambiguous live advisory role; never deliver as keeper speech. */
     private suspend fun drainPeerMailbox(handle: ManagedSessionHandle) {
         try {
@@ -1002,7 +1064,14 @@ class ProviderBackedManagedSessionGateway(
             } ?: return
             if (!peerRoleAllowed(context.roleId, handle.providerId)) return
             for (mail in providerRegistry.peerMailbox.claim(context, handle.providerId.value, handle.providerRunId.value)) {
-                if (status(handle) != ManagedSessionStatus.Running ||
+                val uniqueRecipient = mutex.withLock {
+                    snapshots[handle]?.status == ManagedSessionStatus.Running &&
+                        consultationContexts[handle] == context && consultationContexts.count { (other, candidate) ->
+                            other.providerId == handle.providerId && snapshots[other]?.status == ManagedSessionStatus.Running &&
+                                context.canConsult(candidate, context.roleId)
+                        } == 1
+                }
+                if (!uniqueRecipient ||
                     !peerRoleAllowed(context.roleId, handle.providerId) ||
                     !peerRoleAllowed(mail.senderRole, handle.providerId) ||
                     !providerRegistry.peerMailbox.authorized(mail)) {
@@ -1012,11 +1081,15 @@ class ProviderBackedManagedSessionGateway(
                 }
                 val note = PeerConsultationNote(mail.recipientRole, mail.text, mail.intent, mail.replyTo)
                 val outcome = try {
-                    when (providerFor(handle).sendMessage(handle.providerRunId, note.advisoryText(mail.senderRole, mail.id) +
-                        (if (mail.destinationRun != mail.run) "\nOrigin run ID: ${mail.run}" else ""))) {
+                    when (withTimeout(PEER_SEND_TIMEOUT_MILLIS) {
+                        providerFor(handle).sendMessage(handle.providerRunId, note.advisoryText(mail.senderRole, mail.id) +
+                            (if (mail.destinationRun != mail.run) "\nOrigin run ID: ${mail.run}" else ""))
+                    }) {
                         ProviderActionResult.Accepted -> PeerDelivery.Accepted
                         is ProviderActionResult.Rejected -> PeerDelivery.Rejected
                     }
+                } catch (_: TimeoutCancellationException) {
+                    PeerDelivery.Uncertain
                 } catch (cancelled: CancellationException) {
                     // The durable claim already prevents replay; preserve cancellation.
                     throw cancelled

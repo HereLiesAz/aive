@@ -129,7 +129,8 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
 
     /** Called again immediately before provider delivery; a stale grant is not authority. */
     suspend fun authorized(mail: PeerMail): Boolean = mutex.withLock {
-        mail.destinationRun == mail.run || grants().any { it.route == mail.route && it.generation == mail.grantGeneration }
+        mail in live(read(), now()) && mail.delivery == PeerDelivery.Claimed &&
+            (mail.destinationRun == mail.run || grants().any { it.route == mail.route && it.generation == mail.grantGeneration })
     }
 
     /** Retained receipt history for one exact scope; no payload crosses project or provider boundaries. */
