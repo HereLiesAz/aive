@@ -80,6 +80,33 @@ class MemoryConsolidationQueue(
         }
     }
 
+    /**
+     * One atomic, bounded deposit of historical transcript utterances into a fresh bank. The
+     * caller separately checks the durable bank registry; an existing bank must not be backfilled.
+     * Never retries a changed bank or replaces anything that was explicitly forgotten.
+     */
+    internal suspend fun enqueueBankBatch(requests: List<MemoryBankRequest>): Boolean {
+        require(requests.size in 1..64)
+        val snapshot = store.read()
+        if (snapshot.episodes.isNotEmpty() || snapshot.queue.isNotEmpty() || snapshot.nodes.isNotEmpty() ||
+            snapshot.sections.isNotEmpty() || snapshot.edges.isNotEmpty() || snapshot.declinedCondensations.isNotEmpty()) return false
+        val first = snapshot.nextQueueSequence()
+        val episodes = requests.mapIndexed { index, request ->
+            request.toEpisode(request.episodeId(first + index), maxChunkChars)
+        }
+        val entries = episodes.mapIndexed { index, episode ->
+            val sequence = first + index
+            MemoryQueueEntry(
+                id = MemoryQueueId("queue-$sequence-${episode.id.value}"),
+                sequence = sequence,
+                episodeId = episode.id,
+                priority = MemoryQueuePriority.Normal,
+                createdAtEpochMillis = episode.createdAtEpochMillis,
+            )
+        }
+        return store.commit(snapshot.revision, MemoryStoreMutation(episodesToAdd = episodes, queueUpserts = entries))
+    }
+
     private suspend fun enqueueEpisode(
         episode: MemoryEpisode,
         priority: MemoryQueuePriority,

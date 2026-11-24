@@ -66,6 +66,12 @@ fun interface MemoryPromptContextProvider {
      */
     suspend fun stageCollectiveContributions(conversationId: String, requests: List<MemoryBankRequest>) {}
 
+    /**
+     * Explicit Keeper import of retained historical utterances into a never-before-registered
+     * conversation bank. Null means refused/unavailable; the count is actual queued utterances.
+     */
+    suspend fun importCollectiveHistory(conversationId: String, requests: List<MemoryBankRequest>): Int? = null
+
     /** Entities, actions and code symbols in the request, with how many memories hold each word. */
     suspend fun queryHints(request: AgentTaskRequest): MemoryQueryHints = MemoryQueryHints()
 

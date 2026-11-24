@@ -192,6 +192,52 @@ class MemoryControllerCuePipelineTest {
     }
 
     @Test
+    fun historicalImportIsExplicitAttributedAndCannotResurrectClearedMemory() = runBlocking {
+        val settings = MapSettings()
+        val banks = MemoryBanks.inMemory()
+        val controller = MemoryLayerController(
+            banks = banks,
+            settingsStore = MemoryLayerSettingsStore(settings),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            nowEpochMillis = { 1000L },
+        )
+        controller.updateSettings { it.copy(consolidationPaused = true) }
+        val history = com.hereliesaz.geministrator.queen.CollectiveConversationStore(settings) { 100L }
+        val id = history.create().id
+        history.append(id, "Which route?", com.hereliesaz.geministrator.queen.CollectiveAnswer(
+            "Choose X", listOf(
+                com.hereliesaz.geministrator.queen.CollectiveAssessment("reviewer", "Support X", "source-a", "model-a"),
+                com.hereliesaz.geministrator.queen.CollectiveAssessment("skeptic", "Reject X: missing evidence."),
+            ), emptyList()))
+        history.append(id, "Another question", com.hereliesaz.geministrator.queen.CollectiveAnswer(
+            null, emptyList(), listOf("Queen")))
+        val requests = requireNotNull(history.get(id)).historicalMemoryRequests(1000L)
+        val provider = controller.promptContextProvider
+        assertTrue(banks.known().isEmpty(), "Reading the transcript must not bank it")
+        controller.updateSettings { it.copy(enabled = false) }
+        assertEquals(null, provider.importCollectiveHistory(id, requests))
+        assertTrue(banks.known().isEmpty())
+        controller.updateSettings { it.copy(enabled = true) }
+        assertEquals(5, provider.importCollectiveHistory(id, requests))
+        val episodes = banks.store(id).read().episodes
+        assertEquals(5, episodes.size)
+        assertTrue(episodes.all { it.occurredAtEpochMillis == null && it.createdAtEpochMillis == 1000L })
+        assertEquals(setOf("Which route?", "Another question"), episodes.filter { it.roleId == null }.map { it.chunks.single().text }.toSet())
+        val reviewer = episodes.single { it.roleId == "reviewer" }.chunks.single()
+        assertEquals("Support X", reviewer.text)
+        assertTrue("source-a" in reviewer.label && "model-a" in reviewer.label)
+        assertEquals("Reject X: missing evidence.", episodes.single { it.roleId == "skeptic" }.chunks.single().text)
+        assertTrue(episodes.single { it.chunks.single().text == "Choose X" }.chunks.single().label.contains("model unknown"))
+        assertEquals(null, provider.importCollectiveHistory(id, requests))
+        assertEquals(episodes, banks.store(id).read().episodes)
+        controller.selectBank(id)
+        controller.clearAll()
+        assertEquals(null, provider.importCollectiveHistory(id, requests))
+        assertTrue(banks.store(id).read().episodes.isEmpty())
+    }
+
+    @Test
     fun aTagInAThoughtDrawsItsSummariesAndNoAmbientCloud() = runBlocking {
         val (controller, store) = controllerOver(
             "session:agent-1",
