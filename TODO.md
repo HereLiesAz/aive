@@ -30,7 +30,7 @@ A checked box means implemented and covered by automated tests. It does not mean
 The collective, not the workflow, is the intended unit of intelligence. Workflows remain the governed execution machinery; they were introduced to enforce dependencies, approval and recovery, and must retain those guarantees.
 
 - [ ] Establish peer consultation in live sessions. Initial advisory routing is implemented in the managed-session gateway: same project, run and provider, explicitly tool-free and repository-free roles only, unique recipient, bounded best-effort delivery. No keeper authority is granted. Integration verification remains outstanding.
-- [ ] Make specialist identities and mailboxes durable independently of runs, with explicit communication consent and provenance.
+- [ ] Make specialist identities and mailboxes durable independently of runs, with explicit communication consent and provenance. Initial durable mailbox implemented: uses existing role IDs, persists redacted advisory notes in inference settings, confines delivery to the same project/run/provider, expires pending notes after 24 hours, and removes claims before transport to avoid ambiguous automatic replays. Cross-run communication, permission controls, delivery receipts, and integration verification remain outstanding.
 - [ ] Support asynchronous recruitment, attention-based routing, bounded deliberation and independent dissent.
 - [ ] Turn the queen into a facilitator and expose a unified conversational voice; retain effect and spend gates.
 - [ ] Extend existing procedural memory and habit replay with validated specialist skill learning.
