@@ -946,9 +946,9 @@ class ProviderBackedManagedSessionGateway(
                     providerRegistry.peerMailbox.finish(mail, PeerDelivery.Rejected)
                     continue
                 }
-                val note = PeerConsultationNote(mail.recipientRole, mail.text)
+                val note = PeerConsultationNote(mail.recipientRole, mail.text, mail.intent, mail.replyTo)
                 val outcome = try {
-                    when (providerFor(handle).sendMessage(handle.providerRunId, note.advisoryText(mail.senderRole))) {
+                    when (providerFor(handle).sendMessage(handle.providerRunId, note.advisoryText(mail.senderRole, mail.id))) {
                         ProviderActionResult.Accepted -> PeerDelivery.Accepted
                         is ProviderActionResult.Rejected -> PeerDelivery.Rejected
                     }
