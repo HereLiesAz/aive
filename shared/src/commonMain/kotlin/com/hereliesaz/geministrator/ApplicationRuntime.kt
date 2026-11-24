@@ -21,6 +21,7 @@ import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.isUntrusted
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
+import com.hereliesaz.geministrator.domain.effectiveTokenBudget
 import com.hereliesaz.geministrator.domain.promptInstructions
 import com.hereliesaz.geministrator.domain.activeRoles
 import com.hereliesaz.geministrator.domain.defaultRoleCollectionEntries
@@ -436,7 +437,7 @@ class ApplicationRuntime private constructor(
         val provider = com.hereliesaz.geministrator.domain.AgentProviderId(mail.provider)
         val roster = activeRoles(resolveRoleCollection(persistence.roles.all()))
         val role = roster.singleOrNull { it.id.value == mail.recipientRole } ?: return null
-        if (role.id == BuiltInRoles.Orchestrator.id || role.tokenBudget != null || role.budgetClass != null ||
+        if (role.id == BuiltInRoles.Orchestrator.id || role.effectiveTokenBudget() != null ||
             !com.hereliesaz.geministrator.workflow.peerRoleIsEligible(role, provider)) return null
         val model = collectiveModelFor?.invoke(mail.provider) ?: return null
         if (model.uses.size != 1 || model.uses.any { it.sourceId != mail.provider || it.billsPerToken }) return null
@@ -448,7 +449,7 @@ class ApplicationRuntime private constructor(
                 run.spendPause != null || run.objectiveProvenance.isUntrusted() ||
                 com.hereliesaz.geministrator.workflow.runCostTrip(run, queenCaps()) != null) return false
             val fresh = activeRoles(resolveRoleCollection(persistence.roles.all())).singleOrNull { it.id == role.id }
-            return fresh == role && queenCallAllowed() &&
+            return fresh == role && fresh.effectiveTokenBudget() == null && queenCallAllowed() &&
                 directAdvisoryGateFor(model.uses, 0) == com.hereliesaz.geministrator.queen.CallDecision.Allow &&
                 authorized()
         }
