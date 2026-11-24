@@ -53,6 +53,7 @@ class WorkflowLibraryHost(
     internal var collectiveNew: (suspend () -> com.hereliesaz.geministrator.queen.CollectiveConversation)? = null
     internal var collectiveDelete: (suspend (String) -> Unit)? = null
     internal var collectiveImportHistory: (suspend (String) -> Int?)? = null
+    internal var collectiveRecallGrant: (suspend (String, String, Boolean) -> Boolean)? = null
     internal var collectiveProfiles: (suspend () -> List<com.hereliesaz.geministrator.queen.SpecialistProfile>)? = null
 
     internal var peerMailbox: (() -> com.hereliesaz.geministrator.workflow.PeerMailbox?)? = null

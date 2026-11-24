@@ -410,6 +410,48 @@ class MemoryControllerCuePipelineTest {
         assertTrue(later.none { it.label == "Role lessons" }, "$later")
     }
     @Test
+    fun grantedConversationBanksSupplyOnlyRelevantTagsToActualVoices() = runBlocking {
+        val settings = MapSettings()
+        val history = com.hereliesaz.geministrator.queen.CollectiveConversationStore(settings) { 100L }
+        val source = history.create().id
+        val destination = history.create().id
+        val unrelated = history.create().id
+        val (sourceController, sourceBank) = controllerOver(
+            source, "The keystore password moved to the CI secrets; signing reads KEYSTORE_PASSWORD.",
+            "Fix the keystore signing.")
+        val (_, unrelatedBank) = controllerOver(
+            unrelated, "The turnip orchard requires soil testing.", "Review the turnip orchard.")
+        val controller = MemoryLayerController(
+            banks = MemoryBanks.inMemory(mapOf(source to sourceBank, unrelated to unrelatedBank)),
+            settingsStore = MemoryLayerSettingsStore(settings),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            nowEpochMillis = { 1000L },
+        )
+        controller.setDefaultAttentionLevel(1f)
+        val prompts = mutableListOf<String>()
+        val question = "Check keystore and turnip orchard"
+        suspend fun ask() {
+            val memory = DirectChatMemory(history.recallBanks(destination), controller.promptContextProvider)
+            memory.voice(QueenModel { prompts += it; "Reply" }, "reviewer", destination, "instance").answer(question)
+        }
+        ask()
+        assertEquals(question, prompts.last())
+        assertTrue(history.setRecallGrant(source, destination, true))
+        ask()
+        assertTrue("#keystore" in prompts.last(), prompts.last())
+        assertTrue("#turnip" !in prompts.last() && "CI secrets" !in prompts.last(), prompts.last())
+        assertTrue(history.setRecallGrant(source, destination, false))
+        ask()
+        assertEquals(question, prompts.last())
+        assertTrue(history.setRecallGrant(source, destination, true))
+        controller.updateSettings { it.copy(enabled = false) }
+        ask()
+        assertEquals(question, prompts.last())
+        assertTrue(sourceController.settings.value.enabled)
+    }
+
+    @Test
     fun directModelsReceiveScopedTagsNotPassagesAndRespectDisabledMemory() = runBlocking {
         val (controller, _) = keystoreController()
         val provider = controller.promptContextProvider

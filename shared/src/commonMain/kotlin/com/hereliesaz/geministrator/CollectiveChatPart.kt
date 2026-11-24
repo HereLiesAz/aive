@@ -28,6 +28,8 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
     var status by remember { mutableStateOf("") }
     var deleting by remember { mutableStateOf(false) }
     var importing by remember(selected) { mutableStateOf(false) }
+    var reviewingRecallSource by remember(selected) { mutableStateOf<String?>(null) }
+    var showRecall by remember(selected) { mutableStateOf(false) }
     suspend fun refresh(preferred: String? = selected) {
         conversations = checkNotNull(host.collectiveHistory).invoke()
         profiles = host.collectiveProfiles?.invoke().orEmpty()
@@ -39,7 +41,7 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
         catch (_: Exception) { status = "Conversation history unavailable." }
     }
     ProviderSectionLabel("Ask The Aive")
-    Text("Advisory conversation only. Specialists are selected by relevance and configured model availability. Completed turns are saved locally. Each actual reply is banked separately when memory is enabled; only this conversation and the receiving role's authorized memory supply cues. Deleting chat history does not erase its separate memory bank.",
+    Text("Advisory conversation only. Specialists are selected by relevance and configured model availability. Completed turns are saved locally. Each actual reply is banked separately when memory is enabled; only this conversation, the receiving role's authorized memory, and explicitly granted conversation banks supply cues. Deleting chat history does not erase its separate memory bank.",
         style = AzphaltType.body, color = azphaltOnSurface())
     conversations.forEach { conversation ->
         val title = conversation.turns.firstOrNull()?.question?.take(45) ?: "Empty conversation"
@@ -48,7 +50,64 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
                 if (!busy) { selected = conversation.id; deleting = false }
             })
     }
-    conversations.singleOrNull { it.id == selected }?.turns.orEmpty().forEach { turn ->
+    val destination = conversations.singleOrNull { it.id == selected }
+    if (destination != null && host.collectiveRecallGrant != null) {
+        AzphaltPill(if (showRecall) "Hide recall permissions" else "Conversation recall permissions (${destination.recallSourceIds.size})",
+            "collective-recall-permissions", onClick = { if (!busy) showRecall = !showRecall })
+        if (showRecall) {
+            Text("Allow associative tags from another conversation into this conversation only. " +
+                "All current and future participating models may receive relevant tags from its existing and future memory. " +
+                "No transcript or bank is copied. Revocation applies to subsequent turns; it cannot undo past disclosure or resulting memories.",
+                style = AzphaltType.body, color = azphaltOnSurface())
+            conversations.filter { it.id != destination.id }.forEach { source ->
+                val allowed = source.id in destination.recallSourceIds
+                val title = source.turns.firstOrNull()?.question?.take(45) ?: "Empty conversation"
+                Text("$title · ${source.id}", style = AzphaltType.body, color = azphaltOnSurface())
+                AzphaltPill(if (allowed) "Revoke recall" else "Allow recall from this conversation",
+                    "collective-recall-${source.id}", onClick = {
+                        if (!busy) {
+                            if (!allowed) reviewingRecallSource = source.id
+                            else {
+                                busy = true
+                                scope.launch {
+                                    try {
+                                        val saved = checkNotNull(host.collectiveRecallGrant).invoke(source.id, destination.id, false)
+                                        refresh(destination.id)
+                                        status = if (saved) "Recall revoked for subsequent turns." else "Revocation refused."
+                                    } catch (cancelled: CancellationException) { throw cancelled }
+                                    catch (_: Exception) { status = "Could not revoke recall." }
+                                    finally { busy = false }
+                                }
+                            }
+                        }
+                    })
+            }
+            reviewingRecallSource?.let { sourceId ->
+                val source = conversations.singleOrNull { it.id == sourceId }
+                if (source != null) {
+                    Text("Confirm one-way recall from ${source.id} into ${destination.id}?",
+                        style = AzphaltType.body, color = azphaltOnSurface())
+                    AzphaltPill("Confirm recall grant", "collective-confirm-recall", onClick = {
+                        if (!busy) {
+                            reviewingRecallSource = null
+                            busy = true
+                            scope.launch {
+                                try {
+                                    val saved = checkNotNull(host.collectiveRecallGrant).invoke(source.id, destination.id, true)
+                                    refresh(destination.id)
+                                    status = if (saved) "Recall grant saved." else "Grant refused: at most seven other conversations may be authorized."
+                                } catch (cancelled: CancellationException) { throw cancelled }
+                                catch (_: Exception) { status = "Could not save recall grant." }
+                                finally { busy = false }
+                            }
+                        }
+                    })
+                    AzphaltPill("Cancel recall grant", "collective-cancel-recall", onClick = { reviewingRecallSource = null })
+                }
+            }
+        }
+    }
+    destination?.turns.orEmpty().forEach { turn ->
         val result = turn.result
         Text("You: ${turn.question}", style = AzphaltType.body, color = azphaltOnSurface())
         Text(result.answer?.let { "The Aive: $it" } ?: "The Aive: No synthesized answer was obtained.",
