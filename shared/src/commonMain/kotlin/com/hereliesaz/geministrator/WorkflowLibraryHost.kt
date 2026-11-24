@@ -48,6 +48,8 @@ class WorkflowLibraryHost(
     private val composition = WorkflowCompositionService(persistence)
 
     /** Local Keeper UI only. No remote control surface is given this mailbox. */
+    internal var collectiveChat: (suspend (String, String, String) -> com.hereliesaz.geministrator.queen.CollectiveAnswer)? = null
+
     internal var peerMailbox: (() -> com.hereliesaz.geministrator.workflow.PeerMailbox?)? = null
 
     internal suspend fun peerRoutes() = peerMailbox?.invoke()?.routes().orEmpty()
