@@ -425,11 +425,14 @@ private suspend fun ApplicationRuntime.raisePlanFromParents(
 @OptIn(ExperimentalTime::class)
 private suspend fun ApplicationRuntime.planAndDecide(
     inputs: PlanInputs,
-    orchestrationRuntime: OrchestrationAgentRuntime,
-    review: Pair<PlanReviewer, RoleDefinition>?,
+    rawRuntime: OrchestrationAgentRuntime,
+    rawReview: Pair<PlanReviewer, RoleDefinition>?,
     confirmPlan: (suspend (PlanDecision) -> Boolean)?,
     planStore: ReviewedPlanStore?,
 ): ChosenPlan? {
+    val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(inputs.parentRunIds.map { it.value })
+    val orchestrationRuntime = memory.planner(rawRuntime, (inputs.staffing?.staff?.planner ?: BuiltInRoles.Planner).id.value)
+    val review = rawReview?.let { (model, role) -> memory.reviewer(model, role.id.value) to role }
     reportLaunchProgress("Asking the planner for a swarm (${inputs.plannerRoles.size} roles available)…")
     // Only a launch that will be reviewed has a planning field: the planner's egg, the reviewer who hatches from it.
     review?.let { (_, role) -> reportPlanningStage(planningStage(inputs, PlanningPhase.Planning, null, 0, role)) }
@@ -719,11 +722,13 @@ internal suspend fun ApplicationRuntime.draftSwarm(
     }
     if (packet.objective.isEmpty()) return SwarmDraftResult.Problem(SwarmDraftProblem.NoPrompt)
     if (packet.availableAgents.isEmpty()) return SwarmDraftResult.Problem(SwarmDraftProblem.NoRoles)
+    val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(emptyList())
+    val planner = memory.planner(orchestrationRuntime, BuiltInRoles.Planner.id.value)
     val notes = mutableListOf<String>()
     val plan = try {
         // Failover notes ("OpenAI is out of credit; continued with Claude.") ride back with the draft.
         kotlinx.coroutines.withContext(com.hereliesaz.geministrator.workflow.FailoverNotes { notes += it }) {
-            orchestrationRuntime.plan(packet)
+            planner.plan(packet)
         }
     } catch (cancelled: kotlinx.coroutines.CancellationException) {
         throw cancelled
@@ -734,7 +739,7 @@ internal suspend fun ApplicationRuntime.draftSwarm(
     reviewRole(planReviewer, planReviewer, roles)?.let { (reviewer, role) ->
         val outcome = try {
             kotlinx.coroutines.withContext(com.hereliesaz.geministrator.workflow.FailoverNotes { notes += it }) {
-                reviewUntilApproved(packet, plan, orchestrationRuntime, reviewer, role.name, role.instructions, role.preferredProviderId?.value)
+                reviewUntilApproved(packet, plan, planner, memory.reviewer(reviewer, role.id.value), role.name, role.instructions, role.preferredProviderId?.value)
             }
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
