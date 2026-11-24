@@ -4,6 +4,8 @@ This document is normative for The Aive's local memory-clerk model family.
 
 Memory clerks organize what was thought, said, done, requested, observed, or produced. They do not decide what should be thought.
 
+> The collective's future use of memory is specified in [Collective cognition](architecture/COLLECTIVE_COGNITION.md). No change to the clerk authority boundary, passive associative recall, contradiction preservation or Keeper banking semantics is implied. Cognitive deliberation belongs to reasoning specialists, not memory clerks.
+
 ## Architecture
 
 The Aive uses two distinct local-inference families:
