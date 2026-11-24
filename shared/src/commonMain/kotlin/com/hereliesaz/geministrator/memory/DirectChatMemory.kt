@@ -77,8 +77,10 @@ internal class DirectChatMemory(
     }
 
     /** Tags are not added to a dispute's listed facts and cannot supply authority. */
-    fun voice(base: QueenModel, roleId: String): QueenModel = object : QueenModel {
-        private val session = provider.openDirectChat(workflowIds, roleId)
+    fun voice(base: QueenModel, roleId: String, conversationId: String? = null,
+        participantId: String = roleId): QueenModel = object : QueenModel {
+        private val session = if (conversationId == null) provider.openDirectChat(workflowIds, roleId)
+            else provider.resumeDirectChat(workflowIds, roleId, conversationId, participantId)
         override val uses: List<ModelUse> get() = base.uses
         override suspend fun answer(prompt: String): String {
             val cues = tags(session, prompt)

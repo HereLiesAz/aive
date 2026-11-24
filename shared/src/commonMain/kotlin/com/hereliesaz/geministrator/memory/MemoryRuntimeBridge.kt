@@ -49,6 +49,10 @@ fun interface MemoryPromptContextProvider {
     fun openDirectChat(workflowIds: List<String>, roleId: String): DirectChatCueSession =
         DirectChatCueSession { text -> directChatTags(workflowIds, roleId, text) }
 
+    /** Resume a host-assigned participant in a stable conversation. The identity is not a memory grant. */
+    fun resumeDirectChat(workflowIds: List<String>, roleId: String, conversationId: String,
+        participantId: String): DirectChatCueSession = openDirectChat(workflowIds, roleId)
+
     /** Entities, actions and code symbols in the request, with how many memories hold each word. */
     suspend fun queryHints(request: AgentTaskRequest): MemoryQueryHints = MemoryQueryHints()
 

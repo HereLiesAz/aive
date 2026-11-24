@@ -1,6 +1,8 @@
 package com.hereliesaz.geministrator.memory
 
 import kotlin.concurrent.Volatile
+import kotlinx.serialization.Serializable
+import com.hereliesaz.geministrator.Sha256
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -27,23 +29,47 @@ import kotlinx.coroutines.sync.withLock
  * needs more tokens to reopen and a higher dial fewer. One instance holds one agent's state; see
  * [PerAgentAttention].
  */
+/** Bounded checkpoint metadata; no prompt, memory text or raw node identifier. */
+@Serializable
+internal data class AttentionCheckpoint(
+    val state: MemoryAttentionState,
+    val tokens: Long,
+    val credits: Double,
+    val open: Boolean,
+    val recent: List<AttentionExposure>,
+)
+
+@Serializable
+internal data class AttentionExposure(val nodeHash: String, val depth: Int, val at: Long)
+
 internal class AttentionGatedRecall(
     private val policy: MemoryAttentionPolicy = MemoryAttentionPolicy(),
     initialState: MemoryAttentionState = MemoryAttentionState(),
+    checkpoint: AttentionCheckpoint? = null,
 ) {
     private val gate = MemoryAttentionGate(policy)
     private val mutex = Mutex()
-    private var state: MemoryAttentionState = initialState
+    private var state: MemoryAttentionState = checkpoint?.state ?: initialState
 
     /** Tokens consumed so far, and when (in those tokens) each recent memory was surfaced. */
-    private var tokens: Long = 0
-    private val surfacedAt = LinkedHashMap<Pair<MemoryNodeId, Int>, Long>()
+    private var tokens: Long = checkpoint?.tokens?.coerceAtLeast(0) ?: 0
+    private val surfacedAt = LinkedHashMap<Pair<String, Int>, Long>().apply {
+        checkpoint?.recent?.takeLast(RECENT_LIMIT)?.forEach {
+            if (it.at in 0..tokens && it.depth >= 0 && it.nodeHash.matches(Regex("[a-f0-9]{64}"))) put(it.nodeHash to it.depth, it.at)
+        }
+    }
 
     /** Cue credits: one is spent per surfacing; tokens refill one per cue interval, up to the burst. */
-    private var credits: Double = policy.cueBurst.toDouble()
+    private var credits: Double = checkpoint?.credits?.takeIf { it.isFinite() }?.coerceIn(0.0, policy.cueBurst.toDouble()) ?: policy.cueBurst.toDouble()
 
     /** The gate opened last time it was asked and has not closed since (hysteresis). */
-    private var open: Boolean = false
+    private var open: Boolean = checkpoint?.open ?: false
+
+    suspend fun checkpoint(): AttentionCheckpoint = mutex.withLock {
+        AttentionCheckpoint(state, tokens, credits, open, surfacedAt.map { (key, at) -> AttentionExposure(key.first, key.second, at) })
+    }
+
+    private fun key(id: MemoryNodeId, depth: Int) = Sha256.hex(id.value.encodeToByteArray()) to depth
 
     suspend fun currentState(): MemoryAttentionState = mutex.withLock { state }
 
@@ -51,7 +77,7 @@ internal class AttentionGatedRecall(
         if (tokenCount <= 0) return
         mutex.withLock {
             state = gate.consumeTokens(state, tokenCount)
-            tokens += tokenCount
+            tokens = if (tokens > Long.MAX_VALUE - tokenCount) Long.MAX_VALUE else tokens + tokenCount
             credits = minOf(policy.cueBurst.toDouble(), credits + tokenCount.toDouble() / gate.cuePolicy(state).minimumIntervalTokens)
         }
     }
@@ -81,13 +107,13 @@ internal class AttentionGatedRecall(
     private fun novelAt(hits: List<MemoryRecallHit>, depth: Int): List<MemoryRecallHit> {
         val window = policy.noveltyCueIntervals.toLong() * gate.cuePolicy(state).minimumIntervalTokens
         return hits.filter { hit ->
-            val shownAt = surfacedAt[hit.node.id to depth] ?: return@filter true
+            val shownAt = surfacedAt[key(hit.node.id, depth)] ?: return@filter true
             tokens - shownAt >= window
         }
     }
 
     private fun remember(shown: List<MemoryRecallHit>, depth: Int) {
-        shown.forEach { surfacedAt.remove(it.node.id to depth); surfacedAt[it.node.id to depth] = tokens }
+        shown.forEach { surfacedAt.remove(key(it.node.id, depth)); surfacedAt[key(it.node.id, depth)] = tokens }
         while (surfacedAt.size > RECENT_LIMIT) surfacedAt.remove(surfacedAt.keys.first())
     }
 
