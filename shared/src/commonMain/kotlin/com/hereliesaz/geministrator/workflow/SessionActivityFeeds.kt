@@ -10,8 +10,8 @@ import kotlinx.coroutines.flow.update
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
-/** What one line of a creature's live activity is: its reasoning, or a tool/progress step. */
-enum class SessionActivityKind { Thinking, Progress }
+/** What one line of a creature's live activity is: its reasoning, a tool/progress step, or an observed peer-message lifecycle event. */
+enum class SessionActivityKind { Thinking, Progress, Consultation }
 
 data class SessionActivityLine(
     /** Increasing within a session's feed; newer lines have larger ids. */
@@ -39,7 +39,7 @@ fun ManagedSessionHandle.activityKey(): SessionActivityKey = SessionActivityKey(
  * [maxLineChars], each stamped with when it was recorded (the Log tab reads them all, in time order).
  * Nothing here is persisted or exported: workflow state never holds thinking (the
  * memory layer banks it on its own), and the duplex peer never receives it (docs/architecture/DUPLEX_MCP.md).
- * Messages to and from the agent are not activity; they never enter a feed.
+ * Ordinary messages to and from the agent never enter a feed. The gateway may record peer-message lifecycle metadata, not bodies, as Consultation lines.
  */
 @OptIn(ExperimentalTime::class)
 class SessionActivityFeeds(
