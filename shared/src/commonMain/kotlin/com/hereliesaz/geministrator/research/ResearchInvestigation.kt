@@ -66,9 +66,11 @@ class ResearchInvestigation(
     private val context: () -> ResearchContext = { ResearchContext() },
     private val budget: ResearchBudget = ResearchBudget(),
     private val factModel: QueenModel? = null,
+    private val memoryProvider: com.hereliesaz.geministrator.memory.MemoryPromptContextProvider =
+        com.hereliesaz.geministrator.memory.MemoryRuntimeBridge.promptContextProvider,
 ) {
     /** The same research with [model] answering the facts (the queen's model, held to the keeper's caps by the caller). */
-    fun withFactModel(model: QueenModel?): ResearchInvestigation = ResearchInvestigation(step, context, budget, model)
+    fun withFactModel(model: QueenModel?): ResearchInvestigation = ResearchInvestigation(step, context, budget, model, memoryProvider)
 
     /** [memoryRunIds] contains only existing workflow banks authorized by the caller; never use the external lookup key as a bank ID. */
     suspend fun findings(missingFact: String, runKey: String, memoryRunIds: List<String> = emptyList()): List<String>? {
@@ -85,7 +87,7 @@ class ResearchInvestigation(
         val model = factModel ?: return emptyList()
         if (leads.isEmpty()) return emptyList()
         val reply = try {
-            val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(memoryRunIds)
+            val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(memoryRunIds, memoryProvider)
             memory.voice(model, com.hereliesaz.geministrator.domain.BuiltInRoles.Orchestrator.id.value)
                 .answer(researchFactsPrompt(objective, leads))
         } catch (cancelled: CancellationException) {
