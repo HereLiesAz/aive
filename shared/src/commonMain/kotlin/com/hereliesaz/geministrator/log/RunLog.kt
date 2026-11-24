@@ -136,7 +136,11 @@ fun agentActivityLines(
     val role = roleOf(key)
     val task = taskOf(key)
     lines.map { line ->
-        val mark = if (line.kind == SessionActivityKind.Thinking) "thinking" else "step"
+        val mark = when (line.kind) {
+            SessionActivityKind.Thinking -> "thinking"
+            SessionActivityKind.Progress -> "step"
+            SessionActivityKind.Consultation -> "consultation"
+        }
         Triple(line, key, LogLine(line.atEpochMillis, scope, "[$mark] ${line.text}", role, task))
     }
 }.sortedWith(compareBy({ it.first.atEpochMillis }, { it.second.providerRunId.value }, { it.first.id }))

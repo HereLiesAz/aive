@@ -338,6 +338,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inspector_activity">WHAT IT'S DOING</string>
     <string name="inspector_activity_thinking">THINKING</string>
     <string name="inspector_activity_step">STEP</string>
+    <string name="inspector_activity_consultation">CONSULTATION</string>
     <string name="inspector_activity_attempt">Attempt %1$d</string>
     <string name="inspector_attempt">ATTEMPT</string>
     <string name="inspector_blocked">BLOCKED</string>

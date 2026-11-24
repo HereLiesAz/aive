@@ -15,6 +15,7 @@ The full ledger:
 | **Tick** | A run event: any task changing state, any agent step finishing | the run's event stream |
 | **Spike** | One agent step completing (a model turn, a tool call, a commit) | provider responses, tool results |
 | **Charge** | Work waiting for the agent: inputs arrived, task ready | task queue |
+| **Consultation queued / transport outcome** | Actual peer mailbox enqueue and persisted transport result (not proof of reading) | Managed-session consultation activity in the creature panel and run log; metadata only. A distinct cognitive edge is still planned. |
 | **Synapse forms** | A dependency edge between two agents' tasks, or one agent consuming another's artifact | workflow definition, artifact reads |
 | **Synapse strengthens** | An artifact passed across it and the consumer succeeded with it | artifact handoff + consumer result |
 | **Synapse prunes** | The dependency was removed, or no artifact crossed it for N runs | workflow edits, run history |

@@ -56,7 +56,7 @@ The Aive is the intelligence; specialists are its cognitive organs. The persiste
 - [ ] Deliberation → experience → procedure → habit → reflex: test, version, approve, bound permissions, roll back and return to deliberation on failure.
 - [ ] Persistent specialist profiles and isolated execution/worktrees; reuse existing session search, context compression and scheduling mechanisms where applicable.
 - [ ] Idle consolidation and ongoing responsibilities: associative recall, scheduled review and maintenance within explicit budgets; respect existing memory banking and contradiction-preservation rules.
-- [ ] Real cognitive activity visualization: display actual consultations, recruitment, deliberation, dissent and decisions; no fabricated thoughts or synthetic telemetry.
+- [ ] Real cognitive activity visualization: consultation queue and provider outcome metadata now appear in the existing creature activity panel and run log. Remaining: durable cognitive event stream, attention/recruitment/deliberation/dissent visualization, distinct cognitive links, conversation-level inspection and live acceptance; no fabricated thoughts or synthetic telemetry.
 - [ ] Unified messaging gateway and external agent integration using existing duplex interfaces; preserve origin and trust boundaries.
 - [ ] End-to-end acceptance: restart/recovery, concurrent sessions, delivery and privacy boundaries, cap enforcement, protected dissent, permission revocation, cancellation, verified work and unified response across supported platforms.
 

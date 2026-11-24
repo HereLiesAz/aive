@@ -913,6 +913,8 @@ class ProviderBackedManagedSessionGateway(
         try {
             if (!providerRegistry.peerMailbox.enqueue(origin, sender.providerId.value, sender.taskRunId.value, note,
                     sender.providerRunId.value, sender.inferenceInvocationId)) return
+            activity.record(sender.activityKey(), SessionActivityKind.Consultation,
+                "Queued ${note.intent.name} for ${com.hereliesaz.geministrator.control.ControlRedaction.scrub(note.roleId)}")
             val recipient = mutex.withLock {
                 consultationContexts.entries.filter { (handle, context) ->
                     handle != sender && handle.providerId == sender.providerId &&
@@ -944,6 +946,7 @@ class ProviderBackedManagedSessionGateway(
             for (mail in providerRegistry.peerMailbox.claim(context, handle.providerId.value, handle.providerRunId.value)) {
                 if (status(handle) != ManagedSessionStatus.Running) {
                     providerRegistry.peerMailbox.finish(mail, PeerDelivery.Rejected)
+                    recordPeerDelivery(handle, mail, PeerDelivery.Rejected)
                     continue
                 }
                 val note = PeerConsultationNote(mail.recipientRole, mail.text, mail.intent, mail.replyTo)
@@ -959,12 +962,35 @@ class ProviderBackedManagedSessionGateway(
                     PeerDelivery.Uncertain
                 }
                 providerRegistry.peerMailbox.finish(mail, outcome)
+                recordPeerDelivery(handle, mail, outcome)
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
             // Delivery is best effort; ambiguous sends are not replayed.
         }
+    }
+
+    /** Record observed delivery metadata, never message contents or invented receiver activity. */
+    private suspend fun recordPeerDelivery(recipient: ManagedSessionHandle, mail: PeerMail, outcome: PeerDelivery) {
+        val from = com.hereliesaz.geministrator.control.ControlRedaction.scrub(mail.senderRole)
+        val to = com.hereliesaz.geministrator.control.ControlRedaction.scrub(mail.recipientRole)
+        val result = when (outcome) {
+            PeerDelivery.Accepted -> "Transport accepted"
+            PeerDelivery.Rejected -> "Delivery rejected"
+            PeerDelivery.Uncertain -> "Delivery uncertain"
+            else -> return
+        }
+        activity.record(recipient.activityKey(), SessionActivityKind.Consultation,
+            "$result: ${mail.intent.name} from $from")
+        val sender = mutex.withLock {
+            consultationContexts.keys.firstOrNull {
+                it.providerId == recipient.providerId && it.taskRunId.value == mail.senderTask &&
+                    it.providerRunId.value == mail.senderSession
+            }
+        }
+        if (sender != null) activity.record(sender.activityKey(), SessionActivityKind.Consultation,
+            "$result: ${mail.intent.name} to $to")
     }
 
     private fun AgentTaskRequest.withPeerConsultationInstructions(): AgentTaskRequest {
