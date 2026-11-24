@@ -6,6 +6,8 @@ import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.domain.TaskRunId
 import com.hereliesaz.geministrator.memory.MEMORY_MESSAGE_MARKER
+import com.hereliesaz.geministrator.memory.MemorySessionObserver
+import com.hereliesaz.geministrator.memory.NoOpMemorySessionObserver
 import com.hereliesaz.geministrator.persistence.InMemorySettings
 import com.hereliesaz.geministrator.providers.AgentCapabilities
 import com.hereliesaz.geministrator.providers.AgentEvent
@@ -67,6 +69,41 @@ class KeeperQuestionGatewayTest {
             val answered = gateway.keeperQuestion(handle)
             assertNull(answered?.pending)
             assertEquals(key, answered?.answeredKey)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun keeperAnswerIncludesPassiveMemoryButOnlyTheOriginalAnswerIsBanked() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val provider = AskingProvider(messaging = true)
+        val banked = mutableListOf<String>()
+        val observer = object : MemorySessionObserver by NoOpMemorySessionObserver {
+            override suspend fun annotateUserMessage(handle: ManagedSessionHandle, text: String): String {
+                assertEquals(TaskRunId("answer-task"), handle.taskRunId)
+                return "$text\n\n$MEMORY_MESSAGE_MARKER #deployment"
+            }
+
+            override suspend fun onKeeperMessage(handle: ManagedSessionHandle, text: String) {
+                banked += text
+            }
+        }
+        try {
+            val gateway = ProviderBackedManagedSessionGateway(
+                AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings()), scope,
+                memoryObserver = observer,
+            )
+            val handle = gateway.createSession(request("answer-task"))
+            withTimeout(2_000L) {
+                while (gateway.keeperQuestion(handle)?.pending == null) delay(10L)
+            }
+            val key = AgentUi.questionKey(AskingProvider.QUESTION)
+            assertEquals(ProviderActionResult.Accepted, gateway.answerKeeperQuestion(handle, key, "small"))
+            assertEquals(listOf("small\n\n$MEMORY_MESSAGE_MARKER #deployment"), provider.sent)
+            assertEquals(listOf("small"), banked)
+            assertNull(gateway.keeperQuestion(handle)?.pending)
+            assertEquals(key, gateway.keeperQuestion(handle)?.answeredKey)
         } finally {
             scope.cancel()
         }

@@ -8,7 +8,19 @@ import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.TaskRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunId
+import com.hereliesaz.geministrator.memory.InMemoryMemoryStore
+import com.hereliesaz.geministrator.memory.MEMORY_MESSAGE_MARKER
+import com.hereliesaz.geministrator.memory.MemoryBanks
+import com.hereliesaz.geministrator.memory.MemoryEngineProvider
+import com.hereliesaz.geministrator.memory.MemoryLayerController
+import com.hereliesaz.geministrator.memory.MemoryLayerSettingsStore
+import com.hereliesaz.geministrator.memory.MemoryNode
+import com.hereliesaz.geministrator.memory.MemoryNodeId
+import com.hereliesaz.geministrator.memory.MemoryNodeKind
+import com.hereliesaz.geministrator.memory.MemorySessionObserver
+import com.hereliesaz.geministrator.memory.MemorySnapshot
 import com.hereliesaz.geministrator.persistence.InMemorySettings
+import com.russhwolf.settings.MapSettings
 import com.hereliesaz.geministrator.providers.AgentCapabilities
 import com.hereliesaz.geministrator.providers.AgentEvent
 import com.hereliesaz.geministrator.providers.AgentProvider
@@ -271,6 +283,47 @@ class PeerConsultationGatewayTest {
             assertEquals(recipient.providerRunId, note.first)
             assertTrue(note.second.contains("action: Note"))
             assertTrue(note.second.endsWith("Design finding"))
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun peerDeliveryIncludesActualRecipientMemoryWithoutKeeperAttribution() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val provider = AdvisoryProvider()
+        val registry = AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings())
+        val sender = handle(provider, "architect")
+        val recipient = handle(provider, "reviewer")
+        val keeperMessages = Channel<String>(Channel.UNLIMITED)
+        val store = InMemoryMemoryStore(MemorySnapshot(nodes = listOf(
+            MemoryNode(MemoryNodeId("tag-keystore"), MemoryNodeKind.NounTag, "keystore", createdAtEpochMillis = 0),
+        )))
+        val controller = MemoryLayerController(
+            banks = MemoryBanks.inMemory(mapOf("run" to store)),
+            settingsStore = MemoryLayerSettingsStore(MapSettings()),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = scope,
+            nowEpochMillis = { 1_000L },
+        )
+        controller.setDefaultAttentionLevel(1f)
+        val observer = object : MemorySessionObserver by controller.observer {
+            override suspend fun onKeeperMessage(handle: ManagedSessionHandle, text: String) {
+                keeperMessages.send(text)
+            }
+        }
+        try {
+            val gateway = ProviderBackedManagedSessionGateway(registry, scope, memoryObserver = observer,
+                activity = SessionActivityFeeds(), peerRoster = { listOf(BuiltInRoles.Architect, BuiltInRoles.Reviewer) })
+            gateway.reconnect(sender, ManagedSessionStatus.Running, request(sender, "architect"))
+            gateway.reconnect(recipient, ManagedSessionStatus.Running, request(recipient, "reviewer"))
+            provider.events.send(AgentEvent.Message(sender.providerRunId, "CONSULT reviewer\nWhere is the keystore?"))
+            val delivered = withTimeout(5_000L) { provider.deliveries.receive() }
+            assertEquals(recipient.providerRunId, delivered.first)
+            assertTrue(delivered.second.contains("Where is the keystore?\n\n$MEMORY_MESSAGE_MARKER #keystore"), delivered.second)
+            assertTrue(keeperMessages.tryReceive().isFailure)
+            val receipt = registry.peerMailbox.receipts(PeerConsultationContext("project", "run", "reviewer"), provider.id.value).single()
+            assertEquals("Where is the keystore?", receipt.text)
         } finally {
             scope.cancel()
         }

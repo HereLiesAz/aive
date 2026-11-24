@@ -41,8 +41,10 @@ interface MemorySessionObserver {
     suspend fun onRemindMe(handle: ManagedSessionHandle) = Unit
 
     /**
-     * A user message on its way into a running session. Returns the text to send: memory appends
-     * its cue cloud for the user's words; observers without one return it unchanged.
+     * Incoming conversational text on its way into a running session, whether from the Keeper or
+     * a peer. Returns the original text with the recipient's authorized cue cloud appended as
+     * reference data. This hook does not bank the message or assign it Keeper provenance.
+     * Observers without recall return it unchanged.
      */
     suspend fun annotateUserMessage(handle: ManagedSessionHandle, text: String): String = text
 
