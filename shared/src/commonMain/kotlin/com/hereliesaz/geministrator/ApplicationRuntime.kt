@@ -408,13 +408,22 @@ class ApplicationRuntime private constructor(
         com.hereliesaz.geministrator.queen.CollectiveConversationStore(persistence.inferenceSettings, ::nowEpochMillis)
     }
 
+    private val collectiveProfiles by lazy {
+        com.hereliesaz.geministrator.queen.SpecialistProfileStore(persistence.inferenceSettings, ::nowEpochMillis)
+    }
+
     /** Configured text-only model factory. No managed-session tools or repository access. */
     internal var collectiveModelFor: ((String?) -> com.hereliesaz.geministrator.queen.QueenModel?)? = null
 
     internal suspend fun collectiveHistory() = collectiveConversations.list()
     internal suspend fun newCollectiveConversation() = collectiveChatMutex.withLock { collectiveConversations.create() }
     internal suspend fun deleteCollectiveConversation(id: String) = collectiveChatMutex.withLock { collectiveConversations.delete(id) }
-    internal suspend fun clearCollectiveConversations() = collectiveChatMutex.withLock { collectiveConversations.clear() }
+    internal suspend fun clearCollectiveConversations() = collectiveChatMutex.withLock {
+        collectiveConversations.clear()
+        collectiveProfiles.clear()
+    }
+
+    internal suspend fun collectiveSpecialistProfiles() = collectiveProfiles.profiles()
 
     /** Host-owned conversation history; an absent/deleted identity cannot be resumed. */
     internal suspend fun collectiveAdvisory(
@@ -430,9 +439,10 @@ class ApplicationRuntime private constructor(
             if (role.executionSource != com.hereliesaz.geministrator.domain.RoleExecutionSource.Agent) return null
             val pin = role.preferredProviderId?.value
             if (pin != null && (model.uses.isEmpty() || model.uses.any { it.sourceId != pin })) return null
-            val wrapped = memory.voice(model, role.id.value, conversationId = conversationId)
+            val identity = com.hereliesaz.geministrator.queen.specialistInstanceId(role, model.uses)
+            val wrapped = memory.voice(model, role.id.value, conversationId = conversationId, participantId = identity)
             return com.hereliesaz.geministrator.queen.CollectiveVoice(role.id.value,
-                com.hereliesaz.geministrator.queen.pacedPerCall(wrapped, providerRegistry.sourcePacing))
+                com.hereliesaz.geministrator.queen.pacedPerCall(wrapped, providerRegistry.sourcePacing), identity)
         }
         val queenRole = roster.singleOrNull { it.id == BuiltInRoles.Orchestrator.id }
         val facilitator = queenRole?.let { role -> models?.queen?.let { voice(role, it) } }
@@ -449,6 +459,9 @@ class ApplicationRuntime private constructor(
                     val current = activeRoles(resolveRoleCollection(persistence.roles.all()))
                         .singleOrNull { it.id.value == voice.role }
                     current != null && current == roster.singleOrNull { it.id.value == voice.role }
+                },
+                observeCall = { voice, outcome ->
+                    voice.specialistId?.let { id -> collectiveProfiles.observe(id, voice.role, outcome) }
                 },
             ) { model, count ->
                 models.mayCall() && queenCallAllowed() &&

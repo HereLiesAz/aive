@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.hereliesaz.geministrator.queen.CollectiveConversation
+import com.hereliesaz.geministrator.queen.SpecialistProfile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -18,6 +19,7 @@ import kotlinx.coroutines.launch
 internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
     val scope = rememberCoroutineScope()
     var conversations by remember { mutableStateOf<List<CollectiveConversation>>(emptyList()) }
+    var profiles by remember { mutableStateOf<List<SpecialistProfile>>(emptyList()) }
     var selected by remember { mutableStateOf<String?>(null) }
     var question by remember { mutableStateOf("") }
     var pending by remember { mutableStateOf<Job?>(null) }
@@ -27,6 +29,7 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
     var deleting by remember { mutableStateOf(false) }
     suspend fun refresh(preferred: String? = selected) {
         conversations = checkNotNull(host.collectiveHistory).invoke()
+        profiles = host.collectiveProfiles?.invoke().orEmpty()
         selected = preferred?.takeIf { id -> conversations.any { it.id == id } } ?: conversations.firstOrNull()?.id
     }
     LaunchedEffect(Unit) {
@@ -52,12 +55,19 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
         if (result.unavailable.isNotEmpty()) Text("Unavailable: ${result.unavailable.joinToString()}",
             style = AzphaltType.body, color = azphaltOnSurface())
         if (inspect) result.assessments.forEach { assessment ->
-            Text("${assessment.role} [${assessment.sourceId ?: "unknown source"} / ${assessment.modelId ?: "unknown model"}]: ${assessment.text}",
+            Text("${assessment.role} [${assessment.sourceId ?: "unknown source"} / ${assessment.modelId ?: "unknown model"}; instance ${assessment.specialistId?.take(12) ?: "legacy"}]: ${assessment.text}",
                 style = AzphaltType.body, color = azphaltOnSurface())
         }
     }
     AzphaltPill(if (inspect) "Hide specialist assessments" else "Inspect specialist assessments",
         "collective-inspect", onClick = { inspect = !inspect })
+    if (inspect && profiles.isNotEmpty()) {
+        Text("Observed specialist call outcomes (not answer quality)", style = AzphaltType.body, color = azphaltOnSurface())
+        profiles.forEach { profile ->
+            Text("${profile.roleId} · ${profile.id.take(12)}: ${profile.answered} answers, ${profile.empty} empty, ${profile.failed} failed, ${profile.timedOut} timed out",
+                style = AzphaltType.body, color = azphaltOnSurface())
+        }
+    }
     AzphaltTextField(value = question, onValueChange = { question = it.take(1500) }, label = "Ask a question")
     AzphaltPill("Ask The Aive", "collective-ask", onClick = {
         val prompt = question.trim()

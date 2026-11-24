@@ -63,7 +63,8 @@ internal class CollectiveConversationStore(settings: Settings, private val now: 
             assessments = result.assessments.take(2).map {
                 it.copy(role = clean(it.role, 128), text = clean(it.text, 1200),
                     sourceId = it.sourceId?.let { source -> clean(source, 128) },
-                    modelId = it.modelId?.let { model -> clean(model, 128) })
+                    modelId = it.modelId?.let { model -> clean(model, 128) },
+                    specialistId = it.specialistId?.takeIf { id -> id.matches(Regex("[a-f0-9]{64}")) })
             },
             unavailable = result.unavailable.take(16).map { clean(it, 128) },
         ))
