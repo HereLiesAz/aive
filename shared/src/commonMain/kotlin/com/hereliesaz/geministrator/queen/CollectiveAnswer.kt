@@ -38,7 +38,7 @@ internal suspend fun answerCollectively(
         calls++
         return try {
             withTimeoutOrNull(60_000L) {
-                voice.model.answer(prompt).let(ControlRedaction::scrub).trim().take(1200).takeIf(String::isNotBlank)
+                voice.model.answer(prompt).let { ControlRedaction.scrub(it) }.trim().take(1200).takeIf(String::isNotBlank)
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
