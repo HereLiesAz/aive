@@ -312,6 +312,51 @@ class PeerConsultationGatewayTest {
     }
 
     @Test
+    fun recruitmentUsesOnlyConsentedCrossRunLivePeerWithoutReadingDestinationMemory() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val provider = AdvisoryProvider()
+        val registry = AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings())
+        val sender = handle(provider, "architect")
+        val target = handle(provider, "reviewer")
+        val other = handle(provider, "worker")
+        val route = PeerRoute("project", provider.id.value, "run", "architect", "next-run", "reviewer")
+        val queries = Channel<Pair<String, String>>(Channel.UNLIMITED)
+        val directory = object : com.hereliesaz.geministrator.memory.MemoryPromptContextProvider {
+            override suspend fun recallFor(request: AgentTaskRequest,
+                queryPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan) =
+                com.hereliesaz.geministrator.memory.MemoryPromptRecall()
+            override suspend fun managedExpertise(projectId: String, runId: String, question: String):
+                List<com.hereliesaz.geministrator.memory.CollectiveExpertiseMatch> {
+                queries.send(projectId to runId)
+                return emptyList()
+            }
+        }
+        try {
+            val gateway = ProviderBackedManagedSessionGateway(registry, scope, activity = SessionActivityFeeds(),
+                peerRoster = { listOf(BuiltInRoles.Architect, BuiltInRoles.Reviewer, BuiltInRoles.Worker) },
+                memoryContext = directory)
+            gateway.reconnect(sender, ManagedSessionStatus.Running, request(sender, "architect"))
+            gateway.reconnect(target, ManagedSessionStatus.Running, request(target, "reviewer", run = "next-run"))
+            gateway.reconnect(other, ManagedSessionStatus.Running, request(other, "worker", run = "ungranted-run"))
+            provider.events.send(AgentEvent.Message(sender.providerRunId, "RECRUIT database indexing\nNo grant"))
+            provider.events.send(AgentEvent.Progress(sender.providerRunId, "First processed"))
+            withTimeout(5_000L) { while (gateway.progress(sender)?.message != "First processed") delay(10) }
+            assertTrue(provider.deliveries.tryReceive().isFailure)
+            assertTrue(queries.tryReceive().isFailure)
+            assertTrue(registry.peerMailbox.grant(route))
+            provider.events.send(AgentEvent.Message(sender.providerRunId, "RECRUIT database indexing\nWhich index fits?"))
+            val sent = withTimeout(5_000L) { provider.deliveries.receive() }
+            assertEquals(target.providerRunId, sent.first)
+            assertTrue(sent.second.contains("Which index fits?\nOrigin run ID: run"))
+            assertEquals("project" to "run", withTimeout(5_000L) { queries.receive() })
+            assertTrue(queries.tryReceive().isFailure)
+            assertTrue(provider.deliveries.tryReceive().isFailure)
+            assertTrue(registry.peerMailbox.receipts(PeerConsultationContext("project", "ungranted-run", "worker"),
+                provider.id.value).isEmpty())
+        } finally { scope.cancel() }
+    }
+
+    @Test
     fun recruitmentSelectsRelevantAvailablePeerWithoutBroadcastingOrLaunching() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val provider = AdvisoryProvider()

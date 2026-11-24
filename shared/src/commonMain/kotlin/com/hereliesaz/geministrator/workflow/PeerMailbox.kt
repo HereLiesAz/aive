@@ -182,6 +182,17 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
             }
         }
 
+    /** Exact outgoing cross-run disclosure grants, not memory-read or reverse-route permissions. */
+    suspend fun eligibleDisclosureGrants(origin: PeerConsultationContext, provider: String): List<PeerRouteGrant> =
+        mutex.withLock {
+            grants().filter {
+                val route = it.route
+                !route.activation && route.project == origin.projectId && route.provider == provider &&
+                    route.sourceRun == origin.runId && route.sourceRole == origin.roleId &&
+                    route.targetRun != origin.runId
+            }
+        }
+
     /** Retained receipt history for one exact scope; no payload crosses project or provider boundaries. */
     suspend fun receipts(scope: PeerConsultationContext, provider: String): List<PeerMail> = mutex.withLock {
         live(read(), now()).filter {
@@ -249,7 +260,14 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
     suspend fun enqueue(origin: PeerConsultationContext, provider: String, senderTask: String, note: PeerConsultationNote, senderSession: String? = null, senderInvocation: String? = null, senderSpecialist: String? = null): Boolean =
         mutex.withLock {
             if (note.roleId.isBlank() || origin.roleId == note.roleId) return@withLock false
-            if (note.expertise != null && (note.targetRun != null || note.replyTo != null)) return@withLock false
+            if (note.expertise != null && note.replyTo != null) return@withLock false
+            val recruitedCrossRun = note.expertise != null && note.targetRun != null
+            if (recruitedCrossRun && (note.activation || note.groupAction != null || note.groupId != null ||
+                    note.intent != PeerIntent.Request || note.targetRun == origin.runId ||
+                    note.crossRunGrantGeneration == null || note.recruitedRecipientSession.isNullOrBlank() ||
+                    senderSession.isNullOrBlank())) return@withLock false
+            if (!recruitedCrossRun && (note.crossRunGrantGeneration != null || note.recruitedRecipientSession != null))
+                return@withLock false
             val time = now()
             val entries = live(read(), time)
             val targetRun = note.targetRun ?: origin.runId
@@ -267,7 +285,8 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
                     it.recipientSession == senderSession && it.delivery in setOf(PeerDelivery.Claimed, PeerDelivery.Accepted) }
                     ?: return@withLock false
             }
-            var requiredRecipientSession: String? = null
+            if (note.crossRunGrantGeneration != null && note.crossRunGrantGeneration != generation) return@withLock false
+            var requiredRecipientSession: String? = note.recruitedRecipientSession
             var groupCreatedAt: Long? = null
             val groupId = when (note.groupAction) {
                 null -> {

@@ -1107,7 +1107,8 @@ class ProviderBackedManagedSessionGateway(
 
     /**
      * Prefer one already-running, uniquely addressed peer using deterministic routing.
-     * With no eligible live candidate, consider a separately consented dormant advisory role.
+     * With no eligible local live candidate, consider a consented cross-run live peer, then a
+     * separately consented dormant advisory role in the originating run.
      * No model call is used for selection; activation remains subject to the existing host gates.
      */
     private suspend fun recruitPeer(
@@ -1138,7 +1139,7 @@ class ProviderBackedManagedSessionGateway(
                     description = "${role.name} ${role.description}".take(1024),
                 )
             }
-        if (candidates.isEmpty()) return recruitDormant(sender, origin, request)
+        if (candidates.isEmpty()) return recruitCrossRun(sender, origin, request) ?: recruitDormant(sender, origin, request)
         val experience = runCatchingCancellable {
             memoryContext.managedExpertise(origin.projectId, origin.runId, expertise)
         }.getOrDefault(emptyList())
@@ -1208,6 +1209,80 @@ class ProviderBackedManagedSessionGateway(
         }
         if (!stillLive || !peerRoleAllowed(selected, sender.providerId)) return null
         return request.copy(roleId = selected)
+    }
+
+    /**
+     * Consider only uniquely live recipients on exact outgoing Keeper disclosure grants.
+     * Rank from the originating run's memory and configured descriptions; a disclosure grant
+     * is not permission to read the destination bank. Bind the selected session and generation
+     * so replacement sessions and revoked/reissued grants cannot receive this recruitment.
+     */
+    private suspend fun recruitCrossRun(
+        sender: ManagedSessionHandle,
+        origin: PeerConsultationContext,
+        request: PeerConsultationNote,
+    ): PeerConsultationNote? {
+        val expertise = request.expertise ?: return null
+        val grants = providerRegistry.peerMailbox.eligibleDisclosureGrants(origin, sender.providerId.value)
+        if (grants.isEmpty()) return null
+        val live = mutex.withLock {
+            consultationContexts.entries.filter { (handle, context) ->
+                handle != sender && handle.providerId == sender.providerId &&
+                    snapshots[handle]?.status == ManagedSessionStatus.Running &&
+                    context.projectId == origin.projectId && context.runId != origin.runId &&
+                    grants.any { it.route.targetRun == context.runId && it.route.targetRole == context.roleId }
+            }.groupBy { it.value }.mapNotNull { (context, entries) ->
+                entries.singleOrNull()?.let { context to it.key }
+            }.toMap()
+        }
+        val roster = peerRoster().groupBy { it.id.value }.values.mapNotNull { it.singleOrNull() }
+            .filter { peerRoleIsEligible(it, sender.providerId) }.associateBy { it.id.value }
+        val candidates = live.keys.mapNotNull { context ->
+            val role = roster[context.roleId] ?: return@mapNotNull null
+            val pending = providerRegistry.peerMailbox.pendingCount(context, sender.providerId.value)
+            if (pending >= 4) null else context to com.hereliesaz.geministrator.orchestration.AgentRouteCandidate(
+                id = "${context.runId}/${context.roleId}",
+                capabilities = setOf(AgentCapability.Messaging.name),
+                preferenceRank = pending,
+                description = "${role.name} ${role.description}".take(1024),
+            )
+        }
+        if (candidates.isEmpty()) return null
+        val experience = runCatchingCancellable {
+            memoryContext.managedExpertise(origin.projectId, origin.runId, expertise)
+        }.getOrDefault(emptyList())
+        val experienced = candidates.filter { (context, _) ->
+            val role = roster.getValue(context.roleId)
+            val current = com.hereliesaz.geministrator.queen.specialistInstanceId(role,
+                listOf(com.hereliesaz.geministrator.queen.ModelUse(sender.providerId.value, null, false)), "managed-v1")
+            specialistIdentity(live.getValue(context)) == current && experience.any {
+                it.roleId == context.roleId && it.specialistId == current && it.matchedEpisodes > 0
+            }
+        }
+        val pool = experienced.ifEmpty { candidates }
+        val route = com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities.routeAgent(
+            com.hereliesaz.geministrator.orchestration.AgentRoutingInput(
+                requiredCapabilities = setOf(AgentCapability.Messaging.name),
+                candidates = pool.map { it.second },
+                requiredContextType = "peer-consultation",
+                taskText = expertise,
+            ),
+        )
+        val selected = pool.singleOrNull { it.second.id == route.selectedAgent }?.first ?: return null
+        val target = live.getValue(selected)
+        if (peerRoster().singleOrNull { it.id.value == selected.roleId } != roster[selected.roleId]) return null
+        val stillLive = mutex.withLock {
+            snapshots[sender]?.status == ManagedSessionStatus.Running && consultationContexts[sender] == origin &&
+                snapshots[target]?.status == ManagedSessionStatus.Running && consultationContexts[target] == selected &&
+                consultationContexts.count { (handle, context) ->
+                    handle.providerId == sender.providerId && snapshots[handle]?.status == ManagedSessionStatus.Running &&
+                        context == selected
+                } == 1
+        }
+        if (!stillLive) return null
+        val grant = grants.single { it.route.targetRun == selected.runId && it.route.targetRole == selected.roleId }
+        return request.copy(roleId = selected.roleId, targetRun = selected.runId,
+            crossRunGrantGeneration = grant.generation, recruitedRecipientSession = target.providerRunId.value)
     }
 
     /**
