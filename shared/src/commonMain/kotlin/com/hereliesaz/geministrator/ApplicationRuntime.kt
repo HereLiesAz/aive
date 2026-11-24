@@ -404,37 +404,53 @@ class ApplicationRuntime private constructor(
     internal suspend fun trainingModels(): DisputeModels? = resolveDisputeModels()
 
     private val collectiveChatMutex = Mutex()
+    private val collectiveConversations by lazy {
+        com.hereliesaz.geministrator.queen.CollectiveConversationStore(persistence.inferenceSettings, ::nowEpochMillis)
+    }
 
-    /** Local, explicitly requested advisory turn. No workflow, repository, remote grant or tools. */
+    /** Configured text-only model factory. No managed-session tools or repository access. */
+    internal var collectiveModelFor: ((String?) -> com.hereliesaz.geministrator.queen.QueenModel?)? = null
+
+    internal suspend fun collectiveHistory() = collectiveConversations.list()
+    internal suspend fun newCollectiveConversation() = collectiveChatMutex.withLock { collectiveConversations.create() }
+    internal suspend fun deleteCollectiveConversation(id: String) = collectiveChatMutex.withLock { collectiveConversations.delete(id) }
+    internal suspend fun clearCollectiveConversations() = collectiveChatMutex.withLock { collectiveConversations.clear() }
+
+    /** Host-owned conversation history; an absent/deleted identity cannot be resumed. */
     internal suspend fun collectiveAdvisory(
-        question: String, history: String, conversationId: String,
-    ): com.hereliesaz.geministrator.queen.CollectiveAnswer = collectiveChatMutex.withLock {
+        question: String, conversationId: String,
+    ): com.hereliesaz.geministrator.queen.CollectiveConversation = collectiveChatMutex.withLock {
+        require(question.isNotBlank() && question.length <= 1500)
+        val conversation = requireNotNull(collectiveConversations.get(conversationId))
         val roster = activeRoles(resolveRoleCollection(persistence.roles.all()))
         val models = resolveDisputeModels()
-            ?: return@withLock com.hereliesaz.geministrator.queen.CollectiveAnswer(null, emptyList(), listOf("Queen"))
         val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(emptyList())
-        fun voice(roleId: String, model: com.hereliesaz.geministrator.queen.QueenModel):
+        fun voice(role: com.hereliesaz.geministrator.domain.RoleDefinition, model: com.hereliesaz.geministrator.queen.QueenModel):
             com.hereliesaz.geministrator.queen.CollectiveVoice? {
-            val role = roster.singleOrNull { it.id.value == roleId } ?: return null
             if (role.executionSource != com.hereliesaz.geministrator.domain.RoleExecutionSource.Agent) return null
             val pin = role.preferredProviderId?.value
             if (pin != null && (model.uses.isEmpty() || model.uses.any { it.sourceId != pin })) return null
-            val wrapped = memory.voice(model, roleId, conversationId = conversationId)
-            return com.hereliesaz.geministrator.queen.CollectiveVoice(roleId,
+            val wrapped = memory.voice(model, role.id.value, conversationId = conversationId)
+            return com.hereliesaz.geministrator.queen.CollectiveVoice(role.id.value,
                 com.hereliesaz.geministrator.queen.pacedPerCall(wrapped, providerRegistry.sourcePacing))
         }
-        val facilitator = voice(BuiltInRoles.Orchestrator.id.value, models.queen)
-            ?: return@withLock com.hereliesaz.geministrator.queen.CollectiveAnswer(null, emptyList(), listOf("Queen"))
-        val roles = listOf(com.hereliesaz.geministrator.domain.HallMonitorRole.id.value, BuiltInRoles.Antagonist.id.value)
-        val specialists = roles.mapNotNull { id -> models.voices[id]?.let { voice(id, it) } }
-        val missing = roles.filterNot { id -> specialists.any { it.role == id } }
-        val result = com.hereliesaz.geministrator.queen.answerCollectively(
-            question, history, specialists, facilitator, unavailableRoles = missing,
-        ) { model, count ->
-            models.mayCall() && queenCallAllowed() &&
-                directAdvisoryGateFor(model.uses, count) == com.hereliesaz.geministrator.queen.CallDecision.Allow
+        val queenRole = roster.singleOrNull { it.id == BuiltInRoles.Orchestrator.id }
+        val facilitator = queenRole?.let { role -> models?.queen?.let { voice(role, it) } }
+        val result = if (facilitator == null || models == null) {
+            com.hereliesaz.geministrator.queen.CollectiveAnswer(null, emptyList(), listOf("Queen"))
+        } else {
+            val specialists = com.hereliesaz.geministrator.queen.selectCollectiveSpecialists(
+                question, roster, facilitator.model.uses, collectiveModelFor,
+                models.voices,
+            ).mapNotNull { (role, model) -> voice(role, model) }
+            com.hereliesaz.geministrator.queen.answerCollectively(
+                question, conversation.context(), specialists, facilitator,
+            ) { model, count ->
+                models.mayCall() && queenCallAllowed() &&
+                    directAdvisoryGateFor(model.uses, count) == com.hereliesaz.geministrator.queen.CallDecision.Allow
+            }
         }
-        result
+        requireNotNull(collectiveConversations.append(conversationId, question, result))
     }
 
     internal suspend fun republishState() {
@@ -2043,6 +2059,7 @@ class ApplicationRuntime private constructor(
     suspend fun importJson(encoded: String) {
         val durable = persistence as? DurableWorkflowPersistence ?: return
         providerRegistry.peerMailbox.clear()
+        clearCollectiveConversations()
         durable.importJson(encoded)
         loadLatest()
     }
