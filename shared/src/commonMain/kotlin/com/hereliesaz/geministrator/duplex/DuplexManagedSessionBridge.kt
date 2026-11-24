@@ -33,11 +33,8 @@ class DuplexManagedSessionBridge(
             if (entry.id !in delivered) {
                 when (entry.kind) {
                     DuplexKind.Message, DuplexKind.Request -> {
-                        // External messages must never masquerade as internal memory recalls.
-                        val text = if (entry.body.startsWith(MEMORY_MESSAGE_MARKER)) {
-                            "[external duplex peer] " + entry.body
-                        } else entry.body
-                        val result = gateway.message(handle, text)
+                        // The gateway owns external provenance and recipient-scoped memory annotation.
+                        val result = gateway.externalMessage(handle, entry.body)
                         when (result) {
                             ProviderActionResult.Accepted -> {
                                 delivered += entry.id

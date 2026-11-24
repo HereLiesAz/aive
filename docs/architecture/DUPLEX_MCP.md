@@ -1,6 +1,6 @@
 # Agent-neutral Duplex MCP
 
-Aive's orchestration is not itself an agent. Tasks, agents, memory, and executors retain separate identities, roles, and authorities. The existing `MemorySessionObserver` receives provider events and has a narrowly scoped `reply` callback into that provider's `ManagedSessionGateway.message`; a memory recall is neither a provider identity nor permission to call tools.
+Aive's orchestration is not itself an agent. Tasks, agents, memory, and executors retain separate identities, roles, and authorities. The existing `MemorySessionObserver` receives provider events and has a narrowly scoped `reply` callback into that provider's provider gateway; the observer's private reply callback delivers memory's own messages without another recall. A memory recall is neither a provider identity nor permission to call tools. Duplex ingress uses `ManagedSessionGateway.externalMessage`, not Keeper messaging: recipient-scoped tags accompany untrusted external text, which is never banked as Keeper speech. A marker in external text grants no memory identity.
 
 ## Transport boundary
 
