@@ -120,6 +120,10 @@ interface ManagedSessionGateway {
         message: String,
     ): ProviderActionResult
 
+    /** External conversational input is never Keeper speech or trusted memory output. */
+    suspend fun externalMessage(handle: ManagedSessionHandle, message: String): ProviderActionResult =
+        ProviderActionResult.Rejected("External session messaging is not supported")
+
     suspend fun approvePlan(handle: ManagedSessionHandle): ProviderActionResult
 
     suspend fun cancel(handle: ManagedSessionHandle): ProviderActionResult =
