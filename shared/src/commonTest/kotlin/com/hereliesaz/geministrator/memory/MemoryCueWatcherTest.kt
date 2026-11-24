@@ -79,6 +79,7 @@ class MemoryCueWatcherTest {
         )
         controller.drain()
         val handle = ManagedSessionHandle(TaskRunId("agent-1"), AgentProviderId("p"), ProviderRunId("r"))
+        controller.observer.onSessionStarted(handle, AgentTaskRequest(TaskRunId("agent-1"), "Continue", "", emptyList()))
         val sent = mutableListOf<String>()
         controller.observer.onSessionEvent(handle, AgentEvent.Thinking(ProviderRunId("r"), "Now about #SettingsMemoryStore and its storage.")) {
             sent += it
@@ -96,6 +97,11 @@ class MemoryCueWatcherTest {
         // The protocol is starting context only; later prompts and cue clouds do not repeat it.
         val later = controller.promptContextProvider.recallFor(request, MemoryQueryPlan(emptyList(), enoughEvidence = false)).blocks
         assertTrue(later.none { it.label == "Memory protocol" }, "$later")
+        controller.observer.onSessionEvent(handle, AgentEvent.Thinking(ProviderRunId("r"),
+            "What do I remember about SettingsMemoryStore?")) { ProviderActionResult.Rejected("no mid-session messages") }
+        val fresh = controller.promptContextProvider.recallForNewSession(request, MemoryQueryPlan(emptyList(), enoughEvidence = true))
+        assertTrue(fresh.blocks.any { it.label == "Memory protocol" })
+        assertTrue(fresh.blocks.none { it.label == "Recalled on request" })
     }
 
     @Test
@@ -126,6 +132,7 @@ class MemoryCueWatcherTest {
         controller.drain()
         val before = store.read()
         val handle = ManagedSessionHandle(TaskRunId("agent-1"), AgentProviderId("p"), ProviderRunId("r"))
+        controller.observer.onSessionStarted(handle, AgentTaskRequest(TaskRunId("agent-1"), "Continue", "", emptyList()))
         val sent = mutableListOf<String>()
         // Four follows of the same tag: gist, key phrases, finer summaries, then what they were condensed from.
         repeat(4) {

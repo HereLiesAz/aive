@@ -19,6 +19,11 @@ import kotlin.time.ExperimentalTime
 
 interface MemorySessionObserver {
     suspend fun onSessionStarted(handle: ManagedSessionHandle, request: AgentTaskRequest)
+
+    /** Reconstructed session, not a new provider invocation. Legacy observers retain their start behavior. */
+    suspend fun onSessionReconnected(handle: ManagedSessionHandle, request: AgentTaskRequest) =
+        onSessionStarted(handle, request)
+
     suspend fun onSessionEvent(handle: ManagedSessionHandle, event: AgentEvent)
 
     /**

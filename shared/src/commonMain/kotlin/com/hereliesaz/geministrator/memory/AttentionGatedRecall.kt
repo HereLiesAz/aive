@@ -190,5 +190,12 @@ internal class PerAgentAttention(
     /** Temporarily lowers one agent's dial; token use recovers it (scaled by depth) to rest above its level. */
     suspend fun suppress(agentId: String, level: Float) = forAgent(agentId).suppress(level)
 
+    /** Reconstruct a gate from the exact host-bound session's saved metadata, or start fresh. */
+    suspend fun restore(agentId: String, checkpoint: AttentionCheckpoint?) = mutex.withLock {
+        agents[agentId] = AttentionGatedRecall(policy, MemoryAttentionState(baselineLevel = defaultLevel), checkpoint)
+    }
+
     suspend fun forget(agentId: String) = mutex.withLock { agents.remove(agentId) }
+
+    suspend fun clear() = mutex.withLock { agents.clear() }
 }

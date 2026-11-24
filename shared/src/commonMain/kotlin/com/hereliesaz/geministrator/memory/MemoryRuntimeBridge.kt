@@ -48,6 +48,10 @@ data class CollectiveExpertiseMatch(val roleId: String, val specialistId: String
 fun interface MemoryPromptContextProvider {
     suspend fun recallFor(request: AgentTaskRequest, queryPlan: MemoryQueryPlan): MemoryPromptRecall
 
+    /** Starting a new provider invocation must not reuse a previous session's pending recall or attention. */
+    suspend fun recallForNewSession(request: AgentTaskRequest, queryPlan: MemoryQueryPlan): MemoryPromptRecall =
+        recallFor(request, queryPlan)
+
     /** Cue-only recall for a one-shot model conversation, restricted to caller-authorized existing banks. */
     suspend fun directChatTags(workflowIds: List<String>, roleId: String, text: String): List<String> = emptyList()
 
