@@ -141,7 +141,7 @@ Design a canonical input schema containing fields such as:
   "instruction": ""
 }
 
-Not every role receives every field. The packet carries no retrieved memory: a hive has no memory bank or session when the queen plans it, and memory text in the planning prompt would reach a model that designs steps (an injection and data-flow channel). Memory reaches the agents the queen creates, through the cue path, and not the queen.
+Not every role receives every field. The packet carries no retrieved memory: a hive has no memory bank or session when the queen plans it, and memory text in the planning prompt would reach a model that designs steps (an injection and data-flow channel). Memory currently reaches the agents the queen creates, through the cue path, and not the queen. The owner's universal chat-memory requirement supersedes this exclusion as an architectural target: establish a scoped conversation/root context and deliver relevant passive tags to the Queen and every other chat participant. The original prohibition on unrestricted memory passages in the planning packet remains because of injection and data-flow risk. See [Collective cognition](architecture/COLLECTIVE_COGNITION.md#universal-associative-memory-participation).
 
 Each model must receive only what its job requires.
 
