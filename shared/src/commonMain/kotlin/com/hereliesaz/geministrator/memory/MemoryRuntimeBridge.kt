@@ -39,6 +39,12 @@ fun interface DirectChatCueSession {
     suspend fun observeReply(text: String) {}
 }
 
+/**
+ * Query-local transactive directory pointer. Counts distinct retained agent episodes associated
+ * with the query, not verified facts, competence, consensus or collaboration quality.
+ */
+data class CollectiveExpertiseMatch(val roleId: String, val specialistId: String, val matchedEpisodes: Int)
+
 fun interface MemoryPromptContextProvider {
     suspend fun recallFor(request: AgentTaskRequest, queryPlan: MemoryQueryPlan): MemoryPromptRecall
 
@@ -71,6 +77,12 @@ fun interface MemoryPromptContextProvider {
      * conversation bank. Null means refused/unavailable; the count is actual queued utterances.
      */
     suspend fun importCollectiveHistory(conversationId: String, requests: List<MemoryBankRequest>): Int? = null
+
+    /**
+     * Discover prior contributors from the exact caller-authorized collective banks. No raw memory
+     * or new permissions are returned; implementations must honor disabled memory and forgetting.
+     */
+    suspend fun collectiveExpertise(workflowIds: List<String>, question: String): List<CollectiveExpertiseMatch> = emptyList()
 
     /** Entities, actions and code symbols in the request, with how many memories hold each word. */
     suspend fun queryHints(request: AgentTaskRequest): MemoryQueryHints = MemoryQueryHints()

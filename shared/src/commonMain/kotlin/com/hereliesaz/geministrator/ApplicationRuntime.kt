@@ -498,8 +498,14 @@ class ApplicationRuntime private constructor(
         val models = resolveDisputeModels()
         // Re-read exact persisted consent for each turn while holding the conversation mutex.
         // Only the local Keeper control can edit grants; model text never chooses source banks.
-        val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(
-            collectiveConversations.recallBanks(conversationId))
+        val recallBanks = collectiveConversations.recallBanks(conversationId)
+        val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(recallBanks)
+        val directory = runCatchingCancellable {
+            com.hereliesaz.geministrator.memory.MemoryRuntimeBridge.promptContextProvider
+                .collectiveExpertise(recallBanks, question)
+        }.getOrDefault(emptyList()).filter { match ->
+            roster.any { it.id.value == match.roleId && it.executionSource == com.hereliesaz.geministrator.domain.RoleExecutionSource.Agent }
+        }
         val capture = com.hereliesaz.geministrator.queen.CollectiveMemoryCapture(conversationId, question, ::nowEpochMillis)
         fun voice(role: com.hereliesaz.geministrator.domain.RoleDefinition, model: com.hereliesaz.geministrator.queen.QueenModel):
             com.hereliesaz.geministrator.queen.CollectiveVoice? {
@@ -519,7 +525,7 @@ class ApplicationRuntime private constructor(
         } else {
             val specialists = com.hereliesaz.geministrator.queen.selectCollectiveSpecialists(
                 question, roster, facilitator.model.uses, collectiveModelFor,
-                models.voices,
+                models.voices, experience = directory,
             ).mapNotNull { (role, model) -> voice(role, model) }
             com.hereliesaz.geministrator.queen.answerCollectively(
                 question, conversation.context(), specialists, facilitator,
@@ -532,6 +538,7 @@ class ApplicationRuntime private constructor(
                     voice.specialistId?.let { id -> collectiveProfiles.observe(id, voice.role, outcome) }
                 },
                 recordContribution = capture::record,
+                directory = directory,
             ) { model, count ->
                 models.mayCall() && queenCallAllowed() &&
                     directAdvisoryGateFor(model.uses, count) == com.hereliesaz.geministrator.queen.CallDecision.Allow
