@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.Sha256
 import com.hereliesaz.geministrator.control.ControlRedaction
 import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.russhwolf.settings.Settings
@@ -29,7 +30,14 @@ internal data class PeerMail(
     val senderInvocation: String? = null,
     val delivery: PeerDelivery = PeerDelivery.Queued,
     val recipientSession: String? = null,
-)
+    val intent: PeerIntent = PeerIntent.Inquiry,
+    val replyTo: String? = null,
+    val correlationId: String? = null,
+) {
+    /** Stable content-derived identifier for this scoped, deduplicated envelope. */
+    val id: String get() = Sha256.hex(Json.encodeToString(listOf(project, run, provider, senderRole,
+        senderTask, recipientRole, text, intent.name, replyTo.orEmpty())).encodeToByteArray())
+}
 
 /**
  * Durable bounded queue and receipt ledger. A claim is persisted before transport: a crash cannot
@@ -70,13 +78,18 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
             if (origin.roleId == note.roleId) return@withLock false
             val time = now()
             val entries = live(read(), time)
+            val parent = note.replyTo?.let { id ->
+                entries.singleOrNull { it.id == id && it.project == origin.projectId && it.run == origin.runId &&
+                    it.provider == provider && it.recipientRole == origin.roleId && it.senderRole == note.roleId &&
+                    it.recipientSession == senderSession && it.delivery in setOf(PeerDelivery.Claimed, PeerDelivery.Accepted) }
+                    ?: return@withLock false
+            }
             val mail = PeerMail(origin.projectId, origin.runId, provider, origin.roleId, senderTask,
-                note.roleId, ControlRedaction.scrub(note.body), time, senderSession, senderInvocation)
+                note.roleId, ControlRedaction.scrub(note.body), time, senderSession, senderInvocation,
+                intent = note.intent, replyTo = parent?.id, correlationId = parent?.correlationId ?: parent?.id)
             if (entries.size >= LIMIT || entries.count {
                     it.project == mail.project && it.run == mail.run && it.provider == provider && it.senderTask == senderTask
-                } >= PER_SENDER || entries.any { it.project == mail.project && it.run == mail.run && it.provider == provider &&
-                    it.senderTask == senderTask && it.senderRole == mail.senderRole &&
-                    it.recipientRole == mail.recipientRole && it.text == mail.text }) return@withLock false
+                } >= PER_SENDER || entries.any { it.id == mail.id }) return@withLock false
             save(entries + mail)
             true
         }
