@@ -77,6 +77,12 @@ class AgentProviderRegistry(
 ) {
     private val defaultSettings: Settings by lazy { inferenceSettings ?: durableInferenceSettings() }
 
+    /** Shared durable advisory mailbox; tests use the same isolated settings as inference. */
+    @OptIn(kotlin.time.ExperimentalTime::class)
+    internal val peerMailbox: PeerMailbox by lazy {
+        PeerMailbox(defaultSettings) { kotlin.time.Clock.System.now().toEpochMilliseconds() }
+    }
+
     val genealogyGovernance: InferenceGenealogyGovernanceRuntime = genealogyGovernance
         ?: InferenceGenealogyGovernanceRuntime(graph = SettingsInferenceGenealogyGraph(defaultSettings))
     private val defaultedFabric: CompoundInferenceFabric = inferenceFabric
