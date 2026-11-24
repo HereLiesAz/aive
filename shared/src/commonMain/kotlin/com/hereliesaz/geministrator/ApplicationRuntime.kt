@@ -2267,6 +2267,7 @@ class ApplicationRuntime private constructor(
                 orchestrationUtilities = orchestrationUtilities,
                 contextRetriever = contextRetriever,
                 duplexAttachment = duplexAttachment,
+                peerRoster = { resolveRoleCollection(persistence.roles.all()) },
             )
             val publisher = WorkflowRuntimePublisher()
             val effectiveExecutorIntegrations = executorIntegrations
