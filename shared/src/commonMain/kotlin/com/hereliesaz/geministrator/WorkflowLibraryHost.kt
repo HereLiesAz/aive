@@ -47,8 +47,11 @@ class WorkflowLibraryHost(
 ) {
     private val composition = WorkflowCompositionService(persistence)
 
-    /** Local Keeper UI only. No remote control surface is given this mailbox. */
-    internal var collectiveChat: (suspend (String, String, String) -> com.hereliesaz.geministrator.queen.CollectiveAnswer)? = null
+    /** Local Keeper conversation controls; no remote surface has these callbacks. */
+    internal var collectiveChat: (suspend (String, String) -> com.hereliesaz.geministrator.queen.CollectiveConversation)? = null
+    internal var collectiveHistory: (suspend () -> List<com.hereliesaz.geministrator.queen.CollectiveConversation>)? = null
+    internal var collectiveNew: (suspend () -> com.hereliesaz.geministrator.queen.CollectiveConversation)? = null
+    internal var collectiveDelete: (suspend (String) -> Unit)? = null
 
     internal var peerMailbox: (() -> com.hereliesaz.geministrator.workflow.PeerMailbox?)? = null
 
