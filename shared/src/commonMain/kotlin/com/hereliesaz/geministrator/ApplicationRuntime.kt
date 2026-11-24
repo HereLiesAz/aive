@@ -403,6 +403,40 @@ class ApplicationRuntime private constructor(
 
     internal suspend fun trainingModels(): DisputeModels? = resolveDisputeModels()
 
+    private val collectiveChatMutex = Mutex()
+
+    /** Local, explicitly requested advisory turn. No workflow, repository, remote grant or tools. */
+    internal suspend fun collectiveAdvisory(
+        question: String, history: String, conversationId: String,
+    ): com.hereliesaz.geministrator.queen.CollectiveAnswer = collectiveChatMutex.withLock {
+        val roster = activeRoles(resolveRoleCollection(persistence.roles.all()))
+        val models = resolveDisputeModels()
+            ?: return@withLock com.hereliesaz.geministrator.queen.CollectiveAnswer(null, emptyList(), listOf("Queen"))
+        val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(emptyList())
+        fun voice(roleId: String, model: com.hereliesaz.geministrator.queen.QueenModel):
+            com.hereliesaz.geministrator.queen.CollectiveVoice? {
+            val role = roster.singleOrNull { it.id.value == roleId } ?: return null
+            if (role.executionSource != com.hereliesaz.geministrator.domain.RoleExecutionSource.Agent) return null
+            val pin = role.preferredProviderId?.value
+            if (pin != null && (model.uses.isEmpty() || model.uses.any { it.sourceId != pin })) return null
+            val wrapped = memory.voice(model, roleId, conversationId = conversationId)
+            return com.hereliesaz.geministrator.queen.CollectiveVoice(roleId,
+                com.hereliesaz.geministrator.queen.pacedPerCall(wrapped, providerRegistry.sourcePacing))
+        }
+        val facilitator = voice(BuiltInRoles.Orchestrator.id.value, models.queen)
+            ?: return@withLock com.hereliesaz.geministrator.queen.CollectiveAnswer(null, emptyList(), listOf("Queen"))
+        val roles = listOf(com.hereliesaz.geministrator.domain.HallMonitorRole.id.value, BuiltInRoles.Antagonist.id.value)
+        val specialists = roles.mapNotNull { id -> models.voices[id]?.let { voice(id, it) } }
+        val missing = roles.filterNot { id -> specialists.any { it.role == id } }
+        val result = com.hereliesaz.geministrator.queen.answerCollectively(
+            question, history, specialists, facilitator,
+        ) { model, count ->
+            models.mayCall() && queenCallAllowed() &&
+                directAdvisoryGateFor(model.uses, count) == com.hereliesaz.geministrator.queen.CallDecision.Allow
+        }
+        result.copy(unavailable = (missing + result.unavailable).distinct())
+    }
+
     internal suspend fun republishState() {
         runtimeMutex.withLock { publishCurrent() }
     }
