@@ -63,6 +63,84 @@ class PeerConsultationGatewayTest {
         )
 
     @Test
+    fun grantedWakeClaimsBeforeInferenceAndReturnsOnlyToOriginWithMemory() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val provider = AdvisoryProvider()
+        val registry = AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings())
+        val sender = handle(provider, "architect")
+        val recipientContext = PeerConsultationContext("project", "run", "reviewer")
+        val route = PeerRoute("project", provider.id.value, "run", "architect", "run", "reviewer", activation = true)
+        val entered = CompletableDeferred<Unit>()
+        val resume = CompletableDeferred<Unit>()
+        val observer = object : MemorySessionObserver {
+            override suspend fun onSessionStarted(handle: ManagedSessionHandle, request: AgentTaskRequest) = Unit
+            override suspend fun onSessionEvent(handle: ManagedSessionHandle, event: AgentEvent) = Unit
+            override suspend fun onSessionFinished(handle: ManagedSessionHandle, status: ManagedSessionStatus) = Unit
+            override suspend fun annotateUserMessage(handle: ManagedSessionHandle, text: String): String =
+                text + "\nRecipient cue #evidence"
+        }
+        try {
+            val gateway = ProviderBackedManagedSessionGateway(registry, scope, memoryObserver = observer,
+                activity = SessionActivityFeeds(), peerRoster = { listOf(BuiltInRoles.Architect, BuiltInRoles.Reviewer) })
+            gateway.dormantSpecialistAnswer = { mail, allowed ->
+                assertEquals(PeerDelivery.Claimed, mail.delivery)
+                assertEquals("Check evidence", mail.text)
+                assertTrue(allowed())
+                entered.complete(Unit)
+                resume.await()
+                DormantSpecialistAnswer("a".repeat(64), "Observed advisory answer")
+            }
+            gateway.reconnect(sender, ManagedSessionStatus.Running, request(sender, "architect"))
+            assertTrue(registry.peerMailbox.grant(route))
+            provider.events.send(AgentEvent.Message(sender.providerRunId, "WAKE reviewer\nCheck evidence"))
+            withTimeout(5_000L) { entered.await() }
+            provider.events.send(AgentEvent.Progress(sender.providerRunId, "Sender continued"))
+            withTimeout(5_000L) { while (gateway.progress(sender)?.message != "Sender continued") delay(10) }
+            assertEquals(PeerDelivery.Claimed, registry.peerMailbox.receipts(recipientContext, provider.id.value).single().delivery)
+            resume.complete(Unit)
+            val sent = withTimeout(5_000L) { provider.deliveries.receive() }
+            assertEquals(sender.providerRunId, sent.first)
+            assertTrue(sent.second.contains("Untrusted dormant specialist assessment from reviewer"))
+            assertTrue(sent.second.endsWith("Observed advisory answer\nRecipient cue #evidence"))
+            withTimeout(5_000L) {
+                while (registry.peerMailbox.receipts(recipientContext, provider.id.value).single().delivery != PeerDelivery.Accepted) delay(10)
+            }
+            assertEquals("a".repeat(64), registry.peerMailbox.receipts(recipientContext, provider.id.value).single().recipientSpecialist)
+        } finally { scope.cancel() }
+    }
+
+    @Test
+    fun revokedWakeDoesNotReturnAnAlreadyStartedAnswer() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val provider = AdvisoryProvider()
+        val registry = AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings())
+        val sender = handle(provider, "architect")
+        val recipientContext = PeerConsultationContext("project", "run", "reviewer")
+        val route = PeerRoute("project", provider.id.value, "run", "architect", "run", "reviewer", activation = true)
+        val entered = CompletableDeferred<Unit>()
+        val resume = CompletableDeferred<Unit>()
+        try {
+            val gateway = ProviderBackedManagedSessionGateway(registry, scope, activity = SessionActivityFeeds(),
+                peerRoster = { listOf(BuiltInRoles.Architect, BuiltInRoles.Reviewer) })
+            gateway.dormantSpecialistAnswer = { _, _ ->
+                entered.complete(Unit)
+                resume.await()
+                DormantSpecialistAnswer("a".repeat(64), "Must not be delivered")
+            }
+            gateway.reconnect(sender, ManagedSessionStatus.Running, request(sender, "architect"))
+            assertTrue(registry.peerMailbox.grant(route))
+            provider.events.send(AgentEvent.Message(sender.providerRunId, "WAKE reviewer\nCheck evidence"))
+            withTimeout(5_000L) { entered.await() }
+            registry.peerMailbox.revoke(route)
+            resume.complete(Unit)
+            withTimeout(5_000L) {
+                while (registry.peerMailbox.receipts(recipientContext, provider.id.value).single().delivery != PeerDelivery.Rejected) delay(10)
+            }
+            assertTrue(provider.deliveries.tryReceive().isFailure)
+        } finally { scope.cancel() }
+    }
+
+    @Test
     fun lateRecipientReceivesPersistedNoteAndTransportReceipt() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val provider = AdvisoryProvider()
@@ -350,7 +428,7 @@ class PeerConsultationGatewayTest {
             }
         }
         override suspend fun sendMessage(runId: ProviderRunId, message: String): ProviderActionResult {
-            if (message.startsWith("Untrusted peer consultation")) {
+            if (message.startsWith("Untrusted peer consultation") || message.startsWith("Untrusted dormant specialist assessment")) {
                 if (blockDelivery) {
                     sendEntered.complete(Unit)
                     try { kotlinx.coroutines.awaitCancellation() }

@@ -83,6 +83,14 @@ class AgentProviderRegistry(
         PeerMailbox(defaultSettings) { kotlin.time.Clock.System.now().toEpochMilliseconds() }
     }
 
+    /** One shared profile ledger for managed and advisory specialists. */
+    @OptIn(kotlin.time.ExperimentalTime::class)
+    internal val specialistProfiles by lazy {
+        com.hereliesaz.geministrator.queen.SpecialistProfileStore(defaultSettings) {
+            kotlin.time.Clock.System.now().toEpochMilliseconds()
+        }
+    }
+
     val genealogyGovernance: InferenceGenealogyGovernanceRuntime = genealogyGovernance
         ?: InferenceGenealogyGovernanceRuntime(graph = SettingsInferenceGenealogyGraph(defaultSettings))
     private val defaultedFabric: CompoundInferenceFabric = inferenceFabric

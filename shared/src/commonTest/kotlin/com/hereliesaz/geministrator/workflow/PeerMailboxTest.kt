@@ -12,6 +12,33 @@ class PeerMailboxTest {
     private val recipient = PeerConsultationContext("project", "run", "reviewer")
 
     @Test
+    fun dormantActivationRequiresSeparateExactConsentAndCannotBeReplayed() = runBlocking {
+        val settings = InMemorySettings()
+        val mailbox = PeerMailbox(settings) { 100L }
+        val route = PeerRoute("project", "provider", "run", "architect", "run", "reviewer", activation = true)
+        val note = PeerConsultationNote("reviewer", "Question", PeerIntent.Request, activation = true)
+        assertFalse(mailbox.grant(route.copy(activation = false)))
+        assertFalse(mailbox.enqueue(sender, "provider", "task", note, "sender-session"))
+        assertTrue(mailbox.grant(route))
+        assertFalse(mailbox.enqueue(sender, "other-provider", "task", note, "sender-session"))
+        assertTrue(mailbox.enqueue(sender, "provider", "task", note, "sender-session",
+            senderSpecialist = "specialist-a"))
+        assertTrue(mailbox.claim(recipient, "provider", "live-session").isEmpty())
+        assertEquals(null, mailbox.claimActivation(sender, "provider", "task", "wrong-session", "reviewer"))
+        val claim = requireNotNull(mailbox.claimActivation(sender, "provider", "task", "sender-session", "reviewer"))
+        assertTrue(mailbox.authorized(claim))
+        assertEquals("specialist-a", claim.senderSpecialist)
+        val restarted = PeerMailbox(settings) { 200L }
+        assertEquals(null, restarted.claimActivation(sender, "provider", "task", "sender-session", "reviewer"))
+        restarted.revoke(route)
+        assertTrue(restarted.grant(route))
+        assertFalse(restarted.authorized(claim))
+        assertFalse(restarted.enqueue(sender, "provider", "other-task", note.copy(body = "Different"), "new-session"))
+        restarted.finish(claim, PeerDelivery.Uncertain)
+        assertEquals(PeerDelivery.Uncertain, restarted.receipts(recipient, "provider").single().delivery)
+    }
+
+    @Test
     fun messagesSurviveReconstructionAndAreClaimedOnlyOnce() = runBlocking {
         val settings = InMemorySettings()
         val first = PeerMailbox(settings) { 100L }

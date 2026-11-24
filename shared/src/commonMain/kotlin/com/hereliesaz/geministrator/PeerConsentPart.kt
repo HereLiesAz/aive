@@ -34,12 +34,12 @@ internal fun PeerConsentPart(host: WorkflowLibraryHost) {
         catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { status = "Could not read consultation grants." }
     }
-    ProviderSectionLabel("Cross-run specialist consultation")
-    Text("Off unless you grant an exact directional route. Messages may contain sensitive project information. This never grants tool or execution authority.",
+    ProviderSectionLabel("Specialist consultation and activation")
+    Text("Cross-run messages and same-run dormant activation require separate exact directional grants. Enter the same run ID twice to permit one bounded, non-billed advisory activation of an idle receiving role. Messages may contain sensitive project information. No tool or execution authority is granted.",
         style = AzphaltType.body, color = azphaltOnSurface())
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         routes.forEach { route ->
-            Text("${route.project} · ${route.provider}\n${route.sourceRun} / ${route.sourceRole} → ${route.targetRun} / ${route.targetRole}",
+            Text("${if (route.activation) "Activation" else "Disclosure"} · ${route.project} · ${route.provider}\n${route.sourceRun} / ${route.sourceRole} → ${route.targetRun} / ${route.targetRole}",
                 style = AzphaltType.body, color = azphaltOnSurface())
             AzphaltPill("Revoke route", "revoke-peer-${route.hashCode()}", onClick = {
                 if (!busy) scope.launch {
@@ -60,9 +60,9 @@ internal fun PeerConsentPart(host: WorkflowLibraryHost) {
         AzphaltTextField(value = sourceRole, onValueChange = { sourceRole = it }, label = "Sending role ID")
         AzphaltTextField(value = targetRun, onValueChange = { targetRun = it }, label = "Destination run ID")
         AzphaltTextField(value = targetRole, onValueChange = { targetRole = it }, label = "Receiving role ID")
-        AzphaltPill("Review disclosure grant", "review-peer-route", onClick = {
+        AzphaltPill("Review specialist grant", "review-peer-route", onClick = {
             if (!busy) pending = PeerRoute(project.trim(), provider.trim(), sourceRun.trim(), sourceRole.trim(),
-                targetRun.trim(), targetRole.trim())
+                targetRun.trim(), targetRole.trim(), activation = sourceRun.trim() == targetRun.trim())
         })
         status.takeIf(String::isNotBlank)?.let {
             Text(it, style = AzphaltType.body, color = azphaltOnSurface())
@@ -70,9 +70,9 @@ internal fun PeerConsentPart(host: WorkflowLibraryHost) {
     }
     pending?.let { route ->
         AzphaltAlertDialog(
-            title = "Allow cross-run consultation?",
-            text = "Allow advisory messages from ${route.sourceRole} in ${route.sourceRun} to ${route.targetRole} in ${route.targetRun}, within ${route.project}, using ${route.provider}? Only this direction is authorized. Revoking cannot retrieve information already sent.",
-            confirmLabel = "Allow disclosure",
+            title = if (route.activation) "Allow dormant specialist activation?" else "Allow cross-run consultation?",
+            text = (if (route.activation) "Allow one tool-free, non-billed advisory invocation. " else "") + "Allow advisory messages from ${route.sourceRole} in ${route.sourceRun} to ${route.targetRole} in ${route.targetRun}, within ${route.project}, using ${route.provider}? Only this direction is authorized. Revoking cannot retrieve information already sent.",
+            confirmLabel = if (route.activation) "Allow activation" else "Allow disclosure",
             dismissLabel = "Cancel",
             onDismissRequest = { pending = null },
             onDismiss = { pending = null },
