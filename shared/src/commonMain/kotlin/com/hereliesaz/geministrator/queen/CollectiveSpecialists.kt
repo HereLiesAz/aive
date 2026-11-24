@@ -55,7 +55,7 @@ internal fun selectCollectiveSpecialists(
     for (role in ordered) {
         val pin = role.preferredProviderId?.value
         val choices = if (pin != null) listOf(pin) else sourceIds.sortedBy { it in used }
-        val model = if (role.id == experienced?.first?.id) experienced.second
+        val model = if (experienced != null && role.id == experienced.first.id) experienced.second
         else if (modelFor == null) {
             fallback[role.id.value]?.takeIf {
                 pin == null || (it.uses.isNotEmpty() && it.uses.all { use -> use.sourceId == pin })
