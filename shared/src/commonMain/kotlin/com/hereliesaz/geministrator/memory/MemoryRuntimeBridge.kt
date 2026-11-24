@@ -28,11 +28,26 @@ data class MemoryQueryHints(
     val documentFrequency: Map<String, Int> = emptyMap(),
 )
 
+/**
+ * One recipient's cue state within one direct conversation. No messages or recalled passages are
+ * persisted by this interface; implementations may retain bounded attention/novelty state.
+ */
+fun interface DirectChatCueSession {
+    suspend fun tags(text: String): List<String>
+
+    /** Advance attention from the recipient's own reply without banking it. */
+    suspend fun observeReply(text: String) {}
+}
+
 fun interface MemoryPromptContextProvider {
     suspend fun recallFor(request: AgentTaskRequest, queryPlan: MemoryQueryPlan): MemoryPromptRecall
 
     /** Cue-only recall for a one-shot model conversation, restricted to caller-authorized existing banks. */
     suspend fun directChatTags(workflowIds: List<String>, roleId: String, text: String): List<String> = emptyList()
+
+    /** Each participant opens its own attention session, even when participants share a role. */
+    fun openDirectChat(workflowIds: List<String>, roleId: String): DirectChatCueSession =
+        DirectChatCueSession { text -> directChatTags(workflowIds, roleId, text) }
 
     /** Entities, actions and code symbols in the request, with how many memories hold each word. */
     suspend fun queryHints(request: AgentTaskRequest): MemoryQueryHints = MemoryQueryHints()
