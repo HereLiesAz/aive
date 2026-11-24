@@ -54,6 +54,7 @@ internal data class PeerMail(
     val recruitmentKey: String? = null,
     val groupAction: PeerGroupAction? = null,
     val groupId: String? = null,
+    val groupCreatedAt: Long? = null,
     /** Exact invited/member session for directed group traffic; null for initial invitations. */
     val requiredRecipientSession: String? = null,
 ) {
@@ -136,6 +137,7 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
     /** Called again immediately before provider delivery; a stale grant is not authority. */
     suspend fun authorized(mail: PeerMail): Boolean = mutex.withLock {
         mail in live(read(), now()) && mail.delivery == PeerDelivery.Claimed &&
+            (mail.groupCreatedAt?.let { now() - it < TTL } ?: true) &&
             (mail.destinationRun == mail.run || grants().any { it.route == mail.route && it.generation == mail.grantGeneration })
     }
 
@@ -173,6 +175,7 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
                     ?: return@withLock false
             }
             var requiredRecipientSession: String? = null
+            var groupCreatedAt: Long? = null
             val groupId = when (note.groupAction) {
                 null -> {
                     if (note.groupId != null) return@withLock false
@@ -186,6 +189,8 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
                         ControlRedaction.scrub(note.body))).encodeToByteArray())
                     val invitations = entries.filter { it.groupId == id && it.groupAction == PeerGroupAction.Invite }
                     if (note.groupId != null && invitations.isEmpty()) return@withLock false
+                    groupCreatedAt = invitations.firstOrNull()?.groupCreatedAt ?: time
+                    if (time - checkNotNull(groupCreatedAt) >= TTL) return@withLock false
                     if (invitations.any { it.project != origin.projectId || it.run != origin.runId ||
                             it.provider != provider || it.senderRole != origin.roleId ||
                             it.senderTask != senderTask || it.senderSession != senderSession } ||
@@ -194,10 +199,12 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
                 }
                 PeerGroupAction.Volunteer, PeerGroupAction.Decline -> {
                     if (note.targetRun != null || note.groupId != null || note.expertise != null ||
-                        senderSession.isNullOrBlank() || parent?.groupAction != PeerGroupAction.Invite ||
+                        senderSession.isNullOrBlank() || parent == null || parent.groupAction != PeerGroupAction.Invite ||
                         parent.groupId == null || parent.senderSession.isNullOrBlank()) return@withLock false
                     if (entries.any { it.replyTo == parent.id &&
                             it.groupAction in setOf(PeerGroupAction.Volunteer, PeerGroupAction.Decline) }) return@withLock false
+                    groupCreatedAt = parent.groupCreatedAt ?: return@withLock false
+                    if (time - checkNotNull(groupCreatedAt) >= TTL) return@withLock false
                     requiredRecipientSession = parent.senderSession
                     parent.groupId
                 }
@@ -207,6 +214,8 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
                     val invitations = entries.filter { it.project == origin.projectId && it.run == origin.runId &&
                         it.provider == provider && it.groupId == note.groupId && it.groupAction == PeerGroupAction.Invite }
                     val first = invitations.firstOrNull() ?: return@withLock false
+                    groupCreatedAt = first.groupCreatedAt ?: return@withLock false
+                    if (time - checkNotNull(groupCreatedAt) >= TTL) return@withLock false
                     val members = mutableMapOf(first.senderRole to first.senderSession)
                     invitations.forEach { invitation ->
                         val accepted = entries.singleOrNull { it.replyTo == invitation.id &&
@@ -228,7 +237,7 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
                 intent = note.intent, replyTo = parent?.id, correlationId = parent?.correlationId ?: parent?.id,
                 targetRun = targetRun.takeIf { it != origin.runId }, grantGeneration = generation,
                 recruitmentKey = recruitmentKey, groupAction = note.groupAction, groupId = groupId,
-                requiredRecipientSession = requiredRecipientSession)
+                requiredRecipientSession = requiredRecipientSession, groupCreatedAt = groupCreatedAt)
             if (entries.size >= LIMIT || entries.count {
                     it.project == mail.project && it.run == mail.run && it.provider == provider && it.senderTask == senderTask
                 } >= PER_SENDER || entries.any { it.id == mail.id ||
@@ -248,7 +257,8 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
         val updated = entries.map {
             if (it.delivery == PeerDelivery.Queued && it.project == recipient.projectId && it.destinationRun == recipient.runId &&
                 it.provider == provider && it.recipientRole == recipient.roleId) {
-                if (it.requiredRecipientSession != null && it.requiredRecipientSession != session) {
+                if ((it.groupCreatedAt?.let { created -> now() - created >= TTL } ?: false) ||
+                    (it.requiredRecipientSession != null && it.requiredRecipientSession != session)) {
                     it.copy(delivery = PeerDelivery.Rejected)
                 } else if (it.run != it.destinationRun && activeGrants.none { grant -> grant.route == it.route && grant.generation == it.grantGeneration }) {
                     it.copy(delivery = PeerDelivery.Rejected)
