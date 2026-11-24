@@ -623,6 +623,8 @@ class ProviderBackedManagedSessionGateway(
                             if (current.status != ManagedSessionStatus.Completed && !current.status.isTerminal()) {
                                 // Recorded before the failure is visible, so the engine's failover question about it is told.
                                 recordSessionFailureLocked(handle.providerId, failure.message)
+                                peerDeliverySignals.remove(handle)
+                                peerDeliveryJobs.remove(handle)?.cancel()
                                 snapshots[handle] = current.copy(
                                     status = ManagedSessionStatus.Failed,
                                     progress = ManagedSessionProgress(
@@ -1062,7 +1064,14 @@ class ProviderBackedManagedSessionGateway(
             } ?: return
             if (!peerRoleAllowed(context.roleId, handle.providerId)) return
             for (mail in providerRegistry.peerMailbox.claim(context, handle.providerId.value, handle.providerRunId.value)) {
-                if (status(handle) != ManagedSessionStatus.Running ||
+                val uniqueRecipient = mutex.withLock {
+                    snapshots[handle]?.status == ManagedSessionStatus.Running &&
+                        consultationContexts[handle] == context && consultationContexts.count { (other, candidate) ->
+                            other.providerId == handle.providerId && snapshots[other]?.status == ManagedSessionStatus.Running &&
+                                context.canConsult(candidate, context.roleId)
+                        } == 1
+                }
+                if (!uniqueRecipient ||
                     !peerRoleAllowed(context.roleId, handle.providerId) ||
                     !peerRoleAllowed(mail.senderRole, handle.providerId) ||
                     !providerRegistry.peerMailbox.authorized(mail)) {
