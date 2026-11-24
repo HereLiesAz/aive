@@ -68,6 +68,9 @@ class ProviderBackedManagedSessionGateway(
     private val activity: SessionActivityFeeds = SessionActivityFeeds.Shared,
     /** Current Keeper-owned role catalog; absent or unreadable catalogs never authorize peer traffic. */
     private val peerRoster: suspend () -> List<RoleDefinition> = { emptyList() },
+    /** Host-owned directory lookup; it supplies experience hints, never authority. */
+    private val memoryContext: com.hereliesaz.geministrator.memory.MemoryPromptContextProvider =
+        MemoryRuntimeBridge.promptContextProvider,
 ) : ManagedSessionGateway {
     private val inferenceFabric: CompoundInferenceFabric =
         if (inferenceFabric is GovernedCompoundInferenceFabric) {
@@ -482,9 +485,10 @@ class ProviderBackedManagedSessionGateway(
                 ProviderActionResult.Accepted -> Unit
                 is ProviderActionResult.Rejected -> error(result.reason)
             }
-            recordMemory { memoryObserver.onSessionStarted(handle, request) }
-            rememberConsultationContext(handle, request)
-            registerAndObserve(handle, initialStatus)
+            val identified = handle.copy(specialistId = specialistIdentity(handle))
+            recordMemory { memoryObserver.onSessionStarted(identified, request) }
+            rememberConsultationContext(identified, request)
+            registerAndObserve(identified, initialStatus)
         }
     }
 
@@ -1116,10 +1120,13 @@ class ProviderBackedManagedSessionGateway(
                     snapshots[handle]?.status == ManagedSessionStatus.Running &&
                     origin.projectId == context.projectId && origin.runId == context.runId &&
                     origin.roleId != context.roleId
-            }.map { it.value.roleId }.groupingBy { it }.eachCount().filterValues { it == 1 }.keys
+            }.groupBy { it.value.roleId }.mapNotNull { (role, entries) ->
+                entries.singleOrNull()?.let { role to it.key }
+            }.toMap()
         }
-        val candidates = peerRoster().groupBy { it.id.value }.values.mapNotNull { it.singleOrNull() }
+        val roster = peerRoster().groupBy { it.id.value }.values.mapNotNull { it.singleOrNull() }
             .filter { it.id.value in live && peerRoleIsEligible(it, sender.providerId) }
+        val candidates = roster
             .mapNotNull { role ->
                 val pending = providerRegistry.peerMailbox.pendingCount(origin.copy(roleId = role.id.value), sender.providerId.value)
                 if (pending >= 4) null else com.hereliesaz.geministrator.orchestration.AgentRouteCandidate(
@@ -1130,15 +1137,43 @@ class ProviderBackedManagedSessionGateway(
                 )
             }
         if (candidates.isEmpty()) return null
+        val experience = runCatchingCancellable {
+            memoryContext.managedExpertise(origin.projectId, origin.runId, expertise)
+        }.getOrDefault(emptyList())
+        val experienced = candidates.filter { candidate ->
+            val role = roster.single { it.id.value == candidate.id }
+            val current = com.hereliesaz.geministrator.queen.specialistInstanceId(role,
+                listOf(com.hereliesaz.geministrator.queen.ModelUse(sender.providerId.value, null, false)), "managed-v1")
+            val target = live.getValue(candidate.id)
+            specialistIdentity(target) == current && experience.any {
+                it.roleId == candidate.id && it.specialistId == current && it.matchedEpisodes > 0
+            }
+        }
+        // Prefer a relevant exact observed instance within the existing eligible, unsaturated
+        // candidates. Without one, keep the original deterministic description routing.
+        val pool = experienced.ifEmpty { candidates }
         val route = com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities.routeAgent(
             com.hereliesaz.geministrator.orchestration.AgentRoutingInput(
                 requiredCapabilities = setOf(AgentCapability.Messaging.name),
-                candidates = candidates,
+                candidates = pool,
                 requiredContextType = "peer-consultation",
                 taskText = expertise,
             ),
         )
-        val selected = route.selectedAgent?.takeIf { id -> candidates.any { it.id == id } } ?: return null
+        val selected = route.selectedAgent?.takeIf { id -> pool.any { it.id == id } } ?: return null
+        val target = live.getValue(selected)
+        // Lookup can suspend: refuse a stale selection if either endpoint ceased running or the
+        // target is no longer uniquely live. Transport remains the existing role-addressed mailbox.
+        val stillLive = mutex.withLock {
+            snapshots[sender]?.status == ManagedSessionStatus.Running && consultationContexts[sender] == origin &&
+                snapshots[target]?.status == ManagedSessionStatus.Running &&
+                consultationContexts[target] == origin.copy(roleId = selected) &&
+                consultationContexts.count { (handle, context) ->
+                    handle.providerId == sender.providerId && snapshots[handle]?.status == ManagedSessionStatus.Running &&
+                        context == origin.copy(roleId = selected)
+                } == 1
+        }
+        if (!stillLive || !peerRoleAllowed(selected, sender.providerId)) return null
         return request.copy(roleId = selected)
     }
 

@@ -1298,6 +1298,46 @@ class MemoryLayerController(
                     .thenBy { it.roleId }.thenBy { it.specialistId }).take(16)
         }
 
+        override suspend fun managedExpertise(projectId: String, runId: String, question: String): List<CollectiveExpertiseMatch> {
+            if (!active || projectId.isBlank() || runId.isBlank() || question.isBlank() ||
+                runId.startsWith("collective:") || runId !in banks.known()) return emptyList()
+            val query = com.hereliesaz.geministrator.control.ControlRedaction.scrub(question).take(160)
+            val matchingNodes = tagCandidates(runId, null, query, null).map { it.node.id }.toSet()
+            // The recall layer may include lineage; only the exact physical run/project is eligible.
+            val snapshot = banks.store(runId).read()
+            val sections = snapshot.nodes.asSequence()
+                .filter { it.id in matchingNodes && it.kind in AttentionGatedRecall.CUE_KINDS }
+                .flatMap { it.sourceSectionIds.asSequence() }.toSet()
+            val matchingByEpisode = snapshot.sections.filter { it.id in sections }.groupBy { it.episodeId }
+            val counts = mutableMapOf<Pair<String, String>, Int>()
+            for (episode in snapshot.episodes) {
+                val role = episode.roleId ?: continue
+                if (episode.workflowRunId != runId || episode.projectId != projectId || episode.purged != null ||
+                    !role.matches(Regex("[A-Za-z0-9._:-]{1,128}"))) continue
+                val chunks = episode.chunks.associateBy { it.id }
+                val identities = matchingByEpisode[episode.id].orEmpty().mapNotNull { section ->
+                    // Require a section exclusively backed by the actual host-attributed messages.
+                    // A tag sourced only from the question, instructions or Keeper text is not experience.
+                    if (section.sourceChunkIds.isEmpty()) return@mapNotNull null
+                    val ids = section.sourceChunkIds.map { id ->
+                        val chunk = chunks[id] ?: return@mapNotNull null
+                        if (chunk.kind != MemorySourceKind.Message || !chunk.label.startsWith("Agent message; managed specialist="))
+                            return@mapNotNull null
+                        chunk.label.removePrefix("Agent message; managed specialist=")
+                            .takeIf { it.matches(Regex("[a-f0-9]{64}")) } ?: return@mapNotNull null
+                    }.distinct()
+                    ids.singleOrNull()
+                }.distinct()
+                val identity = identities.singleOrNull() ?: continue
+                val key = role to identity
+                counts[key] = (counts[key] ?: 0) + 1
+            }
+            if (!active) return emptyList()
+            return counts.map { (key, count) -> CollectiveExpertiseMatch(key.first, key.second, count) }
+                .sortedWith(compareByDescending<CollectiveExpertiseMatch> { it.matchedEpisodes }
+                    .thenBy { it.roleId }.thenBy { it.specialistId }).take(16)
+        }
+
         override suspend fun queryHints(request: AgentTaskRequest): MemoryQueryHints =
             if (!active) MemoryQueryHints() else runCatchingCancellable { queryHintsFor(request) }.getOrDefault(MemoryQueryHints())
 

@@ -95,6 +95,8 @@ class QueuedMemorySessionObserver(
         val request: AgentTaskRequest,
         val userPrompt: String,
         val parts: MutableList<MemorySessionPart>,
+        /** Host-bound identity from the initial or reconstructed session, never event text. */
+        val specialistId: String?,
         /** How many of [parts] have already been sent to the queue (the cursor). */
         var sentParts: Int = 0,
         /** How many envelopes this capture has sent; keeps episode ids unique per envelope. */
@@ -177,7 +179,8 @@ class QueuedMemorySessionObserver(
 
         mutex.withLock {
             if (handle !in captures) {
-                captures[handle] = Capture(request, workflowObjective, initialParts)
+                captures[handle] = Capture(request, workflowObjective, initialParts,
+                    handle.specialistId?.takeIf { it.matches(Regex("[a-f0-9]{64}")) })
             }
         }
         mutex.withLock { captures[handle] }?.let { journalUnsent(handle, it, force = true) }
@@ -341,7 +344,13 @@ class QueuedMemorySessionObserver(
             // Nothing is banked unscrubbed: role instructions, prompt blocks, artifacts and messages
             // can all carry a key a run saw, and a bank outlives the run (and is recalled into others).
             userPrompt = ControlRedaction.scrub(capture.userPrompt),
-            parts = parts.map { it.copy(text = ControlRedaction.scrub(it.text)) },
+            parts = parts.map { part ->
+                // Only actual provider Message events receive the host identity. Prompt context,
+                // Keeper messages, thoughts and artifacts cannot manufacture this attribution.
+                val label = if (part.kind == MemorySourceKind.Message && part.label == "Agent message" &&
+                    capture.specialistId != null) "Agent message; managed specialist=${capture.specialistId}" else part.label
+                part.copy(label = label, text = ControlRedaction.scrub(part.text))
+            },
             closedAtEpochMillis = closedAt,
             sequence = sequence,
         )

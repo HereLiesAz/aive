@@ -84,6 +84,12 @@ fun interface MemoryPromptContextProvider {
      */
     suspend fun collectiveExpertise(workflowIds: List<String>, question: String): List<CollectiveExpertiseMatch> = emptyList()
 
+    /**
+     * Host-local directory for an exact managed project/run. Only retained provider messages with
+     * attributable matching sections contribute. No cross-run/project or role-bank discovery.
+     */
+    suspend fun managedExpertise(projectId: String, runId: String, question: String): List<CollectiveExpertiseMatch> = emptyList()
+
     /** Entities, actions and code symbols in the request, with how many memories hold each word. */
     suspend fun queryHints(request: AgentTaskRequest): MemoryQueryHints = MemoryQueryHints()
 
