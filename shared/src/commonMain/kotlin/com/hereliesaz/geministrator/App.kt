@@ -927,6 +927,7 @@ fun App(
             host.collectiveHistory = { checkNotNull(runtime).collectiveHistory() }
             host.collectiveNew = { checkNotNull(runtime).newCollectiveConversation() }
             host.collectiveDelete = { id -> checkNotNull(runtime).deleteCollectiveConversation(id) }
+            host.collectiveProfiles = { checkNotNull(runtime).collectiveSpecialistProfiles() }
         }
 
         // Scheduled hives (docs/Scheduled-Workflows.md): while the app is open, a due schedule starts its
