@@ -973,6 +973,7 @@ private fun environmentProviderCredentials(): Map<String, String> = buildMap {
         ProviderCatalog.COHERE_ID to "COHERE_API_KEY",
         ProviderCatalog.NVIDIA_ID to "NVIDIA_API_KEY",
         ProviderCatalog.SAMBANOVA_ID to "SAMBANOVA_API_KEY",
+        ProviderCatalog.LIQUID_ID to "LIQUID_API_KEY",
     ).forEach { (providerId, environmentName) ->
         System.getenv(environmentName)
             ?.trim()

@@ -71,6 +71,27 @@ class LiteRtLmTextGeneratorTest {
     }
 
     @Test
+    fun aRawPromptRunsAsIsAndStopsAtItsMarker() = runTest {
+        val model = FakeModel { l ->
+            l.onText("<think>\nhm")
+            l.onText("</think>\nHi<|im_end|>")
+            l.onText("never")
+            l.onFailed("cancelled")
+        }
+        val g = TestScopeHolder(backgroundScope).generator(FakeLoader(model))
+        val out = g.generateRaw("<|im_start|>user\nhi<|im_end|>\n", 64, 2048, listOf("<|im_end|>"))
+        assertEquals("<think>\nhm</think>\nHi<|im_end|>", out)
+        assertEquals("<|im_start|>user\nhi<|im_end|>\n", model.prompts.single())
+        assertTrue(model.cancelled)
+    }
+
+    @Test
+    fun aRawPromptThatCannotFitItsContextIsRefused() = runTest {
+        val g = TestScopeHolder(backgroundScope).generator(FakeLoader(FakeModel { it.onFinished() }))
+        assertFailsWith<OnDeviceRuntimeUnavailableException> { g.generateRaw("x".repeat(10_000), 64, 512) }
+    }
+
+    @Test
     fun stopsAtTheAnswerLengthLimit() = runTest {
         val model = FakeModel { l ->
             repeat(10) { l.onText("a") }

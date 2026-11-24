@@ -6,6 +6,7 @@ import com.hereliesaz.geministrator.azphalt.StoreLlmProviders
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.mcp.McpToolSource
 import com.hereliesaz.geministrator.providers.AgentProvider
+import com.hereliesaz.geministrator.providers.lfm.InstalledLocalLlms
 
 /**
  * A hosted provider that can be reached through the common OpenAI Chat Completions wire format.
@@ -45,6 +46,7 @@ object HostedLlmProviders {
     const val COHERE_ID = "cohere"
     const val NVIDIA_ID = "nvidia"
     const val SAMBANOVA_ID = "sambanova"
+    const val LIQUID_ID = ProviderCatalog.LIQUID_ID
     const val OLLAMA_CLOUD_ID = ProviderCatalog.OLLAMA_CLOUD_ID
     const val ZAI_ID = ProviderCatalog.ZAI_ID
     const val CLOUDFLARE_ID = ProviderCatalog.CLOUDFLARE_ID
@@ -132,6 +134,12 @@ object HostedLlmProviders {
             defaultModel = "Meta-Llama-3.3-70B-Instruct",
         ),
         HostedLlmProviderSpec(
+            id = LIQUID_ID,
+            displayName = "Liquid AI",
+            baseUrl = "https://api.liquid.ai/openai/v1",
+            defaultModel = "lfm3-1.7b",
+        ),
+        HostedLlmProviderSpec(
             id = OLLAMA_CLOUD_ID,
             displayName = "Ollama Cloud",
             baseUrl = "https://ollama.com/v1",
@@ -196,10 +204,10 @@ object HostedLlmProviders {
      * last, after the keyless built-ins, for the same reason those do.
      */
     val entries: List<HostedLlmProviderSpec>
-        get() = builtInEntries + storeEntries() + a2aEntries() + browserEntries()
+        get() = builtInEntries + storeEntries() + localEntries() + a2aEntries() + browserEntries()
 
     fun entry(id: String): HostedLlmProviderSpec? =
-        builtInById[id] ?: storeEntries().firstOrNull { it.id == id } ?: a2aEntries().firstOrNull { it.id == id } ?: browserEntries().firstOrNull { it.id == id }
+        builtInById[id] ?: storeEntries().firstOrNull { it.id == id } ?: localEntries().firstOrNull { it.id == id } ?: a2aEntries().firstOrNull { it.id == id } ?: browserEntries().firstOrNull { it.id == id }
 
     /** Remote A2A agents connected by Agent Card; [baseUrl] is the card's URL (docs/A2A.md). */
     private fun a2aEntries(): List<HostedLlmProviderSpec> = A2aAgentConnections.all().map { agent ->
@@ -214,6 +222,20 @@ object HostedLlmProviders {
     }
 
     const val A2A_PROTOCOL = "a2a"
+
+    /** An LFM3 model installed from the store and run on this device through LiteRT-LM; [HostedLlmProviderSpec.baseUrl] is its file. */
+    const val LOCAL_LFM3_PROTOCOL = "litertlm-lfm3"
+
+    private fun localEntries(): List<HostedLlmProviderSpec> = InstalledLocalLlms.all().map { model ->
+        HostedLlmProviderSpec(
+            id = model.providerId,
+            displayName = model.name,
+            baseUrl = model.artifactPath,
+            defaultModel = "lfm3",
+            protocols = listOf(LOCAL_LFM3_PROTOCOL),
+            keyOptional = true,
+        )
+    }
 
     /** Gemini in Google Search through a browser view on the keeper's device ([GoogleAiMode]); chat only, never chosen automatically. */
     const val GOOGLE_AI_MODE_PROTOCOL = "google-ai-mode"
@@ -256,6 +278,12 @@ object HostedLlmProviders {
             bearerToken = credential.trim().takeUnless {
                 it.isEmpty() || it == ProviderCatalog.ANONYMOUS_CREDENTIAL
             },
+        )
+        LOCAL_LFM3_PROTOCOL in spec.protocols -> TextLlmProvider(
+            id = AgentProviderId(spec.id),
+            displayName = spec.displayName,
+            api = LocalLfmModels.api(checkNotNull(InstalledLocalLlms.byProviderId(spec.id)) { "${spec.displayName} is no longer installed" }),
+            tools = tools,
         )
         GOOGLE_AI_MODE_PROTOCOL in spec.protocols -> {
             val browser = checkNotNull(GoogleAiModeHost.browser) { "Google AI Mode needs a browser view, which this device does not provide" }

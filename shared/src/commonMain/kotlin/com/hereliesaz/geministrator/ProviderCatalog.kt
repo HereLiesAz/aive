@@ -4,6 +4,8 @@ import com.hereliesaz.geministrator.a2a.A2aAgentConnection
 import com.hereliesaz.geministrator.a2a.A2aAgentConnections
 import com.hereliesaz.geministrator.azphalt.InstalledStoreLlm
 import com.hereliesaz.geministrator.azphalt.StoreLlmProviders
+import com.hereliesaz.geministrator.providers.lfm.InstalledLocalLlm
+import com.hereliesaz.geministrator.providers.lfm.InstalledLocalLlms
 import com.hereliesaz.geministrator.providers.cli.CliAgentSpec
 import com.hereliesaz.geministrator.providers.cli.CliAgentSpecs
 
@@ -37,6 +39,7 @@ object ProviderCatalog {
     const val COHERE_ID = "cohere"
     const val NVIDIA_ID = "nvidia"
     const val SAMBANOVA_ID = "sambanova"
+    const val LIQUID_ID = "liquid"
     const val OLLAMA_CLOUD_ID = "ollama-cloud"
     const val ZAI_ID = "zai"
     const val CLOUDFLARE_ID = "cloudflare"
@@ -235,6 +238,13 @@ object ProviderCatalog {
             description = "Models hosted by SambaNova. Needs an API key.",
         ),
         ProviderCatalogEntry(
+            id = LIQUID_ID,
+            displayName = "Liquid AI",
+            apiKeyUrl = "https://console.liquid.ai/dashboard/api-keys",
+            credentialLabel = "Liquid API key",
+            description = "Liquid's LFM3 models, small and cheap. Needs an API key. Standard endpoints may keep prompts and train on them, so keep confidential data out.",
+        ),
+        ProviderCatalogEntry(
             id = OLLAMA_CLOUD_ID,
             displayName = "Ollama Cloud",
             apiKeyUrl = "https://ollama.com/settings/keys",
@@ -299,7 +309,7 @@ object ProviderCatalog {
      * remote A2A agents connected by Agent Card (docs/A2A.md), which are never chosen automatically.
      */
     val entries: List<ProviderCatalogEntry>
-        get() = builtInEntries + StoreLlmProviders.all().map(::storeEntry) + A2aAgentConnections.all().map(::a2aEntry) + browserEntries()
+        get() = builtInEntries + StoreLlmProviders.all().map(::storeEntry) + InstalledLocalLlms.all().map(::localEntry) + A2aAgentConnections.all().map(::a2aEntry) + browserEntries()
 
     /** True for a remote A2A agent's id ([A2aAgentConnection.providerId]). */
     fun isA2aAgent(id: String): Boolean = id.startsWith(A2aAgentConnection.PROVIDER_ID_PREFIX)
@@ -347,6 +357,20 @@ object ProviderCatalog {
             "its role instructions and approved context. Used only by roles that prefer it.",
         keyOptional = true,
     )
+
+    private fun localEntry(model: InstalledLocalLlm) = ProviderCatalogEntry(
+        id = model.providerId,
+        displayName = model.name + " (on this device)",
+        apiKeyUrl = "",
+        credentialLabel = "",
+        description = "Runs on this device, installed from the Shop: no key, no network, nothing leaves the phone. " +
+            "Small and slow next to a hosted model, and it needs about ${(model.profile.minRamMegabytes + 1023) / 1024} GB of free memory while it works. " +
+            "Used only by roles that prefer it.",
+        keyOptional = true,
+    )
+
+    /** True for an on-device model installed from the store ([InstalledLocalLlm.providerId]). */
+    fun isLocalModel(id: String): Boolean = id.startsWith("local:")
 
     private fun storeEntry(llm: InstalledStoreLlm) = ProviderCatalogEntry(
         id = llm.providerId,
