@@ -100,6 +100,9 @@ class MemoryLayerController(
     private val pause: suspend (millis: Long) -> Unit = { kotlinx.coroutines.delay(it) },
 ) {
     private val drainMutex = Mutex()
+    /** Serialize collective staging, recovery, release and explicit erasure. */
+    private val collectiveCaptureMutex = Mutex()
+    private val liveCollectiveCaptures = mutableSetOf<String>()
     /** Prevent repeated terminal reconciliation from banking duplicate receipts in one process. */
     private val proceduralTraceMutex = Mutex()
 
@@ -240,11 +243,12 @@ class MemoryLayerController(
      * Sends what sessions had captured but not sent when the app last stopped: the journal's leftovers go
      * into their workflows' queues, then the journal lets go of them. Returns how many were sent.
      */
-    suspend fun recoverCapturedSessions(): Int {
-        if (!active) return 0
+    suspend fun recoverCapturedSessions(): Int = collectiveCaptureMutex.withLock {
+        if (!active) return@withLock 0
         val held = settingsStore.captureJournal
         var sent = 0
         for ((key, envelope) in held.pending()) {
+            if (key in liveCollectiveCaptures) continue
             val workflow = envelope.workflowRunId ?: memoryWorkflowOf(null, envelope.taskRunId, envelope.sourceSessionId)
             val recovered = runCatchingCancellable {
                 registerWorkflow(workflow, envelope.projectId)
@@ -256,7 +260,7 @@ class MemoryLayerController(
             }
         }
         if (sent > 0) drainSoon()
-        return sent
+        sent
     }
 
     /** Shows (and directs the screen's data operations at) [workflowId]'s bank. */
@@ -396,7 +400,7 @@ class MemoryLayerController(
     /** Applies a settings change; the layer is rebuilt between packets, never during one. */
     suspend fun updateSettings(transform: (MemoryLayerSettings) -> MemoryLayerSettings) {
         drainMutex.withLock {
-            val next = settingsStore.update(transform)
+            val next = collectiveCaptureMutex.withLock { settingsStore.update(transform) }
             if (!next.enabled || !next.proceduralTraceCaptureEnabled) MemoryRuntimeBridge.replayLedger?.invalidateAll()
             mutableEngines.value = next.assembleAgents(engineProvider, nowEpochMillis)
             resetLayers()
@@ -652,13 +656,18 @@ class MemoryLayerController(
                     if (bank.clear(current.revision)) break
                 }
             }
-            // Compare-and-set, as forgetting does, so a deposit racing the clear is not half-erased.
-            replaceWhole(own, MemorySnapshot())
-            // What its sessions had captured but not sent is memory too; it must not come back at the next start.
-            val held = settingsStore.captureJournal
-            for ((key, envelope) in held.pending()) {
-                val owner = envelope.workflowRunId ?: memoryWorkflowOf(null, envelope.taskRunId, envelope.sourceSessionId)
-                if (owner == workflowId) runCatchingCancellable { held.record(key, null) }
+            collectiveCaptureMutex.withLock {
+                // Erase staged collective replies before clearing the bank, so release cannot resurrect them.
+                val held = settingsStore.captureJournal
+                for ((key, envelope) in held.pending()) {
+                    val owner = envelope.workflowRunId ?: memoryWorkflowOf(null, envelope.taskRunId, envelope.sourceSessionId)
+                    if (owner == workflowId) {
+                        if (key.startsWith("collective:")) held.record(key, null)
+                        else runCatchingCancellable { held.record(key, null) }
+                    }
+                }
+                // Compare-and-set, as forgetting does, so a deposit racing the clear is not half-erased.
+                replaceWhole(own, MemorySnapshot())
             }
             resetLayers()
             // Replay templates were generalised from what this memory held: they go with it.
@@ -675,14 +684,18 @@ class MemoryLayerController(
         drainMutex.withLock {
             val store = selectedOwnStore() ?: return@withLock
             val workflow = selectedWorkflow() ?: return@withLock
-            // Read, erase (suspending I/O), then commit only if nothing was deposited meanwhile; else
-            // re-read and redo, so a session banked in between is not overwritten with the stale graph.
-            while (true) {
-                val contextual = store.read()
-                val sourceEpisode = contextual.episodes.firstOrNull { it.id == episodeId }
-                // Remove procedure dependencies first; a crash cannot leave a runnable orphan.
-                eraseDerivedProcedures(workflow, episodeId, sourceEpisode)
-                if (store.replaceIfRevision(contextual.revision, contextual.without(episodeId))) break
+            collectiveCaptureMutex.withLock {
+                // Read, erase (suspending I/O), then commit only if nothing was deposited meanwhile.
+                while (true) {
+                    val contextual = store.read()
+                    val sourceEpisode = contextual.episodes.firstOrNull { it.id == episodeId }
+                    if (workflow.startsWith("collective:") && sourceEpisode != null) {
+                        settingsStore.captureJournal.record(sourceEpisode.sourceSessionId, null)
+                    }
+                    // Remove procedure dependencies first; a crash cannot leave a runnable orphan.
+                    eraseDerivedProcedures(workflow, episodeId, sourceEpisode)
+                    if (store.replaceIfRevision(contextual.revision, contextual.without(episodeId))) break
+                }
             }
             resetLayers()
             // A forgotten episode may be a source of a replay template; none outlives forgetting.
@@ -1147,10 +1160,11 @@ class MemoryLayerController(
             }
         }
 
-        override suspend fun bankCollectiveContributions(conversationId: String, requests: List<MemoryBankRequest>) {
-            if (!active || requests.isEmpty()) return
+        /** Validate the host-owned bank and attribution for both capture and release. */
+        private fun validateCollectiveRequests(conversationId: String, requests: List<MemoryBankRequest>) {
             require(conversationId.startsWith("collective:") && conversationId.length <= 128)
-            require(requests.size <= 4 && requests.count { it.sourceKind == MemorySourceKind.UserPrompt } == 1)
+            require(requests.size in 1..4 && requests.count { it.sourceKind == MemorySourceKind.UserPrompt } <= 1)
+            require(requests.map { it.sourceSessionId }.distinct().size == requests.size)
             require(requests.all { request ->
                 val scope = request.scope
                 request.sourceSessionId.startsWith("$conversationId:turn:") &&
@@ -1161,15 +1175,58 @@ class MemoryLayerController(
                         else -> false
                     }
             })
-            registerWorkflow(conversationId, null)
-            val queue = layerFor(conversationId).queue
-            try {
+        }
+
+        override suspend fun stageCollectiveContributions(conversationId: String, requests: List<MemoryBankRequest>) =
+            collectiveCaptureMutex.withLock {
+                if (!active || requests.isEmpty()) return@withLock
+                validateCollectiveRequests(conversationId, requests)
+                registerWorkflow(conversationId, null)
+                val held = settingsStore.captureJournal
                 for (request in requests) {
-                    if (!active) break
-                    queue.enqueueBank(request, MemoryQueuePriority.Normal)
+                    // Sequence 1 suppresses the implicit UserPrompt chunk; the explicit part is the
+                    // original attributed utterance, not a fabricated prompt or duplicate question.
+                    val envelope = MemorySessionEnvelope(
+                        sourceSessionId = request.sourceSessionId,
+                        workflowRunId = conversationId,
+                        roleId = request.scope.roleId,
+                        userPrompt = request.text,
+                        parts = listOf(MemorySessionPart(request.sourceKind, request.label, request.text)),
+                        closedAtEpochMillis = request.bankedAtEpochMillis,
+                        occurredAtEpochMillis = request.occurredAtEpochMillis,
+                        sequence = 1,
+                    )
+                    held.record(request.sourceSessionId, envelope)
+                    check(held.pending()[request.sourceSessionId] == envelope) {
+                        "Collective reply could not be retained in the memory capture journal."
+                    }
+                    liveCollectiveCaptures += request.sourceSessionId
+                }
+            }
+
+        override suspend fun bankCollectiveContributions(conversationId: String, requests: List<MemoryBankRequest>) {
+            if (requests.isEmpty()) return
+            validateCollectiveRequests(conversationId, requests)
+            try {
+                collectiveCaptureMutex.withLock {
+                    val held = settingsStore.captureJournal
+                    val pending = held.pending()
+                    try {
+                        if (!active) return@withLock
+                        for (request in requests) {
+                            // A cleared or disabled-at-capture record must never be recreated from RAM.
+                            val envelope = pending[request.sourceSessionId] ?: continue
+                            check(envelope.workflowRunId == conversationId)
+                            registerWorkflow(conversationId, null)
+                            layerFor(conversationId).queue.enqueueSession(envelope)
+                            held.record(request.sourceSessionId, null)
+                        }
+                    } finally {
+                        liveCollectiveCaptures.removeAll(requests.map { it.sourceSessionId }.toSet())
+                    }
                 }
             } finally {
-                drainSoon()
+                if (active) drainSoon()
             }
         }
 

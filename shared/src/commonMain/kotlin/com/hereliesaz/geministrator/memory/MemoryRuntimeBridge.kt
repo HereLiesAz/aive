@@ -60,6 +60,12 @@ fun interface MemoryPromptContextProvider {
      */
     suspend fun bankCollectiveContributions(conversationId: String, requests: List<MemoryBankRequest>) {}
 
+    /**
+     * Persist actual returned collective replies before the next inference, without exposing them
+     * to recall. The subsequent bank call releases them; startup recovers interrupted turns.
+     */
+    suspend fun stageCollectiveContributions(conversationId: String, requests: List<MemoryBankRequest>) {}
+
     /** Entities, actions and code symbols in the request, with how many memories hold each word. */
     suspend fun queryHints(request: AgentTaskRequest): MemoryQueryHints = MemoryQueryHints()
 

@@ -125,6 +125,73 @@ class MemoryControllerCuePipelineTest {
     }
 
     @Test
+    fun collectiveCaptureSurvivesRestartWithoutEarlyRecallOrDuplicateEpisodes() = runBlocking {
+        val settings = MapSettings()
+        val conversation = "collective:crash"
+        val bank = InMemoryMemoryStore()
+        val banks = MemoryBanks.inMemory(mapOf(conversation to bank))
+        fun controller() = MemoryLayerController(
+            banks = banks,
+            settingsStore = MemoryLayerSettingsStore(settings),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            nowEpochMillis = { 1000L },
+        )
+        val first = controller()
+        first.updateSettings { it.copy(consolidationPaused = true) }
+        val capture = com.hereliesaz.geministrator.queen.CollectiveMemoryCapture(
+            conversation, "Which route?", { 1000L }, first.promptContextProvider)
+        val reviewer = com.hereliesaz.geministrator.queen.CollectiveVoice("reviewer",
+            QueenModel { error("No model call during recovery") }, "reviewer-instance")
+        capture.record(reviewer, "Reject route X: unsafe assumptions.")
+        assertTrue(bank.read().episodes.isEmpty())
+        assertEquals(0, first.recoverCapturedSessions(), "A live turn cannot release its own journal")
+        val journal = SettingsMemoryCaptureJournal(settings)
+        val staged = journal.pending()
+        assertEquals(2, staged.size)
+        val restarted = controller()
+        assertEquals(2, restarted.recoverCapturedSessions())
+        assertTrue(journal.pending().isEmpty())
+        val episodes = bank.read().episodes
+        assertEquals(2, episodes.size)
+        assertEquals("Which route?", episodes.single { it.roleId == null }.chunks.single().text)
+        val note = episodes.single { it.roleId == "reviewer" }.chunks.single()
+        assertEquals(MemorySourceKind.AgentNote, note.kind)
+        assertEquals("Reject route X: unsafe assumptions.", note.text)
+        assertTrue("reviewer-instance" in note.label)
+        // Simulate process death after committing the queue but before removing the journal.
+        staged.forEach { (key, envelope) -> journal.record(key, envelope) }
+        assertEquals(2, controller().recoverCapturedSessions())
+        assertEquals(episodes, bank.read().episodes)
+        assertEquals(2, bank.read().queue.size)
+        assertTrue(journal.pending().isEmpty())
+    }
+
+    @Test
+    fun clearingConversationMemoryCannotBeUndoneByItsLiveCapture() = runBlocking {
+        val settings = MapSettings()
+        val conversation = "collective:clear"
+        val bank = InMemoryMemoryStore()
+        val controller = MemoryLayerController(
+            banks = MemoryBanks.inMemory(mapOf(conversation to bank)),
+            settingsStore = MemoryLayerSettingsStore(settings),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            nowEpochMillis = { 1000L },
+        )
+        controller.updateSettings { it.copy(consolidationPaused = true) }
+        val capture = com.hereliesaz.geministrator.queen.CollectiveMemoryCapture(
+            conversation, "Question", { 1000L }, controller.promptContextProvider)
+        capture.record(com.hereliesaz.geministrator.queen.CollectiveVoice("reviewer", QueenModel { "" }),
+            "Unverified objection")
+        controller.selectBank(conversation)
+        controller.clearAll()
+        capture.flush()
+        assertTrue(SettingsMemoryCaptureJournal(settings).pending().isEmpty())
+        assertTrue(bank.read().episodes.isEmpty())
+    }
+
+    @Test
     fun aTagInAThoughtDrawsItsSummariesAndNoAmbientCloud() = runBlocking {
         val (controller, store) = controllerOver(
             "session:agent-1",

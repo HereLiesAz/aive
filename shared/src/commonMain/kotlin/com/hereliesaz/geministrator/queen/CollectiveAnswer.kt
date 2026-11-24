@@ -8,6 +8,8 @@ import com.hereliesaz.geministrator.memory.MemoryRuntimeBridge
 import com.hereliesaz.geministrator.memory.MemorySourceKind
 import kotlin.random.Random
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 
@@ -29,8 +31,8 @@ internal data class CollectiveVoice(val role: String, val model: QueenModel,
     val specialistId: String? = null)
 
 /**
- * Captures actual, redacted contributions before display truncation. Deposits are deferred until
- * the turn exits so the independent assessments cannot recall each other's current answers.
+ * Captures actual, redacted contributions in the existing crash journal before the next model
+ * call. Deposits into recallable memory wait until the turn exits, preserving independence.
  * The host supplies the conversation identity; neither model text nor the selected Memory screen
  * can choose the bank. Configured routing metadata is attribution, not proof of actual model
  * ancestry or verified claims. No injected cues, internal prompts or recalled passages are copied.
@@ -44,8 +46,8 @@ internal class CollectiveMemoryCapture(
     private val turn = Random.nextLong().toString()
     private val contributions = mutableListOf<MemoryBankRequest>()
 
-    /** One successful returned reply, attributed to its host-selected participant. */
-    fun record(voice: CollectiveVoice, reply: String) {
+    /** One successful returned reply, durably staged with its host-selected participant. */
+    suspend fun record(voice: CollectiveVoice, reply: String) {
         val text = ControlRedaction.scrub(reply).trim().take(12_000)
         if (text.isBlank()) return
         val source = voice.model.uses.singleOrNull()
@@ -55,7 +57,7 @@ internal class CollectiveMemoryCapture(
             "Agent advisory reply (unverified); role=${voice.role}; instance=$instance; " +
                 "configured Source=${source?.sourceId ?: "unknown or multiple"}; model=${source?.modelId ?: "unknown"}"
         ).take(512)
-        contributions += MemoryBankRequest(
+        val request = MemoryBankRequest(
             sourceSessionId = "$conversationId:turn:$turn:${contributions.size}",
             text = text,
             label = provenance,
@@ -64,13 +66,16 @@ internal class CollectiveMemoryCapture(
             bankedAtEpochMillis = time,
             occurredAtEpochMillis = time,
         )
+        val first = contributions.isEmpty()
+        contributions += request
+        // A completed response must not be lost merely because a later call is cancelled.
+        withContext(NonCancellable) {
+            provider.stageCollectiveContributions(conversationId,
+                if (first) listOf(keeperQuestion(time), request) else listOf(request))
+        }
     }
 
-    /** Bank the actual Keeper question once and each completed reply separately. Never replay. */
-    suspend fun flush() {
-        if (contributions.isEmpty()) return
-        val time = contributions.first().bankedAtEpochMillis
-        val prompt = MemoryBankRequest(
+    private fun keeperQuestion(time: Long): MemoryBankRequest = MemoryBankRequest(
             sourceSessionId = "$conversationId:turn:$turn:keeper",
             text = ControlRedaction.scrub(question).trim().take(1500),
             label = "Keeper question",
@@ -79,7 +84,10 @@ internal class CollectiveMemoryCapture(
             bankedAtEpochMillis = time,
             occurredAtEpochMillis = time,
         )
-        val batch = listOf(prompt) + contributions
+    /** Release only already staged contributions; recovery uses the same identities. */
+    suspend fun flush() {
+        if (contributions.isEmpty()) return
+        val batch = listOf(keeperQuestion(contributions.first().bankedAtEpochMillis)) + contributions
         contributions.clear()
         provider.bankCollectiveContributions(conversationId, batch)
     }
@@ -102,7 +110,7 @@ internal suspend fun answerCollectively(
     unavailableRoles: List<String> = emptyList(),
     admitRole: suspend (CollectiveVoice) -> Boolean = { true },
     observeCall: suspend (CollectiveVoice, SpecialistCallOutcome) -> Unit = { _, _ -> },
-    recordContribution: (CollectiveVoice, String) -> Unit = { _, _ -> },
+    recordContribution: suspend (CollectiveVoice, String) -> Unit = { _, _ -> },
     admit: suspend (QueenModel, Int) -> Boolean,
 ): CollectiveAnswer {
     require(question.isNotBlank() && question.length <= 1500)
