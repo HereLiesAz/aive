@@ -27,6 +27,8 @@ A checked box means implemented and covered by automated tests. It does not mean
 
 ## Collective cognition — hive mind transition
 
+Normative target, phase dependencies, migration constraints and acceptance criteria: [Collective cognition](docs/architecture/COLLECTIVE_COGNITION.md).
+
 The Aive is the intelligence; specialists are its cognitive organs. The persistent communicating collective, rather than a workflow, is the unit of intelligence. Workflows remain the governed execution machinery: dependencies, approvals, budget enforcement and recovery must remain intact.
 
 ### Identity, communication and attention
