@@ -273,6 +273,25 @@ data class TaskRun(
     }
 }
 
+/**
+ * Durable charge for one autonomous text-only advisory invocation. An unsettled charge is the
+ * conservative admission reservation, not a claim that the provider actually used those tokens.
+ * Keep it on interruption or absent usage; never replay or silently refund ambiguous work.
+ */
+@Serializable
+data class AutonomousAdvisoryCharge(
+    val requestId: String,
+    val roleId: RoleDefinitionId,
+    val providerId: String,
+    val modelId: String,
+    val inputTokens: Long,
+    val outputTokens: Long,
+    val costUsd: Double,
+    val reservedAtEpochMillis: Long,
+    val settled: Boolean = false,
+    val boundViolated: Boolean = false,
+)
+
 @Serializable
 data class WorkflowRun(
     val id: WorkflowRunId,
@@ -315,6 +334,8 @@ data class WorkflowRun(
      * an input to every task for the context-taint rule. A run saved before this existed reads as keeper-written.
      */
     val objectiveProvenance: ContextProvenance = ContextProvenance.KeeperWritten,
+    /** Separate from task usage: dormant advice does not create a workflow task. */
+    val autonomousAdvisoryCharges: List<AutonomousAdvisoryCharge> = emptyList(),
 ) {
     init {
         require(id !in parentWorkflowRunIds) { "A workflow run cannot continue itself" }

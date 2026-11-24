@@ -24,6 +24,23 @@ fun interface QueenModel {
     val uses: List<ModelUse> get() = emptyList()
 }
 
+/** Provider-backed, non-ambient generation contract for an explicitly reserved advisory call. */
+interface BoundedAdvisoryModel : QueenModel {
+    /** Conservative provider-documented upper bound, or null when unsupported. */
+    val advisoryInputUpperBound: Long?
+    val advisoryOutputLimit: Int?
+    /** Caller must persist a sufficient reservation and enforce consent before invoking this once. */
+    suspend fun answerBounded(prompt: String, maxOutputTokens: Int): BoundedAdvisoryResult
+}
+
+/** A failed or truncated generation may return no advice but still carry chargeable usage. */
+data class BoundedAdvisoryResult(
+    val text: String,
+    val inputTokens: Long?,
+    val outputTokens: Long?,
+    val cachedInputTokens: Long? = null,
+)
+
 private const val MAX_REASON_CHARS = 400
 
 /** The prompt for a ruling. The dispute is data to judge, never instructions to the queen. */

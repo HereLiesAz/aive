@@ -7,16 +7,20 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.HttpRequestData
 import io.ktor.client.request.HttpResponseData
+import io.ktor.http.content.OutgoingContent
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 
 class LlmRestApisTest {
     @Test
@@ -46,6 +50,50 @@ class LlmRestApisTest {
         } finally {
             client.close()
         }
+    }
+
+    @Test
+    fun reservedNativeAdvisoryUsesWireLimitAndNoAmbientSpendEvenWhenTruncated() = runTest {
+        val requests = mutableListOf<String>()
+        var ambient = 0
+        val client = mockJsonClient { request ->
+            requests += (request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()
+            respond(
+                content = if (requests.size == 1)
+                    """{"content":[{"type":"text","text":"advice"}],"usage":{"input_tokens":37,"output_tokens":8}}"""
+                else """{"stop_reason":"max_tokens","content":[{"type":"text","text":"partial"}],"usage":{"input_tokens":41,"output_tokens":512}}""",
+                status = HttpStatusCode.OK, headers = jsonHeaders)
+        }
+        try {
+            val native = AnthropicMessagesApi(LlmApiKeyProvider { "test" }, client = client)
+            val metered = MeteredTextGenerationApi(native, "anthropic", sink = SpendSink { _, _ -> ambient++ })
+            val entry = PlanningApiEntry("anthropic", "Claude", metered)
+            val model = TextGenerationQueenModel(listOf(entry), "anthropic")
+            assertEquals(1_000_000L, model.advisoryInputUpperBound)
+            assertEquals(512, model.advisoryOutputLimit)
+            val result = model.answerBounded("Question", 512)
+            assertEquals("advice", result.text)
+            assertEquals(37L, result.inputTokens)
+            assertEquals(8L, result.outputTokens)
+            val truncated = model.answerBounded("Question two", 512)
+            assertEquals("", truncated.text)
+            assertEquals(41L, truncated.inputTokens)
+            assertEquals(512L, truncated.outputTokens)
+            assertEquals(0, ambient)
+            assertEquals(2, requests.size)
+            requests.forEach {
+                val body = Json.parseToJsonElement(it).jsonObject
+                assertEquals("512", body.getValue("max_tokens").jsonPrimitive.content)
+                assertNull(body["tools"])
+                assertNull(body["system"])
+            }
+            assertFailsWith<IllegalArgumentException> { model.answerBounded("Too large", 513) }
+            assertEquals(2, requests.size)
+            assertNull(TextGenerationQueenModel(listOf(entry)).advisoryInputUpperBound)
+            assertNull(AnthropicMessagesApi(LlmApiKeyProvider { "test" },
+                baseUrl = "https://example.invalid/v1", client = client).advisoryInputUpperBound)
+            assertNull(OpenAiResponsesApi(LlmApiKeyProvider { "test" }, client = client).advisoryInputUpperBound)
+        } finally { client.close() }
     }
 
     @Test

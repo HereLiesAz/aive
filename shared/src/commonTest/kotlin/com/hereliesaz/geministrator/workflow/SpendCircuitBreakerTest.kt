@@ -42,6 +42,37 @@ class SpendCircuitBreakerTest {
     private val working = TaskDefinitionId("working")
     private val waiting = TaskDefinitionId("waiting")
 
+    @Test
+    fun autonomousReservationCountsAgainstRoleRunAndHourlyBudgetWithoutTaskOrAmbientDuplication() = runTest {
+        val persistence = InMemoryWorkflowPersistence()
+        val project = project()
+        persistence.projects.put(project)
+        val definition = definition(task(working))
+        val base = run(definition, taskRun(working, TaskRunStatus.Completed))
+        val role = RoleDefinitionId("dormant")
+        val charge = com.hereliesaz.geministrator.domain.AutonomousAdvisoryCharge(
+            "claim", role, "anthropic", "claude-sonnet-5", 100L, 20L, 0.5, 100L)
+        val empty = HourlySpend(0.0, false)
+        assertNull(base.reserveAutonomousAdvisory(charge, 119L, SpendCaps(), empty))
+        assertNull(base.reserveAutonomousAdvisory(charge, 120L, SpendCaps(runCostCapUsd = 0.5), empty))
+        assertNull(base.reserveAutonomousAdvisory(charge, 120L, SpendCaps(hourlySpendCapUsd = 1.0), HourlySpend(0.6, false)))
+        val reserved = assertNotNull(base.reserveAutonomousAdvisory(charge, 120L, SpendCaps(), empty))
+        assertEquals(120L, reserved.roleTokensSpent(role))
+        assertEquals(0.5, reserved.knownCostUsd())
+        assertNull(reserved.reserveAutonomousAdvisory(charge, 1000L, SpendCaps(), empty))
+        persistence.runs.put(reserved)
+        assertEquals(0.5, hourlySpendUsd(persistence, 101L, reserved.id))
+        val settled = assertNotNull(reserved.settleAutonomousAdvisory("claim", 8, 4, 0.1, 102L))
+        assertEquals(12L, settled.roleTokensSpent(role))
+        assertEquals(0.1, settled.knownCostUsd())
+        persistence.runs.put(settled)
+        assertEquals(0.1, hourlySpendUsd(persistence, 103L, settled.id))
+        assertNull(settled.settleAutonomousAdvisory("claim", 1, 1, 0.01, 104L))
+        val violated = assertNotNull(reserved.settleAutonomousAdvisory("claim", 101, 20, 0.6, 104L))
+        assertTrue(violated.autonomousAdvisoryCharges.single().boundViolated)
+        assertNull(violated.reserveAutonomousAdvisory(charge.copy(requestId = "another"), 1000L, SpendCaps(), empty))
+    }
+
     // ---- Role token budget ----
 
     @Test

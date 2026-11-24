@@ -43,6 +43,10 @@ class MeteredTextGenerationApi(
     private val pricing: ModelPriceTable = ModelPriceTable.Default,
     private val sink: SpendSink = SpendSink { cost, unknown -> AmbientSpendLedger.Shared.record(cost, unknown) },
 ) : TextGenerationApi by delegate {
+    // This explicitly reserved path is charged by the run owner. Never also charge ambient spend.
+    override suspend fun generateRunAccounted(prompt: String, maxOutputTokens: Int): TextGenerationResult =
+        delegate.generateRunAccounted(prompt, maxOutputTokens)
+
     override suspend fun generate(prompt: String): TextGenerationResult = metered { delegate.generate(prompt) }
 
     override suspend fun generateWithBudget(prompt: String, maxOutputTokens: Int): TextGenerationResult =

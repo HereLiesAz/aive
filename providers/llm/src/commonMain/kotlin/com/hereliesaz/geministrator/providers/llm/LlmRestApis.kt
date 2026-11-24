@@ -92,6 +92,16 @@ interface TextGenerationApi {
      */
     val outputTokenCap: Int? get() = null
 
+    /** Hard provider context bound for explicitly reserved autonomous calls, not an estimated tokenizer count. */
+    val advisoryInputUpperBound: Long? get() = null
+
+    /**
+     * Explicit run-accounted path. No ambient metering or fallback; implementations must opt in
+     * to a provider-enforced limit including non-visible generation tokens.
+     */
+    suspend fun generateRunAccounted(prompt: String, maxOutputTokens: Int): TextGenerationResult =
+        error("Run-accounted generation is unsupported")
+
     suspend fun generate(prompt: String): TextGenerationResult
 
     /**
@@ -369,6 +379,18 @@ class AnthropicMessagesApi(
     )
 
     override val outputTokenCap: Int get() = PlanOutputBudget.ANTHROPIC_CAP
+
+    // Native Sonnet 5 has a documented 1M context maximum; count_tokens is only an estimate.
+    // https://platform.claude.com/docs/en/docs/about-claude/models/whats-new-sonnet-5
+    // Reserve the entire context as input plus the requested output ceiling, even though their sum
+    // over-reserves. No proxy endpoint, arbitrary model alias, tools, cache writes or retries.
+    override val advisoryInputUpperBound: Long? get() =
+        1_000_000L.takeIf { model == "claude-sonnet-5" && baseUrl == "https://api.anthropic.com/v1" }
+
+    override suspend fun generateRunAccounted(prompt: String, maxOutputTokens: Int): TextGenerationResult {
+        require(advisoryInputUpperBound != null && maxOutputTokens in 1..minOf(outputTokenCap, 512))
+        return generate(CacheablePrompt(dynamicSuffix = prompt), maxOutputTokens)
+    }
 
     override suspend fun generate(prompt: String): TextGenerationResult = generate(CacheablePrompt(dynamicSuffix = prompt))
 

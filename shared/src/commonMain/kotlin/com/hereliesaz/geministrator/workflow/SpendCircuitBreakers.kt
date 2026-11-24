@@ -54,15 +54,56 @@ data class SpendCapTrip(
     val unknownCost: Boolean = false,
 )
 
-/** The cost providers have reported (or the app priced) for this run. Unpriced usage adds nothing here: see [hasUnpricedUsage]. */
-fun WorkflowRun.knownCostUsd(): Double = taskRuns.values.sumOf { it.usage?.costUsd ?: 0.0 }
+/** Reported/priced run usage plus conservative unsettled autonomous reservations. Unpriced usage adds nothing: see [hasUnpricedUsage]. */
+fun WorkflowRun.knownCostUsd(): Double = taskRuns.values.sumOf { it.usage?.costUsd ?: 0.0 } +
+    autonomousAdvisoryCharges.sumOf { it.costUsd }
 
 /** Whether some of this run's usage was billed but could not be priced, so [knownCostUsd] is only a floor. */
 fun WorkflowRun.hasUnpricedUsage(): Boolean = taskRuns.values.any { it.usage?.costUnknown == true }
 
-/** Tokens reported for every task [roleId] has worked in this run: the role's spend against its budget. */
+/** Reported task tokens plus settled or conservatively reserved autonomous tokens for this role. */
 fun WorkflowRun.roleTokensSpent(roleId: RoleDefinitionId): Long =
-    taskRuns.values.filter { it.assignedRoleId == roleId }.sumOf { it.usage?.totalTokens ?: 0L }
+    taskRuns.values.filter { it.assignedRoleId == roleId }.sumOf { it.usage?.totalTokens ?: 0L } +
+        autonomousAdvisoryCharges.filter { it.roleId == roleId }.sumOf { it.inputTokens + it.outputTokens }
+
+/**
+ * Reserve before any provider request. Require explicit budget, usable price and room under all
+ * applicable caps. Existing running tasks still use the ordinary reported-usage circuit breakers.
+ * A dormant request cannot consume a role with other unfinished assigned tasks.
+ */
+internal fun WorkflowRun.reserveAutonomousAdvisory(
+    charge: com.hereliesaz.geministrator.domain.AutonomousAdvisoryCharge,
+    roleBudget: Long,
+    caps: SpendCaps,
+    hourly: HourlySpend,
+): WorkflowRun? {
+    if (autonomousAdvisoryCharges.size >= 128 || autonomousAdvisoryCharges.any {
+            it.requestId == charge.requestId || it.boundViolated
+        } || charge.settled || charge.boundViolated ||
+        charge.inputTokens !in 1..1_000_000L || charge.outputTokens !in 1..512L ||
+        !charge.costUsd.isFinite() || charge.costUsd < 0.0 ||
+        taskRuns.values.any { it.assignedRoleId == charge.roleId && !it.status.isTerminal() }) return null
+    val spent = roleTokensSpent(charge.roleId)
+    if (spent < 0L || spent > roleBudget || charge.inputTokens + charge.outputTokens > roleBudget - spent) return null
+    if (runCostTrip(this, caps) != null ||
+        caps.runCostCapUsd?.let { knownCostUsd() + charge.costUsd >= it } == true ||
+        caps.hourlySpendCapUsd?.let { hourly.unpricedUsage || hourly.knownUsd + charge.costUsd >= it } == true) return null
+    return copy(autonomousAdvisoryCharges = autonomousAdvisoryCharges + charge,
+        updatedAtEpochMillis = decisionTime(charge.reservedAtEpochMillis, this))
+}
+
+/** Actual reported usage replaces only its own reservation; a provider-bound violation remains visible. */
+internal fun WorkflowRun.settleAutonomousAdvisory(
+    requestId: String, input: Long, output: Long, cost: Double, now: Long,
+): WorkflowRun? {
+    val charge = autonomousAdvisoryCharges.singleOrNull { it.requestId == requestId && !it.settled } ?: return null
+    if (input < 0 || output < 0 || input > Long.MAX_VALUE - output || !cost.isFinite() || cost < 0.0) return null
+    val violated = input > charge.inputTokens || output > charge.outputTokens || cost > charge.costUsd
+    return copy(autonomousAdvisoryCharges = autonomousAdvisoryCharges.map {
+        if (it == charge) it.copy(inputTokens = input, outputTokens = output, costUsd = cost,
+            settled = true, boundViolated = violated) else it
+    }, updatedAtEpochMillis = decisionTime(now, this))
+}
 
 /** Whether [taskRun] is parked because its role spent its token budget. */
 fun TaskRun.isHeldForRoleBudget(): Boolean =
@@ -112,6 +153,9 @@ suspend fun hourlySpend(
     var known = 0.0
     var unpriced = false
     for (runId in runIds) {
+        // Autonomous charges are persisted on the run, not emitted as synthetic task usage or ambient spend.
+        known += persistence.runs.get(runId)?.autonomousAdvisoryCharges.orEmpty()
+            .filter { it.reservedAtEpochMillis in since..nowEpochMillis }.sumOf { it.costUsd }
         persistence.eventsSince(runId, since)
             .asSequence()
             .filterIsInstance<ProviderUsageRecorded>()

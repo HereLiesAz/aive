@@ -10,6 +10,7 @@ import com.hereliesaz.geministrator.queen.ModelUse
 import com.hereliesaz.geministrator.queen.reviewerSourceOrder
 import com.hereliesaz.geministrator.orchestration.reportLaunchProgress
 import kotlinx.coroutines.CancellationException
+import com.hereliesaz.geministrator.providers.spentTokens
 
 /**
  * Plan reviewer backed by the keeper's linked cloud LLMs (orchestration/PlanReview.kt).
@@ -66,7 +67,31 @@ fun configuredPlanReviewer(linked: Map<String, String>): PlanReviewer? =
 class TextGenerationQueenModel(
     private val candidates: List<PlanningApiEntry>,
     private val pinnedProviderId: String? = null,
-) : com.hereliesaz.geministrator.queen.QueenModel {
+) : com.hereliesaz.geministrator.queen.BoundedAdvisoryModel {
+    /** Run-accounted calls require a single explicitly pinned native adapter. */
+    private val boundedApi: TextGenerationApi? get() = pinnedProviderId?.let { id ->
+        candidates.singleOrNull { it.id == id }?.api?.takeIf { it.advisoryInputUpperBound != null }
+    }
+    override val advisoryInputUpperBound: Long? get() = boundedApi?.advisoryInputUpperBound
+    override val advisoryOutputLimit: Int? get() = boundedApi?.outputTokenCap?.coerceAtMost(512)
+
+    override suspend fun answerBounded(prompt: String, maxOutputTokens: Int): com.hereliesaz.geministrator.queen.BoundedAdvisoryResult {
+        val api = checkNotNull(boundedApi) { "No bounded pinned adapter" }
+        require(maxOutputTokens in 1..checkNotNull(advisoryOutputLimit))
+        val result = try {
+            api.generateRunAccounted(prompt, maxOutputTokens)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            // A truncated response is not advice, but reported usage still belongs to the run.
+            val spent = failure.spentTokens() ?: throw failure
+            return com.hereliesaz.geministrator.queen.BoundedAdvisoryResult(
+                "", spent.spentInputTokens, spent.spentOutputTokens, spent.spentCachedInputTokens)
+        }
+        return com.hereliesaz.geministrator.queen.BoundedAdvisoryResult(
+            result.text, result.inputTokens, result.outputTokens, result.cachedInputTokens)
+    }
+
     /** Every Source she may try, for the price check before a call: with no pin she may move to any of them. */
     override val uses: List<com.hereliesaz.geministrator.queen.ModelUse>
         get() = (if (pinnedProviderId == null) candidates else candidates.filter { it.id == pinnedProviderId })
