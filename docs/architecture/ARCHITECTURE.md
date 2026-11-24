@@ -2,11 +2,11 @@
 
 ## Product definition
 
-The Aive is a Compose Multiplatform control room for governed software-development workflows.
+The Aive is a persistent collective intelligence implemented in Compose Multiplatform, with a governed workflow runtime for intentional action.
 
-> The Aive is not an agent. It is the swarm that coordinates agents.
+> The Aive is the intelligence. Its specialists are its cognitive organs.
 
-Its job is to turn an objective into explicit work, establish dependency and verification structure, assign that work to appropriate executors, observe the run, and surface only the human decisions that genuinely require a person.
+The architectural target is one conversational hive mind: specialists independently consult, deliberate, recruit and synthesize; the Queen facilitates. Workflows are downstream execution instruments, not the unit of cognition. The existing runtime turns an objective into explicit governed work, establishes dependency and verification structure, assigns executors, observes runs and surfaces human decisions. Retain those guarantees while migrating toward [Collective cognition](COLLECTIVE_COGNITION.md), which specifies the target, boundaries and acceptance criteria.
 
 The Aive is not an IDE. Source editing, terminals, and generic filesystem tooling are outside the product boundary.
 

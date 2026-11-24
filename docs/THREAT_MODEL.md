@@ -709,6 +709,12 @@ The keeper ruled that the queen must be able to adjust a running swarm throughou
 - **What stays as it was.** Every other swarm keeps asking the keeper to approve a repair. No remote interface gains any route (invariant 8).
 - **Residual risk.** The queen spends model calls on a repair without being asked; it is bounded by the attempt cap, the keeper's spend caps and the allowance. A swarm whose goal is worded to look like a request to be taught gets the same treatment, so a goal that came from outside is never routed there (the router reads only the goal's words, and an outside goal still hits `R-outside`).
 
+### Collective cognition transition
+
+[Collective cognition](architecture/COLLECTIVE_COGNITION.md) is the target architecture, not evidence of implemented controls. Initial peer consultation and mailboxes introduce an advisory data flow restricted to the same project, run and provider and explicitly tool-free, repository-free sessions. The mailbox redacts recognized credential shapes; this is not a guarantee that arbitrary sensitive information has been removed. Transport acceptance is not proof of reading, agreement or execution. Claimed messages are removed before transport, so interrupted delivery can lose a note rather than automatically replay it.
+
+Before enabling broader communication, enforce and test authenticated specialist identity, consent-scoped project/conversation boundaries, recipient eligibility at delivery, provenance, payload redaction, revocation, expiry, retention and export controls. Before autonomous recruitment or background work, enforce admission, recursion, concurrency, cancellation, source and spend limits. Deliberation, habits and the unified conversation/API must not relax any existing approval, tool, effect or context-taint boundary. These are outstanding implementation obligations, not new claims of enforcement.
+
 ## Open Items
 
 - Automated prompt-injection scanning of artifact content before use as provider context.

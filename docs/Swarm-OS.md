@@ -4,6 +4,8 @@ Status: proposal. This supersedes `Bowl-OS.md`, keeping every decision it made (
 
 The rules of that world are `Node-Creature-Genome.md`. The binding rule is `Ecology-and-the-Swarm.md`: nothing happens to a creature unless something happened in a run. Swarm OS is that world made into the app.
 
+> **Direction update:** [Collective cognition](architecture/COLLECTIVE_COGNITION.md) defines the persistent collective beyond individual workflows. In the target UI, specialist identity survives runs, conversations are a primary interaction, and cognitive communication links are distinct from execution dependencies. The ecology binding rule still applies: only actual recorded activity changes meaningful state. Existing workflow build and live views remain supported.
+
 ## First principles
 
 1. **The view is the swarm.** One top-down field of neural tissue: every agent you keep is a creature in it, every dependency a synapse, every run an egg, every provider a capillary. There's no screen of the app that isn't a distance from this field.

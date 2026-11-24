@@ -1,5 +1,7 @@
 The Aive Orchestration Models — Kaggle Training Sequence
 
+> **Architectural direction:** [Collective cognition](architecture/COLLECTIVE_COGNITION.md) defines the target. These orchestration models remain useful execution and routing utilities. Planning is downstream of collective deliberation; a coordinator is not the sovereign intelligence. Existing approval, role and memory-injection boundaries remain in force.
+
 This training series begins after the Aive Memory Clerk model family is substantially complete.
 
 The Memory Clerks organize historical information.

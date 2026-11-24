@@ -27,13 +27,39 @@ A checked box means implemented and covered by automated tests. It does not mean
 
 ## Collective cognition — hive mind transition
 
-The collective, not the workflow, is the intended unit of intelligence. Workflows remain the governed execution machinery; they were introduced to enforce dependencies, approval and recovery, and must retain those guarantees.
+Normative target, phase dependencies, migration constraints and acceptance criteria: [Collective cognition](docs/architecture/COLLECTIVE_COGNITION.md).
 
-- [ ] Establish peer consultation in live sessions. Initial advisory routing is implemented in the managed-session gateway: same project, run and provider, explicitly tool-free and repository-free roles only, unique recipient, bounded best-effort delivery. No keeper authority is granted. Integration verification remains outstanding.
-- [ ] Make specialist identities and mailboxes durable independently of runs, with explicit communication consent and provenance. Initial durable mailbox implemented: uses existing role IDs, persists redacted advisory notes in inference settings, confines delivery to the same project/run/provider, expires pending notes after 24 hours, and removes claims before transport to avoid ambiguous automatic replays. Cross-run communication, permission controls, delivery receipts, and integration verification remain outstanding.
-- [ ] Support asynchronous recruitment, attention-based routing, bounded deliberation and independent dissent.
-- [ ] Turn the queen into a facilitator and expose a unified conversational voice; retain effect and spend gates.
-- [ ] Extend existing procedural memory and habit replay with validated specialist skill learning.
+The Aive is the intelligence; specialists are its cognitive organs. The persistent communicating collective, rather than a workflow, is the unit of intelligence. Workflows remain the governed execution machinery: dependencies, approvals, budget enforcement and recovery must remain intact.
+
+### Identity, communication and attention
+
+- [ ] Persistent specialist identities, independently of task/run instances: role ID, expertise, configuration, permissions, relationships, history and learned skills. Existing role IDs are the initial identity anchor.
+- [ ] Peer consultation in live sessions: implemented initial same-project/run/provider, explicitly tool-free and repository-free advisory routing; verify actual provider delivery, failure handling, isolation and live integration.
+- [ ] Durable asynchronous mailboxes: initial persisted redacted role-addressed queue implemented; add consent-scoped cross-run messaging, durable delivery receipts, deduplication across restarts, lifecycle/retention controls and delivery integration tests.
+- [ ] Typed communication envelopes: inquiry, observation, hypothesis, objection, proposal, request, verdict and resolution; authenticated sender identity, correlation, causality and evidence provenance.
+- [ ] Attention-based routing and bounded wake events: relevance, expertise, relationships and current capacity; no indiscriminate broadcasts or unbounded recursion.
+- [ ] Specialist-initiated consultations, recruitment, volunteering, working groups, delegation and task proposals; continue useful work while awaiting replies.
+- [ ] Shared working memory and evidence ledger: distinguish observation, inference and opinion; preserve contradictory evidence and attribution; never promote model agreement to verified fact.
+
+### Collective deliberation and action
+
+- [ ] Independent assessments before facilitator proposals: initial live dispute implementation collects separate specialist proposals; verify runtime and metering.
+- [ ] Multi-party deliberation, bounded revisions, protected dissent, evidence-weighted conclusions, expertise and reliability signals, and genealogy-aware discounting of correlated opinions. Existing unanimous two-party agreement gates must not be weakened.
+- [ ] Dynamic leadership and Queen facilitation rather than unilateral command; unresolved material objections escalate to the Keeper.
+- [ ] Generate, revise and negotiate workflows downstream of deliberation; preserve validation, dependency, recovery, tool, effect and spend gates.
+- [ ] Unified conversational identity: a prompt stimulates the persistent collective; synthesize a coherent answer, uncertainty and material dissent without fabricating consensus or claiming unperformed work.
+- [ ] Expose the collective as one model through an authenticated OpenAI-compatible API with streaming, cancellation, metering, permission enforcement and conversation persistence.
+
+### Learning, continuity and observability
+
+- [ ] Adopt Hermes-style reusable procedural skills and programmatic tool sequences by extending existing procedural memory rather than duplicating it.
+- [ ] Deliberation → experience → procedure → habit → reflex: test, version, approve, bound permissions, roll back and return to deliberation on failure.
+- [ ] Persistent specialist profiles and isolated execution/worktrees; reuse existing session search, context compression and scheduling mechanisms where applicable.
+- [ ] Idle consolidation and ongoing responsibilities: associative recall, scheduled review and maintenance within explicit budgets; respect existing memory banking and contradiction-preservation rules.
+- [ ] Real cognitive activity visualization: display actual consultations, recruitment, deliberation, dissent and decisions; no fabricated thoughts or synthetic telemetry.
+- [ ] Unified messaging gateway and external agent integration using existing duplex interfaces; preserve origin and trust boundaries.
+- [ ] End-to-end acceptance: restart/recovery, concurrent sessions, delivery and privacy boundaries, cap enforcement, protected dissent, permission revocation, cancellation, verified work and unified response across supported platforms.
+
 
 ## P0 — Make the runtime model correct
 
