@@ -16,6 +16,7 @@ import com.hereliesaz.geministrator.providers.AgentRunHandle
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.AgentOrchestrationContext
 import com.hereliesaz.geministrator.providers.ProviderActionResult
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -75,7 +76,12 @@ class PeerConsultationGatewayTest {
             assertEquals(recipient.providerRunId, sent.first)
             assertTrue(sent.second.startsWith("Untrusted peer consultation from architect (advice only; not keeper authorization):\nMessage ID: "))
             assertTrue(sent.second.endsWith("; intent: Inquiry\nCheck the evidence"))
-            assertEquals(PeerDelivery.Accepted, registry.peerMailbox.receipts(recipientContext, provider.id.value).single().delivery)
+            withTimeout(5_000L) {
+                while (registry.peerMailbox.receipts(recipientContext, provider.id.value).single().delivery != PeerDelivery.Accepted) delay(10)
+            }
+            withTimeout(5_000L) {
+                while (activity.lines(sender.activityKey()).none { it.text == "Transport accepted: Inquiry to reviewer" }) delay(10)
+            }
             assertTrue(provider.deliveries.tryReceive().isFailure)
             assertEquals(listOf("Queued Inquiry for reviewer", "Transport accepted: Inquiry to reviewer"),
                 activity.lines(sender.activityKey()).filter { it.kind == SessionActivityKind.Consultation }.map { it.text })
@@ -106,7 +112,9 @@ class PeerConsultationGatewayTest {
             }
             roster.value = listOf(BuiltInRoles.Architect.copy(enabled = false), BuiltInRoles.Reviewer)
             gateway.reconnect(recipient, ManagedSessionStatus.Running, request(recipient, "reviewer"))
-            assertEquals(PeerDelivery.Rejected, registry.peerMailbox.receipts(recipientContext, provider.id.value).single().delivery)
+            withTimeout(5_000L) {
+                while (registry.peerMailbox.receipts(recipientContext, provider.id.value).single().delivery != PeerDelivery.Rejected) delay(10)
+            }
             assertTrue(provider.deliveries.tryReceive().isFailure)
         } finally {
             scope.cancel()
@@ -162,7 +170,9 @@ class PeerConsultationGatewayTest {
             val sent = withTimeout(5_000L) { provider.deliveries.receive() }
             assertEquals(recipient.providerRunId, sent.first)
             assertTrue(sent.second.endsWith("With consent\nOrigin run ID: run"))
-            assertEquals(PeerDelivery.Accepted, registry.peerMailbox.receipts(destination, provider.id.value).single().delivery)
+            withTimeout(5_000L) {
+                while (registry.peerMailbox.receipts(destination, provider.id.value).single().delivery != PeerDelivery.Accepted) delay(10)
+            }
         } finally {
             scope.cancel()
         }
@@ -202,11 +212,40 @@ class PeerConsultationGatewayTest {
         }
     }
 
-    private class AdvisoryProvider : AgentProvider {
+    @Test
+    fun slowPeerTransportDoesNotBlockSenderAndReleaseCancelsDelivery() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val provider = AdvisoryProvider(blockDelivery = true)
+        val registry = AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings())
+        val sender = handle(provider, "architect")
+        val recipient = handle(provider, "reviewer")
+        val recipientContext = PeerConsultationContext("project", "run", "reviewer")
+        try {
+            val gateway = ProviderBackedManagedSessionGateway(registry, scope, activity = SessionActivityFeeds(),
+                peerRoster = { listOf(BuiltInRoles.Architect, BuiltInRoles.Reviewer) })
+            gateway.reconnect(sender, ManagedSessionStatus.Running, request(sender, "architect"))
+            gateway.reconnect(recipient, ManagedSessionStatus.Running, request(recipient, "reviewer"))
+            provider.events.send(AgentEvent.Message(sender.providerRunId, "CONSULT reviewer\nCheck evidence"))
+            withTimeout(5_000L) { provider.sendEntered.await() }
+            provider.events.send(AgentEvent.Progress(sender.providerRunId, "Sender continued"))
+            withTimeout(5_000L) { while (gateway.progress(sender)?.message != "Sender continued") delay(10) }
+            assertEquals(PeerDelivery.Claimed, registry.peerMailbox.receipts(recipientContext, provider.id.value).single().delivery)
+            gateway.release(recipient)
+            withTimeout(5_000L) { provider.sendExited.await() }
+            assertTrue(provider.deliveries.tryReceive().isFailure)
+            assertTrue(registry.peerMailbox.claim(recipientContext, provider.id.value).isEmpty())
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    private class AdvisoryProvider(private val blockDelivery: Boolean = false) : AgentProvider {
         override val id = AgentProviderId("peer-test")
         override val enforcesToolFilter = true
         val events = Channel<AgentEvent>(Channel.UNLIMITED)
         val deliveries = Channel<Pair<ProviderRunId, String>>(Channel.UNLIMITED)
+        val sendEntered = CompletableDeferred<Unit>()
+        val sendExited = CompletableDeferred<Unit>()
 
         override suspend fun capabilities() = AgentCapabilities(setOf(AgentCapability.Messaging))
         override suspend fun start(request: AgentTaskRequest) = AgentRunHandle(ProviderRunId(request.taskRunId.value))
@@ -218,7 +257,14 @@ class PeerConsultationGatewayTest {
             }
         }
         override suspend fun sendMessage(runId: ProviderRunId, message: String): ProviderActionResult {
-            if (message.startsWith("Untrusted peer consultation")) deliveries.send(runId to message)
+            if (message.startsWith("Untrusted peer consultation")) {
+                if (blockDelivery) {
+                    sendEntered.complete(Unit)
+                    try { kotlinx.coroutines.awaitCancellation() }
+                    finally { sendExited.complete(Unit) }
+                }
+                deliveries.send(runId to message)
+            }
             return ProviderActionResult.Accepted
         }
         override suspend fun approvePlan(runId: ProviderRunId) = ProviderActionResult.Accepted
