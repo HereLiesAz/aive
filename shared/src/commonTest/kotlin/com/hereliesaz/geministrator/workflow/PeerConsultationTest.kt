@@ -18,6 +18,16 @@ import kotlin.test.assertTrue
 
 class PeerConsultationTest {
     @Test
+    fun wakeIsExplicitAdvisoryIntent() {
+        val note = requireNotNull(PeerConsultationNote.parse("WAKE reviewer\nAssess evidence"))
+        kotlin.test.assertTrue(note.activation)
+        kotlin.test.assertEquals("reviewer", note.roleId)
+        kotlin.test.assertEquals(PeerIntent.Request, note.intent)
+        kotlin.test.assertEquals(null, PeerConsultationNote.parse("WAKE reviewer other\nAssess evidence"))
+        kotlin.test.assertEquals(false, PeerConsultationNote.parse("CONSULT reviewer\nAssess evidence")?.activation)
+    }
+
+    @Test
     fun explicitNoteIsParsedAndSecretsAreRemoved() {
         val note = requireNotNull(PeerConsultationNote.parse("CONSULT reviewer\nCheck the evidence. token=abcdefgh123456"))
         assertEquals("reviewer", note.roleId)

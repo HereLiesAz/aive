@@ -24,6 +24,8 @@ internal data class PeerRoute(
     val sourceRole: String,
     val targetRun: String,
     val targetRole: String,
+    /** Separate permission to invoke one dormant same-run advisory specialist. */
+    val activation: Boolean = false,
 )
 
 /** A grant generation is never reused after revocation. */
@@ -57,14 +59,18 @@ internal data class PeerMail(
     val groupCreatedAt: Long? = null,
     /** Exact invited/member session for directed group traffic; null for initial invitations. */
     val requiredRecipientSession: String? = null,
+    val activation: Boolean = false,
+    val senderSpecialist: String? = null,
+    val recipientSpecialist: String? = null,
 ) {
     /** Stable content-derived identifier for this scoped, deduplicated envelope. */
     val id: String get() = Sha256.hex(Json.encodeToString(listOf(project, run, provider, senderRole,
         senderTask, recipientRole, text, intent.name, replyTo.orEmpty()) +
         (targetRun?.let { listOf(it, grantGeneration.toString()) } ?: emptyList()) +
-        (groupAction?.let { listOf(it.name, groupId.orEmpty()) } ?: emptyList())).encodeToByteArray())
+        (groupAction?.let { listOf(it.name, groupId.orEmpty()) } ?: emptyList()) +
+        (if (activation) listOf("activation", grantGeneration.toString()) else emptyList())).encodeToByteArray())
     val destinationRun: String get() = targetRun ?: run
-    val route: PeerRoute get() = PeerRoute(project, provider, run, senderRole, destinationRun, recipientRole)
+    val route: PeerRoute get() = PeerRoute(project, provider, run, senderRole, destinationRun, recipientRole, activation)
 }
 
 /**
@@ -102,7 +108,7 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
 
     /** Only a local Keeper surface may call this; route values must be verified against the run catalog there. */
     suspend fun grant(route: PeerRoute): Boolean = mutex.withLock {
-        if (route.sourceRun == route.targetRun || route.sourceRole == route.targetRole ||
+        if ((route.sourceRun == route.targetRun) != route.activation || route.sourceRole == route.targetRole ||
             listOf(route.project, route.provider, route.sourceRun, route.sourceRole, route.targetRun, route.targetRole)
                 .any { !Regex("[A-Za-z0-9_.:-]{1,128}").matches(it) }) return@withLock false
         val current = grants()
@@ -138,7 +144,7 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
     suspend fun authorized(mail: PeerMail): Boolean = mutex.withLock {
         mail in live(read(), now()) && mail.delivery == PeerDelivery.Claimed &&
             (mail.groupCreatedAt?.let { now() - it < TTL } ?: true) &&
-            (mail.destinationRun == mail.run || grants().any { it.route == mail.route && it.generation == mail.grantGeneration })
+            ((mail.destinationRun == mail.run && !mail.activation) || grants().any { it.route == mail.route && it.generation == mail.grantGeneration })
     }
 
     /** Retained receipt history for one exact scope; no payload crosses project or provider boundaries. */
@@ -158,15 +164,17 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
     }
 
     /** Persist a note before returning success. Duplicate pending messages are not enqueued. */
-    suspend fun enqueue(origin: PeerConsultationContext, provider: String, senderTask: String, note: PeerConsultationNote, senderSession: String? = null, senderInvocation: String? = null): Boolean =
+    suspend fun enqueue(origin: PeerConsultationContext, provider: String, senderTask: String, note: PeerConsultationNote, senderSession: String? = null, senderInvocation: String? = null, senderSpecialist: String? = null): Boolean =
         mutex.withLock {
             if (note.roleId.isBlank() || origin.roleId == note.roleId) return@withLock false
             if (note.expertise != null && (note.targetRun != null || note.replyTo != null)) return@withLock false
             val time = now()
             val entries = live(read(), time)
             val targetRun = note.targetRun ?: origin.runId
-            val route = PeerRoute(origin.projectId, provider, origin.runId, origin.roleId, targetRun, note.roleId)
-            val generation = if (targetRun == origin.runId) null else
+            if (note.activation && (note.targetRun != null || note.replyTo != null || note.groupAction != null ||
+                    note.expertise != null || senderSession.isNullOrBlank() || note.intent != PeerIntent.Request)) return@withLock false
+            val route = PeerRoute(origin.projectId, provider, origin.runId, origin.roleId, targetRun, note.roleId, note.activation)
+            val generation = if (targetRun == origin.runId && !note.activation) null else
                 grants().singleOrNull { it.route == route }?.generation ?: return@withLock false
             val parent = note.replyTo?.let { id ->
                 entries.singleOrNull { it.id == id && it.project == origin.projectId && it.destinationRun == origin.runId && it.run == targetRun &&
@@ -237,7 +245,10 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
                 intent = note.intent, replyTo = parent?.id, correlationId = parent?.correlationId ?: parent?.id,
                 targetRun = targetRun.takeIf { it != origin.runId }, grantGeneration = generation,
                 recruitmentKey = recruitmentKey, groupAction = note.groupAction, groupId = groupId,
-                requiredRecipientSession = requiredRecipientSession, groupCreatedAt = groupCreatedAt)
+                requiredRecipientSession = requiredRecipientSession, groupCreatedAt = groupCreatedAt,
+                activation = note.activation, senderSpecialist = senderSpecialist)
+            if (note.activation && entries.any { it.activation && it.project == mail.project && it.run == mail.run &&
+                    it.provider == provider && it.recipientRole == mail.recipientRole }) return@withLock false
             if (entries.size >= LIMIT || entries.count {
                     it.project == mail.project && it.run == mail.run && it.provider == provider && it.senderTask == senderTask
                 } >= PER_SENDER || entries.any { it.id == mail.id ||
@@ -250,30 +261,48 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
         }
 
     /** Persist claims before transport, preventing replay even after an interrupted send. */
-    suspend fun claim(recipient: PeerConsultationContext, provider: String, session: String? = null): List<PeerMail> = mutex.withLock {
+    suspend fun claim(recipient: PeerConsultationContext, provider: String, session: String? = null, specialist: String? = null): List<PeerMail> = mutex.withLock {
         val entries = live(read(), now())
         val activeGrants = grants()
         val claimed = mutableListOf<PeerMail>()
         val updated = entries.map {
-            if (it.delivery == PeerDelivery.Queued && it.project == recipient.projectId && it.destinationRun == recipient.runId &&
+            if (!it.activation && it.delivery == PeerDelivery.Queued && it.project == recipient.projectId && it.destinationRun == recipient.runId &&
                 it.provider == provider && it.recipientRole == recipient.roleId) {
                 if ((it.groupCreatedAt?.let { created -> now() - created >= TTL } ?: false) ||
                     (it.requiredRecipientSession != null && it.requiredRecipientSession != session)) {
                     it.copy(delivery = PeerDelivery.Rejected)
                 } else if (it.run != it.destinationRun && activeGrants.none { grant -> grant.route == it.route && grant.generation == it.grantGeneration }) {
                     it.copy(delivery = PeerDelivery.Rejected)
-                } else it.copy(delivery = PeerDelivery.Claimed, recipientSession = session).also(claimed::add)
+                } else it.copy(delivery = PeerDelivery.Claimed, recipientSession = session, recipientSpecialist = specialist).also(claimed::add)
             } else it
         }
         save(updated)
         claimed
     }
 
+    /**
+     * Claim an exact sender's dormant invocation before inference. Ordinary live delivery cannot
+     * claim this note; revocation or restart cannot turn an old claim into fresh inference.
+     */
+    suspend fun claimActivation(origin: PeerConsultationContext, provider: String, task: String,
+        session: String, target: String): PeerMail? = mutex.withLock {
+        val entries = live(read(), now())
+        val note = entries.singleOrNull {
+            it.activation && it.delivery == PeerDelivery.Queued && it.project == origin.projectId &&
+                it.run == origin.runId && it.provider == provider && it.senderRole == origin.roleId &&
+                it.senderTask == task && it.senderSession == session && it.recipientRole == target
+        } ?: return@withLock null
+        val allowed = grants().any { it.route == note.route && it.generation == note.grantGeneration }
+        val next = note.copy(delivery = if (allowed) PeerDelivery.Claimed else PeerDelivery.Rejected)
+        save(entries.map { if (it == note) next else it })
+        next.takeIf { allowed }
+    }
+
     /** Record the transport outcome only for an exact persisted claim; never requeue it. */
-    suspend fun finish(claim: PeerMail, outcome: PeerDelivery) = mutex.withLock {
+    suspend fun finish(claim: PeerMail, outcome: PeerDelivery, specialist: String? = null) = mutex.withLock {
         require(outcome in setOf(PeerDelivery.Accepted, PeerDelivery.Rejected, PeerDelivery.Uncertain))
         require(claim.delivery == PeerDelivery.Claimed)
         val entries = live(read(), now())
-        save(entries.map { if (it == claim) it.copy(delivery = outcome) else it })
+        save(entries.map { if (it == claim) it.copy(delivery = outcome, recipientSpecialist = specialist ?: it.recipientSpecialist) else it })
     }
 }

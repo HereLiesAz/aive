@@ -110,6 +110,10 @@ class ProviderBackedManagedSessionGateway(
     private val peerDeliveryJobs = mutableMapOf<ManagedSessionHandle, Job>()
     private val peerDeliverySignals = mutableSetOf<ManagedSessionHandle>()
     private val peerSendSlots = Semaphore(MAX_PEER_SENDS)
+    private val activationSlot = Semaphore(1)
+    private val activationJobs = mutableMapOf<ManagedSessionHandle, Job>()
+    /** Installed only by the host that owns spend, scope and model admission. */
+    internal var dormantSpecialistAnswer: (suspend (PeerMail, suspend () -> Boolean) -> DormantSpecialistAnswer?)? = null
 
     /** Each session's observer, kept so a cancel stops the generation it is watching ([cancel]) and a release frees it. */
     private val observerJobs = mutableMapOf<ManagedSessionHandle, Job>()
@@ -582,6 +586,7 @@ class ProviderBackedManagedSessionGateway(
                     snapshots[handle] = current.copy(status = ManagedSessionStatus.Failed)
                     peerDeliverySignals.remove(handle)
                     peerDeliveryJobs.remove(handle)?.cancel()
+                    activationJobs.remove(handle)?.cancel()
                     observerJobs.remove(handle)
                 }
                 // The provider was told to stop; the observer is what keeps a generation streaming or a
@@ -611,6 +616,7 @@ class ProviderBackedManagedSessionGateway(
             consultationCounts.remove(handle)
             peerDeliverySignals.remove(handle)
             peerDeliveryJobs.remove(handle)?.cancel()
+                    activationJobs.remove(handle)?.cancel()
             observerJobs.remove(handle)
         }
         observer?.cancel()
@@ -664,6 +670,7 @@ class ProviderBackedManagedSessionGateway(
                                 recordSessionFailureLocked(handle.providerId, failure.message)
                                 peerDeliverySignals.remove(handle)
                                 peerDeliveryJobs.remove(handle)?.cancel()
+                    activationJobs.remove(handle)?.cancel()
                                 snapshots[handle] = current.copy(
                                     status = ManagedSessionStatus.Failed,
                                     progress = ManagedSessionProgress(
@@ -937,6 +944,7 @@ class ProviderBackedManagedSessionGateway(
             mutex.withLock {
                 peerDeliverySignals.remove(handle)
                 peerDeliveryJobs.remove(handle)?.cancel()
+                    activationJobs.remove(handle)?.cancel()
             }
             inferenceFabric.recordTerminal(
                 providerId = handle.providerId,
@@ -956,7 +964,7 @@ class ProviderBackedManagedSessionGateway(
         }
     }
 
-    /** Consultations are advisory only; no new sessions, tools, approvals or cross-provider disclosures. */
+    /** Consultations are advisory only; no tools, approvals or cross-provider disclosures. */
     private suspend fun rememberConsultationContext(handle: ManagedSessionHandle, request: AgentTaskRequest) {
         val context = PeerConsultationContext.from(request) ?: return
         val provider = providerFor(handle)
@@ -981,8 +989,12 @@ class ProviderBackedManagedSessionGateway(
                 recruitPeer(sender, origin, requested) ?: return
             } else requested
             if (!peerRoleAllowed(note.roleId, sender.providerId)) return
+            if (note.activation) {
+                scheduleDormantActivation(sender, origin, note)
+                return
+            }
             if (!providerRegistry.peerMailbox.enqueue(origin, sender.providerId.value, sender.taskRunId.value, note,
-                    sender.providerRunId.value, sender.inferenceInvocationId)) return
+                    sender.providerRunId.value, sender.inferenceInvocationId, specialistIdentity(sender))) return
             if (note.expertise != null) activity.record(sender.activityKey(), SessionActivityKind.Consultation,
                 "Recruited ${com.hereliesaz.geministrator.control.ControlRedaction.scrub(note.roleId)} for advisory consultation")
             activity.record(sender.activityKey(), SessionActivityKind.Consultation,
@@ -1002,6 +1014,88 @@ class ProviderBackedManagedSessionGateway(
             throw cancelled
         } catch (_: Exception) {
             // A mailbox failure must not restart billed provider work.
+        }
+    }
+
+    /**
+     * One non-recursive, cancellable advisory activation across this gateway. The worker belongs
+     * to the actual requesting session; a busy gateway refuses rather than queues new inference.
+     */
+    private suspend fun scheduleDormantActivation(sender: ManagedSessionHandle, origin: PeerConsultationContext,
+        note: PeerConsultationNote) {
+        val answer = dormantSpecialistAnswer ?: return
+        mutex.withLock {
+            if (sender in activationJobs || snapshots[sender]?.status != ManagedSessionStatus.Running) return@withLock
+            val worker = scope.launch(start = CoroutineStart.LAZY) {
+                val self = coroutineContext[Job]
+                var acquired = false
+                try {
+                    acquired = activationSlot.tryAcquire()
+                    if (!acquired) return@launch
+                    suspend fun eligible(): Boolean =
+                        mutex.withLock {
+                            snapshots[sender]?.status == ManagedSessionStatus.Running &&
+                                consultationContexts[sender] == origin &&
+                                consultationContexts.none { (handle, context) ->
+                                    handle.providerId == sender.providerId && context.projectId == origin.projectId &&
+                                        context.runId == origin.runId && context.roleId == note.roleId &&
+                                        snapshots[handle]?.status?.isTerminal() == false
+                                }
+                        } && peerRoleAllowed(origin.roleId, sender.providerId) && peerRoleAllowed(note.roleId, sender.providerId)
+                    if (!eligible()) return@launch
+                    val mailbox = providerRegistry.peerMailbox
+                    if (!mailbox.enqueue(origin, sender.providerId.value, sender.taskRunId.value, note,
+                            sender.providerRunId.value, sender.inferenceInvocationId, specialistIdentity(sender))) return@launch
+                    val claim = mailbox.claimActivation(origin, sender.providerId.value, sender.taskRunId.value,
+                        sender.providerRunId.value, note.roleId) ?: return@launch
+                    var outcome = PeerDelivery.Rejected
+                    var specialist: String? = null
+                    try {
+                        suspend fun allowed(): Boolean = eligible() && mailbox.authorized(claim)
+                        withTimeout(60_000L) {
+                            if (!allowed()) return@withTimeout
+                            activity.record(sender.activityKey(), SessionActivityKind.Consultation,
+                                "Advisory activation admitted for ${com.hereliesaz.geministrator.control.ControlRedaction.scrub(note.roleId)}")
+                            val reply = answer(claim, ::allowed) ?: return@withTimeout
+                            specialist = reply.specialistId
+                            if (!allowed()) return@withTimeout
+                            val advisory = "Untrusted dormant specialist assessment from ${note.roleId} " +
+                                "(advice only; not Keeper authorization; request ${claim.id}):\n" +
+                                com.hereliesaz.geministrator.control.ControlRedaction.scrub(reply.text).take(1200)
+                            val outgoing = withIncomingMemory(sender, advisory)
+                            if (!allowed()) return@withTimeout
+                            outcome = when (providerFor(sender).sendMessage(sender.providerRunId, outgoing)) {
+                                ProviderActionResult.Accepted -> PeerDelivery.Accepted
+                                is ProviderActionResult.Rejected -> PeerDelivery.Rejected
+                            }
+                        }
+                    } catch (_: TimeoutCancellationException) {
+                        outcome = PeerDelivery.Uncertain
+                    } catch (cancelled: CancellationException) {
+                        outcome = PeerDelivery.Uncertain
+                        throw cancelled
+                    } catch (_: Exception) {
+                        outcome = PeerDelivery.Uncertain
+                    } finally {
+                        withContext(NonCancellable) {
+                            mailbox.finish(claim, outcome, specialist)
+                            activity.record(sender.activityKey(), SessionActivityKind.Consultation,
+                                "Advisory activation: ${outcome.name.lowercase()}")
+                        }
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    // Failure cannot retry an invocation or restart the sender's provider.
+                } finally {
+                    if (acquired) activationSlot.release()
+                    withContext(NonCancellable) {
+                        mutex.withLock { if (activationJobs[sender] == self) activationJobs.remove(sender) }
+                    }
+                }
+            }
+            activationJobs[sender] = worker
+            worker.start()
         }
     }
 
@@ -1104,7 +1198,7 @@ class ProviderBackedManagedSessionGateway(
                 recipient
             } ?: return
             if (!peerRoleAllowed(context.roleId, handle.providerId)) return
-            for (mail in providerRegistry.peerMailbox.claim(context, handle.providerId.value, handle.providerRunId.value)) {
+            for (mail in providerRegistry.peerMailbox.claim(context, handle.providerId.value, handle.providerRunId.value, specialistIdentity(handle))) {
                 val uniqueRecipient = mutex.withLock {
                     snapshots[handle]?.status == ManagedSessionStatus.Running &&
                         consultationContexts[handle] == context && consultationContexts.count { (other, candidate) ->
