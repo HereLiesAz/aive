@@ -1561,7 +1561,9 @@ class ApplicationRuntime private constructor(
         val rolesNow = roles
         wordingJob = runtimeScope.launch(callContext) {
             try {
-                val made = com.hereliesaz.geministrator.queen.generateWordings(models.queen, definition, run, rolesNow, checkpoint)
+                val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(listOf(run.id.value))
+                val voice = memory.voice(models.queen, com.hereliesaz.geministrator.domain.BuiltInRoles.Orchestrator.id.value)
+                val made = com.hereliesaz.geministrator.queen.generateWordings(voice, definition, run, rolesNow, checkpoint)
                 if (made.isNotEmpty()) {
                     queenWordings[runId] = made
                     while (queenWordings.size > 32) queenWordings.remove(queenWordings.keys.first())
