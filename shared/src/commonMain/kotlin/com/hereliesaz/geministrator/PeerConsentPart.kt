@@ -60,7 +60,7 @@ internal fun PeerConsentPart(host: WorkflowLibraryHost) {
         AzphaltTextField(value = sourceRole, onValueChange = { sourceRole = it }, label = "Sending role ID")
         AzphaltTextField(value = targetRun, onValueChange = { targetRun = it }, label = "Destination run ID")
         AzphaltTextField(value = targetRole, onValueChange = { targetRole = it }, label = "Receiving role ID")
-        AzphaltPill("Review disclosure grant", "review-peer-route", onClick = {
+        AzphaltPill("Review specialist grant", "review-peer-route", onClick = {
             if (!busy) pending = PeerRoute(project.trim(), provider.trim(), sourceRun.trim(), sourceRole.trim(),
                 targetRun.trim(), targetRole.trim(), activation = sourceRun.trim() == targetRun.trim())
         })

@@ -12,7 +12,7 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 
 /**
- * Identity of one configured advisory specialist, distinct from its role or task. A model-route
+ * Identity of one configured specialist, distinct from its role or task. A model-route
  * or role revision changes the identity; neither identity nor past activity confers authority.
  * Hash the serialized role and ordered possible model route, never persist its instructions.
  */
@@ -64,6 +64,7 @@ internal class SpecialistProfileStore(settings: Settings, private val now: () ->
      * binding is never reinterpreted against a later role revision. No authority is conveyed.
      */
     suspend fun bindManaged(session: String, role: RoleDefinition, provider: String): String = mutex.withLock {
+        require(session.isNotBlank() && provider.isNotBlank())
         val book = read()
         book.bindings.singleOrNull { it.session == session }?.let { return@withLock it.specialist }
         val id = specialistInstanceId(role, listOf(ModelUse(provider, null, false)), "managed-v1")

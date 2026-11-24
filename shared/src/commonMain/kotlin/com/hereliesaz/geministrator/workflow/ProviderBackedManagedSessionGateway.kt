@@ -616,7 +616,7 @@ class ProviderBackedManagedSessionGateway(
             consultationCounts.remove(handle)
             peerDeliverySignals.remove(handle)
             peerDeliveryJobs.remove(handle)?.cancel()
-                    activationJobs.remove(handle)?.cancel()
+            activationJobs.remove(handle)?.cancel()
             observerJobs.remove(handle)
         }
         observer?.cancel()
@@ -670,7 +670,7 @@ class ProviderBackedManagedSessionGateway(
                                 recordSessionFailureLocked(handle.providerId, failure.message)
                                 peerDeliverySignals.remove(handle)
                                 peerDeliveryJobs.remove(handle)?.cancel()
-                    activationJobs.remove(handle)?.cancel()
+                                activationJobs.remove(handle)?.cancel()
                                 snapshots[handle] = current.copy(
                                     status = ManagedSessionStatus.Failed,
                                     progress = ManagedSessionProgress(
@@ -944,7 +944,7 @@ class ProviderBackedManagedSessionGateway(
             mutex.withLock {
                 peerDeliverySignals.remove(handle)
                 peerDeliveryJobs.remove(handle)?.cancel()
-                    activationJobs.remove(handle)?.cancel()
+                activationJobs.remove(handle)?.cancel()
             }
             inferenceFabric.recordTerminal(
                 providerId = handle.providerId,
@@ -1309,9 +1309,13 @@ class ProviderBackedManagedSessionGateway(
         } catch (_: Exception) {
             emptyList()
         }
+        val crossRun = routes.filterNot { it.activation }
+        val wake = routes.filter { it.activation && it.targetRole !in available && dormantSpecialistAnswer != null }
         val directory = (if (available.isEmpty()) "" else "\nCurrently available peer role IDs: " + available.joinToString(", ")) +
-            (if (routes.isEmpty()) "" else "\nKeeper-consented cross-run routes (run ID, role ID): " +
-                routes.joinToString("; ") { "${it.targetRun}, ${it.targetRole}" })
+            (if (crossRun.isEmpty()) "" else "\nKeeper-consented cross-run routes (run ID, role ID): " +
+                crossRun.joinToString("; ") { "${it.targetRun}, ${it.targetRole}" }) +
+            (if (wake.isEmpty()) "" else "\nKeeper-consented dormant activation role IDs: " +
+                wake.joinToString(", ") { it.targetRole })
         return copy(promptContext = promptContext.copy(stablePrefix = promptContext.stablePrefix +
             PromptContextBlock("Peer consultation", PeerConsultationNote.INSTRUCTIONS + directory)))
     }
