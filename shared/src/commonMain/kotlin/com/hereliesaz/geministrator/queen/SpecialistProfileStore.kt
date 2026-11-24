@@ -7,6 +7,8 @@ import com.russhwolf.settings.Settings
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 
 /**
@@ -22,9 +24,7 @@ internal fun specialistInstanceId(role: RoleDefinition, uses: List<ModelUse>): S
     val route = uses.map { listOf(it.sourceId, it.modelId.orEmpty(), it.billsPerToken.toString()) }
     val roleHash = Sha256.hex(Json.encodeToString(RoleDefinition.serializer(), revision).encodeToByteArray())
     val routeHash = Sha256.hex(Json.encodeToString(
-        kotlinx.serialization.builtins.ListSerializer(
-            kotlinx.serialization.builtins.ListSerializer(kotlinx.serialization.builtins.serializer<String>())
-        ), route).encodeToByteArray())
+        ListSerializer(ListSerializer(String.serializer())), route).encodeToByteArray())
     return Sha256.hex("advisory-v1:$roleHash:$routeHash".encodeToByteArray())
 }
 
