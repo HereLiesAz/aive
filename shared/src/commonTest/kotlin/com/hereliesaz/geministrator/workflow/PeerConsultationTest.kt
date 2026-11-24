@@ -102,4 +102,17 @@ class PeerConsultationTest {
         assertNull(PeerConsultationNote.parse("RECRUIT " + "x".repeat(161) + "\nQuestion"))
         assertNull(PeerConsultationNote.parse("RECRUIT database\tindex\nQuestion"))
     }
+    @Test
+    fun groupCommandsRequireExplicitInvitationOrGroupReference() {
+        val id = "b".repeat(64)
+        val invitation = requireNotNull(PeerConsultationNote.parse("INVITE reviewer\nReview the design"))
+        assertEquals(PeerGroupAction.Invite, invitation.groupAction)
+        assertNull(invitation.groupId)
+        val volunteer = requireNotNull(PeerConsultationNote.parse("VOLUNTEER architect $id\nI can help"))
+        assertEquals(PeerGroupAction.Volunteer, volunteer.groupAction)
+        assertEquals(id, volunteer.replyTo)
+        assertEquals(id, PeerConsultationNote.parse("GROUP-NOTE reviewer $id\nFinding")?.groupId)
+        assertNull(PeerConsultationNote.parse("DECLINE architect\nNo"))
+        assertNull(PeerConsultationNote.parse("GROUP-NOTE reviewer made-up\nFinding"))
+    }
 }
