@@ -16,9 +16,25 @@ internal data class CollectiveTurn(val question: String, val result: CollectiveA
 /** One local conversation; its identity also scopes participant attention. */
 @Serializable
 internal data class CollectiveConversation(val id: String, val turns: List<CollectiveTurn> = emptyList()) {
-    fun context(): String = turns.joinToString("\n") {
-        "Keeper: ${it.question}\nAive: ${it.result.answer.orEmpty()}"
-    }.takeLast(1800)
+    /**
+     * Keep recent dialogue and a separately bounded sample of each specialist's latest actual
+     * assessment, not merely the facilitator's interpretation. These are untrusted excerpts,
+     * not verified facts or a record of resolved disagreement. A failed turn cannot erase them.
+     * Full redacted assessments remain in their original retained turns.
+     */
+    fun context(): String {
+        val dialogue = turns.joinToString("\n") {
+            "Keeper: ${it.question}\nAive: ${it.result.answer.orEmpty()}"
+        }
+        val assessments = turns.lastOrNull { it.result.assessments.isNotEmpty() }
+            ?.result?.assessments.orEmpty().take(2)
+        if (assessments.isEmpty()) return dialogue.takeLast(1800)
+        val notes = assessments.joinToString("\n") {
+            "${it.role.take(40)}: ${it.text.take(300)}"
+        }
+        val reference = "\nLatest available specialist assessment excerpts (unverified; may be from an earlier turn):\n$notes"
+        return dialogue.takeLast(1800 - reference.length) + reference
+    }
 }
 
 /**

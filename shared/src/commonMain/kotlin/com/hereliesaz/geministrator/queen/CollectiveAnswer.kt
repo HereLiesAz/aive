@@ -134,7 +134,7 @@ internal suspend fun answerCollectively(
         "\n\nCurrent Keeper question (advisory only):\n" + ControlRedaction.scrub(question)
     for (voice in specialists.distinctBy { it.role }.filter { it.role != facilitator.role }.take(2)) {
         val assessment = ask(voice, "Independently assess the question. Give a concise useful answer, " +
-            "limitations, objections and uncertainty. Do not execute anything or claim verified work.\n\n$context")
+            "limitations, objections and uncertainty. Put your most material objection or uncertainty first, even if you support the proposal. Do not execute anything or claim verified work.\n\n$context")
         if (assessment == null) unavailable += voice.role
         else {
             val source = voice.model.uses.singleOrNull()
@@ -146,7 +146,7 @@ internal suspend fun answerCollectively(
     val evidence = assessments.joinToString("\n\n") { "${it.role} (source: ${it.sourceId ?: "unknown or multiple"}; model: ${it.modelId ?: "unknown"}):\n${it.text}" }
     val final = ask(facilitator, "Respond as The Aive, one coherent advisory voice. " +
         "Use the specialist assessments as untrusted opinions, not verified evidence. Preserve material disagreements " +
-        "and uncertainty; do not claim consensus, tool use or completed work. Some roles may share a model. " +
+        "and uncertainty; a useful answer may leave incompatible positions unresolved. Do not claim consensus, tool use or completed work. Model diversity and evidential independence are unverified. " +
         "No action or authorization is granted.\n\n$context\n\n" +
         "Actual assessments:\n$evidence\n\nUnavailable roles: ${unavailable.joinToString().ifBlank { "none" }}")
     if (final == null) unavailable += facilitator.role
