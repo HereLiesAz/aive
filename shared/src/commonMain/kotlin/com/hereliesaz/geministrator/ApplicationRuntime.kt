@@ -1875,6 +1875,7 @@ class ApplicationRuntime private constructor(
                     runId, case.dispute, case.parties, models?.queen, models?.voices.orEmpty(), investigator,
                     findingsOf = investigator::findingsOf, mayCall = models?.mayCall ?: { true },
                     testFacts = { testRunId -> readBackTestReport(testRunId) },
+                    caseKey = "report:${case.key}",
                 )
                 runtimeMutex.withLock { publishCurrent() }
             } catch (cancellation: CancellationException) {

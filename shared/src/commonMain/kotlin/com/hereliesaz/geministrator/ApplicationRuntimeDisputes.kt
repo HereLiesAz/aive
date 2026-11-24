@@ -50,12 +50,20 @@ internal suspend fun ApplicationRuntime.raiseDispute(
     mayCall: () -> Boolean = { true },
     /** Reads a started test swarm's results back as listed facts (see [readBackTestReport]); null when they cannot be read. */
     testFacts: (suspend (String) -> List<String>?)? = null,
+    /** Stable host case key, distinct for each report or training dispute; never model-authored. */
+    caseKey: String,
 ): DisputeResolution {
     val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(
         if (persistence.runs.get(WorkflowRunId(runId)) != null) listOf(runId) else emptyList(),
     )
-    val queenWithMemory = queenModel?.let { memory.voice(it, BuiltInRoles.Orchestrator.id.value) }
-    val voicesWithMemory = voices.mapValues { (roleId, model) -> memory.voice(model, roleId) }
+    val roles = activeRoles(resolveRoleCollection(persistence.roles.all()))
+    val conversationId = "dispute:$caseKey"
+    val queenWithMemory = queenModel?.let {
+        memory.configuredVoice(it, BuiltInRoles.Orchestrator.id.value, conversationId, roles)
+    }
+    val voicesWithMemory = voices.mapValues { (roleId, model) ->
+        memory.configuredVoice(model, roleId, conversationId, roles)
+    }
     var resolution = settleWithAgreement(dispute, parties, queenWithMemory, voicesWithMemory, allowInvestigation = !investigated, mayCall = mayCall, independentProposals = true)
     var investigationRunId: String? = null
     val agreed = resolution as? DisputeResolution.Agreed

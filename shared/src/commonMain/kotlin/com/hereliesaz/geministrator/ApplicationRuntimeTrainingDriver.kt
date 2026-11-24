@@ -111,6 +111,7 @@ internal suspend fun ApplicationRuntime.driveTrainingRound(runId: String) {
         val resolution = raiseDispute(
             runId, trainingDispute(disputed, exchange.facts), trainingDisputants(), models?.queen, models?.voices.orEmpty(),
             launcher = null, investigated = true, mayCall = mayCall,
+            caseKey = "training:${run.id.value}:${info.round}",
         )
         val option = ((resolution as? DisputeResolution.Agreed)?.outcome as? DisputeOutcome.Ruled)?.optionId
         next = trainingNextAfterDispute(option, disputed, info.round, limits, findings)
