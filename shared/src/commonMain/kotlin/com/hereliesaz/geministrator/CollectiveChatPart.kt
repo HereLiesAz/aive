@@ -17,13 +17,13 @@ import kotlin.random.Random
 @Composable
 internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
     val scope = rememberCoroutineScope()
-    var conversation by remember(host) { mutableStateOf("collective:${currentEpochMillis()}:${Random.nextLong()}") }
-    var question by remember(host) { mutableStateOf("") }
-    var turns by remember(host) { mutableStateOf<List<Pair<String, CollectiveAnswer>>>(emptyList()) }
-    var pending by remember(host) { mutableStateOf<Job?>(null) }
-    var busy by remember(host) { mutableStateOf(false) }
-    var inspect by remember(host) { mutableStateOf(false) }
-    var status by remember(host) { mutableStateOf("") }
+    var conversation by remember { mutableStateOf("collective:${currentEpochMillis()}:${Random.nextLong()}") }
+    var question by remember { mutableStateOf("") }
+    var turns by remember { mutableStateOf<List<Pair<String, CollectiveAnswer>>>(emptyList()) }
+    var pending by remember { mutableStateOf<Job?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    var inspect by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf("") }
     ProviderSectionLabel("Ask The Aive")
     Text("One advisory voice, informed by independent assessments. No workflow starts. Only role memory is consulted; these turns are kept in this panel.",
         style = AzphaltType.body, color = azphaltOnSurface())
