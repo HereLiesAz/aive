@@ -18,6 +18,8 @@ data class ManagedSessionHandle(
     val providerId: AgentProviderId,
     val providerRunId: ProviderRunId,
     val inferenceInvocationId: String? = null,
+    /** Host-derived diagnostic identity, not session equality or authority. */
+    val specialistId: String? = null,
 ) {
     // Invocation metadata is diagnostic/provenance state, not provider-session identity. Persisted
     // handles are reconstructed without it, so equality must remain stable across reconstruction.
@@ -86,6 +88,9 @@ interface ManagedSessionGateway {
     suspend fun resolveProvider(selection: ProviderSelectionRequest): AgentProviderId
 
     suspend fun createSession(request: ManagedSessionRequest): ManagedSessionHandle
+
+    /** Recover the original specialist binding for a reconstructed session when retained. */
+    suspend fun specialistIdentity(handle: ManagedSessionHandle): String? = handle.specialistId
 
     /**
      * The plan [providerId] drafts for [request] before any run starts, or null when that provider

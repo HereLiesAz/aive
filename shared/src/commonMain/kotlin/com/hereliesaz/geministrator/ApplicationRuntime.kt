@@ -408,9 +408,7 @@ class ApplicationRuntime private constructor(
         com.hereliesaz.geministrator.queen.CollectiveConversationStore(persistence.inferenceSettings, ::nowEpochMillis)
     }
 
-    private val collectiveProfiles by lazy {
-        com.hereliesaz.geministrator.queen.SpecialistProfileStore(persistence.inferenceSettings, ::nowEpochMillis)
-    }
+    private val collectiveProfiles get() = providerRegistry.specialistProfiles
 
     /** Configured text-only model factory. No managed-session tools or repository access. */
     internal var collectiveModelFor: ((String?) -> com.hereliesaz.geministrator.queen.QueenModel?)? = null

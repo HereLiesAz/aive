@@ -57,6 +57,25 @@ class SpecialistProfileStoreTest {
     }
 
     @Test
+    fun managedBindingSurvivesRestartAndRoleRevisionWithoutDoubleCounting() = runTest {
+        val settings = MapSettings()
+        val role = BuiltInRoles.Architect
+        val first = SpecialistProfileStore(settings) { 100L }
+        val original = first.bindManaged("session-a", role, "provider-a")
+        val restarted = SpecialistProfileStore(settings) { 200L }
+        assertEquals(original, restarted.managedIdentity("session-a"))
+        val changed = role.copy(instructions = "New revision")
+        assertEquals(original, restarted.bindManaged("session-a", changed, "provider-a"))
+        assertEquals(original, restarted.bindManaged("session-b", role, "provider-a"))
+        assertNotEquals(original, restarted.bindManaged("session-c", changed, "provider-a"))
+        assertNotEquals(original, restarted.bindManaged("session-d", role, "provider-b"))
+        assertEquals(2L, restarted.profiles().single { it.id == original }.managedSessions)
+        assertEquals(0L, restarted.profiles().single { it.id == original }.answered)
+        restarted.clear()
+        assertEquals(null, first.managedIdentity("session-a"))
+    }
+
+    @Test
     fun profilesRetainOnlyTheNewestBoundedInstances() = runTest {
         val store = SpecialistProfileStore(MapSettings()) { 100L }
         repeat(129) { i ->

@@ -64,7 +64,7 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
     if (inspect && profiles.isNotEmpty()) {
         Text("Observed specialist call outcomes (not answer quality)", style = AzphaltType.body, color = azphaltOnSurface())
         profiles.forEach { profile ->
-            Text("${profile.roleId} · ${profile.id.take(12)}: ${profile.answered} answers, ${profile.empty} empty, ${profile.failed} failed, ${profile.timedOut} timed out",
+            Text("${profile.roleId} · ${profile.id.take(12)}: ${profile.answered} answers, ${profile.empty} empty, ${profile.failed} failed, ${profile.timedOut} timed out, ${profile.managedSessions} managed sessions",
                 style = AzphaltType.body, color = azphaltOnSurface())
         }
     }

@@ -52,6 +52,8 @@ An individual role template, installed specialist instance, task assignment and 
 
 The current peer admission path uses the existing persisted role catalog as its identity anchor, checks current enabled state and provider pin on enqueue and delivery, and advertises only unique live eligible same-run peers (up to 16) at prompt construction. A missing or unreadable catalog disables peer traffic. This does not yet establish multiple independent specialist instances per role. Cross-run disclosure is separately authorized by the Keeper.
 
+Managed dispatch now binds the actual provider and configured role revision to a distinct managed specialist ID, retaining up to 512 hashed session bindings in the same local profile ledger. Reconstructed handles resolve retained bindings without using the edited roster to rewrite history. Unknown/evicted historical sessions remain unknown; managed model identity is not asserted where the provider does not expose it at dispatch. Managed session counts are distinct from advisory call outcomes and do not establish quality or authority.
+
 The specialist catalog is durable. Model sessions are created on demand, not kept alive for appearance. Idle specialists are available to be awakened; idle does not mean a provider is billing. Retirement disables routing and preserves the historical identity subject to retention policy. Deletion, export and revocation must have explicit semantics.
 
 ## 4. Communication fabric

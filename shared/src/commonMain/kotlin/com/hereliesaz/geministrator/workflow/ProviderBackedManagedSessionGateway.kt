@@ -125,6 +125,16 @@ class ProviderBackedManagedSessionGateway(
     /** How many sessions this gateway still holds state for. */
     internal suspend fun trackedSessionCount(): Int = mutex.withLock { snapshots.size }
 
+    /** Key includes the exact provider session and task, not any model-authored identifier. */
+    private fun ManagedSessionHandle.specialistSessionKey(): String =
+        com.hereliesaz.geministrator.Sha256.hex(listOf(taskRunId.value, providerId.value, providerRunId.value)
+            .joinToString("") { "${it.length}:$it" }.encodeToByteArray())
+
+    override suspend fun specialistIdentity(handle: ManagedSessionHandle): String? =
+        runCatchingCancellable {
+            providerRegistry.specialistProfiles.managedIdentity(handle.specialistSessionKey())
+        }.getOrNull()
+
     override suspend fun resolveProvider(selection: ProviderSelectionRequest): AgentProviderId =
         selectProvider(selection, "No registered provider can satisfy this task").id
 
@@ -225,6 +235,9 @@ class ProviderBackedManagedSessionGateway(
             request.providerSelection.copy(repository = recalledRequest.repository),
             "No registered provider can satisfy this task",
         )
+        val specialistRole = runCatchingCancellable {
+            peerRoster().singleOrNull { it.id == recalledRequest.orchestrationContext.roleId }
+        }.getOrNull()
         val providerCapabilities = provider.capabilities()
         // Only an agent the keeper can reply to mid-task is told how to ask the keeper a question.
         val askingRequest = if (AgentCapability.Messaging in providerCapabilities.supported) {
@@ -257,10 +270,16 @@ class ProviderBackedManagedSessionGateway(
                     providerRunId = run.providerRunId,
                     inferenceInvocationId = prepared.plan.invocationId,
                 )
-                recordMemory { memoryObserver.onSessionStarted(handle, taskRequest) }
-                rememberConsultationContext(handle, taskRequest)
+                val specialistId = specialistRole?.let { role ->
+                    runCatchingCancellable {
+                        providerRegistry.specialistProfiles.bindManaged(handle.specialistSessionKey(), role, provider.id.value)
+                    }.getOrNull()
+                }
+                val identified = handle.copy(specialistId = specialistId)
+                recordMemory { memoryObserver.onSessionStarted(identified, taskRequest) }
+                rememberConsultationContext(identified, taskRequest)
                 registerAndObserve(
-                    handle = handle,
+                    handle = identified,
                     initialStatus = if (taskRequest.requirePlanApproval) {
                         ManagedSessionStatus.Planning
                     } else {
@@ -270,7 +289,7 @@ class ProviderBackedManagedSessionGateway(
                 // No suspension occurs between clearing the rollback marker and returning the
                 // committed handle to the caller.
                 startedProviderRunId = null
-                handle
+                identified
             }
         } catch (failure: CancellationException) {
             cancelUnreturnedProviderRun(provider, startedProviderRunId)
