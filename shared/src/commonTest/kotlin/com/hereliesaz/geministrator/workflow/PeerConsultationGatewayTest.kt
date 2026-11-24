@@ -56,7 +56,8 @@ class PeerConsultationGatewayTest {
         val recipient = handle(provider, "reviewer")
         val recipientContext = PeerConsultationContext("project", "run", "reviewer")
         try {
-            val gateway = ProviderBackedManagedSessionGateway(registry, scope)
+            val activity = SessionActivityFeeds()
+            val gateway = ProviderBackedManagedSessionGateway(registry, scope, activity = activity)
             gateway.reconnect(sender, ManagedSessionStatus.Running, request(sender, "architect"))
             provider.events.send(AgentEvent.Message(sender.providerRunId, "CONSULT reviewer\nCheck the evidence"))
             withTimeout(5_000L) {
@@ -73,6 +74,11 @@ class PeerConsultationGatewayTest {
             assertTrue(sent.second.endsWith("; intent: Inquiry\nCheck the evidence"))
             assertEquals(PeerDelivery.Accepted, registry.peerMailbox.receipts(recipientContext, provider.id.value).single().delivery)
             assertTrue(provider.deliveries.tryReceive().isFailure)
+            assertEquals(listOf("Queued Inquiry for reviewer", "Transport accepted: Inquiry to reviewer"),
+                activity.lines(sender.activityKey()).filter { it.kind == SessionActivityKind.Consultation }.map { it.text })
+            assertEquals(listOf("Transport accepted: Inquiry from architect"),
+                activity.lines(recipient.activityKey()).filter { it.kind == SessionActivityKind.Consultation }.map { it.text })
+            assertTrue(activity.lines(unrelated.activityKey()).none { it.kind == SessionActivityKind.Consultation })
         } finally {
             scope.cancel()
         }
