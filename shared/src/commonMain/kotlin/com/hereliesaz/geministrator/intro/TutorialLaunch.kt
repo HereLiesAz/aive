@@ -24,7 +24,9 @@ internal object TutorialLaunch {
 
     private fun voice(base: QueenModel, roles: Collection<RoleDefinition>, default: RoleDefinition): TutorialVoice {
         val role = roles.firstOrNull { it.id == default.id && it.enabled } ?: default
-        return TutorialVoice(role.name, voiceModel(base, role.name, role.instructions))
+        // A first-run tutorial has no authorized workflow bank; only the receiving role's lessons apply.
+        val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(emptyList())
+        return TutorialVoice(role.name, memory.voice(voiceModel(base, role.name, role.instructions), role.id.value))
     }
 
     /**
@@ -40,7 +42,9 @@ internal object TutorialLaunch {
 
     fun planner(base: QueenModel, roles: Collection<RoleDefinition>): QueenModel = voice(base, roles, BuiltInRoles.Planner).model
 
-    fun writer(base: QueenModel): QueenModel = voiceModel(base, WRITER_NAME, WRITER_TEXT)
+    fun writer(base: QueenModel): QueenModel =
+        com.hereliesaz.geministrator.memory.DirectChatMemory(emptyList())
+            .voice(voiceModel(base, WRITER_NAME, WRITER_TEXT), "tutorial-writer")
 
     /** The registry rows with a label, without the rail's entries when no rail is on screen (a phone layout). */
     fun rows(labels: Map<String, String>): List<TargetRow> {
