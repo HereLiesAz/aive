@@ -70,21 +70,24 @@ class ResearchInvestigation(
     /** The same research with [model] answering the facts (the queen's model, held to the keeper's caps by the caller). */
     fun withFactModel(model: QueenModel?): ResearchInvestigation = ResearchInvestigation(step, context, budget, model)
 
-    suspend fun findings(missingFact: String, runKey: String): List<String>? {
+    /** [memoryRunIds] contains only existing workflow banks authorized by the caller; never use the external lookup key as a bank ID. */
+    suspend fun findings(missingFact: String, runKey: String, memoryRunIds: List<String> = emptyList()): List<String>? {
         val objective = ResearchText.clean(missingFact, 200)
         if (objective.isEmpty()) return null
         // "Learn about" is a word the step's own deterministic rule reads as a request to look something up.
         val outcome = step.run("Learn about $objective", context(), runKey)
         val tools = outcome.leads.toAvailableTools(budget)
-        val facts = factsFrom(objective, outcome.leads)
+        val facts = factsFrom(objective, outcome.leads, memoryRunIds)
         return (facts + tools).takeIf { it.isNotEmpty() }
     }
 
-    private suspend fun factsFrom(objective: String, leads: List<ResearchLead>): List<String> {
+    private suspend fun factsFrom(objective: String, leads: List<ResearchLead>, memoryRunIds: List<String>): List<String> {
         val model = factModel ?: return emptyList()
         if (leads.isEmpty()) return emptyList()
         val reply = try {
-            model.answer(researchFactsPrompt(objective, leads))
+            val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(memoryRunIds)
+            memory.voice(model, com.hereliesaz.geministrator.domain.BuiltInRoles.Orchestrator.id.value)
+                .answer(researchFactsPrompt(objective, leads))
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
