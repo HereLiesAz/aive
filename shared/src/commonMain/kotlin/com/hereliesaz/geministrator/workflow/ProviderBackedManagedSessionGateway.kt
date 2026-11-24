@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.ContextProvenance
+import com.hereliesaz.geministrator.runCatchingCancellable
 import com.hereliesaz.geministrator.agentui.AgentUi
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
@@ -478,7 +479,7 @@ class ProviderBackedManagedSessionGateway(
         val outgoing = if (message.startsWith(MEMORY_MESSAGE_MARKER)) {
             message
         } else {
-            runCatching { memoryObserver.annotateUserMessage(handle, message) }.getOrDefault(message)
+            withIncomingMemory(handle, message)
         }
         val result = providerFor(handle).sendMessage(handle.providerRunId, outgoing)
         // The keeper's words are banked only once the provider took them: a refused message never reached the agent.
@@ -487,6 +488,10 @@ class ProviderBackedManagedSessionGateway(
         }
         result
     }
+
+    /** Passive recipient-scoped cues, independent of the sender's identity or banking. */
+    private suspend fun withIncomingMemory(handle: ManagedSessionHandle, text: String): String =
+        runCatchingCancellable { memoryObserver.annotateUserMessage(handle, text) }.getOrDefault(text)
 
     override suspend fun keeperQuestion(handle: ManagedSessionHandle): KeeperQuestionState? =
         mutex.withLock {
@@ -500,8 +505,8 @@ class ProviderBackedManagedSessionGateway(
         questionKey: String,
         answer: String,
     ): ProviderActionResult = providerOperation("Unable to answer provider session ${handle.providerRunId.value}") {
-        // The answer is structured data for the agent; memory's cue cloud is not added to it.
-        val result = providerFor(handle).sendMessage(handle.providerRunId, answer)
+        // Preserve the answer as the first part of the message; passive cues are separate reference data.
+        val result = providerFor(handle).sendMessage(handle.providerRunId, withIncomingMemory(handle, answer))
         if (result is ProviderActionResult.Accepted) {
             // The keeper's answer is part of the session, banked like any other message of theirs.
             recordMemory { memoryObserver.onKeeperMessage(handle, answer) }
@@ -1085,8 +1090,15 @@ class ProviderBackedManagedSessionGateway(
                     groupAction = mail.groupAction, groupId = mail.groupId)
                 val outcome = try {
                     when (withTimeout(PEER_SEND_TIMEOUT_MILLIS) {
-                        providerFor(handle).sendMessage(handle.providerRunId, note.advisoryText(mail.senderRole, mail.id) +
-                            (if (mail.destinationRun != mail.run) "\nOrigin run ID: ${mail.run}" else ""))
+                        val advisory = note.advisoryText(mail.senderRole, mail.id) +
+                            (if (mail.destinationRun != mail.run) "\nOrigin run ID: ${mail.run}" else "")
+                        val outgoing = withIncomingMemory(handle, advisory)
+                        // Recall may suspend; revalidate consent and recipient lifecycle after it returns.
+                        if (!peerRoleAllowed(context.roleId, handle.providerId) ||
+                            !peerRoleAllowed(mail.senderRole, handle.providerId) ||
+                            !providerRegistry.peerMailbox.authorized(mail) || status(handle) != ManagedSessionStatus.Running) {
+                            ProviderActionResult.Rejected("Peer delivery no longer authorized")
+                        } else providerFor(handle).sendMessage(handle.providerRunId, outgoing)
                     }) {
                         ProviderActionResult.Accepted -> PeerDelivery.Accepted
                         is ProviderActionResult.Rejected -> PeerDelivery.Rejected
