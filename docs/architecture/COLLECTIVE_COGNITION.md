@@ -39,6 +39,8 @@ The [threat model](../THREAT_MODEL.md), [policy decision point](POLICY.md), and 
 
 An individual role template, installed specialist instance, task assignment and provider session must not be conflated. Several specialists may share a role or model without sharing identity. A specialist may have several assignments, or none. A provider change must not erase its mail, expertise or history. Migration from role IDs must preserve existing configurations, pins, references, instructions and historical runs. Never infer that historical task IDs are persistent specialist IDs.
 
+The current peer admission path uses the existing persisted role catalog as its identity anchor, checks current enabled state and provider pin on enqueue and delivery, and advertises only unique live eligible same-run peers (up to 16) at prompt construction. A missing or unreadable catalog disables peer traffic. This does not yet establish multiple independent specialist instances per role or authorize cross-run communication.
+
 The specialist catalog is durable. Model sessions are created on demand, not kept alive for appearance. Idle specialists are available to be awakened; idle does not mean a provider is billing. Retirement disables routing and preserves the historical identity subject to retention policy. Deletion, export and revocation must have explicit semantics.
 
 ## 4. Communication fabric
