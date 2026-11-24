@@ -214,7 +214,9 @@ class ProviderBackedManagedSessionGateway(
         val providerCapabilities = provider.capabilities()
         // Only an agent the keeper can reply to mid-task is told how to ask the keeper a question.
         val askingRequest = if (AgentCapability.Messaging in providerCapabilities.supported) {
-            recalledRequest.withKeeperQuestionInstructions().withPeerConsultationInstructions()
+            recalledRequest.withKeeperQuestionInstructions().let {
+                if (provider.enforcesToolFilter) it.withPeerConsultationInstructions() else it
+            }
         } else {
             recalledRequest
         }
@@ -891,7 +893,8 @@ class ProviderBackedManagedSessionGateway(
     /** Consultations are advisory only; no new sessions, tools, approvals or cross-provider disclosures. */
     private suspend fun rememberConsultationContext(handle: ManagedSessionHandle, request: AgentTaskRequest) {
         val context = PeerConsultationContext.from(request) ?: return
-        if (AgentCapability.Messaging !in providerFor(handle).capabilities().supported) return
+        val provider = providerFor(handle)
+        if (!provider.enforcesToolFilter || AgentCapability.Messaging !in provider.capabilities().supported) return
         mutex.withLock { consultationContexts[handle] = context }
     }
 
