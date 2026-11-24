@@ -15,6 +15,21 @@ import kotlinx.serialization.json.Json
 @Serializable
 internal enum class PeerDelivery { Queued, Claimed, Accepted, Rejected, Uncertain, Expired }
 
+/** Directional Keeper consent for two exact runs and roles on one provider. No wildcard scope. */
+@Serializable
+internal data class PeerRoute(
+    val project: String,
+    val provider: String,
+    val sourceRun: String,
+    val sourceRole: String,
+    val targetRun: String,
+    val targetRole: String,
+)
+
+/** A grant generation is never reused after revocation. */
+@Serializable
+internal data class PeerRouteGrant(val route: PeerRoute, val generation: Long)
+
 /** A redacted advisory note addressed to a specialist, not a provider session. */
 @Serializable
 internal data class PeerMail(
@@ -33,17 +48,22 @@ internal data class PeerMail(
     val intent: PeerIntent = PeerIntent.Inquiry,
     val replyTo: String? = null,
     val correlationId: String? = null,
+    val targetRun: String? = null,
+    val grantGeneration: Long? = null,
 ) {
     /** Stable content-derived identifier for this scoped, deduplicated envelope. */
     val id: String get() = Sha256.hex(Json.encodeToString(listOf(project, run, provider, senderRole,
-        senderTask, recipientRole, text, intent.name, replyTo.orEmpty())).encodeToByteArray())
+        senderTask, recipientRole, text, intent.name, replyTo.orEmpty()) +
+        (targetRun?.let { listOf(it, grantGeneration.toString()) } ?: emptyList())).encodeToByteArray())
+    val destinationRun: String get() = targetRun ?: run
+    val route: PeerRoute get() = PeerRoute(project, provider, run, senderRole, destinationRun, recipientRole)
 }
 
 /**
  * Durable bounded queue and receipt ledger. A claim is persisted before transport: a crash cannot
  * replay an ambiguous send. Claimed notes remain visible until retention expires; rejected and
  * uncertain sends are not retried automatically. Scope is deliberately
- * restricted to the originating run and provider; this is not permission to disclose across runs.
+ * restricted to the originating project and provider; a different run requires an exact, current Keeper grant.
  */
 internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
     private val store = ChunkedStringSettings.unbounded(settings)
@@ -51,6 +71,9 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
     private val json = Json
     private companion object {
         const val KEY = "hive.peer.mailbox.v1"
+        const val GRANTS = "hive.peer.grants.v1"
+        const val GENERATION = "hive.peer.grant-generation.v1"
+        const val MAX_GRANTS = 64
         const val LIMIT = 128
         const val PER_SENDER = 4
         const val TTL = 86_400_000L
@@ -64,11 +87,42 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
 
     private fun save(entries: List<PeerMail>) = store.putString(KEY, json.encodeToString(entries))
 
+    private fun grants(): List<PeerRouteGrant> =
+        store.getStringOrNull(GRANTS)?.let { json.decodeFromString<List<PeerRouteGrant>>(it) }.orEmpty()
+
+    /** Only a local Keeper surface may call this; route values must be verified against the run catalog there. */
+    suspend fun grant(route: PeerRoute): Boolean = mutex.withLock {
+        if (route.sourceRun == route.targetRun || route.sourceRole == route.targetRole ||
+            listOf(route.project, route.provider, route.sourceRun, route.sourceRole, route.targetRun, route.targetRole)
+                .any { !Regex("[A-Za-z0-9_.:-]{1,128}").matches(it) }) return@withLock false
+        val current = grants()
+        if (current.any { it.route == route }) return@withLock true
+        if (current.size >= MAX_GRANTS) return@withLock false
+        val generation = store.getLong(GENERATION, 0L) + 1L
+        check(generation > 0L)
+        store.putLong(GENERATION, generation)
+        store.putString(GRANTS, json.encodeToString(current + PeerRouteGrant(route, generation)))
+        true
+    }
+
+    /** Revoking a route invalidates every queued note under that grant, including after re-grant. */
+    suspend fun revoke(route: PeerRoute) = mutex.withLock {
+        store.putString(GRANTS, json.encodeToString(grants().filterNot { it.route == route }))
+    }
+
+    suspend fun routes(): List<PeerRoute> = mutex.withLock { grants().map { it.route } }
+
+    /** Called again immediately before provider delivery; a stale grant is not authority. */
+    suspend fun authorized(mail: PeerMail): Boolean = mutex.withLock {
+        mail.destinationRun == mail.run || grants().any { it.route == mail.route && it.generation == mail.grantGeneration }
+    }
+
     /** Retained receipt history for one exact scope; no payload crosses project or provider boundaries. */
     suspend fun receipts(scope: PeerConsultationContext, provider: String): List<PeerMail> = mutex.withLock {
         live(read(), now()).filter {
-            it.project == scope.projectId && it.run == scope.runId && it.provider == provider &&
-                (it.senderRole == scope.roleId || it.recipientRole == scope.roleId)
+            it.project == scope.projectId && it.provider == provider &&
+                ((it.run == scope.runId && it.senderRole == scope.roleId) ||
+                    (it.destinationRun == scope.runId && it.recipientRole == scope.roleId))
         }
     }
 
@@ -78,15 +132,20 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
             if (origin.roleId == note.roleId) return@withLock false
             val time = now()
             val entries = live(read(), time)
+            val targetRun = note.targetRun ?: origin.runId
+            val route = PeerRoute(origin.projectId, provider, origin.runId, origin.roleId, targetRun, note.roleId)
+            val generation = if (targetRun == origin.runId) null else
+                grants().singleOrNull { it.route == route }?.generation ?: return@withLock false
             val parent = note.replyTo?.let { id ->
-                entries.singleOrNull { it.id == id && it.project == origin.projectId && it.run == origin.runId &&
+                entries.singleOrNull { it.id == id && it.project == origin.projectId && it.destinationRun == origin.runId && it.run == targetRun &&
                     it.provider == provider && it.recipientRole == origin.roleId && it.senderRole == note.roleId &&
                     it.recipientSession == senderSession && it.delivery in setOf(PeerDelivery.Claimed, PeerDelivery.Accepted) }
                     ?: return@withLock false
             }
             val mail = PeerMail(origin.projectId, origin.runId, provider, origin.roleId, senderTask,
                 note.roleId, ControlRedaction.scrub(note.body), time, senderSession, senderInvocation,
-                intent = note.intent, replyTo = parent?.id, correlationId = parent?.correlationId ?: parent?.id)
+                intent = note.intent, replyTo = parent?.id, correlationId = parent?.correlationId ?: parent?.id,
+                targetRun = targetRun.takeIf { it != origin.runId }, grantGeneration = generation)
             if (entries.size >= LIMIT || entries.count {
                     it.project == mail.project && it.run == mail.run && it.provider == provider && it.senderTask == senderTask
                 } >= PER_SENDER || entries.any { it.id == mail.id }) return@withLock false
@@ -97,11 +156,14 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
     /** Persist claims before transport, preventing replay even after an interrupted send. */
     suspend fun claim(recipient: PeerConsultationContext, provider: String, session: String? = null): List<PeerMail> = mutex.withLock {
         val entries = live(read(), now())
+        val activeGrants = grants()
         val claimed = mutableListOf<PeerMail>()
         val updated = entries.map {
-            if (it.delivery == PeerDelivery.Queued && it.project == recipient.projectId && it.run == recipient.runId &&
+            if (it.delivery == PeerDelivery.Queued && it.project == recipient.projectId && it.destinationRun == recipient.runId &&
                 it.provider == provider && it.recipientRole == recipient.roleId) {
-                it.copy(delivery = PeerDelivery.Claimed, recipientSession = session).also(claimed::add)
+                if (it.run != it.destinationRun && activeGrants.none { grant -> grant.route == it.route && grant.generation == it.grantGeneration }) {
+                    it.copy(delivery = PeerDelivery.Rejected)
+                } else it.copy(delivery = PeerDelivery.Claimed, recipientSession = session).also(claimed::add)
             } else it
         }
         save(updated)
