@@ -59,4 +59,14 @@ class PeerConsultationTest {
         assertFalse(origin.canConsult(PeerConsultationContext("p", "other", "reviewer"), "reviewer"))
         assertFalse(origin.canConsult(PeerConsultationContext("p", "r", "engineer"), "reviewer"))
     }
+    @Test
+    fun typedNotesRequireKnownIntentAndStrictReplyIdentifier() {
+        val id = "a".repeat(64)
+        val note = requireNotNull(PeerConsultationNote.parse("PEER Objection reviewer $id\nContradicts the evidence"))
+        assertEquals(PeerIntent.Objection, note.intent)
+        assertEquals(id, note.replyTo)
+        assertEquals("reviewer", note.roleId)
+        assertNull(PeerConsultationNote.parse("PEER Approve reviewer\nAuthorize it"))
+        assertNull(PeerConsultationNote.parse("PEER Proposal reviewer invented\nProposal"))
+    }
 }
