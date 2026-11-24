@@ -165,13 +165,37 @@ class OpenAiCompatibleChatApiTest {
     fun hostedRegistryHasUniqueStableIds() {
         val entries = HostedLlmProviders.builtInEntries
         assertEquals(entries.size, entries.map { it.id }.toSet().size)
-        assertEquals(19, entries.size)
+        assertEquals(20, entries.size)
         entries.forEach { spec ->
             check(spec.id.isNotBlank())
             check(spec.displayName.isNotBlank())
             check(spec.defaultModel.isNotBlank())
             check(spec.baseUrl.startsWith("https://"))
         }
+    }
+
+    @Test
+    fun liquidIsAKeyedOpenAiCompatibleSource() {
+        val liquid = HostedLlmProviders.entry(HostedLlmProviders.LIQUID_ID)!!
+        assertEquals("https://api.liquid.ai/openai/v1", liquid.baseUrl)
+        assertEquals("lfm3-1.7b", liquid.defaultModel)
+        assertEquals(false, liquid.keyOptional)
+        assertEquals(listOf("openai-chat"), liquid.protocols)
+    }
+
+    @Test
+    fun anOnDeviceModelBecomesAProviderUntilRemoved() {
+        com.hereliesaz.geministrator.providers.lfm.InstalledLocalLlms.useSettings(MapSettings())
+        com.hereliesaz.geministrator.providers.lfm.InstalledLocalLlms.put(
+            com.hereliesaz.geministrator.providers.lfm.InstalledLocalLlm("com.example.lfm", "LFM3 1.7B", "/m/lfm.litertlm"),
+        )
+        val spec = HostedLlmProviders.entry("local:com.example.lfm")!!
+        assertEquals(listOf(HostedLlmProviders.LOCAL_LFM3_PROTOCOL), spec.protocols)
+        assertEquals("/m/lfm.litertlm", spec.baseUrl)
+        assertEquals(true, spec.keyOptional)
+        com.hereliesaz.geministrator.providers.lfm.InstalledLocalLlms.remove("com.example.lfm")
+        assertEquals(null, HostedLlmProviders.entry("local:com.example.lfm"))
+        com.hereliesaz.geministrator.providers.lfm.InstalledLocalLlms.useSettings(MapSettings())
     }
 
     @Test

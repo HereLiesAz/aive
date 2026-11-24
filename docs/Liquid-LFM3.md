@@ -63,14 +63,40 @@ Not done here: publishing the packages to `azphalt.store` (the Shop list is remo
 central), and installing on a device. The installer change is Android-only and could not be compiled here (no Android SDK);
 CI compiles it.
 
-## Not built yet
+## A creature's mind (built)
 
-- Nothing runs a store-installed model: the LiteRT-LM generator is fixed to Qwen2.5-0.5B (template, 1,280-token context).
-- The on-device provider is a small-task helper, not a selectable creature mind.
+A store-installed LFM3 model can be linked as a provider and chosen as a creature's mind. Nothing about it is special-cased in
+the run loop: it is a `ToolCallingTextGenerationApi` (`LfmLocalChatApi`), so `TextLlmProvider` and the shared `McpToolLoop` drive it
+like any hosted model.
 
-## Liquid's hosted API
+- **Install (Android):** after the package is verified and registered, `InstalledLocalLlms` records the model (`providerId`
+  `local:<packageId>`, the `.litertlm` path, and its `LfmModelProfile` read from the package's `params` and `requirements`:
+  `contextTokens`, `thinking`, `minRamMB`, `imageInput`). Only a package declaring `chatFormat: "lfm3"` and `toolFormat: "lfm3-xml"`
+  qualifies. Removing the package removes the provider.
+- **A round:** the prompt is written with `LfmChatPrompt` (the tools as a `<tools>` block, earlier calls and their `<tool_response>`
+  results replayed from the rounds), run through `LiteRtLmTextGenerator.generateRaw` (the prompt as is, stopped at `<|im_end|>`,
+  refused rather than truncated when it cannot fit the profile's context), and read back with `LfmToolCallParser`; arguments are typed
+  from the tool's JSON Schema. A failed tool goes back as `Error: ...`; the loop's last word offers no tools.
+- **Cost:** none per token (`billsPerToken` false); token counts are estimates, since the engine reports none.
+- **Memory:** one loaded engine per model file, shared by every conversation and released after two idle minutes; the generator
+  refuses to load when the free memory is under the profile's `minRamMB`.
+- **Where it shows:** `ProviderCatalog` lists it as "<name> (on this device)", keyless, never chosen automatically (the keeper links
+  it on purpose).
+
+Still not done: image input for `lfm3-vl-2b` (the profile records `imageInput`; the text path ignores images), running on desktop
+(no LiteRT-LM runtime is lent there, so the provider is listed only where the Android installer registered it), and a run on a device.
+The Android pieces (installer registration, `LocalLiteRtLmHost` in `AndroidMemoryLayerRuntime`) are compiled by CI only.
+
+## Liquid's hosted API (built: the "Liquid AI" source)
 
 `https://api.liquid.ai/openai/v1`, OpenAI chat-completions compatible, bearer key from `console.liquid.ai/dashboard/api-keys`.
 Models: `lfm3-1.7b`, `lfm3-vl-2b`, `lfm3-omni-2b`, `lfm3-audio-2b`, `lfm2.5-24b-a2b`; `d1.2` on a separate decisions endpoint.
 Per million tokens: `lfm3-1.7b` 0.08 in / 0.20 out; `lfm3-vl-2b` 0.10 in / 0.50 out. Standard endpoints may keep and train on
 prompts. No keyless use. Whether the server turns the XML into `tool_calls` is unverified.
+
+Built as a keyed `HostedLlmProviderSpec` (`liquid`, default `lfm3-1.7b`) over the shared OpenAI-compatible chat API, so tool calls
+go through the server's `tool_calls` if it produces them. It cannot read the XML itself, so if the server returns the model's raw
+`<tool_call>` text instead, that text reaches the creature unread (to be checked against a live key). Linked with a key from the
+provider screen, or `LIQUID_API_KEY` on desktop and headless. Its price is not on the price list (no price was read from Liquid's own
+page this session), so a dollar cap stops a run that spends on it, as for every unpriced hosted model.
+

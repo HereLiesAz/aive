@@ -173,6 +173,7 @@ internal object HeadlessCredentials {
         ProviderCatalog.COHERE_ID to "COHERE_API_KEY",
         ProviderCatalog.NVIDIA_ID to "NVIDIA_API_KEY",
         ProviderCatalog.SAMBANOVA_ID to "SAMBANOVA_API_KEY",
+        ProviderCatalog.LIQUID_ID to "LIQUID_API_KEY",
         ProviderCatalog.OLLAMA_CLOUD_ID to "OLLAMA_API_KEY",
         ProviderCatalog.ZAI_ID to "ZAI_API_KEY",
     )

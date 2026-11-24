@@ -142,6 +142,35 @@ class LiteRtLmTextGenerator(
         }
     }
 
+    /**
+     * Completes an already-formatted [prompt] (a model other than the Qwen this class is named for brings its own chat
+     * template) and returns the text as the model wrote it, unsanitised, stopped at the first of [stopMarkers] or after
+     * [maxNewTokens]. [contextTokens] is the context the model was exported with: a prompt that cannot fit with its answer
+     * is refused rather than truncated by the engine. Serialised with every other generation on this engine.
+     */
+    suspend fun generateRaw(
+        prompt: String,
+        maxNewTokens: Int,
+        contextTokens: Int,
+        stopMarkers: List<String> = emptyList(),
+    ): String {
+        val limit = maxNewTokens.coerceIn(1, contextTokens)
+        if (OnDeviceTextAgentProvider.estimateTokens(prompt.length) + limit > contextTokens) {
+            throw OnDeviceRuntimeUnavailableException("The task is too long for the model's context")
+        }
+        return mutex.withLock {
+            idleRelease?.cancel()
+            idleRelease = null
+            try {
+                val path = modelPath() ?: throw OnDeviceRuntimeUnavailableException("No LiteRT-LM model is installed")
+                val loaded = ensureLoaded(path)
+                complete(loaded, limit, offCaller = false, stopMarkers = stopMarkers) { loaded.complete(prompt, it) }
+            } finally {
+                scheduleIdleRelease()
+            }
+        }
+    }
+
     private suspend fun ensureLoaded(path: String): LiteRtLmModel {
         val current = model
         if (current != null && loadedPath == path) return current
@@ -172,6 +201,7 @@ class LiteRtLmTextGenerator(
         loaded: LiteRtLmModel,
         maxNewTokens: Int,
         offCaller: Boolean,
+        stopMarkers: List<String> = emptyList(),
         start: (LiteRtLmCompletionListener) -> LiteRtLmCompletion,
     ): String {
         val events = Channel<String>(Channel.UNLIMITED)
@@ -204,7 +234,9 @@ class LiteRtLmTextGenerator(
                     if (stoppedByLimit) continue
                     text.append(piece)
                     pieces++
-                    if (pieces >= maxNewTokens || text.length >= maxNewTokens * MAX_CHARS_PER_TOKEN) {
+                    if (pieces >= maxNewTokens || text.length >= maxNewTokens * MAX_CHARS_PER_TOKEN ||
+                        stopMarkers.any { text.contains(it) }
+                    ) {
                         stoppedByLimit = true
                         call.cancel()
                     }
