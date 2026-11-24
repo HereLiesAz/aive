@@ -99,6 +99,8 @@ import com.hereliesaz.geministrator.workflow.uniqueLaunchStamp
 import com.hereliesaz.geministrator.workflow.awaitsNestedHumanApproval
 import com.hereliesaz.geministrator.workflow.humanReadable
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -483,7 +485,8 @@ class ApplicationRuntime private constructor(
         val conversation = requireNotNull(collectiveConversations.get(conversationId))
         val roster = activeRoles(resolveRoleCollection(persistence.roles.all()))
         val models = resolveDisputeModels()
-        val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(emptyList())
+        val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(listOf(conversationId))
+        val capture = com.hereliesaz.geministrator.queen.CollectiveMemoryCapture(conversationId, question, ::nowEpochMillis)
         fun voice(role: com.hereliesaz.geministrator.domain.RoleDefinition, model: com.hereliesaz.geministrator.queen.QueenModel):
             com.hereliesaz.geministrator.queen.CollectiveVoice? {
             if (role.executionSource != com.hereliesaz.geministrator.domain.RoleExecutionSource.Agent) return null
@@ -496,6 +499,7 @@ class ApplicationRuntime private constructor(
         }
         val queenRole = roster.singleOrNull { it.id == BuiltInRoles.Orchestrator.id }
         val facilitator = queenRole?.let { role -> models?.queen?.let { voice(role, it) } }
+        try {
         val result = if (facilitator == null || models == null) {
             com.hereliesaz.geministrator.queen.CollectiveAnswer(null, emptyList(), listOf("Queen"))
         } else {
@@ -513,12 +517,18 @@ class ApplicationRuntime private constructor(
                 observeCall = { voice, outcome ->
                     voice.specialistId?.let { id -> collectiveProfiles.observe(id, voice.role, outcome) }
                 },
+                recordContribution = capture::record,
             ) { model, count ->
                 models.mayCall() && queenCallAllowed() &&
                     directAdvisoryGateFor(model.uses, count) == com.hereliesaz.geministrator.queen.CallDecision.Allow
             }
         }
         requireNotNull(collectiveConversations.append(conversationId, question, result))
+        } finally {
+            // Already returned replies remain experience even if a later participant is cancelled.
+            // Only local queue deposits run here; no model call or consolidation is awaited.
+            withContext(NonCancellable) { capture.flush() }
+        }
     }
 
     internal suspend fun republishState() {

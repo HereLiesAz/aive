@@ -32,6 +32,19 @@ class CollectiveAnswerTest {
     }
 
     @Test
+    fun captureReceivesOnlyActualCompletedRepliesEvenWhenLaterCallIsCancelled() = runTest {
+        val recorded = mutableListOf<Pair<String, String>>()
+        val reviewer = CollectiveVoice("reviewer", QueenModel { "Actual objection" })
+        val cancelled = CollectiveVoice("skeptic", QueenModel { throw CancellationException("Cancelled") })
+        val queen = CollectiveVoice("queen", QueenModel { error("Must not synthesize") })
+        assertFailsWith<CancellationException> {
+            answerCollectively("Question", "", listOf(reviewer, cancelled), queen,
+                recordContribution = { voice, text -> recorded += voice.role to text }) { _, _ -> true }
+        }
+        assertEquals(listOf("reviewer" to "Actual objection"), recorded)
+    }
+
+    @Test
     fun deniedSynthesisDoesNotInventAnAnswer() = runTest {
         val reviewer = CollectiveVoice("reviewer", QueenModel { "One actual assessment" })
         val queen = CollectiveVoice("queen", QueenModel { error("Must not be called") })

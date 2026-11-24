@@ -38,7 +38,7 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
         catch (_: Exception) { status = "Conversation history unavailable." }
     }
     ProviderSectionLabel("Ask The Aive")
-    Text("Advisory conversation only. Specialists are selected by relevance and configured model availability. Completed turns are saved locally; only role memory is consulted.",
+    Text("Advisory conversation only. Specialists are selected by relevance and configured model availability. Completed turns are saved locally. Each actual reply is banked separately when memory is enabled; only this conversation and the receiving role's authorized memory supply cues. Deleting chat history does not erase its separate memory bank.",
         style = AzphaltType.body, color = azphaltOnSurface())
     conversations.forEach { conversation ->
         val title = conversation.turns.firstOrNull()?.question?.take(45) ?: "Empty conversation"
