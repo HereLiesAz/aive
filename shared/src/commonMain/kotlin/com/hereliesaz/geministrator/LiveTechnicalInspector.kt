@@ -99,6 +99,7 @@ import com.hereliesaz.geministrator.resources.inspector_activity
 import com.hereliesaz.geministrator.resources.inspector_shared_creature
 import com.hereliesaz.geministrator.resources.inspector_shared_creature_here
 import com.hereliesaz.geministrator.resources.inspector_activity_attempt
+import com.hereliesaz.geministrator.resources.inspector_activity_consultation
 import com.hereliesaz.geministrator.resources.inspector_activity_step
 import com.hereliesaz.geministrator.resources.inspector_activity_thinking
 import com.hereliesaz.geministrator.resources.common_approve
@@ -900,6 +901,7 @@ private fun CreatureActivity(taskRun: TaskRun, activity: SessionActivityFeeds) {
                                 when (line.kind) {
                                     SessionActivityKind.Thinking -> Res.string.inspector_activity_thinking
                                     SessionActivityKind.Progress -> Res.string.inspector_activity_step
+                                    SessionActivityKind.Consultation -> Res.string.inspector_activity_consultation
                                 },
                             ) + if (line.atEpochMillis > 0) "  ·  ${formatLogTime(line.atEpochMillis)}" else "",
                             style = AzphaltType.eyebrow,
