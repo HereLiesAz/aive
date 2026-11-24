@@ -94,6 +94,8 @@ class ProviderBackedManagedSessionGateway(
     private val snapshots = mutableMapOf<ManagedSessionHandle, SessionSnapshot>()
     private val observedEventKeys = mutableMapOf<ManagedSessionHandle, MutableSet<String>>()
     private val progressCounts = mutableMapOf<ManagedSessionHandle, Long>()
+    private val consultationContexts = mutableMapOf<ManagedSessionHandle, PeerConsultationContext>()
+    private val consultationCounts = mutableMapOf<ManagedSessionHandle, Int>()
 
     /** Each session's observer, kept so a cancel stops the generation it is watching ([cancel]) and a release frees it. */
     private val observerJobs = mutableMapOf<ManagedSessionHandle, Job>()
@@ -212,7 +214,7 @@ class ProviderBackedManagedSessionGateway(
         val providerCapabilities = provider.capabilities()
         // Only an agent the keeper can reply to mid-task is told how to ask the keeper a question.
         val askingRequest = if (AgentCapability.Messaging in providerCapabilities.supported) {
-            recalledRequest.withKeeperQuestionInstructions()
+            recalledRequest.withKeeperQuestionInstructions().withPeerConsultationInstructions()
         } else {
             recalledRequest
         }
@@ -240,6 +242,7 @@ class ProviderBackedManagedSessionGateway(
                     inferenceInvocationId = prepared.plan.invocationId,
                 )
                 recordMemory { memoryObserver.onSessionStarted(handle, taskRequest) }
+                rememberConsultationContext(handle, taskRequest)
                 registerAndObserve(
                     handle = handle,
                     initialStatus = if (taskRequest.requirePlanApproval) {
@@ -439,6 +442,7 @@ class ProviderBackedManagedSessionGateway(
                 is ProviderActionResult.Rejected -> error(result.reason)
             }
             recordMemory { memoryObserver.onSessionStarted(handle, request) }
+            rememberConsultationContext(handle, request)
             registerAndObserve(handle, initialStatus)
         }
     }
@@ -545,6 +549,8 @@ class ProviderBackedManagedSessionGateway(
             snapshots.remove(handle)
             observedEventKeys.remove(handle)
             progressCounts.remove(handle)
+            consultationContexts.remove(handle)
+            consultationCounts.remove(handle)
             observerJobs.remove(handle)
         }
         observer?.cancel()
@@ -858,6 +864,9 @@ class ProviderBackedManagedSessionGateway(
         // Nothing but usage is recorded about a session that had already ended.
         if (alreadyTerminal) return
         activity.record(handle, effectiveEvent)
+        if (effectiveEvent is AgentEvent.Message) {
+            routePeerConsultation(handle, effectiveEvent.content)
+        }
         recordMemory { memoryObserver.onSessionEvent(handle, effectiveEvent) { text -> message(handle, text) } }
         recordMemory { duplexAttachment?.onSessionEvent(handle, effectiveEvent) }
         terminalStatus?.let { status ->
@@ -877,6 +886,44 @@ class ProviderBackedManagedSessionGateway(
             recordMemory { memoryObserver.onSessionFinished(handle, status) }
             recordMemory { duplexAttachment?.onSessionFinished(handle, status) }
         }
+    }
+
+    /** Consultations are advisory only; no new sessions, tools, approvals or cross-provider disclosures. */
+    private suspend fun rememberConsultationContext(handle: ManagedSessionHandle, request: AgentTaskRequest) {
+        val context = PeerConsultationContext.from(request) ?: return
+        if (AgentCapability.Messaging !in providerFor(handle).capabilities().supported) return
+        mutex.withLock { consultationContexts[handle] = context }
+    }
+
+    /** Deliver one bounded peer note to a uniquely addressed, already-running advisory session. */
+    private suspend fun routePeerConsultation(sender: ManagedSessionHandle, content: String) {
+        val note = PeerConsultationNote.parse(content) ?: return
+        val target = mutex.withLock {
+            val origin = consultationContexts[sender] ?: return@withLock null
+            if (snapshots[sender]?.status != ManagedSessionStatus.Running) return@withLock null
+            if ((consultationCounts[sender] ?: 0) >= 4) return@withLock null
+            val recipient = consultationContexts.entries.filter { (handle, context) ->
+                handle != sender && handle.providerId == sender.providerId &&
+                    snapshots[handle]?.status == ManagedSessionStatus.Running &&
+                    origin.canConsult(context, note.roleId)
+            }.singleOrNull()?.key ?: return@withLock null
+            consultationCounts[sender] = (consultationCounts[sender] ?: 0) + 1
+            recipient to origin.roleId
+        } ?: return
+        // Do not use message(): peer content must never be banked as the keeper's words.
+        try {
+            providerFor(target.first).sendMessage(target.first.providerRunId, note.advisoryText(target.second))
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Consultation is best effort, never a reason to restart a billed provider session.
+        }
+    }
+
+    private fun AgentTaskRequest.withPeerConsultationInstructions(): AgentTaskRequest {
+        if (PeerConsultationContext.from(this) == null) return this
+        return copy(promptContext = promptContext.copy(stablePrefix = promptContext.stablePrefix +
+            PromptContextBlock("Peer consultation", PeerConsultationNote.INSTRUCTIONS)))
     }
 
     private fun AgentEvent.UsageReported.sanitizedUsage(): ManagedSessionUsage = ManagedSessionUsage(
