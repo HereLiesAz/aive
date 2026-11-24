@@ -24,7 +24,7 @@ internal fun selectCollectiveSpecialists(
     }.groupBy { it.id }.values.mapNotNull { it.singleOrNull() }
         .sortedWith(bySimilarityTo<RoleDefinition>(question) { "${it.name} ${it.description}" }.thenBy { it.id.value })
     val used = mutableSetOf<String>()
-    val sourceIds = facilitatorSources.map { it.sourceId }.distinct()
+    val sourceIds = (modelFor?.invoke(null)?.uses.orEmpty() + facilitatorSources).map { it.sourceId }.distinct()
     val selected = mutableListOf<Pair<RoleDefinition, QueenModel>>()
     for (role in candidates) {
         val pin = role.preferredProviderId?.value
