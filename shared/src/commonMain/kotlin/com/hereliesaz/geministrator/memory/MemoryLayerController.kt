@@ -1088,6 +1088,24 @@ class MemoryLayerController(
         override suspend fun recallFor(request: AgentTaskRequest, queryPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan): MemoryPromptRecall =
             recallForPrompt(request, queryPlan)
 
+        override suspend fun directChatTags(workflowIds: List<String>, roleId: String, text: String): List<String> {
+            if (!active || text.isBlank()) return emptyList()
+            val known = banks.known()
+            val roleBank = roleBankId(roleId).takeIf { it.isNotBlank() && it in known }
+            val sources = (workflowIds.filter { it in known }.distinct().take(8) + listOfNotNull(roleBank)).distinct()
+            val hits = sources.flatMap { tagCandidates(it, null, text.take(12_000), null) }
+                .groupBy { it.node.id }.values.mapNotNull { group -> group.maxByOrNull { it.score } }
+                .sortedByDescending { it.score }.take(MAX_RECALL_RESULTS)
+            val level = attention.defaultLevel
+            val gate = AttentionGatedRecall(attentionPolicy, MemoryAttentionState(baselineLevel = level))
+            val selected = gate.selectAlongside(hits).take(MemoryAttentionGate(attentionPolicy).cuePolicy(gate.currentState()).maxTags)
+            return selected.map { MemoryCueWatcher.hashtag(it.node.text) }
+                .filter { tag ->
+                    tag.length in 2..81 && tag.drop(1).all { it.isLetterOrDigit() || it in "-_." } &&
+                        com.hereliesaz.geministrator.control.ControlRedaction.scrub(tag) == tag
+                }.distinct()
+        }
+
         override suspend fun queryHints(request: AgentTaskRequest): MemoryQueryHints =
             if (!active) MemoryQueryHints() else runCatchingCancellable { queryHintsFor(request) }.getOrDefault(MemoryQueryHints())
 
@@ -1388,19 +1406,33 @@ class MemoryLayerController(
         val session = cueSession(agentId, request)
         val gate = attention.forAgent(agentId)
         val workflow = request?.let { memoryWorkflowOf(it) } ?: workflowOfAgent(agentId)
+        val roleBank = roleBankOf(request ?: session.request)
+        val hits = tagCandidates(workflow, roleBank, text, agentId)
+        val cues = (if (alongside) gate.selectAlongside(hits) else gate.select(hits)).take(MemoryAttentionGate(attentionPolicy).cuePolicy(gate.currentState()).maxTags)
+        if (cues.isEmpty()) return null
+        cueMutex.withLock {
+            session.watcher.offered(cues.map { it.node.text })
+            cues.forEach { session.dwell.hit(it.node.text) }
+        }
+        // Key phrases ride after the tags, as "- " lines like any other injection.
+        val phrases = runCatchingCancellable { cuePhrases(listOfNotNull(workflow, roleBank), cues, gate, agentId) }.getOrDefault(emptyList())
+        return cueCloudText(cues.map { it.node.text }, phrases)
+    }
+
+    /** Shared tag lookup for managed and direct conversations; returns no passages. */
+    private suspend fun tagCandidates(workflow: String, roleBank: String?, text: String, agentId: String?): List<MemoryRecallHit> {
         val tool = layerFor(workflow).tool
         val words = CONTENT_WORD.findAll(text.lowercase()).map { it.value }.filter { it !in CLOUD_STOPWORDS }.distinct().toList()
         val cueWords = words.filterNot { isCommonWord(tool, it) }.take(MAX_CLOUD_QUERY_WORDS)
         // Keyword triggers: the text's words and 2–3 word phrases looked up in the table held ready
         // (no search), each firing its tag at the relevance its keyword weight earns.
         val keywordHits = keywordCueHits(workflow, text, tool)
-        if (cueWords.isEmpty() && keywordHits.isEmpty()) return null
+        if (cueWords.isEmpty() && keywordHits.isEmpty()) return emptyList()
         // Each uncommon word seeds its own cues (a word should not be diluted by its neighbours);
         // a tag reached by several words, or by a keyword too, keeps its best score.
         val best = LinkedHashMap<MemoryNodeId, MemoryRecallHit>()
         keywordHits.forEach { hit -> best[hit.node.id] = hit }
         // The role's lesson bank, when it has one, is read the same way as the workflow's own.
-        val roleBank = roleBankOf(request ?: session.request)
         val readFrom = listOfNotNull(tool, roleBank?.let { layerFor(it).tool })
         cueWords.forEach { word ->
             readFrom.forEach { source ->
@@ -1416,16 +1448,7 @@ class MemoryLayerController(
                 }
             }
         }
-        val hits = best.values.sortedByDescending { it.score }.take(MAX_RECALL_RESULTS)
-        val cues = (if (alongside) gate.selectAlongside(hits) else gate.select(hits)).take(MemoryAttentionGate(attentionPolicy).cuePolicy(gate.currentState()).maxTags)
-        if (cues.isEmpty()) return null
-        cueMutex.withLock {
-            session.watcher.offered(cues.map { it.node.text })
-            cues.forEach { session.dwell.hit(it.node.text) }
-        }
-        // Key phrases ride after the tags, as "- " lines like any other injection.
-        val phrases = runCatchingCancellable { cuePhrases(listOfNotNull(workflow, roleBank), cues, gate, agentId) }.getOrDefault(emptyList())
-        return cueCloudText(cues.map { it.node.text }, phrases)
+        return best.values.sortedByDescending { it.score }.take(MAX_RECALL_RESULTS)
     }
 
     /**
