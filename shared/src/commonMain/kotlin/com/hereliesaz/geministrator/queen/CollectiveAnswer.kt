@@ -27,11 +27,12 @@ internal suspend fun answerCollectively(
     history: String,
     specialists: List<CollectiveVoice>,
     facilitator: CollectiveVoice,
+    unavailableRoles: List<String> = emptyList(),
     admit: suspend (QueenModel, Int) -> Boolean,
 ): CollectiveAnswer {
     require(question.isNotBlank() && question.length <= 1500)
     val assessments = mutableListOf<CollectiveAssessment>()
-    val unavailable = mutableListOf<String>()
+    val unavailable = unavailableRoles.toMutableList()
     var calls = 0
     suspend fun ask(voice: CollectiveVoice, prompt: String): String? {
         if (calls >= 3 || !admit(voice.model, calls)) return null
