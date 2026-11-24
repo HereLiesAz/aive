@@ -268,8 +268,9 @@ class MemoryControllerCuePipelineTest {
         planner.plan(packet)
         planner.repair(packet)
         assertEquals(2, seen.size)
-        assertTrue(seen.all { it.artifacts.single().contains("#keystore") })
-        assertTrue(seen.all { it.instruction == packet.instruction && "CI secrets" !in it.artifacts.single() })
+        assertTrue(seen.first().artifacts.single().contains("#keystore"))
+        assertTrue(seen.last().artifacts.isEmpty(), "recently surfaced tags must not repeat")
+        assertTrue(seen.all { it.instruction == packet.instruction && it.artifacts.none { artifact -> "CI secrets" in artifact } })
         assertTrue(packet.artifacts.isEmpty())
         var reviewPrompt = ""
         val reviewer = memory.reviewer(PlanReviewer {
@@ -317,5 +318,21 @@ class MemoryControllerCuePipelineTest {
         ), calls)
         assertEquals(4, prompts.size)
         assertTrue(prompts.all { it.endsWith("#role-cue") })
+    }
+    @Test
+    fun directChatNoveltyIsPerParticipantAndResetsForNewConversations() = runBlocking {
+        val (controller, _) = keystoreController()
+        val provider = controller.promptContextProvider
+        val a = provider.openDirectChat(listOf("wf-keys"), "planner")
+        val b = provider.openDirectChat(listOf("wf-keys"), "planner")
+        val question = "Where is the keystore?"
+        assertTrue("#keystore" in a.tags(question))
+        assertTrue(a.tags(question).isEmpty())
+        assertTrue("#keystore" in b.tags(question))
+        assertTrue("#keystore" in provider.openDirectChat(listOf("wf-keys"), "planner").tags(question))
+        a.observeReply("other context ".repeat(20_000))
+        assertTrue("#keystore" in a.tags(question))
+        controller.updateSettings { it.copy(enabled = false) }
+        assertTrue(b.tags(question).isEmpty())
     }
 }
