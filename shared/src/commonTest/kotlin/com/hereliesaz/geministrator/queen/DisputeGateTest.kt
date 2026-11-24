@@ -201,6 +201,37 @@ class DisputeGateTest {
         assertEquals(EscalationReason.NoApproach, (keeper as DisputeResolution.Escalated).escalation.reason)
     }
 
+    @Test
+    fun independentSpecialistsSpeakBeforeTheFacilitatorAndDissentStillBlocks() = runBlocking {
+        val trace = mutableListOf<String>()
+        var facilitatorPrompt = ""
+        val queen = QueenModel { prompt ->
+            trace += "facilitator"
+            facilitatorPrompt = prompt
+            rulePass
+        }
+        val first = QueenModel { prompt ->
+            if (prompt.startsWith("Give your independent")) {
+                trace += "nanny proposal"
+                assertFalse("Antagonist assessment" in prompt)
+                "Nanny assessment: pass [f1]"
+            } else "ANSWER: AGREE"
+        }
+        val second = QueenModel { prompt ->
+            if (prompt.startsWith("Give your independent")) {
+                trace += "antagonist proposal"
+                assertFalse("Nanny assessment" in prompt)
+                "Antagonist assessment: refine [f2]"
+            } else "ANSWER: DISAGREE\nCITE: f2\nWHY: Cost objection."
+        }
+        val result = settleWithAgreement(dispute, parties, queen,
+            mapOf("nanny" to first, "antagonist" to second), independentProposals = true)
+        assertEquals(listOf("nanny proposal", "antagonist proposal", "facilitator", "facilitator"), trace)
+        assertTrue("Nanny assessment: pass [f1]" in facilitatorPrompt)
+        assertTrue("Antagonist assessment: refine [f2]" in facilitatorPrompt)
+        assertEquals(EscalationReason.NotAgreed, assertIs<DisputeResolution.Escalated>(result).escalation.reason)
+    }
+
     // --- findings and notes ----------------------------------------------------------------------------------------
 
     @Test
