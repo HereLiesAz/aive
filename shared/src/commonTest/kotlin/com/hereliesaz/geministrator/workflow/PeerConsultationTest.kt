@@ -90,4 +90,16 @@ class PeerConsultationTest {
         assertNull(PeerConsultationNote.parse("PEER-RUN Inquiry reviewer\nMissing run"))
         assertNull(PeerConsultationNote.parse("PEER-RUN Inquiry * reviewer\nWildcard"))
     }
+    @Test
+    fun recruitmentRequiresBoundedExpertiseAndQuestion() {
+        val note = requireNotNull(PeerConsultationNote.parse("RECRUIT database indexing\nWhich index fits?"))
+        assertEquals(PeerIntent.Request, note.intent)
+        assertEquals("database indexing", note.expertise)
+        assertEquals("", note.roleId)
+        assertEquals("Which index fits?", note.body)
+        assertNull(PeerConsultationNote.parse("RECRUIT \nQuestion"))
+        assertNull(PeerConsultationNote.parse("RECRUIT database\n"))
+        assertNull(PeerConsultationNote.parse("RECRUIT " + "x".repeat(161) + "\nQuestion"))
+        assertNull(PeerConsultationNote.parse("RECRUIT database\tindex\nQuestion"))
+    }
 }
