@@ -1562,7 +1562,8 @@ class ApplicationRuntime private constructor(
         wordingJob = runtimeScope.launch(callContext) {
             try {
                 val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(listOf(run.id.value))
-                val voice = memory.voice(models.queen, com.hereliesaz.geministrator.domain.BuiltInRoles.Orchestrator.id.value)
+                val voice = memory.voice(models.queen, com.hereliesaz.geministrator.domain.BuiltInRoles.Orchestrator.id.value,
+                    conversationId = "wording:${run.id.value}")
                 val made = com.hereliesaz.geministrator.queen.generateWordings(voice, definition, run, rolesNow, checkpoint)
                 if (made.isNotEmpty()) {
                     queenWordings[runId] = made
