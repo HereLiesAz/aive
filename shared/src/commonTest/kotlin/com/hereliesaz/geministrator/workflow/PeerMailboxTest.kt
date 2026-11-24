@@ -104,4 +104,33 @@ class PeerMailboxTest {
         assertEquals(claim.id, reply.correlationId)
         assertTrue(claim.id != reply.id)
     }
+    @Test
+    fun exactCrossRunConsentSurvivesRestartAndRevocationInvalidatesOldNotes() = runBlocking {
+        val settings = InMemorySettings()
+        val mailbox = PeerMailbox(settings) { 100L }
+        val destination = recipient.copy(runId = "next-run")
+        val route = PeerRoute("project", "provider", "run", "architect", "next-run", "reviewer")
+        val note = PeerConsultationNote("reviewer", "Check evidence", targetRun = "next-run")
+        assertFalse(mailbox.enqueue(sender, "provider", "task", note))
+        assertTrue(mailbox.grant(route))
+        assertFalse(mailbox.enqueue(sender.copy(projectId = "other"), "provider", "task", note))
+        assertFalse(mailbox.enqueue(sender, "other-provider", "task", note))
+        assertFalse(mailbox.enqueue(destination, "provider", "task2",
+            PeerConsultationNote("architect", "Reverse direction", targetRun = "run")))
+        assertTrue(mailbox.enqueue(sender, "provider", "task", note))
+        val restarted = PeerMailbox(settings) { 200L }
+        assertEquals(listOf(route), restarted.routes())
+        assertTrue(restarted.claim(recipient, "provider").isEmpty())
+        restarted.revoke(route)
+        assertTrue(restarted.grant(route))
+        assertTrue(restarted.claim(destination, "provider").isEmpty())
+        assertEquals(PeerDelivery.Rejected, restarted.receipts(destination, "provider").single().delivery)
+        assertTrue(restarted.enqueue(sender, "provider", "task", note))
+        val claim = restarted.claim(destination, "provider", "receiver").single()
+        assertEquals("run", claim.run)
+        assertEquals("next-run", claim.destinationRun)
+        assertTrue(restarted.authorized(claim))
+        restarted.revoke(route)
+        assertFalse(restarted.authorized(claim))
+    }
 }
