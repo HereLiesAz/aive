@@ -2,6 +2,8 @@ package com.hereliesaz.geministrator.memory
 
 import com.hereliesaz.geministrator.control.ControlRedaction
 import com.hereliesaz.geministrator.domain.BuiltInRoles
+import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.queen.specialistInstanceId
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
 import com.hereliesaz.geministrator.orchestration.OrchestrationPacket
 import com.hereliesaz.geministrator.orchestration.OrchestrationPlan
@@ -74,6 +76,21 @@ internal class DirectChatMemory(
             val cues = tags(session, planReviewPrompt(request.copy(memoryTags = emptyList())))
             return base.review(request.copy(memoryTags = cues)).also { observed(session, it.toString()) }
         }
+    }
+
+    /**
+     * A host-owned resumable conversation can restore attention for the same configured role
+     * revision and model route. Unknown/ambiguous roster or route identity stays transient;
+     * never assign a replacement model the old participant's exposure state. Scope and role
+     * remain separate parts of the checkpoint key, not access grants.
+     */
+    fun configuredVoice(base: QueenModel, roleId: String, conversationId: String,
+        roles: List<RoleDefinition>): QueenModel {
+        val role = roles.singleOrNull { it.id.value == roleId }
+        val uses = base.uses
+        if (role == null || uses.isEmpty() || uses.any { it.sourceId.isBlank() || it.modelId.isNullOrBlank() })
+            return voice(base, roleId)
+        return voice(base, roleId, conversationId, specialistInstanceId(role, uses, "direct-attention-v1"))
     }
 
     /** Tags are not added to a dispute's listed facts and cannot supply authority. */

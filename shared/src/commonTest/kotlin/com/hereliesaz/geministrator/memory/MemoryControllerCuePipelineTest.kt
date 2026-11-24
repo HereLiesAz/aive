@@ -629,6 +629,55 @@ class MemoryControllerCuePipelineTest {
         assertTrue(b.tags(question).isEmpty())
     }
     @Test
+    fun configuredDisputeVoicesResumeOnlyTheirExactCaseRoleAndRoute() = runBlocking {
+        val (_, bank) = keystoreController()
+        val settings = MapSettings()
+        fun recreate() = MemoryLayerController(
+            banks = MemoryBanks.inMemory(mapOf("wf-keys" to bank)),
+            settingsStore = MemoryLayerSettingsStore(settings),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            nowEpochMillis = { 1000L },
+        ).also { it.setDefaultAttentionLevel(1f) }
+        val prompts = mutableListOf<String>()
+        fun model(source: String, modelId: String?) = object : QueenModel {
+            override val uses = listOf(com.hereliesaz.geministrator.queen.ModelUse(source, modelId, true))
+            override suspend fun answer(prompt: String): String {
+                prompts += prompt
+                return "Answer"
+            }
+        }
+        val queen = com.hereliesaz.geministrator.domain.BuiltInRoles.Orchestrator
+        val peer = com.hereliesaz.geministrator.domain.BuiltInRoles.Antagonist
+        val roles = listOf(queen, peer)
+        val question = "Where is the keystore?"
+        val route = model("source", "model-a")
+        val case = "dispute:report:run:report-a"
+        val first = DirectChatMemory(listOf("wf-keys"), recreate().promptContextProvider)
+        first.configuredVoice(route, queen.id.value, case, roles).answer(question)
+        assertTrue("#keystore" in prompts.last())
+        val after = DirectChatMemory(listOf("wf-keys"), recreate().promptContextProvider)
+        after.configuredVoice(route, queen.id.value, case, roles).answer(question)
+        assertEquals(question, prompts.last(), "same case and configured instance retain exposure")
+        after.configuredVoice(route, peer.id.value, case, roles).answer(question)
+        assertTrue("#keystore" in prompts.last(), "other participants get independent cues")
+        after.configuredVoice(model("source", "model-b"), queen.id.value, case, roles).answer(question)
+        assertTrue("#keystore" in prompts.last(), "different model route has fresh attention")
+        after.configuredVoice(route, queen.id.value, case,
+            listOf(queen.copy(instructions = "Revised role"), peer)).answer(question)
+        assertTrue("#keystore" in prompts.last(), "role revision has fresh attention")
+        after.configuredVoice(route, queen.id.value, "dispute:report:run:report-b", roles).answer(question)
+        assertTrue("#keystore" in prompts.last(), "another report has fresh attention")
+        repeat(2) {
+            after.configuredVoice(model("source", null), queen.id.value, case, roles).answer(question)
+            assertTrue("#keystore" in prompts.last(), "unknown model stays transient")
+        }
+        DirectChatMemory(emptyList(), recreate().promptContextProvider)
+            .configuredVoice(route, queen.id.value, case, roles).answer(question)
+        assertEquals(question, prompts.last(), "case identity never grants bank access")
+    }
+
+    @Test
     fun directVoiceResumesAttentionFromSettingsAfterControllerRecreation() = runBlocking {
         val (_, bank) = keystoreController()
         val settings = MapSettings()
