@@ -335,4 +335,50 @@ class MemoryControllerCuePipelineTest {
         controller.updateSettings { it.copy(enabled = false) }
         assertTrue(b.tags(question).isEmpty())
     }
+    @Test
+    fun directVoiceResumesAttentionFromSettingsAfterControllerRecreation() = runBlocking {
+        val (_, bank) = keystoreController()
+        val settings = MapSettings()
+        var now = 1_000L
+        fun recreate() = MemoryLayerController(
+            banks = MemoryBanks.inMemory(mapOf("wf-keys" to bank)),
+            settingsStore = MemoryLayerSettingsStore(settings),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            nowEpochMillis = { now },
+        ).also { it.setDefaultAttentionLevel(1f) }
+
+        val prompts = mutableListOf<String>()
+        val model = QueenModel { prompts += it; "Answer" }
+        val question = "Where is the keystore?"
+        val first = recreate()
+        DirectChatMemory(listOf("wf-keys"), first.promptContextProvider)
+            .voice(model, "planner", "wording:wf-keys", "primary").answer(question)
+        assertTrue(prompts.last().contains("#keystore"))
+        val restarted = recreate()
+        val memory = DirectChatMemory(listOf("wf-keys"), restarted.promptContextProvider)
+        memory.voice(model, "planner", "wording:wf-keys", "primary").answer(question)
+        assertEquals(question, prompts.last())
+        memory.voice(model, "planner", "wording:wf-keys", "companion").answer(question)
+        assertTrue(prompts.last().contains("#keystore"))
+        memory.voice(model, "reviewer", "wording:wf-keys", "primary").answer(question)
+        assertTrue(prompts.last().contains("#keystore"))
+        DirectChatMemory(emptyList(), restarted.promptContextProvider)
+            .voice(model, "planner", "wording:wf-keys", "primary").answer(question)
+        assertEquals(question, prompts.last())
+        memory.voice(model, "planner", "another-conversation", "primary").answer(question)
+        assertTrue(prompts.last().contains("#keystore"))
+
+        now += 7 * 24 * 60 * 60 * 1000L
+        val expired = recreate()
+        DirectChatMemory(listOf("wf-keys"), expired.promptContextProvider)
+            .voice(model, "planner", "wording:wf-keys", "primary").answer(question)
+        assertTrue(prompts.last().contains("#keystore"))
+        expired.updateSettings { it.copy(enabled = false) }
+        expired.updateSettings { it.copy(enabled = true) }
+        val reset = recreate()
+        DirectChatMemory(listOf("wf-keys"), reset.promptContextProvider)
+            .voice(model, "planner", "wording:wf-keys", "primary").answer(question)
+        assertTrue(prompts.last().contains("#keystore"))
+    }
 }
