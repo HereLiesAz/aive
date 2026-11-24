@@ -79,6 +79,9 @@ class MemoryLayerSettingsStore(
     /** Where sessions' not-yet-sent memory is kept against a crash: the same settings, under its own key. */
     val captureJournal: MemoryCaptureJournal by lazy { SettingsMemoryCaptureJournal(settings) }
 
+    /** Durable advisory attention, stored separately from conversation text and memory graphs. */
+    internal val directAttention by lazy { DirectAttentionStore(settings) }
+
     private val mutableUnreadable = MutableStateFlow(unreadableRaw != null)
 
     /** True when stored settings exist but could not be read: memory is off until the keeper sets it up again. */
