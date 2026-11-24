@@ -51,7 +51,12 @@ internal suspend fun ApplicationRuntime.raiseDispute(
     /** Reads a started test swarm's results back as listed facts (see [readBackTestReport]); null when they cannot be read. */
     testFacts: (suspend (String) -> List<String>?)? = null,
 ): DisputeResolution {
-    var resolution = settleWithAgreement(dispute, parties, queenModel, voices, allowInvestigation = !investigated, mayCall = mayCall, independentProposals = true)
+    val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(
+        if (persistence.runs.get(WorkflowRunId(runId)) != null) listOf(runId) else emptyList(),
+    )
+    val queenWithMemory = queenModel?.let { memory.voice(it, BuiltInRoles.Orchestrator.id.value) }
+    val voicesWithMemory = voices.mapValues { (roleId, model) -> memory.voice(model, roleId) }
+    var resolution = settleWithAgreement(dispute, parties, queenWithMemory, voicesWithMemory, allowInvestigation = !investigated, mayCall = mayCall, independentProposals = true)
     var investigationRunId: String? = null
     val agreed = resolution as? DisputeResolution.Agreed
     val request = (agreed?.outcome as? DisputeOutcome.Investigate)?.request
@@ -71,7 +76,7 @@ internal suspend fun ApplicationRuntime.raiseDispute(
     val found = if (request?.kind == InvestigationKind.Research && investigationRunId != null) findingsOf(investigationRunId) else emptyList()
     if (found.isNotEmpty()) {
         // One investigation per dispute: the second pass may not commission another, and both disputants agree again.
-        resolution = settleWithAgreement(dispute.withFindings(found), parties, queenModel, voices, allowInvestigation = false, mayCall = mayCall, independentProposals = true)
+        resolution = settleWithAgreement(dispute.withFindings(found), parties, queenWithMemory, voicesWithMemory, allowInvestigation = false, mayCall = mayCall, independentProposals = true)
         rememberDisputeNotes(runId, disputeNotes(runId, dispute.question, parties, resolution, null))
     }
     val testRun = investigationRunId
@@ -79,7 +84,7 @@ internal suspend fun ApplicationRuntime.raiseDispute(
         val read = testFacts(testRun).orEmpty()
         if (read.isNotEmpty()) {
             // One more agreed ruling on what the test found; she may not commission another investigation.
-            resolution = settleWithAgreement(dispute.withFindings(read), parties, queenModel, voices, allowInvestigation = false, mayCall = mayCall, independentProposals = true)
+            resolution = settleWithAgreement(dispute.withFindings(read), parties, queenWithMemory, voicesWithMemory, allowInvestigation = false, mayCall = mayCall, independentProposals = true)
             rememberDisputeNotes(runId, disputeNotes(runId, dispute.question, parties, resolution, null))
         }
     }
