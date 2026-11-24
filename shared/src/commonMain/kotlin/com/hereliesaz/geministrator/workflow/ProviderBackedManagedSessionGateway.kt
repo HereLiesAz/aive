@@ -578,6 +578,7 @@ class ProviderBackedManagedSessionGateway(
             }
         }
         if (!shouldObserve) return
+        if (initialStatus == ManagedSessionStatus.Running) drainPeerMailbox(handle)
         // Only a configured task binding may participate, and attachment failures never fail work.
         recordMemory { duplexAttachment?.onSessionStarted(handle, this) }
 
@@ -866,6 +867,7 @@ class ProviderBackedManagedSessionGateway(
         // Nothing but usage is recorded about a session that had already ended.
         if (alreadyTerminal) return
         activity.record(handle, effectiveEvent)
+        if (effectiveEvent is AgentEvent.PlanApproved) drainPeerMailbox(handle)
         if (effectiveEvent is AgentEvent.Message) {
             routePeerConsultation(handle, effectiveEvent.content)
         }
@@ -898,28 +900,55 @@ class ProviderBackedManagedSessionGateway(
         mutex.withLock { consultationContexts[handle] = context }
     }
 
-    /** Deliver one bounded peer note to a uniquely addressed, already-running advisory session. */
+    /** Queue advisory notes even when a recipient is temporarily absent. */
     private suspend fun routePeerConsultation(sender: ManagedSessionHandle, content: String) {
         val note = PeerConsultationNote.parse(content) ?: return
-        val target = mutex.withLock {
-            val origin = consultationContexts[sender] ?: return@withLock null
-            if (snapshots[sender]?.status != ManagedSessionStatus.Running) return@withLock null
-            if ((consultationCounts[sender] ?: 0) >= 4) return@withLock null
-            val recipient = consultationContexts.entries.filter { (handle, context) ->
-                handle != sender && handle.providerId == sender.providerId &&
-                    snapshots[handle]?.status == ManagedSessionStatus.Running &&
-                    origin.canConsult(context, note.roleId)
-            }.singleOrNull()?.key ?: return@withLock null
+        val origin = mutex.withLock {
+            val context = consultationContexts[sender] ?: return@withLock null
+            if (snapshots[sender]?.status != ManagedSessionStatus.Running ||
+                context.roleId == note.roleId || (consultationCounts[sender] ?: 0) >= 4) return@withLock null
             consultationCounts[sender] = (consultationCounts[sender] ?: 0) + 1
-            recipient to origin.roleId
+            context
         } ?: return
-        // Do not use message(): peer content must never be banked as the keeper's words.
         try {
-            providerFor(target.first).sendMessage(target.first.providerRunId, note.advisoryText(target.second))
+            if (!providerRegistry.peerMailbox.enqueue(origin, sender.providerId.value, sender.taskRunId.value, note)) return
+            val recipient = mutex.withLock {
+                consultationContexts.entries.filter { (handle, context) ->
+                    handle != sender && handle.providerId == sender.providerId &&
+                        snapshots[handle]?.status == ManagedSessionStatus.Running &&
+                        origin.canConsult(context, note.roleId)
+                }.singleOrNull()?.key
+            }
+            if (recipient != null) drainPeerMailbox(recipient)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
-            // Consultation is best effort, never a reason to restart a billed provider session.
+            // A mailbox failure must not restart billed provider work.
+        }
+    }
+
+    /** Claim only for an unambiguous live advisory role; never deliver as keeper speech. */
+    private suspend fun drainPeerMailbox(handle: ManagedSessionHandle) {
+        try {
+            val context = mutex.withLock {
+                val recipient = consultationContexts[handle] ?: return@withLock null
+                if (snapshots[handle]?.status != ManagedSessionStatus.Running) return@withLock null
+                if (consultationContexts.count { (other, candidate) ->
+                        other.providerId == handle.providerId &&
+                            snapshots[other]?.status == ManagedSessionStatus.Running &&
+                            recipient.canConsult(candidate, recipient.roleId)
+                    } != 1) return@withLock null
+                recipient
+            } ?: return
+            for (mail in providerRegistry.peerMailbox.claim(context, handle.providerId.value)) {
+                if (status(handle) != ManagedSessionStatus.Running) break
+                val note = PeerConsultationNote(mail.recipientRole, mail.text)
+                providerFor(handle).sendMessage(handle.providerRunId, note.advisoryText(mail.senderRole))
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Delivery is best effort; ambiguous sends are not replayed.
         }
     }
 
