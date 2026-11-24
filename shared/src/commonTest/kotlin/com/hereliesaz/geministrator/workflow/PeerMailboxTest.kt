@@ -12,6 +12,62 @@ class PeerMailboxTest {
     private val recipient = PeerConsultationContext("project", "run", "reviewer")
 
     @Test
+    fun collaborationEvidenceCountsExactDirectionalClosedLoopsNotVotesOrTransportAlone() = runBlocking {
+        val settings = InMemorySettings()
+        var time = 100L
+        val mailbox = PeerMailbox(settings) { time }
+        val a = "a".repeat(64)
+        val b = "b".repeat(64)
+        val wrong = "c".repeat(64)
+        suspend fun initial(text: String, outcome: PeerDelivery): PeerMail {
+            assertTrue(mailbox.enqueue(sender, "provider", "task", PeerConsultationNote("reviewer", text),
+                "origin", senderSpecialist = a))
+            val claim = mailbox.claim(recipient, "provider", "receiver", b).single()
+            if (outcome != PeerDelivery.Claimed) mailbox.finish(claim, outcome)
+            return claim
+        }
+        val first = initial("Question one", PeerDelivery.Accepted)
+        val second = initial("Question two", PeerDelivery.Accepted)
+        initial("Question three", PeerDelivery.Uncertain)
+        initial("Question four", PeerDelivery.Rejected)
+        suspend fun reply(parent: PeerMail, text: String, intent: PeerIntent, recipientSession: String, recipientId: String) {
+            assertTrue(mailbox.enqueue(recipient, "provider", "task2",
+                PeerConsultationNote("architect", text, intent, parent.id), "receiver", senderSpecialist = b))
+            val claim = mailbox.claim(sender, "provider", recipientSession, recipientId).single()
+            mailbox.finish(claim, PeerDelivery.Accepted)
+        }
+        reply(first, "Contrary evidence", PeerIntent.Objection, "origin", a)
+        reply(first, "Another objection", PeerIntent.Objection, "origin", a)
+        reply(second, "Observation for a replacement session", PeerIntent.Observation, "replacement", wrong)
+        // A fourth response is an inquiry, not an authored advisory answer, even when delivered.
+        reply(second, "Clarify the question", PeerIntent.Inquiry, "origin", a)
+        val restarted = PeerMailbox(settings) { time }
+        val result = restarted.collaborationEvidence("project", "run", "provider")
+        assertEquals(listOf(PeerCollaborationEvidence("architect", a, "reviewer", b,
+            accepted = 2, rejected = 1, uncertain = 1, claimed = 0, replied = 2, returned = 1)), result)
+        assertTrue(restarted.collaborationEvidence("other", "run", "provider").isEmpty())
+        assertTrue(restarted.collaborationEvidence("project", "other", "provider").isEmpty())
+        assertTrue(restarted.collaborationEvidence("project", "run", "other").isEmpty())
+        time += 86_400_000L
+        assertTrue(restarted.collaborationEvidence("project", "run", "provider").isEmpty())
+    }
+
+    @Test
+    fun collaborationEvidenceDoesNotInferReplyOrAbilityFromAcceptanceAndClearsWithProject() = runBlocking {
+        val mailbox = PeerMailbox(InMemorySettings()) { 100L }
+        val a = "a".repeat(64)
+        val b = "b".repeat(64)
+        assertTrue(mailbox.enqueue(sender, "provider", "task", PeerConsultationNote("reviewer", "Question"),
+            "origin", senderSpecialist = a))
+        val claim = mailbox.claim(recipient, "provider", "receiver", b).single()
+        mailbox.finish(claim, PeerDelivery.Accepted)
+        assertEquals(1, mailbox.collaborationEvidence("project", "run", "provider").single().accepted)
+        assertEquals(0, mailbox.collaborationEvidence("project", "run", "provider").single().returned)
+        mailbox.forgetProject("project")
+        assertTrue(mailbox.collaborationEvidence("project", "run", "provider").isEmpty())
+    }
+
+    @Test
     fun dormantActivationRequiresSeparateExactConsentAndCannotBeReplayed() = runBlocking {
         val settings = InMemorySettings()
         val mailbox = PeerMailbox(settings) { 100L }
