@@ -926,7 +926,8 @@ class ProviderBackedManagedSessionGateway(
                 consultationContexts.entries.filter { (handle, context) ->
                     handle != sender && handle.providerId == sender.providerId &&
                         snapshots[handle]?.status == ManagedSessionStatus.Running &&
-                        origin.canConsult(context, note.roleId)
+                        origin.projectId == context.projectId && context.runId == (note.targetRun ?: origin.runId) &&
+                        context.roleId == note.roleId
                 }.singleOrNull()?.key
             }
             if (recipient != null) drainPeerMailbox(recipient)
@@ -954,14 +955,16 @@ class ProviderBackedManagedSessionGateway(
             for (mail in providerRegistry.peerMailbox.claim(context, handle.providerId.value, handle.providerRunId.value)) {
                 if (status(handle) != ManagedSessionStatus.Running ||
                     !peerRoleAllowed(context.roleId, handle.providerId) ||
-                    !peerRoleAllowed(mail.senderRole, handle.providerId)) {
+                    !peerRoleAllowed(mail.senderRole, handle.providerId) ||
+                    !providerRegistry.peerMailbox.authorized(mail)) {
                     providerRegistry.peerMailbox.finish(mail, PeerDelivery.Rejected)
                     recordPeerDelivery(handle, mail, PeerDelivery.Rejected)
                     continue
                 }
                 val note = PeerConsultationNote(mail.recipientRole, mail.text, mail.intent, mail.replyTo)
                 val outcome = try {
-                    when (providerFor(handle).sendMessage(handle.providerRunId, note.advisoryText(mail.senderRole, mail.id))) {
+                    when (providerFor(handle).sendMessage(handle.providerRunId, note.advisoryText(mail.senderRole, mail.id) +
+                        (if (mail.destinationRun != mail.run) "\nOrigin run ID: ${mail.run}" else ""))) {
                         ProviderActionResult.Accepted -> PeerDelivery.Accepted
                         is ProviderActionResult.Rejected -> PeerDelivery.Rejected
                     }
@@ -1031,7 +1034,19 @@ class ProviderBackedManagedSessionGateway(
                     candidate.roleId != context.roleId
             }.map { it.value.roleId }.groupingBy { it }.eachCount().filterValues { it == 1 }.keys.sorted()
         }.filter { peerRoleAllowed(it, provider) && Regex("[A-Za-z0-9_.:-]{1,128}").matches(it) }.take(16)
-        val directory = if (available.isEmpty()) "" else "\nCurrently available peer role IDs: " + available.joinToString(", ")
+        val routes = try {
+            providerRegistry.peerMailbox.routes().filter {
+                it.project == context.projectId && it.provider == provider.value &&
+                    it.sourceRun == context.runId && it.sourceRole == context.roleId
+            }.filter { peerRoleAllowed(it.targetRole, provider) }.take(16)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            emptyList()
+        }
+        val directory = (if (available.isEmpty()) "" else "\nCurrently available peer role IDs: " + available.joinToString(", ")) +
+            (if (routes.isEmpty()) "" else "\nKeeper-consented cross-run routes (run ID, role ID): " +
+                routes.joinToString("; ") { "${it.targetRun}, ${it.targetRole}" })
         return copy(promptContext = promptContext.copy(stablePrefix = promptContext.stablePrefix +
             PromptContextBlock("Peer consultation", PeerConsultationNote.INSTRUCTIONS + directory)))
     }
