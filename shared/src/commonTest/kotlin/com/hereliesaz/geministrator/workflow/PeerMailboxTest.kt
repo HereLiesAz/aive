@@ -56,4 +56,52 @@ class PeerMailboxTest {
         assertFalse(mailbox.enqueue(sender, "provider", "task", PeerConsultationNote("reviewer", "Fifth")))
         assertEquals(listOf("Note 0", "Note 1", "Note 2", "Note 3"), mailbox.claim(recipient, "provider").map { it.text })
     }
+    @Test
+    fun receiptsRetainProvenanceAndSuppressReplayAfterTransport() = runBlocking {
+        val settings = InMemorySettings()
+        val first = PeerMailbox(settings) { 100L }
+        val note = PeerConsultationNote("reviewer", "Check the evidence")
+        assertTrue(first.enqueue(sender, "provider", "task", note, "origin-session", "invocation"))
+        val claim = first.claim(recipient, "provider", "receiver-session").single()
+        assertEquals(PeerDelivery.Claimed, claim.delivery)
+        first.finish(claim, PeerDelivery.Accepted)
+        val restarted = PeerMailbox(settings) { 200L }
+        val receipt = restarted.receipts(recipient, "provider").single()
+        assertEquals(PeerDelivery.Accepted, receipt.delivery)
+        assertEquals("origin-session", receipt.senderSession)
+        assertEquals("receiver-session", receipt.recipientSession)
+        assertEquals("invocation", receipt.senderInvocation)
+        assertFalse(restarted.enqueue(sender, "provider", "task", note, "origin-session", "invocation"))
+        assertTrue(restarted.claim(recipient, "provider").isEmpty())
+        assertTrue(restarted.receipts(recipient.copy(projectId = "another"), "provider").isEmpty())
+    }
+
+    @Test
+    fun interruptedAndRejectedClaimsAreNeverReplayed() = runBlocking {
+        val settings = InMemorySettings()
+        val mailbox = PeerMailbox(settings) { 100L }
+        assertTrue(mailbox.enqueue(sender, "provider", "task", PeerConsultationNote("reviewer", "First")))
+        assertTrue(mailbox.enqueue(sender, "provider", "task", PeerConsultationNote("reviewer", "Second")))
+        val claims = mailbox.claim(recipient, "provider")
+        mailbox.finish(claims.last(), PeerDelivery.Rejected)
+        val restarted = PeerMailbox(settings) { 200L }
+        assertEquals(listOf(PeerDelivery.Claimed, PeerDelivery.Rejected), restarted.receipts(recipient, "provider").map { it.delivery })
+        assertTrue(restarted.claim(recipient, "provider").isEmpty())
+    }
+    @Test
+    fun repliesMustReferenceAnActualDeliveredMessageFromTheSameSession() = runBlocking {
+        val mailbox = PeerMailbox(InMemorySettings()) { 100L }
+        assertTrue(mailbox.enqueue(sender, "provider", "task", PeerConsultationNote("reviewer", "Question"), "origin"))
+        val claim = mailbox.claim(recipient, "provider", "receiver").single()
+        mailbox.finish(claim, PeerDelivery.Accepted)
+        val answer = PeerConsultationNote("architect", "Contrary evidence", PeerIntent.Objection, claim.id)
+        assertFalse(mailbox.enqueue(recipient, "provider", "task2", answer, "wrong-session"))
+        assertFalse(mailbox.enqueue(recipient.copy(projectId = "other"), "provider", "task2", answer, "receiver"))
+        assertTrue(mailbox.enqueue(recipient, "provider", "task2", answer, "receiver"))
+        val reply = mailbox.claim(sender, "provider", "origin").single()
+        assertEquals(PeerIntent.Objection, reply.intent)
+        assertEquals(claim.id, reply.replyTo)
+        assertEquals(claim.id, reply.correlationId)
+        assertTrue(claim.id != reply.id)
+    }
 }

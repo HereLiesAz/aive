@@ -911,7 +911,8 @@ class ProviderBackedManagedSessionGateway(
             context
         } ?: return
         try {
-            if (!providerRegistry.peerMailbox.enqueue(origin, sender.providerId.value, sender.taskRunId.value, note)) return
+            if (!providerRegistry.peerMailbox.enqueue(origin, sender.providerId.value, sender.taskRunId.value, note,
+                    sender.providerRunId.value, sender.inferenceInvocationId)) return
             val recipient = mutex.withLock {
                 consultationContexts.entries.filter { (handle, context) ->
                     handle != sender && handle.providerId == sender.providerId &&
@@ -940,10 +941,24 @@ class ProviderBackedManagedSessionGateway(
                     } != 1) return@withLock null
                 recipient
             } ?: return
-            for (mail in providerRegistry.peerMailbox.claim(context, handle.providerId.value)) {
-                if (status(handle) != ManagedSessionStatus.Running) break
-                val note = PeerConsultationNote(mail.recipientRole, mail.text)
-                providerFor(handle).sendMessage(handle.providerRunId, note.advisoryText(mail.senderRole))
+            for (mail in providerRegistry.peerMailbox.claim(context, handle.providerId.value, handle.providerRunId.value)) {
+                if (status(handle) != ManagedSessionStatus.Running) {
+                    providerRegistry.peerMailbox.finish(mail, PeerDelivery.Rejected)
+                    continue
+                }
+                val note = PeerConsultationNote(mail.recipientRole, mail.text, mail.intent, mail.replyTo)
+                val outcome = try {
+                    when (providerFor(handle).sendMessage(handle.providerRunId, note.advisoryText(mail.senderRole, mail.id))) {
+                        ProviderActionResult.Accepted -> PeerDelivery.Accepted
+                        is ProviderActionResult.Rejected -> PeerDelivery.Rejected
+                    }
+                } catch (cancelled: CancellationException) {
+                    // The durable claim already prevents replay; preserve cancellation.
+                    throw cancelled
+                } catch (_: Exception) {
+                    PeerDelivery.Uncertain
+                }
+                providerRegistry.peerMailbox.finish(mail, outcome)
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
