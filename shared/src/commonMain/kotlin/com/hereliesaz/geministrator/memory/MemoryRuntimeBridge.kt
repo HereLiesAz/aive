@@ -31,6 +31,9 @@ data class MemoryQueryHints(
 fun interface MemoryPromptContextProvider {
     suspend fun recallFor(request: AgentTaskRequest, queryPlan: MemoryQueryPlan): MemoryPromptRecall
 
+    /** Cue-only recall for a one-shot model conversation, restricted to caller-authorized existing banks. */
+    suspend fun directChatTags(workflowIds: List<String>, roleId: String, text: String): List<String> = emptyList()
+
     /** Entities, actions and code symbols in the request, with how many memories hold each word. */
     suspend fun queryHints(request: AgentTaskRequest): MemoryQueryHints = MemoryQueryHints()
 
