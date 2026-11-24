@@ -53,6 +53,13 @@ fun interface MemoryPromptContextProvider {
     fun resumeDirectChat(workflowIds: List<String>, roleId: String, conversationId: String,
         participantId: String): DirectChatCueSession = openDirectChat(workflowIds, roleId)
 
+    /**
+     * Host-captured actual collective dialogue, deposited only into its own conversation bank.
+     * Implementations must honor disabled memory and never promote agent replies to Keeper speech.
+     * Ordinary direct-chat observation remains cue-only, not an implicit banking authority.
+     */
+    suspend fun bankCollectiveContributions(conversationId: String, requests: List<MemoryBankRequest>) {}
+
     /** Entities, actions and code symbols in the request, with how many memories hold each word. */
     suspend fun queryHints(request: AgentTaskRequest): MemoryQueryHints = MemoryQueryHints()
 

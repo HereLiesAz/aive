@@ -75,6 +75,56 @@ class MemoryControllerCuePipelineTest {
     private val accept: suspend (String) -> ProviderActionResult = { ProviderActionResult.Accepted }
 
     @Test
+    fun collectiveRepliesAreIndependentlyBankedAndScopedToTheirConversation() = runBlocking {
+        val conversation = "collective:one"
+        val bank = InMemoryMemoryStore()
+        val other = InMemoryMemoryStore()
+        val banks = MemoryBanks.inMemory(mapOf(conversation to bank, "collective:other" to other))
+        val controller = MemoryLayerController(
+            banks = banks,
+            settingsStore = MemoryLayerSettingsStore(MapSettings()),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            nowEpochMillis = { 1000L },
+        )
+        controller.updateSettings { it.copy(consolidationPaused = true) }
+        val capture = com.hereliesaz.geministrator.queen.CollectiveMemoryCapture(
+            conversation, "Which route?", { 1000L }, controller.promptContextProvider)
+        val first = com.hereliesaz.geministrator.queen.CollectiveVoice("reviewer",
+            QueenModel { "Support route X. " + "a".repeat(1300) }, "reviewer-instance")
+        val second = com.hereliesaz.geministrator.queen.CollectiveVoice("skeptic",
+            QueenModel { "Reject route X: missing measurements." }, "skeptic-instance")
+        val queen = com.hereliesaz.geministrator.queen.CollectiveVoice("queen",
+            QueenModel { "Choose route X." }, "queen-instance")
+        val result = com.hereliesaz.geministrator.queen.answerCollectively(
+            "Which route?", "", listOf(first, second), queen, recordContribution = capture::record,
+        ) { _, _ -> true }
+        assertEquals(1200, result.assessments.first().text.length)
+        assertTrue(bank.read().episodes.isEmpty(), "No current-turn memory before independent assessments finish")
+        capture.flush()
+        capture.flush()
+        val episodes = bank.read().episodes
+        assertEquals(4, episodes.size)
+        assertEquals(setOf(null, "reviewer", "skeptic", "queen"), episodes.map { it.roleId }.toSet())
+        assertEquals("Which route?", episodes.single { it.roleId == null }.chunks.single().text)
+        val reviewer = episodes.single { it.roleId == "reviewer" }.chunks.single()
+        assertTrue(reviewer.text.endsWith("a".repeat(1300)))
+        assertTrue("reviewer-instance" in reviewer.label)
+        assertEquals("Reject route X: missing measurements.", episodes.single { it.roleId == "skeptic" }.chunks.single().text)
+        assertTrue(episodes.filter { it.roleId != null }.all { it.chunks.single().kind == MemorySourceKind.AgentNote })
+        assertEquals("Choose route X.", episodes.single { it.roleId == "queen" }.chunks.single().text)
+        assertTrue(other.read().episodes.isEmpty())
+        assertEquals(setOf(conversation, "collective:other"), banks.known().toSet())
+
+        controller.updateSettings { it.copy(enabled = false) }
+        val disabled = com.hereliesaz.geministrator.queen.CollectiveMemoryCapture(
+            conversation, "Do not bank", { 1001L }, controller.promptContextProvider)
+        disabled.record(first, "Not retained")
+        disabled.flush()
+        assertEquals(4, bank.read().episodes.size)
+    }
+
+    @Test
     fun aTagInAThoughtDrawsItsSummariesAndNoAmbientCloud() = runBlocking {
         val (controller, store) = controllerOver(
             "session:agent-1",
