@@ -1147,6 +1147,32 @@ class MemoryLayerController(
             }
         }
 
+        override suspend fun bankCollectiveContributions(conversationId: String, requests: List<MemoryBankRequest>) {
+            if (!active || requests.isEmpty()) return
+            require(conversationId.startsWith("collective:") && conversationId.length <= 128)
+            require(requests.size <= 4 && requests.count { it.sourceKind == MemorySourceKind.UserPrompt } == 1)
+            require(requests.all { request ->
+                val scope = request.scope
+                request.sourceSessionId.startsWith("$conversationId:turn:") &&
+                    scope == MemoryBankScope(workflowRunId = conversationId, roleId = scope.roleId) &&
+                    when (request.sourceKind) {
+                        MemorySourceKind.UserPrompt -> scope.roleId == null && request.label == "Keeper question"
+                        MemorySourceKind.AgentNote -> !scope.roleId.isNullOrBlank()
+                        else -> false
+                    }
+            })
+            registerWorkflow(conversationId, null)
+            val queue = layerFor(conversationId).queue
+            try {
+                for (request in requests) {
+                    if (!active) break
+                    queue.enqueueBank(request, MemoryQueuePriority.Normal)
+                }
+            } finally {
+                drainSoon()
+            }
+        }
+
         override suspend fun queryHints(request: AgentTaskRequest): MemoryQueryHints =
             if (!active) MemoryQueryHints() else runCatchingCancellable { queryHintsFor(request) }.getOrDefault(MemoryQueryHints())
 
