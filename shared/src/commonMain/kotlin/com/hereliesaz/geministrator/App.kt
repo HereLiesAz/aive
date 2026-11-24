@@ -927,6 +927,7 @@ fun App(
             host.collectiveHistory = { checkNotNull(runtime).collectiveHistory() }
             host.collectiveNew = { checkNotNull(runtime).newCollectiveConversation() }
             host.collectiveDelete = { id -> checkNotNull(runtime).deleteCollectiveConversation(id) }
+            host.collectiveImportHistory = { id -> checkNotNull(runtime).importCollectiveHistory(id) }
             host.collectiveProfiles = { checkNotNull(runtime).collectiveSpecialistProfiles() }
         }
 

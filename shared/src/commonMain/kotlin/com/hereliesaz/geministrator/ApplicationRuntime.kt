@@ -418,6 +418,13 @@ class ApplicationRuntime private constructor(
     internal var collectiveModelFor: ((String?) -> com.hereliesaz.geministrator.queen.QueenModel?)? = null
 
     internal suspend fun collectiveHistory() = collectiveConversations.list()
+
+    /** Explicit local Keeper action only; use the stored transcript, never caller-supplied text. */
+    internal suspend fun importCollectiveHistory(id: String): Int? = collectiveChatMutex.withLock {
+        val conversation = collectiveConversations.get(id) ?: return@withLock null
+        com.hereliesaz.geministrator.memory.MemoryRuntimeBridge.promptContextProvider
+            .importCollectiveHistory(id, conversation.historicalMemoryRequests(nowEpochMillis()))
+    }
     internal suspend fun newCollectiveConversation() = collectiveChatMutex.withLock { collectiveConversations.create() }
     internal suspend fun deleteCollectiveConversation(id: String) = collectiveChatMutex.withLock { collectiveConversations.delete(id) }
     internal suspend fun clearCollectiveConversations() = collectiveChatMutex.withLock {

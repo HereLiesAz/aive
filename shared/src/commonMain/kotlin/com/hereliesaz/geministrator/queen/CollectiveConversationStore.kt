@@ -1,6 +1,10 @@
 package com.hereliesaz.geministrator.queen
 
 import com.hereliesaz.geministrator.control.ControlRedaction
+import com.hereliesaz.geministrator.domain.BuiltInRoles
+import com.hereliesaz.geministrator.memory.MemoryBankRequest
+import com.hereliesaz.geministrator.memory.MemoryBankScope
+import com.hereliesaz.geministrator.memory.MemorySourceKind
 import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.sync.Mutex
@@ -34,6 +38,41 @@ internal data class CollectiveConversation(val id: String, val turns: List<Colle
         }
         val reference = "\nLatest available specialist assessment excerpts (unverified; may be from an earlier turn):\n$notes"
         return dialogue.takeLast(1800 - reference.length) + reference
+    }
+
+    /**
+     * Explicit import of retained transcript text only. Historical timestamps and the facilitator's
+     * configured route were not recorded; never invent them or claim the excerpts are complete.
+     * The controller must reject import into any previously registered conversation bank.
+     */
+    fun historicalMemoryRequests(importedAt: Long): List<MemoryBankRequest> = buildList {
+        turns.takeLast(16).forEachIndexed { index, turn ->
+            fun addUtterance(slot: String, text: String, role: String?, label: String, kind: MemorySourceKind) {
+                val clean = ControlRedaction.scrub(text).trim()
+                if (clean.isBlank()) return
+                add(MemoryBankRequest(
+                    sourceSessionId = "$id:turn:legacy:$index:$slot",
+                    text = clean.take(if (kind == MemorySourceKind.UserPrompt) 1500 else 1200),
+                    label = ControlRedaction.scrub(label).take(512),
+                    sourceKind = kind,
+                    scope = MemoryBankScope(workflowRunId = id, roleId = role),
+                    bankedAtEpochMillis = importedAt,
+                    occurredAtEpochMillis = null,
+                ))
+            }
+            addUtterance("keeper", turn.question, null, "Keeper question (retained transcript)", MemorySourceKind.UserPrompt)
+            turn.result.assessments.take(2).forEachIndexed { slot, assessment ->
+                if (assessment.role.isNotBlank()) addUtterance("assessment:$slot", assessment.text,
+                    assessment.role, "Historical agent advisory excerpt (unverified); role=${assessment.role}; " +
+                        "instance=${assessment.specialistId ?: "unknown"}; configured Source=${assessment.sourceId ?: "unknown"}; " +
+                        "model=${assessment.modelId ?: "unknown"}", MemorySourceKind.AgentNote)
+            }
+            turn.result.answer?.let { answer ->
+                addUtterance("facilitator", answer, BuiltInRoles.Orchestrator.id.value,
+                    "Historical facilitator advisory excerpt (unverified); instance, Source and model unknown",
+                    MemorySourceKind.AgentNote)
+            }
+        }
     }
 }
 

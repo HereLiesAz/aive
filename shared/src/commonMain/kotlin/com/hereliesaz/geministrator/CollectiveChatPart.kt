@@ -27,6 +27,7 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
     var inspect by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("") }
     var deleting by remember { mutableStateOf(false) }
+    var importing by remember(selected) { mutableStateOf(false) }
     suspend fun refresh(preferred: String? = selected) {
         conversations = checkNotNull(host.collectiveHistory).invoke()
         profiles = host.collectiveProfiles?.invoke().orEmpty()
@@ -110,6 +111,33 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
             }
         }
     })
+    if (selected != null && !busy && host.collectiveImportHistory != null &&
+        conversations.singleOrNull { it.id == selected }?.turns?.isNotEmpty() == true) {
+        if (importing) Text("Import the retained questions and agent excerpts into this conversation's memory? " +
+            "Previously banked or cleared conversations are refused. The excerpts may be incomplete; original dates are unknown.",
+            style = AzphaltType.body, color = azphaltOnSurface())
+        AzphaltPill(if (importing) "Confirm import into memory" else "Import retained history into memory",
+            "collective-import-history", onClick = {
+                if (!importing) importing = true
+                else {
+                    val id = selected
+                    importing = false
+                    if (id != null) {
+                        busy = true
+                        scope.launch {
+                            try {
+                                val count = checkNotNull(host.collectiveImportHistory).invoke(id)
+                                status = count?.let { "Queued $it historical utterances for memory consolidation." }
+                                    ?: "Import refused: memory is unavailable/disabled, or this conversation already has a memory bank."
+                            } catch (cancelled: CancellationException) { throw cancelled }
+                            catch (_: Exception) { status = "Historical memory import failed." }
+                            finally { busy = false }
+                        }
+                    }
+                }
+            })
+        if (importing) AzphaltPill("Cancel import", "collective-import-cancel", onClick = { importing = false })
+    }
     if (selected != null && !busy) AzphaltPill(if (deleting) "Confirm delete conversation" else "Delete conversation",
         "collective-delete", onClick = {
             if (!deleting) deleting = true

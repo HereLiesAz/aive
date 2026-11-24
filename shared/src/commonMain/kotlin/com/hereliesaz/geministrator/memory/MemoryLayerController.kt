@@ -1230,6 +1230,33 @@ class MemoryLayerController(
             }
         }
 
+        override suspend fun importCollectiveHistory(conversationId: String, requests: List<MemoryBankRequest>): Int? {
+            if (requests.isEmpty()) return null
+            require(requests.size <= 64 && conversationId.startsWith("collective:") && conversationId.length <= 128)
+            require(requests.map { it.sourceSessionId }.distinct().size == requests.size)
+            require(requests.all { request ->
+                val scope = request.scope
+                request.sourceSessionId.startsWith("$conversationId:turn:legacy:") &&
+                    scope == MemoryBankScope(workflowRunId = conversationId, roleId = scope.roleId) &&
+                    request.occurredAtEpochMillis == null &&
+                    when (request.sourceKind) {
+                        MemorySourceKind.UserPrompt -> scope.roleId == null && request.label == "Keeper question (retained transcript)"
+                        MemorySourceKind.AgentNote -> !scope.roleId.isNullOrBlank()
+                        else -> false
+                    }
+            })
+            val count = collectiveCaptureMutex.withLock {
+                // The registry is add-only, including banks that were explicitly cleared.
+                // Refuse mixed-era/previously banked histories rather than guess which text was forgotten.
+                if (!active || conversationId in banks.known() ||
+                    settingsStore.captureJournal.pending().values.any { it.workflowRunId == conversationId }) return@withLock null
+                registerWorkflow(conversationId, null)
+                if (layerFor(conversationId).queue.enqueueBankBatch(requests)) requests.size else null
+            }
+            if (count != null) drainSoon()
+            return count
+        }
+
         override suspend fun queryHints(request: AgentTaskRequest): MemoryQueryHints =
             if (!active) MemoryQueryHints() else runCatchingCancellable { queryHintsFor(request) }.getOrDefault(MemoryQueryHints())
 
