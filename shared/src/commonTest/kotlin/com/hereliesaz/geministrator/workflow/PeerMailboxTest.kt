@@ -215,6 +215,39 @@ class PeerMailboxTest {
         assertTrue(claim.id != reply.id)
     }
     @Test
+    fun crossRunRecruitmentBindsGrantAndSessionWithoutGrantingReverseAccess() = runBlocking {
+        val mailbox = PeerMailbox(InMemorySettings()) { 100L }
+        val destination = recipient.copy(runId = "next-run")
+        val route = PeerRoute("project", "provider", "run", "architect", "next-run", "reviewer")
+        val query = PeerConsultationNote("reviewer", "Which index?", PeerIntent.Request,
+            targetRun = "next-run", expertise = "database indexing")
+        assertTrue(mailbox.eligibleDisclosureGrants(sender, "provider").isEmpty())
+        assertTrue(mailbox.grant(route))
+        val old = mailbox.eligibleDisclosureGrants(sender, "provider").single()
+        assertFalse(mailbox.enqueue(sender, "provider", "task", query, "origin"))
+        mailbox.revoke(route)
+        assertTrue(mailbox.grant(route))
+        val bound = query.copy(crossRunGrantGeneration = old.generation, recruitedRecipientSession = "receiver")
+        assertFalse(mailbox.enqueue(sender, "provider", "task", bound, "origin"))
+        val current = mailbox.eligibleDisclosureGrants(sender, "provider").single()
+        val valid = bound.copy(crossRunGrantGeneration = current.generation)
+        assertTrue(mailbox.enqueue(sender, "provider", "task", valid, "origin"))
+        assertTrue(mailbox.claim(destination, "provider", "replacement").isEmpty())
+        assertEquals(PeerDelivery.Rejected, mailbox.receipts(destination, "provider").single().delivery)
+        assertTrue(mailbox.claim(destination, "provider", "receiver").isEmpty())
+        assertFalse(mailbox.enqueue(sender, "provider", "task", query.copy(targetRun = null), "origin"))
+        assertFalse(mailbox.enqueue(destination, "provider", "other", PeerConsultationNote("architect",
+            "Reply", targetRun = "run"), "receiver"))
+        assertTrue(mailbox.eligibleDisclosureGrants(sender.copy(projectId = "other"), "provider").isEmpty())
+        assertTrue(mailbox.eligibleDisclosureGrants(sender, "other").isEmpty())
+        assertTrue(mailbox.enqueue(sender, "provider", "task", valid.copy(body = "Another question"), "origin"))
+        val claim = mailbox.claim(destination, "provider", "receiver").single()
+        assertTrue(mailbox.authorized(claim))
+        mailbox.revoke(route)
+        assertFalse(mailbox.authorized(claim))
+    }
+
+    @Test
     fun exactCrossRunConsentSurvivesRestartAndRevocationInvalidatesOldNotes() = runBlocking {
         val settings = InMemorySettings()
         val mailbox = PeerMailbox(settings) { 100L }
