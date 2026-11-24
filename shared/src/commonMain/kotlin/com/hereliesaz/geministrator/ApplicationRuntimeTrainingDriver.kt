@@ -97,10 +97,11 @@ internal suspend fun ApplicationRuntime.driveTrainingRound(runId: String) {
     val models = trainingModels()
     val mayCall = models?.mayCall ?: { true }
 
+    val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(listOf(run.id.value))
     val exchange = exchangeOnRuling(
         results, findings, info.round, limits,
-        nanny = models?.voices?.get(HallMonitorRole.id.value),
-        antagonist = models?.voices?.get(BuiltInRoles.Antagonist.id.value),
+        nanny = models?.voices?.get(HallMonitorRole.id.value)?.let { memory.voice(it, HallMonitorRole.id.value) },
+        antagonist = models?.voices?.get(BuiltInRoles.Antagonist.id.value)?.let { memory.voice(it, BuiltInRoles.Antagonist.id.value) },
         mayCall = mayCall,
     )
     var next = nextForExchange(exchange, info.round, limits, findings)
