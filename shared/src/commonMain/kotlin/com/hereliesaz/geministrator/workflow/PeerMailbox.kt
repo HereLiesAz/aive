@@ -52,11 +52,16 @@ internal data class PeerMail(
     val grantGeneration: Long? = null,
     /** Host-derived deduplication identity for an expertise request, independent of selected peer. */
     val recruitmentKey: String? = null,
+    val groupAction: PeerGroupAction? = null,
+    val groupId: String? = null,
+    /** Exact invited/member session for directed group traffic; null for initial invitations. */
+    val requiredRecipientSession: String? = null,
 ) {
     /** Stable content-derived identifier for this scoped, deduplicated envelope. */
     val id: String get() = Sha256.hex(Json.encodeToString(listOf(project, run, provider, senderRole,
         senderTask, recipientRole, text, intent.name, replyTo.orEmpty()) +
-        (targetRun?.let { listOf(it, grantGeneration.toString()) } ?: emptyList())).encodeToByteArray())
+        (targetRun?.let { listOf(it, grantGeneration.toString()) } ?: emptyList()) +
+        (groupAction?.let { listOf(it.name, groupId.orEmpty()) } ?: emptyList())).encodeToByteArray())
     val destinationRun: String get() = targetRun ?: run
     val route: PeerRoute get() = PeerRoute(project, provider, run, senderRole, destinationRun, recipientRole)
 }
@@ -79,6 +84,7 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
         const val LIMIT = 128
         const val PER_SENDER = 4
         const val MAX_PENDING_PER_ROLE = 4
+        const val MAX_INVITEES = 3
         const val TTL = 86_400_000L
     }
 
@@ -166,6 +172,53 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
                     it.recipientSession == senderSession && it.delivery in setOf(PeerDelivery.Claimed, PeerDelivery.Accepted) }
                     ?: return@withLock false
             }
+            var requiredRecipientSession: String? = null
+            val groupId = when (note.groupAction) {
+                null -> {
+                    if (note.groupId != null) return@withLock false
+                    null
+                }
+                PeerGroupAction.Invite -> {
+                    if (note.targetRun != null || note.replyTo != null || note.expertise != null ||
+                        senderSession.isNullOrBlank()) return@withLock false
+                    val id = note.groupId ?: Sha256.hex(Json.encodeToString(listOf("group", origin.projectId,
+                        origin.runId, provider, origin.roleId, senderTask, senderSession, note.roleId,
+                        ControlRedaction.scrub(note.body))).encodeToByteArray())
+                    val invitations = entries.filter { it.groupId == id && it.groupAction == PeerGroupAction.Invite }
+                    if (note.groupId != null && invitations.isEmpty()) return@withLock false
+                    if (invitations.any { it.project != origin.projectId || it.run != origin.runId ||
+                            it.provider != provider || it.senderRole != origin.roleId ||
+                            it.senderTask != senderTask || it.senderSession != senderSession } ||
+                        invitations.size >= MAX_INVITEES || invitations.any { it.recipientRole == note.roleId }) return@withLock false
+                    id
+                }
+                PeerGroupAction.Volunteer, PeerGroupAction.Decline -> {
+                    if (note.targetRun != null || note.groupId != null || note.expertise != null ||
+                        senderSession.isNullOrBlank() || parent?.groupAction != PeerGroupAction.Invite ||
+                        parent.groupId == null || parent.senderSession.isNullOrBlank()) return@withLock false
+                    if (entries.any { it.replyTo == parent.id &&
+                            it.groupAction in setOf(PeerGroupAction.Volunteer, PeerGroupAction.Decline) }) return@withLock false
+                    requiredRecipientSession = parent.senderSession
+                    parent.groupId
+                }
+                PeerGroupAction.Note -> {
+                    if (note.targetRun != null || note.replyTo != null || note.expertise != null ||
+                        senderSession.isNullOrBlank() || note.groupId == null) return@withLock false
+                    val invitations = entries.filter { it.project == origin.projectId && it.run == origin.runId &&
+                        it.provider == provider && it.groupId == note.groupId && it.groupAction == PeerGroupAction.Invite }
+                    val first = invitations.firstOrNull() ?: return@withLock false
+                    val members = mutableMapOf(first.senderRole to first.senderSession)
+                    invitations.forEach { invitation ->
+                        val accepted = entries.singleOrNull { it.replyTo == invitation.id &&
+                            it.groupId == note.groupId && it.groupAction == PeerGroupAction.Volunteer &&
+                            it.delivery == PeerDelivery.Accepted }
+                        if (accepted != null) members[invitation.recipientRole] = invitation.recipientSession
+                    }
+                    if (members[origin.roleId] != senderSession) return@withLock false
+                    requiredRecipientSession = members[note.roleId]?.takeIf { it.isNotBlank() } ?: return@withLock false
+                    note.groupId
+                }
+            }
             val recruitmentKey = note.expertise?.let {
                 Sha256.hex(Json.encodeToString(listOf(origin.projectId, origin.runId, provider, origin.roleId,
                     senderTask, ControlRedaction.scrub(it), ControlRedaction.scrub(note.body))).encodeToByteArray())
@@ -174,7 +227,8 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
                 note.roleId, ControlRedaction.scrub(note.body), time, senderSession, senderInvocation,
                 intent = note.intent, replyTo = parent?.id, correlationId = parent?.correlationId ?: parent?.id,
                 targetRun = targetRun.takeIf { it != origin.runId }, grantGeneration = generation,
-                recruitmentKey = recruitmentKey)
+                recruitmentKey = recruitmentKey, groupAction = note.groupAction, groupId = groupId,
+                requiredRecipientSession = requiredRecipientSession)
             if (entries.size >= LIMIT || entries.count {
                     it.project == mail.project && it.run == mail.run && it.provider == provider && it.senderTask == senderTask
                 } >= PER_SENDER || entries.any { it.id == mail.id ||
@@ -194,7 +248,9 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
         val updated = entries.map {
             if (it.delivery == PeerDelivery.Queued && it.project == recipient.projectId && it.destinationRun == recipient.runId &&
                 it.provider == provider && it.recipientRole == recipient.roleId) {
-                if (it.run != it.destinationRun && activeGrants.none { grant -> grant.route == it.route && grant.generation == it.grantGeneration }) {
+                if (it.requiredRecipientSession != null && it.requiredRecipientSession != session) {
+                    it.copy(delivery = PeerDelivery.Rejected)
+                } else if (it.run != it.destinationRun && activeGrants.none { grant -> grant.route == it.route && grant.generation == it.grantGeneration }) {
                     it.copy(delivery = PeerDelivery.Rejected)
                 } else it.copy(delivery = PeerDelivery.Claimed, recipientSession = session).also(claimed::add)
             } else it
