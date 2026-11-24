@@ -908,18 +908,24 @@ class ProviderBackedManagedSessionGateway(
 
     /** Queue advisory notes even when a recipient is temporarily absent. */
     private suspend fun routePeerConsultation(sender: ManagedSessionHandle, content: String) {
-        val note = PeerConsultationNote.parse(content) ?: return
+        val requested = PeerConsultationNote.parse(content) ?: return
         val origin = mutex.withLock {
             val context = consultationContexts[sender] ?: return@withLock null
             if (snapshots[sender]?.status != ManagedSessionStatus.Running ||
-                context.roleId == note.roleId || (consultationCounts[sender] ?: 0) >= 4) return@withLock null
+                context.roleId == requested.roleId || (consultationCounts[sender] ?: 0) >= 4) return@withLock null
             consultationCounts[sender] = (consultationCounts[sender] ?: 0) + 1
             context
         } ?: return
         try {
-            if (!peerRoleAllowed(origin.roleId, sender.providerId) || !peerRoleAllowed(note.roleId, sender.providerId)) return
+            if (!peerRoleAllowed(origin.roleId, sender.providerId)) return
+            val note = if (requested.expertise != null) {
+                recruitPeer(sender, origin, requested) ?: return
+            } else requested
+            if (!peerRoleAllowed(note.roleId, sender.providerId)) return
             if (!providerRegistry.peerMailbox.enqueue(origin, sender.providerId.value, sender.taskRunId.value, note,
                     sender.providerRunId.value, sender.inferenceInvocationId)) return
+            if (note.expertise != null) activity.record(sender.activityKey(), SessionActivityKind.Consultation,
+                "Recruited ${com.hereliesaz.geministrator.control.ControlRedaction.scrub(note.roleId)} for advisory consultation")
             activity.record(sender.activityKey(), SessionActivityKind.Consultation,
                 "Queued ${note.intent.name} for ${com.hereliesaz.geministrator.control.ControlRedaction.scrub(note.roleId)}")
             val recipient = mutex.withLock {
@@ -936,6 +942,49 @@ class ProviderBackedManagedSessionGateway(
         } catch (_: Exception) {
             // A mailbox failure must not restart billed provider work.
         }
+    }
+
+    /**
+     * Select one already-running, uniquely addressed peer using the existing deterministic routing
+     * utility. Recruitment is not a launch, a remote discovery request, or a new spend allowance.
+     * No model call is used for selection. Pending pressure is measured from the durable mailbox.
+     */
+    private suspend fun recruitPeer(
+        sender: ManagedSessionHandle,
+        origin: PeerConsultationContext,
+        request: PeerConsultationNote,
+    ): PeerConsultationNote? {
+        val expertise = request.expertise ?: return null
+        val live = mutex.withLock {
+            consultationContexts.entries.filter { (handle, context) ->
+                handle != sender && handle.providerId == sender.providerId &&
+                    snapshots[handle]?.status == ManagedSessionStatus.Running &&
+                    origin.projectId == context.projectId && origin.runId == context.runId &&
+                    origin.roleId != context.roleId
+            }.map { it.value.roleId }.groupingBy { it }.eachCount().filterValues { it == 1 }.keys
+        }
+        val candidates = peerRoster().groupBy { it.id.value }.values.mapNotNull { it.singleOrNull() }
+            .filter { it.id.value in live && peerRoleIsEligible(it, sender.providerId) }
+            .mapNotNull { role ->
+                val pending = providerRegistry.peerMailbox.pendingCount(origin.copy(roleId = role.id.value), sender.providerId.value)
+                if (pending >= 4) null else com.hereliesaz.geministrator.orchestration.AgentRouteCandidate(
+                    id = role.id.value,
+                    capabilities = setOf(AgentCapability.Messaging.name),
+                    preferenceRank = pending,
+                    description = "${role.name} ${role.description}".take(1024),
+                )
+            }
+        if (candidates.isEmpty()) return null
+        val route = com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities.routeAgent(
+            com.hereliesaz.geministrator.orchestration.AgentRoutingInput(
+                requiredCapabilities = setOf(AgentCapability.Messaging.name),
+                candidates = candidates,
+                requiredContextType = "peer-consultation",
+                taskText = expertise,
+            ),
+        )
+        val selected = route.selectedAgent?.takeIf { id -> candidates.any { it.id == id } } ?: return null
+        return request.copy(roleId = selected)
     }
 
     /** Claim only for an unambiguous live advisory role; never deliver as keeper speech. */
