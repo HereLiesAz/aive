@@ -217,7 +217,13 @@ class MemoryLayerController(
         var binding: ManagedAttentionBinding? = null,
     )
 
-    private data class ManagedAttentionBinding(val handle: ManagedSessionHandle, val parts: List<String>)
+    private data class ManagedAttentionBinding(
+        val handle: ManagedSessionHandle, val parts: List<String>, val workflow: String,
+    )
+
+    // Banking follows exact provider handles even while a replacement prepares its entry prompt.
+    // Losing attention ownership must not discard the old invocation's real final observations.
+    private val captureBindings = mutableMapOf<ManagedSessionHandle, ManagedAttentionBinding>()
 
     /** A task ID alone is not a provider session. Scope and role are included without storing raw IDs. */
     private fun managedBinding(handle: ManagedSessionHandle, request: AgentTaskRequest, workflow: String): ManagedAttentionBinding {
@@ -225,7 +231,7 @@ class MemoryLayerController(
         return ManagedAttentionBinding(handle, listOf("managed-v1", handle.taskRunId.value,
             handle.providerId.value, handle.providerRunId.value, handle.specialistId.orEmpty(), workflow,
             context.projectId?.value.orEmpty(), context.workflowDefinitionId?.value.orEmpty(),
-            context.roleId?.value.orEmpty()) + context.parentWorkflowRunIds.map { it.value }.distinct().sorted())
+            context.roleId?.value.orEmpty()) + context.parentWorkflowRunIds.map { it.value }.distinct().sorted(), workflow)
     }
 
     /** Serialize checkpoint writes with rebinding and erasure; no stale session can restore its gate. */
@@ -790,7 +796,8 @@ class MemoryLayerController(
             val binding = managedBinding(handle, request, workflow)
             val session = cueMutex.withLock {
                 val previous = cueSessions[id]
-                if (previous?.binding == binding) return@withLock previous
+                captureBindings[handle] = binding
+                if (previous != null && previous.binding == binding) return@withLock previous
                 agentWorkflows[id] = workflow
                 val checkpoint = if (reconnect) runCatchingCancellable {
                     settingsStore.managedAttention.load(binding.parts, nowEpochMillis())
@@ -811,9 +818,10 @@ class MemoryLayerController(
 
         override suspend fun onSessionEvent(handle: ManagedSessionHandle, event: AgentEvent) {
             if (!active) return
+            val binding = cueMutex.withLock { captureBindings[handle] } ?: return
+            layerFor(binding.workflow).sessionObserver.onSessionEvent(handle, event)
             val session = managedCueSession(handle) ?: return
             val agentId = handle.taskRunId.value
-            layerFor(memoryWorkflowOf(checkNotNull(session.request), handle.providerRunId.value)).sessionObserver.onSessionEvent(handle, event)
             val text = when (event) {
                 is AgentEvent.Message -> event.content
                 is AgentEvent.PlanGenerated -> event.summary
@@ -821,6 +829,7 @@ class MemoryLayerController(
                 else -> null
             }
             val tokenCount = AttentionGatedRecall.approximateTokens(text, APPROXIMATE_CHARS_PER_TOKEN)
+            if (tokenCount == 0) return
             cueMutex.withLock {
                 if (cueSessions[agentId] !== session) return@withLock
                 attention.forAgent(agentId).consumeTokens(tokenCount)
@@ -846,7 +855,7 @@ class MemoryLayerController(
             val session = managedCueSession(handle) ?: return
             // The agent's own message asking for the session so far to be sent to memory now.
             if (event is AgentEvent.Message && MemoryRemindMeCommand.isIn(text)) {
-                layerFor(workflowOfAgent(handle.taskRunId.value)).sessionObserver.onRemindMe(handle)
+                layerFor(checkNotNull(session.binding).workflow).sessionObserver.onRemindMe(handle)
                 drainSoon()
             }
             respondToThought(handle.taskRunId.value, text, reply, session)
@@ -870,19 +879,21 @@ class MemoryLayerController(
 
         override suspend fun onKeeperMessage(handle: ManagedSessionHandle, text: String) {
             if (!active || text.isBlank()) return
-            val session = managedCueSession(handle) ?: return
-            layerFor(memoryWorkflowOf(checkNotNull(session.request), handle.providerRunId.value)).sessionObserver.onKeeperMessage(handle, text)
+            val binding = cueMutex.withLock { captureBindings[handle] } ?: return
+            layerFor(binding.workflow).sessionObserver.onKeeperMessage(handle, text)
         }
 
         override suspend fun onSessionFinished(handle: ManagedSessionHandle, status: ManagedSessionStatus) {
-            val session = managedCueSession(handle) ?: return
-            if (active) layerFor(memoryWorkflowOf(checkNotNull(session.request), handle.providerRunId.value)).sessionObserver.onSessionFinished(handle, status)
+            val binding = cueMutex.withLock { captureBindings[handle] } ?: return
+            if (active) layerFor(binding.workflow).sessionObserver.onSessionFinished(handle, status)
             cueMutex.withLock {
-                val id = handle.taskRunId.value
-                if (cueSessions[id] !== session) return@withLock
+                if (captureBindings[handle] != binding) return@withLock
+                captureBindings.remove(handle)
                 runCatchingCancellable {
-                    session.binding?.let { settingsStore.managedAttention.remove(it.parts, nowEpochMillis()) }
+                    settingsStore.managedAttention.remove(binding.parts, nowEpochMillis())
                 }
+                val id = handle.taskRunId.value
+                if (cueSessions[id]?.binding != binding) return@withLock
                 attention.forget(id)
                 cueSessions.remove(id)
                 agentWorkflows.remove(id)
@@ -1700,7 +1711,7 @@ class MemoryLayerController(
             if (cueSessions[agentId] !== session) return
             attention.forAgent(agentId)
         }
-        val workflow = memoryWorkflowOf(checkNotNull(session.request), session.binding?.handle?.providerRunId?.value ?: agentId)
+        val workflow = checkNotNull(session.binding).workflow
         val layer = layerFor(workflow)
         val tool = layer.tool
         val isCommon: suspend (String) -> Boolean = { word -> isCommonWord(tool, word) }
