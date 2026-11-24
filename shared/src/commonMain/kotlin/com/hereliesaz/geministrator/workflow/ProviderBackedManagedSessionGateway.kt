@@ -1309,7 +1309,8 @@ class ProviderBackedManagedSessionGateway(
             .filter { role ->
                 role.id != BuiltInRoles.Orchestrator.id && role.id.value != origin.roleId &&
                     role.id.value !in occupied && peerRoleIsEligible(role, sender.providerId) &&
-                    role.effectiveTokenBudget() == null && grants.any { it.route.targetRole == role.id.value }
+                    grants.any { grant -> grant.route.targetRole == role.id.value &&
+                        (if (grant.route.paidActivation) role.effectiveTokenBudget() != null else role.effectiveTokenBudget() == null) }
             }
         if (roster.isEmpty()) return null
         val experience = runCatchingCancellable {
@@ -1326,8 +1327,10 @@ class ProviderBackedManagedSessionGateway(
             }.thenBy { it.id.value })
         val selected = ranked.first()
         if (peerRoster().singleOrNull { it.id == selected.id } != selected) return null
-        val grant = grants.single { it.route.targetRole == selected.id.value }
-        return request.copy(roleId = selected.id.value, activation = true, activationGrantGeneration = grant.generation)
+        val grant = grants.single { it.route.targetRole == selected.id.value &&
+            it.route.paidActivation == (selected.effectiveTokenBudget() != null) }
+        return request.copy(roleId = selected.id.value, activation = true, activationGrantGeneration = grant.generation,
+            paidActivation = grant.route.paidActivation)
     }
 
     /**

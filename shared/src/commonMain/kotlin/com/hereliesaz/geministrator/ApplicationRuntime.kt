@@ -66,6 +66,8 @@ import com.hereliesaz.geministrator.workflow.NestedWorkflowExecutorIntegration
 import com.hereliesaz.geministrator.workflow.ProviderBackedManagedSessionGateway
 import com.hereliesaz.geministrator.workflow.RoleSurfaceRuntimeRegistry
 import com.hereliesaz.geministrator.workflow.SpendCaps
+import com.hereliesaz.geministrator.workflow.reserveAutonomousAdvisory
+import com.hereliesaz.geministrator.workflow.settleAutonomousAdvisory
 import com.hereliesaz.geministrator.workflow.improvement.ImprovementSource
 import com.hereliesaz.geministrator.workflow.improvement.ProposalStatus
 import com.hereliesaz.geministrator.queen.QueenAction
@@ -439,9 +441,9 @@ class ApplicationRuntime private constructor(
     internal suspend fun collectiveSpecialistProfiles() = collectiveProfiles.profiles()
 
     /**
-     * A dormant wake is an explicitly authorized, one-shot, non-billed text advisory call.
-     * Until autonomous usage can be charged to a run's role budget, roles with an explicit
-     * token allowance or budget class are refused rather than spending outside that allowance.
+     * A dormant wake is an explicitly authorized one-shot text advisory call. Legacy free grants
+     * cannot incur paid usage. Paid calls require a separate grant, priced bounded adapter and
+     * durable run/role reservation before generation; unknown outcomes retain that reservation.
      */
     private suspend fun answerDormantSpecialist(
         mail: com.hereliesaz.geministrator.workflow.PeerMail,
@@ -450,10 +452,17 @@ class ApplicationRuntime private constructor(
         val provider = com.hereliesaz.geministrator.domain.AgentProviderId(mail.provider)
         val roster = activeRoles(resolveRoleCollection(persistence.roles.all()))
         val role = roster.singleOrNull { it.id.value == mail.recipientRole } ?: return null
-        if (role.id == BuiltInRoles.Orchestrator.id || role.effectiveTokenBudget() != null ||
+        if (role.id == BuiltInRoles.Orchestrator.id ||
             !com.hereliesaz.geministrator.workflow.peerRoleIsEligible(role, provider)) return null
         val model = collectiveModelFor?.invoke(mail.provider) ?: return null
-        if (model.uses.size != 1 || model.uses.any { it.sourceId != mail.provider || it.billsPerToken }) return null
+        val use = model.uses.singleOrNull()?.takeIf { it.sourceId == mail.provider } ?: return null
+        if (mail.paidActivation != use.billsPerToken ||
+            (mail.paidActivation != (role.effectiveTokenBudget() != null))) return null
+        val bounded = if (mail.paidActivation) model as? com.hereliesaz.geministrator.queen.BoundedAdvisoryModel
+            ?: return null else null
+        val price = if (mail.paidActivation)
+            com.hereliesaz.geministrator.providers.ModelPriceTable.Default.priceFor(use.sourceId, use.modelId)
+                ?: return null else null
         suspend fun admitted(): Boolean {
             if (!authorized()) return false
             val run = runtimeMutex.withLock { current?.state?.run } ?: return false
@@ -462,13 +471,70 @@ class ApplicationRuntime private constructor(
                 run.spendPause != null || run.objectiveProvenance.isUntrusted() ||
                 com.hereliesaz.geministrator.workflow.runCostTrip(run, queenCaps()) != null) return false
             val fresh = activeRoles(resolveRoleCollection(persistence.roles.all())).singleOrNull { it.id == role.id }
-            return fresh == role && fresh.effectiveTokenBudget() == null && queenCallAllowed() &&
+            return fresh == role && (fresh.effectiveTokenBudget() != null) == mail.paidActivation && queenCallAllowed() &&
                 directAdvisoryGateFor(model.uses, 0) == com.hereliesaz.geministrator.queen.CallDecision.Allow &&
                 authorized()
         }
         if (!admitted()) return null
         val id = com.hereliesaz.geministrator.queen.specialistInstanceId(role, model.uses)
-        val guarded = com.hereliesaz.geministrator.queen.cappedModel(model) { admitted() }
+        val guarded = if (bounded == null || price == null) {
+            com.hereliesaz.geministrator.queen.cappedModel(model) { admitted() }
+        } else object : com.hereliesaz.geministrator.queen.QueenModel {
+            override val uses get() = model.uses
+            override suspend fun answer(prompt: String): String {
+                val input = bounded.advisoryInputUpperBound ?: return ""
+                val output = bounded.advisoryOutputLimit?.coerceAtMost(512)?.takeIf { it > 0 } ?: return ""
+                val modelId = use.modelId ?: return ""
+                val pacing = com.hereliesaz.geministrator.queen.currentQueenCallContext()
+                if (pacing != null && !pacing.awaitTurn(use.sourceId)) return ""
+                if (!admitted()) return ""
+                val reservation = com.hereliesaz.geministrator.domain.AutonomousAdvisoryCharge(
+                    mail.id, role.id, use.sourceId, modelId, input, output.toLong(),
+                    price.costUsd(input, output.toLong()), nowEpochMillis())
+                val reserved = runtimeMutex.withLock {
+                    if (!authorized()) return@withLock false
+                    val snapshot = current ?: return@withLock false
+                    val run = newestRun(snapshot.state.run)
+                    if (run.id.value != mail.run || run.projectId.value != mail.project ||
+                        run.status != WorkflowRunStatus.Running || run.globalPause != null || run.keeperPause != null ||
+                        run.spendPause != null || run.objectiveProvenance.isUntrusted()) return@withLock false
+                    val fresh = activeRoles(resolveRoleCollection(persistence.roles.all())).singleOrNull { it.id == role.id }
+                    if (fresh != role) return@withLock false
+                    val budget = fresh.effectiveTokenBudget() ?: return@withLock false
+                    val runBudget = run.roleSnapshot.singleOrNull { it.id == role.id }?.effectiveTokenBudget()
+                    val caps = queenCaps()
+                    val hourly = com.hereliesaz.geministrator.workflow.hourlySpend(persistence, nowEpochMillis(),
+                        run.id, com.hereliesaz.geministrator.workflow.AmbientSpendLedger.Shared)
+                    val next = run.reserveAutonomousAdvisory(reservation, minOf(budget, runBudget ?: budget), caps, hourly)
+                        ?: return@withLock false
+                    persistence.runs.put(next)
+                    replaceCurrent(snapshot.copy(state = snapshot.state.copy(run = next)))
+                    true
+                }
+                if (!reserved || !authorized()) return ""
+                // No retry. Missing usage, provider error, cancellation or process death keeps the
+                // durable reservation rather than claiming that ambiguous paid work cost nothing.
+                val result = bounded.answerBounded(prompt, output)
+                val usedInput = result.inputTokens ?: return ""
+                val usedOutput = result.outputTokens ?: return ""
+                if (usedInput < 0 || usedOutput < 0 || usedInput > Long.MAX_VALUE - usedOutput) return ""
+                val actualCost = price.costUsd(usedInput, usedOutput)
+                val settled = withContext(NonCancellable) {
+                    runtimeMutex.withLock {
+                        val snapshot = current
+                        val live = snapshot?.state?.run?.takeIf { it.id.value == mail.run }
+                        val run = if (live != null) newestRun(live)
+                            else persistence.runs.get(WorkflowRunId(mail.run)) ?: return@withLock false
+                        val next = run.settleAutonomousAdvisory(mail.id, usedInput, usedOutput, actualCost, nowEpochMillis())
+                            ?: return@withLock false
+                        persistence.runs.put(next)
+                        if (snapshot != null && live != null) replaceCurrent(snapshot.copy(state = snapshot.state.copy(run = next)))
+                        next.autonomousAdvisoryCharges.single { it.requestId == mail.id }.boundViolated.not()
+                    }
+                }
+                return if (settled && authorized()) result.text else ""
+            }
+        }
         val voice = com.hereliesaz.geministrator.queen.voiceModel(guarded, role.name, role.promptInstructions())
         val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(listOf(mail.run))
         val caller = com.hereliesaz.geministrator.queen.pacedPerCall(

@@ -26,6 +26,8 @@ internal data class PeerRoute(
     val targetRole: String,
     /** Separate permission to invoke one dormant same-run advisory specialist. */
     val activation: Boolean = false,
+    /** Separate explicit permission to incur reserved paid advisory usage. Legacy grants remain free-only. */
+    val paidActivation: Boolean = false,
 )
 
 /**
@@ -80,15 +82,17 @@ internal data class PeerMail(
     val activation: Boolean = false,
     val senderSpecialist: String? = null,
     val recipientSpecialist: String? = null,
+    val paidActivation: Boolean = false,
 ) {
     /** Stable content-derived identifier for this scoped, deduplicated envelope. */
     val id: String get() = Sha256.hex(Json.encodeToString(listOf(project, run, provider, senderRole,
         senderTask, recipientRole, text, intent.name, replyTo.orEmpty()) +
         (targetRun?.let { listOf(it, grantGeneration.toString()) } ?: emptyList()) +
         (groupAction?.let { listOf(it.name, groupId.orEmpty()) } ?: emptyList()) +
-        (if (activation) listOf("activation", grantGeneration.toString()) else emptyList())).encodeToByteArray())
+        (if (activation) listOf("activation", grantGeneration.toString()) else emptyList()) +
+        (if (paidActivation) listOf("paid") else emptyList())).encodeToByteArray())
     val destinationRun: String get() = targetRun ?: run
-    val route: PeerRoute get() = PeerRoute(project, provider, run, senderRole, destinationRun, recipientRole, activation)
+    val route: PeerRoute get() = PeerRoute(project, provider, run, senderRole, destinationRun, recipientRole, activation, paidActivation)
 }
 
 /**
@@ -127,6 +131,7 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
     /** Only a local Keeper surface may call this; route values must be verified against the run catalog there. */
     suspend fun grant(route: PeerRoute): Boolean = mutex.withLock {
         if ((route.sourceRun == route.targetRun) != route.activation || route.sourceRole == route.targetRole ||
+            (route.paidActivation && !route.activation) ||
             listOf(route.project, route.provider, route.sourceRun, route.sourceRole, route.targetRun, route.targetRole)
                 .any { !Regex("[A-Za-z0-9_.:-]{1,128}").matches(it) }) return@withLock false
         val current = grants()
@@ -271,11 +276,12 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
             val time = now()
             val entries = live(read(), time)
             val targetRun = note.targetRun ?: origin.runId
+            if (note.paidActivation && !note.activation) return@withLock false
             if (note.activationGrantGeneration != null && (!note.activation || note.expertise == null)) return@withLock false
             if (note.activation && (note.targetRun != null || note.replyTo != null || note.groupAction != null ||
                     senderSession.isNullOrBlank() || note.intent != PeerIntent.Request ||
                     (note.expertise != null && note.activationGrantGeneration == null))) return@withLock false
-            val route = PeerRoute(origin.projectId, provider, origin.runId, origin.roleId, targetRun, note.roleId, note.activation)
+            val route = PeerRoute(origin.projectId, provider, origin.runId, origin.roleId, targetRun, note.roleId, note.activation, note.paidActivation)
             val generation = if (targetRun == origin.runId && !note.activation) null else
                 grants().singleOrNull { it.route == route }?.generation ?: return@withLock false
             if (note.activationGrantGeneration != null && note.activationGrantGeneration != generation) return@withLock false
@@ -350,7 +356,7 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
                 targetRun = targetRun.takeIf { it != origin.runId }, grantGeneration = generation,
                 recruitmentKey = recruitmentKey, groupAction = note.groupAction, groupId = groupId,
                 requiredRecipientSession = requiredRecipientSession, groupCreatedAt = groupCreatedAt,
-                activation = note.activation, senderSpecialist = senderSpecialist)
+                activation = note.activation, senderSpecialist = senderSpecialist, paidActivation = note.paidActivation)
             if (note.activation && entries.any { it.activation && it.project == mail.project && it.run == mail.run &&
                     it.provider == provider && it.recipientRole == mail.recipientRole }) return@withLock false
             if (entries.size >= LIMIT || entries.count {

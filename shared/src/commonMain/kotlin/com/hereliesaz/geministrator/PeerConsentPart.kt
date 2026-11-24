@@ -41,7 +41,7 @@ internal fun PeerConsentPart(host: WorkflowLibraryHost) {
         style = AzphaltType.body, color = azphaltOnSurface())
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         routes.forEach { route ->
-            Text("${if (route.activation) "Activation" else "Disclosure"} · ${route.project} · ${route.provider}\n${route.sourceRun} / ${route.sourceRole} → ${route.targetRun} / ${route.targetRole}",
+            Text("${if (route.paidActivation) "Paid activation" else if (route.activation) "Activation" else "Disclosure"} · ${route.project} · ${route.provider}\n${route.sourceRun} / ${route.sourceRole} → ${route.targetRun} / ${route.targetRole}",
                 style = AzphaltType.body, color = azphaltOnSurface())
             AzphaltPill("Revoke route", "revoke-peer-${route.hashCode()}", onClick = {
                 if (!busy) scope.launch {
@@ -95,15 +95,21 @@ internal fun PeerConsentPart(host: WorkflowLibraryHost) {
             if (!busy) pending = PeerRoute(project.trim(), provider.trim(), sourceRun.trim(), sourceRole.trim(),
                 targetRun.trim(), targetRole.trim(), activation = sourceRun.trim() == targetRun.trim())
         })
+        if (sourceRun.isNotBlank() && sourceRun.trim() == targetRun.trim()) {
+            AzphaltPill("Review paid specialist grant", "review-paid-peer-route", onClick = {
+                if (!busy) pending = PeerRoute(project.trim(), provider.trim(), sourceRun.trim(), sourceRole.trim(),
+                    targetRun.trim(), targetRole.trim(), activation = true, paidActivation = true)
+            })
+        }
         status.takeIf(String::isNotBlank)?.let {
             Text(it, style = AzphaltType.body, color = azphaltOnSurface())
         }
     }
     pending?.let { route ->
         AzphaltAlertDialog(
-            title = if (route.activation) "Allow dormant specialist activation?" else "Allow cross-run consultation?",
-            text = (if (route.activation) "Allow one tool-free, non-billed advisory invocation. " else "") + "Allow advisory messages from ${route.sourceRole} in ${route.sourceRun} to ${route.targetRole} in ${route.targetRun}, within ${route.project}, using ${route.provider}? Only this direction is authorized. Revoking cannot retrieve information already sent.",
-            confirmLabel = if (route.activation) "Allow activation" else "Allow disclosure",
+            title = if (route.paidActivation) "Allow paid dormant specialist activation?" else if (route.activation) "Allow dormant specialist activation?" else "Allow cross-run consultation?",
+            text = (if (route.paidActivation) "Allow one tool-free billed invocation only with a persisted run/role reservation. The full provider context bound and up to 512 output tokens are reserved; uncertain usage retains the reservation. " else if (route.activation) "Allow one tool-free, non-billed advisory invocation. " else "") + "Allow advisory messages from ${route.sourceRole} in ${route.sourceRun} to ${route.targetRole} in ${route.targetRun}, within ${route.project}, using ${route.provider}? Only this direction is authorized. Revoking cannot retrieve information already sent.",
+            confirmLabel = if (route.paidActivation) "Allow paid activation" else if (route.activation) "Allow activation" else "Allow disclosure",
             dismissLabel = "Cancel",
             onDismissRequest = { pending = null },
             onDismiss = { pending = null },

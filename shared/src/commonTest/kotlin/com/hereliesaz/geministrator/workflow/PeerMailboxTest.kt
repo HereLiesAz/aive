@@ -68,6 +68,25 @@ class PeerMailboxTest {
     }
 
     @Test
+    fun paidActivationRequiresSeparateGrantAndCannotReuseFreeConsent() = runBlocking {
+        val mailbox = PeerMailbox(InMemorySettings()) { 100L }
+        val free = PeerRoute("project", "provider", "run", "architect", "run", "reviewer", activation = true)
+        val paid = free.copy(paidActivation = true)
+        val note = requireNotNull(PeerConsultationNote.parse("WAKE-PAID reviewer\nQuestion"))
+        assertTrue(note.paidActivation)
+        assertTrue(mailbox.grant(free))
+        assertFalse(mailbox.enqueue(sender, "provider", "task", note, "origin"))
+        assertTrue(mailbox.grant(paid))
+        assertTrue(mailbox.enqueue(sender, "provider", "task", note, "origin"))
+        val claim = requireNotNull(mailbox.claimActivation(sender, "provider", "task", "origin", "reviewer"))
+        assertTrue(claim.paidActivation)
+        assertTrue(mailbox.authorized(claim))
+        mailbox.revoke(paid)
+        assertFalse(mailbox.authorized(claim))
+        assertTrue(free in mailbox.routes())
+    }
+
+    @Test
     fun recruitedWakeRequiresExactUnusedGrantGenerationAndDeduplicatesAcrossRoutes() = runBlocking {
         val mailbox = PeerMailbox(InMemorySettings()) { 100L }
         val route = PeerRoute("project", "provider", "run", "architect", "run", "reviewer", activation = true)
