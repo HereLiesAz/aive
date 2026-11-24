@@ -6,6 +6,7 @@ import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.duplex.DuplexSessionAttachment
 import com.hereliesaz.geministrator.domain.ProviderRunId
+import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.inference.CompoundInferenceFabric
 import com.hereliesaz.geministrator.inference.GovernedCompoundInferenceFabric
 import com.hereliesaz.geministrator.inference.INFERENCE_INVOCATION_ID_METADATA_KEY
@@ -59,6 +60,8 @@ class ProviderBackedManagedSessionGateway(
      * never persisted into workflow state nor passed to the duplex peer.
      */
     private val activity: SessionActivityFeeds = SessionActivityFeeds.Shared,
+    /** Current Keeper-owned role catalog; absent or unreadable catalogs never authorize peer traffic. */
+    private val peerRoster: suspend () -> List<RoleDefinition> = { emptyList() },
 ) : ManagedSessionGateway {
     private val inferenceFabric: CompoundInferenceFabric =
         if (inferenceFabric is GovernedCompoundInferenceFabric) {
@@ -215,7 +218,7 @@ class ProviderBackedManagedSessionGateway(
         // Only an agent the keeper can reply to mid-task is told how to ask the keeper a question.
         val askingRequest = if (AgentCapability.Messaging in providerCapabilities.supported) {
             recalledRequest.withKeeperQuestionInstructions().let {
-                if (provider.enforcesToolFilter) it.withPeerConsultationInstructions() else it
+                if (provider.enforcesToolFilter) it.withPeerConsultationInstructions(provider.id) else it
             }
         } else {
             recalledRequest
@@ -431,7 +434,9 @@ class ProviderBackedManagedSessionGateway(
             when (
                 val result = provider.reconnect(
                     runId = handle.providerRunId,
-                    request = request,
+                    request = if (provider.enforcesToolFilter && peerMessagingSupported(provider)) {
+                        request.withPeerConsultationInstructions(provider.id)
+                    } else request,
                     planGenerated = initialStatus != ManagedSessionStatus.Planning,
                     planApproved = initialStatus !in setOf(
                         ManagedSessionStatus.Planning,
@@ -896,7 +901,8 @@ class ProviderBackedManagedSessionGateway(
     private suspend fun rememberConsultationContext(handle: ManagedSessionHandle, request: AgentTaskRequest) {
         val context = PeerConsultationContext.from(request) ?: return
         val provider = providerFor(handle)
-        if (!provider.enforcesToolFilter || AgentCapability.Messaging !in provider.capabilities().supported) return
+        if (!provider.enforcesToolFilter || !peerMessagingSupported(provider) ||
+            !peerRoleAllowed(context.roleId, handle.providerId)) return
         mutex.withLock { consultationContexts[handle] = context }
     }
 
@@ -911,6 +917,7 @@ class ProviderBackedManagedSessionGateway(
             context
         } ?: return
         try {
+            if (!peerRoleAllowed(origin.roleId, sender.providerId) || !peerRoleAllowed(note.roleId, sender.providerId)) return
             if (!providerRegistry.peerMailbox.enqueue(origin, sender.providerId.value, sender.taskRunId.value, note,
                     sender.providerRunId.value, sender.inferenceInvocationId)) return
             activity.record(sender.activityKey(), SessionActivityKind.Consultation,
@@ -943,8 +950,11 @@ class ProviderBackedManagedSessionGateway(
                     } != 1) return@withLock null
                 recipient
             } ?: return
+            if (!peerRoleAllowed(context.roleId, handle.providerId)) return
             for (mail in providerRegistry.peerMailbox.claim(context, handle.providerId.value, handle.providerRunId.value)) {
-                if (status(handle) != ManagedSessionStatus.Running) {
+                if (status(handle) != ManagedSessionStatus.Running ||
+                    !peerRoleAllowed(context.roleId, handle.providerId) ||
+                    !peerRoleAllowed(mail.senderRole, handle.providerId)) {
                     providerRegistry.peerMailbox.finish(mail, PeerDelivery.Rejected)
                     recordPeerDelivery(handle, mail, PeerDelivery.Rejected)
                     continue
@@ -993,10 +1003,37 @@ class ProviderBackedManagedSessionGateway(
             "$result: ${mail.intent.name} to $to")
     }
 
-    private fun AgentTaskRequest.withPeerConsultationInstructions(): AgentTaskRequest {
-        if (PeerConsultationContext.from(this) == null) return this
+    /** Catalog lookup failure disables consultation, not the underlying task. */
+    private suspend fun peerRoleAllowed(role: String, provider: AgentProviderId): Boolean = try {
+        peerRoster().singleOrNull { it.id.value == role }?.let { peerRoleIsEligible(it, provider) } == true
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        false
+    }
+
+    private suspend fun peerMessagingSupported(provider: AgentProvider): Boolean = try {
+        AgentCapability.Messaging in provider.capabilities().supported
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        false
+    }
+
+    private suspend fun AgentTaskRequest.withPeerConsultationInstructions(provider: AgentProviderId): AgentTaskRequest {
+        val context = PeerConsultationContext.from(this) ?: return this
+        if (!peerRoleAllowed(context.roleId, provider)) return this
+        if (promptContext.stablePrefix.any { it.label == "Peer consultation" }) return this
+        val available = mutex.withLock {
+            consultationContexts.entries.filter { (handle, candidate) ->
+                handle.providerId == provider && snapshots[handle]?.status == ManagedSessionStatus.Running &&
+                    candidate.projectId == context.projectId && candidate.runId == context.runId &&
+                    candidate.roleId != context.roleId
+            }.map { it.value.roleId }.groupingBy { it }.eachCount().filterValues { it == 1 }.keys.sorted()
+        }.filter { peerRoleAllowed(it, provider) && Regex("[A-Za-z0-9_.:-]{1,128}").matches(it) }.take(16)
+        val directory = if (available.isEmpty()) "" else "\nCurrently available peer role IDs: " + available.joinToString(", ")
         return copy(promptContext = promptContext.copy(stablePrefix = promptContext.stablePrefix +
-            PromptContextBlock("Peer consultation", PeerConsultationNote.INSTRUCTIONS)))
+            PromptContextBlock("Peer consultation", PeerConsultationNote.INSTRUCTIONS + directory)))
     }
 
     private fun AgentEvent.UsageReported.sanitizedUsage(): ManagedSessionUsage = ManagedSessionUsage(
