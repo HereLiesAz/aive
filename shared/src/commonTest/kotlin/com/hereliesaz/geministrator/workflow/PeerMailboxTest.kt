@@ -133,4 +133,21 @@ class PeerMailboxTest {
         restarted.revoke(route)
         assertFalse(restarted.authorized(claim))
     }
+    @Test
+    fun projectReplacementRemovesOnlyItsLocalConsentAndMail() = runBlocking {
+        val mailbox = PeerMailbox(InMemorySettings()) { 100L }
+        val route = PeerRoute("project", "provider", "run", "architect", "next-run", "reviewer")
+        val other = route.copy(project = "other")
+        assertTrue(mailbox.grant(route))
+        assertTrue(mailbox.grant(other))
+        assertTrue(mailbox.enqueue(sender, "provider", "task", PeerConsultationNote("reviewer", "Old")))
+        assertTrue(mailbox.enqueue(sender.copy(projectId = "other"), "provider", "task", PeerConsultationNote("reviewer", "Keep")))
+        mailbox.forgetProject("project")
+        assertEquals(listOf(other), mailbox.routes())
+        assertTrue(mailbox.receipts(recipient, "provider").isEmpty())
+        assertEquals("Keep", mailbox.claim(recipient.copy(projectId = "other"), "provider").single().text)
+        mailbox.clear()
+        assertTrue(mailbox.routes().isEmpty())
+        assertTrue(mailbox.receipts(recipient.copy(projectId = "other"), "provider").isEmpty())
+    }
 }
