@@ -410,6 +410,53 @@ class MemoryControllerCuePipelineTest {
         assertTrue(later.none { it.label == "Role lessons" }, "$later")
     }
     @Test
+    fun transactiveDirectoryUsesOnlyRetainedAttributedAuthorizedEpisodes() = runBlocking {
+        val settings = MapSettings()
+        val history = com.hereliesaz.geministrator.queen.CollectiveConversationStore(settings) { 100L }
+        val source = history.create().id
+        val destination = history.create().id
+        val privateBank = history.create().id
+        val bank = InMemoryMemoryStore()
+        val other = InMemoryMemoryStore()
+        val banks = MemoryBanks.inMemory(mapOf(source to bank, privateBank to other))
+        val controller = MemoryLayerController(
+            banks = banks,
+            settingsStore = MemoryLayerSettingsStore(settings),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            nowEpochMillis = { 1000L },
+        )
+        val id = "a".repeat(64)
+        val privateId = "b".repeat(64)
+        suspend fun capture(conversation: String, specialist: String) {
+            val capture = com.hereliesaz.geministrator.queen.CollectiveMemoryCapture(
+                conversation, "Check keystore signing", { 1000L }, controller.promptContextProvider)
+            capture.record(com.hereliesaz.geministrator.queen.CollectiveVoice("reviewer", QueenModel { "" }, specialist),
+                "The keystore password moved to the CI secrets; signing reads KEYSTORE_PASSWORD.")
+            capture.flush()
+        }
+        capture(source, id)
+        capture(privateBank, privateId)
+        controller.drain()
+        val provider = controller.promptContextProvider
+        suspend fun lookup() = provider.collectiveExpertise(history.recallBanks(destination), "Check keystore")
+        assertTrue(lookup().isEmpty())
+        assertTrue(history.setRecallGrant(source, destination, true))
+        assertEquals(listOf(CollectiveExpertiseMatch("reviewer", id, 1)), lookup())
+        assertTrue(history.setRecallGrant(source, destination, false))
+        assertTrue(lookup().isEmpty())
+        assertTrue(history.setRecallGrant(source, destination, true))
+        controller.updateSettings { it.copy(enabled = false) }
+        assertTrue(lookup().isEmpty())
+        controller.updateSettings { it.copy(enabled = true) }
+        controller.selectBank(source)
+        val reply = bank.read().episodes.single { it.roleId == "reviewer" }
+        controller.forgetEpisode(reply.id)
+        assertTrue(lookup().isEmpty())
+        assertTrue(other.read().episodes.any { it.roleId == "reviewer" })
+    }
+
+    @Test
     fun grantedConversationBanksSupplyOnlyRelevantTagsToActualVoices() = runBlocking {
         val settings = MapSettings()
         val history = com.hereliesaz.geministrator.queen.CollectiveConversationStore(settings) { 100L }

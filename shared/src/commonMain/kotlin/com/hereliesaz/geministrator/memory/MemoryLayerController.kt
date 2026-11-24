@@ -1257,6 +1257,47 @@ class MemoryLayerController(
             return count
         }
 
+        override suspend fun collectiveExpertise(workflowIds: List<String>, question: String): List<CollectiveExpertiseMatch> {
+            if (!active || question.isBlank()) return emptyList()
+            val known = banks.known().toSet()
+            val authorized = workflowIds.distinct().take(8).filter { it.startsWith("collective:") && it in known }
+            val query = com.hereliesaz.geministrator.control.ControlRedaction.scrub(question).take(1500)
+            val counts = mutableMapOf<Pair<String, String>, Int>()
+            for (bank in authorized) {
+                if (!active) return emptyList()
+                val hits = tagCandidates(bank, null, query, null)
+                // Re-read the physical bank, not a lineage view: only retained local provenance
+                // can contribute. A cleared/forgotten episode or purged attribution is not a pointer.
+                val snapshot = banks.store(bank).read()
+                val matchingNodes = hits.map { it.node.id }.toSet()
+                val matchingEpisodes = snapshot.nodes.asSequence()
+                    .filter { it.id in matchingNodes && it.kind in AttentionGatedRecall.CUE_KINDS }
+                    .flatMap { it.sourceEpisodeIds.asSequence() }.toSet()
+                for (episode in snapshot.episodes) {
+                    val role = episode.roleId ?: continue
+                    if (episode.id !in matchingEpisodes || episode.workflowRunId != bank ||
+                        episode.purged != null || !episode.sourceSessionId.startsWith("$bank:turn:") ||
+                        !role.matches(Regex("[A-Za-z0-9._:-]{1,128}"))) continue
+                    val identities = episode.chunks.asSequence().filter { it.kind == MemorySourceKind.AgentNote }
+                        .mapNotNull { chunk ->
+                            // Labels are host-generated attribution, not text extracted by the model.
+                            val prefix = listOf("Agent advisory reply (unverified); role=$role; instance=",
+                                "Historical agent advisory excerpt (unverified); role=$role; instance=")
+                                .firstOrNull { chunk.label.startsWith(it) } ?: return@mapNotNull null
+                            chunk.label.removePrefix(prefix).substringBefore("; configured Source=")
+                                .takeIf { it.matches(Regex("[a-f0-9]{64}")) }
+                        }.distinct().toList()
+                    val identity = identities.singleOrNull() ?: continue
+                    val key = role to identity
+                    counts[key] = (counts[key] ?: 0) + 1
+                }
+            }
+            if (!active) return emptyList()
+            return counts.map { (key, count) -> CollectiveExpertiseMatch(key.first, key.second, count) }
+                .sortedWith(compareByDescending<CollectiveExpertiseMatch> { it.matchedEpisodes }
+                    .thenBy { it.roleId }.thenBy { it.specialistId }).take(16)
+        }
+
         override suspend fun queryHints(request: AgentTaskRequest): MemoryQueryHints =
             if (!active) MemoryQueryHints() else runCatchingCancellable { queryHintsFor(request) }.getOrDefault(MemoryQueryHints())
 

@@ -56,6 +56,28 @@ class CollectiveSpecialistsTest {
     }
 
     @Test
+    fun relevantExactInstanceGetsOneSlotWithoutDisplacingIndependentExploration() {
+        val a = RoleDefinition(RoleDefinitionId("a"), "Indexing", "indexing", "")
+        val b = a.copy(id = RoleDefinitionId("b"))
+        val experienced = a.copy(id = RoleDefinitionId("z"))
+        val pinned = experienced.copy(preferredProviderId = AgentProviderId("other"))
+        val first = model("a")
+        val other = model("other")
+        val pointer = com.hereliesaz.geministrator.memory.CollectiveExpertiseMatch(
+            experienced.id.value, specialistInstanceId(experienced, other.uses), 2)
+        val fallback = mapOf(a.id.value to first, b.id.value to first, experienced.id.value to other)
+        val roster = listOf(a, b, experienced)
+        val chosen = selectCollectiveSpecialists("indexing", roster, first.uses, null, fallback, listOf(pointer))
+        assertEquals(listOf(experienced.id, a.id), chosen.map { it.first.id })
+        assertEquals("other", chosen.first().second.uses.single().sourceId)
+        val revised = experienced.copy(description = "indexing revised")
+        val changed = selectCollectiveSpecialists("indexing", listOf(a, b, revised), first.uses, null, fallback, listOf(pointer))
+        assertEquals(listOf(a.id, b.id), changed.map { it.first.id })
+        val repinned = selectCollectiveSpecialists("indexing", listOf(a, b, pinned), first.uses, null, fallback, listOf(pointer))
+        assertEquals(listOf(a.id, b.id), repinned.map { it.first.id })
+    }
+
+    @Test
     fun explicitPinNeverFallsBackToAnotherSource() {
         val role = BuiltInRoles.Architect.copy(preferredProviderId = AgentProviderId("pinned"))
         val result = selectCollectiveSpecialists("Architecture", listOf(role), model("other").uses,

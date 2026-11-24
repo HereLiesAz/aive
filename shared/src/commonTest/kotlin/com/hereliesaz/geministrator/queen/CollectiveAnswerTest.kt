@@ -32,6 +32,20 @@ class CollectiveAnswerTest {
     }
 
     @Test
+    fun directoryPointersReachEveryActualParticipantWithoutClaimingExpertise() = runTest {
+        val prompts = mutableListOf<String>()
+        val voice = QueenModel { prompts += it; "Reply" }
+        val pointer = com.hereliesaz.geministrator.memory.CollectiveExpertiseMatch("reviewer", "a".repeat(64), 2)
+        answerCollectively("Question", "", listOf(CollectiveVoice("reviewer", voice),
+            CollectiveVoice("skeptic", voice)), CollectiveVoice("queen", voice),
+            directory = listOf(pointer)) { _, _ -> true }
+        assertEquals(3, prompts.size)
+        assertTrue(prompts.all { "reviewer / aaaaaaaaaaaa: 2 retained matching episodes" in it &&
+            "not evidence or verified expertise" in it && "contact requires host admission" in it })
+        assertTrue(prompts.none { "a".repeat(64) in it })
+    }
+
+    @Test
     fun captureReceivesOnlyActualCompletedRepliesEvenWhenLaterCallIsCancelled() = runTest {
         val recorded = mutableListOf<Pair<String, String>>()
         val reviewer = CollectiveVoice("reviewer", QueenModel { "Actual objection" })
