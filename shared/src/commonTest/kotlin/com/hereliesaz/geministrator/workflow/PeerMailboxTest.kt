@@ -56,4 +56,36 @@ class PeerMailboxTest {
         assertFalse(mailbox.enqueue(sender, "provider", "task", PeerConsultationNote("reviewer", "Fifth")))
         assertEquals(listOf("Note 0", "Note 1", "Note 2", "Note 3"), mailbox.claim(recipient, "provider").map { it.text })
     }
+    @Test
+    fun receiptsRetainProvenanceAndSuppressReplayAfterTransport() = runBlocking {
+        val settings = InMemorySettings()
+        val first = PeerMailbox(settings) { 100L }
+        val note = PeerConsultationNote("reviewer", "Check the evidence")
+        assertTrue(first.enqueue(sender, "provider", "task", note, "origin-session", "invocation"))
+        val claim = first.claim(recipient, "provider", "receiver-session").single()
+        assertEquals(PeerDelivery.Claimed, claim.delivery)
+        first.finish(claim, PeerDelivery.Accepted)
+        val restarted = PeerMailbox(settings) { 200L }
+        val receipt = restarted.receipts(recipient, "provider").single()
+        assertEquals(PeerDelivery.Accepted, receipt.delivery)
+        assertEquals("origin-session", receipt.senderSession)
+        assertEquals("receiver-session", receipt.recipientSession)
+        assertEquals("invocation", receipt.senderInvocation)
+        assertFalse(restarted.enqueue(sender, "provider", "task", note, "origin-session", "invocation"))
+        assertTrue(restarted.claim(recipient, "provider").isEmpty())
+        assertTrue(restarted.receipts(recipient.copy(projectId = "another"), "provider").isEmpty())
+    }
+
+    @Test
+    fun interruptedAndRejectedClaimsAreNeverReplayed() = runBlocking {
+        val settings = InMemorySettings()
+        val mailbox = PeerMailbox(settings) { 100L }
+        assertTrue(mailbox.enqueue(sender, "provider", "task", PeerConsultationNote("reviewer", "First")))
+        assertTrue(mailbox.enqueue(sender, "provider", "task", PeerConsultationNote("reviewer", "Second")))
+        val claims = mailbox.claim(recipient, "provider")
+        mailbox.finish(claims.last(), PeerDelivery.Rejected)
+        val restarted = PeerMailbox(settings) { 200L }
+        assertEquals(listOf(PeerDelivery.Claimed, PeerDelivery.Rejected), restarted.receipts(recipient, "provider").map { it.delivery })
+        assertTrue(restarted.claim(recipient, "provider").isEmpty())
+    }
 }
