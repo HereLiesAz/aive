@@ -168,6 +168,40 @@ class PeerConsultationGatewayTest {
         }
     }
 
+    @Test
+    fun recruitmentSelectsRelevantAvailablePeerWithoutBroadcastingOrLaunching() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val provider = AdvisoryProvider()
+        val registry = AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings())
+        val sender = handle(provider, "architect")
+        val reviewer = handle(provider, "reviewer")
+        val worker = handle(provider, "worker")
+        val unrelated = handle(provider, "elsewhere")
+        val reviewRole = BuiltInRoles.Reviewer.copy(description = "database indexing query optimization")
+        val workerRole = BuiltInRoles.Worker.copy(description = "illustration typography painting")
+        try {
+            val activity = SessionActivityFeeds()
+            val gateway = ProviderBackedManagedSessionGateway(registry, scope, activity = activity,
+                peerRoster = { listOf(BuiltInRoles.Architect, reviewRole, workerRole) })
+            gateway.reconnect(sender, ManagedSessionStatus.Running, request(sender, "architect"))
+            gateway.reconnect(reviewer, ManagedSessionStatus.Running, request(reviewer, "reviewer"))
+            gateway.reconnect(worker, ManagedSessionStatus.Running, request(worker, "worker"))
+            gateway.reconnect(unrelated, ManagedSessionStatus.Running, request(unrelated, "reviewer", "other-project"))
+            provider.events.send(AgentEvent.Message(sender.providerRunId, "RECRUIT database indexing query optimization\nWhich index fits?"))
+            val sent = withTimeout(5_000L) { provider.deliveries.receive() }
+            assertEquals(reviewer.providerRunId, sent.first)
+            assertTrue(sent.second.endsWith("; intent: Request\nWhich index fits?"))
+            provider.events.send(AgentEvent.Progress(sender.providerRunId, "Recruitment processed"))
+            withTimeout(5_000L) { while (gateway.progress(sender)?.message != "Recruitment processed") delay(10) }
+            assertTrue(provider.deliveries.tryReceive().isFailure)
+            assertTrue(activity.lines(sender.activityKey()).any { it.text == "Recruited reviewer for advisory consultation" })
+            assertTrue(activity.lines(worker.activityKey()).none { it.kind == SessionActivityKind.Consultation })
+            assertTrue(activity.lines(unrelated.activityKey()).none { it.kind == SessionActivityKind.Consultation })
+        } finally {
+            scope.cancel()
+        }
+    }
+
     private class AdvisoryProvider : AgentProvider {
         override val id = AgentProviderId("peer-test")
         override val enforcesToolFilter = true

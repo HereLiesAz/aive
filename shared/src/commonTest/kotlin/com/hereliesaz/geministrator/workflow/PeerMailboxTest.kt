@@ -150,4 +150,33 @@ class PeerMailboxTest {
         assertTrue(mailbox.routes().isEmpty())
         assertTrue(mailbox.receipts(recipient.copy(projectId = "other"), "provider").isEmpty())
     }
+    @Test
+    fun replayedRecruitmentCannotSelectAnotherPeerAfterRestart() = runBlocking {
+        val settings = InMemorySettings()
+        val first = PeerMailbox(settings) { 100L }
+        val note = PeerConsultationNote("reviewer", "Check evidence", PeerIntent.Request, expertise = "review")
+        assertTrue(first.enqueue(sender, "provider", "task", note))
+        first.finish(first.claim(recipient, "provider", "receiver").single(), PeerDelivery.Accepted)
+        val restarted = PeerMailbox(settings) { 200L }
+        assertFalse(restarted.enqueue(sender, "provider", "task", note.copy(roleId = "another")))
+        assertTrue(restarted.claim(recipient.copy(roleId = "another"), "provider").isEmpty())
+    }
+
+    @Test
+    fun pendingPressureIsBoundedAcrossMultipleSendersAndReleasedOnOutcome() = runBlocking {
+        val mailbox = PeerMailbox(InMemorySettings()) { 100L }
+        repeat(4) { i ->
+            assertTrue(mailbox.enqueue(sender.copy(roleId = "sender-$i"), "provider", "task-$i",
+                PeerConsultationNote("reviewer", "Question $i")))
+        }
+        assertEquals(4, mailbox.pendingCount(recipient, "provider"))
+        val fifth = PeerConsultationNote("reviewer", "Fifth")
+        assertFalse(mailbox.enqueue(sender, "provider", "fifth-task", fifth))
+        val claims = mailbox.claim(recipient, "provider", "receiver")
+        assertEquals(4, mailbox.pendingCount(recipient, "provider"))
+        mailbox.finish(claims.first(), PeerDelivery.Accepted)
+        assertEquals(3, mailbox.pendingCount(recipient, "provider"))
+        assertTrue(mailbox.enqueue(sender, "provider", "fifth-task", fifth))
+        assertEquals(0, mailbox.pendingCount(recipient.copy(runId = "other"), "provider"))
+    }
 }

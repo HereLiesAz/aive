@@ -50,6 +50,8 @@ internal data class PeerMail(
     val correlationId: String? = null,
     val targetRun: String? = null,
     val grantGeneration: Long? = null,
+    /** Host-derived deduplication identity for an expertise request, independent of selected peer. */
+    val recruitmentKey: String? = null,
 ) {
     /** Stable content-derived identifier for this scoped, deduplicated envelope. */
     val id: String get() = Sha256.hex(Json.encodeToString(listOf(project, run, provider, senderRole,
@@ -76,6 +78,7 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
         const val MAX_GRANTS = 64
         const val LIMIT = 128
         const val PER_SENDER = 4
+        const val MAX_PENDING_PER_ROLE = 4
         const val TTL = 86_400_000L
     }
 
@@ -138,10 +141,18 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
         }
     }
 
+    /** Pending advisory pressure, not a claim about the specialist's compute utilization. */
+    suspend fun pendingCount(scope: PeerConsultationContext, provider: String): Int = mutex.withLock {
+        live(read(), now()).count { it.project == scope.projectId && it.destinationRun == scope.runId &&
+            it.provider == provider && it.recipientRole == scope.roleId &&
+            it.delivery in setOf(PeerDelivery.Queued, PeerDelivery.Claimed) }
+    }
+
     /** Persist a note before returning success. Duplicate pending messages are not enqueued. */
     suspend fun enqueue(origin: PeerConsultationContext, provider: String, senderTask: String, note: PeerConsultationNote, senderSession: String? = null, senderInvocation: String? = null): Boolean =
         mutex.withLock {
-            if (origin.roleId == note.roleId) return@withLock false
+            if (note.roleId.isBlank() || origin.roleId == note.roleId) return@withLock false
+            if (note.expertise != null && (note.targetRun != null || note.replyTo != null)) return@withLock false
             val time = now()
             val entries = live(read(), time)
             val targetRun = note.targetRun ?: origin.runId
@@ -154,13 +165,22 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
                     it.recipientSession == senderSession && it.delivery in setOf(PeerDelivery.Claimed, PeerDelivery.Accepted) }
                     ?: return@withLock false
             }
+            val recruitmentKey = note.expertise?.let {
+                Sha256.hex(Json.encodeToString(listOf(origin.projectId, origin.runId, provider, origin.roleId,
+                    senderTask, ControlRedaction.scrub(it), ControlRedaction.scrub(note.body))).encodeToByteArray())
+            }
             val mail = PeerMail(origin.projectId, origin.runId, provider, origin.roleId, senderTask,
                 note.roleId, ControlRedaction.scrub(note.body), time, senderSession, senderInvocation,
                 intent = note.intent, replyTo = parent?.id, correlationId = parent?.correlationId ?: parent?.id,
-                targetRun = targetRun.takeIf { it != origin.runId }, grantGeneration = generation)
+                targetRun = targetRun.takeIf { it != origin.runId }, grantGeneration = generation,
+                recruitmentKey = recruitmentKey)
             if (entries.size >= LIMIT || entries.count {
                     it.project == mail.project && it.run == mail.run && it.provider == provider && it.senderTask == senderTask
-                } >= PER_SENDER || entries.any { it.id == mail.id }) return@withLock false
+                } >= PER_SENDER || entries.any { it.id == mail.id ||
+                    (recruitmentKey != null && it.recruitmentKey == recruitmentKey) } || entries.count {
+                    it.project == mail.project && it.destinationRun == mail.destinationRun && it.provider == provider &&
+                        it.recipientRole == mail.recipientRole && it.delivery in setOf(PeerDelivery.Queued, PeerDelivery.Claimed)
+                } >= MAX_PENDING_PER_ROLE) return@withLock false
             save(entries + mail)
             true
         }
