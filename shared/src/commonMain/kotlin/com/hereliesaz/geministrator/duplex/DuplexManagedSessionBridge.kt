@@ -86,6 +86,10 @@ class DuplexSessionObserver(
         memory.onSessionStarted(handle, request)
     }
 
+    override suspend fun onSessionReconnected(handle: ManagedSessionHandle, request: AgentTaskRequest) {
+        memory.onSessionReconnected(handle, request)
+    }
+
     override suspend fun onSessionEvent(handle: ManagedSessionHandle, event: AgentEvent) {
         memory.onSessionEvent(handle, event)
         if (handle == session) publish(event)

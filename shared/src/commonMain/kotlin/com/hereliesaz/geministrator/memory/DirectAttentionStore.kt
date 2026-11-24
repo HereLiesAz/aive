@@ -24,7 +24,7 @@ internal class DirectAttentionStore(settings: Settings, private val storageKey: 
     private data class Entry(val key: String, val updatedAt: Long, val checkpoint: AttentionCheckpoint)
 
     private companion object {
-         const val LIMIT = 64
+        const val LIMIT = 64
         const val TTL_MILLIS = 7 * 24 * 60 * 60 * 1000L
         val serializer = ListSerializer(Entry.serializer())
     }

@@ -813,7 +813,7 @@ class MemoryLayerController(
             if (!active) return
             val session = managedCueSession(handle) ?: return
             val agentId = handle.taskRunId.value
-            layerFor(memoryWorkflowOf(session.request, handle.providerRunId.value)).sessionObserver.onSessionEvent(handle, event)
+            layerFor(memoryWorkflowOf(checkNotNull(session.request), handle.providerRunId.value)).sessionObserver.onSessionEvent(handle, event)
             val text = when (event) {
                 is AgentEvent.Message -> event.content
                 is AgentEvent.PlanGenerated -> event.summary
@@ -871,16 +871,18 @@ class MemoryLayerController(
         override suspend fun onKeeperMessage(handle: ManagedSessionHandle, text: String) {
             if (!active || text.isBlank()) return
             val session = managedCueSession(handle) ?: return
-            layerFor(memoryWorkflowOf(session.request, handle.providerRunId.value)).sessionObserver.onKeeperMessage(handle, text)
+            layerFor(memoryWorkflowOf(checkNotNull(session.request), handle.providerRunId.value)).sessionObserver.onKeeperMessage(handle, text)
         }
 
         override suspend fun onSessionFinished(handle: ManagedSessionHandle, status: ManagedSessionStatus) {
             val session = managedCueSession(handle) ?: return
-            if (active) layerFor(memoryWorkflowOf(session.request, handle.providerRunId.value)).sessionObserver.onSessionFinished(handle, status)
+            if (active) layerFor(memoryWorkflowOf(checkNotNull(session.request), handle.providerRunId.value)).sessionObserver.onSessionFinished(handle, status)
             cueMutex.withLock {
                 val id = handle.taskRunId.value
                 if (cueSessions[id] !== session) return@withLock
-                session.binding?.let { settingsStore.managedAttention.remove(it.parts, nowEpochMillis()) }
+                runCatchingCancellable {
+                    session.binding?.let { settingsStore.managedAttention.remove(it.parts, nowEpochMillis()) }
+                }
                 attention.forget(id)
                 cueSessions.remove(id)
                 agentWorkflows.remove(id)
@@ -1185,6 +1187,10 @@ class MemoryLayerController(
     val promptContextProvider: MemoryPromptContextProvider = object : MemoryPromptContextProvider {
         override suspend fun recallFor(request: AgentTaskRequest, queryPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan): MemoryPromptRecall =
             recallForPrompt(request, queryPlan)
+
+        override suspend fun recallForNewSession(request: AgentTaskRequest,
+            queryPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan): MemoryPromptRecall =
+            recallForPrompt(request, queryPlan, newSession = true)
 
         override suspend fun directChatTags(workflowIds: List<String>, roleId: String, text: String): List<String> =
             openDirectChat(workflowIds, roleId).tags(text)
@@ -1591,10 +1597,25 @@ class MemoryLayerController(
     private suspend fun recallForPrompt(
         request: AgentTaskRequest,
         queryPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan,
+        newSession: Boolean = false,
     ): MemoryPromptRecall {
         if (!active) return MemoryPromptRecall()
+        val agentId = request.taskRunId.value
+        // A new provider launch is not the next turn of an existing session. In particular it
+        // cannot consume that session's pending recalled text or novelty state under a reused task ID.
+        val (session, agentAttention) = cueMutex.withLock {
+            val previous = cueSessions[agentId]
+            val sameScope = previous?.request?.orchestrationContext == request.orchestrationContext &&
+                previous?.request?.let { memoryWorkflowOf(it) } == memoryWorkflowOf(request)
+            if (newSession || (previous != null && !sameScope)) {
+                attention.forget(agentId)
+                agentWorkflows.remove(agentId)
+                cueSessions.remove(agentId)
+            }
+            val session = cueSessions.getOrPut(agentId) { CueSession(MemoryCueWatcher(attentionPolicy), request) }
+            session to attention.forAgent(agentId)
+        }
         // The incoming task prompt is cognition the agent is about to spend; count it toward recovery.
-        val agentAttention = attention.forAgent(request.taskRunId.value)
         agentAttention.consumeTokens(
             AttentionGatedRecall.approximateTokens(request.objective + request.roleInstructions, APPROXIMATE_CHARS_PER_TOKEN),
         )
@@ -1604,7 +1625,6 @@ class MemoryLayerController(
         // Cue-first: the Attention Deficit Dial decides whether deeper resolutions may surface.
         // The lineage first, whatever the gate's order; read-only hits after, labelled.
         val hits = agentAttention.select(ranked).sortedBy { it.provenance?.readOnlyFromWorkflow != null }
-        val session = cueSession(request.taskRunId.value, request)
         // Recalls the agent asked for that its provider could not take mid-session arrive now.
         val (pending, firstPrompt) = cueMutex.withLock {
             val first = !session.protocolGiven
@@ -1621,7 +1641,8 @@ class MemoryLayerController(
                 add(PromptContextBlock("Role lessons", ROLE_LESSONS_POINTER))
             }
             // The user's prompt draws its own cue cloud, like any thought.
-            runCatchingCancellable { cueCloud(request.taskRunId.value, request.objective, request, alongside = true) }.getOrNull()?.let { add(PromptContextBlock("Memory", it)) }
+            runCatchingCancellable { cueCloud(agentId, request.objective, request, alongside = true,
+                expected = session, boundGate = agentAttention) }.getOrNull()?.let { add(PromptContextBlock("Memory", it)) }
             if (pending.isNotEmpty()) {
                 add(PromptContextBlock("Recalled on request", untrustedRecall(pending.joinToString("\n\n") { it.removePrefix(MEMORY_MESSAGE_MARKER).trim() }.take(MAX_RECALL_CHARS))))
             }
@@ -1652,6 +1673,8 @@ class MemoryLayerController(
                 )
             }
         }
+        if (!active || cueMutex.withLock { cueSessions[agentId] !== session }) return MemoryPromptRecall()
+        runCatchingCancellable { saveManagedAttention(agentId, session) }
         return MemoryPromptRecall(
             blocks = blocks,
             memoryAddresses = hits.mapTo(linkedSetOf()) { "memory-node:${it.node.id.value}" },
@@ -1677,7 +1700,7 @@ class MemoryLayerController(
             if (cueSessions[agentId] !== session) return
             attention.forAgent(agentId)
         }
-        val workflow = memoryWorkflowOf(session.request, session.binding?.handle?.providerRunId?.value ?: agentId)
+        val workflow = memoryWorkflowOf(checkNotNull(session.request), session.binding?.handle?.providerRunId?.value ?: agentId)
         val layer = layerFor(workflow)
         val tool = layer.tool
         val isCommon: suspend (String) -> Boolean = { word -> isCommonWord(tool, word) }

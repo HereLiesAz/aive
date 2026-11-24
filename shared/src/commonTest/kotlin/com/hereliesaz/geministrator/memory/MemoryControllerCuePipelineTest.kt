@@ -649,9 +649,13 @@ class MemoryControllerCuePipelineTest {
         restored.observer.onSessionReconnected(h.copy(inferenceInvocationId = "reconstructed"), req)
         assertEquals(question, restored.observer.annotateUserMessage(h, question))
         val replacement = h.copy(providerRunId = ProviderRunId("replacement"))
+        val entry = restored.promptContextProvider.recallForNewSession(req.copy(objective = question),
+            MemoryQueryPlan(emptyList(), enoughEvidence = true))
+        assertTrue(entry.blocks.any { it.label == "Memory" && "#keystore" in it.content })
         restored.observer.onSessionStarted(replacement, req)
         assertEquals(question, restored.observer.annotateUserMessage(h, question))
-        assertTrue("#keystore" in restored.observer.annotateUserMessage(replacement, question))
+        assertEquals(question, restored.observer.annotateUserMessage(replacement, question),
+            "new invocation retains its own entry cues, not the previous session's gate")
         val another = recreate()
         another.observer.onSessionReconnected(replacement, req)
         assertEquals(question, another.observer.annotateUserMessage(replacement, question))
