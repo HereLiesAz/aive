@@ -521,6 +521,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Installer runners have independent Gradle caches. Refresh a stale or
+          # transient plugin lookup before failing the build, as the main job does.
+          for attempt in 1 2 3; do
+            if ./gradlew --refresh-dependencies help; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            echo "::warning::Desktop dependency refresh attempt $attempt failed"
+            sleep $((attempt * 20))
+          done
           ./gradlew :desktopApp:generateDesktopBrandAssets
           for icon in \
             desktopApp/build/generated/brand/desktop/aive-icon-color.png \
