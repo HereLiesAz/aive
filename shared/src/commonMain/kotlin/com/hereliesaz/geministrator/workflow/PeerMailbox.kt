@@ -28,6 +28,24 @@ internal data class PeerRoute(
     val activation: Boolean = false,
 )
 
+/**
+ * Directional, scoped observations from retained consultation receipts. Counts are per distinct
+ * initial inquiry/request, not per message or vote. Missing replies are censored observations,
+ * not failures; a returned objection counts exactly like a returned supporting opinion.
+ */
+internal data class PeerCollaborationEvidence(
+    val senderRole: String,
+    val senderSpecialist: String,
+    val recipientRole: String,
+    val recipientSpecialist: String,
+    val accepted: Int,
+    val rejected: Int,
+    val uncertain: Int,
+    val claimed: Int,
+    val replied: Int,
+    val returned: Int,
+)
+
 /** A grant generation is never reused after revocation. */
 @Serializable
 internal data class PeerRouteGrant(val route: PeerRoute, val generation: Long)
@@ -155,6 +173,53 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
                     (it.destinationRun == scope.runId && it.recipientRole == scope.roleId))
         }
     }
+
+    /**
+     * Read-only projection of the bounded receipt ledger, never a second reputation database.
+     * Only exact same-project/run/provider ordinary consultations with host-attributed instances
+     * and sessions qualify. Exclude invitations, wakes, cross-run routes and unattributed history.
+     * Count at most one authored reply and one delivered return per accepted initial inquiry.
+     */
+    suspend fun collaborationEvidence(project: String, run: String, provider: String): List<PeerCollaborationEvidence> =
+        mutex.withLock {
+            val entries = live(read(), now()).filter {
+                it.project == project && it.run == run && it.destinationRun == run &&
+                    it.provider == provider && !it.activation && it.groupAction == null
+            }
+            val identity = Regex("[a-f0-9]{64}")
+            val initial = entries.filter {
+                it.replyTo == null && it.intent in setOf(PeerIntent.Inquiry, PeerIntent.Request) &&
+                    it.senderSpecialist?.matches(identity) == true && it.recipientSpecialist?.matches(identity) == true &&
+                    !it.senderSession.isNullOrBlank() && !it.recipientSession.isNullOrBlank() &&
+                    it.delivery in setOf(PeerDelivery.Claimed, PeerDelivery.Accepted, PeerDelivery.Rejected, PeerDelivery.Uncertain)
+            }
+            val repliesByParent = entries.filter { it.replyTo != null }.groupBy { it.replyTo }
+            initial.groupBy { listOf(it.senderRole, checkNotNull(it.senderSpecialist),
+                it.recipientRole, checkNotNull(it.recipientSpecialist)) }.map { (pair, requests) ->
+                val accepted = requests.filter { it.delivery == PeerDelivery.Accepted }
+                var replied = 0
+                var returned = 0
+                for (request in accepted) {
+                    val replies = repliesByParent[request.id].orEmpty().filter {
+                        it.senderRole == request.recipientRole && it.recipientRole == request.senderRole &&
+                            it.senderSession == request.recipientSession &&
+                            it.senderSpecialist == request.recipientSpecialist &&
+                            it.createdAt >= request.createdAt &&
+                            it.intent in setOf(PeerIntent.Observation, PeerIntent.Hypothesis, PeerIntent.Objection,
+                                PeerIntent.Proposal, PeerIntent.Verdict, PeerIntent.Resolution)
+                    }
+                    if (replies.isNotEmpty()) replied++
+                    if (replies.any { it.delivery == PeerDelivery.Accepted &&
+                            it.recipientSession == request.senderSession &&
+                            it.recipientSpecialist == request.senderSpecialist }) returned++
+                }
+                PeerCollaborationEvidence(pair[0], pair[1], pair[2], pair[3],
+                    accepted.size, requests.count { it.delivery == PeerDelivery.Rejected },
+                    requests.count { it.delivery == PeerDelivery.Uncertain },
+                    requests.count { it.delivery == PeerDelivery.Claimed }, replied, returned)
+            }.sortedWith(compareBy<PeerCollaborationEvidence> { it.senderRole }.thenBy { it.recipientRole }
+                .thenBy { it.senderSpecialist }.thenBy { it.recipientSpecialist })
+        }
 
     /** Pending advisory pressure, not a claim about the specialist's compute utilization. */
     suspend fun pendingCount(scope: PeerConsultationContext, provider: String): Int = mutex.withLock {

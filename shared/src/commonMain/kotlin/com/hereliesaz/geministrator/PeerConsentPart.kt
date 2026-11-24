@@ -12,6 +12,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.workflow.PeerRoute
+import com.hereliesaz.geministrator.workflow.PeerCollaborationEvidence
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -29,6 +30,7 @@ internal fun PeerConsentPart(host: WorkflowLibraryHost) {
     var pending by remember { mutableStateOf<PeerRoute?>(null) }
     var status by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
+    var evidence by remember(project, sourceRun, provider) { mutableStateOf<List<PeerCollaborationEvidence>?>(null) }
     LaunchedEffect(host) {
         try { routes = host.peerRoutes() }
         catch (cancelled: CancellationException) { throw cancelled }
@@ -60,6 +62,35 @@ internal fun PeerConsentPart(host: WorkflowLibraryHost) {
         AzphaltTextField(value = sourceRole, onValueChange = { sourceRole = it }, label = "Sending role ID")
         AzphaltTextField(value = targetRun, onValueChange = { targetRun = it }, label = "Destination run ID")
         AzphaltTextField(value = targetRole, onValueChange = { targetRole = it }, label = "Receiving role ID")
+        AzphaltPill("Inspect collaboration receipts for source run", "inspect-peer-collaboration", onClick = {
+            if (!busy && project.isNotBlank() && sourceRun.isNotBlank() && provider.isNotBlank()) {
+                val p = project.trim()
+                val r = sourceRun.trim()
+                val s = provider.trim()
+                busy = true
+                scope.launch {
+                    try {
+                        val result = host.peerCollaborationEvidence(p, r, s)
+                        if (project.trim() == p && sourceRun.trim() == r && provider.trim() == s) evidence = result
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Exception) { status = "Could not inspect collaboration receipts." }
+                    finally { busy = false }
+                }
+            }
+        })
+        evidence?.let { rows ->
+            Text("Retained same-run consultation observations (up to 24 hours; not expertise or task quality). " +
+                "Missing replies are unknown, and objections count equally with support.",
+                style = AzphaltType.body, color = azphaltOnSurface())
+            if (rows.isEmpty()) Text("No attributable consultation receipts in this scope.",
+                style = AzphaltType.body, color = azphaltOnSurface())
+            rows.forEach { row ->
+                Text("${row.senderRole} / ${row.senderSpecialist.take(12)} → ${row.recipientRole} / ${row.recipientSpecialist.take(12)}\n" +
+                    "Accepted requests: ${row.accepted}; claimed: ${row.claimed}; rejected: ${row.rejected}; uncertain: ${row.uncertain}. " +
+                    "Authored replies: ${row.replied}; accepted returns to original instance/session: ${row.returned}.",
+                    style = AzphaltType.body, color = azphaltOnSurface())
+            }
+        }
         AzphaltPill("Review specialist grant", "review-peer-route", onClick = {
             if (!busy) pending = PeerRoute(project.trim(), provider.trim(), sourceRun.trim(), sourceRole.trim(),
                 targetRun.trim(), targetRole.trim(), activation = sourceRun.trim() == targetRun.trim())

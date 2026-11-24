@@ -60,6 +60,14 @@ class WorkflowLibraryHost(
 
     internal suspend fun peerRoutes() = peerMailbox?.invoke()?.routes().orEmpty()
 
+    /** Local inspection only; never expose receipt bodies or cross-project evidence. */
+    internal suspend fun peerCollaborationEvidence(project: String, run: String, provider: String):
+        List<com.hereliesaz.geministrator.workflow.PeerCollaborationEvidence> {
+        val existing = persistence.runs.get(com.hereliesaz.geministrator.domain.WorkflowRunId(run)) ?: return emptyList()
+        if (existing.projectId.value != project || persistence.projects.get(existing.projectId) == null) return emptyList()
+        return peerMailbox?.invoke()?.collaborationEvidence(project, run, provider).orEmpty()
+    }
+
     /** Check both persisted runs belong to the named project, and roles still exist. */
     internal suspend fun grantPeerRoute(route: com.hereliesaz.geministrator.workflow.PeerRoute): Boolean {
         val source = persistence.runs.get(com.hereliesaz.geministrator.domain.WorkflowRunId(route.sourceRun)) ?: return false

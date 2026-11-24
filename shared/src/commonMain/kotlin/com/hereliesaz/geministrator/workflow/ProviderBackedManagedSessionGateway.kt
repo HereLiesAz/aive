@@ -1160,7 +1160,38 @@ class ProviderBackedManagedSessionGateway(
                 taskText = expertise,
             ),
         )
-        val selected = route.selectedAgent?.takeIf { id -> pool.any { it.id == id } } ?: return null
+        val baseline = route.selectedAgent?.takeIf { id -> pool.any { it.id == id } } ?: return null
+        val baselineCandidate = pool.single { it.id == baseline }
+        // Only break an exact relevance/pressure tie using positive observed closed loops.
+        // Unknown or unreturned requests never penalize a candidate; no task-quality rate is inferred.
+        val relevance = com.hereliesaz.geministrator.orchestration.bySimilarityTo<
+            com.hereliesaz.geministrator.orchestration.AgentRouteCandidate>(expertise) { it.description }
+        val tied = pool.filter { it.preferenceRank == baselineCandidate.preferenceRank &&
+            relevance.compare(it, baselineCandidate) == 0 }
+        val senderId = specialistIdentity(sender)
+        val selected = if (senderId == null || tied.size < 2) baseline else {
+            val evidence = runCatchingCancellable {
+                providerRegistry.peerMailbox.collaborationEvidence(origin.projectId, origin.runId, sender.providerId.value)
+            }.getOrDefault(emptyList())
+            val senderRole = peerRoster().singleOrNull { it.id.value == origin.roleId }
+            val senderCurrent = senderRole?.let {
+                com.hereliesaz.geministrator.queen.specialistInstanceId(it,
+                    listOf(com.hereliesaz.geministrator.queen.ModelUse(sender.providerId.value, null, false)), "managed-v1")
+            }
+            val scores = if (senderCurrent != senderId) emptyList() else tied.map { candidate ->
+                val role = roster.single { it.id.value == candidate.id }
+                val current = com.hereliesaz.geministrator.queen.specialistInstanceId(role,
+                    listOf(com.hereliesaz.geministrator.queen.ModelUse(sender.providerId.value, null, false)), "managed-v1")
+                val score = if (specialistIdentity(live.getValue(candidate.id)) != current) 0 else
+                    evidence.singleOrNull { it.senderRole == origin.roleId && it.senderSpecialist == senderId &&
+                        it.recipientRole == candidate.id && it.recipientSpecialist == current }?.returned ?: 0
+                candidate.id to score
+            }
+            // Require positive evidence on both sides of a comparison: a newcomer is not inferior.
+            if (scores.size != tied.size || scores.any { it.second < 2 }) baseline
+            else scores.sortedWith(compareByDescending<Pair<String, Int>> { it.second }
+                .thenBy { it.first != baseline }.thenBy { it.first }).first().first
+        }
         val target = live.getValue(selected)
         // Lookup can suspend: refuse a stale selection if either endpoint ceased running or the
         // target is no longer uniquely live. Transport remains the existing role-addressed mailbox.
