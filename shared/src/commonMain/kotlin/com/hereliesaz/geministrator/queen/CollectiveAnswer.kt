@@ -32,6 +32,7 @@ internal suspend fun answerCollectively(
     specialists: List<CollectiveVoice>,
     facilitator: CollectiveVoice,
     unavailableRoles: List<String> = emptyList(),
+    admitRole: suspend (CollectiveVoice) -> Boolean = { true },
     admit: suspend (QueenModel, Int) -> Boolean,
 ): CollectiveAnswer {
     require(question.isNotBlank() && question.length <= 1500)
@@ -39,7 +40,7 @@ internal suspend fun answerCollectively(
     val unavailable = unavailableRoles.toMutableList()
     var calls = 0
     suspend fun ask(voice: CollectiveVoice, prompt: String): String? {
-        if (calls >= 3 || !admit(voice.model, calls)) return null
+        if (calls >= 3 || !admitRole(voice) || !admit(voice.model, calls)) return null
         calls++
         return try {
             withTimeoutOrNull(60_000L) {
