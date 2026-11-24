@@ -8,6 +8,8 @@ import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.duplex.DuplexSessionAttachment
 import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.BuiltInRoles
+import com.hereliesaz.geministrator.domain.effectiveTokenBudget
 import com.hereliesaz.geministrator.inference.CompoundInferenceFabric
 import com.hereliesaz.geministrator.inference.GovernedCompoundInferenceFabric
 import com.hereliesaz.geministrator.inference.INFERENCE_INVOCATION_ID_METADATA_KEY
@@ -1043,7 +1045,7 @@ class ProviderBackedManagedSessionGateway(
                                 consultationContexts.none { (handle, context) ->
                                     handle.providerId == sender.providerId && context.projectId == origin.projectId &&
                                         context.runId == origin.runId && context.roleId == note.roleId &&
-                                        snapshots[handle]?.status?.isTerminal() == false
+                                        snapshots[handle]?.status?.isTerminal() != true
                                 }
                         } && peerRoleAllowed(origin.roleId, sender.providerId) && peerRoleAllowed(note.roleId, sender.providerId)
                     if (!eligible()) return@launch
@@ -1104,9 +1106,9 @@ class ProviderBackedManagedSessionGateway(
     }
 
     /**
-     * Select one already-running, uniquely addressed peer using the existing deterministic routing
-     * utility. Recruitment is not a launch, a remote discovery request, or a new spend allowance.
-     * No model call is used for selection. Pending pressure is measured from the durable mailbox.
+     * Prefer one already-running, uniquely addressed peer using deterministic routing.
+     * With no eligible live candidate, consider a separately consented dormant advisory role.
+     * No model call is used for selection; activation remains subject to the existing host gates.
      */
     private suspend fun recruitPeer(
         sender: ManagedSessionHandle,
@@ -1136,7 +1138,7 @@ class ProviderBackedManagedSessionGateway(
                     description = "${role.name} ${role.description}".take(1024),
                 )
             }
-        if (candidates.isEmpty()) return null
+        if (candidates.isEmpty()) return recruitDormant(sender, origin, request)
         val experience = runCatchingCancellable {
             memoryContext.managedExpertise(origin.projectId, origin.runId, expertise)
         }.getOrDefault(emptyList())
@@ -1206,6 +1208,51 @@ class ProviderBackedManagedSessionGateway(
         }
         if (!stillLive || !peerRoleAllowed(selected, sender.providerId)) return null
         return request.copy(roleId = selected)
+    }
+
+    /**
+     * A fallback only when live recruitment has no candidate. Rank unused exact activation grants
+     * by retained same-run experience of the current managed role revision, then description
+     * relevance. The host still decides whether a non-billed advisory model is admissible.
+     */
+    private suspend fun recruitDormant(
+        sender: ManagedSessionHandle,
+        origin: PeerConsultationContext,
+        request: PeerConsultationNote,
+    ): PeerConsultationNote? {
+        val expertise = request.expertise ?: return null
+        if (dormantSpecialistAnswer == null) return null
+        val grants = providerRegistry.peerMailbox.eligibleActivationGrants(origin, sender.providerId.value)
+        if (grants.isEmpty()) return null
+        val occupied = mutex.withLock {
+            consultationContexts.filter { (handle, context) ->
+                handle.providerId == sender.providerId && context.projectId == origin.projectId &&
+                    context.runId == origin.runId && snapshots[handle]?.status?.isTerminal() != true
+            }.values.map { it.roleId }.toSet()
+        }
+        val roster = peerRoster().groupBy { it.id.value }.values.mapNotNull { it.singleOrNull() }
+            .filter { role ->
+                role.id != BuiltInRoles.Orchestrator.id && role.id.value != origin.roleId &&
+                    role.id.value !in occupied && peerRoleIsEligible(role, sender.providerId) &&
+                    role.effectiveTokenBudget() == null && grants.any { it.route.targetRole == role.id.value }
+            }
+        if (roster.isEmpty()) return null
+        val experience = runCatchingCancellable {
+            memoryContext.managedExpertise(origin.projectId, origin.runId, expertise)
+        }.getOrDefault(emptyList())
+        val experienced = roster.filter { role ->
+            val current = com.hereliesaz.geministrator.queen.specialistInstanceId(role,
+                listOf(com.hereliesaz.geministrator.queen.ModelUse(sender.providerId.value, null, false)), "managed-v1")
+            experience.any { it.roleId == role.id.value && it.specialistId == current && it.matchedEpisodes > 0 }
+        }
+        val ranked = experienced.ifEmpty { roster }.sortedWith(
+            com.hereliesaz.geministrator.orchestration.bySimilarityTo<RoleDefinition>(expertise) {
+                "${it.name} ${it.description}".take(1024)
+            }.thenBy { it.id.value })
+        val selected = ranked.first()
+        if (peerRoster().singleOrNull { it.id == selected.id } != selected) return null
+        val grant = grants.single { it.route.targetRole == selected.id.value }
+        return request.copy(roleId = selected.id.value, activation = true, activationGrantGeneration = grant.generation)
     }
 
     /**

@@ -165,6 +165,23 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
             ((mail.destinationRun == mail.run && !mail.activation) || grants().any { it.route == mail.route && it.generation == mail.grantGeneration })
     }
 
+    /**
+     * Unused exact activation grants for one originating role/run/provider. The generation travels
+     * with automatic recruitment and must still match at enqueue; a new grant cannot revive it.
+     */
+    suspend fun eligibleActivationGrants(origin: PeerConsultationContext, provider: String): List<PeerRouteGrant> =
+        mutex.withLock {
+            val used = live(read(), now()).filter {
+                it.activation && it.project == origin.projectId && it.run == origin.runId && it.provider == provider
+            }.map { it.recipientRole }.toSet()
+            grants().filter {
+                val route = it.route
+                route.activation && route.project == origin.projectId && route.provider == provider &&
+                    route.sourceRun == origin.runId && route.targetRun == origin.runId &&
+                    route.sourceRole == origin.roleId && route.targetRole !in used
+            }
+        }
+
     /** Retained receipt history for one exact scope; no payload crosses project or provider boundaries. */
     suspend fun receipts(scope: PeerConsultationContext, provider: String): List<PeerMail> = mutex.withLock {
         live(read(), now()).filter {
@@ -236,11 +253,14 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
             val time = now()
             val entries = live(read(), time)
             val targetRun = note.targetRun ?: origin.runId
+            if (note.activationGrantGeneration != null && (!note.activation || note.expertise == null)) return@withLock false
             if (note.activation && (note.targetRun != null || note.replyTo != null || note.groupAction != null ||
-                    note.expertise != null || senderSession.isNullOrBlank() || note.intent != PeerIntent.Request)) return@withLock false
+                    senderSession.isNullOrBlank() || note.intent != PeerIntent.Request ||
+                    (note.expertise != null && note.activationGrantGeneration == null))) return@withLock false
             val route = PeerRoute(origin.projectId, provider, origin.runId, origin.roleId, targetRun, note.roleId, note.activation)
             val generation = if (targetRun == origin.runId && !note.activation) null else
                 grants().singleOrNull { it.route == route }?.generation ?: return@withLock false
+            if (note.activationGrantGeneration != null && note.activationGrantGeneration != generation) return@withLock false
             val parent = note.replyTo?.let { id ->
                 entries.singleOrNull { it.id == id && it.project == origin.projectId && it.destinationRun == origin.runId && it.run == targetRun &&
                     it.provider == provider && it.recipientRole == origin.roleId && it.senderRole == note.roleId &&
