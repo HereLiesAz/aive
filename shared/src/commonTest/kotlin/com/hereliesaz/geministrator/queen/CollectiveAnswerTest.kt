@@ -27,6 +27,8 @@ class CollectiveAnswerTest {
         assertFalse("Use option X" in prompts[1])
         assertTrue("Use option X" in prompts[2] && "Reject option X" in prompts[2])
         assertTrue(prompts.all { "Which option?" in it && "Prior discussion" in it })
+        assertTrue("most material objection" in prompts[0] && "most material objection" in prompts[1])
+        assertTrue("leave incompatible positions unresolved" in prompts[2])
     }
 
     @Test

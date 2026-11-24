@@ -54,12 +54,16 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
             style = AzphaltType.body, color = azphaltOnSurface())
         if (result.unavailable.isNotEmpty()) Text("Unavailable: ${result.unavailable.joinToString()}",
             style = AzphaltType.body, color = azphaltOnSurface())
-        if (inspect) result.assessments.forEach { assessment ->
-            Text("${assessment.role} [${assessment.sourceId ?: "unknown source"} / ${assessment.modelId ?: "unknown model"}; instance ${assessment.specialistId?.take(12) ?: "legacy"}]: ${assessment.text}",
-                style = AzphaltType.body, color = azphaltOnSurface())
+        if (result.assessments.isNotEmpty()) {
+            Text("Specialist assessments (unverified; not a consensus verdict)", style = AzphaltType.body, color = azphaltOnSurface())
+            result.assessments.forEach { assessment ->
+                Text("${assessment.role}: ${assessment.text}", style = AzphaltType.body, color = azphaltOnSurface())
+                if (inspect) Text("Configured Source: ${assessment.sourceId ?: "unknown"} / model: ${assessment.modelId ?: "unknown"}; instance ${assessment.specialistId?.take(12) ?: "legacy"}",
+                    style = AzphaltType.body, color = azphaltOnSurface())
+            }
         }
     }
-    AzphaltPill(if (inspect) "Hide specialist assessments" else "Inspect specialist assessments",
+    AzphaltPill(if (inspect) "Hide specialist provenance" else "Inspect specialist provenance",
         "collective-inspect", onClick = { inspect = !inspect })
     if (inspect && profiles.isNotEmpty()) {
         Text("Observed specialist call outcomes (not answer quality)", style = AzphaltType.body, color = azphaltOnSurface())

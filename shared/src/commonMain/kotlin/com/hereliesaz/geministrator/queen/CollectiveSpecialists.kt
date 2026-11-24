@@ -9,7 +9,8 @@ import com.hereliesaz.geministrator.orchestration.bySimilarityTo
 /**
  * Recruit up to two distinct eligible roles from the current catalog. This is advisory activation,
  * not launching a task or giving a role its tools. Respect explicit pins and favor a different
- * configured source for the second assessment; provider diversity is not proof of independence.
+ * configured Source and model identifier for the second assessment. Neither establishes
+ * model-family or evidential independence.
  * Factory calls construct text-only adapters, not inference calls.
  */
 internal fun selectCollectiveSpecialists(
@@ -24,6 +25,7 @@ internal fun selectCollectiveSpecialists(
     }.groupBy { it.id }.values.mapNotNull { it.singleOrNull() }
         .sortedWith(bySimilarityTo<RoleDefinition>(question) { "${it.name} ${it.description}" }.thenBy { it.id.value })
     val used = mutableSetOf<String>()
+    val usedModels = mutableSetOf<String>()
     val sourceIds = (modelFor?.invoke(null)?.uses.orEmpty() + facilitatorSources).map { it.sourceId }.distinct()
     val selected = mutableListOf<Pair<RoleDefinition, QueenModel>>()
     for (role in candidates) {
@@ -34,12 +36,22 @@ internal fun selectCollectiveSpecialists(
                 pin == null || (it.uses.isNotEmpty() && it.uses.all { use -> use.sourceId == pin })
             }
         } else {
-            choices.firstNotNullOfOrNull { source ->
+            val available = choices.mapNotNull { source ->
                 modelFor(source)?.takeIf { it.uses.isNotEmpty() && it.uses.all { use -> use.sourceId == source } }
-            }?.let { voiceModel(it, role.name, role.promptInstructions()) }
+            }
+            // Prefer distinct configured identifiers among unused Sources; unknown is not diversity.
+            val chosen = if (usedModels.isEmpty() || pin != null) available.firstOrNull()
+            else available.sortedWith(compareBy<QueenModel> { candidate ->
+                candidate.uses.any { it.sourceId in used }
+            }.thenBy { candidate ->
+                val ids = candidate.uses.mapNotNull { it.modelId?.takeIf(String::isNotBlank) }
+                ids.isEmpty() || ids.any { it in usedModels }
+            }).firstOrNull()
+            chosen?.let { voiceModel(it, role.name, role.promptInstructions()) }
         } ?: continue
         selected += role to model
         used += model.uses.map { it.sourceId }
+        usedModels += model.uses.mapNotNull { it.modelId?.takeIf(String::isNotBlank) }
         if (selected.size == 2) break
     }
     return selected

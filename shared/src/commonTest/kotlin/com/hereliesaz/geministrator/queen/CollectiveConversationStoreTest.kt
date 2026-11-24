@@ -32,6 +32,30 @@ class CollectiveConversationStoreTest {
     }
 
     @Test
+    fun priorOpposingAssessmentsSurviveSynthesisAndFailedFollowUp() = runTest {
+        val settings = MapSettings()
+        val store = CollectiveConversationStore(settings) { 100L }
+        val id = store.create().id
+        val other = store.create().id
+        store.append(id, "Which option?", CollectiveAnswer("Choose X", listOf(
+            CollectiveAssessment("reviewer", "Support X. " + "a".repeat(1100)),
+            CollectiveAssessment("skeptic", "Reject X: missing independent evidence. " + "b".repeat(1100)),
+        ), emptyList()))
+        store.append(id, "Follow up " + "c".repeat(1400), CollectiveAnswer(null, emptyList(), listOf("Queen")))
+        store.append(other, "Other conversation", CollectiveAnswer("Unrelated", listOf(
+            CollectiveAssessment("private", "not shared with the first conversation"),
+        ), emptyList()))
+        val restored = requireNotNull(CollectiveConversationStore(settings) { 200L }.get(id))
+        val history = restored.context()
+        assertTrue("Support X." in history)
+        assertTrue("Reject X: missing independent evidence." in history)
+        assertTrue("unverified; may be from an earlier turn" in history)
+        assertFalse("not shared with the first conversation" in history)
+        assertTrue(history.length <= 1800)
+        assertTrue(restored.turns.first().result.assessments[1].text.endsWith("b".repeat(1100)))
+    }
+
+    @Test
     fun boundedConversationsAndTurnsKeepNewestData() = runTest {
         val store = CollectiveConversationStore(MapSettings()) { 100L }
         val oldest = store.create()
