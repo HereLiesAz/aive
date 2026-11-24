@@ -419,6 +419,10 @@ class ApplicationRuntime private constructor(
 
     internal suspend fun collectiveHistory() = collectiveConversations.list()
 
+    /** Serialize grants and revocations with complete advisory turns; no in-flight scope changes. */
+    internal suspend fun setCollectiveRecallGrant(source: String, destination: String, allowed: Boolean): Boolean =
+        collectiveChatMutex.withLock { collectiveConversations.setRecallGrant(source, destination, allowed) }
+
     /** Explicit local Keeper action only; use the stored transcript, never caller-supplied text. */
     internal suspend fun importCollectiveHistory(id: String): Int? = collectiveChatMutex.withLock {
         val conversation = collectiveConversations.get(id) ?: return@withLock null
@@ -492,7 +496,10 @@ class ApplicationRuntime private constructor(
         val conversation = requireNotNull(collectiveConversations.get(conversationId))
         val roster = activeRoles(resolveRoleCollection(persistence.roles.all()))
         val models = resolveDisputeModels()
-        val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(listOf(conversationId))
+        // Re-read exact persisted consent for each turn while holding the conversation mutex.
+        // Only the local Keeper control can edit grants; model text never chooses source banks.
+        val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(
+            collectiveConversations.recallBanks(conversationId))
         val capture = com.hereliesaz.geministrator.queen.CollectiveMemoryCapture(conversationId, question, ::nowEpochMillis)
         fun voice(role: com.hereliesaz.geministrator.domain.RoleDefinition, model: com.hereliesaz.geministrator.queen.QueenModel):
             com.hereliesaz.geministrator.queen.CollectiveVoice? {
