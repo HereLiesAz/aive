@@ -446,6 +446,7 @@ fun App(
     LaunchedEffect(runtime, researchStep, researchContext, queenModelFor) {
         val active = runtime ?: return@LaunchedEffect
         val modelFor = queenModelFor
+        active.collectiveModelFor = modelFor
         active.disputeModelSource = if (modelFor == null) {
             null
         } else {
@@ -920,10 +921,12 @@ fun App(
             }
             host.specialistTrainer = { roleId: String, domain: String -> runtime?.startTrainingFromActive(roleId, domain) ?: false }
             host.peerMailbox = { runtime?.providerRegistry?.peerMailbox }
-            host.collectiveChat = { question, history, conversation ->
-                runtime?.collectiveAdvisory(question, history, conversation)
-                    ?: com.hereliesaz.geministrator.queen.CollectiveAnswer(null, emptyList(), listOf("Runtime"))
+            host.collectiveChat = { question, conversation ->
+                checkNotNull(runtime).collectiveAdvisory(question, conversation)
             }
+            host.collectiveHistory = { checkNotNull(runtime).collectiveHistory() }
+            host.collectiveNew = { checkNotNull(runtime).newCollectiveConversation() }
+            host.collectiveDelete = { id -> checkNotNull(runtime).deleteCollectiveConversation(id) }
         }
 
         // Scheduled hives (docs/Scheduled-Workflows.md): while the app is open, a due schedule starts its
@@ -1348,6 +1351,7 @@ fun App(
                             scope.launch {
                                 try {
                                     runtime?.providerRegistry?.peerMailbox?.clear()
+                                    runtime?.clearCollectiveConversations()
                                     (runtime?.persistence as? com.hereliesaz.geministrator.persistence.DurableWorkflowPersistence)?.clearWorkflowData()
                                     runtime?.loadLatest()
                                 } catch (failure: CancellationException) {
