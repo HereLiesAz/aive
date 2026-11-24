@@ -63,6 +63,49 @@ class PeerConsultationGatewayTest {
         )
 
     @Test
+    fun recruitmentFallsBackToConsentedDormantSpecialistOnlyWithoutLiveCandidates() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val provider = AdvisoryProvider()
+        val registry = AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings())
+        val sender = handle(provider, "architect")
+        val idle = BuiltInRoles.Reviewer.copy(id = RoleDefinitionId("idle-index"), name = "Database indexing",
+            description = "database indexing query optimization", tokenBudget = null, budgetClass = null)
+        val unrelated = idle.copy(id = RoleDefinitionId("ungranted-index"))
+        val budgeted = idle.copy(id = RoleDefinitionId("budgeted-index"), tokenBudget = 1L)
+        val route = PeerRoute("project", provider.id.value, "run", "architect", "run", idle.id.value, activation = true)
+        try {
+            val gateway = ProviderBackedManagedSessionGateway(registry, scope, activity = SessionActivityFeeds(),
+                peerRoster = { listOf(BuiltInRoles.Architect, idle, unrelated, budgeted) })
+            val calls = Channel<String>(Channel.UNLIMITED)
+            gateway.dormantSpecialistAnswer = { mail, allowed ->
+                assertTrue(allowed())
+                assertEquals(PeerDelivery.Claimed, mail.delivery)
+                calls.send(mail.recipientRole)
+                DormantSpecialistAnswer("a".repeat(64), "Index advice")
+            }
+            gateway.reconnect(sender, ManagedSessionStatus.Running, request(sender, "architect"))
+            assertTrue(registry.peerMailbox.grant(route.copy(targetRole = budgeted.id.value)))
+            provider.events.send(AgentEvent.Message(sender.providerRunId, "RECRUIT database indexing\nNo grant"))
+            provider.events.send(AgentEvent.Progress(sender.providerRunId, "First request processed"))
+            withTimeout(5_000L) { while (gateway.progress(sender)?.message != "First request processed") delay(10) }
+            assertTrue(calls.tryReceive().isFailure)
+            assertTrue(registry.peerMailbox.grant(route))
+            provider.events.send(AgentEvent.Message(sender.providerRunId, "RECRUIT database indexing\nWhich index fits?"))
+            assertEquals(idle.id.value, withTimeout(5_000L) { calls.receive() })
+            val sent = withTimeout(5_000L) { provider.deliveries.receive() }
+            assertEquals(sender.providerRunId, sent.first)
+            assertTrue(sent.second.endsWith("Index advice"))
+            withTimeout(5_000L) {
+                while (registry.peerMailbox.receipts(PeerConsultationContext("project", "run", idle.id.value),
+                        provider.id.value).single().delivery != PeerDelivery.Accepted) delay(10)
+            }
+            assertTrue(calls.tryReceive().isFailure)
+            assertTrue(registry.peerMailbox.receipts(PeerConsultationContext("project", "run", unrelated.id.value),
+                provider.id.value).isEmpty())
+        } finally { scope.cancel() }
+    }
+
+    @Test
     fun grantedWakeClaimsBeforeInferenceAndReturnsOnlyToOriginWithMemory() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val provider = AdvisoryProvider()

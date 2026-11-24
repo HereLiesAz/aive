@@ -68,6 +68,33 @@ class PeerMailboxTest {
     }
 
     @Test
+    fun recruitedWakeRequiresExactUnusedGrantGenerationAndDeduplicatesAcrossRoutes() = runBlocking {
+        val mailbox = PeerMailbox(InMemorySettings()) { 100L }
+        val route = PeerRoute("project", "provider", "run", "architect", "run", "reviewer", activation = true)
+        val other = route.copy(targetRole = "worker")
+        val query = PeerConsultationNote("reviewer", "Which index?", PeerIntent.Request,
+            expertise = "database indexing", activation = true)
+        assertTrue(mailbox.eligibleActivationGrants(sender, "provider").isEmpty())
+        assertTrue(mailbox.grant(route))
+        val old = mailbox.eligibleActivationGrants(sender, "provider").single()
+        assertFalse(mailbox.enqueue(sender, "provider", "task", query, "origin"))
+        mailbox.revoke(route)
+        assertTrue(mailbox.grant(route))
+        assertFalse(mailbox.enqueue(sender, "provider", "task", query.copy(activationGrantGeneration = old.generation), "origin"))
+        val current = mailbox.eligibleActivationGrants(sender, "provider").single()
+        assertTrue(mailbox.enqueue(sender, "provider", "task", query.copy(activationGrantGeneration = current.generation), "origin"))
+        assertTrue(mailbox.eligibleActivationGrants(sender, "provider").isEmpty())
+        val claim = requireNotNull(mailbox.claimActivation(sender, "provider", "task", "origin", "reviewer"))
+        mailbox.finish(claim, PeerDelivery.Accepted)
+        assertTrue(mailbox.grant(other))
+        val alternative = mailbox.eligibleActivationGrants(sender, "provider").single()
+        assertFalse(mailbox.enqueue(sender, "provider", "task", query.copy(roleId = "worker",
+            activationGrantGeneration = alternative.generation), "origin"))
+        assertTrue(mailbox.eligibleActivationGrants(sender.copy(runId = "other"), "provider").isEmpty())
+        assertTrue(mailbox.eligibleActivationGrants(sender, "other").isEmpty())
+    }
+
+    @Test
     fun dormantActivationRequiresSeparateExactConsentAndCannotBeReplayed() = runBlocking {
         val settings = InMemorySettings()
         val mailbox = PeerMailbox(settings) { 100L }
