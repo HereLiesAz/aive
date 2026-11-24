@@ -82,4 +82,12 @@ class PeerConsultationTest {
         assertTrue(peerRoleIsEligible(role.copy(preferredProviderId = provider), provider))
         assertFalse(peerRoleIsEligible(role.copy(executionSource = RoleExecutionSource.GitHubAction("test.yml")), provider))
     }
+    @Test
+    fun crossRunProtocolNamesExactDestination() {
+        val note = requireNotNull(PeerConsultationNote.parse("PEER-RUN Inquiry next-run reviewer\nCheck evidence"))
+        assertEquals("next-run", note.targetRun)
+        assertEquals("reviewer", note.roleId)
+        assertNull(PeerConsultationNote.parse("PEER-RUN Inquiry reviewer\nMissing run"))
+        assertNull(PeerConsultationNote.parse("PEER-RUN Inquiry * reviewer\nWildcard"))
+    }
 }
