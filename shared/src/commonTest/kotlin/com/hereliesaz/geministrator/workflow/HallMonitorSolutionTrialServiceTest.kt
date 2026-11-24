@@ -92,6 +92,27 @@ class HallMonitorSolutionTrialServiceTest {
     }
 
     @Test
+    fun trialPlannerReceivesOnlySourceRunAndPlannerTags() = runTest {
+        val fixture = fixture()
+        val planner = CapturingPlanner()
+        val provider = object : com.hereliesaz.geministrator.memory.MemoryPromptContextProvider {
+            override suspend fun recallFor(request: com.hereliesaz.geministrator.providers.AgentTaskRequest,
+                queryPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan) =
+                error("Direct chat must not retrieve passages")
+            override suspend fun directChatTags(workflowIds: List<String>, roleId: String, text: String): List<String> {
+                assertEquals(listOf("source-run"), workflowIds)
+                assertEquals(BuiltInRoles.Planner.id.value, roleId)
+                return listOf("#latency")
+            }
+        }
+        val service = HallMonitorSolutionTrialService(fixture.persistence,
+            AgentProviderRegistry(emptyList(), inferenceSettings = InMemorySettings()), provider)
+        val trial = service.launch(fixture.sourceRun, "latency-plateau", 0, planner, 100L)
+        assertTrue(assertNotNull(planner.lastPacket).artifacts.any { it.endsWith("#latency") })
+        assertEquals(IntegrationPolicy.Manual, assertNotNull(fixture.persistence.definitions.get(trial.workflowDefinitionId)).integrationPolicy)
+    }
+
+    @Test
     fun refusesSecondConcurrentTrialOfSameSolution() = runTest {
         val fixture = fixture()
         val planner = CapturingPlanner()

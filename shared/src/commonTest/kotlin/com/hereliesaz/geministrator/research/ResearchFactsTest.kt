@@ -72,4 +72,30 @@ class ResearchFactsTest {
         assertEquals(1, research(QueenModel { "NONE" }).findings("Which database does the app use?", "k")!!.size)
         assertEquals(1, research(null).findings("Which database does the app use?", "k")!!.size)
     }
+    @Test
+    fun factModelReceivesScopedTagsButLookupDoesNot() = runTest {
+        val queries = mutableListOf<String>()
+        val prompts = mutableListOf<String>()
+        val provider = object : com.hereliesaz.geministrator.memory.MemoryPromptContextProvider {
+            override suspend fun recallFor(request: com.hereliesaz.geministrator.providers.AgentTaskRequest,
+                queryPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan) =
+                error("Direct chat must not retrieve passages")
+            override suspend fun directChatTags(workflowIds: List<String>, roleId: String, text: String): List<String> {
+                assertEquals(listOf("authorized-run"), workflowIds)
+                assertEquals(com.hereliesaz.geministrator.domain.BuiltInRoles.Orchestrator.id.value, roleId)
+                return listOf("#sqlite")
+            }
+        }
+        val source = LocalResearchSource { objective -> queries += objective; leads }
+        val investigation = ResearchInvestigation(
+            ResearchStep(local = listOf(ResearchSource.Repository to source)),
+            { ResearchContext(repositoryLinked = true) },
+            memoryProvider = provider,
+        ).withFactModel(QueenModel { prompts += it; "FACT: Unsupported. | SOURCE: 9" })
+        val found = investigation.findings("Which database does the app use?", "external-key",
+            memoryRunIds = listOf("authorized-run"))!!
+        assertTrue(prompts.single().contains("#sqlite"))
+        assertTrue(queries.none { "#sqlite" in it })
+        assertTrue(found.none { "Unsupported" in it || "#sqlite" in it })
+    }
 }

@@ -38,6 +38,8 @@ import com.hereliesaz.geministrator.persistence.WorkflowPersistence
 class HallMonitorSolutionTrialService(
     private val persistence: WorkflowPersistence,
     private val providerRegistry: AgentProviderRegistry,
+    private val memoryProvider: com.hereliesaz.geministrator.memory.MemoryPromptContextProvider =
+        com.hereliesaz.geministrator.memory.MemoryRuntimeBridge.promptContextProvider,
 ) {
     suspend fun launch(
         sourceRun: WorkflowRun,
@@ -171,7 +173,8 @@ class HallMonitorSolutionTrialService(
                 the modified version and inspect the evidence for themselves.
             """.trimIndent(),
         )
-        val plan = orchestrationRuntime.repair(packet)
+        val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(listOf(sourceRun.id.value), memoryProvider)
+        val plan = memory.planner(orchestrationRuntime, BuiltInRoles.Planner.id.value).repair(packet)
         val planned = OrchestratedWorkflowFactory.create(
             id = trialDefinitionId,
             objective = experimentObjective,

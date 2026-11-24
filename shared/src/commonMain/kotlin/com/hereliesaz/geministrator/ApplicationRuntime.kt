@@ -1627,7 +1627,8 @@ class ApplicationRuntime private constructor(
                 val models = resolveDisputeModels()
                 val researcher = models?.research
                 val researchPass: (suspend (String) -> List<String>?)? =
-                    if (researcher == null) null else { missing -> researcher.findings(missing, "dispute-$runId") }
+                    if (researcher == null) null else { missing -> researcher.findings(missing, "dispute-$runId",
+                        memoryRunIds = if (persistence.runs.get(WorkflowRunId(runId)) != null) listOf(runId) else emptyList()) }
                 val investigator = com.hereliesaz.geministrator.queen.DisputeInvestigator(
                     research = researchPass,
                     test = { request -> launchDisputeTestSwarm(runId, case.dispute, request) },

@@ -290,4 +290,32 @@ class MemoryControllerCuePipelineTest {
         queen.answer("Check keystore")
         assertEquals("Check keystore", queenPrompt)
     }
+    @Test
+    fun tutorialVoicesUseTheirOwnRoleBanksWithoutWorkflowAccess() = runBlocking {
+        val calls = mutableListOf<String>()
+        val prompts = mutableListOf<String>()
+        val provider = object : MemoryPromptContextProvider {
+            override suspend fun recallFor(request: AgentTaskRequest, queryPlan: MemoryQueryPlan) =
+                error("Direct chat must not retrieve passages")
+            override suspend fun directChatTags(workflowIds: List<String>, roleId: String, text: String): List<String> {
+                assertTrue(workflowIds.isEmpty())
+                calls += roleId
+                return listOf("#role-cue")
+            }
+        }
+        val memory = DirectChatMemory(emptyList(), provider)
+        val base = QueenModel { prompts += it; "Reply" }
+        val launch = com.hereliesaz.geministrator.intro.TutorialLaunch
+        launch.planner(base, emptyList(), memory).answer("Plan lesson")
+        launch.reviewers(base, emptyList(), true, memory).forEach { it.model.answer("Review lesson") }
+        launch.writer(base, memory).answer("Write lesson")
+        assertEquals(listOf(
+            com.hereliesaz.geministrator.domain.BuiltInRoles.Planner.id.value,
+            com.hereliesaz.geministrator.domain.BuiltInRoles.Reviewer.id.value,
+            com.hereliesaz.geministrator.domain.BuiltInRoles.Antagonist.id.value,
+            "tutorial-writer",
+        ), calls)
+        assertEquals(4, prompts.size)
+        assertTrue(prompts.all { it.endsWith("#role-cue") })
+    }
 }
