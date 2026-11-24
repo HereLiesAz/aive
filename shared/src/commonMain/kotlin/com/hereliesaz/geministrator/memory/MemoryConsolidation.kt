@@ -894,7 +894,14 @@ private fun MemoryConsolidationStage.next(): MemoryConsolidationStage = when (th
 }
 
 private fun MemorySessionEnvelope.episodeId(): MemoryEpisodeId = MemoryEpisodeId(
-    "episode-${closedAtEpochMillis}-${sourceSessionId.hashCode().toString(16)}" + if (sequence > 0) "-$sequence" else "",
+    // Collective deposits are host-assigned unique utterances, not a hash of mutable text.
+    // Recovery after queue commit but before journal removal must address the exact same episode.
+    if (workflowRunId?.startsWith("collective:") == true &&
+        sourceSessionId.startsWith("$workflowRunId:turn:") && sequence == 1) {
+        "episode-collective-$sourceSessionId"
+    } else {
+        "episode-${closedAtEpochMillis}-${sourceSessionId.hashCode().toString(16)}" + if (sequence > 0) "-$sequence" else ""
+    },
 )
 
 private fun MemoryBankRequest.episodeId(sequence: Long): MemoryEpisodeId = MemoryEpisodeId(
