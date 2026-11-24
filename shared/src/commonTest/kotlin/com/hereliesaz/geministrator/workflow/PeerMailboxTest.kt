@@ -222,4 +222,21 @@ class PeerMailboxTest {
         assertFalse(mailbox.enqueue(sender, "provider", "task", PeerConsultationNote("reviewer", "Finding",
             groupAction = PeerGroupAction.Note, groupId = invite.groupId), "host"))
     }
+    @Test
+    fun groupInviteLimitAndLifetimeCannotBeExtendedByLaterInvitations() = runBlocking {
+        var time = 100L
+        val mailbox = PeerMailbox(InMemorySettings()) { time }
+        val first = PeerConsultationNote("reviewer", "Purpose", PeerIntent.Request, groupAction = PeerGroupAction.Invite)
+        assertTrue(mailbox.enqueue(sender, "provider", "task", first, "host"))
+        val initial = mailbox.claim(recipient, "provider", "guest").single()
+        mailbox.finish(initial, PeerDelivery.Accepted)
+        val group = requireNotNull(initial.groupId)
+        time += 1000L
+        assertTrue(mailbox.enqueue(sender, "provider", "task", first.copy(roleId = "worker", groupId = group), "host"))
+        assertTrue(mailbox.enqueue(sender, "provider", "task", first.copy(roleId = "designer", groupId = group), "host"))
+        assertFalse(mailbox.enqueue(sender, "provider", "task", first.copy(roleId = "researcher", groupId = group), "host"))
+        time = 86_400_100L
+        assertTrue(mailbox.claim(recipient.copy(roleId = "worker"), "provider", "worker-session").isEmpty())
+        assertFalse(mailbox.enqueue(sender, "provider", "task", first.copy(roleId = "researcher", groupId = group), "host"))
+    }
 }
