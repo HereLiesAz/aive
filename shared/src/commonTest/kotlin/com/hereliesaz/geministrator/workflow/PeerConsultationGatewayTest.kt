@@ -35,7 +35,7 @@ class PeerConsultationGatewayTest {
     private fun handle(provider: AdvisoryProvider, role: String) =
         ManagedSessionHandle(TaskRunId("task-$role"), provider.id, ProviderRunId(role))
 
-    private fun request(handle: ManagedSessionHandle, role: String, project: String = "project") =
+    private fun request(handle: ManagedSessionHandle, role: String, project: String = "project", run: String = "run") =
         AgentTaskRequest(
             taskRunId = handle.taskRunId,
             objective = "Consider evidence",
@@ -44,7 +44,7 @@ class PeerConsultationGatewayTest {
             allowedTools = emptyList(),
             orchestrationContext = AgentOrchestrationContext(
                 projectId = ProjectId(project),
-                workflowRunId = WorkflowRunId("run"),
+                workflowRunId = WorkflowRunId(run),
                 roleId = RoleDefinitionId(role),
             ),
         )
@@ -128,6 +128,41 @@ class PeerConsultationGatewayTest {
                 while (gateway.progress(sender)?.message != "Observed") delay(10)
             }
             assertTrue(registry.peerMailbox.receipts(PeerConsultationContext("project", "run", "reviewer"), provider.id.value).isEmpty())
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun crossRunMessageReachesOnlyConsentedDestination() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val provider = AdvisoryProvider()
+        val registry = AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings())
+        val sender = handle(provider, "architect")
+        val recipient = handle(provider, "reviewer")
+        val destination = PeerConsultationContext("project", "next-run", "reviewer")
+        val route = PeerRoute("project", provider.id.value, "run", "architect", "next-run", "reviewer")
+        try {
+            val gateway = ProviderBackedManagedSessionGateway(registry, scope, activity = SessionActivityFeeds(),
+                peerRoster = { listOf(BuiltInRoles.Architect, BuiltInRoles.Reviewer) })
+            gateway.reconnect(sender, ManagedSessionStatus.Running, request(sender, "architect"))
+            provider.events.send(AgentEvent.Message(sender.providerRunId, "PEER-RUN Inquiry next-run reviewer\nWithout consent"))
+            provider.events.send(AgentEvent.Progress(sender.providerRunId, "First checked"))
+            withTimeout(5_000L) { while (gateway.progress(sender)?.message != "First checked") delay(10) }
+            assertTrue(registry.peerMailbox.receipts(destination, provider.id.value).isEmpty())
+            assertTrue(registry.peerMailbox.grant(route))
+            provider.events.send(AgentEvent.Message(sender.providerRunId, "PEER-RUN Inquiry next-run reviewer\nWith consent"))
+            withTimeout(5_000L) {
+                while (registry.peerMailbox.receipts(destination, provider.id.value).isEmpty()) delay(10)
+            }
+            val unrelated = handle(provider, "other")
+            gateway.reconnect(unrelated, ManagedSessionStatus.Running, request(unrelated, "reviewer"))
+            assertTrue(provider.deliveries.tryReceive().isFailure)
+            gateway.reconnect(recipient, ManagedSessionStatus.Running, request(recipient, "reviewer", run = "next-run"))
+            val sent = withTimeout(5_000L) { provider.deliveries.receive() }
+            assertEquals(recipient.providerRunId, sent.first)
+            assertTrue(sent.second.endsWith("With consent\nOrigin run ID: run"))
+            assertEquals(PeerDelivery.Accepted, registry.peerMailbox.receipts(destination, provider.id.value).single().delivery)
         } finally {
             scope.cancel()
         }

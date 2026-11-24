@@ -47,6 +47,31 @@ class WorkflowLibraryHost(
 ) {
     private val composition = WorkflowCompositionService(persistence)
 
+    /** Local Keeper UI only. No remote control surface is given this mailbox. */
+    internal var peerMailbox: (() -> com.hereliesaz.geministrator.workflow.PeerMailbox?)? = null
+
+    internal suspend fun peerRoutes() = peerMailbox?.invoke()?.routes().orEmpty()
+
+    /** Check both persisted runs belong to the named project, and roles still exist. */
+    internal suspend fun grantPeerRoute(route: com.hereliesaz.geministrator.workflow.PeerRoute): Boolean {
+        val source = persistence.runs.get(com.hereliesaz.geministrator.domain.WorkflowRunId(route.sourceRun)) ?: return false
+        val target = persistence.runs.get(com.hereliesaz.geministrator.domain.WorkflowRunId(route.targetRun)) ?: return false
+        if (source.projectId.value != route.project || target.projectId != source.projectId ||
+            persistence.projects.get(source.projectId) == null) return false
+        val roles = installedRoles()
+        val provider = com.hereliesaz.geministrator.domain.AgentProviderId(route.provider)
+        if (listOf(route.sourceRole, route.targetRole).any { id ->
+                roles.singleOrNull { it.id.value == id }?.let {
+                    com.hereliesaz.geministrator.workflow.peerRoleIsEligible(it, provider)
+                } != true
+            }) return false
+        return peerMailbox?.invoke()?.grant(route) == true
+    }
+
+    internal suspend fun revokePeerRoute(route: com.hereliesaz.geministrator.workflow.PeerRoute) {
+        checkNotNull(peerMailbox?.invoke()) { "Peer mailbox unavailable" }.revoke(route)
+    }
+
     /**
      * Asks the linked keeper to draft a swarm from a prompt (SwarmDraft.kt); null where no planner
      * is linked. It only proposes: it launches nothing and touches no repository.

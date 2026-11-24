@@ -1951,6 +1951,9 @@ class ApplicationRuntime private constructor(
     suspend fun importProjectFile(encoded: String): Project {
         val settingsPersistence = persistence as? DurableWorkflowPersistence
             ?: error(".ive project import requires durable persistence")
+        val incoming = com.hereliesaz.geministrator.persistence.decodeProjectFile(encoded,
+            com.hereliesaz.geministrator.persistence.SettingsWorkflowPersistence.defaultJson)
+        providerRegistry.peerMailbox.forgetProject(incoming.projects.single().id.value)
         return settingsPersistence.importProjectFile(encoded)
     }
 
@@ -1996,7 +1999,9 @@ class ApplicationRuntime private constructor(
     }
 
     suspend fun importJson(encoded: String) {
-        (persistence as? DurableWorkflowPersistence)?.importJson(encoded)
+        val durable = persistence as? DurableWorkflowPersistence ?: return
+        providerRegistry.peerMailbox.clear()
+        durable.importJson(encoded)
         loadLatest()
     }
 

@@ -1691,6 +1691,7 @@ private fun MainDestination(
                                             onAssignTask = onAssignTaskCompute,
                                             embedded = true,
                                         )
+                                        KeeperSection.Projects -> LocalWorkflowLibraryHost.current?.let { PeerConsentPart(it) }
                                         KeeperSection.Delegations -> delegations?.let { DelegationsPart(it, compact) }
                                         KeeperSection.LocalAgents -> LocalAgentsPart()
                                         KeeperSection.ChatBots -> ChatBotsPart()
