@@ -445,6 +445,11 @@ class ApplicationRuntime private constructor(
             ).mapNotNull { (role, model) -> voice(role, model) }
             com.hereliesaz.geministrator.queen.answerCollectively(
                 question, conversation.context(), specialists, facilitator,
+                admitRole = { voice ->
+                    val current = activeRoles(resolveRoleCollection(persistence.roles.all()))
+                        .singleOrNull { it.id.value == voice.role }
+                    current != null && current == roster.singleOrNull { it.id.value == voice.role }
+                },
             ) { model, count ->
                 models.mayCall() && queenCallAllowed() &&
                     directAdvisoryGateFor(model.uses, count) == com.hereliesaz.geministrator.queen.CallDecision.Allow
