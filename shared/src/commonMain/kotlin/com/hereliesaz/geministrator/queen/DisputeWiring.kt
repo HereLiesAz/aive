@@ -19,8 +19,10 @@ fun voicePrompt(roleName: String, roleText: String, prompt: String): String = bu
 }
 
 /** [base] speaking as one creature: the same model, with that creature's role text in front. */
-fun voiceModel(base: QueenModel, roleName: String, roleText: String): QueenModel =
-    QueenModel { prompt -> base.answer(voicePrompt(roleName, roleText, prompt)) }
+fun voiceModel(base: QueenModel, roleName: String, roleText: String): QueenModel = object : QueenModel {
+    override val uses: List<ModelUse> get() = base.uses
+    override suspend fun answer(prompt: String): String = base.answer(voicePrompt(roleName, roleText, prompt))
+}
 
 /**
  * The voices of the creatures that may be in a dispute today (the Nanny and the Antagonist), by role id, each answering through

@@ -920,6 +920,10 @@ fun App(
             }
             host.specialistTrainer = { roleId: String, domain: String -> runtime?.startTrainingFromActive(roleId, domain) ?: false }
             host.peerMailbox = { runtime?.providerRegistry?.peerMailbox }
+            host.collectiveChat = { question, history, conversation ->
+                runtime?.collectiveAdvisory(question, history, conversation)
+                    ?: com.hereliesaz.geministrator.queen.CollectiveAnswer(null, emptyList(), listOf("Runtime"))
+            }
         }
 
         // Scheduled hives (docs/Scheduled-Workflows.md): while the app is open, a due schedule starts its
