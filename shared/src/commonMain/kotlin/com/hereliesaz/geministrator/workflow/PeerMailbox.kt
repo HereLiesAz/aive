@@ -10,6 +10,10 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
+/** Transport acceptance is not proof of reading, agreement or work. */
+@Serializable
+internal enum class PeerDelivery { Queued, Claimed, Accepted, Rejected, Uncertain, Expired }
+
 /** A redacted advisory note addressed to a specialist, not a provider session. */
 @Serializable
 internal data class PeerMail(
@@ -21,11 +25,16 @@ internal data class PeerMail(
     val recipientRole: String,
     val text: String,
     val createdAt: Long,
+    val senderSession: String? = null,
+    val senderInvocation: String? = null,
+    val delivery: PeerDelivery = PeerDelivery.Queued,
+    val recipientSession: String? = null,
 )
 
 /**
- * Durable bounded queue. Claims are removed before delivery: a crash cannot replay an ambiguous
- * provider send. Rejected or interrupted sends are not retried automatically. Scope is deliberately
+ * Durable bounded queue and receipt ledger. A claim is persisted before transport: a crash cannot
+ * replay an ambiguous send. Claimed notes remain visible until retention expires; rejected and
+ * uncertain sends are not retried automatically. Scope is deliberately
  * restricted to the originating run and provider; this is not permission to disclose across runs.
  */
 internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
@@ -45,29 +54,52 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
     private fun live(entries: List<PeerMail>, time: Long): List<PeerMail> =
         entries.filter { it.createdAt <= time && time - it.createdAt < TTL }
 
+    private fun save(entries: List<PeerMail>) = store.putString(KEY, json.encodeToString(entries))
+
+    /** Retained receipt history for one exact scope; no payload crosses project or provider boundaries. */
+    suspend fun receipts(scope: PeerConsultationContext, provider: String): List<PeerMail> = mutex.withLock {
+        live(read(), now()).filter {
+            it.project == scope.projectId && it.run == scope.runId && it.provider == provider &&
+                (it.senderRole == scope.roleId || it.recipientRole == scope.roleId)
+        }
+    }
+
     /** Persist a note before returning success. Duplicate pending messages are not enqueued. */
-    suspend fun enqueue(origin: PeerConsultationContext, provider: String, senderTask: String, note: PeerConsultationNote): Boolean =
+    suspend fun enqueue(origin: PeerConsultationContext, provider: String, senderTask: String, note: PeerConsultationNote, senderSession: String? = null, senderInvocation: String? = null): Boolean =
         mutex.withLock {
             if (origin.roleId == note.roleId) return@withLock false
             val time = now()
             val entries = live(read(), time)
             val mail = PeerMail(origin.projectId, origin.runId, provider, origin.roleId, senderTask,
-                note.roleId, ControlRedaction.scrub(note.body), time)
+                note.roleId, ControlRedaction.scrub(note.body), time, senderSession, senderInvocation)
             if (entries.size >= LIMIT || entries.count {
                     it.project == mail.project && it.run == mail.run && it.provider == provider && it.senderTask == senderTask
-                } >= PER_SENDER || entries.any { it.copy(createdAt = time) == mail }) return@withLock false
-            store.putString(KEY, json.encodeToString(entries + mail))
+                } >= PER_SENDER || entries.any { it.project == mail.project && it.run == mail.run && it.provider == provider &&
+                    it.senderTask == senderTask && it.senderRole == mail.senderRole &&
+                    it.recipientRole == mail.recipientRole && it.text == mail.text }) return@withLock false
+            save(entries + mail)
             true
         }
 
-    /** Atomically remove and return only mail addressed to this exact specialist scope. */
-    suspend fun claim(recipient: PeerConsultationContext, provider: String): List<PeerMail> = mutex.withLock {
+    /** Persist claims before transport, preventing replay even after an interrupted send. */
+    suspend fun claim(recipient: PeerConsultationContext, provider: String, session: String? = null): List<PeerMail> = mutex.withLock {
         val entries = live(read(), now())
-        val (claimed, remaining) = entries.partition {
-            it.project == recipient.projectId && it.run == recipient.runId &&
-                it.provider == provider && it.recipientRole == recipient.roleId
+        val claimed = mutableListOf<PeerMail>()
+        val updated = entries.map {
+            if (it.delivery == PeerDelivery.Queued && it.project == recipient.projectId && it.run == recipient.runId &&
+                it.provider == provider && it.recipientRole == recipient.roleId) {
+                it.copy(delivery = PeerDelivery.Claimed, recipientSession = session).also(claimed::add)
+            } else it
         }
-        store.putString(KEY, json.encodeToString(remaining))
+        save(updated)
         claimed
+    }
+
+    /** Record the transport outcome only for an exact persisted claim; never requeue it. */
+    suspend fun finish(claim: PeerMail, outcome: PeerDelivery) = mutex.withLock {
+        require(outcome in setOf(PeerDelivery.Accepted, PeerDelivery.Rejected, PeerDelivery.Uncertain))
+        require(claim.delivery == PeerDelivery.Claimed)
+        val entries = live(read(), now())
+        save(entries.map { if (it == claim) it.copy(delivery = outcome) else it })
     }
 }
