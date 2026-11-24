@@ -33,11 +33,11 @@ The Aive is the intelligence; specialists are its cognitive organs. The persiste
 
 ### Identity, communication and attention
 
-- [ ] Persistent specialist identities, independently of task/run instances: role ID, expertise, configuration, permissions, relationships, history and learned skills. Existing role IDs are the initial identity anchor.
+- [ ] Persistent specialist identities, independently of task/run instances: role ID, expertise, configuration, permissions, relationships, history and learned skills. Existing role IDs are the initial identity anchor; peer admission now reads the current persisted roster and respects retirement and provider pins. Distinct specialist instances, relationships and skills remain open.
 - [ ] Peer consultation in live sessions: implemented initial same-project/run/provider, explicitly tool-free and repository-free advisory routing; verify actual provider delivery, failure handling, isolation and live integration.
 - [ ] Durable asynchronous mailboxes: initial persisted redacted role-addressed queue implemented; durable transport receipts, scoped session provenance and restart deduplication within the retention window are implemented, with managed-gateway regression coverage. Remaining: consent-scoped cross-run messaging, retention controls, real-provider verification and receiver acknowledgements.
 - [ ] Typed communication envelopes: inquiry, observation, hypothesis, objection, proposal, request, verdict and resolution; initial typed intents, scoped message IDs, validated reply correlation, and session/invocation provenance are implemented. Remaining: stable specialist identities, explicit schema versions, evidence references, richer causality and cross-run consent.
-- [ ] Attention-based routing and bounded wake events: relevance, expertise, relationships and current capacity; no indiscriminate broadcasts or unbounded recursion.
+- [ ] Attention-based routing and bounded wake events: relevance, expertise, relationships and current capacity; initial prompts list uniquely available eligible peers in the same run and provider (bounded to 16); ranking and wake events remain open. No indiscriminate broadcasts or unbounded recursion.
 - [ ] Specialist-initiated consultations, recruitment, volunteering, working groups, delegation and task proposals; continue useful work while awaiting replies.
 - [ ] Shared working memory and evidence ledger: distinguish observation, inference and opinion; preserve contradictory evidence and attribution; never promote model agreement to verified fact.
 
