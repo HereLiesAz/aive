@@ -69,7 +69,7 @@ class WorkflowLibraryHost(
     }
 
     internal suspend fun revokePeerRoute(route: com.hereliesaz.geministrator.workflow.PeerRoute) {
-        peerMailbox?.invoke()?.revoke(route)
+        checkNotNull(peerMailbox?.invoke()) { "Peer mailbox unavailable" }.revoke(route)
     }
 
     /**
