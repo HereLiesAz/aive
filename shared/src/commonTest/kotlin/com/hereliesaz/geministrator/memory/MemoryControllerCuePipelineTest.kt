@@ -629,6 +629,39 @@ class MemoryControllerCuePipelineTest {
         assertTrue(b.tags(question).isEmpty())
     }
     @Test
+    fun managedAttentionResumesOnlyExactProviderSessionAndClearsWithMemory() = runBlocking {
+        val (_, bank) = keystoreController()
+        val settings = MapSettings()
+        fun recreate() = MemoryLayerController(
+            banks = MemoryBanks.inMemory(mapOf("wf-keys" to bank)),
+            settingsStore = MemoryLayerSettingsStore(settings),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            nowEpochMillis = { 1000L },
+        ).also { it.setDefaultAttentionLevel(1f) }
+        val h = handle("managed")
+        val req = request("managed", "wf-keys")
+        val question = "Where is the keystore?"
+        val first = recreate()
+        first.observer.onSessionStarted(h, req)
+        assertTrue("#keystore" in first.observer.annotateUserMessage(h, question))
+        val restored = recreate()
+        restored.observer.onSessionReconnected(h.copy(inferenceInvocationId = "reconstructed"), req)
+        assertEquals(question, restored.observer.annotateUserMessage(h, question))
+        val replacement = h.copy(providerRunId = ProviderRunId("replacement"))
+        restored.observer.onSessionStarted(replacement, req)
+        assertEquals(question, restored.observer.annotateUserMessage(h, question))
+        assertTrue("#keystore" in restored.observer.annotateUserMessage(replacement, question))
+        val another = recreate()
+        another.observer.onSessionReconnected(replacement, req)
+        assertEquals(question, another.observer.annotateUserMessage(replacement, question))
+        another.updateSettings { it.copy(enabled = false) }
+        assertEquals(question, another.observer.annotateUserMessage(replacement, question))
+        another.updateSettings { it.copy(enabled = true) }
+        assertTrue("#keystore" in another.observer.annotateUserMessage(replacement, question))
+    }
+
+    @Test
     fun configuredDisputeVoicesResumeOnlyTheirExactCaseRoleAndRoute() = runBlocking {
         val (_, bank) = keystoreController()
         val settings = MapSettings()

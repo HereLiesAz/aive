@@ -81,6 +81,8 @@ class MemoryLayerSettingsStore(
 
     /** Durable advisory attention, stored separately from conversation text and memory graphs. */
     internal val directAttention by lazy { DirectAttentionStore(settings) }
+    /** Separate bounded ledger for exact managed provider-session checkpoints. */
+    internal val managedAttention by lazy { DirectAttentionStore(settings, "aive.memory.managed-attention.v1") }
 
     private val mutableUnreadable = MutableStateFlow(unreadableRaw != null)
 

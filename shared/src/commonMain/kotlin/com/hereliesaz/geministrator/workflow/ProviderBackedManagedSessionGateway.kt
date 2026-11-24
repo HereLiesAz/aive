@@ -488,7 +488,7 @@ class ProviderBackedManagedSessionGateway(
                 is ProviderActionResult.Rejected -> error(result.reason)
             }
             val identified = handle.copy(specialistId = specialistIdentity(handle))
-            recordMemory { memoryObserver.onSessionStarted(identified, request) }
+            recordMemory { memoryObserver.onSessionReconnected(identified, request) }
             rememberConsultationContext(identified, request)
             registerAndObserve(identified, initialStatus)
         }

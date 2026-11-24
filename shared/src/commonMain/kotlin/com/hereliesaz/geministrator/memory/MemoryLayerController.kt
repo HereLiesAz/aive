@@ -180,6 +180,16 @@ class MemoryLayerController(
             keywordTriggers.clear()
         }
         settingsStore.directAttention.clear()
+        cueMutex.withLock {
+            settingsStore.managedAttention.clear()
+            attention.clear()
+            // Scope remains bound, but transient cue history and pending recalled text cannot
+            // survive a memory reset or explicit erasure.
+            cueSessions.entries.toList().forEach { (id, session) ->
+                cueSessions[id] = CueSession(MemoryCueWatcher(attentionPolicy), session.request,
+                    binding = session.binding)
+            }
+        }
     }
 
     /** Workflow of each running agent (task run), fixed when its session starts. */
@@ -203,7 +213,31 @@ class MemoryLayerController(
         var protocolGiven: Boolean = false,
         /** What the agent is dwelling on and how deep injections go; this session only, never stored. */
         val dwell: MemoryDwell = MemoryDwell(),
+        /** Exact host-bound provider session; null before provider start. */
+        var binding: ManagedAttentionBinding? = null,
     )
+
+    private data class ManagedAttentionBinding(val handle: ManagedSessionHandle, val parts: List<String>)
+
+    /** A task ID alone is not a provider session. Scope and role are included without storing raw IDs. */
+    private fun managedBinding(handle: ManagedSessionHandle, request: AgentTaskRequest, workflow: String): ManagedAttentionBinding {
+        val context = request.orchestrationContext
+        return ManagedAttentionBinding(handle, listOf("managed-v1", handle.taskRunId.value,
+            handle.providerId.value, handle.providerRunId.value, handle.specialistId.orEmpty(), workflow,
+            context.projectId?.value.orEmpty(), context.workflowDefinitionId?.value.orEmpty(),
+            context.roleId?.value.orEmpty()) + context.parentWorkflowRunIds.map { it.value }.distinct().sorted())
+    }
+
+    /** Serialize checkpoint writes with rebinding and erasure; no stale session can restore its gate. */
+    private suspend fun saveManagedAttention(agentId: String, session: CueSession) = cueMutex.withLock {
+        val binding = session.binding ?: return@withLock
+        if (!active || cueSessions[agentId] !== session) return@withLock
+        settingsStore.managedAttention.save(binding.parts, nowEpochMillis(), attention.forAgent(agentId))
+    }
+
+    private suspend fun managedCueSession(handle: ManagedSessionHandle): CueSession? = cueMutex.withLock {
+        cueSessions[handle.taskRunId.value]?.takeIf { it.binding?.handle == handle }
+    }
 
     private val cueMutex = Mutex()
 
@@ -220,10 +254,16 @@ class MemoryLayerController(
     fun setDefaultAttentionLevel(level: Float) { attention.defaultLevel = level }
 
     /** Turns one running agent's dial persistently. */
-    suspend fun setAttentionLevel(taskRunId: String, level: Float) = attention.setLevel(taskRunId, level)
+    suspend fun setAttentionLevel(taskRunId: String, level: Float) {
+        attention.setLevel(taskRunId, level)
+        cueMutex.withLock { cueSessions[taskRunId] }?.let { saveManagedAttention(taskRunId, it) }
+    }
 
     /** Temporarily lowers one agent's dial; its own token use recovers it. */
-    suspend fun suppressAttention(taskRunId: String, level: Float) = attention.suppress(taskRunId, level)
+    suspend fun suppressAttention(taskRunId: String, level: Float) {
+        attention.suppress(taskRunId, level)
+        cueMutex.withLock { cueSessions[taskRunId] }?.let { saveManagedAttention(taskRunId, it) }
+    }
 
     private val active: Boolean get() = settings.value.enabled
 
@@ -732,7 +772,13 @@ class MemoryLayerController(
     // ---- banking and recall -----------------------------------------------------------------------
 
     val observer: MemorySessionObserver = object : MemorySessionObserver {
-        override suspend fun onSessionStarted(handle: ManagedSessionHandle, request: AgentTaskRequest) {
+        override suspend fun onSessionStarted(handle: ManagedSessionHandle, request: AgentTaskRequest) =
+            bindSession(handle, request, reconnect = false)
+
+        override suspend fun onSessionReconnected(handle: ManagedSessionHandle, request: AgentTaskRequest) =
+            bindSession(handle, request, reconnect = true)
+
+        private suspend fun bindSession(handle: ManagedSessionHandle, request: AgentTaskRequest, reconnect: Boolean) {
             if (!active) return
             val workflow = memoryWorkflowOf(request, handle.providerRunId.value)
             registerWorkflow(
@@ -740,14 +786,34 @@ class MemoryLayerController(
                 request.orchestrationContext.projectId?.value,
                 request.orchestrationContext.parentWorkflowRunIds.map { it.value },
             )
-            cueMutex.withLock { agentWorkflows[handle.taskRunId.value] = workflow }
+            val id = handle.taskRunId.value
+            val binding = managedBinding(handle, request, workflow)
+            val session = cueMutex.withLock {
+                val previous = cueSessions[id]
+                if (previous?.binding == binding) return@withLock previous
+                agentWorkflows[id] = workflow
+                val checkpoint = if (reconnect) runCatchingCancellable {
+                    settingsStore.managedAttention.load(binding.parts, nowEpochMillis())
+                }.getOrNull() else null
+                // A normal start may retain the just-generated entry cues; replacement and
+                // reconstruction never inherit another session's task-keyed gate.
+                val preflight = !reconnect && previous != null && previous.binding == null &&
+                    previous.request?.orchestrationContext == request.orchestrationContext
+                if (!preflight) attention.restore(id, checkpoint)
+                val next = if (preflight) checkNotNull(previous).also { it.binding = binding }
+                    else CueSession(MemoryCueWatcher(attentionPolicy), request, binding = binding)
+                cueSessions[id] = next
+                next
+            }
             layerFor(workflow).sessionObserver.onSessionStarted(handle, request)
-            cueSession(handle.taskRunId.value, request)
+            runCatchingCancellable { saveManagedAttention(id, session) }
         }
 
         override suspend fun onSessionEvent(handle: ManagedSessionHandle, event: AgentEvent) {
             if (!active) return
-            layerFor(workflowOfAgent(handle.taskRunId.value)).sessionObserver.onSessionEvent(handle, event)
+            val session = managedCueSession(handle) ?: return
+            val agentId = handle.taskRunId.value
+            layerFor(memoryWorkflowOf(session.request, handle.providerRunId.value)).sessionObserver.onSessionEvent(handle, event)
             val text = when (event) {
                 is AgentEvent.Message -> event.content
                 is AgentEvent.PlanGenerated -> event.summary
@@ -755,8 +821,12 @@ class MemoryLayerController(
                 else -> null
             }
             val tokenCount = AttentionGatedRecall.approximateTokens(text, APPROXIMATE_CHARS_PER_TOKEN)
-            attention.forAgent(handle.taskRunId.value).consumeTokens(tokenCount)
-            cueMutex.withLock { cueSessions[handle.taskRunId.value]?.dwell?.consumeTokens(tokenCount) }
+            cueMutex.withLock {
+                if (cueSessions[agentId] !== session) return@withLock
+                attention.forAgent(agentId).consumeTokens(tokenCount)
+                session.dwell.consumeTokens(tokenCount)
+            }
+            runCatchingCancellable { saveManagedAttention(agentId, session) }
         }
 
         override suspend fun onSessionEvent(
@@ -773,37 +843,49 @@ class MemoryLayerController(
                 else -> null
             } ?: return
             if (text.isBlank() || text.startsWith(MEMORY_MESSAGE_MARKER)) return
+            val session = managedCueSession(handle) ?: return
             // The agent's own message asking for the session so far to be sent to memory now.
             if (event is AgentEvent.Message && MemoryRemindMeCommand.isIn(text)) {
                 layerFor(workflowOfAgent(handle.taskRunId.value)).sessionObserver.onRemindMe(handle)
                 drainSoon()
             }
-            respondToThought(handle.taskRunId.value, text, reply)
+            respondToThought(handle.taskRunId.value, text, reply, session)
+            runCatchingCancellable { saveManagedAttention(handle.taskRunId.value, session) }
         }
 
         override suspend fun annotateUserMessage(handle: ManagedSessionHandle, text: String): String {
             if (!active || text.isBlank()) return text
             val agentId = handle.taskRunId.value
+            val session = managedCueSession(handle) ?: return text
             val tokenCount = AttentionGatedRecall.approximateTokens(text, APPROXIMATE_CHARS_PER_TOKEN)
-            attention.forAgent(agentId).consumeTokens(tokenCount)
-            cueMutex.withLock { cueSessions[agentId]?.dwell?.consumeTokens(tokenCount) }
-            val cloud = runCatchingCancellable { cueCloud(agentId, text) }.getOrNull() ?: return text
-            return "$text\n\n$cloud"
+            val gate = cueMutex.withLock {
+                if (cueSessions[agentId] !== session) return text
+                attention.forAgent(agentId).also { it.consumeTokens(tokenCount) }
+            }
+            cueMutex.withLock { session.dwell.consumeTokens(tokenCount) }
+            val cloud = runCatchingCancellable { cueCloud(agentId, text, expected = session, boundGate = gate) }.getOrNull()
+            runCatchingCancellable { saveManagedAttention(agentId, session) }
+            return if (cloud != null && active && managedCueSession(handle) === session) "$text\n\n$cloud" else text
         }
 
         override suspend fun onKeeperMessage(handle: ManagedSessionHandle, text: String) {
             if (!active || text.isBlank()) return
-            layerFor(workflowOfAgent(handle.taskRunId.value)).sessionObserver.onKeeperMessage(handle, text)
+            val session = managedCueSession(handle) ?: return
+            layerFor(memoryWorkflowOf(session.request, handle.providerRunId.value)).sessionObserver.onKeeperMessage(handle, text)
         }
 
         override suspend fun onSessionFinished(handle: ManagedSessionHandle, status: ManagedSessionStatus) {
-            if (!active) return
-            layerFor(workflowOfAgent(handle.taskRunId.value)).sessionObserver.onSessionFinished(handle, status)
-            attention.forget(handle.taskRunId.value)
+            val session = managedCueSession(handle) ?: return
+            if (active) layerFor(memoryWorkflowOf(session.request, handle.providerRunId.value)).sessionObserver.onSessionFinished(handle, status)
             cueMutex.withLock {
-                cueSessions.remove(handle.taskRunId.value)
-                agentWorkflows.remove(handle.taskRunId.value)
+                val id = handle.taskRunId.value
+                if (cueSessions[id] !== session) return@withLock
+                session.binding?.let { settingsStore.managedAttention.remove(it.parts, nowEpochMillis()) }
+                attention.forget(id)
+                cueSessions.remove(id)
+                agentWorkflows.remove(id)
             }
+            if (!active) return
             mutableActivity.value = mutableActivity.value.copy(banked = mutableActivity.value.banked + 1)
             publish()
             drainSoon()
@@ -1589,16 +1671,20 @@ class MemoryLayerController(
         agentId: String,
         text: String,
         reply: suspend (String) -> com.hereliesaz.geministrator.providers.ProviderActionResult,
+        session: CueSession,
     ) {
-        val session = cueSession(agentId)
-        val gate = attention.forAgent(agentId)
-        val workflow = workflowOfAgent(agentId)
+        val gate = cueMutex.withLock {
+            if (cueSessions[agentId] !== session) return
+            attention.forAgent(agentId)
+        }
+        val workflow = memoryWorkflowOf(session.request, session.binding?.handle?.providerRunId?.value ?: agentId)
         val layer = layerFor(workflow)
         val tool = layer.tool
         val isCommon: suspend (String) -> Boolean = { word -> isCommonWord(tool, word) }
         val triggers = cueMutex.withLock { session.watcher }.read(text, isCommon)
 
         suspend fun deliver(message: String) {
+            if (!active || cueMutex.withLock { cueSessions[agentId] !== session }) return
             runCatchingCancellable { layer.sessionObserver.noteIssued(message) }
             val accepted = runCatchingCancellable { reply(message) }.getOrNull() is com.hereliesaz.geministrator.providers.ProviderActionResult.Accepted
             if (!accepted) cueMutex.withLock {
@@ -1626,7 +1712,7 @@ class MemoryLayerController(
         }
 
         // Ambient cue cloud from the thought's uncommon words, paced by the dial.
-        cueCloud(agentId, text)?.let { deliver(it) }
+        cueCloud(agentId, text, expected = session, boundGate = gate)?.let { deliver(it) }
     }
 
     /**
@@ -1634,15 +1720,19 @@ class MemoryLayerController(
      * Tag recall, the dial decides whether cues surface, and surfaced cues count as offered so the
      * agent can follow them. Null when nothing surfaces.
      */
-    private suspend fun cueCloud(agentId: String, text: String, request: AgentTaskRequest? = null, alongside: Boolean = false): String? {
-        val session = cueSession(agentId, request)
-        val gate = attention.forAgent(agentId)
-        val workflow = request?.let { memoryWorkflowOf(it) } ?: workflowOfAgent(agentId)
+    private suspend fun cueCloud(agentId: String, text: String, request: AgentTaskRequest? = null,
+        alongside: Boolean = false, expected: CueSession? = null, boundGate: AttentionGatedRecall? = null): String? {
+        val session = expected ?: cueSession(agentId, request)
+        val gate = boundGate ?: attention.forAgent(agentId)
+        val workflow = request?.let { memoryWorkflowOf(it) } ?: session.request?.let {
+            memoryWorkflowOf(it, session.binding?.handle?.providerRunId?.value ?: agentId)
+        } ?: workflowOfAgent(agentId)
         val roleBank = roleBankOf(request ?: session.request)
         val hits = tagCandidates(workflow, roleBank, text, agentId)
         val cues = (if (alongside) gate.selectAlongside(hits) else gate.select(hits)).take(MemoryAttentionGate(attentionPolicy).cuePolicy(gate.currentState()).maxTags)
-        if (cues.isEmpty()) return null
+        if (cues.isEmpty() || !active) return null
         cueMutex.withLock {
+            if (cueSessions[agentId] !== session) return null
             session.watcher.offered(cues.map { it.node.text })
             cues.forEach { session.dwell.hit(it.node.text) }
         }
