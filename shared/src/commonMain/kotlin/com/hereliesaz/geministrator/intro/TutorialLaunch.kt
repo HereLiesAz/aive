@@ -22,10 +22,10 @@ internal object TutorialLaunch {
     private const val WRITER_NAME = "Writer"
     private const val WRITER_TEXT = "Write the one piece you are asked for, exactly in the form requested, within the stated limits, using only what you are given."
 
-    private fun voice(base: QueenModel, roles: Collection<RoleDefinition>, default: RoleDefinition): TutorialVoice {
+    private fun voice(base: QueenModel, roles: Collection<RoleDefinition>, default: RoleDefinition,
+        memory: com.hereliesaz.geministrator.memory.DirectChatMemory): TutorialVoice {
         val role = roles.firstOrNull { it.id == default.id && it.enabled } ?: default
         // A first-run tutorial has no authorized workflow bank; only the receiving role's lessons apply.
-        val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(emptyList())
         return TutorialVoice(role.name, memory.voice(voiceModel(base, role.name, role.instructions), role.id.value))
     }
 
@@ -34,17 +34,20 @@ internal object TutorialLaunch {
      * reader is not the first thing a first-timer meets. Nothing in the teaching launch asks for her yet, so she is not here
      * by default; a keeper who has switched her off in the Roster never gets her.
      */
-    fun reviewers(base: QueenModel, roles: Collection<RoleDefinition>, bringAntagonist: Boolean = false): List<TutorialVoice> = buildList {
-        add(voice(base, roles, BuiltInRoles.Reviewer))
+    fun reviewers(base: QueenModel, roles: Collection<RoleDefinition>, bringAntagonist: Boolean = false,
+        memory: com.hereliesaz.geministrator.memory.DirectChatMemory = com.hereliesaz.geministrator.memory.DirectChatMemory(emptyList())): List<TutorialVoice> = buildList {
+        add(voice(base, roles, BuiltInRoles.Reviewer, memory))
         val mine = roles.firstOrNull { it.id == BuiltInRoles.Antagonist.id }
-        if (bringAntagonist && (mine == null || mine.enabled)) add(voice(base, roles, BuiltInRoles.Antagonist))
+        if (bringAntagonist && (mine == null || mine.enabled)) add(voice(base, roles, BuiltInRoles.Antagonist, memory))
     }
 
-    fun planner(base: QueenModel, roles: Collection<RoleDefinition>): QueenModel = voice(base, roles, BuiltInRoles.Planner).model
+    fun planner(base: QueenModel, roles: Collection<RoleDefinition>,
+        memory: com.hereliesaz.geministrator.memory.DirectChatMemory = com.hereliesaz.geministrator.memory.DirectChatMemory(emptyList())): QueenModel =
+        voice(base, roles, BuiltInRoles.Planner, memory).model
 
-    fun writer(base: QueenModel): QueenModel =
-        com.hereliesaz.geministrator.memory.DirectChatMemory(emptyList())
-            .voice(voiceModel(base, WRITER_NAME, WRITER_TEXT), "tutorial-writer")
+    fun writer(base: QueenModel,
+        memory: com.hereliesaz.geministrator.memory.DirectChatMemory = com.hereliesaz.geministrator.memory.DirectChatMemory(emptyList())): QueenModel =
+        memory.voice(voiceModel(base, WRITER_NAME, WRITER_TEXT), "tutorial-writer")
 
     /** The registry rows with a label, without the rail's entries when no rail is on screen (a phone layout). */
     fun rows(labels: Map<String, String>): List<TargetRow> {
@@ -87,10 +90,11 @@ internal object TutorialLaunch {
         val rows = rows(labels)
         val store = ComfortStore(DurableUiState.store, TourTargetId.registeredIds)
         val places = TourTargetId.entries.associate { it.name to it.place }
+        val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(emptyList())
         val director = TutorialDirector(
-            planner = planner(base, roles),
-            reviewers = reviewers(base, roles),
-            writer = writer(base),
+            planner = planner(base, roles, memory),
+            reviewers = reviewers(base, roles, memory = memory),
+            writer = writer(base, memory),
             rows = rows,
             whereOf = { places[it].orEmpty() },
             surface = TourControllerSurface,
