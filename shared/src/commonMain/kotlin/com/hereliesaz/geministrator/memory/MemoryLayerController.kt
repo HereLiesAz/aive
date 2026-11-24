@@ -1088,22 +1088,44 @@ class MemoryLayerController(
         override suspend fun recallFor(request: AgentTaskRequest, queryPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan): MemoryPromptRecall =
             recallForPrompt(request, queryPlan)
 
-        override suspend fun directChatTags(workflowIds: List<String>, roleId: String, text: String): List<String> {
-            if (!active || text.isBlank()) return emptyList()
-            val known = banks.known()
-            val roleBank = roleBankId(roleId).takeIf { it.isNotBlank() && it in known }
-            val sources = (workflowIds.filter { it in known }.distinct().take(8) + listOfNotNull(roleBank)).distinct()
-            val hits = sources.flatMap { tagCandidates(it, null, text.take(12_000), null) }
-                .groupBy { it.node.id }.values.mapNotNull { group -> group.maxByOrNull { it.score } }
-                .sortedByDescending { it.score }.take(MAX_RECALL_RESULTS)
-            val level = attention.defaultLevel
-            val gate = AttentionGatedRecall(attentionPolicy, MemoryAttentionState(baselineLevel = level))
-            val selected = gate.selectAlongside(hits).take(MemoryAttentionGate(attentionPolicy).cuePolicy(gate.currentState()).maxTags)
-            return selected.map { MemoryCueWatcher.hashtag(it.node.text) }
-                .filter { tag ->
-                    tag.length in 2..81 && tag.drop(1).all { it.isLetterOrDigit() || it in "-_." } &&
-                        com.hereliesaz.geministrator.control.ControlRedaction.scrub(tag) == tag
-                }.distinct()
+        override suspend fun directChatTags(workflowIds: List<String>, roleId: String, text: String): List<String> =
+            openDirectChat(workflowIds, roleId).tags(text)
+
+        override fun openDirectChat(workflowIds: List<String>, roleId: String): DirectChatCueSession {
+            val authorized = workflowIds.distinct().take(8)
+            return object : DirectChatCueSession {
+                private val mutex = Mutex()
+                private var gate = AttentionGatedRecall(attentionPolicy, MemoryAttentionState(baselineLevel = attention.defaultLevel))
+
+                override suspend fun tags(text: String): List<String> = mutex.withLock {
+                    if (!active) {
+                        gate = AttentionGatedRecall(attentionPolicy, MemoryAttentionState(baselineLevel = attention.defaultLevel))
+                        return@withLock emptyList()
+                    }
+                    if (text.isBlank()) return@withLock emptyList()
+                    val known = banks.known()
+                    val roleBank = roleBankId(roleId).takeIf { it.isNotBlank() && it in known }
+                    val sources = (authorized.filter { it in known } + listOfNotNull(roleBank)).distinct()
+                    val bounded = text.take(12_000)
+                    gate.setBaseline(attention.defaultLevel)
+                    gate.consumeTokens(AttentionGatedRecall.approximateTokens(bounded))
+                    val hits = sources.flatMap { tagCandidates(it, null, bounded, null) }
+                        .filter { hit ->
+                            val tag = MemoryCueWatcher.hashtag(hit.node.text)
+                            tag.length in 2..81 && tag.drop(1).all { it.isLetterOrDigit() || it in "-_." } &&
+                                com.hereliesaz.geministrator.control.ControlRedaction.scrub(tag) == tag
+                        }
+                        .groupBy { it.node.id }.values.mapNotNull { group -> group.maxByOrNull { it.score } }
+                        .sortedByDescending { it.score }.take(MAX_RECALL_RESULTS)
+                    if (!active) return@withLock emptyList()
+                    val selected = gate.selectAlongside(hits).take(MemoryAttentionGate(attentionPolicy).cuePolicy(gate.currentState()).maxTags)
+                    selected.map { MemoryCueWatcher.hashtag(it.node.text) }.distinct()
+                }
+
+                override suspend fun observeReply(text: String) = mutex.withLock {
+                    if (active) gate.consumeTokens(AttentionGatedRecall.approximateTokens(text))
+                }
+            }
         }
 
         override suspend fun queryHints(request: AgentTaskRequest): MemoryQueryHints =
