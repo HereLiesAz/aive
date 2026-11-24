@@ -112,6 +112,18 @@ internal class PeerMailbox(settings: Settings, private val now: () -> Long) {
 
     suspend fun routes(): List<PeerRoute> = mutex.withLock { grants().map { it.route } }
 
+    /** Forget local consent and mail before replacing workflow data. Keep the grant counter monotonic. */
+    suspend fun clear() = mutex.withLock {
+        store.remove(GRANTS)
+        store.remove(KEY)
+    }
+
+    /** Forget consent and messages for a replaced project without touching other projects. */
+    suspend fun forgetProject(project: String) = mutex.withLock {
+        store.putString(GRANTS, json.encodeToString(grants().filterNot { it.route.project == project }))
+        save(read().filterNot { it.project == project })
+    }
+
     /** Called again immediately before provider delivery; a stale grant is not authority. */
     suspend fun authorized(mail: PeerMail): Boolean = mutex.withLock {
         mail.destinationRun == mail.run || grants().any { it.route == mail.route && it.generation == mail.grantGeneration }
