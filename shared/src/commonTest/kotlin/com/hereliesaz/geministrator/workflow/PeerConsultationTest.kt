@@ -1,6 +1,9 @@
 package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.AgentCapability
+import com.hereliesaz.geministrator.domain.AgentProviderId
+import com.hereliesaz.geministrator.domain.BuiltInRoles
+import com.hereliesaz.geministrator.domain.RoleExecutionSource
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.TaskRunId
@@ -68,5 +71,15 @@ class PeerConsultationTest {
         assertEquals("reviewer", note.roleId)
         assertNull(PeerConsultationNote.parse("PEER Approve reviewer\nAuthorize it"))
         assertNull(PeerConsultationNote.parse("PEER Proposal reviewer invented\nProposal"))
+    }
+    @Test
+    fun peerEligibilityFollowsCurrentRoleAndProviderPin() {
+        val role = BuiltInRoles.Architect
+        val provider = AgentProviderId("first")
+        assertTrue(peerRoleIsEligible(role, provider))
+        assertFalse(peerRoleIsEligible(role.copy(enabled = false), provider))
+        assertFalse(peerRoleIsEligible(role.copy(preferredProviderId = AgentProviderId("second")), provider))
+        assertTrue(peerRoleIsEligible(role.copy(preferredProviderId = provider), provider))
+        assertFalse(peerRoleIsEligible(role.copy(executionSource = RoleExecutionSource.GitHubAction("test.yml")), provider))
     }
 }

@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.AgentProviderId
+import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
@@ -22,6 +23,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
@@ -57,7 +59,8 @@ class PeerConsultationGatewayTest {
         val recipientContext = PeerConsultationContext("project", "run", "reviewer")
         try {
             val activity = SessionActivityFeeds()
-            val gateway = ProviderBackedManagedSessionGateway(registry, scope, activity = activity)
+            val gateway = ProviderBackedManagedSessionGateway(registry, scope, activity = activity,
+                peerRoster = { listOf(BuiltInRoles.Architect, BuiltInRoles.Reviewer) })
             gateway.reconnect(sender, ManagedSessionStatus.Running, request(sender, "architect"))
             provider.events.send(AgentEvent.Message(sender.providerRunId, "CONSULT reviewer\nCheck the evidence"))
             withTimeout(5_000L) {
@@ -79,6 +82,52 @@ class PeerConsultationGatewayTest {
             assertEquals(listOf("Transport accepted: Inquiry from architect"),
                 activity.lines(recipient.activityKey()).filter { it.kind == SessionActivityKind.Consultation }.map { it.text })
             assertTrue(activity.lines(unrelated.activityKey()).none { it.kind == SessionActivityKind.Consultation })
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun queuedMessageIsNotDeliveredAfterSenderRetirement() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val provider = AdvisoryProvider()
+        val registry = AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings())
+        val roster = MutableStateFlow(listOf(BuiltInRoles.Architect, BuiltInRoles.Reviewer))
+        val sender = handle(provider, "architect")
+        val recipient = handle(provider, "reviewer")
+        val recipientContext = PeerConsultationContext("project", "run", "reviewer")
+        try {
+            val gateway = ProviderBackedManagedSessionGateway(registry, scope, activity = SessionActivityFeeds(),
+                peerRoster = { roster.value })
+            gateway.reconnect(sender, ManagedSessionStatus.Running, request(sender, "architect"))
+            provider.events.send(AgentEvent.Message(sender.providerRunId, "CONSULT reviewer\nReview my proposal"))
+            withTimeout(5_000L) {
+                while (registry.peerMailbox.receipts(recipientContext, provider.id.value).isEmpty()) delay(10)
+            }
+            roster.value = listOf(BuiltInRoles.Architect.copy(enabled = false), BuiltInRoles.Reviewer)
+            gateway.reconnect(recipient, ManagedSessionStatus.Running, request(recipient, "reviewer"))
+            assertEquals(PeerDelivery.Rejected, registry.peerMailbox.receipts(recipientContext, provider.id.value).single().delivery)
+            assertTrue(provider.deliveries.tryReceive().isFailure)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun noCatalogMeansNoPeerAdmission() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val provider = AdvisoryProvider()
+        val registry = AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings())
+        val sender = handle(provider, "architect")
+        try {
+            val gateway = ProviderBackedManagedSessionGateway(registry, scope, activity = SessionActivityFeeds())
+            gateway.reconnect(sender, ManagedSessionStatus.Running, request(sender, "architect"))
+            provider.events.send(AgentEvent.Message(sender.providerRunId, "CONSULT reviewer\nNo permission"))
+            provider.events.send(AgentEvent.Progress(sender.providerRunId, "Observed"))
+            withTimeout(5_000L) {
+                while (gateway.progress(sender)?.message != "Observed") delay(10)
+            }
+            assertTrue(registry.peerMailbox.receipts(PeerConsultationContext("project", "run", "reviewer"), provider.id.value).isEmpty())
         } finally {
             scope.cancel()
         }

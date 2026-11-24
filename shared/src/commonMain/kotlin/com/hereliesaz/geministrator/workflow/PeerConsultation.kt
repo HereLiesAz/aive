@@ -2,8 +2,18 @@ package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.control.ControlRedaction
 import com.hereliesaz.geministrator.domain.AgentCapability
+import com.hereliesaz.geministrator.domain.AgentProviderId
+import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.RoleExecutionSource
+import com.hereliesaz.geministrator.domain.isRoleCollectionMarkerId
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import kotlinx.serialization.Serializable
+
+/** A role's existing durable identity is the initial specialist anchor. A disabled, non-agent,
+ * or differently pinned role is not an eligible peer, regardless of an old session's snapshot. */
+internal fun peerRoleIsEligible(role: RoleDefinition, provider: AgentProviderId): Boolean =
+    role.enabled && !isRoleCollectionMarkerId(role.id.value) && role.executionSource == RoleExecutionSource.Agent &&
+        (role.preferredProviderId == null || role.preferredProviderId == provider)
 
 /** A consultation is confined to advisory roles in the same project and workflow run. */
 internal data class PeerConsultationContext(val projectId: String, val runId: String, val roleId: String) {
