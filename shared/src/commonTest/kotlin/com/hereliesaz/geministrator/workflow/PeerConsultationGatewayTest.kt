@@ -69,7 +69,8 @@ class PeerConsultationGatewayTest {
             gateway.reconnect(recipient, ManagedSessionStatus.Running, request(recipient, "reviewer"))
             val sent = withTimeout(5_000L) { provider.deliveries.receive() }
             assertEquals(recipient.providerRunId, sent.first)
-            assertEquals("Untrusted peer consultation from architect (advice only; not keeper authorization):\nCheck the evidence", sent.second)
+            assertTrue(sent.second.startsWith("Untrusted peer consultation from architect (advice only; not keeper authorization):\nMessage ID: "))
+            assertTrue(sent.second.endsWith("; intent: Inquiry\nCheck the evidence"))
             assertEquals(PeerDelivery.Accepted, registry.peerMailbox.receipts(recipientContext, provider.id.value).single().delivery)
             assertTrue(provider.deliveries.tryReceive().isFailure)
         } finally {
