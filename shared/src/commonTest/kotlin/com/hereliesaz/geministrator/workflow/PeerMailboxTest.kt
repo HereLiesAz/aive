@@ -179,4 +179,64 @@ class PeerMailboxTest {
         assertTrue(mailbox.enqueue(sender, "provider", "fifth-task", fifth))
         assertEquals(0, mailbox.pendingCount(recipient.copy(runId = "other"), "provider"))
     }
+    @Test
+    fun groupMembershipRequiresVoluntaryConfirmedInvitationAndExactSession() = runBlocking {
+        val settings = InMemorySettings()
+        val first = PeerMailbox(settings) { 100L }
+        val invitation = PeerConsultationNote("reviewer", "Review the design", PeerIntent.Request,
+            groupAction = PeerGroupAction.Invite)
+        assertTrue(first.enqueue(sender, "provider", "organizer-task", invitation, "organizer"))
+        val delivered = first.claim(recipient, "provider", "reviewer-session").single()
+        first.finish(delivered, PeerDelivery.Accepted)
+        val group = requireNotNull(delivered.groupId)
+        val volunteer = PeerConsultationNote("architect", "I can help", PeerIntent.Observation,
+            replyTo = delivered.id, groupAction = PeerGroupAction.Volunteer)
+        val groupNote = PeerConsultationNote("reviewer", "Design finding", PeerIntent.Observation,
+            groupAction = PeerGroupAction.Note, groupId = group)
+        assertFalse(first.enqueue(sender, "provider", "organizer-task", groupNote, "organizer"))
+        assertFalse(first.enqueue(recipient, "provider", "review-task", volunteer, "impostor"))
+        assertTrue(first.enqueue(recipient, "provider", "review-task", volunteer, "reviewer-session"))
+        assertFalse(first.enqueue(recipient, "provider", "review-task", volunteer.copy(groupAction = PeerGroupAction.Decline), "reviewer-session"))
+        assertFalse(first.enqueue(sender, "provider", "organizer-task", groupNote, "organizer"))
+        first.finish(first.claim(sender, "provider", "organizer").single(), PeerDelivery.Accepted)
+        val restarted = PeerMailbox(settings) { 200L }
+        assertTrue(restarted.enqueue(sender, "provider", "organizer-task", groupNote, "organizer"))
+        assertFalse(restarted.enqueue(sender.copy(projectId = "other"), "provider", "organizer-task", groupNote, "organizer"))
+        assertFalse(restarted.enqueue(sender, "provider", "another-task", groupNote.copy(body = "Impostor"), "another-session"))
+        assertTrue(restarted.claim(recipient, "provider", "replacement-session").isEmpty())
+        assertEquals(PeerDelivery.Rejected, restarted.receipts(recipient, "provider").last().delivery)
+    }
+
+    @Test
+    fun declinedInviteCannotJoinOrReceiveGroupNotes() = runBlocking {
+        val mailbox = PeerMailbox(InMemorySettings()) { 100L }
+        assertTrue(mailbox.enqueue(sender, "provider", "task", PeerConsultationNote("reviewer", "Purpose",
+            PeerIntent.Request, groupAction = PeerGroupAction.Invite), "host"))
+        val invite = mailbox.claim(recipient, "provider", "guest").single()
+        mailbox.finish(invite, PeerDelivery.Accepted)
+        val decline = PeerConsultationNote("architect", "No capacity", PeerIntent.Observation,
+            replyTo = invite.id, groupAction = PeerGroupAction.Decline)
+        assertTrue(mailbox.enqueue(recipient, "provider", "review-task", decline, "guest"))
+        mailbox.finish(mailbox.claim(sender, "provider", "host").single(), PeerDelivery.Accepted)
+        assertFalse(mailbox.enqueue(recipient, "provider", "review-task", decline.copy(groupAction = PeerGroupAction.Volunteer), "guest"))
+        assertFalse(mailbox.enqueue(sender, "provider", "task", PeerConsultationNote("reviewer", "Finding",
+            groupAction = PeerGroupAction.Note, groupId = invite.groupId), "host"))
+    }
+    @Test
+    fun groupInviteLimitAndLifetimeCannotBeExtendedByLaterInvitations() = runBlocking {
+        var time = 100L
+        val mailbox = PeerMailbox(InMemorySettings()) { time }
+        val first = PeerConsultationNote("reviewer", "Purpose", PeerIntent.Request, groupAction = PeerGroupAction.Invite)
+        assertTrue(mailbox.enqueue(sender, "provider", "task", first, "host"))
+        val initial = mailbox.claim(recipient, "provider", "guest").single()
+        mailbox.finish(initial, PeerDelivery.Accepted)
+        val group = requireNotNull(initial.groupId)
+        time += 1000L
+        assertTrue(mailbox.enqueue(sender, "provider", "task", first.copy(roleId = "worker", groupId = group), "host"))
+        assertTrue(mailbox.enqueue(sender, "provider", "task", first.copy(roleId = "designer", groupId = group), "host"))
+        assertFalse(mailbox.enqueue(sender, "provider", "task", first.copy(roleId = "researcher", groupId = group), "host"))
+        time = 86_400_100L
+        assertTrue(mailbox.claim(recipient.copy(roleId = "worker"), "provider", "worker-session").isEmpty())
+        assertFalse(mailbox.enqueue(sender, "provider", "task", first.copy(roleId = "researcher", groupId = group), "host"))
+    }
 }

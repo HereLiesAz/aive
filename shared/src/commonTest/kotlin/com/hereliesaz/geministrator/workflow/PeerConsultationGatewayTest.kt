@@ -239,10 +239,48 @@ class PeerConsultationGatewayTest {
         }
     }
 
+    @Test
+    fun workingGroupFormsOnlyAfterActualVolunteerReply() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val provider = AdvisoryProvider()
+        val registry = AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings())
+        val sender = handle(provider, "architect")
+        val recipient = handle(provider, "reviewer")
+        try {
+            val gateway = ProviderBackedManagedSessionGateway(registry, scope, activity = SessionActivityFeeds(),
+                peerRoster = { listOf(BuiltInRoles.Architect, BuiltInRoles.Reviewer) })
+            gateway.reconnect(sender, ManagedSessionStatus.Running, request(sender, "architect"))
+            gateway.reconnect(recipient, ManagedSessionStatus.Running, request(recipient, "reviewer"))
+            provider.events.send(AgentEvent.Message(sender.providerRunId, "INVITE reviewer\nReview this design"))
+            val invite = withTimeout(5_000L) { provider.deliveries.receive() }
+            assertEquals(recipient.providerRunId, invite.first)
+            assertTrue(invite.second.contains("action: Invite"))
+            val messageId = invite.second.substringAfter("Message ID: ").substringBefore(';')
+            val groupId = invite.second.substringAfter("Working group: ").substringBefore(';')
+            provider.reviewerEvents.send(AgentEvent.Message(recipient.providerRunId,
+                "VOLUNTEER architect $messageId\nI can help"))
+            val answer = withTimeout(5_000L) { provider.deliveries.receive() }
+            assertEquals(sender.providerRunId, answer.first)
+            assertTrue(answer.second.contains("action: Volunteer"))
+            withTimeout(5_000L) {
+                while (registry.peerMailbox.receipts(PeerConsultationContext("project", "run", "architect"),
+                        provider.id.value).none { it.groupAction == PeerGroupAction.Volunteer && it.delivery == PeerDelivery.Accepted }) delay(10)
+            }
+            provider.events.send(AgentEvent.Message(sender.providerRunId, "GROUP-NOTE reviewer $groupId\nDesign finding"))
+            val note = withTimeout(5_000L) { provider.deliveries.receive() }
+            assertEquals(recipient.providerRunId, note.first)
+            assertTrue(note.second.contains("action: Note"))
+            assertTrue(note.second.endsWith("Design finding"))
+        } finally {
+            scope.cancel()
+        }
+    }
+
     private class AdvisoryProvider(private val blockDelivery: Boolean = false) : AgentProvider {
         override val id = AgentProviderId("peer-test")
         override val enforcesToolFilter = true
         val events = Channel<AgentEvent>(Channel.UNLIMITED)
+        val reviewerEvents = Channel<AgentEvent>(Channel.UNLIMITED)
         val deliveries = Channel<Pair<ProviderRunId, String>>(Channel.UNLIMITED)
         val sendEntered = CompletableDeferred<Unit>()
         val sendExited = CompletableDeferred<Unit>()
@@ -252,6 +290,8 @@ class PeerConsultationGatewayTest {
         override fun observe(runId: ProviderRunId) = flow {
             if (runId.value == "architect") {
                 for (event in events) emit(event)
+            } else if (runId.value == "reviewer") {
+                for (event in reviewerEvents) emit(event)
             } else {
                 kotlinx.coroutines.awaitCancellation()
             }
