@@ -1343,6 +1343,7 @@ fun App(
                         onClearWorkflowData = {
                             scope.launch {
                                 try {
+                                    runtime?.providerRegistry?.peerMailbox?.clear()
                                     (runtime?.persistence as? com.hereliesaz.geministrator.persistence.DurableWorkflowPersistence)?.clearWorkflowData()
                                     runtime?.loadLatest()
                                 } catch (failure: CancellationException) {
