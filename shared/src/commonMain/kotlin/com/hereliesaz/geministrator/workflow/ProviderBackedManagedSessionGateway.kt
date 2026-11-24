@@ -948,6 +948,8 @@ class ProviderBackedManagedSessionGateway(
                 "Recruited ${com.hereliesaz.geministrator.control.ControlRedaction.scrub(note.roleId)} for advisory consultation")
             activity.record(sender.activityKey(), SessionActivityKind.Consultation,
                 "Queued ${note.intent.name} for ${com.hereliesaz.geministrator.control.ControlRedaction.scrub(note.roleId)}")
+            if (note.groupAction != null) activity.record(sender.activityKey(), SessionActivityKind.Consultation,
+                "Working group ${note.groupAction.name.lowercase()} queued for ${com.hereliesaz.geministrator.control.ControlRedaction.scrub(note.roleId)}")
             val recipient = mutex.withLock {
                 consultationContexts.entries.filter { (handle, context) ->
                     handle != sender && handle.providerId == sender.providerId &&
@@ -1079,7 +1081,8 @@ class ProviderBackedManagedSessionGateway(
                     recordPeerDelivery(handle, mail, PeerDelivery.Rejected)
                     continue
                 }
-                val note = PeerConsultationNote(mail.recipientRole, mail.text, mail.intent, mail.replyTo)
+                val note = PeerConsultationNote(mail.recipientRole, mail.text, mail.intent, mail.replyTo,
+                    groupAction = mail.groupAction, groupId = mail.groupId)
                 val outcome = try {
                     when (withTimeout(PEER_SEND_TIMEOUT_MILLIS) {
                         providerFor(handle).sendMessage(handle.providerRunId, note.advisoryText(mail.senderRole, mail.id) +
