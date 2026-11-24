@@ -429,12 +429,12 @@ class ApplicationRuntime private constructor(
         val specialists = roles.mapNotNull { id -> models.voices[id]?.let { voice(id, it) } }
         val missing = roles.filterNot { id -> specialists.any { it.role == id } }
         val result = com.hereliesaz.geministrator.queen.answerCollectively(
-            question, history, specialists, facilitator,
+            question, history, specialists, facilitator, unavailableRoles = missing,
         ) { model, count ->
             models.mayCall() && queenCallAllowed() &&
                 directAdvisoryGateFor(model.uses, count) == com.hereliesaz.geministrator.queen.CallDecision.Allow
         }
-        result.copy(unavailable = (missing + result.unavailable).distinct())
+        result
     }
 
     internal suspend fun republishState() {
