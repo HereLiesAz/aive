@@ -171,9 +171,12 @@ class MemoryLayerController(
         return triggers
     }
 
-    private suspend fun resetLayers() = layersMutex.withLock {
-        layers.clear()
-        keywordTriggers.clear()
+    private suspend fun resetLayers() {
+        layersMutex.withLock {
+            layers.clear()
+            keywordTriggers.clear()
+        }
+        settingsStore.directAttention.clear()
     }
 
     /** Workflow of each running agent (task run), fixed when its session starts. */
@@ -1091,15 +1094,29 @@ class MemoryLayerController(
         override suspend fun directChatTags(workflowIds: List<String>, roleId: String, text: String): List<String> =
             openDirectChat(workflowIds, roleId).tags(text)
 
-        override fun openDirectChat(workflowIds: List<String>, roleId: String): DirectChatCueSession {
+        override fun openDirectChat(workflowIds: List<String>, roleId: String): DirectChatCueSession =
+            directSession(workflowIds, roleId, null, null)
+
+        override fun resumeDirectChat(workflowIds: List<String>, roleId: String, conversationId: String,
+            participantId: String): DirectChatCueSession =
+            directSession(workflowIds, roleId, conversationId, participantId)
+
+        private fun directSession(workflowIds: List<String>, roleId: String, conversationId: String?,
+            participantId: String?): DirectChatCueSession {
             val authorized = workflowIds.distinct().take(8)
             return object : DirectChatCueSession {
                 private val mutex = Mutex()
-                private var gate = AttentionGatedRecall(attentionPolicy, MemoryAttentionState(baselineLevel = attention.defaultLevel))
+                private var localGate = AttentionGatedRecall(attentionPolicy, MemoryAttentionState(baselineLevel = attention.defaultLevel))
+
+                private suspend fun <T> advance(block: suspend (AttentionGatedRecall) -> T): T =
+                    if (conversationId != null && participantId != null) {
+                        settingsStore.directAttention.advance(authorized, roleId, conversationId, participantId,
+                            nowEpochMillis(), attentionPolicy, attention.defaultLevel, block)
+                    } else block(localGate)
 
                 override suspend fun tags(text: String): List<String> = mutex.withLock {
                     if (!active) {
-                        gate = AttentionGatedRecall(attentionPolicy, MemoryAttentionState(baselineLevel = attention.defaultLevel))
+                        localGate = AttentionGatedRecall(attentionPolicy, MemoryAttentionState(baselineLevel = attention.defaultLevel))
                         return@withLock emptyList()
                     }
                     if (text.isBlank()) return@withLock emptyList()
@@ -1107,6 +1124,7 @@ class MemoryLayerController(
                     val roleBank = roleBankId(roleId).takeIf { it.isNotBlank() && it in known }
                     val sources = (authorized.filter { it in known } + listOfNotNull(roleBank)).distinct()
                     val bounded = text.take(12_000)
+                    advance { gate ->
                     gate.setBaseline(attention.defaultLevel)
                     gate.consumeTokens(AttentionGatedRecall.approximateTokens(bounded))
                     val hits = sources.flatMap { tagCandidates(it, null, bounded, null) }
@@ -1117,13 +1135,14 @@ class MemoryLayerController(
                         }
                         .groupBy { it.node.id }.values.mapNotNull { group -> group.maxByOrNull { it.score } }
                         .sortedByDescending { it.score }.take(MAX_RECALL_RESULTS)
-                    if (!active) return@withLock emptyList()
+                    if (!active) return@advance emptyList()
                     val selected = gate.selectAlongside(hits).take(MemoryAttentionGate(attentionPolicy).cuePolicy(gate.currentState()).maxTags)
                     selected.map { MemoryCueWatcher.hashtag(it.node.text) }.distinct()
+                    }
                 }
 
                 override suspend fun observeReply(text: String) = mutex.withLock {
-                    if (active) gate.consumeTokens(AttentionGatedRecall.approximateTokens(text))
+                    if (active) advance { gate -> gate.consumeTokens(AttentionGatedRecall.approximateTokens(text)) }
                 }
             }
         }
