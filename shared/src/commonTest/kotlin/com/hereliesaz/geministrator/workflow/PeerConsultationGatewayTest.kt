@@ -303,6 +303,46 @@ class PeerConsultationGatewayTest {
     }
 
     @Test
+    fun recruitmentUsesExactManagedInstanceExperienceWithoutWideningScope() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val provider = AdvisoryProvider()
+        val registry = AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings())
+        val sender = handle(provider, "architect")
+        val reviewer = handle(provider, "reviewer")
+        val worker = handle(provider, "worker")
+        val reviewRole = BuiltInRoles.Reviewer.copy(description = "database indexing query optimization")
+        val workerRole = BuiltInRoles.Worker.copy(description = "illustration typography painting")
+        // Use the same persisted session binding contract as the real gateway's start path.
+        val key = com.hereliesaz.geministrator.Sha256.hex(listOf(worker.taskRunId.value, worker.providerId.value,
+            worker.providerRunId.value).joinToString("") { "${it.length}:$it" }.encodeToByteArray())
+        val identity = registry.specialistProfiles.bindManaged(key, workerRole, provider.id.value)
+        val directory = object : com.hereliesaz.geministrator.memory.MemoryPromptContextProvider {
+            override suspend fun recallFor(request: AgentTaskRequest,
+                queryPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan) =
+                com.hereliesaz.geministrator.memory.MemoryPromptRecall()
+            override suspend fun managedExpertise(projectId: String, runId: String, question: String):
+                List<com.hereliesaz.geministrator.memory.CollectiveExpertiseMatch> {
+                assertEquals("project", projectId)
+                assertEquals("run", runId)
+                assertEquals("database indexing", question)
+                return listOf(com.hereliesaz.geministrator.memory.CollectiveExpertiseMatch("worker", identity, 1))
+            }
+        }
+        try {
+            val gateway = ProviderBackedManagedSessionGateway(registry, scope, activity = SessionActivityFeeds(),
+                peerRoster = { listOf(BuiltInRoles.Architect, reviewRole, workerRole) }, memoryContext = directory)
+            gateway.reconnect(sender, ManagedSessionStatus.Running, request(sender, "architect"))
+            gateway.reconnect(reviewer, ManagedSessionStatus.Running, request(reviewer, "reviewer"))
+            gateway.reconnect(worker, ManagedSessionStatus.Running, request(worker, "worker"))
+            provider.events.send(AgentEvent.Message(sender.providerRunId, "RECRUIT database indexing\nWhich index fits?"))
+            val sent = withTimeout(5_000L) { provider.deliveries.receive() }
+            assertEquals(worker.providerRunId, sent.first)
+            assertTrue(sent.second.endsWith("; intent: Request\nWhich index fits?"))
+            assertTrue(provider.deliveries.tryReceive().isFailure)
+        } finally { scope.cancel() }
+    }
+
+    @Test
     fun slowPeerTransportDoesNotBlockSenderAndReleaseCancelsDelivery() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val provider = AdvisoryProvider(blockDelivery = true)

@@ -410,6 +410,47 @@ class MemoryControllerCuePipelineTest {
         assertTrue(later.none { it.label == "Role lessons" }, "$later")
     }
     @Test
+    fun managedDirectoryRequiresMatchingAttributedAgentMessageInExactProjectAndRun() = runBlocking {
+        val store = InMemoryMemoryStore()
+        val settings = MapSettings()
+        val controller = MemoryLayerController(
+            banks = MemoryBanks.inMemory(mapOf("run" to store)),
+            settingsStore = MemoryLayerSettingsStore(settings),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            nowEpochMillis = { 1000L },
+        )
+        val identity = "a".repeat(64)
+        val handle = handle("reviewer").copy(specialistId = identity)
+        val request = request("reviewer", "run", "Review typography").let {
+            it.copy(orchestrationContext = it.orchestrationContext.copy(
+                projectId = com.hereliesaz.geministrator.domain.ProjectId("project"),
+                roleId = RoleDefinitionId("reviewer")))
+        }
+        controller.observer.onSessionStarted(handle, request)
+        controller.observer.onKeeperMessage(handle, "Examine turnip orchard irrigation.")
+        controller.observer.onSessionEvent(handle.copy(specialistId = "b".repeat(64)),
+            AgentEvent.Message(handle.providerRunId, "The keystore password moved to the CI secrets; signing reads KEYSTORE_PASSWORD."))
+        controller.observer.onSessionFinished(handle, ManagedSessionStatus.Completed)
+        controller.drain()
+        val provider = controller.promptContextProvider
+        assertEquals(listOf(CollectiveExpertiseMatch("reviewer", identity, 1)),
+            provider.managedExpertise("project", "run", "Check keystore"))
+        assertTrue(provider.managedExpertise("other", "run", "Check keystore").isEmpty())
+        assertTrue(provider.managedExpertise("project", "other", "Check keystore").isEmpty())
+        assertTrue(provider.managedExpertise("project", "run", "turnip orchard").isEmpty())
+        val episode = store.read().episodes.single()
+        assertTrue(episode.chunks.any { it.label == "Agent message; managed specialist=$identity" })
+        assertTrue(episode.chunks.none { "b".repeat(64) in it.label })
+        controller.updateSettings { it.copy(enabled = false) }
+        assertTrue(provider.managedExpertise("project", "run", "Check keystore").isEmpty())
+        controller.updateSettings { it.copy(enabled = true) }
+        controller.selectBank("run")
+        controller.forgetEpisode(episode.id)
+        assertTrue(provider.managedExpertise("project", "run", "Check keystore").isEmpty())
+    }
+
+    @Test
     fun transactiveDirectoryUsesOnlyRetainedAttributedAuthorizedEpisodes() = runBlocking {
         val settings = MapSettings()
         val history = com.hereliesaz.geministrator.queen.CollectiveConversationStore(settings) { 100L }
