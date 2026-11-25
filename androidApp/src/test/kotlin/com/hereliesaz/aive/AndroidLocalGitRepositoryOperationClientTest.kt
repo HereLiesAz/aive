@@ -9,6 +9,8 @@ import com.hereliesaz.geministrator.retrieval.LocalRepositoryChunkSource
 import com.hereliesaz.geministrator.domain.TaskRunId
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.workflow.ExternalExecutionStatus
+import com.hereliesaz.geministrator.workflow.RepositoryFileProposal
+import com.hereliesaz.geministrator.workflow.RepositoryProposedFile
 import java.io.File
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
@@ -42,6 +44,33 @@ class AndroidLocalGitRepositoryOperationClientTest {
         createdAtEpochMillis = 1L,
         updatedAtEpochMillis = 1L,
     )
+
+    @Test
+    fun hostSnapshotReadsCommittedImportAndRefusesUnsafePaths() = withRepository { root ->
+        root.resolve("README.md").writeText("dirty\n")
+        root.resolve("untracked.txt").writeText("untracked")
+        val client = AndroidLocalGitRepositoryOperationClient(export = { _, _ -> error("Read must not export") })
+        val (base, blob) = Git.open(root).use {
+            it.repository.resolve("HEAD").name to it.repository.resolve("HEAD:README.md").name
+        }
+        val result = runBlocking {
+            client.readFileProposalContext(project(root), listOf("README.md", "untracked.txt", "absent/child"))
+        }
+        assertEquals(ExternalExecutionStatus.Completed, result.status)
+        assertEquals(RepositoryFileProposal(base, listOf(
+            RepositoryProposedFile("README.md", blob, "initial\n"),
+            RepositoryProposedFile("untracked.txt", null, ""),
+            RepositoryProposedFile("absent/child", null, ""),
+        )), RepositoryFileProposal.parse(result.artifacts.single().textContent!!))
+        assertEquals("dirty\n", root.resolve("README.md").readText())
+        assertEquals(base, Git.open(root).use { it.repository.resolve("HEAD").name })
+        for (path in listOf("README.md/child", "../escape", "src/*.kt", "src")) {
+            kotlin.test.assertFailsWith<IllegalArgumentException>(path) {
+                runBlocking { client.readFileProposalContext(project(root), listOf(path)) }
+            }
+        }
+        assertEquals(result, runBlocking { client.getRun(project(root), result.id) })
+    }
 
     @Test
     fun worktreeBranchCommitAndExportLeaveTheImportAlone() = withRepository { root ->

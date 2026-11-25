@@ -61,6 +61,12 @@ data class RepositoryFileProposal(val baseCommit: String, val files: List<Reposi
             }
         }
 
+        /** Validate literal snapshot targets before accessing any backend, including platform readers. */
+        fun validateSnapshotPaths(paths: List<String>) {
+            validateProposalPaths(paths)
+            require(paths.none { path -> path.any { it in "*?[" } }) { "Snapshot requires literal file paths, not globs" }
+        }
+
         /** Parse strictly, without permissive unknown fields, Markdown extraction or command interpretation. */
         fun parse(text: String): RepositoryFileProposal {
             require(text.length <= 1_000_000) { "Proposal JSON exceeds input limit" }
@@ -161,15 +167,14 @@ internal fun expandHostFileSteps(
     repository: RepositoryRef?,
     roles: Map<RoleDefinitionId, RoleDefinition>,
 ): WorkflowDefinition {
-    if (repository?.source !in setOf(RepositorySource.GitHub, RepositorySource.GitLab)) return definition
+    if (repository?.source !in setOf(RepositorySource.GitHub, RepositorySource.GitLab, RepositorySource.Local)) return definition
     val occupied = definition.tasks.mapTo(mutableSetOf()) { it.id }
     val tasks = buildList {
         for (task in definition.tasks) {
             val contract = task.contract
             val role = task.roleId?.let(roles::get)
             val paths = task.resources.filterIsInstance<TaskResource.RepositoryFiles>().singleOrNull()?.paths
-            val exactPaths = paths != null && paths.isNotEmpty() && paths.none { path -> path.any { it in "*?[" } } &&
-                runCatching { RepositoryFileProposal.validateProposalPaths(paths) }.isSuccess
+            val exactPaths = paths != null && runCatching { RepositoryFileProposal.validateSnapshotPaths(paths) }.isSuccess
             if (task.usesHostFileContext || contract == null || contract.startingPoint ||
                 contract.allowedTools.isNotEmpty() ||
                 com.hereliesaz.geministrator.template.StepInstantiation.missingInputs(contract).isNotEmpty() ||

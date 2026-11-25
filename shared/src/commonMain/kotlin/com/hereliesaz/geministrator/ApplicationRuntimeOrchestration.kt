@@ -215,7 +215,8 @@ internal fun newWorkflowInstruction(objective: String, repository: RepositoryRef
         append(" A repository is linked (").append(repository.name).append("). A step sees only short excerpts of it, its README and docs first,")
         append(" so name the files or parts each step should read in that step's objective.")
         if (repository.source in setOf(com.hereliesaz.geministrator.domain.RepositorySource.GitHub,
-                com.hereliesaz.geministrator.domain.RepositorySource.GitLab)) {
+                com.hereliesaz.geministrator.domain.RepositorySource.GitLab,
+                com.hereliesaz.geministrator.domain.RepositorySource.Local)) {
             append(" For a read-only question about known repository files, choose the read-repository-files template, ")
             append(" declare the literal paths in repository_files, and leave the target input empty. Aive supplies the files. ")
             append(" Do not assign repository edits merely to answer a question.")

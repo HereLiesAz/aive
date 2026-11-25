@@ -97,8 +97,7 @@ class GitHubRestRepositoryOperationClient(
      * An absent path gets a null expected blob; a truncated tree is never treated as absence.
      */
     override suspend fun readFileProposalContext(project: Project, paths: List<String>): ExternalExecutionRun {
-        RepositoryFileProposal.validateProposalPaths(paths)
-        require(paths.none { path -> path.any { it in "*?[" } }) { "Snapshot requires literal file paths, not globs" }
+        RepositoryFileProposal.validateSnapshotPaths(paths)
         val repository = requireRepository(project, RepositorySource.GitHub)
         repository.requirePublicRemoteHost("github.com", "GitHub")
         val token = tokenProvider.requireToken("GitHub")
@@ -125,13 +124,7 @@ class GitHubRestRepositoryOperationClient(
             }
         }
         val snapshot = RepositoryFileProposal(base.sha, files).also { it.validate() }
-        return completedRun(
-            source = RepositorySource.GitHub,
-            operation = RepositoryFileProposal.READ_CONTEXT_OPERATION,
-            label = "Repository file proposal context",
-            text = Json.encodeToString(snapshot),
-            metadata = mapOf("baseCommit" to base.sha),
-        ).also { runs.put(it) }
+        return snapshot.toSnapshotRun(RepositorySource.GitHub).also { runs.put(it) }
     }
 
     /**
@@ -368,8 +361,7 @@ class GitLabRestRepositoryOperationClient(
      * No workspace checkout, model credential, or write request is needed.
      */
     override suspend fun readFileProposalContext(project: Project, paths: List<String>): ExternalExecutionRun {
-        RepositoryFileProposal.validateProposalPaths(paths)
-        require(paths.none { path -> path.any { it in "*?[" } }) { "Snapshot requires literal file paths, not globs" }
+        RepositoryFileProposal.validateSnapshotPaths(paths)
         val repository = requireRepository(project, RepositorySource.GitLab)
         val apiBase = repository.gitLabApiBase()
         val token = tokenProvider.requireToken("GitLab")
@@ -449,11 +441,7 @@ class GitLabRestRepositoryOperationClient(
             }
         }
         val snapshot = RepositoryFileProposal(base, files).also { it.validate() }
-        return completedRun(
-            source = RepositorySource.GitLab, operation = RepositoryFileProposal.READ_CONTEXT_OPERATION,
-            label = "Repository file proposal context", text = Json.encodeToString(snapshot),
-            metadata = mapOf("baseCommit" to base),
-        ).also { runs.put(it) }
+        return snapshot.toSnapshotRun(RepositorySource.GitLab).also { runs.put(it) }
     }
 
     override suspend fun start(project: Project, operation: String): ExternalExecutionRun {
@@ -665,6 +653,16 @@ private fun RepositoryRef.requirePublicRemoteHost(expectedHost: String, service:
     require(host.equals(expectedHost, ignoreCase = true)) {
         "$service repository credentials are configured only for $expectedHost"
     }
+}
+
+/** Build the same snapshot artifact for remote and platform-owned local repository readers. */
+fun RepositoryFileProposal.toSnapshotRun(source: RepositorySource): ExternalExecutionRun {
+    validate()
+    return completedRun(
+        source = source, operation = RepositoryFileProposal.READ_CONTEXT_OPERATION,
+        label = "Repository file proposal context", text = Json.encodeToString(this),
+        metadata = mapOf("baseCommit" to baseCommit),
+    )
 }
 
 @OptIn(ExperimentalTime::class)

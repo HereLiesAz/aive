@@ -30,9 +30,9 @@ A keeper-authored read-only `read-file-proposal-context` task uses exactly one `
 
 At workflow preparation, an Auto, local, single-inference file-write contract with no external tools, one CodeChange/files-change output, no specified target branch and a literal repository_files path list is compiled into four steps: host snapshot, model proposal, human approval of the proposal, and host commit. The final step retains the original ID and output contract (BRANCH and FILES lines), so downstream dependencies are unchanged. The model retains its role but receives neither a repository handle nor tools, and repository capabilities inherited from its role are not required. The host rejects any proposal whose base or blob IDs differ from its snapshot or that adds an unlisted path. Any original plan gate stays on the proposal; the host commit additionally waits for a person's approval of the actual contents.
 
-For either GitHub or GitLab, an eligible read-repository-files template with literal repository_files paths is compiled into a host snapshot followed by the original inference-only answer step. The answer preserves its identity, contract, dependencies and role, but receives no repository handle or tools. Both routes keep an explicit target, provider pin, placement, condition or other incompatible declaration unchanged rather than guessing. Missing required template inputs are not bypassed. No cached habit substitutes for the fresh host snapshot and inference.
+For GitHub, GitLab or Local Git, an eligible read-repository-files template with literal repository_files paths is compiled into a host snapshot followed by the original inference-only answer step. The answer preserves its identity, contract, dependencies and role, but receives no repository handle or tools. Both routes keep an explicit target, provider pin, placement, condition or other incompatible declaration unchanged rather than guessing. Missing required template inputs are not bypassed. No cached habit substitutes for the fresh host snapshot and inference.
 
-The planner is told to choose these routes for known file paths. GitLab writes and Local Git reads/writes retain their existing workspace agents. The existing repository mutation approval and context-taint rules remain in force.
+The planner is told to choose these routes for known file paths. GitLab and Local Git writes retain their existing workspace agents. GitLab's commits API does not document an atomic create-only branch condition; host-owned GitLab writes remain disabled rather than weaken the dedicated-branch invariant. The existing repository mutation approval and context-taint rules remain in force.
 
 The same GitHub connection is also used by the GitHub Actions executor.
 
@@ -64,7 +64,7 @@ Only GitLab.com is supported (`https://gitlab.com/api/v4`); repository operation
 
 ### Local Git
 
-On Desktop, The Aive can link a local Git working tree without a repository-service token. See `Local-Git-Repository-Operations.md` for the bounded local operation vocabulary. Supported desktop LLM providers can also execute governed Local Git coding tasks in isolated worktrees, leaving the user's source checkout untouched and preserving changes on dedicated `aive/...` branches.
+On Desktop, The Aive can link a local Git working tree without a repository-service token. Android works with its imported repository copy. Both support `read-file-proposal-context`: exact regular files at committed HEAD, never the dirty checkout, with the same UTF-8 and path limits. The browser has no local repository client. See `Local-Git-Repository-Operations.md` for the bounded local operation vocabulary. Supported desktop LLM providers can also execute governed Local Git coding tasks in isolated worktrees, leaving the user's source checkout untouched and preserving changes on dedicated `aive/...` branches.
 
 ### Entire
 

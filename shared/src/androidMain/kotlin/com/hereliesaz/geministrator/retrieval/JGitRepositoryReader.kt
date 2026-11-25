@@ -1,6 +1,9 @@
 package com.hereliesaz.geministrator.retrieval
 
+import com.hereliesaz.geministrator.workflow.RepositoryFileProposal
+import com.hereliesaz.geministrator.workflow.RepositoryProposedFile
 import java.io.File
+import org.eclipse.jgit.lib.FileMode
 import java.nio.file.Files
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -40,6 +43,45 @@ object JGitRepositoryReader : LocalRepositoryReader {
 
     override suspend fun readBlob(root: String, blob: String): String? = withRepository(root) { repository ->
         String(repository.open(ObjectId.fromString(blob), Constants.OBJ_BLOB).bytes, Charsets.UTF_8)
+    }
+
+    /** Read only committed regular blobs in the imported repository, never its working directory. */
+    override suspend fun snapshot(root: String, paths: List<String>): RepositoryFileProposal = withContext(Dispatchers.IO) {
+        RepositoryFileProposal.validateSnapshotPaths(paths)
+        val builder = FileRepositoryBuilder().findGitDir(File(root)).setMustExist(true)
+        require(builder.gitDir != null) { "Local snapshot requires a Git repository" }
+        builder.build().use { repository ->
+            val base = requireNotNull(repository.resolve("HEAD^{commit}")) { "Local snapshot requires a committed HEAD" }
+            RevWalk(repository).use { rev ->
+                val tree = rev.parseCommit(base).tree
+                var remaining = RepositoryFileProposal.MAX_TOTAL_BYTES
+                val files = paths.map { path ->
+                    val parts = path.split('/')
+                    var absent = false
+                    for (length in 1 until parts.size) {
+                        val ancestor = TreeWalk.forPath(repository, parts.take(length).joinToString("/"), tree)
+                        if (ancestor == null) { absent = true; break }
+                        ancestor.use {
+                            require(it.getFileMode(0) == FileMode.TREE) { "A file path crosses a non-directory" }
+                        }
+                    }
+                    val target = if (absent) null else TreeWalk.forPath(repository, path, tree)
+                    if (target == null) RepositoryProposedFile(path, null, "") else target.use {
+                        require(it.getFileMode(0) in setOf(FileMode.REGULAR_FILE, FileMode.EXECUTABLE_FILE)) {
+                            "Snapshot target is not a regular file"
+                        }
+                        val blob = it.getObjectId(0)
+                        val loader = repository.open(blob, Constants.OBJ_BLOB)
+                        val limit = minOf(remaining, RepositoryFileProposal.MAX_FILE_BYTES)
+                        require(loader.size <= limit.toLong()) { "Local snapshot exceeds content limit" }
+                        val bytes = loader.getBytes(limit)
+                        remaining -= bytes.size
+                        RepositoryProposedFile(path, blob.name, bytes.decodeToString(throwOnInvalidSequence = true))
+                    }
+                }
+                RepositoryFileProposal(base.name, files).also { it.validate() }
+            }
+        }
     }
 
     override suspend fun diskFiles(root: String): List<LocalRepositoryFile> = withContext(Dispatchers.IO) {

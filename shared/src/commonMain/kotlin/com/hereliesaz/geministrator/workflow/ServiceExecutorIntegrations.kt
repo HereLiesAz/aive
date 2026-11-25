@@ -46,7 +46,7 @@ class RepositoryOperationExecutorIntegration(
                 require(client.supportsFileProposalContext(context.project)) { "Host file snapshots are unavailable for this repository" }
                 val paths = context.task.resources.filterIsInstance<com.hereliesaz.geministrator.domain.TaskResource.RepositoryFiles>()
                     .singleOrNull()?.paths ?: error("Snapshot task requires exactly one repository_files resource")
-                RepositoryFileProposal.validateProposalPaths(paths)
+                RepositoryFileProposal.validateSnapshotPaths(paths)
                 client.readFileProposalContext(context.project, paths)
             } else if (executor.operation.startsWith(CommitFileProposalOperation.PREFIX)) {
                 require(client.supportsFileProposals(context.project)) { "Host file commits are unavailable for this repository" }

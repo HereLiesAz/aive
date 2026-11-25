@@ -1,6 +1,11 @@
 package com.hereliesaz.geministrator.retrieval
 
+import com.hereliesaz.geministrator.sanitizeGitEnvironment
+import com.hereliesaz.geministrator.workflow.RepositoryFileProposal
+import com.hereliesaz.geministrator.workflow.RepositoryProposedFile
 import java.io.File
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.runInterruptible
 import java.nio.file.Files
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
@@ -21,6 +26,60 @@ object GitCliRepositoryReader : LocalRepositoryReader {
         }
 
     override suspend fun readBlob(root: String, blob: String): String? = git(root, "cat-file", "blob", blob)
+
+    /**
+     * Inspect each ancestor and target in the immutable HEAD tree using literal pathspecs.
+     * Exact blob bytes are decoded strictly; a failed Git command is never a missing file.
+     */
+    override suspend fun snapshot(root: String, paths: List<String>): RepositoryFileProposal {
+        RepositoryFileProposal.validateSnapshotPaths(paths)
+        val base = requireNotNull(git(root, "rev-parse", "--verify", "HEAD^{commit}", maxBytes = 128)) {
+            "Local snapshot requires a committed HEAD"
+        }.trim()
+        require(base.matches(Regex("[0-9a-f]{40}"))) { "Invalid local base commit SHA" }
+        val entries = mutableMapOf<String, List<String>?>()
+        suspend fun entry(path: String): List<String>? {
+            if (entries.containsKey(path)) return entries[path]
+            val raw = requireNotNull(git(root, "ls-tree", "--full-tree", "-l", "-z", base, "--", path, maxBytes = 4096)) {
+                "Unable to read local snapshot tree"
+            }
+            val result = if (raw.isEmpty()) null else {
+                require(raw.endsWith('\u0000') && raw.count { it == '\u0000' } == 1) { "Ambiguous local snapshot tree entry" }
+                val fields = raw.removeSuffix("\u0000").split('\t', limit = 2)
+                require(fields.size == 2 && fields[1] == path) { "Unexpected local snapshot tree path" }
+                fields[0].split(' ').filter(String::isNotEmpty).also {
+                    require(it.size == 4 && it[2].matches(Regex("[0-9a-f]{40}"))) { "Invalid local snapshot tree entry" }
+                }
+            }
+            entries[path] = result
+            return result
+        }
+        var remaining = RepositoryFileProposal.MAX_TOTAL_BYTES
+        val files = paths.map { path ->
+            val parts = path.split('/')
+            var absent = false
+            for (length in 1 until parts.size) {
+                val ancestor = entry(parts.take(length).joinToString("/"))
+                if (ancestor == null) { absent = true; break }
+                require(ancestor[0] == "040000" && ancestor[1] == "tree") { "A file path crosses a non-directory" }
+            }
+            val target = if (absent) null else entry(path)
+            if (target == null) RepositoryProposedFile(path, null, "") else {
+                require(target[0] in setOf("100644", "100755") && target[1] == "blob") {
+                    "Snapshot target is not a regular file"
+                }
+                val size = requireNotNull(target[3].toIntOrNull()) { "Invalid local blob size" }
+                require(size in 0..minOf(remaining, RepositoryFileProposal.MAX_FILE_BYTES)) { "Local snapshot exceeds content limit" }
+                val content = requireNotNull(git(root, "cat-file", "blob", target[2], maxBytes = size)) {
+                    "Unable to read exact local snapshot blob"
+                }
+                require(content.encodeToByteArray().size == size) { "Local snapshot blob size changed" }
+                remaining -= size
+                RepositoryProposedFile(path, target[2], content)
+            }
+        }
+        return RepositoryFileProposal(base, files).also { it.validate() }
+    }
 
     override suspend fun diskFiles(root: String): List<LocalRepositoryFile> = withContext(Dispatchers.IO) {
         val base = File(root)
@@ -45,27 +104,38 @@ object GitCliRepositoryReader : LocalRepositoryReader {
         }.getOrNull()
     }
 
-    private suspend fun git(root: String, vararg args: String): String? = withContext(Dispatchers.IO) {
-        runCatching {
+    private suspend fun git(root: String, vararg args: String, maxBytes: Int? = null): String? = withContext(Dispatchers.IO) {
+        try {
             // Output goes to a file, not a pipe: reading a pipe to EOF would block before the
             // timeout is ever evaluated, and a hung git would never be stopped.
             val outputFile = Files.createTempFile("aive-git", ".out").toFile()
             try {
-                val process = ProcessBuilder(listOf("git", "-C", root) + args)
+                val flags = if (maxBytes == null) emptyList() else listOf("--no-replace-objects", "--literal-pathspecs")
+                val builder = ProcessBuilder(listOf("git", "-C", root) + flags + args)
                     .redirectError(ProcessBuilder.Redirect.DISCARD)
                     .redirectOutput(outputFile)
-                    .start()
-                if (!process.waitFor(30, TimeUnit.SECONDS)) {
-                    process.destroyForcibly()
-                    null
-                } else if (process.exitValue() == 0) {
-                    outputFile.readText()
-                } else {
-                    null
+                sanitizeGitEnvironment(builder)
+                val process = builder.start()
+                try {
+                    process.outputStream.close()
+                    if (!runInterruptible { process.waitFor(30, TimeUnit.SECONDS) }) {
+                        null
+                    } else if (process.exitValue() == 0) {
+                        if (maxBytes == null) outputFile.readText() else {
+                            require(outputFile.length() <= maxBytes.toLong()) { "Git snapshot output exceeds its bound" }
+                            outputFile.readBytes().decodeToString(throwOnInvalidSequence = true)
+                        }
+                    } else null
+                } finally {
+                    if (process.isAlive) process.destroyForcibly()
                 }
             } finally {
                 outputFile.delete()
             }
-        }.getOrNull()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            null
+        }
     }
 }

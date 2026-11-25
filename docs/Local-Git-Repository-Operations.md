@@ -6,6 +6,7 @@ Supported operation strings:
 
 - `status`
 - `fetch`
+- `read-file-proposal-context` — read-only immutable snapshot of literal regular-file paths in committed HEAD; also supported by Android imports
 - `pull`
 - `add-all`
 - `push`
@@ -17,7 +18,7 @@ Supported operation strings:
 - `entire-trail:<title>` — publishes the current branch to Entire and opens a Trail for it (`entire trail create`); see `Entire.md`
 - `entire-mirror:</gh|et/owner/repo>` — mirrors a repository onto Entire (`entire repo mirror add --no-wait`); see `Entire.md`
 
-These are parsed into fixed `ProcessBuilder` argument lists (the Entire operations run the `entire` command in the repository). Repository operations are not arbitrary shell commands.
+Desktop command operations are parsed into fixed `ProcessBuilder` argument lists (the Entire operations run the `entire` command in the repository). The snapshot uses the existing platform reader (Git CLI or JGit) and produces a bounded JSON artifact; it never reads uncommitted contents, follows symlinks, or invokes a checkout. Repository operations are not arbitrary shell commands.
 
 Each operation emits a `CommandOutput` artifact carrying repository metadata used by the orchestration UI:
 

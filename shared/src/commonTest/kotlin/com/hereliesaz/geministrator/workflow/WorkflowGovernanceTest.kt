@@ -74,7 +74,7 @@ class WorkflowGovernanceTest {
     }
 
     @Test
-    fun exactRepositoryReadUsesHostAndPreservesAnswerContractAcrossBothRemoteSources() = runBlocking {
+    fun exactRepositoryReadUsesHostAndPreservesAnswerContractAcrossRepositorySources() = runBlocking {
         val role = BuiltInRoles.Reviewer.copy(capabilitiesRequired = setOf(AgentCapability.RepositoryRead))
         val template = com.hereliesaz.geministrator.template.StepPresets.ReadRepositoryFiles
         val id = TaskDefinitionId("answer")
@@ -86,7 +86,8 @@ class WorkflowGovernanceTest {
         val registry = AgentProviderRegistry(emptyList(), inferenceSettings = InMemorySettings())
         val preparer = WorkflowDefinitionPreparer(registry, listOf(role))
         for (source in listOf(com.hereliesaz.geministrator.domain.RepositorySource.GitHub,
-            com.hereliesaz.geministrator.domain.RepositorySource.GitLab)) {
+            com.hereliesaz.geministrator.domain.RepositorySource.GitLab,
+            com.hereliesaz.geministrator.domain.RepositorySource.Local)) {
             val repo = com.hereliesaz.geministrator.domain.RepositoryRef("owner", "project", source = source)
             val prepared = preparer.prepare(definition, repo)
             assertEquals(listOf("answer--host-read", "answer"), prepared.tasks.map { it.id.value })
