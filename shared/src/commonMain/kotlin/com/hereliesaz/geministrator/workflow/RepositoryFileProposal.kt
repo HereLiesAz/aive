@@ -199,7 +199,7 @@ internal fun expandHostFileSteps(
             val fileResources = task.resources.filterIsInstance<TaskResource.RepositoryFiles>()
             val paths = fileResources.singleOrNull()?.paths
             val discoverRead = repository?.source == RepositorySource.GitHub && fileResources.isEmpty() &&
-                contract?.template?.id == "read-repository-files" && contract.effects == setOf(StepEffect.None)
+                contract?.let { it.template.id == "read-repository-files" && it.effects == setOf(StepEffect.None) } == true
             val exactPaths = paths != null && runCatching { RepositoryFileProposal.validateSnapshotPaths(paths) }.isSuccess
             if (task.usesHostFileContext || contract == null || contract.startingPoint ||
                 contract.allowedTools.isNotEmpty() ||

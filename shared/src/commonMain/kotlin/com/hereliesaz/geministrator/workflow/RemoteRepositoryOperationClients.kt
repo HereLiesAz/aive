@@ -167,7 +167,12 @@ class GitHubRestRepositoryOperationClient(
             remaining -= size
         }
         require(paths.isNotEmpty()) { "No relevant bounded text files found in the committed repository; specify exact paths" }
-        return readSnapshot(url, token, base, paths).toSnapshotRun(RepositorySource.GitHub).also { runs.put(it) }
+        val snapshot = readSnapshot(url, token, base, paths)
+        return completedRun(
+            source = RepositorySource.GitHub, operation = RepositoryFileProposal.DISCOVER_READ_OPERATION,
+            label = "Bounded discovered repository snapshot", text = Json.encodeToString(snapshot),
+            metadata = mapOf("baseCommit" to base.sha, "partial" to "true"),
+        ).also { runs.put(it) }
     }
 
     /**
