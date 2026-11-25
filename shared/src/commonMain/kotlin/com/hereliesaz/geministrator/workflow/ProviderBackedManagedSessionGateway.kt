@@ -184,12 +184,13 @@ class ProviderBackedManagedSessionGateway(
                     // Not the provider's own failure (a malformed request would fail anywhere): stop here.
                     ?: throw failure
                 failures += benched
-                // Whatever the engine pinned this call to, the next pick is open again, minus those tried.
+                // Release the dispatch pin, not the task's explicit capability constraints.
                 attempt = attempt.copy(
                     providerSelection = attempt.providerSelection.copy(
-                        constraints = com.hereliesaz.geministrator.domain.ProviderConstraints.None,
-                        requiredCapabilities = attempt.providerSelection.requiredCapabilities +
-                            ((attempt.providerSelection.constraints as? com.hereliesaz.geministrator.domain.ProviderConstraints.RequireCapabilities)?.capabilities.orEmpty()),
+                        constraints = attempt.providerSelection.constraints.takeUnless {
+                            it is com.hereliesaz.geministrator.domain.ProviderConstraints.RequireProvider
+                        } ?: com.hereliesaz.geministrator.domain.ProviderConstraints.None,
+                        resolvedProviderId = null,
                         preferredProviderId = null,
                         excludedProviderIds = tried.toSet(),
                     ),
@@ -214,7 +215,10 @@ class ProviderBackedManagedSessionGateway(
         val next = try {
             providerRegistry.select(
                 selection.copy(
-                    constraints = com.hereliesaz.geministrator.domain.ProviderConstraints.None,
+                    constraints = selection.constraints.takeUnless {
+                        it is com.hereliesaz.geministrator.domain.ProviderConstraints.RequireProvider
+                    } ?: com.hereliesaz.geministrator.domain.ProviderConstraints.None,
+                    resolvedProviderId = null,
                     preferredProviderId = null,
                     excludedProviderIds = tried,
                 ),
@@ -231,7 +235,7 @@ class ProviderBackedManagedSessionGateway(
 
     private suspend fun startSession(request: ManagedSessionRequest, chosen: AgentProvider?): ManagedSessionHandle {
         val requiredCapabilities = buildSet {
-            addAll(request.providerSelection.requiredCapabilities.withoutRepositoryAccessUnless(request.providerSelection.repository))
+            addAll(request.providerSelection.requiredCapabilities.withoutRepositoryAccessUnless(request.taskRequest.repository))
             val constraints = request.providerSelection.constraints
             if (constraints is com.hereliesaz.geministrator.domain.ProviderConstraints.RequireCapabilities) {
                 addAll(constraints.capabilities)

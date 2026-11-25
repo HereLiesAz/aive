@@ -363,8 +363,7 @@ class WorkflowEngine(
                         request = request,
                         sessionRequest = ManagedSessionRequest(
                             providerSelection = selection.copy(
-                                preferredProviderId = providerId,
-                                constraints = ProviderConstraints.RequireProvider(providerId),
+                                resolvedProviderId = providerId,
                             ),
                             taskRequest = request,
                         ),
