@@ -927,8 +927,8 @@ fun App(
             }
             host.specialistTrainer = { roleId: String, domain: String -> runtime?.startTrainingFromActive(roleId, domain) ?: false }
             host.peerMailbox = { runtime?.providerRegistry?.peerMailbox }
-            host.collectiveChat = { question, conversation ->
-                checkNotNull(runtime).collectiveAdvisory(question, conversation)
+            host.collectiveChat = { question, conversation, timeBudget ->
+                checkNotNull(runtime).collectiveAdvisory(question, conversation, timeBudget)
             }
             host.collectiveHistory = { checkNotNull(runtime).collectiveHistory() }
             host.collectiveNew = { checkNotNull(runtime).newCollectiveConversation() }

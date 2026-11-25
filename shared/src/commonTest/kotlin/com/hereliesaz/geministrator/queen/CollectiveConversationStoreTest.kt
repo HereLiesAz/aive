@@ -10,6 +10,21 @@ import kotlin.test.assertTrue
 
 class CollectiveConversationStoreTest {
     @Test
+    fun allAdaptiveExaminationsSurviveRestartAndHistoryImport() = runTest {
+        val settings = MapSettings()
+        val store = CollectiveConversationStore(settings) { 100L }
+        val id = store.create().id
+        val assessments = (1..9).map { CollectiveAssessment("role-$it", "Actual assessment $it",
+            crossExamination = it > 2, respondsTo = if (it > 2) it - 1 else null) }
+        store.append(id, "Question", CollectiveAnswer("Answer", assessments, emptyList(),
+            reviewRequested = true, stop = DeliberationStop.RepeatedObjection))
+        val restored = requireNotNull(CollectiveConversationStore(settings) { 200L }.get(id))
+        assertEquals(assessments, restored.turns.single().result.assessments)
+        assertEquals(11, restored.historicalMemoryRequests(200L).size)
+        assertEquals(DeliberationStop.RepeatedObjection, restored.turns.single().result.stop)
+    }
+
+    @Test
     fun crossExaminationSurvivesRestartAndFullTranscriptImport() = runTest {
         val settings = MapSettings()
         val store = CollectiveConversationStore(settings) { 100L }

@@ -1323,7 +1323,7 @@ class MemoryLayerController(
         /** Validate the host-owned bank and attribution for both capture and release. */
         private fun validateCollectiveRequests(conversationId: String, requests: List<MemoryBankRequest>) {
             require(conversationId.startsWith("collective:") && conversationId.length <= 128)
-            require(requests.size in 1..com.hereliesaz.geministrator.queen.MAX_COLLECTIVE_UTTERANCES && requests.count { it.sourceKind == MemorySourceKind.UserPrompt } <= 1)
+            require(requests.isNotEmpty() && requests.count { it.sourceKind == MemorySourceKind.UserPrompt } <= 1)
             require(requests.map { it.sourceSessionId }.distinct().size == requests.size)
             require(requests.all { request ->
                 val scope = request.scope
@@ -1452,7 +1452,7 @@ class MemoryLayerController(
 
         override suspend fun importCollectiveHistory(conversationId: String, requests: List<MemoryBankRequest>): Int? {
             if (requests.isEmpty()) return null
-            require(requests.size <= com.hereliesaz.geministrator.queen.MAX_COLLECTIVE_HISTORY_UTTERANCES && conversationId.startsWith("collective:") && conversationId.length <= 128)
+            require(conversationId.startsWith("collective:") && conversationId.length <= 128)
             require(requests.map { it.sourceSessionId }.distinct().size == requests.size)
             require(requests.all { request ->
                 val scope = request.scope

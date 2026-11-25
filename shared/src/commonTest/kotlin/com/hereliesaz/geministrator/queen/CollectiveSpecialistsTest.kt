@@ -68,13 +68,14 @@ class CollectiveSpecialistsTest {
         val fallback = mapOf(a.id.value to first, b.id.value to first, experienced.id.value to other)
         val roster = listOf(a, b, experienced)
         val chosen = selectCollectiveSpecialists("indexing", roster, first.uses, null, fallback, listOf(pointer))
-        assertEquals(listOf(experienced.id, a.id), chosen.map { it.first.id })
+        assertEquals(listOf(experienced.id, a.id), chosen.take(2).map { it.first.id })
         assertEquals("other", chosen.first().second.uses.single().sourceId)
+        assertEquals(setOf(a.id, b.id, experienced.id), chosen.map { it.first.id }.toSet())
         val revised = experienced.copy(description = "indexing revised")
         val changed = selectCollectiveSpecialists("indexing", listOf(a, b, revised), first.uses, null, fallback, listOf(pointer))
-        assertEquals(listOf(a.id, b.id), changed.map { it.first.id })
+        assertEquals(listOf(a.id, b.id), changed.take(2).map { it.first.id })
         val repinned = selectCollectiveSpecialists("indexing", listOf(a, b, pinned), first.uses, null, fallback, listOf(pointer))
-        assertEquals(listOf(a.id, b.id), repinned.map { it.first.id })
+        assertEquals(listOf(a.id, b.id), repinned.take(2).map { it.first.id })
     }
 
     @Test

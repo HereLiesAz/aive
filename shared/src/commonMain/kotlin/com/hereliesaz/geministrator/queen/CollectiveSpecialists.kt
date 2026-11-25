@@ -8,8 +8,8 @@ import com.hereliesaz.geministrator.orchestration.bySimilarityTo
 import com.hereliesaz.geministrator.memory.CollectiveExpertiseMatch
 
 /**
- * Recruit up to two distinct eligible roles from the current catalog. This is advisory activation,
- * not launching a task or giving a role its tools. Respect explicit pins and favor a different
+ * Rank distinct eligible roles from the current catalog for initial and requested advisory recruitment.
+ * This never launches a task or gives a role its tools. Respect explicit pins and favor a different
  * configured Source and model identifier for the second assessment. Neither establishes
  * model-family or evidential independence.
  * At most one slot prefers a relevant previously observed exact instance; the other remains
@@ -77,7 +77,6 @@ internal fun selectCollectiveSpecialists(
         selected += role to model
         used += model.uses.map { it.sourceId }
         usedModels += model.uses.mapNotNull { it.modelId?.takeIf(String::isNotBlank) }
-        if (selected.size == 2) break
     }
     return selected
 }

@@ -36,12 +36,13 @@ internal data class CollectiveConversation(
             "Keeper: ${it.question}\nAive: ${it.result.answer.orEmpty()}"
         }
         val assessments = turns.lastOrNull { it.result.assessments.isNotEmpty() }
-            ?.result?.assessments.orEmpty().take(MAX_COLLECTIVE_ASSESSMENTS)
+            ?.result?.assessments.orEmpty()
         if (assessments.isEmpty()) return dialogue.takeLast(1800)
-        val notes = assessments.joinToString("\n") {
+        val sample = assessments.filterNot { it.crossExamination } + assessments.filter { it.crossExamination }.takeLast(1)
+        val notes = sample.joinToString("\n") {
             "${it.role.take(40)}${if (it.crossExamination) " (cross-examination)" else ""}: ${it.text.take(300)}"
         }
-        val reference = "\nLatest available specialist assessment excerpts (unverified; may be from an earlier turn):\n$notes"
+        val reference = ("\nLatest available specialist assessment excerpts (unverified; may be from an earlier turn):\n$notes").take(1800)
         return dialogue.takeLast(1800 - reference.length) + reference
     }
 
@@ -66,11 +67,12 @@ internal data class CollectiveConversation(
                 ))
             }
             addUtterance("keeper", turn.question, null, "Keeper question (retained transcript)", MemorySourceKind.UserPrompt)
-            turn.result.assessments.take(MAX_COLLECTIVE_ASSESSMENTS).forEachIndexed { slot, assessment ->
+            turn.result.assessments.forEachIndexed { slot, assessment ->
                 if (assessment.role.isNotBlank()) addUtterance("assessment:$slot", assessment.text,
                     assessment.role, "Historical agent advisory excerpt (unverified); role=${assessment.role}; " +
                         "instance=${assessment.specialistId ?: "unknown"}; configured Source=${assessment.sourceId ?: "unknown"}; " +
-                        "model=${assessment.modelId ?: "unknown"}; phase=${if (assessment.crossExamination) "cross-examination" else "initial"}", MemorySourceKind.AgentNote)
+                        "model=${assessment.modelId ?: "unknown"}; phase=${if (assessment.crossExamination) "cross-examination" else "initial"}; " +
+                        "argument=${slot + 1}; respondsTo=${assessment.respondsTo ?: "not recorded"}", MemorySourceKind.AgentNote)
             }
             turn.result.answer?.let { answer ->
                 addUtterance("facilitator", answer, BuiltInRoles.Orchestrator.id.value,
@@ -124,7 +126,7 @@ internal class CollectiveConversationStore(settings: Settings, private val now: 
         fun clean(text: String, max: Int) = ControlRedaction.scrub(text).take(max)
         val turn = CollectiveTurn(clean(question, 1500), result.copy(
             answer = result.answer?.let { clean(it, 1200) },
-            assessments = result.assessments.take(MAX_COLLECTIVE_ASSESSMENTS).map {
+            assessments = result.assessments.map {
                 it.copy(role = clean(it.role, 128), text = clean(it.text, 1200),
                     sourceId = it.sourceId?.let { source -> clean(source, 128) },
                     modelId = it.modelId?.let { model -> clean(model, 128) },

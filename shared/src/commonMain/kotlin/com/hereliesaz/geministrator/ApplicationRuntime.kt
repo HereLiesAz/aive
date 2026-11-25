@@ -245,9 +245,14 @@ class ApplicationRuntime private constructor(
         callsSoFar: Int,
     ): com.hereliesaz.geministrator.queen.CallDecision = directAdvisoryGateFor(reviewer.uses, callsSoFar)
 
-    /** Reuse the same fail-closed price, hourly allowance, call and Source-room gate for advisory chats. */
+    /** Plan review retains its original call quota; collective dialogue shares only the resource gate. */
     internal suspend fun directAdvisoryGateFor(
         uses: List<com.hereliesaz.geministrator.queen.ModelUse>, callsSoFar: Int,
+    ): com.hereliesaz.geministrator.queen.CallDecision =
+        advisoryGateFor(uses, planningCalls = callsSoFar)
+
+    private suspend fun advisoryGateFor(
+        uses: List<com.hereliesaz.geministrator.queen.ModelUse>, planningCalls: Int? = null,
     ): com.hereliesaz.geministrator.queen.CallDecision {
         val caps = queenCaps()
         val read = com.hereliesaz.geministrator.queen.priceRead(
@@ -263,9 +268,9 @@ class ApplicationRuntime private constructor(
         }
         val noRoom = providerRegistry.keylessWithoutRoom()
         val room = uses.isEmpty() || uses.any { it.sourceId !in noRoom }
-        return com.hereliesaz.geministrator.queen.planningMayCall(
-            com.hereliesaz.geministrator.queen.PlanningCaller.Reviewer, read.status, read.estimateUsd, caps, hourly, callsSoFar, room,
-        )
+        return if (planningCalls != null) com.hereliesaz.geministrator.queen.planningMayCall(
+            com.hereliesaz.geministrator.queen.PlanningCaller.Reviewer, read.status, read.estimateUsd, caps, hourly, planningCalls, room,
+        ) else com.hereliesaz.geministrator.queen.deliberationMayCall(read.status, read.estimateUsd, caps, hourly, room)
     }
 
     /**
@@ -577,6 +582,7 @@ class ApplicationRuntime private constructor(
     /** Host-owned conversation history; an absent/deleted identity cannot be resumed. */
     internal suspend fun collectiveAdvisory(
         question: String, conversationId: String,
+        timeBudgetMillis: Long = com.hereliesaz.geministrator.queen.DEFAULT_DELIBERATION_MILLIS,
     ): com.hereliesaz.geministrator.queen.CollectiveConversation = collectiveChatMutex.withLock {
         require(question.isNotBlank() && question.length <= 1500)
         val conversation = requireNotNull(collectiveConversations.get(conversationId))
@@ -592,6 +598,7 @@ class ApplicationRuntime private constructor(
             roster.any { it.id.value == match.roleId && it.executionSource == com.hereliesaz.geministrator.domain.RoleExecutionSource.Agent }
         }
         val capture = com.hereliesaz.geministrator.queen.CollectiveMemoryCapture(conversationId, question, ::nowEpochMillis)
+        var captureAvailable = true
         val evidenceIssue = collectiveEvidence.issueId()
         fun voice(role: com.hereliesaz.geministrator.domain.RoleDefinition, model: com.hereliesaz.geministrator.queen.QueenModel):
             com.hereliesaz.geministrator.queen.CollectiveVoice? {
@@ -624,8 +631,11 @@ class ApplicationRuntime private constructor(
                     voice.specialistId?.let { id -> collectiveProfiles.observe(id, voice.role, outcome) }
                 },
                 recordContribution = { voice, reply ->
-                    capture.record(voice, reply)
                     withContext(NonCancellable) {
+                        runCatchingCancellable { capture.record(voice, reply) }.onFailure {
+                            captureAvailable = false
+                            com.hereliesaz.geministrator.log.AppLog.record("memory", "Collective capture unavailable: ${it::class.simpleName}")
+                        }
                         runCatchingCancellable {
                             collectiveEvidence.recordAdvisory(evidenceIssue, conversationId, question, voice, reply)
                         }.onFailure {
@@ -634,9 +644,10 @@ class ApplicationRuntime private constructor(
                     }
                 },
                 directory = directory,
-            ) { model, count ->
-                models.mayCall() && queenCallAllowed() &&
-                    directAdvisoryGateFor(model.uses, count) == com.hereliesaz.geministrator.queen.CallDecision.Allow
+                timeBudgetMillis = timeBudgetMillis,
+            ) { model, _ ->
+                captureAvailable && models.mayCall() && queenCallAllowed() &&
+                    advisoryGateFor(model.uses) == com.hereliesaz.geministrator.queen.CallDecision.Allow
             }
         }
         requireNotNull(collectiveConversations.append(conversationId, question, result))

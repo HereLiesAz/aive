@@ -11,7 +11,63 @@ import kotlin.test.assertTrue
 
 class CollectiveAnswerTest {
     @Test
-    fun requestedReviewRetainsInitialDissentAndUsesOnlyOneAdditionalCall() = runTest {
+    fun novelObjectionsContinuePastFourCallsAndRecruitAdditionalPeers() = runTest {
+        val admissions = mutableListOf<Int>()
+        var firstCalls = 0
+        val first = CollectiveVoice("a", QueenModel {
+            if (++firstCalls == 1) "REVIEW: needed\nMissing measurements." else "REVIEW: needed\nMissing control group."
+        })
+        var secondCalls = 0
+        val second = CollectiveVoice("b", QueenModel {
+            if (++secondCalls == 1) "REVIEW: none\nEstimate only." else "REVIEW: none\nSeparate instrumentation needed."
+        })
+        var thirdCalls = 0
+        val third = CollectiveVoice("c", QueenModel {
+            if (++thirdCalls == 1) "REVIEW: needed\nCalibration drift." else "REVIEW: none\nSeparate instrumentation needed."
+        })
+        val queen = CollectiveVoice("queen", QueenModel { "Unverified." })
+        val result = answerCollectively("Question", "", listOf(first, second, third), queen) { _, count ->
+            admissions += count
+            true
+        }
+        assertTrue(admissions.size > 4)
+        assertEquals("c", result.assessments[2].role)
+        assertEquals(listOf(null, null, 1, 3, 4), result.assessments.map { it.respondsTo })
+        assertEquals(listOf("a", "b", "c", "a", "c"), result.assessments.map { it.role })
+        assertEquals(DeliberationStop.NoFurtherReviewRequested, result.stop)
+        assertEquals("Unverified.", result.answer)
+    }
+
+    @Test
+    fun repeatedObjectionStopsWithoutDeclaringConsensus() = runTest {
+        val first = CollectiveVoice("a", QueenModel { "REVIEW: needed\nMissing independent measurement." })
+        val second = CollectiveVoice("b", QueenModel { "REVIEW: needed\nMissing independent measurement." })
+        var prompt = ""
+        val queen = CollectiveVoice("queen", QueenModel { prompt = it; "Unresolved." })
+        val result = answerCollectively("Question", "", listOf(first, second), queen) { _, _ -> true }
+        assertEquals(3, result.assessments.size)
+        assertEquals(DeliberationStop.RepeatedObjection, result.stop)
+        assertTrue("without resolving it" in prompt)
+    }
+
+    @Test
+    fun keeperDeadlineStopsExplorationAndReservesSynthesis() = runTest {
+        val first = CollectiveVoice("a", QueenModel { "REVIEW: needed\nMissing test." })
+        val second = CollectiveVoice("b", QueenModel {
+            kotlinx.coroutines.delay(1_000)
+            "Too late"
+        })
+        val queen = CollectiveVoice("queen", QueenModel { "Partial answer." })
+        val result = answerCollectively("Question", "", listOf(first, second), queen,
+            timeBudgetMillis = 300L) { _, _ -> true }
+        assertEquals(DeliberationStop.TimeBudget, result.stop)
+        assertEquals(listOf(1), result.unexaminedRequests)
+        assertEquals("Partial answer.", result.answer)
+        assertEquals(1, result.assessments.size)
+    }
+
+    @Test
+    fun requestedReviewRetainsInitialDissentAndStopsWhenNoFurtherReviewRequested() = runTest {
         val prompts = mutableListOf<String>()
         val admitted = mutableListOf<Int>()
         val first = CollectiveVoice("reviewer", QueenModel { prompts += it; "REVIEW: needed\nNo physical measurement." })
@@ -69,6 +125,8 @@ class CollectiveAnswerTest {
         assertTrue(prompts.all { "Which option?" in it && "Prior discussion" in it })
         assertTrue("most material objection" in prompts[0] && "most material objection" in prompts[1])
         assertTrue("leave incompatible positions unresolved" in prompts[2])
+        assertTrue("Do not count votes" in prompts[2])
+        assertTrue("equate persuasive style with truth" in prompts[2])
     }
 
     @Test
