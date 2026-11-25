@@ -1,5 +1,11 @@
 package com.hereliesaz.geministrator.queen
 
+import com.hereliesaz.geministrator.research.LocalResearchSource
+import com.hereliesaz.geministrator.research.ResearchBudget
+import com.hereliesaz.geministrator.research.ResearchContext
+import com.hereliesaz.geministrator.research.ResearchLead
+import com.hereliesaz.geministrator.research.ResearchSource
+import com.hereliesaz.geministrator.research.ResearchStep
 import com.russhwolf.settings.MapSettings
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -8,6 +14,35 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class CollectiveEvidenceLedgerTest {
+    @Test
+    fun researchStepRetainsReturnedClaimsWithoutVerification() = runTest {
+        val settings = MapSettings()
+        val ledger = CollectiveEvidenceLedger(settings) { 100L }
+        val source = LocalResearchSource {
+            listOf(
+                ResearchLead("Manual", ResearchSource.Repository, "local", "Uses SQLite", true),
+                ResearchLead("Extra", ResearchSource.Repository, "local", "Unbounded second lead", true),
+            )
+        }
+        val step = ResearchStep(
+            local = listOf(ResearchSource.Repository to source),
+            budget = ResearchBudget(maxLeads = 1),
+            observeOutcome = ledger::recordResearch,
+        )
+        step.run("Learn about storage", ResearchContext(repositoryLinked = true), "lookup-1")
+        step.run("Paint a wall", ResearchContext(), "lookup-empty")
+        val book = CollectiveEvidenceLedger(settings) { 200L }.snapshot()
+        assertEquals(1, book.entries.size)
+        val entry = book.entries.single()
+        assertEquals(EvidenceKind.CitedClaim, entry.kind)
+        assertEquals("Learn about storage", entry.question)
+        assertEquals("Research operation: lookup-1", entry.source)
+        assertTrue(entry.text.contains("linked repository"))
+        assertTrue(entry.text.contains("Uses SQLite"))
+        assertEquals(false, entry.recordedByKeeper)
+        assertTrue(book.reviews.isEmpty())
+    }
+
     @Test
     fun opinionsRemainIndependentAcrossRestartAndReview() = runTest {
         val settings = MapSettings()

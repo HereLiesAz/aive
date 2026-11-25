@@ -55,6 +55,8 @@ class ResearchStep(
     private val budget: ResearchBudget = ResearchBudget(),
     /** The app's own docs, read locally for any objective that bears on them; null reads none. Needs no consent. */
     private val appDocs: AiveDocsResearch? = null,
+    /** Local evidence projection of an actual completed step, including docs-only outcomes. Never authorizes a lookup. */
+    private val observeOutcome: (suspend (String, String, ResearchOutcome, ResearchBudget) -> Unit)? = null,
 ) {
     /** True when there is something to consult, for [researchWanted]. */
     val lookupConfigured: Boolean get() = candidates.isNotEmpty()
@@ -69,7 +71,20 @@ class ResearchStep(
         }
     }
 
+    /** Research is unchanged by evidence retention; a storage failure must not block planning. */
     suspend fun run(objective: String, context: ResearchContext, runKey: String): ResearchOutcome {
+        val outcome = collect(objective, context, runKey)
+        try {
+            observeOutcome?.invoke(objective, runKey, outcome, budget)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            com.hereliesaz.geministrator.log.AppLog.record("evidence", "Could not retain research evidence: ${failure::class.simpleName}")
+        }
+        return outcome
+    }
+
+    private suspend fun collect(objective: String, context: ResearchContext, runKey: String): ResearchOutcome {
         val docs = docsFor(objective)
         if (!researchWanted(objective, context.copy(lookupConfigured = context.lookupConfigured || lookupConfigured))) {
             return if (docs.isEmpty()) {

@@ -1,6 +1,11 @@
 package com.hereliesaz.geministrator.queen
 
 import com.hereliesaz.geministrator.control.ControlRedaction
+import com.hereliesaz.geministrator.domain.ArtifactRef
+import com.hereliesaz.geministrator.domain.WorkflowRun
+import com.hereliesaz.geministrator.research.ResearchBudget
+import com.hereliesaz.geministrator.research.ResearchOutcome
+import com.hereliesaz.geministrator.research.toAvailableTools
 import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
 import com.russhwolf.settings.Settings
 import kotlinx.coroutines.sync.Mutex
@@ -64,6 +69,51 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
         val source = voice.model.uses.singleOrNull()
         append(issue, question, EvidenceKind.Opinion, reply, source?.sourceId ?: "Configured Source not recorded",
             conversation, voice.role, voice.specialistId, source?.modelId)
+    }
+
+    /**
+     * Retain exactly the bounded lead projection and bundled excerpts returned by the research step.
+     * Source text remains a cited claim, not an observation proving its contents or a Keeper decision.
+     * The lookup key identifies the originating operation; it grants no memory or execution permission.
+     * Empty results (including declined or failed lookups with no returned content) create no entry.
+     */
+    suspend fun recordResearch(question: String, runKey: String, outcome: ResearchOutcome, budget: ResearchBudget) {
+        val lines = (outcome.leads.toAvailableTools(budget) + outcome.docs).distinct()
+        if (lines.isEmpty()) return
+        val issue = issueId()
+        mutex.withLock {
+            val entries = lines.mapNotNull { line ->
+                val statement = clean(line, 12_000)
+                if (statement.isBlank()) null else EvidenceEntry(
+                    identity(), issue, clean(question, 1500).ifBlank { "Research" },
+                    EvidenceKind.CitedClaim, statement, clean("Research operation: $runKey", 512),
+                    now(),
+                )
+            }
+            if (entries.isNotEmpty()) {
+                val book = read()
+                write(book.copy(entries = book.entries + entries))
+            }
+        }
+    }
+
+    /**
+     * Project a newly persisted workflow artifact into the shared ledger. Even a test result can contain
+     * an author's unsupported assertion: only the receipt of an artifact is host-observed. Preserve
+     * its run, producing task and artifact reference without treating its payload as verified.
+     * A URI-only artifact is recorded by reference; no resource is fetched or executed.
+     */
+    suspend fun recordArtifact(run: WorkflowRun, artifact: ArtifactRef) {
+        val question = run.objective.ifBlank { "Workflow ${run.id.value}" }
+        val text = buildString {
+            append(artifact.kind.name).append(": ").append(artifact.label.take(512))
+            artifact.textContent?.let { append("\n").append(it.take(12_000)) }
+            if (artifact.textContent == null) append("\nArtifact content not read (reference only).")
+        }
+        append(
+            "workflow:${run.id.value}", question, EvidenceKind.CitedClaim, text,
+            "Run ${run.id.value} | task run ${artifact.taskRunId.value} | artifact ${artifact.id.value}",
+        )
     }
 
     /** Explicit local Keeper contribution with a stated source. */

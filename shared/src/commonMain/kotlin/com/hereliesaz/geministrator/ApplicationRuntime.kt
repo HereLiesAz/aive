@@ -162,6 +162,8 @@ class ApplicationRuntime private constructor(
     private val queenLedger: com.hereliesaz.geministrator.workflow.improvement.ImprovementStore? = null,
     /** The keeper's allowances, so she can say a run is close to its own. */
     private val queenCaps: () -> SpendCaps = { SpendCaps() },
+    /** Shared by this runtime and all its child coordinators: one mutex for the durable evidence book. */
+    internal val collectiveEvidence: com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger,
 ) {
     private data class QueenReview(
         val runId: String,
@@ -418,10 +420,6 @@ class ApplicationRuntime private constructor(
     private val collectiveChatMutex = Mutex()
     private val collectiveConversations by lazy {
         com.hereliesaz.geministrator.queen.CollectiveConversationStore(persistence.inferenceSettings, ::nowEpochMillis)
-    }
-
-    internal val collectiveEvidence by lazy {
-        com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger(persistence.inferenceSettings, ::nowEpochMillis)
     }
 
     private val collectiveProfiles get() = providerRegistry.specialistProfiles
@@ -2553,6 +2551,10 @@ class ApplicationRuntime private constructor(
                     ),
                 )
 
+            val collectiveEvidence = com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger(
+                persistence.inferenceSettings, ::nowEpochMillis,
+            )
+
             fun build(roles: List<RoleDefinition>): ApplicationRuntime {
                 val engine = WorkflowEngine(
                     sessionGateway = gateway,
@@ -2571,6 +2573,7 @@ class ApplicationRuntime private constructor(
                     engine = engine,
                     sessionGateway = gateway,
                     executorIntegrations = runtimeIntegrations,
+                    observeArtifact = collectiveEvidence::recordArtifact,
                     orchestrationUtilities = orchestrationUtilities,
                     surfaceRuntime = roleSurfaceRuntime,
                     spendCaps = spendCaps,
@@ -2626,6 +2629,7 @@ class ApplicationRuntime private constructor(
                     queenLevel,
                     queenLedger,
                     spendCaps,
+                    collectiveEvidence,
                 )
             }
 

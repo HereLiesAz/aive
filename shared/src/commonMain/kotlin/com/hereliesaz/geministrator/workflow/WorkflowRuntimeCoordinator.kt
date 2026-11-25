@@ -4,6 +4,7 @@ import com.hereliesaz.geministrator.ErrorKind
 import com.hereliesaz.geministrator.classifyError
 import com.hereliesaz.geministrator.domain.ApprovalGateId
 import com.hereliesaz.geministrator.domain.ArtifactId
+import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.BlockingReason
 import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.Project
@@ -103,6 +104,8 @@ class WorkflowRuntimeCoordinator(
     private val enforceDeadlines: Boolean = HARD_DEADLINES_ENABLED,
     /** Learns replayable habits from accepted runs and quarantines one that was turned back; null does neither. */
     private val habitReplayObserver: HabitReplayObserver? = null,
+    /** Receives newly persisted artifact versions, not artifacts merely encountered again on restart. */
+    private val observeArtifact: (suspend (WorkflowRun, ArtifactRef) -> Unit)? = null,
 ) {
     private val gateCoordinator = ApprovalGateCoordinator(
         persistence.approvalGates,
@@ -1087,8 +1090,26 @@ class WorkflowRuntimeCoordinator(
         val current = run.taskRuns.values.flatMap(TaskRun::artifacts)
         for (artifact in current) {
             if (persistedArtifacts[artifact.id] == artifact) continue
+            // The durable repository, not the in-process cache, decides whether this is a new version.
+            // Reopening a run must not repopulate previously erased ledger evidence.
+            val newEvidence = if (observeArtifact == null) false else try {
+                persistence.artifacts.get(artifact.id) != artifact
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                com.hereliesaz.geministrator.log.AppLog.record("evidence", "Could not inspect artifact receipt: ${failure::class.simpleName}")
+                false
+            }
             persistence.artifacts.put(artifact)
             persistedArtifacts[artifact.id] = artifact
+            if (newEvidence) {
+                try {
+                    withContext(NonCancellable) { observeArtifact?.invoke(run, artifact) }
+                } catch (failure: Exception) {
+                    // Evidence is descriptive, never a prerequisite for executing or persisting work.
+                    com.hereliesaz.geministrator.log.AppLog.record("evidence", "Could not retain artifact evidence: ${failure::class.simpleName}")
+                }
+            }
         }
         // Only the run being cycled is remembered: another run's artifacts are written again if it comes back.
         val keep = current.mapTo(mutableSetOf()) { it.id }

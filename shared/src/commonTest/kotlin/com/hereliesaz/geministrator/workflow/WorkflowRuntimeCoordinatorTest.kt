@@ -37,6 +37,39 @@ import kotlin.test.assertFailsWith
 
 class WorkflowRuntimeCoordinatorTest {
     @Test
+    fun newlyPersistedArtifactsReachLedgerButRestartDoesNotRestoreErasedEvidence() = runBlocking {
+        val persistence = InMemoryWorkflowPersistence()
+        val settings = com.russhwolf.settings.MapSettings()
+        val ledger = com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger(settings) { 50L }
+        val taskId = TaskDefinitionId("ci")
+        val executor = TaskExecutor.GitHubAction("ci.yml")
+        val definition = definition(TaskDefinition(taskId, "CI", "Run CI", roleId = null, executor = executor))
+        val taskRun = taskRun(taskId, TaskRunStatus.Completed, executor)
+        val artifact = ArtifactRef(
+            id = ArtifactId("ci-result"), kind = ArtifactKind.TestResult, taskRunId = taskRun.id,
+            label = "CI", textContent = "passed", createdAtEpochMillis = 10L,
+        )
+        val run = run(definition, WorkflowRunStatus.Completed, mapOf(taskId to taskRun.copy(artifacts = listOf(artifact))))
+        val gateway = FakeManagedSessionGateway()
+        fun coordinator(book: com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger) = WorkflowRuntimeCoordinator(
+            persistence, WorkflowEngine(sessionGateway = gateway, roles = BuiltInRoles.all), gateway,
+            observeArtifact = book::recordArtifact,
+        )
+        val first = coordinator(ledger)
+        first.persist(project(), definition, WorkflowRuntimeState(run))
+        first.persist(project(), definition, WorkflowRuntimeState(run))
+        val entry = ledger.snapshot().entries.single()
+        assertEquals(com.hereliesaz.geministrator.queen.EvidenceKind.CitedClaim, entry.kind)
+        assertEquals("TestResult: CI\npassed", entry.text)
+        assertEquals("Run run-definition-ci | task run task-run-ci | artifact ci-result", entry.source)
+        assertEquals(emptyList(), ledger.snapshot().reviews)
+        ledger.forget(entry.id)
+        val restored = com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger(settings) { 60L }
+        coordinator(restored).persist(project(), definition, WorkflowRuntimeState(run))
+        assertEquals(emptyList(), restored.snapshot().entries)
+    }
+
+    @Test
     fun awaitingHumanWithoutProviderHandlesIsPreserved() = runBlocking {
         val taskId = TaskDefinitionId("approval")
         val definition = definition(
