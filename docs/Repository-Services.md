@@ -11,6 +11,7 @@ Connect a GitHub access token from **Repositories** in the control room.
 Repository-operation tasks support:
 
 - `status`
+- `discover-repository-files`
 - `read-file-proposal-context`
 - `create-branch:<branch>`
 - `open-pull-request:<source>:<target>:<title>`
@@ -25,6 +26,8 @@ The artifact must be strict JSON, for example:
 ```
 
 Replace the example SHA with the linked base's actual commit. `expectedBlob: null` creates a new file only; an existing regular file requires its exact blob SHA, and retains its mode. The host refuses a changed base, unsafe paths, duplicate or conflicting paths, truncated trees, symlinks, submodules, and replacements of directories. It prepares the tree and commit before creating a new `aive/` ref; it never updates a ref or opens or merges a PR. A failed final ref creation may leave unreachable Git objects, but never overwrites a branch. The bounds are 24 files, 120,000 UTF-8 bytes per file and 500,000 bytes total, inherited from the existing GitLab workspace action limits (enforced here in bytes rather than characters).
+
+A keeper-authored `discover-repository-files` operation ranks safe regular-file paths against the task objective on an immutable GitHub commit. It returns a JSON `CommandOutput` with `baseCommit`, `paths`, `eligiblePathCount` and `partial`, limited to 64 candidates and 24,000 UTF-8 path bytes. It refuses truncated trees, does not fetch file contents, and cannot authorize writes. Omitted paths are not proof of absence. Subsequent exact-file snapshot steps still require explicit literal paths; automatic selection from the manifest is not yet wired. GitLab and Local Git discovery remain unsupported.
 
 A keeper-authored read-only `read-file-proposal-context` task uses exactly one `repository_files` resource with literal paths, not globs. It returns complete bounded UTF-8 files and their immutable blob SHAs, or null for paths absent from the complete tree, as a JSON `CommandOutput` artifact. A subsequent model-only proposal task can depend on that artifact, retain the base and expected blob IDs, and supply the desired contents. The read operation uses the linked GitHub or GitLab credential in Aive, never the model. It does not write or require a repository-capable inference provider.
 

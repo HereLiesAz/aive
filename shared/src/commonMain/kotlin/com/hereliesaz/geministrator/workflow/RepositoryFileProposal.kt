@@ -63,6 +63,8 @@ data class RepositoryFileProposal(val baseCommit: String, val files: List<Reposi
 
         /** Read-only operation for an exact, host-owned snapshot of proposed edit targets. */
         const val READ_CONTEXT_OPERATION = "read-file-proposal-context"
+        /** Read-only bounded discovery of candidate file paths, not authorization to modify them. */
+        const val DISCOVER_OPERATION = "discover-repository-files"
         const val MAX_FILE_BYTES = 120_000
         const val MAX_TOTAL_BYTES = 500_000
 

@@ -9,6 +9,10 @@ import kotlinx.coroutines.CancellationException
 
 interface RepositoryOperationClient {
     fun supports(project: Project): Boolean = true
+    /** Opt in to host path discovery independently of reading file contents or writing branches. */
+    fun supportsFileDiscovery(project: Project): Boolean = false
+    suspend fun discoverFiles(project: Project, objective: String): ExternalExecutionRun =
+        error("Host file discovery is unavailable for this repository")
     /** Opt in to exact-file snapshots separately from branch writes. */
     fun supportsFileProposalContext(project: Project): Boolean = false
     suspend fun readFileProposalContext(project: Project, paths: List<String>): ExternalExecutionRun =
@@ -37,12 +41,16 @@ class RepositoryOperationExecutorIntegration(
     override fun supports(executor: TaskExecutor, project: Project): Boolean =
         executor is TaskExecutor.RepositoryOperation && client.supports(project) &&
             (!executor.operation.startsWith(CommitFileProposalOperation.PREFIX) || client.supportsFileProposals(project)) &&
-            (executor.operation.trim() != RepositoryFileProposal.READ_CONTEXT_OPERATION || client.supportsFileProposalContext(project))
+            (executor.operation.trim() != RepositoryFileProposal.READ_CONTEXT_OPERATION || client.supportsFileProposalContext(project)) &&
+            (executor.operation.trim() != RepositoryFileProposal.DISCOVER_OPERATION || client.supportsFileDiscovery(project))
 
     override suspend fun dispatch(context: TaskExecutorContext): TaskExecutorExecution {
         val executor = context.executor as TaskExecutor.RepositoryOperation
         return repositoryOperation("Repository operation '${executor.operation}' failed") {
-            val result = if (executor.operation.trim() == RepositoryFileProposal.READ_CONTEXT_OPERATION) {
+            val result = if (executor.operation.trim() == RepositoryFileProposal.DISCOVER_OPERATION) {
+                require(client.supportsFileDiscovery(context.project)) { "Host file discovery is unavailable for this repository" }
+                client.discoverFiles(context.project, context.task.objective)
+            } else if (executor.operation.trim() == RepositoryFileProposal.READ_CONTEXT_OPERATION) {
                 require(client.supportsFileProposalContext(context.project)) { "Host file snapshots are unavailable for this repository" }
                 val paths = context.task.resources.filterIsInstance<com.hereliesaz.geministrator.domain.TaskResource.RepositoryFiles>()
                     .singleOrNull()?.paths ?: error("Snapshot task requires exactly one repository_files resource")

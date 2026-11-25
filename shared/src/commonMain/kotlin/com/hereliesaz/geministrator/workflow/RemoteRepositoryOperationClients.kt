@@ -41,6 +41,13 @@ class RoutingRepositoryOperationClient(
 ) : RepositoryOperationClient {
     override fun supports(project: Project): Boolean = clients.any { it.supports(project) }
 
+    override fun supportsFileDiscovery(project: Project): Boolean =
+        clients.any { it.supports(project) && it.supportsFileDiscovery(project) }
+
+    override suspend fun discoverFiles(project: Project, objective: String): ExternalExecutionRun =
+        (clients.firstOrNull { it.supports(project) && it.supportsFileDiscovery(project) }
+            ?: error("No host file-discovery client for the linked repository")).discoverFiles(project, objective)
+
     override fun supportsFileProposalContext(project: Project): Boolean =
         clients.any { it.supports(project) && it.supportsFileProposalContext(project) }
 
@@ -91,6 +98,39 @@ class GitHubRestRepositoryOperationClient(
 
     override fun supportsFileProposals(project: Project): Boolean = supports(project)
     override fun supportsFileProposalContext(project: Project): Boolean = supports(project)
+    override fun supportsFileDiscovery(project: Project): Boolean = supports(project)
+
+    /**
+     * Return bounded candidate paths from the complete committed GitHub tree. The objective is
+     * only a ranking query; no file contents, credentials, commands or mutation are exposed.
+     * A partial manifest is explicitly marked, and is never evidence that an omitted path is absent.
+     */
+    override suspend fun discoverFiles(project: Project, objective: String): ExternalExecutionRun {
+        val repository = requireRepository(project, RepositorySource.GitHub)
+        repository.requirePublicRemoteHost("github.com", "GitHub")
+        val token = tokenProvider.requireToken("GitHub")
+        val repo = getRepository(repository, token)
+        val url = "$baseUrl/repos/${repository.owner.encodeURLPathPart()}/${repository.name.encodeURLPathPart()}"
+        val base = readFileProposalBase(url, repository.defaultBranch ?: repo.defaultBranch, token)
+        val queryWords = com.hereliesaz.geministrator.vector.BuiltInTextEmbedder.tokens(objective.take(4096)).toSet()
+        val candidates = base.entries.values.filter { entry ->
+            entry.type == "blob" && entry.mode in setOf("100644", "100755") && isGitObjectId(entry.sha) &&
+                runCatching { RepositoryFileProposal.validateSnapshotPaths(listOf(entry.path)) }.isSuccess
+        }.sortedWith(compareByDescending<GitHubFileTreeEntry> {
+            com.hereliesaz.geministrator.retrieval.GitHubRepositoryChunkSource.pathScore(it.path, queryWords)
+        }.thenBy { it.path })
+        var bytes = 0
+        val paths = candidates.take(64).takeWhile {
+            bytes += it.path.encodeToByteArray().size
+            bytes <= 24_000
+        }.map { it.path }
+        val manifest = RepositoryDiscoveryManifest(base.sha, paths, candidates.size, paths.size < candidates.size)
+        return completedRun(
+            source = RepositorySource.GitHub, operation = RepositoryFileProposal.DISCOVER_OPERATION,
+            label = "Repository file candidates", text = Json.encodeToString(manifest),
+            metadata = mapOf("baseCommit" to base.sha),
+        ).also { runs.put(it) }
+    }
 
     /**
      * Read complete regular UTF-8 files at one immutable base commit, without a model or any write.
@@ -750,6 +790,15 @@ private data class GitHubRefResponse(
 @Serializable
 private data class GitHubRefObject(
     val sha: String,
+)
+
+/** Bounded path-only evidence, not permission to read or write a file. */
+@Serializable
+internal data class RepositoryDiscoveryManifest(
+    val baseCommit: String,
+    val paths: List<String>,
+    val eligiblePathCount: Int,
+    val partial: Boolean,
 )
 
 private data class GitHubFileProposalBase(val sha: String, val treeSha: String, val entries: Map<String, GitHubFileTreeEntry>)
