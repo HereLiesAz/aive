@@ -221,7 +221,8 @@ internal fun newWorkflowInstruction(objective: String, repository: RepositoryRef
             append(" declare the literal paths in repository_files, and leave the target input empty. Aive supplies the files. ")
             append(" Do not assign repository edits merely to answer a question.")
         }
-        if (repository.source == com.hereliesaz.geministrator.domain.RepositorySource.GitHub) {
+        if (repository.source in setOf(com.hereliesaz.geministrator.domain.RepositorySource.GitHub,
+                com.hereliesaz.geministrator.domain.RepositorySource.Local)) {
             append(" For a file-editing objective with known exact paths, choose the prepare-files-for-repository template and ")
             append(" declare those literal paths in its repository_files resource (no globs). Aive reads and commits the files ")
             append(" itself after reviewing the proposed contents; leave the target branch input empty unless the keeper specifies one. ")

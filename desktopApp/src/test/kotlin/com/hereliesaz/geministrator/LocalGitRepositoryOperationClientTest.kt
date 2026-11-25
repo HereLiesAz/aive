@@ -65,6 +65,44 @@ class LocalGitRepositoryOperationClientTest {
     }
 
     @Test
+    fun hostCommitCreatesNewBranchWithoutChangingCheckoutOrIndex() = withGitRepository { root ->
+        val client = LocalGitRepositoryOperationClient()
+        val base = git(root, "rev-parse", "HEAD").trim()
+        val blob = git(root, "rev-parse", "HEAD:README.md").trim()
+        root.resolve("README.md").writeText("dirty\n")
+        val index = git(root, "ls-files", "--stage")
+        val proposal = RepositoryFileProposal(base, listOf(
+            RepositoryProposedFile("README.md", blob, "replacement\n"),
+            RepositoryProposedFile("new.txt", null, "new\n"),
+        ))
+        val result = runBlocking { client.commitFileProposal(project(root), "aive/reviewed", proposal) }
+        assertEquals(ExternalExecutionStatus.Completed, result.status)
+        assertEquals("replacement\n", git(root, "show", "aive/reviewed:README.md"))
+        assertEquals("new\n", git(root, "show", "aive/reviewed:new.txt"))
+        assertEquals(base, git(root, "rev-parse", "HEAD").trim())
+        assertEquals(index, git(root, "ls-files", "--stage"))
+        assertEquals("dirty\n", root.resolve("README.md").toFile().readText())
+        val head = git(root, "rev-parse", "aive/reviewed").trim()
+        assertEquals(head, result.artifacts.single().metadata["headCommit"])
+        assertFailsWith<IllegalArgumentException> {
+            runBlocking { client.commitFileProposal(project(root), "aive/reviewed", proposal) }
+        }
+        assertEquals(head, git(root, "rev-parse", "aive/reviewed").trim())
+        git(root, "symbolic-ref", "refs/heads/aive/alias", "refs/heads/aive/unborn")
+        assertFailsWith<IllegalArgumentException> {
+            runBlocking { client.commitFileProposal(project(root), "aive/alias", proposal) }
+        }
+        assertEquals("refs/heads/aive/unborn", git(root, "symbolic-ref", "refs/heads/aive/alias").trim())
+        assertTrue("refs/heads/aive/unborn" !in git(root, "show-ref"))
+        git(root, "add", "README.md")
+        git(root, "commit", "-m", "Advance source branch")
+        assertFailsWith<IllegalArgumentException> {
+            runBlocking { client.commitFileProposal(project(root), "aive/stale", proposal) }
+        }
+        assertTrue("aive/stale" !in git(root, "branch", "--list"))
+    }
+
+    @Test
     fun statusReportsHeadBranchAndCleanWorkingTree() = withGitRepository { root ->
         val client = LocalGitRepositoryOperationClient()
         val execution = runBlocking { client.start(project(root), "status") }

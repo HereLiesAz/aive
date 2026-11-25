@@ -4,6 +4,12 @@ import com.hereliesaz.geministrator.workflow.RepositoryFileProposal
 import com.hereliesaz.geministrator.workflow.RepositoryProposedFile
 import java.io.File
 import org.eclipse.jgit.lib.FileMode
+import org.eclipse.jgit.dircache.DirCache
+import org.eclipse.jgit.dircache.DirCacheEditor
+import org.eclipse.jgit.dircache.DirCacheEntry
+import org.eclipse.jgit.lib.CommitBuilder
+import org.eclipse.jgit.lib.PersonIdent
+import org.eclipse.jgit.lib.RefUpdate
 import java.nio.file.Files
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -83,6 +89,65 @@ object JGitRepositoryReader : LocalRepositoryReader {
             }
         }
     }
+
+    /**
+     * Build a new commit from the approved immutable tree with an in-memory index. No working files
+     * are materialized. A zero expected old object ID makes the final branch update create-only.
+     */
+    override suspend fun commitProposal(root: String, branch: String, proposal: RepositoryFileProposal): String =
+        withContext(Dispatchers.IO) {
+            RepositoryFileProposal.requireDedicatedBranch(branch)
+            RepositoryFileProposal.validateSnapshotPaths(proposal.files.map { it.path })
+            proposal.requireMatchingSnapshot(snapshot(root, proposal.files.map { it.path }))
+            val builder = FileRepositoryBuilder().findGitDir(File(root)).setMustExist(true)
+            require(builder.gitDir != null) { "Local commit requires a Git repository" }
+            builder.build().use { repository ->
+                val base = ObjectId.fromString(proposal.baseCommit)
+                val ref = "refs/heads/$branch"
+                require(repository.resolve("HEAD^{commit}") == base) { "Linked base changed; regenerate and approve the proposal" }
+                require(repository.exactRef(ref) == null) { "Dedicated branch already exists" }
+                RevWalk(repository).use { rev ->
+                    val tree = rev.parseCommit(base).tree
+                    repository.newObjectReader().use { reader ->
+                        val cache = DirCache.read(reader, tree)
+                        repository.newObjectInserter().use { inserter ->
+                            val editor = cache.editor()
+                            for (file in proposal.files) {
+                                val existing = cache.getEntry(file.path)
+                                require(existing?.objectId?.name == file.expectedBlob) { "Approved file blob changed" }
+                                val mode = existing?.fileMode ?: FileMode.REGULAR_FILE
+                                require(mode in setOf(FileMode.REGULAR_FILE, FileMode.EXECUTABLE_FILE)) { "Not a regular file" }
+                                val blob = inserter.insert(Constants.OBJ_BLOB, file.content.encodeToByteArray())
+                                editor.add(object : DirCacheEditor.PathEdit(file.path) {
+                                    override fun apply(entry: DirCacheEntry) {
+                                        entry.setFileMode(mode)
+                                        entry.setObjectId(blob)
+                                    }
+                                })
+                            }
+                            editor.finish()
+                            val identity = PersonIdent("The Aive", "aive@localhost")
+                            val commit = CommitBuilder().apply {
+                                setTreeId(cache.writeTree(inserter))
+                                setParentId(base)
+                                setAuthor(identity)
+                                setCommitter(identity)
+                                setMessage("Apply approved Aive file proposal")
+                            }
+                            val head = inserter.insert(commit)
+                            inserter.flush()
+                            require(repository.resolve("HEAD^{commit}") == base) { "Linked base changed; regenerate and approve the proposal" }
+                            require(repository.exactRef(ref) == null) { "Dedicated branch already exists" }
+                            val update = repository.updateRef(ref, true)
+                            update.setExpectedOldObjectId(ObjectId.zeroId())
+                            update.setNewObjectId(head)
+                            check(update.update() == RefUpdate.Result.NEW) { "Unable to create dedicated branch; no existing branch is updated" }
+                            head.name
+                        }
+                    }
+                }
+            }
+        }
 
     override suspend fun diskFiles(root: String): List<LocalRepositoryFile> = withContext(Dispatchers.IO) {
         val base = File(root)

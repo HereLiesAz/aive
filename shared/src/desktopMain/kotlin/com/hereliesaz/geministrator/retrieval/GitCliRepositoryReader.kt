@@ -81,6 +81,56 @@ object GitCliRepositoryReader : LocalRepositoryReader {
         return RepositoryFileProposal(base, files).also { it.validate() }
     }
 
+    /**
+     * Git plumbing writes only objects and a private temporary index. A single ref transaction
+     * verifies the original HEAD and creates the destination, refusing even a pre-existing branch
+     * that points at the same commit. Neither checkout nor hooks run.
+     */
+    override suspend fun commitProposal(root: String, branch: String, proposal: RepositoryFileProposal): String {
+        RepositoryFileProposal.requireDedicatedBranch(branch)
+        RepositoryFileProposal.validateSnapshotPaths(proposal.files.map { it.path })
+        proposal.requireMatchingSnapshot(snapshot(root, proposal.files.map { it.path }))
+        val temporary = withContext(Dispatchers.IO) { Files.createTempDirectory("aive-host-index-").toFile() }
+        try {
+            val index = File(temporary, "index")
+            val hooks = File(temporary, "hooks").also { check(it.mkdir()) }
+            suspend fun command(vararg args: String, input: ByteArray? = null): String =
+                requireNotNull(git(root, *args, maxBytes = 4096, input = input, index = index, hooks = hooks)) {
+                    "Host Git operation failed: ${args.firstOrNull().orEmpty()}"
+                }
+            command("read-tree", proposal.baseCommit)
+            for (file in proposal.files) {
+                val mode = if (file.expectedBlob == null) "100644" else {
+                    val entry = command("ls-tree", "--full-tree", "-z", proposal.baseCommit, "--", file.path)
+                    val prefix = entry.substringBefore('\t').split(' ')
+                    require(prefix.size == 3 && prefix[2] == file.expectedBlob && prefix[0] in setOf("100644", "100755")) {
+                        "Approved file mode or blob changed"
+                    }
+                    prefix[0]
+                }
+                val blob = command("hash-object", "-w", "--stdin", input = file.content.encodeToByteArray()).trim()
+                require(blob.matches(Regex("[0-9a-f]{40}"))) { "Invalid local blob SHA" }
+                command("update-index", "--add", "--cacheinfo", "$mode,$blob,${file.path}")
+            }
+            val tree = command("write-tree").trim()
+            require(tree.matches(Regex("[0-9a-f]{40}"))) { "Invalid local tree SHA" }
+            val commit = command("commit-tree", tree, "-p", proposal.baseCommit,
+                input = "Apply approved Aive file proposal\n".encodeToByteArray()).trim()
+            require(commit.matches(Regex("[0-9a-f]{40}"))) { "Invalid local commit SHA" }
+            val ref = "refs/heads/$branch"
+            // A dangling symbolic ref can look absent to create. Refuse symbolic destinations
+            // before the transaction, and never dereference the destination during creation.
+            require(git(root, "symbolic-ref", "-q", ref, maxBytes = 4096) == null) {
+                "Dedicated branch is a symbolic ref"
+            }
+            command("update-ref", "--stdin", input =
+                "verify HEAD ${proposal.baseCommit}\noption no-deref\ncreate $ref $commit\n".encodeToByteArray())
+            return commit
+        } finally {
+            withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { temporary.deleteRecursively() }
+        }
+    }
+
     override suspend fun diskFiles(root: String): List<LocalRepositoryFile> = withContext(Dispatchers.IO) {
         val base = File(root)
         base.walkTopDown()
@@ -104,17 +154,36 @@ object GitCliRepositoryReader : LocalRepositoryReader {
         }.getOrNull()
     }
 
-    private suspend fun git(root: String, vararg args: String, maxBytes: Int? = null): String? = withContext(Dispatchers.IO) {
+    private suspend fun git(
+        root: String,
+        vararg args: String,
+        maxBytes: Int? = null,
+        input: ByteArray? = null,
+        index: File? = null,
+        hooks: File? = null,
+    ): String? = withContext(Dispatchers.IO) {
         try {
             // Output goes to a file, not a pipe: reading a pipe to EOF would block before the
             // timeout is ever evaluated, and a hung git would never be stopped.
             val outputFile = Files.createTempFile("aive-git", ".out").toFile()
+            var inputFile: File? = null
             try {
-                val flags = if (maxBytes == null) emptyList() else listOf("--no-replace-objects", "--literal-pathspecs")
+                val flags = buildList {
+                    if (maxBytes != null) addAll(listOf("--no-replace-objects", "--literal-pathspecs"))
+                    if (hooks != null) addAll(listOf("-c", "core.hooksPath=${hooks.absolutePath}",
+                        "-c", "core.fsmonitor=false", "-c", "core.splitIndex=false", "-c", "commit.gpgsign=false",
+                        "-c", "user.name=The Aive", "-c", "user.email=aive@localhost"))
+                }
                 val builder = ProcessBuilder(listOf("git", "-C", root) + flags + args)
                     .redirectError(ProcessBuilder.Redirect.DISCARD)
                     .redirectOutput(outputFile)
                 sanitizeGitEnvironment(builder)
+                index?.let { builder.environment()["GIT_INDEX_FILE"] = it.absolutePath }
+                if (input != null) {
+                    inputFile = Files.createTempFile("aive-git", ".in").toFile()
+                    inputFile.writeBytes(input)
+                    builder.redirectInput(inputFile)
+                }
                 val process = builder.start()
                 try {
                     process.outputStream.close()
@@ -131,6 +200,7 @@ object GitCliRepositoryReader : LocalRepositoryReader {
                 }
             } finally {
                 outputFile.delete()
+                inputFile?.delete()
             }
         } catch (cancelled: CancellationException) {
             throw cancelled

@@ -73,6 +73,45 @@ class AndroidLocalGitRepositoryOperationClientTest {
     }
 
     @Test
+    fun hostCommitPreservesImportedCheckoutAndCreatesOnlyNewBranch() = withRepository { root ->
+        val client = AndroidLocalGitRepositoryOperationClient(export = { _, _ -> error("Commit must not export") })
+        val (base, blob) = Git.open(root).use {
+            it.repository.resolve("HEAD").name to it.repository.resolve("HEAD:README.md").name
+        }
+        root.resolve("README.md").writeText("dirty\n")
+        val proposal = RepositoryFileProposal(base, listOf(
+            RepositoryProposedFile("README.md", blob, "replacement\n"),
+            RepositoryProposedFile("new.txt", null, "new\n"),
+        ))
+        val result = runBlocking { client.commitFileProposal(project(root), "aive/reviewed", proposal) }
+        assertEquals(ExternalExecutionStatus.Completed, result.status)
+        val head = Git.open(root).use { git ->
+            val repository = git.repository
+            assertEquals(base, repository.resolve("HEAD").name)
+            assertEquals(blob, repository.readDirCache().getEntry("README.md").objectId.name)
+            assertEquals("replacement\n", String(repository.open(repository.resolve("aive/reviewed:README.md")).bytes, Charsets.UTF_8))
+            assertEquals("new\n", String(repository.open(repository.resolve("aive/reviewed:new.txt")).bytes, Charsets.UTF_8))
+            repository.resolve("aive/reviewed").name
+        }
+        assertEquals("dirty\n", root.resolve("README.md").readText())
+        assertEquals(head, result.artifacts.single().metadata["headCommit"])
+        kotlin.test.assertFailsWith<IllegalArgumentException> {
+            runBlocking { client.commitFileProposal(project(root), "aive/reviewed", proposal) }
+        }
+        assertEquals(head, Git.open(root).use { it.repository.resolve("aive/reviewed").name })
+        Git.open(root).use { git ->
+            git.repository.updateRef("refs/heads/aive/alias", true).link("refs/heads/aive/unborn")
+        }
+        kotlin.test.assertFailsWith<IllegalArgumentException> {
+            runBlocking { client.commitFileProposal(project(root), "aive/alias", proposal) }
+        }
+        Git.open(root).use { git ->
+            assertTrue(git.repository.exactRef("refs/heads/aive/alias").isSymbolic)
+            assertEquals(null, git.repository.resolve("refs/heads/aive/unborn"))
+        }
+    }
+
+    @Test
     fun worktreeBranchCommitAndExportLeaveTheImportAlone() = withRepository { root ->
         root.resolve("README.md").writeText("uncommitted\n")
         val exported = mutableMapOf<String, ByteArray>()

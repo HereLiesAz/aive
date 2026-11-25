@@ -39,7 +39,28 @@ data class RepositoryFileProposal(val baseCommit: String, val files: List<Reposi
         }
     }
 
+    /**
+     * Compare the freshly read base and expected blob identifiers with the approved changes.
+     * Contents in [snapshot] are evidence, not instructions. Never allow a missing file to replace an existing one.
+     */
+    fun requireMatchingSnapshot(snapshot: RepositoryFileProposal) {
+        validate()
+        require(baseCommit == snapshot.baseCommit) { "Linked base changed; regenerate and approve the proposal" }
+        val actual = snapshot.files.associateBy { it.path }
+        require(files.all { proposed ->
+            val original = actual[proposed.path]
+            original != null && proposed.expectedBlob == original.expectedBlob
+        }) { "Proposal does not match the current committed file snapshot" }
+    }
+
     companion object {
+        /** Validate a dedicated new branch name before a host-owned commit. */
+        fun requireDedicatedBranch(branch: String) {
+            require(GitRefNames.requireSafe(branch) == branch && branch.startsWith("aive/") && branch.length <= 200) {
+                "Host commit requires a dedicated aive/ branch"
+            }
+        }
+
         /** Read-only operation for an exact, host-owned snapshot of proposed edit targets. */
         const val READ_CONTEXT_OPERATION = "read-file-proposal-context"
         const val MAX_FILE_BYTES = 120_000
@@ -135,9 +156,7 @@ internal data class CommitFileProposalOperation(val producer: TaskDefinitionId, 
             }
             val branch = parts[1]
             if (branch != "auto") {
-                require(GitRefNames.requireSafe(branch) == branch && branch.startsWith("aive/") && branch.length <= 200) {
-                    "Commit requires a dedicated aive/ branch"
-                }
+                RepositoryFileProposal.requireDedicatedBranch(branch)
             }
             return CommitFileProposalOperation(TaskDefinitionId(parts[0]), branch)
         }
@@ -188,7 +207,7 @@ internal fun expandHostFileSteps(
                 continue
             }
             val readOnly = contract.template.id == "read-repository-files" && contract.effects == setOf(StepEffect.None)
-            val write = repository?.source == RepositorySource.GitHub &&
+            val write = repository?.source in setOf(RepositorySource.GitHub, RepositorySource.Local) &&
                 contract.effects == setOf(StepEffect.WritesRepositoryBranch) &&
                 contract.outputs.size == 1 && contract.outputs.single().kind == ArtifactKind.CodeChange &&
                 contract.outputs.single().validatorId == StepOutputValidators.FILES_CHANGE &&

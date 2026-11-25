@@ -7,6 +7,7 @@ Supported operation strings:
 - `status`
 - `fetch`
 - `read-file-proposal-context` — read-only immutable snapshot of literal regular-file paths in committed HEAD; also supported by Android imports
+- `commit-files:<proposal-task-id>:<new-aive-branch>` (or `:auto`) — approved changes in a new branch, without touching the checkout or index; also supported by Android imports
 - `pull`
 - `add-all`
 - `push`
