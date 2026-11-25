@@ -7,7 +7,6 @@ import com.hereliesaz.geministrator.prompts.PromptSuggestions
 import com.hereliesaz.geministrator.prompts.rememberPromptHistory
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,8 +15,6 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -33,7 +30,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -46,12 +42,10 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.hereliesaz.conveyance.h2g2.H2g2WorkflowState
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.build_build
-import com.hereliesaz.geministrator.resources.build_live
 import com.hereliesaz.geministrator.resources.hive_new_build_help
 import com.hereliesaz.geministrator.resources.hive_new_build_title
 import com.hereliesaz.geministrator.resources.hive_new_build_title_only
@@ -115,25 +109,11 @@ internal fun TerrariumModeSegments(
             ).forEach { (mode, label, open) ->
                 val fill = if (open) azphaltStrong() else Azphalt.Ink
                 val text = stringResource(label)
-                Box(
-                    modifier = Modifier
-                        .semantics {
-                            role = Role.RadioButton
-                            selected = open
-                            contentDescription = text
-                        }
-                        // With the capsule's own 4dp each side, the control stands 48dp tall.
-                        .height(AzphaltMinTouchTarget - 8.dp)
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(fill)
-                        .clickable {
-                            onBuildingChange(mode == "build")
-                        }
-                        .padding(horizontal = 14.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(text.uppercase(), style = AzphaltType.capsule, color = fill.onOpposite())
-                }
+                AzphaltPill(
+                    label = text, seed = "terrarium-mode-$mode", selected = open,
+                    onClick = { onBuildingChange(mode == "build") }, role = Role.RadioButton,
+                    fillOverride = fill, textOverride = fill.onOpposite(),
+                )
             }
         }
     }
@@ -262,21 +242,10 @@ internal fun NewHiveNamer(
                 val ready = draft.isNotBlank()
                 val fill = if (ready) azphaltStrong() else AzphaltLiftedInk
                 val label = stringResource(Res.string.hive_new_save)
-                Box(
-                    modifier = Modifier
-                        .semantics {
-                            role = Role.Button
-                            contentDescription = label
-                        }
-                        .height(AzphaltMinTouchTarget)
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(fill)
-                        .clickable(onClick = { save() })
-                        .padding(horizontal = 18.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(label.uppercase(), style = AzphaltType.capsule.copy(fontSize = 14.sp), color = fill.onOpposite())
-                }
+                AzphaltPill(
+                    label = label, seed = "hive-save", onClick = { save() },
+                    fillOverride = fill, textOverride = fill.onOpposite(),
+                )
             }
         }
         message?.let {

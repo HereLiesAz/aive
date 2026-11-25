@@ -6,7 +6,6 @@ import com.hereliesaz.geministrator.prompts.PromptSuggestBox
 import com.hereliesaz.geministrator.prompts.PromptSuggestions
 import com.hereliesaz.geministrator.prompts.rememberPromptHistory
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,9 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -339,22 +336,9 @@ private fun DraftField(prompt: String, field: PromptFieldState, busy: Boolean, o
     }
 }
 
-/** A capsule at least 48dp tall: [label] on [fill], read aloud as [description]. */
+/** A shared compact capsule with a 48dp target: [label] on [fill], read aloud as [description]. */
 @Composable
 private fun DraftCapsuleButton(label: String, description: String, fill: Color, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .semantics {
-                role = Role.Button
-                contentDescription = description
-            }
-            .defaultMinSize(minHeight = AzphaltMinTouchTarget, minWidth = AzphaltMinTouchTarget)
-            .clip(RoundedCornerShape(999.dp))
-            .background(fill)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(label.uppercase(), style = AzphaltType.capsule.copy(fontSize = 14.sp), color = fill.onOpposite())
-    }
+    AzphaltPill(label = label, seed = "draftcapsulebutton-$label", onClick = onClick,
+        description = description, fillOverride = fill, textOverride = fill.onOpposite())
 }

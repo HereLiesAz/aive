@@ -1,6 +1,8 @@
 package com.hereliesaz.geministrator
 
 import com.hereliesaz.conveyance.h2g2.H2g2
+import com.hereliesaz.conveyance.h2g2.menu.Pill
+import com.hereliesaz.conveyance.h2g2.menu.PillMetrics
 import com.russhwolf.settings.Settings
 
 import androidx.compose.foundation.background
@@ -17,7 +19,6 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -154,10 +155,10 @@ internal object AzphaltShapes {
 }
 
 /** Smallest touch target (dp) for anything clickable. */
-internal val AzphaltMinTouchTarget: Dp = 48.dp
+internal val AzphaltMinTouchTarget: Dp = PillMetrics.TouchTarget
 
-/** The drawn height of a pill (HG2Gui's `PillMetrics.Height`); its hit box is [AzphaltMinTouchTarget]. */
-internal val AzphaltPillHeight: Dp = 32.dp
+/** Visible height of the shared compact pill; its hit box is [AzphaltMinTouchTarget]. */
+internal val AzphaltPillHeight: Dp = PillMetrics.CompactHeight
 
 /**
  * The app's two typefaces, bundled under composeResources/font (licences in THIRD_PARTY_NOTICES.md):
@@ -283,66 +284,36 @@ internal fun AzphaltPill(
     enabled: Boolean = true,
     /** What a screen reader says in place of the label (and end cap), when the label alone does not say what it acts on. */
     description: String? = null,
+    /** Explicit colours for existing surface-specific controls; geometry is always shared. */
+    fillOverride: Color? = null,
+    textOverride: Color? = null,
+    dimDisabled: Boolean = true,
 ) {
     // Every pill wears its own colour: a hue from its seed, with an end cap in the same family.
     // Selected sits on Ink (Yellow when its surface is Ink, so it never vanishes); the one main
     // action fills with the surface's strong colour; danger fills red.
     val onInk = azphaltSurface() == Azphalt.Ink
-    val fill = when {
+    val fill = fillOverride ?: when {
         selected -> if (onInk) Azphalt.Yellow else Azphalt.Ink
         tone == PillTone.Danger -> AzphaltDanger
         tone == PillTone.Primary -> azphaltStrong()
         else -> Azphalt.hue(seed)
     }
-    val content = fill.onOpposite()
+    val content = textOverride ?: fill.onOpposite()
     val cap = when {
         selected -> if (onInk) Azphalt.Ink else Azphalt.Yellow
         tone == PillTone.Quiet -> Azphalt.cap(seed)
         else -> content
     }
-    val pillRole = role
-    // HG2Gui's geometry (docs/DESIGN.md, 10): the drawn capsule is 32dp tall and the hit box around it
-    // 48dp, so two rows' boxes tile exactly and a thumb never falls between them.
-    Box(
-        modifier = modifier
-            .semantics {
-                this.role = pillRole
-                this.selected = selected
-                contentDescription = description ?: if (endCap != null) "$label: $endCap" else label
-                if (stateDescription != null) this.stateDescription = stateDescription
-                if (!enabled) disabled()
-            }
-            .alpha(if (enabled) 1f else 0.5f)
-            .defaultMinSize(minHeight = AzphaltMinTouchTarget)
-            .clip(RoundedCornerShape(999.dp))
-            .clickable(enabled = enabled, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        // Only the drawn capsule grows when selected, never the hit box around it: a pill that fills its row would
-        // otherwise swell past the fields above and below it (seen on the first form's Work).
-        Row(
-            modifier = Modifier
-                .azphaltSelectedTransform(selected)
-                .heightIn(min = AzphaltPillHeight)
-                .clip(RoundedCornerShape(999.dp))
-                .background(fill)
-                .padding(start = 16.dp, top = 5.dp, bottom = 5.dp, end = if (endCap == null) 16.dp else 5.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(label.uppercase(), style = AzphaltType.capsule, color = content)
-            if (endCap != null) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(cap)
-                        .padding(horizontal = 8.dp, vertical = 2.dp),
-                ) {
-                    Text(endCap.uppercase(), style = AzphaltType.endCap, color = cap.onOpposite())
-                }
-            }
-        }
-    }
+    Pill(
+        label = label, cap = endCap, hue = Azphalt.hueIndex(seed), selected = selected,
+        modifier = modifier.defaultMinSize(minWidth = AzphaltMinTouchTarget)
+            .alpha(if (!enabled && dimDisabled) 0.5f else 1f),
+        onClick = onClick, enabled = enabled, anchor = Alignment.Center, stretch = false,
+        fillOverride = fill, textOverride = content, capFillOverride = cap, capTextOverride = cap.onOpposite(),
+        semanticRole = role, spokenLabel = description ?: if (endCap != null) "$label: $endCap" else label,
+        spokenState = stateDescription, compact = true,
+    )
 }
 
 /** One tab of an [AzphaltTabs] row. [key] must be unique within the row. */

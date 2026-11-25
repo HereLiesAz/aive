@@ -1,8 +1,5 @@
 package com.hereliesaz.geministrator
 
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.sin
 import com.hereliesaz.geministrator.tour.tourTarget
 import com.hereliesaz.geministrator.tour.TourTargetId
 import com.hereliesaz.geministrator.prompts.PromptKind
@@ -13,7 +10,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -81,7 +77,6 @@ import com.hereliesaz.geministrator.resources.hive_cap_centre
 import com.hereliesaz.geministrator.resources.hive_cap_redo
 import com.hereliesaz.geministrator.resources.hive_cap_undo
 import com.hereliesaz.geministrator.resources.build_build
-import com.hereliesaz.geministrator.resources.build_live
 import com.hereliesaz.geministrator.resources.build_redo
 import com.hereliesaz.geministrator.resources.build_undo
 import com.hereliesaz.geministrator.resources.creature_panel_close
@@ -482,21 +477,12 @@ private val HiveControlsOneLineFrom = 760.dp
 
 @Composable
 private fun ModeSegment(label: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Box(
-        modifier = modifier
-            .heightIn(min = AzphaltMinTouchTarget)
-            .clip(RoundedCornerShape(26.dp))
-            .background(if (selected) azphaltStrong() else Color.Transparent)
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-            .padding(horizontal = 18.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            label.uppercase(),
-            style = AzphaltType.endCap,
-            color = if (selected) azphaltStrong().onOpposite() else azphaltMutedOnSurface(),
-        )
-    }
+    AzphaltPill(
+        label = label, seed = "hive-mode-$label", selected = selected, onClick = onClick,
+        modifier = modifier, role = Role.RadioButton,
+        fillOverride = if (selected) azphaltStrong() else Color.Transparent,
+        textOverride = if (selected) azphaltStrong().onOpposite() else azphaltMutedOnSurface(),
+    )
 }
 
 /**
@@ -799,7 +785,7 @@ internal fun MindDefinitionList(identity: String, provider: String?, role: RoleD
 
 /**
  * One of the hive's controls: a capsule with its word on it, per HG2Gui (docs/design: the capsule is the one small
- * button; no icons, no borders, no hexagons). The drawn capsule is 32dp tall inside a 48dp target ([AzphaltPill]);
+ * button; no icons, no borders, no hexagons). The shared compact capsule sits inside a 48dp target ([AzphaltPill]);
  * [label] is what a screen reader says (the longer words), [caption] what the capsule shows. A danger control is
  * the run's red, a selected one is Ink, and a control that cannot be used is dimmed and announced as disabled.
  */

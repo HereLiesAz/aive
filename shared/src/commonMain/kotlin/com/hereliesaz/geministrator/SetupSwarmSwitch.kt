@@ -2,16 +2,11 @@ package com.hereliesaz.geministrator
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
@@ -52,18 +47,11 @@ internal fun SetupSwarmSwitch(
                 val selected = isSwarm == swarm
                 val fill = if (selected) Azphalt.Yellow else Azphalt.Ink
                 val position = stringResource(Res.string.tab_position, index + 1, options.size)
-                Box(
-                    modifier = Modifier
-                        .defaultMinSize(minWidth = AzphaltMinTouchTarget, minHeight = AzphaltMinTouchTarget)
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(fill)
-                        .selectable(selected = selected, role = Role.Tab, onClick = { onSwarmChange(isSwarm) })
-                        .semantics { stateDescription = position }
-                        .padding(horizontal = 18.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(text.uppercase(), style = AzphaltType.capsule, color = fill.onOpposite())
-                }
+                AzphaltPill(
+                    label = text, seed = "setup-swarm-$text", selected = selected,
+                    onClick = { onSwarmChange(isSwarm) }, role = Role.Tab,
+                    stateDescription = position, fillOverride = fill, textOverride = fill.onOpposite(),
+                )
             }
         }
     }
