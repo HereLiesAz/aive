@@ -885,6 +885,7 @@ class ApplicationRuntime private constructor(
                 id = WorkflowDefinitionId("workflow-$stamp"),
                 objective = cleanObjective,
                 roles = launchRoles,
+                repositoryLinked = project.repository != null,
             )
             val launchService = WorkflowLaunchService(
                 preparer = WorkflowDefinitionPreparer(providerRegistry, launchRoles),

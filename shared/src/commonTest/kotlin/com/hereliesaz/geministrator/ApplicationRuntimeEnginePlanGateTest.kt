@@ -71,7 +71,11 @@ class ApplicationRuntimeEnginePlanGateTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         try {
             val runtime = ApplicationRuntime.create(providers = listOf(provider), scope = scope, persistence = persistence)
-            runtime.launchStarterWorkflow(projectName = "Engine plan gate", objective = "Hold the plan")
+            runtime.launchStarterWorkflow(
+                projectName = "Engine plan gate",
+                objective = "Hold the plan",
+                repository = com.hereliesaz.geministrator.domain.RepositoryRef("test", "project"),
+            )
             waitFor {
                 (runtime.state.value as? ApplicationRuntimeState.Live)
                     ?.presentation?.run?.taskRuns?.get(implementation)

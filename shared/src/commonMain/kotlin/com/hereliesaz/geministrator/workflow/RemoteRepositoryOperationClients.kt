@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.net.boundedBodyText
+import com.hereliesaz.geministrator.net.boundedBytes
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ArtifactRef
@@ -40,6 +41,20 @@ class RoutingRepositoryOperationClient(
 ) : RepositoryOperationClient {
     override fun supports(project: Project): Boolean = clients.any { it.supports(project) }
 
+    override fun supportsFileProposalContext(project: Project): Boolean =
+        clients.any { it.supports(project) && it.supportsFileProposalContext(project) }
+
+    override suspend fun readFileProposalContext(project: Project, paths: List<String>): ExternalExecutionRun =
+        (clients.firstOrNull { it.supports(project) && it.supportsFileProposalContext(project) }
+            ?: error("No host file-snapshot client for the linked repository")).readFileProposalContext(project, paths)
+
+    override fun supportsFileProposals(project: Project): Boolean =
+        clients.any { it.supports(project) && it.supportsFileProposals(project) }
+
+    override suspend fun commitFileProposal(project: Project, branch: String, proposal: RepositoryFileProposal): ExternalExecutionRun =
+        (clients.firstOrNull { it.supports(project) && it.supportsFileProposals(project) }
+            ?: error("No host file-commit client for the linked repository")).commitFileProposal(project, branch, proposal)
+
     override suspend fun start(project: Project, operation: String): ExternalExecutionRun =
         clientFor(project).start(project, operation)
 
@@ -73,6 +88,132 @@ class GitHubRestRepositoryOperationClient(
 
     override fun supports(project: Project): Boolean =
         project.repository?.source == RepositorySource.GitHub
+
+    override fun supportsFileProposals(project: Project): Boolean = supports(project)
+    override fun supportsFileProposalContext(project: Project): Boolean = supports(project)
+
+    /**
+     * Read complete regular UTF-8 files at one immutable base commit, without a model or any write.
+     * An absent path gets a null expected blob; a truncated tree is never treated as absence.
+     */
+    override suspend fun readFileProposalContext(project: Project, paths: List<String>): ExternalExecutionRun {
+        RepositoryFileProposal.validateSnapshotPaths(paths)
+        val repository = requireRepository(project, RepositorySource.GitHub)
+        repository.requirePublicRemoteHost("github.com", "GitHub")
+        val token = tokenProvider.requireToken("GitHub")
+        val repo = getRepository(repository, token)
+        val url = "$baseUrl/repos/${repository.owner.encodeURLPathPart()}/${repository.name.encodeURLPathPart()}"
+        val base = readFileProposalBase(url, repository.defaultBranch ?: repo.defaultBranch, token)
+        var remaining = RepositoryFileProposal.MAX_TOTAL_BYTES
+        val files = paths.map { path ->
+            val existing = base.entries[path]
+            validateFileTarget(path, base.entries)
+            if (existing == null) {
+                RepositoryProposedFile(path, null, "")
+            } else {
+                require(existing.type == "blob" && existing.mode in setOf("100644", "100755") && isGitObjectId(existing.sha)) {
+                    "Snapshot target is not a regular file"
+                }
+                val response = httpClient.get("$url/git/blobs/${existing.sha}") {
+                    githubHeaders(token, "application/vnd.github.raw+json")
+                }
+                check(response.status.value in 200..299) { "Unable to read proposal file: HTTP ${response.status.value}" }
+                val bytes = response.boundedBytes(minOf(remaining, RepositoryFileProposal.MAX_FILE_BYTES))
+                remaining -= bytes.size
+                RepositoryProposedFile(path, existing.sha, bytes.decodeToString(throwOnInvalidSequence = true))
+            }
+        }
+        val snapshot = RepositoryFileProposal(base.sha, files).also { it.validate() }
+        return snapshot.toSnapshotRun(RepositorySource.GitHub).also { runs.put(it) }
+    }
+
+    /**
+     * Prepare a Git tree and commit against an exact base, then create (never update) a dedicated ref.
+     * All HTTP requests use the host's repository credential. A failed ref creation never overwrites a branch.
+     */
+    override suspend fun commitFileProposal(project: Project, branch: String, proposal: RepositoryFileProposal): ExternalExecutionRun {
+        proposal.validate()
+        require(GitRefNames.requireSafe(branch) == branch && branch.startsWith("aive/") && branch.length <= 200) {
+            "Host commit requires a dedicated aive/ branch"
+        }
+        val repository = requireRepository(project, RepositorySource.GitHub)
+        repository.requirePublicRemoteHost("github.com", "GitHub")
+        val token = tokenProvider.requireToken("GitHub")
+        val repo = getRepository(repository, token)
+        val baseBranch = repository.defaultBranch ?: repo.defaultBranch
+        require(branch != baseBranch && branch != repo.defaultBranch) { "Cannot commit to the default or linked base branch" }
+        val url = "$baseUrl/repos/${repository.owner.encodeURLPathPart()}/${repository.name.encodeURLPathPart()}"
+        val base = readFileProposalBase(url, baseBranch, token, expectedCommit = proposal.baseCommit)
+        val entries = base.entries
+        val changes = proposal.files.map { file ->
+            val existing = entries[file.path]
+            if (file.expectedBlob == null) {
+                require(existing == null) { "A proposed new file already exists" }
+            } else {
+                require(existing != null && existing.type == "blob" && existing.mode in setOf("100644", "100755") &&
+                    existing.sha == file.expectedBlob) { "A proposed replacement does not match an existing regular file" }
+            }
+            validateFileTarget(file.path, entries)
+            GitHubFileTreeChange(file.path, existing?.mode ?: "100644", type = "blob", content = file.content)
+        }
+        val newTree = json.decodeFromString<GitHubCommitPointer>(httpClient.post("$url/git/trees") {
+            githubHeaders(token)
+            contentType(ContentType.Application.Json)
+            setBody(json.encodeToString(GitHubCreateFileTreeBody(base.treeSha, changes)))
+        }.requireSuccessBody("prepare repository tree"))
+        require(isGitObjectId(newTree.sha)) { "GitHub returned an invalid new tree SHA" }
+        val newCommit = json.decodeFromString<GitHubCommitPointer>(httpClient.post("$url/git/commits") {
+            githubHeaders(token)
+            contentType(ContentType.Application.Json)
+            setBody(json.encodeToString(GitHubCreateFileCommitBody("Apply approved Aive file proposal", newTree.sha, listOf(proposal.baseCommit))))
+        }.requireSuccessBody("prepare repository commit"))
+        require(isGitObjectId(newCommit.sha)) { "GitHub returned an invalid commit SHA" }
+        val created = json.decodeFromString<GitHubRefResponse>(httpClient.post("$url/git/refs") {
+            githubHeaders(token)
+            contentType(ContentType.Application.Json)
+            setBody(json.encodeToString(GitHubCreateRefBody("refs/heads/$branch", newCommit.sha)))
+        }.requireSuccessBody("create dedicated commit branch"))
+        require(created.obj.sha == newCommit.sha) { "GitHub returned a different commit than requested" }
+        return completedRun(
+            source = RepositorySource.GitHub,
+            operation = "commit-files",
+            label = "Commit approved files",
+            text = "BRANCH: $branch\nFILES: ${proposal.files.joinToString(", ") { it.path }}\nCOMMIT: ${newCommit.sha}",
+            artifactKind = ArtifactKind.CodeChange,
+            metadata = mapOf("branch" to branch, "headCommit" to newCommit.sha, "baseCommit" to proposal.baseCommit),
+        ).also { runs.put(it) }
+    }
+
+    /** Both readers and writers validate the same complete immutable tree. */
+    private suspend fun readFileProposalBase(url: String, branch: String, token: String, expectedCommit: String? = null): GitHubFileProposalBase {
+        val base = json.decodeFromString<GitHubRefResponse>(httpClient.get(
+            "$url/git/ref/heads/${branch.encodeURLPathPart()}",
+        ) { githubHeaders(token) }.requireSuccessBody("read linked base ref"))
+        require(isGitObjectId(base.obj.sha)) { "GitHub returned an invalid base commit SHA" }
+        require(expectedCommit == null || base.obj.sha == expectedCommit) { "Linked base changed; regenerate and approve the proposal" }
+        val commit = json.decodeFromString<GitHubFileCommitResponse>(httpClient.get(
+            "$url/git/commits/${base.obj.sha}",
+        ) { githubHeaders(token) }.requireSuccessBody("read base commit"))
+        require(isGitObjectId(commit.tree.sha)) { "GitHub returned an invalid tree SHA" }
+        val tree = json.decodeFromString<GitHubFileTreeResponse>(httpClient.get(
+            "$url/git/trees/${commit.tree.sha}",
+        ) {
+            githubHeaders(token)
+            parameter("recursive", "1")
+        }.requireSuccessBody("read complete base tree"))
+        require(!tree.truncated) { "Cannot safely validate changes against a truncated repository tree" }
+        return GitHubFileProposalBase(base.obj.sha, commit.tree.sha, tree.tree.associateBy { it.path })
+    }
+
+    /** No target may replace a directory or cross a symlink, submodule or file. */
+    private fun validateFileTarget(path: String, entries: Map<String, GitHubFileTreeEntry>) {
+        require(entries[path]?.type != "tree" && entries.keys.none { it.startsWith(path + "/") }) { "Cannot replace a directory with a file" }
+        var parent = path.substringBeforeLast('/', "")
+        while (parent.isNotEmpty()) {
+            require(entries[parent]?.type.let { it == null || it == "tree" }) { "A file path crosses a non-directory" }
+            parent = parent.substringBeforeLast('/', "")
+        }
+    }
 
     override suspend fun start(project: Project, operation: String): ExternalExecutionRun {
         val repository = requireRepository(project, RepositorySource.GitHub)
@@ -194,8 +335,8 @@ class GitHubRestRepositoryOperationClient(
         return json.decodeFromString(body)
     }
 
-    private fun HttpRequestBuilder.githubHeaders(token: String) {
-        header(HttpHeaders.Accept, "application/vnd.github+json")
+    private fun HttpRequestBuilder.githubHeaders(token: String, accept: String = "application/vnd.github+json") {
+        header(HttpHeaders.Accept, accept)
         header(HttpHeaders.Authorization, "Bearer $token")
         header("X-GitHub-Api-Version", "2026-03-10")
     }
@@ -211,6 +352,97 @@ class GitLabRestRepositoryOperationClient(
 
     override fun supports(project: Project): Boolean =
         project.repository?.source == RepositorySource.GitLab
+
+    override fun supportsFileProposalContext(project: Project): Boolean = supports(project)
+
+    /**
+     * Read literal regular-file paths from a single GitLab commit. Directory pages are cached and
+     * exhausted before declaring a path absent; the page budget fails closed on oversized trees.
+     * No workspace checkout, model credential, or write request is needed.
+     */
+    override suspend fun readFileProposalContext(project: Project, paths: List<String>): ExternalExecutionRun {
+        RepositoryFileProposal.validateSnapshotPaths(paths)
+        val repository = requireRepository(project, RepositorySource.GitLab)
+        val apiBase = repository.gitLabApiBase()
+        val token = tokenProvider.requireToken("GitLab")
+        val url = "$apiBase/projects/${repository.displayName().encodeURLPathPart()}"
+        val info = json.decodeFromString<GitLabProjectResponse>(httpClient.get(url) {
+            gitlabHeaders(token)
+        }.requireSuccessBody("read GitLab project"))
+        val baseBranch = repository.defaultBranch ?: info.defaultBranch
+        val base = json.decodeFromString<GitLabBranchResponse>(httpClient.get(
+            "$url/repository/branches/${baseBranch.encodeURLPathPart()}",
+        ) { gitlabHeaders(token) }.requireSuccessBody("read GitLab base branch")).commit.id
+        require(isGitObjectId(base)) { "GitLab returned an invalid base commit SHA" }
+        val directories = mutableMapOf<String, Map<String, GitLabSnapshotTreeEntry>>()
+        var pagesRemaining = 100
+        suspend fun directory(path: String): Map<String, GitLabSnapshotTreeEntry> {
+            directories[path]?.let { return it }
+            val entries = linkedMapOf<String, GitLabSnapshotTreeEntry>()
+            var page = 1
+            while (true) {
+                require(pagesRemaining-- > 0) { "GitLab snapshot directory page limit exceeded" }
+                val response = httpClient.get("$url/repository/tree") {
+                    gitlabHeaders(token)
+                    parameter("ref", base)
+                    parameter("recursive", false)
+                    if (path.isNotEmpty()) parameter("path", path)
+                    parameter("per_page", 100)
+                    parameter("page", page)
+                }
+                val items = json.decodeFromString<List<GitLabSnapshotTreeEntry>>(
+                    response.requireSuccessBody("read GitLab snapshot tree"),
+                )
+                require(items.size <= 100) { "GitLab returned an oversized tree page" }
+                for (item in items) {
+                    require(item.path.substringBeforeLast('/', "") == path && entries.put(item.path, item) == null) {
+                        "GitLab returned an invalid or repeated tree entry"
+                    }
+                }
+                // A full page is never proof of completion, even if pagination headers are omitted.
+                val nextPage = response.headers["X-Next-Page"]?.takeIf(String::isNotBlank)
+                require(nextPage == null || nextPage.toIntOrNull() == page + 1) { "Invalid GitLab snapshot pagination" }
+                if (items.size < 100 && nextPage == null) break
+                page++
+            }
+            directories[path] = entries
+            return entries
+        }
+        var remaining = RepositoryFileProposal.MAX_TOTAL_BYTES
+        val files = paths.map { path ->
+            val parts = path.split('/')
+            var parent = ""
+            var absent = false
+            for (part in parts.dropLast(1)) {
+                val next = if (parent.isEmpty()) part else "$parent/$part"
+                val entry = directory(parent)[next]
+                if (entry == null) {
+                    absent = true
+                    break
+                }
+                require(entry.type == "tree" && entry.mode == "040000") { "A file path crosses a non-directory" }
+                parent = next
+            }
+            val entry = if (absent) null else directory(parent)[path]
+            if (entry == null) {
+                RepositoryProposedFile(path, null, "")
+            } else {
+                require(entry.type == "blob" && entry.mode in setOf("100644", "100755") && isGitObjectId(entry.id)) {
+                    "Snapshot target is not a regular file"
+                }
+                val response = httpClient.get("$url/repository/files/${path.encodeURLPathPart()}/raw") {
+                    gitlabHeaders(token)
+                    parameter("ref", base)
+                }
+                check(response.status.value in 200..299) { "Unable to read GitLab snapshot file: HTTP ${response.status.value}" }
+                val bytes = response.boundedBytes(minOf(remaining, RepositoryFileProposal.MAX_FILE_BYTES))
+                remaining -= bytes.size
+                RepositoryProposedFile(path, entry.id, bytes.decodeToString(throwOnInvalidSequence = true))
+            }
+        }
+        val snapshot = RepositoryFileProposal(base, files).also { it.validate() }
+        return snapshot.toSnapshotRun(RepositorySource.GitLab).also { runs.put(it) }
+    }
 
     override suspend fun start(project: Project, operation: String): ExternalExecutionRun {
         val repository = requireRepository(project, RepositorySource.GitLab)
@@ -423,6 +655,16 @@ private fun RepositoryRef.requirePublicRemoteHost(expectedHost: String, service:
     }
 }
 
+/** Build the same snapshot artifact for remote and platform-owned local repository readers. */
+fun RepositoryFileProposal.toSnapshotRun(source: RepositorySource): ExternalExecutionRun {
+    validate()
+    return completedRun(
+        source = source, operation = RepositoryFileProposal.READ_CONTEXT_OPERATION,
+        label = "Repository file proposal context", text = Json.encodeToString(this),
+        metadata = mapOf("baseCommit" to baseCommit),
+    )
+}
+
 @OptIn(ExperimentalTime::class)
 private fun completedRun(
     source: RepositorySource,
@@ -507,6 +749,26 @@ private data class GitHubRefObject(
     val sha: String,
 )
 
+private data class GitHubFileProposalBase(val sha: String, val treeSha: String, val entries: Map<String, GitHubFileTreeEntry>)
+
+@Serializable
+private data class GitHubFileCommitResponse(val tree: GitHubCommitPointer)
+
+@Serializable
+private data class GitHubFileTreeResponse(val tree: List<GitHubFileTreeEntry>, val truncated: Boolean)
+
+@Serializable
+private data class GitHubFileTreeEntry(val path: String, val mode: String, val type: String, val sha: String)
+
+@Serializable
+private data class GitHubFileTreeChange(val path: String, val mode: String, val type: String, val content: String)
+
+@Serializable
+private data class GitHubCreateFileTreeBody(@SerialName("base_tree") val baseTree: String, val tree: List<GitHubFileTreeChange>)
+
+@Serializable
+private data class GitHubCreateFileCommitBody(val message: String, val tree: String, val parents: List<String>)
+
 @Serializable
 private data class GitHubCreateRefBody(
     val ref: String,
@@ -540,6 +802,9 @@ private data class GitLabBranchResponse(
     val commit: GitLabCommitResponse,
     @SerialName("web_url") val webUrl: String? = null,
 )
+
+@Serializable
+private data class GitLabSnapshotTreeEntry(val path: String, val type: String, val mode: String, val id: String)
 
 @Serializable
 private data class GitLabCommitResponse(

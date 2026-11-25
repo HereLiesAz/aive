@@ -5,6 +5,8 @@ import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.workflow.ExternalExecutionStatus
+import com.hereliesaz.geministrator.workflow.RepositoryFileProposal
+import com.hereliesaz.geministrator.workflow.RepositoryProposedFile
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createTempDirectory
@@ -20,6 +22,48 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 
 class LocalGitRepositoryOperationClientTest {
+    @Test
+    fun hostSnapshotReadsCommittedBytesAndNotWorkingTree() = withGitRepository { root ->
+        root.resolve("README.md").writeText("dirty\n")
+        root.resolve("untracked.txt").writeText("untracked")
+        val client = LocalGitRepositoryOperationClient()
+        val base = git(root, "rev-parse", "HEAD").trim()
+        val blob = git(root, "rev-parse", "HEAD:README.md").trim()
+        val branch = git(root, "branch", "--show-current").trim()
+        val result = runBlocking {
+            client.readFileProposalContext(project(root), listOf("README.md", "untracked.txt", "absent/new.txt"))
+        }
+        assertEquals(ExternalExecutionStatus.Completed, result.status)
+        assertEquals(RepositoryFileProposal(base, listOf(
+            RepositoryProposedFile("README.md", blob, "initial\n"),
+            RepositoryProposedFile("untracked.txt", null, ""),
+            RepositoryProposedFile("absent/new.txt", null, ""),
+        )), RepositoryFileProposal.parse(result.artifacts.single().textContent!!))
+        assertEquals("dirty\n", root.resolve("README.md").toFile().readText())
+        assertEquals(base, git(root, "rev-parse", "HEAD").trim())
+        assertEquals(branch, git(root, "branch", "--show-current").trim())
+        assertEquals(result, runBlocking { client.getRun(project(root), result.id) })
+        assertFailsWith<IllegalArgumentException> {
+            runBlocking { client.readFileProposalContext(project(root), listOf("README.md/child")) }
+        }
+    }
+
+    @Test
+    fun hostSnapshotRejectsBinaryAndSymlinkWithoutFollowingIt() = withGitRepository { root ->
+        // Insert a symbolic-link tree entry directly; no platform symlink privilege is needed.
+        git(root, "update-index", "--add", "--cacheinfo", "120000," +
+            git(root, "rev-parse", "HEAD:README.md").trim() + ",alias")
+        root.resolve("binary").toFile().writeBytes(byteArrayOf(0xc3.toByte(), 0x28))
+        git(root, "add", "binary")
+        git(root, "commit", "-m", "Unsafe snapshot targets")
+        val client = LocalGitRepositoryOperationClient()
+        for (path in listOf("alias", "alias/child", "binary", "../escape", "*.md")) {
+            assertFailsWith<IllegalArgumentException>(path) {
+                runBlocking { client.readFileProposalContext(project(root), listOf(path)) }
+            }
+        }
+    }
+
     @Test
     fun statusReportsHeadBranchAndCleanWorkingTree() = withGitRepository { root ->
         val client = LocalGitRepositoryOperationClient()

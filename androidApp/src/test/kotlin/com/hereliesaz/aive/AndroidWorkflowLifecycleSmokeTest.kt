@@ -132,6 +132,7 @@ class AndroidWorkflowLifecycleSmokeTest {
             runtime.launchStarterWorkflow(
                 projectName = "Android lifecycle proof",
                 objective = "Verify governed workflow execution on the Android application runtime",
+                repository = com.hereliesaz.geministrator.domain.RepositoryRef("test", "project"),
             )
 
             withTimeout(15_000L) {

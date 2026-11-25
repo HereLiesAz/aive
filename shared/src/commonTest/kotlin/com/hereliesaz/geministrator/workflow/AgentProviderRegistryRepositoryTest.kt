@@ -22,6 +22,32 @@ import kotlin.test.assertTrue
 
 class AgentProviderRegistryRepositoryTest {
     @Test
+    fun resolvedRepositoryFreeProviderDoesNotReimposeInheritedRepositoryCapabilities(): Unit = runBlocking {
+        val provider = SourceAwareProvider(AgentProviderId("blockrun"), emptySet(), setOf(AgentCapability.Messaging))
+        val registry = AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings())
+        val request = ProviderSelectionRequest(
+            requiredCapabilities = setOf(AgentCapability.RepositoryRead, AgentCapability.RepositoryWrite),
+        )
+        assertEquals(provider.id, registry.select(request).id)
+        assertEquals(provider.id, registry.select(request.copy(resolvedProviderId = provider.id)).id)
+        assertEquals(provider.id, registry.select(request.copy(
+            constraints = com.hereliesaz.geministrator.domain.ProviderConstraints.RequireProvider(provider.id),
+        )).id)
+        assertFailsWith<IllegalStateException> {
+            registry.select(request.copy(
+                resolvedProviderId = provider.id,
+                constraints = com.hereliesaz.geministrator.domain.ProviderConstraints.RequireCapabilities(setOf(AgentCapability.RepositoryWrite)),
+            ))
+        }
+        assertFailsWith<IllegalStateException> {
+            registry.select(request.copy(
+                resolvedProviderId = provider.id,
+                repository = RepositoryRef("team", "project"),
+            ))
+        }
+    }
+
+    @Test
     fun repositoryWorkSelectsProviderCompatibleWithLinkedSource() = runBlocking {
         val githubOnly = SourceAwareProvider(
             id = AgentProviderId("github-only"),

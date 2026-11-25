@@ -3,6 +3,7 @@ package com.hereliesaz.geministrator.retrieval
 import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.vector.BuiltInTextEmbedder
+import com.hereliesaz.geministrator.workflow.RepositoryFileProposal
 
 /** A file in a local repository: committed ([blob] set) or read from disk ([blob] null). */
 data class LocalRepositoryFile(val path: String, val size: Long, val blob: String? = null)
@@ -20,6 +21,10 @@ interface LocalRepositoryReader {
     suspend fun committedFiles(root: String, commit: String): List<LocalRepositoryFile>?
 
     suspend fun readBlob(root: String, blob: String): String?
+
+    /** Strict, bounded read of literal paths at HEAD; never falls back to disk or treats a failed read as absence. */
+    suspend fun snapshot(root: String, paths: List<String>): RepositoryFileProposal =
+        error("Committed file snapshots are unsupported by this repository reader")
 
     /** Files on disk under [root], for a folder that is not a Git repository. */
     suspend fun diskFiles(root: String): List<LocalRepositoryFile>

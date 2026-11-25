@@ -55,6 +55,8 @@ data class ProviderSelectionRequest(
      * said so just now). The replay provider then goes first; unless it is excluded, a task without this flag never sees it.
      */
     val habitReplay: Boolean = false,
+    /** Provider already resolved for this dispatch; does not replace the keeper's task constraints. */
+    val resolvedProviderId: AgentProviderId? = null,
 )
 
 class AgentProviderRegistry(
@@ -219,9 +221,9 @@ class AgentProviderRegistry(
     }
 
     /**
-     * The provider for [request]. A source that has every capability asked for is preferred, as ever. With no repository linked,
-     * though, a role built for repository work does not need that access (there is nothing to read or change): if no source has
-     * it, any connected source that has the rest is chosen, so a repository is never required to run a hive.
+     * The provider for [request]. Auto prefers a source with every requested capability. Without a linked repository,
+     * role-derived repository requirements may be dropped; an explicit task capability constraint never is.
+     * The same rule applies when a provider has already been resolved for dispatch or explicitly selected.
      */
     suspend fun select(request: ProviderSelectionRequest): AgentProvider = try {
         selectWith(request)
@@ -245,29 +247,33 @@ class AgentProviderRegistry(
         val repositoryAccessRequired =
             AgentCapability.RepositoryRead in required || AgentCapability.RepositoryWrite in required
 
-        when (val constraints = request.constraints) {
-            is ProviderConstraints.RequireProvider -> {
-                val provider = providersById[constraints.providerId]
-                    ?: error("Required provider ${constraints.providerId.value} is not registered")
-                if (!provider.capabilities().supported.containsAll(required)) {
-                    error("Provider ${constraints.providerId.value} does not satisfy required capabilities $required")
-                }
-                if (request.requiresToolFilter && !provider.enforcesToolFilter) {
-                    error("Provider ${constraints.providerId.value} cannot limit a step to its allowed tools")
-                }
-                if (!provider.supportsRepository(request.repository)) {
-                    error(
-                        if (request.repository == null) {
-                            "Provider ${constraints.providerId.value} works only inside a linked repository"
-                        } else {
-                            "Provider ${constraints.providerId.value} cannot operate in the context of the linked " +
-                                "${request.repository.source.displayName()} repository"
-                        },
-                    )
-                }
-                return provider
+        val explicitProvider = (request.constraints as? ProviderConstraints.RequireProvider)?.providerId
+        require(explicitProvider == null || request.resolvedProviderId == null || explicitProvider == request.resolvedProviderId) {
+            "Resolved provider does not match the task's required provider"
+        }
+        val pinnedId = explicitProvider ?: request.resolvedProviderId
+        if (pinnedId != null) {
+            val provider = providersById[pinnedId]
+                ?: error("Required provider ${pinnedId.value} is not registered")
+            val explicitCapabilities = (request.constraints as? ProviderConstraints.RequireCapabilities)?.capabilities.orEmpty()
+            val effectiveRequired = request.requiredCapabilities.withoutRepositoryAccessUnless(request.repository) + explicitCapabilities
+            if (!provider.capabilities().supported.containsAll(effectiveRequired)) {
+                error("Provider ${pinnedId.value} does not satisfy required capabilities $effectiveRequired")
             }
-            else -> Unit
+            if (request.requiresToolFilter && !provider.enforcesToolFilter) {
+                error("Provider ${pinnedId.value} cannot limit a step to its allowed tools")
+            }
+            if (!provider.supportsRepository(request.repository)) {
+                error(
+                    if (request.repository == null) {
+                        "Provider ${pinnedId.value} works only inside a linked repository"
+                    } else {
+                        "Provider ${pinnedId.value} cannot operate in the context of the linked " +
+                            "${request.repository.source.displayName()} repository"
+                    },
+                )
+            }
+            return provider
         }
 
         // An approved habit that can answer this task goes first, ahead of a pinned provider: the keeper approved it.
@@ -409,9 +415,8 @@ class AgentProviderRegistry(
 }
 
 /**
- * [this] without the repository capabilities when no repository is linked: with nothing linked there is nothing for a role built for
- * repository work to read or change, and it answers in text. A repository is never required to run a hive. Used by [select] only
- * after no source had them; a task's own explicit capability constraint is not filtered (that is the keeper's word).
+ * [this] without inherited repository capabilities when no repository is linked. Apply to role requirements only,
+ * before adding explicit task capability constraints. A repository-free text task cannot read or change a repository.
  */
 internal fun Set<AgentCapability>.withoutRepositoryAccessUnless(repository: RepositoryRef?): Set<AgentCapability> =
     if (repository != null) this else this - setOf(AgentCapability.RepositoryRead, AgentCapability.RepositoryWrite)

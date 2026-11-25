@@ -56,9 +56,10 @@ class WorkflowDefinitionPreparer(
             withSkeletonOfThought,
             activeRoles,
         )
-        val originalIds = withCompoundInference.tasks.mapTo(mutableSetOf()) { it.id }
+        val withHostFiles = expandHostFileSteps(withCompoundInference, repository, rolesById)
+        val originalIds = withHostFiles.tasks.mapTo(mutableSetOf()) { it.id }
         val prepared = buildList {
-            for (task in withCompoundInference.tasks) {
+            for (task in withHostFiles.tasks) {
                 val roleForTask = task.roleId?.let(rolesById::get)
                 val executor = task.effectiveExecutor(roleForTask)
                 if (executor !is TaskExecutor.RoleAgent || task.environmentPlanningPolicy == EnvironmentPlanningPolicy.NotRequired) {
@@ -77,9 +78,10 @@ class WorkflowDefinitionPreparer(
                 val selectedProvider = providerRegistry.select(
                     ProviderSelectionRequest(
                         preferredProviderId = role.preferredProviderId,
-                        requiredCapabilities = role.capabilitiesRequired,
+                        requiredCapabilities = task.providerCapabilitiesFor(role),
                         constraints = task.providerConstraints,
-                        repository = repository,
+                        repository = task.providerRepositoryFor(repository),
+                        requiresToolFilter = task.usesHostFileContext,
                     ),
                 )
                 val providerRequiresPlanning = selectedProvider.capabilities().requiresEnvironmentPlanning
@@ -126,7 +128,7 @@ class WorkflowDefinitionPreparer(
             }
         }
 
-        return withCompoundInference.copy(tasks = prepared).also(WorkflowGraphValidator::requireValid)
+        return withHostFiles.copy(tasks = prepared).also(WorkflowGraphValidator::requireValid)
     }
 }
 

@@ -44,6 +44,7 @@ class StarterWorkflowEndToEndTest {
             runtime.launchStarterWorkflow(
                 projectName = "Alpha",
                 objective = "Ship the requested change",
+                repository = com.hereliesaz.geministrator.domain.RepositoryRef("test", "project"),
             )
 
             var implementationApproved = false

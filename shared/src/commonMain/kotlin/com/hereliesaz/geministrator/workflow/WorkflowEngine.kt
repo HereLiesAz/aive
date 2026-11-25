@@ -317,13 +317,13 @@ class WorkflowEngine(
                     val replays = replaysWithoutModel(project, definition, nextRun, task, taskRun, role, taskRun.failedProviders.toSet())
                     val selection = ProviderSelectionRequest(
                         preferredProviderId = role.preferredProviderId,
-                        requiredCapabilities = role.capabilitiesRequired,
+                        requiredCapabilities = task.providerCapabilitiesFor(role),
                         constraints = task.providerConstraints,
-                        repository = project.repository,
+                        repository = task.providerRepositoryFor(project.repository),
                         estimatedInputTokens = ownEstimate,
                         excludedProviderIds = taskRun.failedProviders.toSet(),
                         failoverAllowed = isProviderAuto(role, task),
-                        requiresToolFilter = task.contract?.requiresToolFilter() == true || role.toolCeiling.isNotEmpty(),
+                        requiresToolFilter = task.usesHostFileContext || task.contract?.requiresToolFilter() == true || role.toolCeiling.isNotEmpty(),
                         habitReplay = replays,
                     )
                     val providerId = sessionGateway.resolveProvider(selection)
@@ -363,8 +363,7 @@ class WorkflowEngine(
                         request = request,
                         sessionRequest = ManagedSessionRequest(
                             providerSelection = selection.copy(
-                                preferredProviderId = providerId,
-                                constraints = ProviderConstraints.RequireProvider(providerId),
+                                resolvedProviderId = providerId,
                             ),
                             taskRequest = request,
                         ),
@@ -1091,6 +1090,7 @@ class WorkflowEngine(
         role: RoleDefinition,
         failed: Set<AgentProviderId>,
     ): Boolean {
+        if (task.usesHostFileContext) return false
         val planner = habitReplay ?: return false
         if (com.hereliesaz.geministrator.providers.HabitReplayAgentProvider.ID in failed) return false
         return try {
@@ -1129,12 +1129,12 @@ class WorkflowEngine(
         val role = roleDefinition(run, roleId) ?: return null
         return ProviderSelectionRequest(
             preferredProviderId = role.preferredProviderId,
-            requiredCapabilities = role.capabilitiesRequired,
+            requiredCapabilities = task.providerCapabilitiesFor(role),
             constraints = task.providerConstraints,
-            repository = project.repository,
+            repository = task.providerRepositoryFor(project.repository),
             excludedProviderIds = taskRun.failedProviders.toSet(),
             failoverAllowed = isProviderAuto(role, task),
-            requiresToolFilter = task.contract?.requiresToolFilter() == true || role.toolCeiling.isNotEmpty(),
+            requiresToolFilter = task.usesHostFileContext || task.contract?.requiresToolFilter() == true || role.toolCeiling.isNotEmpty(),
         )
     }
 
@@ -1144,6 +1144,12 @@ class WorkflowEngine(
      * the originating device, before anything waits on it. Pure.
      */
     fun outputRejection(task: TaskDefinition, artifacts: List<ArtifactRef>): BlockingReason? {
+        if (task.hostFileProposal) {
+            val raw = artifacts.singleOrNull { it.kind == ArtifactKind.CodeChange }?.textContent
+            if (raw == null || runCatching { RepositoryFileProposal.parse(raw) }.isFailure) {
+                return BlockingReason(OUTPUT_CONTRACT_VIOLATION, "Return one valid host-file proposal JSON artifact.")
+            }
+        }
         val violations = task.contract?.let { checkStepOutputs(it, artifacts) }.orEmpty()
         if (violations.isNotEmpty()) return BlockingReason(OUTPUT_CONTRACT_VIOLATION, contractViolationMessage(violations))
         val problems = (task.verificationPolicy as? VerificationPolicy.Deterministic)

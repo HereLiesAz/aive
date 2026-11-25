@@ -40,6 +40,208 @@ class RemoteRepositoryOperationClientsTest {
     }
 
     @Test
+    fun hostSnapshotReadsOnlyExactPathsAtOneCommitAndDoesNotWrite() = runBlocking {
+        val base = "a".repeat(40)
+        val tree = "b".repeat(40)
+        val blob = "c".repeat(40)
+        val requests = mutableListOf<String>()
+        val engine = MockEngine { request ->
+            assertEquals(HttpMethod.Get, request.method)
+            val path = request.url.encodedPath
+            requests += path
+            when {
+                path.endsWith("/git/ref/heads/main") -> respondJson("""{"object":{"sha":"$base"}}""")
+                path.endsWith("/git/commits/$base") -> respondJson("""{"tree":{"sha":"$tree"}}""")
+                path.endsWith("/git/trees/$tree") -> respondJson("""{"truncated":false,"tree":[{"path":"README.md","mode":"100644","type":"blob","sha":"$blob"}]}""")
+                path.endsWith("/git/blobs/$blob") -> {
+                    assertEquals("application/vnd.github.raw+json", request.headers[HttpHeaders.Accept])
+                    respondJson("exact file content")
+                }
+                else -> respondJson("""{"default_branch":"main","html_url":"https://github.com/HereLiesAz/aive"}""")
+            }
+        }
+        val client = GitHubRestRepositoryOperationClient(RepositoryServiceTokenProvider { "github-token" }, trackedClient(engine))
+        val result = client.readFileProposalContext(githubProject(), listOf("README.md", "new.txt"))
+        assertEquals(ExternalExecutionStatus.Completed, result.status)
+        assertEquals(RepositoryFileProposal(base, listOf(RepositoryProposedFile("README.md", blob, "exact file content"),
+            RepositoryProposedFile("new.txt", null, ""))), RepositoryFileProposal.parse(result.artifacts.single().textContent!!))
+        assertEquals(1, requests.count { "/git/blobs/" in it })
+    }
+
+    @Test
+    fun hostCommitCreatesTreeCommitAndNewRefWithoutUpdatingTheBase() = runBlocking {
+        val base = "a".repeat(40)
+        val oldTree = "b".repeat(40)
+        val oldBlob = "c".repeat(40)
+        val newTree = "d".repeat(40)
+        val newCommit = "e".repeat(40)
+        val writes = mutableListOf<String>()
+        val engine = MockEngine { request ->
+            val path = request.url.encodedPath
+            assertEquals("Bearer github-token", request.headers[HttpHeaders.Authorization])
+            if (request.method == HttpMethod.Post) writes += path.substringAfter("/git/")
+            when {
+                path.endsWith("/git/ref/heads/main") -> respondJson("""{"object":{"sha":"$base"}}""")
+                path.endsWith("/git/commits/$base") -> respondJson("""{"tree":{"sha":"$oldTree"}}""")
+                path.endsWith("/git/trees/$oldTree") -> respondJson("""{"truncated":false,"tree":[{"path":"README.md","mode":"100755","type":"blob","sha":"$oldBlob"}]}""")
+                path.endsWith("/git/trees") -> {
+                    val body = Json.parseToJsonElement((request.body as TextContent).text).jsonObject
+                    assertEquals(oldTree, body.getValue("base_tree").jsonPrimitive.content)
+                    assertEquals(Json.parseToJsonElement("""[{"path":"README.md","mode":"100755","type":"blob","content":"replacement"}]"""), body["tree"])
+                    respondJson("""{"sha":"$newTree"}""")
+                }
+                path.endsWith("/git/commits") -> {
+                    val body = Json.parseToJsonElement((request.body as TextContent).text).jsonObject
+                    assertEquals(newTree, body.getValue("tree").jsonPrimitive.content)
+                    assertEquals(Json.parseToJsonElement("""["$base"]"""), body["parents"])
+                    respondJson("""{"sha":"$newCommit"}""")
+                }
+                path.endsWith("/git/refs") -> {
+                    val body = Json.parseToJsonElement((request.body as TextContent).text).jsonObject
+                    assertEquals("refs/heads/aive/reviewed", body.getValue("ref").jsonPrimitive.content)
+                    assertEquals(newCommit, body.getValue("sha").jsonPrimitive.content)
+                    respondJson("""{"object":{"sha":"$newCommit"}}""")
+                }
+                else -> {
+                    assertEquals(HttpMethod.Get, request.method)
+                    respondJson("""{"default_branch":"main","html_url":"https://github.com/HereLiesAz/aive"}""")
+                }
+            }
+        }
+        val client = GitHubRestRepositoryOperationClient(RepositoryServiceTokenProvider { "github-token" }, trackedClient(engine))
+        val proposal = RepositoryFileProposal(base, listOf(RepositoryProposedFile("README.md", oldBlob, "replacement")))
+        val result = client.commitFileProposal(githubProject(), "aive/reviewed", proposal)
+        assertEquals(listOf("trees", "commits", "refs"), writes)
+        assertEquals(ExternalExecutionStatus.Completed, result.status)
+        assertEquals(newCommit, result.artifacts.single().metadata["headCommit"])
+        assertEquals(result, client.getRun(githubProject(), result.id))
+    }
+
+    @Test
+    fun hostCommitRejectsUnsafePathsBeforeAnyRequest() = runBlocking {
+        val engine = MockEngine { error("No request should be sent") }
+        val client = GitHubRestRepositoryOperationClient(RepositoryServiceTokenProvider { "github-token" }, trackedClient(engine))
+        for (path in listOf("../escape", "dir/.git/config", "a//b", "/absolute", "a\\b")) {
+            val proposal = RepositoryFileProposal("a".repeat(40), listOf(RepositoryProposedFile(path, null, "text")))
+            kotlin.test.assertFailsWith<IllegalArgumentException> { client.commitFileProposal(githubProject(), "aive/reviewed", proposal) }
+        }
+    }
+
+    @Test
+    fun gitLabSnapshotPinsReadsToCommitAndCachesDirectoryListings() = runBlocking {
+        val base = "a".repeat(40)
+        val blob = "b".repeat(40)
+        val tree = "c".repeat(40)
+        val directories = mutableListOf<String>()
+        val reads = mutableListOf<String>()
+        val engine = MockEngine { request ->
+            assertEquals(HttpMethod.Get, request.method)
+            assertEquals("gitlab-token", request.headers["PRIVATE-TOKEN"])
+            when {
+                request.url.encodedPath.contains("/repository/branches/") ->
+                    respondJson("""{"name":"main","commit":{"id":"$base"}}""")
+                request.url.encodedPath.endsWith("/repository/tree") -> {
+                    assertEquals(base, request.url.parameters["ref"])
+                    assertEquals("false", request.url.parameters["recursive"])
+                    val dir = request.url.parameters["path"].orEmpty()
+                    directories += dir
+                    when (dir) {
+                        "" -> respondJson("""[{"path":"docs","type":"tree","mode":"040000","id":"$tree"}]""")
+                        "docs" -> respondJson("""[{"path":"docs/readme.md","type":"blob","mode":"100644","id":"$blob"}]""")
+                        else -> error("Unexpected directory $dir")
+                    }
+                }
+                request.url.encodedPath.endsWith("/raw") -> {
+                    assertEquals(base, request.url.parameters["ref"])
+                    reads += request.url.encodedPath
+                    respondJson("exact GitLab contents")
+                }
+                else -> respondJson("""{"default_branch":"main","web_url":"https://gitlab.com/team/app"}""")
+            }
+        }
+        val client = GitLabRestRepositoryOperationClient(RepositoryServiceTokenProvider { "gitlab-token" }, trackedClient(engine))
+        val result = client.readFileProposalContext(gitLabProject(), listOf("docs/readme.md", "docs/new.md", "absent/child.md"))
+        assertEquals(ExternalExecutionStatus.Completed, result.status)
+        assertEquals(listOf("", "docs"), directories)
+        assertEquals(1, reads.size)
+        assertEquals(RepositoryFileProposal(base, listOf(
+            RepositoryProposedFile("docs/readme.md", blob, "exact GitLab contents"),
+            RepositoryProposedFile("docs/new.md", null, ""),
+            RepositoryProposedFile("absent/child.md", null, ""),
+        )), RepositoryFileProposal.parse(result.artifacts.single().textContent!!))
+        assertTrue(!client.supportsFileProposals(gitLabProject()))
+    }
+
+    @Test
+    fun gitLabSnapshotRejectsSymlinkTargetsAndAncestors() = runBlocking {
+        val base = "a".repeat(40)
+        var treePages = 0
+        val engine = MockEngine { request ->
+            assertEquals(HttpMethod.Get, request.method)
+            when {
+                request.url.encodedPath.contains("/repository/branches/") ->
+                    respondJson("""{"name":"main","commit":{"id":"$base"}}""")
+                request.url.encodedPath.endsWith("/repository/tree") -> {
+                    treePages++
+                    respondJson("""[{"path":"alias","type":"blob","mode":"120000","id":"${"b".repeat(40)}"}]""")
+                }
+                request.url.encodedPath.endsWith("/raw") -> error("A symlink must never be read")
+                else -> respondJson("""{"default_branch":"main","web_url":"https://gitlab.com/team/app"}""")
+            }
+        }
+        val client = GitLabRestRepositoryOperationClient(RepositoryServiceTokenProvider { "gitlab-token" }, trackedClient(engine))
+        for (path in listOf("alias", "alias/child")) {
+            kotlin.test.assertFailsWith<IllegalArgumentException> {
+                client.readFileProposalContext(gitLabProject(), listOf(path))
+            }
+        }
+        assertEquals(2, treePages)
+    }
+
+    @Test
+    fun gitLabSnapshotFindsTargetOnLaterPageAndFailsClosedWhenNextPageFails() = runBlocking {
+        val base = "a".repeat(40)
+        val blob = "b".repeat(40)
+        val pages = mutableListOf<String?>()
+        var failSecondPage = false
+        val engine = MockEngine { request ->
+            assertEquals(HttpMethod.Get, request.method)
+            when {
+                request.url.encodedPath.contains("/repository/branches/") ->
+                    respondJson("""{"name":"main","commit":{"id":"$base"}}""")
+                request.url.encodedPath.endsWith("/repository/tree") -> {
+                    val page = request.url.parameters["page"]
+                    pages += page
+                    when (page) {
+                        "1" -> respondJson((0 until 100).joinToString(",", "[", "]") {
+                            """{"path":"other-$it.txt","mode":"100644","type":"blob","id":"$blob"}"""
+                        })
+                        "2" -> if (failSecondPage) {
+                            respondJson("""{"message":"unavailable"}""", HttpStatusCode.ServiceUnavailable)
+                        } else {
+                            respondJson("""[{"path":"target.txt","mode":"100644","type":"blob","id":"$blob"}]""")
+                        }
+                        else -> error("Unexpected page $page")
+                    }
+                }
+                request.url.encodedPath.endsWith("/raw") -> respondJson("found on page two")
+                else -> respondJson("""{"default_branch":"main","web_url":"https://gitlab.com/team/app"}""")
+            }
+        }
+        val client = GitLabRestRepositoryOperationClient(RepositoryServiceTokenProvider { "gitlab-token" }, trackedClient(engine))
+        val result = client.readFileProposalContext(gitLabProject(), listOf("target.txt"))
+        assertEquals(RepositoryProposedFile("target.txt", blob, "found on page two"),
+            RepositoryFileProposal.parse(result.artifacts.single().textContent!!).files.single())
+        assertEquals(listOf("1", "2"), pages)
+        failSecondPage = true
+        pages.clear()
+        kotlin.test.assertFailsWith<IllegalStateException> {
+            client.readFileProposalContext(gitLabProject(), listOf("target.txt"))
+        }
+        assertEquals(listOf("1", "2"), pages)
+    }
+
+    @Test
     fun gitLabStatusReadsProjectAndBranchWithPrivateToken() = runBlocking {
         val requests = mutableListOf<io.ktor.client.request.HttpRequestData>()
         val engine = MockEngine { request ->

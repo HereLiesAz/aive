@@ -167,6 +167,10 @@ data class TaskDefinition(
     val optional: Boolean = false,
     /** What the queen decided this creature works from (see [TaskResource]); empty for every older definition, which gets the context it always got. */
     val resources: List<TaskResource> = emptyList(),
+    /** A host-file proposal is inference only: no repository handle or tools go to its provider. */
+    val hostFileProposal: Boolean = false,
+    /** Read-only inference over a host-owned repository snapshot, with no repository handle or tools. */
+    val hostFileRead: Boolean = false,
 )
 
 @Serializable

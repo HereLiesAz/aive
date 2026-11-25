@@ -3,23 +3,62 @@ package com.hereliesaz.geministrator.workflow
 import com.hereliesaz.geministrator.domain.ApprovalPolicy
 import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.EnvironmentPlanningPolicy
+import com.hereliesaz.geministrator.domain.IntegrationPolicy
+import com.hereliesaz.geministrator.domain.RoleExecutionSource
 import com.hereliesaz.geministrator.domain.RoleAuthority
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
+import com.hereliesaz.geministrator.domain.TaskResource
 import com.hereliesaz.geministrator.domain.TestDesignPolicy
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
+import com.hereliesaz.geministrator.intro.TutorialRouter
 import com.hereliesaz.geministrator.template.StepTemplateAssignments
 
 object StarterWorkflowFactory {
+    /**
+     * Repository-free objectives and lessons use a generic worker; the coding starter remains available
+     * for a linked repository. The live caller supplies the actual linkage, not a provider capability.
+     * [repositoryLinked] defaults to true for callers constructing the existing coding starter directly.
+     */
     fun create(
         id: WorkflowDefinitionId,
         objective: String,
         roles: Collection<RoleDefinition> = BuiltInRoles.all,
+        repositoryLinked: Boolean = true,
     ): WorkflowDefinition {
+        val tutorial = TutorialRouter.isTutorialGoal(objective)
+        if (!repositoryLinked || tutorial) {
+            val eligible = roles.filter {
+                it.enabled && it.executionSource is RoleExecutionSource.Agent &&
+                    it.capabilitiesRequired.isEmpty() && it.authorities.isEmpty()
+            }
+            val worker = eligible.firstOrNull { it.id == BuiltInRoles.Worker.id }
+                ?: error("The active swarm has no enabled generic Worker without execution requirements")
+            val task = TaskDefinition(
+                id = TaskDefinitionId("objective"),
+                name = "Complete objective",
+                objective = objective,
+                roleId = worker.id,
+                executor = TaskExecutor.RoleAgent(worker.id),
+                environmentPlanningPolicy = EnvironmentPlanningPolicy.NotRequired,
+                resources = if (tutorial) listOf(TaskResource.AiveDocs()) else emptyList(),
+            )
+            return StepTemplateAssignments.apply(
+                WorkflowDefinition(
+                    id = id,
+                    name = objective.take(80),
+                    description = "General-purpose starter workflow.",
+                    tasks = listOf(task),
+                    integrationPolicy = IntegrationPolicy.Manual,
+                    testDesignPolicy = TestDesignPolicy.None,
+                ),
+                StepTemplateAssignments.STARTER_KEY,
+            )
+        }
         val implementationRole = roles.roleFor(
             authority = RoleAuthority.Implement,
             preferredId = BuiltInRoles.ImplementationEngineer.id,

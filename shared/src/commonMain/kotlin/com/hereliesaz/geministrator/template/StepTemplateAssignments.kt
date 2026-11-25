@@ -87,6 +87,7 @@ object StepTemplateAssignments {
         "suite-weekly-tech-debt/survey" to WRITE,
         "suite-weekly-tech-debt/report" to WRITE,
         "short-film/concept" to WRITE,
+        "starter/objective" to WRITE,
         "starter/verification" to CHECK,
         "starter/review" to CHECK,
         "suite-feature-delivery/implement" to CHANGE_CODE,

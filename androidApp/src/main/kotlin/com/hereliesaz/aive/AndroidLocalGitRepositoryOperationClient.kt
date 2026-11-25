@@ -10,6 +10,8 @@ import com.hereliesaz.geministrator.workflow.ExternalExecutionRun
 import com.hereliesaz.geministrator.workflow.ExternalExecutionStatus
 import com.hereliesaz.geministrator.workflow.LocalGitOperation
 import com.hereliesaz.geministrator.workflow.RepositoryOperationClient
+import com.hereliesaz.geministrator.workflow.toSnapshotRun
+import com.hereliesaz.geministrator.retrieval.JGitRepositoryReader
 import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
@@ -37,6 +39,18 @@ internal class AndroidLocalGitRepositoryOperationClient(
     private val runs = ConcurrentHashMap<String, ExternalExecutionRun>()
 
     override fun supports(project: Project): Boolean = project.repository?.source == RepositorySource.Local
+
+    override fun supportsFileProposalContext(project: Project): Boolean = supports(project)
+
+    /** Expose immutable committed files through the governed repository executor. */
+    override suspend fun readFileProposalContext(project: Project, paths: List<String>): ExternalExecutionRun {
+        require(supports(project)) { "Local Git executor requires a Local Git repository" }
+        val path = requireNotNull(project.repository?.localPath?.takeIf(String::isNotBlank)) {
+            "Local Git repository path is missing"
+        }
+        return JGitRepositoryReader.snapshot(path, paths)
+            .toSnapshotRun(RepositorySource.Local).also { runs[it.id] = it }
+    }
 
     override suspend fun start(project: Project, operation: String): ExternalExecutionRun =
         start(project, operation, "legacy:${project.id.value}:$operation")

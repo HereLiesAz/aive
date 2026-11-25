@@ -37,6 +37,74 @@ import kotlin.test.assertTrue
 
 class WorkflowGovernanceTest {
     @Test
+    fun declaredFileWriteUsesHostSnapshotProposalApprovalAndOriginalCommitStep() = runBlocking {
+        val role = BuiltInRoles.ImplementationEngineer
+        val source = com.hereliesaz.geministrator.template.BuiltInTemplates.PrepareFilesForRepository
+        val id = TaskDefinitionId("edit")
+        val edit = com.hereliesaz.geministrator.template.StepInstantiation.task(
+            source, source.base(), id, "Edit files", mapOf("brief" to "Update README"),
+        ).copy(resources = listOf(com.hereliesaz.geministrator.domain.TaskResource.RepositoryFiles(listOf("README.md"))))
+        val follow = TaskDefinition(TaskDefinitionId("follow"), "Follow", "Review result", BuiltInRoles.Worker.id,
+            dependsOn = setOf(id), environmentPlanningPolicy = EnvironmentPlanningPolicy.NotRequired)
+        val definition = WorkflowDefinition(WorkflowDefinitionId("host"), "Host write", tasks = listOf(edit, follow),
+            testDesignPolicy = com.hereliesaz.geministrator.domain.TestDesignPolicy.None)
+        val registry = AgentProviderRegistry(emptyList(), inferenceSettings = InMemorySettings())
+        val preparer = WorkflowDefinitionPreparer(registry, listOf(role, BuiltInRoles.Worker))
+        val repo = com.hereliesaz.geministrator.domain.RepositoryRef("owner", "project")
+        val prepared = preparer.prepare(definition, repo)
+        val read = prepared.tasks.single { it.id.value == "edit--host-read" }
+        val proposal = prepared.tasks.single { it.id.value == "edit--host-proposal" }
+        val gate = prepared.tasks.single { it.id.value == "edit--host-approve" }
+        val commit = prepared.tasks.single { it.id == id }
+        assertEquals(com.hereliesaz.geministrator.domain.TaskExecutor.RepositoryOperation("read-file-proposal-context"), read.executor)
+        assertEquals(setOf(read.id), proposal.dependsOn)
+        assertEquals(role.id, proposal.roleId)
+        assertEquals(emptySet(), proposal.providerCapabilitiesFor(role))
+        assertEquals(null, proposal.providerRepositoryFor(repo))
+        assertEquals(setOf(proposal.id), gate.dependsOn)
+        assertTrue(gate.executor is com.hereliesaz.geministrator.domain.TaskExecutor.HumanApproval)
+        assertEquals(setOf(proposal.id, gate.id), commit.dependsOn)
+        assertEquals(com.hereliesaz.geministrator.domain.TaskExecutor.RepositoryOperation("commit-files:edit--host-proposal:auto"), commit.executor)
+        assertEquals(edit.contract, commit.contract)
+        assertEquals(follow, prepared.tasks.single { it.id == follow.id })
+        assertEquals(prepared, preparer.prepare(prepared, repo))
+        val unbounded = definition.copy(tasks = listOf(edit.copy(resources = listOf(
+            com.hereliesaz.geministrator.domain.TaskResource.RepositoryFiles(listOf("docs/*.md")))), follow))
+        assertEquals(unbounded, expandHostFileSteps(unbounded, repo, mapOf(role.id to role)))
+    }
+
+    @Test
+    fun exactRepositoryReadUsesHostAndPreservesAnswerContractAcrossRepositorySources() = runBlocking {
+        val role = BuiltInRoles.Reviewer.copy(capabilitiesRequired = setOf(AgentCapability.RepositoryRead))
+        val template = com.hereliesaz.geministrator.template.StepPresets.ReadRepositoryFiles
+        val id = TaskDefinitionId("answer")
+        val task = com.hereliesaz.geministrator.template.StepInstantiation.task(
+            template, template.base(), id, "Read docs", mapOf("question" to "What does the README say?"),
+        ).copy(resources = listOf(com.hereliesaz.geministrator.domain.TaskResource.RepositoryFiles(listOf("README.md"))))
+        val definition = WorkflowDefinition(WorkflowDefinitionId("read"), "Host read", tasks = listOf(task),
+            testDesignPolicy = com.hereliesaz.geministrator.domain.TestDesignPolicy.None)
+        val registry = AgentProviderRegistry(emptyList(), inferenceSettings = InMemorySettings())
+        val preparer = WorkflowDefinitionPreparer(registry, listOf(role))
+        for (source in listOf(com.hereliesaz.geministrator.domain.RepositorySource.GitHub,
+            com.hereliesaz.geministrator.domain.RepositorySource.GitLab,
+            com.hereliesaz.geministrator.domain.RepositorySource.Local)) {
+            val repo = com.hereliesaz.geministrator.domain.RepositoryRef("owner", "project", source = source)
+            val prepared = preparer.prepare(definition, repo)
+            assertEquals(listOf("answer--host-read", "answer"), prepared.tasks.map { it.id.value })
+            val snapshot = prepared.tasks.first()
+            val answer = prepared.tasks.last()
+            assertEquals(com.hereliesaz.geministrator.domain.TaskExecutor.RepositoryOperation("read-file-proposal-context"), snapshot.executor)
+            assertEquals(task.resources, snapshot.resources)
+            assertEquals(setOf(snapshot.id), answer.dependsOn)
+            assertEquals(task.contract, answer.contract)
+            assertTrue(answer.hostFileRead)
+            assertEquals(emptySet(), answer.providerCapabilitiesFor(role))
+            assertEquals(null, answer.providerRepositoryFor(repo))
+            assertEquals(prepared, preparer.prepare(prepared, repo))
+        }
+    }
+
+    @Test
     fun providerRequiredEnvironmentPlanningInjectsEpaBeforeWorker() = runBlocking {
         val worker = GovernanceFakeProvider(
             id = AgentProviderId("worker"),

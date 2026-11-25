@@ -24,6 +24,76 @@ import kotlin.test.assertTrue
 
 class ServiceExecutorIntegrationsTest {
     @Test
+    fun hostCommitRefusesUnapprovedOrUnrelatedProposalBeforeCallingClient() = runBlocking {
+        val client = RecordingRepositoryClient()
+        val integration = RepositoryOperationExecutorIntegration(client)
+        val attempt = context(TaskExecutor.RepositoryOperation("commit-files:proposal:aive/change"))
+        val failed = integration.dispatch(attempt)
+        assertEquals(TaskRunStatus.Failed, failed.status)
+        assertTrue(failed.progressMessage.orEmpty().contains("Unknown proposal task"))
+        assertEquals(null, client.fileProposal)
+    }
+
+    @Test
+    fun hostCommitConsumesOnlyTheApprovedDirectProposal() = runBlocking {
+        val client = RecordingRepositoryClient()
+        val integration = RepositoryOperationExecutorIntegration(client)
+        val initial = context(TaskExecutor.RepositoryOperation("commit-files:proposal:aive/change"))
+        val producer = TaskDefinitionId("proposal")
+        val approval = TaskDefinitionId("approval")
+        val proposalTask = TaskDefinition(producer, "Proposal", "Produce files", null,
+            executor = TaskExecutor.RoleAgent(com.hereliesaz.geministrator.domain.RoleDefinitionId("worker")))
+        val gate = TaskDefinition(approval, "Review proposal", "Approve these files", null,
+            dependsOn = setOf(producer), executor = TaskExecutor.HumanApproval())
+        val commit = initial.task.copy(dependsOn = setOf(producer, approval))
+        val proposalRun = initial.taskRun.copy(id = TaskRunId("proposal-run"), taskDefinitionId = producer,
+            status = TaskRunStatus.Completed, executor = proposalTask.executor,
+            artifacts = listOf(ArtifactRef(ArtifactId("proposal-output"), ArtifactKind.CodeChange,
+                TaskRunId("proposal-run"), "File proposal", textContent = """{"baseCommit":"${"a".repeat(40)}","files":[{"path":"README.md","expectedBlob":null,"content":"new"}]}""",
+                createdAtEpochMillis = 1L)))
+        val approvalRun = initial.taskRun.copy(id = TaskRunId("approval-run"), taskDefinitionId = approval,
+            status = TaskRunStatus.Completed, executor = gate.executor)
+        val approved = initial.copy(task = commit,
+            definition = initial.definition.copy(tasks = listOf(proposalTask, gate, commit)),
+            run = initial.run.copy(taskRuns = initial.run.taskRuns + mapOf(producer to proposalRun, approval to approvalRun)))
+        val denied = approved.copy(run = approved.run.copy(taskRuns = approved.run.taskRuns +
+            (approval to approvalRun.copy(status = TaskRunStatus.Cancelled))))
+        assertEquals(TaskRunStatus.Failed, integration.dispatch(denied).status)
+        assertEquals(null, client.fileProposal)
+        val result = integration.dispatch(approved)
+        assertEquals(TaskRunStatus.Completed, result.status)
+        assertEquals("aive/change", client.branch)
+        assertEquals(RepositoryProposedFile("README.md", null, "new"), client.fileProposal?.files?.single())
+
+        // A completed approval cannot authorize paths outside the original host snapshot.
+        val snapshotId = TaskDefinitionId("snapshot")
+        val snapshotTask = TaskDefinition(snapshotId, "Snapshot", "Read files", null,
+            executor = TaskExecutor.RepositoryOperation("read-file-proposal-context"))
+        val snapshotRun = proposalRun.copy(id = TaskRunId("snapshot-run"), taskDefinitionId = snapshotId,
+            executor = snapshotTask.executor,
+            artifacts = listOf(proposalRun.artifacts.single().copy(
+                id = ArtifactId("snapshot-output"), kind = ArtifactKind.CommandOutput,
+                taskRunId = TaskRunId("snapshot-run"),
+                textContent = """{"baseCommit":"${"a".repeat(40)}","files":[{"path":"OTHER.md","expectedBlob":null,"content":""}]}""")))
+        val scoped = approved.copy(
+            definition = approved.definition.copy(tasks = listOf(snapshotTask,
+                proposalTask.copy(hostFileProposal = true, dependsOn = setOf(snapshotId)), gate, commit)),
+            run = approved.run.copy(taskRuns = approved.run.taskRuns + (snapshotId to snapshotRun)))
+        val scopedClient = RecordingRepositoryClient()
+        val scopedIntegration = RepositoryOperationExecutorIntegration(scopedClient)
+        val rejected = scopedIntegration.dispatch(scoped)
+        assertEquals(TaskRunStatus.Failed, rejected.status)
+        assertTrue(rejected.progressMessage.orEmpty().contains("outside its host snapshot"))
+        assertEquals(null, scopedClient.fileProposal)
+        val validSnapshot = snapshotRun.copy(artifacts = listOf(snapshotRun.artifacts.single().copy(
+            textContent = """{"baseCommit":"${"a".repeat(40)}","files":[{"path":"README.md","expectedBlob":null,"content":""}]}""")))
+        val valid = scoped.copy(run = scoped.run.copy(taskRuns = scoped.run.taskRuns + (snapshotId to validSnapshot)))
+        assertEquals(TaskRunStatus.Completed, scopedIntegration.dispatch(valid).status)
+        assertEquals(RepositoryProposedFile("README.md", null, "new"), scopedClient.fileProposal?.files?.single())
+
+    }
+
+    @Test
     fun repositoryOperationDispatchesAndCompletes() = runBlocking {
         val client = RecordingRepositoryClient()
         val integration = RepositoryOperationExecutorIntegration(client)
@@ -127,6 +197,16 @@ private class RecordingRepositoryClient : RepositoryOperationClient {
     var operation: String? = null
     var runId: String? = null
     val identities = mutableListOf<String>()
+    var fileProposal: RepositoryFileProposal? = null
+    var branch: String? = null
+
+    override fun supportsFileProposals(project: Project) = true
+
+    override suspend fun commitFileProposal(project: Project, branch: String, proposal: RepositoryFileProposal): ExternalExecutionRun {
+        this.branch = branch
+        fileProposal = proposal
+        return ExternalExecutionRun("file-commit", ExternalExecutionStatus.Completed)
+    }
 
     override suspend fun start(project: Project, operation: String, operationIdentity: String): ExternalExecutionRun {
         identities += operationIdentity

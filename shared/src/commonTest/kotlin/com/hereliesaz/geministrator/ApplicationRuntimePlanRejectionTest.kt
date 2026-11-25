@@ -44,6 +44,7 @@ class ApplicationRuntimePlanRejectionTest {
             runtime.launchStarterWorkflow(
                 projectName = "Plan rejection",
                 objective = "Reject the first implementation plan",
+                repository = com.hereliesaz.geministrator.domain.RepositoryRef("test", "project"),
             )
 
             val implementationId = TaskDefinitionId("implementation")
