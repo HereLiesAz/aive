@@ -40,7 +40,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: HereLiesAz/conveyance-h2g2
-          ref: bb3325b8594bfade69850ed19be16c58d62b0ff5 # pinned: README "Bumping the vendor pins"
+          ref: 966f3b99212fada0498f83f0fd8d63b3b87340fd # pinned: README "Bumping the vendor pins"
           path: vendor/conveyance-h2g2
 
       - name: Check out Conveyance
