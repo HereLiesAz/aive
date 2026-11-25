@@ -229,6 +229,19 @@ class CollectiveAnswerTest {
     }
 
     @Test
+    fun unattendedConversationIsExplicitlyHostInitiatedRatherThanANewKeeperRequest() = runTest {
+        val prompts = mutableListOf<String>()
+        val reviewer = CollectiveVoice("reviewer", QueenModel { prompts += it; "No change." })
+        val queen = CollectiveVoice("queen", QueenModel { prompts += it; "Reviewer has not changed." })
+        val result = answerCollectively("Earlier question", "", listOf(reviewer), queen,
+            automaticReconsideration = true) { _, _ -> true }
+        assertEquals(2, prompts.size)
+        assertTrue(prompts.all { "Host-initiated reconsideration of earlier Keeper question" in it })
+        assertTrue(prompts.all { "Current Keeper question" !in it })
+        assertEquals("Reviewer has not changed.", result.answer)
+    }
+
+    @Test
     fun newObservationCanPersuadeParticipantsAwayFromTheirEarlierAgreement() = runTest {
         val history = "a: I favor X.\nb: I was persuaded by a and now favor X."
         var aCalls = 0

@@ -105,6 +105,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -423,6 +425,9 @@ class ApplicationRuntime private constructor(
     }
 
     private val collectiveChatMutex = Mutex()
+    private val collectiveBackgroundJob = MutableStateFlow<Job?>(null)
+    private val collectiveBackgroundChanges = MutableStateFlow(0L)
+    internal val collectiveBackgroundRevision: StateFlow<Long> = collectiveBackgroundChanges.asStateFlow()
     private val collectiveConversations by lazy {
         com.hereliesaz.geministrator.queen.CollectiveConversationStore(persistence.inferenceSettings, ::nowEpochMillis)
     }
@@ -441,14 +446,64 @@ class ApplicationRuntime private constructor(
             .importCollectiveHistory(id, conversation.historicalMemoryRequests(nowEpochMillis()))
     }
     internal suspend fun newCollectiveConversation() = collectiveChatMutex.withLock { collectiveConversations.create() }
-    internal suspend fun setCollectiveAutomaticEvidence(id: String, enabled: Boolean) = collectiveChatMutex.withLock {
-        collectiveConversations.setAutomaticEvidence(id, enabled)
+    internal suspend fun setCollectiveAutomaticEvidence(id: String, enabled: Boolean): com.hereliesaz.geministrator.queen.CollectiveConversation? {
+        collectiveBackgroundJob.value?.cancel()
+        return collectiveChatMutex.withLock { collectiveConversations.setAutomaticEvidence(id, enabled) }
     }
-    internal suspend fun deleteCollectiveConversation(id: String) = collectiveChatMutex.withLock { collectiveConversations.delete(id) }
-    internal suspend fun clearCollectiveConversations() = collectiveChatMutex.withLock {
-        collectiveConversations.clear()
-        collectiveEvidence.clear()
-        collectiveProfiles.clear()
+    internal suspend fun setCollectiveBackgroundEvidence(id: String, enabled: Boolean): com.hereliesaz.geministrator.queen.CollectiveConversation? {
+        collectiveBackgroundJob.value?.cancel()
+        return collectiveChatMutex.withLock { collectiveConversations.setBackgroundEvidence(id, enabled) }
+    }
+    internal suspend fun deleteCollectiveConversation(id: String) {
+        collectiveBackgroundJob.value?.cancel()
+        collectiveChatMutex.withLock { collectiveConversations.delete(id) }
+    }
+    internal suspend fun clearCollectiveConversations() {
+        collectiveBackgroundJob.value?.cancel()
+        collectiveChatMutex.withLock {
+            collectiveConversations.clear()
+            collectiveEvidence.clear()
+            collectiveProfiles.clear()
+        }
+    }
+
+    /**
+     * One app-lifetime scan. Never queues behind a foreground conversation, never wakes an
+     * unconsenting conversation, and reserves durable retry spacing before attempting inference.
+     * The child may be cancelled by a foreground ask or a permission change without stopping
+     * the app's scanning loop. Only known free routes are admitted below.
+     */
+    internal suspend fun reconsiderCollectiveEvidence() = coroutineScope {
+        val wake = launch(start = CoroutineStart.LAZY) {
+            if (!collectiveChatMutex.tryLock()) return@launch
+            try {
+                val candidates = collectiveConversations.list().filter { it.backgroundEvidenceDue(nowEpochMillis()) }
+                    .sortedBy { it.lastBackgroundEvidenceAttempt ?: Long.MIN_VALUE }
+                for (conversation in candidates) {
+                    val observations = collectiveEvidence.linkedObservations(conversation.id, automatic = true, automaticOnly = true)
+                    val question = observations.reconsiderationQuestion ?: continue
+                    if (observations.automaticEvidenceIds.isEmpty() || observations.participantIds.isEmpty()) continue
+                    val reserved = collectiveConversations.claimBackgroundEvidence(conversation.id) ?: continue
+                    val result = collectiveAdvisoryLocked(question, reserved,
+                        com.hereliesaz.geministrator.queen.DEFAULT_DELIBERATION_MILLIS,
+                        observations, automaticReconsideration = true)
+                    if (result.turns != reserved.turns) collectiveBackgroundChanges.value++
+                    break
+                }
+            } finally {
+                collectiveChatMutex.unlock()
+            }
+        }
+        if (!collectiveBackgroundJob.compareAndSet(null, wake)) {
+            wake.cancel()
+            return@coroutineScope
+        }
+        try {
+            wake.start()
+            wake.join()
+        } finally {
+            collectiveBackgroundJob.compareAndSet(wake, null)
+        }
     }
 
     internal suspend fun collectiveSpecialistProfiles() = collectiveProfiles.profiles()
@@ -586,12 +641,27 @@ class ApplicationRuntime private constructor(
     internal suspend fun collectiveAdvisory(
         question: String, conversationId: String,
         timeBudgetMillis: Long = com.hereliesaz.geministrator.queen.DEFAULT_DELIBERATION_MILLIS,
-    ): com.hereliesaz.geministrator.queen.CollectiveConversation = collectiveChatMutex.withLock {
-        require(question.isNotBlank() && question.length <= 1500)
-        val conversation = requireNotNull(collectiveConversations.get(conversationId))
-        val observations = runCatchingCancellable { collectiveEvidence.linkedObservations(conversationId, automatic = conversation.automaticEvidence) }
+    ): com.hereliesaz.geministrator.queen.CollectiveConversation {
+        collectiveBackgroundJob.value?.cancel()
+        return collectiveChatMutex.withLock {
+            val conversation = requireNotNull(collectiveConversations.get(conversationId))
+            val observations = runCatchingCancellable { collectiveEvidence.linkedObservations(conversationId, automatic = conversation.automaticEvidence) }
             .onFailure { com.hereliesaz.geministrator.log.AppLog.record("evidence", "Linked observations unavailable: ${it::class.simpleName}") }
-            .getOrDefault(com.hereliesaz.geministrator.queen.LinkedConversationObservations())
+                .getOrDefault(com.hereliesaz.geministrator.queen.LinkedConversationObservations())
+            collectiveAdvisoryLocked(question, conversation, timeBudgetMillis, observations)
+        }
+    }
+
+    /** Caller owns collectiveChatMutex; no unattended call may use an unknown or paid route. */
+    private suspend fun collectiveAdvisoryLocked(
+        question: String,
+        conversation: com.hereliesaz.geministrator.queen.CollectiveConversation,
+        timeBudgetMillis: Long,
+        observations: com.hereliesaz.geministrator.queen.LinkedConversationObservations,
+        automaticReconsideration: Boolean = false,
+    ): com.hereliesaz.geministrator.queen.CollectiveConversation {
+        require(question.isNotBlank() && question.length <= 1500)
+        val conversationId = conversation.id
         val roster = activeRoles(resolveRoleCollection(persistence.roles.all()))
         val models = resolveDisputeModels()
         // Conversation identity is provenance/attention context only. Recall is collective.
@@ -603,7 +673,8 @@ class ApplicationRuntime private constructor(
         }.getOrDefault(emptyList()).filter { match ->
             roster.any { it.id.value == match.roleId && it.executionSource == com.hereliesaz.geministrator.domain.RoleExecutionSource.Agent }
         }
-        val capture = com.hereliesaz.geministrator.queen.CollectiveMemoryCapture(conversationId, question, ::nowEpochMillis)
+        val capture = com.hereliesaz.geministrator.queen.CollectiveMemoryCapture(conversationId, question, ::nowEpochMillis,
+            keeperAuthoredQuestion = !automaticReconsideration)
         var captureAvailable = true
         val evidenceIssue = collectiveEvidence.issueId()
         fun voice(role: com.hereliesaz.geministrator.domain.RoleDefinition, model: com.hereliesaz.geministrator.queen.QueenModel):
@@ -627,7 +698,10 @@ class ApplicationRuntime private constructor(
             val specialists = com.hereliesaz.geministrator.queen.selectCollectiveSpecialists(
                 question, roster, facilitator.model.uses, collectiveModelFor,
                 models.voices, experience = directory, returningInstances = observations.participantIds,
-            ).mapNotNull { (role, model) -> voice(role, model) }
+            ).mapNotNull { (role, model) -> voice(role, model) }.filter { voice ->
+                !automaticReconsideration || (voice.specialistId in observations.participantIds &&
+                    voice.model.uses.isNotEmpty() && voice.model.uses.none { it.billsPerToken })
+            }
             com.hereliesaz.geministrator.queen.answerCollectively(
                 question, conversation.context(), specialists, facilitator,
                 admitRole = { voice ->
@@ -655,12 +729,18 @@ class ApplicationRuntime private constructor(
                 directory = directory,
                 timeBudgetMillis = timeBudgetMillis,
                 observations = observations,
+                automaticReconsideration = automaticReconsideration,
             ) { model, _ ->
-                captureAvailable && models.mayCall() && queenCallAllowed() &&
+                val wakeAllowed = !automaticReconsideration || (model.uses.isNotEmpty() &&
+                    model.uses.none { it.billsPerToken } &&
+                    collectiveConversations.get(conversationId)?.let { it.automaticEvidence && it.backgroundEvidence } == true)
+                wakeAllowed && captureAvailable && models.mayCall() && queenCallAllowed() &&
                     advisoryGateFor(model.uses) == com.hereliesaz.geministrator.queen.CallDecision.Allow
             }
         }
-        requireNotNull(collectiveConversations.append(conversationId, question, result))
+        // A refused or wholly unavailable wake consumes its retry interval but adds no empty turn.
+        return if (automaticReconsideration && result.assessments.isEmpty() && result.answer == null) conversation
+        else requireNotNull(collectiveConversations.append(conversationId, question, result, automaticReconsideration))
         } finally {
             // Already returned replies remain experience even if a later participant is cancelled.
             // Only local queue deposits run here; no model call or consolidation is awaited.

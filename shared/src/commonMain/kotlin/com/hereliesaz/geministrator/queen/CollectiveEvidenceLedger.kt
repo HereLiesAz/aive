@@ -83,6 +83,8 @@ internal data class LinkedConversationObservations(
     val automaticEvidenceIds: List<String> = emptyList(),
     /** Latest retraction IDs included in the projected evidence. */
     val retractionIds: Map<String, String> = emptyMap(),
+    /** An actual earlier question selected from the newly matched issue, for a host wake. */
+    val reconsiderationQuestion: String? = null,
 )
 
 /** A redacted projection awaiting confirmation of the exact durable artifact version. */
@@ -165,8 +167,9 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
      * No call, memory write, change of belief or authorization occurs here.
      */
     suspend fun linkedObservations(
-        conversation: String, automatic: Boolean = false,
+        conversation: String, automatic: Boolean = false, automaticOnly: Boolean = false,
     ): LinkedConversationObservations = mutex.withLock {
+        require(!automaticOnly || automatic)
         val book = read()
         val opinions = book.entries.filter { it.conversationId == conversation && it.kind == EvidenceKind.Opinion }
         val opinionById = opinions.associateBy { it.id }
@@ -196,6 +199,7 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
             .associateBy { it.targetId }
         val explicitIds = linked.keys.toSet()
         val autoIds = linkedSetOf<String>()
+        val autoIssueIds = mutableMapOf<String, String>()
         if (automatic && opinions.isNotEmpty()) {
             // Topic matching is a local routing hint. Ignore empty/redacted objectives and
             // avoid matching common single words. No model call and no automatic association.
@@ -212,17 +216,29 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
                     vectors.getOrPut(b) { embedder.embedOne(b) }) >= AUTO_TOPIC_SIMILARITY
             }
             val received = opinions.filter { it.specialistId != null }.groupBy { it.specialistId }
-            val issues = byIssue.values.sortedByDescending { contributors -> contributors.maxOf { it.recordedAt } }
+            val entryOrder = book.entries.mapIndexed { index, entry -> entry.id to index }.toMap()
+            val issues = byIssue.values.sortedByDescending { contributors ->
+                contributors.maxOf { entryOrder.getValue(it.id) }
+            }
             for (entry in book.entries.asReversed()) {
                 if (entry.id in explicitIds || !entry.canReconsider()) continue
                 val retraction = retractions[entry.id]
-                val revision = maxOf(entry.recordedAt, retraction?.recordedAt ?: Long.MIN_VALUE)
-                // Return to the newest matching issue, not every earlier repetition of a question.
+                // Preserve the original affected issue on retries and retractions, even if a
+                // partial reconsideration just created a newer issue with the same question.
+                // Ledger order, not a potentially identical or rolled-back clock, establishes
+                // which issue existed before the original evidence.
                 val issue = issues.firstOrNull { contributors ->
-                    contributors.minOf { it.recordedAt } <= revision &&
+                    contributors.minOf { entryOrder.getValue(it.id) } < entryOrder.getValue(entry.id) &&
                         matches(contributors.first().question, entry.question)
-                } ?: continue
-                val pending = issue.mapNotNull { it.specialistId }.distinct().filter { id ->
+                } ?: if (retraction != null) issues.firstOrNull { contributors ->
+                    contributors.minOf { it.recordedAt } <= retraction.recordedAt &&
+                        matches(contributors.first().question, entry.question)
+                } else null
+                if (issue == null) continue
+                val priorRecipients = if (retraction == null) emptySet() else received.filterValues { replies ->
+                    replies.any { entry.id in it.promptEvidenceIds }
+                }.keys.filterNotNull().toSet()
+                val pending = (issue.mapNotNull { it.specialistId }.toSet() + priorRecipients).filter { id ->
                     received[id].orEmpty().none { reply ->
                         entry.id in reply.promptEvidenceIds &&
                             reply.promptEvidenceRetractions[entry.id] == retraction?.id
@@ -232,12 +248,16 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
                 linked[entry.id] = pending.toMutableSet()
                 linkedQuestions[entry.id] = issue.first().question
                 autoIds += entry.id
+                autoIssueIds[entry.id] = issue.first().issueId
             }
         }
         val explicit = book.entries.asReversed().filter { it.id in explicitIds }
         val discovered = book.entries.asReversed().filter { it.id in autoIds }
         // Reserve space for new discoveries when manual links fill the bounded prompt.
-        val selected = if (discovered.isEmpty()) explicit.take(4) else
+        val selected = if (automaticOnly) {
+            val issue = discovered.firstOrNull()?.let { autoIssueIds.getValue(it.id) }
+            discovered.filter { autoIssueIds[it.id] == issue }.take(4)
+        } else if (discovered.isEmpty()) explicit.take(4) else
             (explicit.take(if (discovered.size >= 2) 2 else 3) + discovered).take(4)
         if (selected.isEmpty()) return@withLock LinkedConversationObservations()
         val context = selected.joinToString("\n") { entry ->
@@ -263,7 +283,8 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
         LinkedConversationObservations(context,
             selected.flatMap { linked.getValue(it.id) }.toSet(), selected.map { it.id },
             selected.filter { it.id in autoIds }.map { it.id },
-            selected.mapNotNull { entry -> retractions[entry.id]?.let { entry.id to it.id } }.toMap())
+            selected.mapNotNull { entry -> retractions[entry.id]?.let { entry.id to it.id } }.toMap(),
+            selected.firstOrNull { it.id in autoIds }?.let { linkedQuestions.getValue(it.id) })
     }
 
     /** Actual advisory text stays an opinion regardless of its author or the number agreeing. */

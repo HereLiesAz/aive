@@ -699,6 +699,16 @@ fun App(
         observer(timeline)
     }
     LaunchedEffect(runtime) { onRuntimeAvailable(runtime) }
+    // Host-lifetime only: no service, alarm, headless wake or inference without the local opt-in.
+    LaunchedEffect(runtime) {
+        val active = runtime ?: return@LaunchedEffect
+        while (true) {
+            delay(60_000L)
+            runCatchingCancellable { active.reconsiderCollectiveEvidence() }.onFailure {
+                com.hereliesaz.geministrator.log.AppLog.record("evidence", "Unattended reconsideration unavailable: ${it::class.simpleName}")
+            }
+        }
+    }
     // The queen mends a swarm that teaches the app while it runs (QueenMending.kt).
     LaunchedEffect(runtime, orchestrationRuntime) {
         val active = runtime
@@ -934,6 +944,8 @@ fun App(
             host.collectiveNew = { checkNotNull(runtime).newCollectiveConversation() }
             host.collectiveDelete = { id -> checkNotNull(runtime).deleteCollectiveConversation(id) }
             host.collectiveAutomaticEvidence = { id, enabled -> checkNotNull(runtime).setCollectiveAutomaticEvidence(id, enabled) }
+            host.collectiveBackgroundEvidence = { id, enabled -> checkNotNull(runtime).setCollectiveBackgroundEvidence(id, enabled) }
+            host.collectiveBackgroundRevision = runtime?.collectiveBackgroundRevision
             host.collectiveImportHistory = { id -> checkNotNull(runtime).importCollectiveHistory(id) }
             host.collectiveProfiles = { checkNotNull(runtime).collectiveSpecialistProfiles() }
             host.evidenceLedger = { runtime?.collectiveEvidence }

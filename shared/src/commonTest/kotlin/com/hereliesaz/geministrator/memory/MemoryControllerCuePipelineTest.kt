@@ -305,6 +305,32 @@ class MemoryControllerCuePipelineTest {
     }
 
     @Test
+    fun unattendedReconsiderationBanksOnlyActualRepliesNotAnInventedKeeperQuestion() = runBlocking {
+        val conversation = "collective:wake"
+        val bank = InMemoryMemoryStore()
+        val settings = MapSettings()
+        val controller = MemoryLayerController(
+            banks = MemoryBanks.inMemory(mapOf(conversation to bank)),
+            settingsStore = MemoryLayerSettingsStore(settings),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined), nowEpochMillis = { 1000L },
+        )
+        controller.updateSettings { it.copy(consolidationPaused = true) }
+        val capture = com.hereliesaz.geministrator.queen.CollectiveMemoryCapture(
+            conversation, "Earlier question", { 1000L }, controller.promptContextProvider,
+            keeperAuthoredQuestion = false)
+        val voice = com.hereliesaz.geministrator.queen.CollectiveVoice("reviewer", QueenModel { error("No inference needed") })
+        capture.record(voice, "Still unconvinced.")
+        assertEquals(1, SettingsMemoryCaptureJournal(settings).pending().size)
+        capture.flush()
+        val episodes = bank.read().episodes
+        assertEquals(1, episodes.size)
+        assertEquals("Still unconvinced.", episodes.single().chunks.single().text)
+        assertEquals(MemorySourceKind.AgentNote, episodes.single().chunks.single().kind)
+        assertEquals("reviewer", episodes.single().roleId)
+    }
+
+    @Test
     fun collectiveCaptureSurvivesRestartWithoutEarlyRecallOrDuplicateEpisodes() = runBlocking {
         val settings = MapSettings()
         val conversation = "collective:crash"

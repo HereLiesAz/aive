@@ -30,6 +30,38 @@ class CollectiveConversationStoreTest {
     }
 
     @Test
+    fun unattendedPermissionAndAttemptSpacingSurviveRestartWithoutInventingKeeperUtterances() = runTest {
+        val settings = MapSettings()
+        var time = 100L
+        val store = CollectiveConversationStore(settings) { time }
+        val id = store.create().id
+        assertNull(store.setBackgroundEvidence(id, true))
+        assertNull(store.claimBackgroundEvidence(id))
+        store.setAutomaticEvidence(id, true)
+        assertNull(store.claimBackgroundEvidence(id))
+        assertTrue(requireNotNull(store.setBackgroundEvidence(id, true)).backgroundEvidence)
+        assertEquals(100L, requireNotNull(store.claimBackgroundEvidence(id)).lastBackgroundEvidenceAttempt)
+        val restored = CollectiveConversationStore(settings) { time }
+        time = 600_099L
+        assertNull(restored.claimBackgroundEvidence(id))
+        time = 600_100L
+        assertEquals(600_100L, requireNotNull(restored.claimBackgroundEvidence(id)).lastBackgroundEvidenceAttempt)
+        assertNull(restored.claimBackgroundEvidence(id))
+        val result = CollectiveAnswer("Actual facilitator reply", listOf(CollectiveAssessment("reviewer", "Changed my mind.")), emptyList())
+        store.append(id, "Earlier question", result, automaticReconsideration = true)
+        val conversation = requireNotNull(restored.get(id))
+        assertTrue(conversation.turns.single().automaticReconsideration)
+        assertTrue("Host reconsideration of earlier question:" in conversation.context())
+        assertEquals(listOf("Changed my mind.", "Actual facilitator reply"),
+            conversation.historicalMemoryRequests(time).map { it.text })
+        assertFalse(requireNotNull(restored.setAutomaticEvidence(id, false)).backgroundEvidence)
+        time = 1_200_100L
+        assertNull(store.claimBackgroundEvidence(id))
+        store.delete(id)
+        assertNull(restored.claimBackgroundEvidence(id))
+    }
+
+    @Test
     fun allAdaptiveExaminationsSurviveRestartAndHistoryImport() = runTest {
         val settings = MapSettings()
         val store = CollectiveConversationStore(settings) { 100L }
