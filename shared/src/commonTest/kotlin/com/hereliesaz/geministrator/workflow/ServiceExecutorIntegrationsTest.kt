@@ -64,6 +64,33 @@ class ServiceExecutorIntegrationsTest {
         assertEquals(TaskRunStatus.Completed, result.status)
         assertEquals("aive/change", client.branch)
         assertEquals(RepositoryProposedFile("README.md", null, "new"), client.fileProposal?.files?.single())
+
+        // A completed approval cannot authorize paths outside the original host snapshot.
+        val snapshotId = TaskDefinitionId("snapshot")
+        val snapshotTask = TaskDefinition(snapshotId, "Snapshot", "Read files", null,
+            executor = TaskExecutor.RepositoryOperation("read-file-proposal-context"))
+        val snapshotRun = proposalRun.copy(id = TaskRunId("snapshot-run"), taskDefinitionId = snapshotId,
+            executor = snapshotTask.executor,
+            artifacts = listOf(proposalRun.artifacts.single().copy(
+                id = ArtifactId("snapshot-output"), kind = ArtifactKind.CommandOutput,
+                taskRunId = TaskRunId("snapshot-run"),
+                textContent = """{"baseCommit":"${"a".repeat(40)}","files":[{"path":"OTHER.md","expectedBlob":null,"content":""}]}""")))
+        val scoped = approved.copy(
+            definition = approved.definition.copy(tasks = listOf(snapshotTask,
+                proposalTask.copy(hostFileProposal = true, dependsOn = setOf(snapshotId)), gate, commit)),
+            run = approved.run.copy(taskRuns = approved.run.taskRuns + (snapshotId to snapshotRun)))
+        val scopedClient = RecordingRepositoryClient()
+        val scopedIntegration = RepositoryOperationExecutorIntegration(scopedClient)
+        val rejected = scopedIntegration.dispatch(scoped)
+        assertEquals(TaskRunStatus.Failed, rejected.status)
+        assertTrue(rejected.progressMessage.orEmpty().contains("outside its host snapshot"))
+        assertEquals(null, scopedClient.fileProposal)
+        val validSnapshot = snapshotRun.copy(artifacts = listOf(snapshotRun.artifacts.single().copy(
+            textContent = """{"baseCommit":"${"a".repeat(40)}","files":[{"path":"README.md","expectedBlob":null,"content":""}]}""")))
+        val valid = scoped.copy(run = scoped.run.copy(taskRuns = scoped.run.taskRuns + (snapshotId to validSnapshot)))
+        assertEquals(TaskRunStatus.Completed, scopedIntegration.dispatch(valid).status)
+        assertEquals(RepositoryProposedFile("README.md", null, "new"), scopedClient.fileProposal?.files?.single())
+
     }
 
     @Test
