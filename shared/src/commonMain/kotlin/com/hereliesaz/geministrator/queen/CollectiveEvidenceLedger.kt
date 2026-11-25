@@ -5,6 +5,7 @@ import com.hereliesaz.geministrator.control.ControlRedaction
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.persistence.ArtifactRepository
 import com.hereliesaz.geministrator.domain.ArtifactRef
+import com.hereliesaz.geministrator.workflow.LocalTestReceipt
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.research.ResearchBudget
 import com.hereliesaz.geministrator.research.ResearchClaim
@@ -33,6 +34,15 @@ internal data class EvidenceEntry(
     val recordedByKeeper: Boolean = false,
     /** Host-computed correspondence to the exact bounded research source, not a truth verdict. */
     val researchCitation: EvidenceResearchCitation? = null,
+    /** Only the actual local executor result can populate this observation. */
+    val localTest: EvidenceLocalTest? = null,
+)
+
+/** Process result independent of report content, not an acceptance-criteria verdict. */
+@Serializable
+internal data class EvidenceLocalTest(
+    val exitCode: Int, val timedOut: Boolean, val started: Boolean,
+    val checkoutCommit: String? = null,
 )
 
 /** Local citation evidence with source position and the actual redacted excerpt shown to the model. */
@@ -56,6 +66,7 @@ internal data class EvidenceReview(
 @Serializable
 internal data class PendingArtifactEvidence(
     val artifactId: ArtifactId, val fingerprint: String, val entry: EvidenceEntry,
+    val observation: EvidenceEntry? = null,
 )
 
 @Serializable
@@ -155,7 +166,15 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
      * URI-only artifacts are recorded by reference; nothing is fetched or executed. Pending versions
      * are replaced only by a newly staged version of the same artifact and are erased on clear.
      */
-    suspend fun stageArtifactEvidence(run: WorkflowRun, artifact: ArtifactRef) {
+    suspend fun stageArtifactEvidence(run: WorkflowRun, artifact: ArtifactRef) = stageArtifact(run, artifact, null)
+
+    /** Stage an executor observation alongside, never instead of, the artifact's untrusted claim. */
+    suspend fun stageLocalTestEvidence(run: WorkflowRun, artifact: ArtifactRef, receipt: LocalTestReceipt) {
+        require(receipt.artifactId == artifact.id)
+        stageArtifact(run, artifact, receipt)
+    }
+
+    private suspend fun stageArtifact(run: WorkflowRun, artifact: ArtifactRef, receipt: LocalTestReceipt?) {
         val question = run.objective.ifBlank { "Workflow ${run.id.value}" }
         val text = buildString {
             append(artifact.kind.name).append(": ").append(clean(artifact.label, 512))
@@ -169,7 +188,7 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
         mutex.withLock {
             val book = read()
             val prior = book.pendingArtifacts.singleOrNull { it.artifactId == artifact.id }
-            if (prior?.fingerprint == fingerprint) return@withLock
+            if (prior?.fingerprint == fingerprint && (receipt == null || prior.observation != null)) return@withLock
             require(prior != null || book.pendingArtifacts.size < MAX_PENDING_ARTIFACTS) {
                 "Evidence recovery journal is full"
             }
@@ -180,8 +199,22 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
                 now(),
             )
             require(entry.question.isNotBlank() && entry.text.isNotBlank())
+            val observation = receipt?.let {
+                val commit = it.checkoutCommit?.takeIf { value -> value.matches(Regex("[0-9a-fA-F]{40}|[0-9a-fA-F]{64}")) }
+                val outcome = when {
+                    !it.started -> "Local test command could not start."
+                    it.timedOut -> "Local test command timed out."
+                    it.passed -> "Local test command exited successfully (exit 0)."
+                    else -> "Local test command failed (exit ${it.exitCode})."
+                }
+                EvidenceEntry(
+                    identity(), entry.issueId, entry.question, EvidenceKind.Observation,
+                    outcome, entry.source, now(),
+                    localTest = EvidenceLocalTest(it.exitCode, it.timedOut, it.started, commit),
+                )
+            }
             write(book.copy(pendingArtifacts = book.pendingArtifacts.filterNot { it.artifactId == artifact.id } +
-                PendingArtifactEvidence(artifact.id, fingerprint, entry)))
+                PendingArtifactEvidence(artifact.id, fingerprint, entry, observation)))
         }
     }
 
@@ -207,7 +240,7 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
             if (artifactFingerprint(artifact) == pending.fingerprint) confirmed += pending
         }
         if (confirmed.isNotEmpty()) write(book.copy(
-            entries = book.entries + confirmed.map { it.entry },
+            entries = book.entries + confirmed.flatMap { listOfNotNull(it.entry, it.observation) },
             pendingArtifacts = book.pendingArtifacts.filterNot { it in confirmed },
         ))
     }

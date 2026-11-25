@@ -2575,6 +2575,7 @@ class ApplicationRuntime private constructor(
                     executorIntegrations = runtimeIntegrations,
                     stageArtifactEvidence = collectiveEvidence::stageArtifactEvidence,
                     recoverArtifactEvidence = { collectiveEvidence.recoverArtifactEvidence(persistence.artifacts) },
+                    stageLocalTestEvidence = collectiveEvidence::stageLocalTestEvidence,
                     orchestrationUtilities = orchestrationUtilities,
                     surfaceRuntime = roleSurfaceRuntime,
                     spendCaps = spendCaps,

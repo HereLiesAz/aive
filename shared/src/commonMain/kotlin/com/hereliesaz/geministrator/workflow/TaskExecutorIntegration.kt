@@ -204,6 +204,8 @@ data class TaskExecutorExecution(
     val progressMessage: String? = null,
     /** The task's total spend so far when the executor reports one (a nested workflow's child run); null keeps what the task has. */
     val usage: com.hereliesaz.geministrator.domain.TaskUsage? = null,
+    /** The local test runner's actual process result, independent of its report content. */
+    val localTestReceipt: LocalTestReceipt? = null,
 ) {
     init {
         require(status in supportedStatuses) {

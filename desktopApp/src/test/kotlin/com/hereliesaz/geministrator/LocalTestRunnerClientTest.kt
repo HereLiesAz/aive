@@ -115,6 +115,13 @@ class LocalTestRunnerClientTest {
             assertEquals("0", report.metadata["exitCode"])
             assertEquals("true", report.metadata["passed"])
             assertEquals("linked-folder", report.metadata["workspace"])
+            val receipt = requireNotNull(finished.localTestReceipt)
+            assertEquals(report.id, receipt.artifactId)
+            assertEquals(0, receipt.exitCode)
+            assertTrue(receipt.started)
+            assertFalse(receipt.timedOut)
+            assertTrue(receipt.passed)
+            assertEquals(null, receipt.checkoutCommit)
             assertTrue(report.textContent.orEmpty().contains("all good"))
             assertTrue(report.textContent.orEmpty().contains("Result: passed"))
         } finally {

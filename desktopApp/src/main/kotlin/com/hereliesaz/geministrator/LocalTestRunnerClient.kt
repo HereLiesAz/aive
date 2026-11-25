@@ -12,6 +12,7 @@ import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.releasedDependencies
 import com.hereliesaz.geministrator.workflow.ExternalExecutionRun
 import com.hereliesaz.geministrator.workflow.ExternalExecutionStatus
+import com.hereliesaz.geministrator.workflow.LocalTestReceipt
 import com.hereliesaz.geministrator.workflow.TaskExecutorContext
 import com.hereliesaz.geministrator.workflow.TestRunnerClient
 import java.io.File
@@ -349,6 +350,13 @@ internal class LocalTestRunnerClient(
             artifacts = listOf(artifact),
             progress = if (passed) 1f else null,
             message = "Tests $outcome · $displayed",
+            localTestReceipt = LocalTestReceipt(
+                artifactId = artifact.id,
+                exitCode = result.exitCode,
+                timedOut = result.timedOut,
+                started = result.startFailure == null,
+                checkoutCommit = workspace.metadata["headCommit"],
+            ),
         )
     }
 

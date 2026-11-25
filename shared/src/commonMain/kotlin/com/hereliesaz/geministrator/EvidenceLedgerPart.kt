@@ -57,6 +57,12 @@ internal fun EvidenceLedgerPart(ledger: CollectiveEvidenceLedger, parentBusy: Bo
     matching.drop(page * 20).take(20).forEach { entry ->
         Text("${entry.kind.name}: ${entry.question}\n${entry.text}\nSource: ${entry.source} · ${if (entry.recordedByKeeper) "Keeper" else entry.roleId.orEmpty()} ${entry.modelId.orEmpty()} · instance ${entry.specialistId ?: "not recorded"}",
             style = AzphaltType.body, color = azphaltOnSurface())
+        entry.localTest?.let { receipt ->
+            Text("Observed local process: exit ${receipt.exitCode}, started ${receipt.started}, timed out ${receipt.timedOut}.\n" +
+                "Initial detached checkout: ${receipt.checkoutCommit ?: "not pinned"}. " +
+                "This does not certify the tested work or acceptance criteria.",
+                style = AzphaltType.body, color = azphaltOnSurface())
+        }
         entry.researchCitation?.let { citation ->
             Text("Research citation ${citation.sourceNumber}: ${citation.sourceType} / ${citation.sourceName}\n" +
                 "Source excerpt: ${citation.sourceExcerpt}\n" +
