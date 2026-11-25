@@ -71,6 +71,10 @@ class WorkflowGovernanceTest {
         val unbounded = definition.copy(tasks = listOf(edit.copy(resources = listOf(
             com.hereliesaz.geministrator.domain.TaskResource.RepositoryFiles(listOf("docs/*.md")))), follow))
         assertEquals(unbounded, expandHostFileSteps(unbounded, repo, mapOf(role.id to role)))
+        val local = repo.copy(source = com.hereliesaz.geministrator.domain.RepositorySource.Local)
+        assertEquals(prepared, preparer.prepare(definition, local))
+        val gitlab = repo.copy(source = com.hereliesaz.geministrator.domain.RepositorySource.GitLab)
+        assertEquals(definition, expandHostFileSteps(definition, gitlab, mapOf(role.id to role)))
     }
 
     @Test

@@ -133,9 +133,7 @@ class GitHubRestRepositoryOperationClient(
      */
     override suspend fun commitFileProposal(project: Project, branch: String, proposal: RepositoryFileProposal): ExternalExecutionRun {
         proposal.validate()
-        require(GitRefNames.requireSafe(branch) == branch && branch.startsWith("aive/") && branch.length <= 200) {
-            "Host commit requires a dedicated aive/ branch"
-        }
+        RepositoryFileProposal.requireDedicatedBranch(branch)
         val repository = requireRepository(project, RepositorySource.GitHub)
         repository.requirePublicRemoteHost("github.com", "GitHub")
         val token = tokenProvider.requireToken("GitHub")
@@ -174,14 +172,7 @@ class GitHubRestRepositoryOperationClient(
             setBody(json.encodeToString(GitHubCreateRefBody("refs/heads/$branch", newCommit.sha)))
         }.requireSuccessBody("create dedicated commit branch"))
         require(created.obj.sha == newCommit.sha) { "GitHub returned a different commit than requested" }
-        return completedRun(
-            source = RepositorySource.GitHub,
-            operation = "commit-files",
-            label = "Commit approved files",
-            text = "BRANCH: $branch\nFILES: ${proposal.files.joinToString(", ") { it.path }}\nCOMMIT: ${newCommit.sha}",
-            artifactKind = ArtifactKind.CodeChange,
-            metadata = mapOf("branch" to branch, "headCommit" to newCommit.sha, "baseCommit" to proposal.baseCommit),
-        ).also { runs.put(it) }
+        return proposal.toCommitRun(RepositorySource.GitHub, branch, newCommit.sha).also { runs.put(it) }
     }
 
     /** Both readers and writers validate the same complete immutable tree. */
@@ -662,6 +653,18 @@ fun RepositoryFileProposal.toSnapshotRun(source: RepositorySource): ExternalExec
         source = source, operation = RepositoryFileProposal.READ_CONTEXT_OPERATION,
         label = "Repository file proposal context", text = Json.encodeToString(this),
         metadata = mapOf("baseCommit" to baseCommit),
+    )
+}
+
+/** Common evidence format for host-owned commits on remote or local repositories. */
+fun RepositoryFileProposal.toCommitRun(source: RepositorySource, branch: String, headCommit: String): ExternalExecutionRun {
+    RepositoryFileProposal.requireDedicatedBranch(branch)
+    require(isGitObjectId(headCommit)) { "Invalid committed head SHA" }
+    return completedRun(
+        source = source, operation = "commit-files", label = "Commit approved files",
+        text = "BRANCH: $branch\nFILES: ${files.joinToString(", ") { it.path }}\nCOMMIT: $headCommit",
+        artifactKind = ArtifactKind.CodeChange,
+        metadata = mapOf("branch" to branch, "headCommit" to headCommit, "baseCommit" to baseCommit),
     )
 }
 

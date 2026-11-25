@@ -26,6 +26,10 @@ interface LocalRepositoryReader {
     suspend fun snapshot(root: String, paths: List<String>): RepositoryFileProposal =
         error("Committed file snapshots are unsupported by this repository reader")
 
+    /** Commit approved replacements to a new branch without changing the working tree or index. */
+    suspend fun commitProposal(root: String, branch: String, proposal: RepositoryFileProposal): String =
+        error("Host-owned commits are unsupported by this repository reader")
+
     /** Files on disk under [root], for a folder that is not a Git repository. */
     suspend fun diskFiles(root: String): List<LocalRepositoryFile>
 

@@ -32,7 +32,7 @@ At workflow preparation, an Auto, local, single-inference file-write contract wi
 
 For GitHub, GitLab or Local Git, an eligible read-repository-files template with literal repository_files paths is compiled into a host snapshot followed by the original inference-only answer step. The answer preserves its identity, contract, dependencies and role, but receives no repository handle or tools. Both routes keep an explicit target, provider pin, placement, condition or other incompatible declaration unchanged rather than guessing. Missing required template inputs are not bypassed. No cached habit substitutes for the fresh host snapshot and inference.
 
-The planner is told to choose these routes for known file paths. GitLab and Local Git writes retain their existing workspace agents. GitLab's commits API does not document an atomic create-only branch condition; host-owned GitLab writes remain disabled rather than weaken the dedicated-branch invariant. The existing repository mutation approval and context-taint rules remain in force.
+The planner is told to choose these routes for known file paths. Local Git also supports the host proposal and approval pipeline on desktop and Android. GitLab writes retain their existing workspace agents. GitLab's commits API does not document an atomic create-only branch condition; host-owned GitLab writes remain disabled rather than weaken the dedicated-branch invariant. The existing repository mutation approval and context-taint rules remain in force.
 
 The same GitHub connection is also used by the GitHub Actions executor.
 
