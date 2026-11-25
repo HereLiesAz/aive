@@ -205,7 +205,7 @@ object CliRunScript {
         if (aptPackages.isEmpty() && npmSpec == null && !update) return null
         return "NONCE=${PosixShell.quote(nonce)}\nUPDATE=${if (update) "1" else "0"}\nNPMSPEC=${PosixShell.quote(npmSpec.orEmpty())}\n" +
             "APTPKGS=(${aptPackages.joinToString(" ") { PosixShell.quote(it) }})\n" +
-            "APT_ARCHIVES=${PosixShell.quote(APT_ARCHIVES)}\nAPT_LISTS=${PosixShell.quote(APT_LISTS)}\n" + INSTALL_BODY.replace('§', '
+            "APT_ARCHIVES=${PosixShell.quote(APT_ARCHIVES)}\nAPT_LISTS=${PosixShell.quote(APT_LISTS)}\n" + INSTALL_BODY.replace('§', '$')
     }
 
     // Fixed texts. `§` stands for `$` (Kotlin would read it as its own), and is replaced before the text is used.
@@ -233,137 +233,6 @@ if [ "§CODE" = 0 ] && [ "§UPDATE" = 1 ]; then
 fi
 if [ "§CODE" = 0 ] && [ "§{#APTPKGS[@]}" -gt 0 ]; then
   OUT="§OUT§(timeout -k 10 1500 apt-get "§{APT_DIR_OPTIONS[@]}" install -y -o Dpkg::Options::=--force-confold -- "§{APTPKGS[@]}" 2>&1)"; CODE=§?
-fi
-if [ "§CODE" = 0 ] && [ -n "§NPMSPEC" ]; then
-  if ! command -v npm >/dev/null 2>&1; then printf 'AIVE-NONPM %s\n' "§NONCE"; exit 0; fi
-  OUT="§OUT§(timeout -k 10 900 npm install -g --no-audit --no-fund -- "§NPMSPEC" 2>&1)"; CODE=§?
-fi
-printf 'AIVE-INSTALL %s %s\n' "§NONCE" "§CODE"
-printf '%s\n' "§OUT" | tail -c 2000
-printf '\nAIVE-INSTALL-END %s\n' "§NONCE"
-"""
-
-    private const val BODY = """
-set -u
-umask 077
-sect() { printf 'AIVE-%s-BEGIN %s\n' "§1" "§NONCE"; if [ -f "§2" ]; then "§3" -c "§4" "§2"; fi; printf '\nAIVE-%s-END %s\n' "§1" "§NONCE"; }
-fin() {
-  R="§(printf '%s' "§{2:-}" | tr '\r\n' '  ' | cut -c1-300)"
-  {
-    printf 'AIVE-RESULT-BEGIN %s\n' "§NONCE"
-    printf 'status=%s\n' "§1"
-    printf 'exit=%s\n' "§{EXITCODE:-0}"
-    printf 'branch=%s\n' "§{BRANCHOUT:-}"
-    printf 'commit=%s\n' "§{COMMITOUT:-}"
-    printf 'patch-truncated=%s\n' "§{PTRUNC:-0}"
-    printf 'reason=%s\n' "§R"
-    sect ANSWER "§RUN/out" tail $ANSWER_MAX_BYTES
-    sect STDERR "§RUN/err" tail $STDERR_MAX_BYTES
-    sect PATCH "§RUN/patch" head $PATCH_MAX_BYTES
-    printf 'AIVE-RESULT-END %s\n' "§NONCE"
-  }
-  exit 0
-}
-badlink() {
-  find "§TREE" -path "§TREE/.git" -prune -o -type l -print0 2>/dev/null | while IFS= read -r -d '' l; do
-    t="§(readlink -- "§l")"
-    case "§t" in /*) r="§(realpath -m -- "§t" 2>/dev/null)" ;; *) r="§(realpath -m -- "§(dirname -- "§l")/§t" 2>/dev/null)" ;; esac
-    case "§r" in "§TREEREAL"|"§TREEREAL"/*) ;; *) printf '%s\n' "§{l#"§TREE"/}"; break ;; esac
-  done
-}
-doclone() { timeout -k 5 300 "§{G[@]}" clone "§{CL[@]}" -- "§REPOURL" "§TREE" >"§RUN/clone.out" 2>&1; }
-[ "§HOME" = "§HOMEEXPECT" ] || fin refused "The runtime's home folder is not where The Aive expects it."
-case "§RUN" in "§HOME"/.aive-cli/?*) ;; *) fin refused "The run folder is not under the runtime's home." ;; esac
-mkdir -p -- "§HOME/.aive-cli" && chmod 700 "§HOME/.aive-cli" && rm -rf -- "§RUN" && mkdir -- "§RUN" && mkdir -- "§RUN/tmp" || fin failed "Could not make a work folder in the runtime."
-trap 'rm -rf -- "§RUN"' EXIT
-TREE="§RUN/tree"
-BIN=""
-for b in "§{BINS[@]}"; do
-  p="§(command -v "§b" 2>/dev/null)"
-  case "§p" in /*) BIN="§p"; break ;; esac
-done
-[ -n "§BIN" ] || fin refused "§DNAME is not installed in the runtime§HINT"
-export GIT_TERMINAL_PROMPT=0
-: "§{GIT_SSH_COMMAND:=ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new}"; export GIT_SSH_COMMAND
-G=(git -c core.hooksPath=/dev/null -c core.fsmonitor=false -c core.autocrlf=false -c protocol.ext.allow=never -c protocol.file.allow=never)
-if [ -n "§REPOURL" ]; then
-  CL=(--depth 1 --no-tags --single-branch)
-  if [ -n "§BASEREF" ]; then CL+=(--branch "§BASEREF"); fi
-  if [ -n "§TOKENHOST" ] && [ -n "§{AIVE_GIT_TOKEN:-}" ]; then
-    ( export GIT_CONFIG_COUNT=1 "GIT_CONFIG_KEY_0=http.https://§TOKENHOST/.extraHeader" "GIT_CONFIG_VALUE_0=Authorization: Basic §(printf 'x-access-token:%s' "§AIVE_GIT_TOKEN" | base64 -w0)"; doclone ) || fin failed "The runtime's git could not clone the repository: §(tail -c 250 "§RUN/clone.out")"
-  else
-    doclone || fin failed "The runtime's git could not clone the repository (a private repository needs the token option): §(tail -c 250 "§RUN/clone.out")"
-  fi
-  unset AIVE_GIT_TOKEN
-  TREEREAL="§(realpath -- "§TREE")"
-  BASE="§("§{G[@]}" -C "§TREE" rev-parse HEAD 2>/dev/null)" || fin failed "The clone has no commit to work from."
-  "§{G[@]}" -C "§TREE" checkout -q -b "§BRANCH" || fin failed "Could not make the branch §BRANCH."
-  BRANCHOUT="§BRANCH"
-  if [ "§ALLOWCFG" != 1 ] && [ "§{#CFGPATS[@]}" -gt 0 ]; then
-    GP=()
-    for pt in "§{CFGPATS[@]}"; do GP+=(-e "/§pt"); done
-    HIT="§("§{G[@]}" -C "§TREE" ls-files | tr 'A-Z' 'a-z' | sed 's|^|/|' | grep -F "§{GP[@]}" | head -n 1)"
-    [ -z "§HIT" ] || fin refused "This repository tracks §DNAME project settings (§HIT), which can make it run commands, so it was not started."
-  fi
-  LK="§(badlink)"
-  [ -z "§LK" ] || fin refused "This repository tracks a symbolic link that points outside the checkout (§LK), so §DNAME was not started."
-else
-  unset AIVE_GIT_TOKEN
-  mkdir -- "§TREE" || fin failed "Could not make a folder to work in."
-  TREEREAL="§(realpath -- "§TREE")"
-fi
-printf '%s' "§PROMPT" > "§RUN/prompt"
-E=("PATH=§PATHVALUE" "HOME=§HOME" "TMPDIR=§RUN/tmp" "LANG=C.UTF-8" "NO_COLOR=1" "TERM=dumb")
-for v in "§{ENVNAMES[@]}"; do
-  if [ -n "§{!v:-}" ]; then E+=("§v=§{!v}"); fi
-done
-ARGV=("§{ARGS[@]}")
-if [ "§STDINPROMPT" = 1 ]; then INFILE="§RUN/prompt"; else INFILE=/dev/null; ARGV+=("§(cat "§RUN/prompt")"); fi
-cd "§TREE" || fin failed "Could not enter the work folder."
-env -i "§{E[@]}" timeout -k 10 "§TIMEOUT" "§BIN" "§{ARGV[@]}" <"§INFILE" >"§RUN/out" 2>"§RUN/err"
-EXITCODE=§?
-if [ "§EXITCODE" = 124 ] || [ "§EXITCODE" = 137 ]; then fin failed "§DNAME timed out and was stopped."; fi
-if [ "§EXITCODE" != 0 ]; then fin failed "§DNAME failed (exit §EXITCODE)."; fi
-if [ -n "§REPOURL" ] && [ "§MODE" = edit ]; then
-  CH="§("§{G[@]}" -C "§TREE" status --porcelain=v1 -z --untracked-files=all | tr '\0' '\n')"
-  if printf '%s\n' "§CH" | grep -qiE '(^|[ /])\.git(attributes|modules)?(/|§)'; then fin failed "§DNAME changed a file that controls how Git behaves; the change was discarded."; fi
-  LK="§(badlink)"
-  [ -z "§LK" ] || fin failed "§DNAME made a symbolic link that points outside the checkout (§LK); the change was discarded."
-  "§{G[@]}" -C "§TREE" add -A >/dev/null 2>&1
-  if ! "§{G[@]}" -C "§TREE" diff --cached --quiet; then
-    "§{G[@]}" -C "§TREE" -c user.name=Aive -c user.email=aive@localhost -c commit.gpgsign=false commit --no-verify -q -m "§MSG" -m "Aive-Provider: §PROVID" >/dev/null 2>&1 || fin failed "Could not commit §DNAME's changes."
-    COMMITOUT="§("§{G[@]}" -C "§TREE" rev-parse HEAD)"
-    "§{G[@]}" -C "§TREE" diff --no-ext-diff --no-textconv "§BASE" "§COMMITOUT" > "§RUN/patch" 2>/dev/null
-    if [ "§(wc -c < "§RUN/patch")" -gt $PATCH_MAX_BYTES ]; then PTRUNC=1; fi
-  fi
-fi
-fin ok ""
-"""
-}
-)
-    }
-
-    // Fixed texts. `§` stands for `$` (Kotlin would read it as its own), and is replaced before the text is used.
-    private const val PROBE_BODY = """
-printf 'AIVE-READY %s\n' "§NONCE"
-for n in "§{NAMES[@]}"; do
-  p="§(command -v "§n" 2>/dev/null)"
-  case "§p" in
-    /*) printf 'AIVE-FOUND %s %s %s\n' "§NONCE" "§n" "§p" ;;
-    *) printf 'AIVE-MISSING %s %s\n' "§NONCE" "§n" ;;
-  esac
-done
-"""
-
-    private const val INSTALL_BODY = """
-export DEBIAN_FRONTEND=noninteractive
-CODE=0
-OUT=""
-if [ "§UPDATE" = 1 ]; then
-  OUT="§(timeout -k 10 600 apt-get update 2>&1)"; CODE=§?
-fi
-if [ "§CODE" = 0 ] && [ "§{#APTPKGS[@]}" -gt 0 ]; then
-  OUT="§OUT§(timeout -k 10 1500 apt-get install -y -o Dpkg::Options::=--force-confold -- "§{APTPKGS[@]}" 2>&1)"; CODE=§?
 fi
 if [ "§CODE" = 0 ] && [ -n "§NPMSPEC" ]; then
   if ! command -v npm >/dev/null 2>&1; then printf 'AIVE-NONPM %s\n' "§NONCE"; exit 0; fi
