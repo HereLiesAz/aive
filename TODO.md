@@ -31,6 +31,10 @@ Normative target, phase dependencies, migration constraints and acceptance crite
 
 The Aive is the intelligence; specialists are its cognitive organs. The persistent communicating collective, rather than a workflow, is the unit of intelligence. Workflows remain the governed execution machinery: dependencies, approvals, budget enforcement and recovery must remain intact.
 
+**Owner correction (2026-11-24):** Shared memory, individual attention. Every role may associate with all memory in its authorized collective corpus, irrespective of originating role. Keep physical bank provenance and explicit Keeper privacy boundaries; remove role-specific recall eligibility and role-based ranking of provider-bound recall. The role-only implementation descriptions below are historical. Passive project recall must include older registered banks as well as recent ones; shared physical banks must not confer access to their ancestry. Verify provenance, recall cost at scale, and actual delivery across every chat family before closing universal participation.
+
+**Direct reply capture slice:** Stage actual run-bound dispute and training responses before the next inference; release at exchange exit, never as Keeper speech or as a new memory-access grant. Test crash recovery, clear-before-release, disabled capture, and independent proposal isolation. Other direct families, absent-bank and provider-side interruption cases remain open; do not mark complete before live verification.
+
 **Continuation order:** finish universal memory participation and provider-path verification; then shared evidence and dissent, bounded multi-party deliberation, governed autonomous action, procedural learning and idle consolidation, unified API/identity, cognitive telemetry and live acceptance. Evaluate research mechanisms against matched-budget isolated and centralized baselines, rather than treating increased message volume as intelligence. Do not close the encompassing items for a partial implementation.
 
 ### Identity, communication and attention

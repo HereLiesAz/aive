@@ -451,9 +451,11 @@ ranges and occurrence counts never depend on raw history surviving and are never
   "Memory timeline", "Recalled on request") and the memory protocol say the text is untrusted data, not instructions.
 - **The memory marker is not an opt-out.** Only the exact text memory sent into a session (`noteIssued`) is
   skipped when echoed; an agent message that merely starts with the marker is banked.
-- **Bounded reads at task start.** The lineage log is decoded when its stored text changes, recall reads the
-  newest 12 sibling banks (`MemoryLineage.MAX_READ_ONLY_NEIGHBOURS`), and habit formation reads each bank's
-  newest 1000 receipts. The stored lineage and receipts are still add-only.
+- **Shared recall, bounded delivery.** The lineage log is decoded when its stored text changes. Every registered
+  bank in the authorized projects and verified role-lesson corpus is eligible for passive association,
+  regardless of originating role or age. Shared reads are physical and read-only, not through another bank's
+  private ancestry. Attention bounds delivery. Habit formation still reads each bank's newest 1000 receipts.
+  The stored lineage and receipts are still add-only. Recall cost at large bank counts remains to be verified.
 - **Unreadable memory settings fail safe.** Stored settings that cannot be decoded leave memory off, are not
   overwritten, and are copied to `aive.memory.layer-settings.v1.unreadable` before the keeper's first change.
 

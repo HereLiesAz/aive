@@ -563,7 +563,7 @@ data class MemoryHitProvenance(
      * memory is in the reader's own lineage; null for a read-only memory of another workflow.
      */
     val lineagePath: List<String>?,
-    /** Set when the hit was read, read-only, from another workflow's bank in the same project. */
+    /** Set when the hit was read from an authorized external physical bank without write access. */
     val readOnlyFromWorkflow: String? = null,
 )
 

@@ -94,16 +94,27 @@ internal suspend fun ApplicationRuntime.driveTrainingRound(runId: String) {
     val results = trainingResults(run)
     val findings = reviewerFindings(trainingStepText(run, TRAINING_REVIEW_ID).orEmpty())
     val limits = tightenLimits(defaultTrainingLimits(keeperHourlyCapUsd()), trainerLimitOf(run))
-    val models = trainingModels()
+    val (models, configuredRoles) = trainingModels()
     val mayCall = models?.mayCall ?: { true }
 
-    val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(listOf(run.id.value))
-    val exchange = exchangeOnRuling(
-        results, findings, info.round, limits,
-        nanny = models?.voices?.get(HallMonitorRole.id.value)?.let { memory.voice(it, HallMonitorRole.id.value, conversationId = "training-ruling:${run.id.value}") },
-        antagonist = models?.voices?.get(BuiltInRoles.Antagonist.id.value)?.let { memory.voice(it, BuiltInRoles.Antagonist.id.value, conversationId = "training-ruling:${run.id.value}") },
-        mayCall = mayCall,
+    val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(
+        listOf(run.id.value), captureWorkflowId = run.id.value,
     )
+    val conversationId = "training-ruling:${run.id.value}"
+    val exchange = try {
+        exchangeOnRuling(
+            results, findings, info.round, limits,
+            nanny = models?.voices?.get(HallMonitorRole.id.value)?.let {
+                memory.configuredVoice(it, HallMonitorRole.id.value, conversationId, configuredRoles)
+            },
+            antagonist = models?.voices?.get(BuiltInRoles.Antagonist.id.value)?.let {
+                memory.configuredVoice(it, BuiltInRoles.Antagonist.id.value, conversationId, configuredRoles)
+            },
+            mayCall = mayCall,
+        )
+    } finally {
+        memory.flushReplies()
+    }
     var next = nextForExchange(exchange, info.round, limits, findings)
     val disputed = (next as? TrainingNext.SettleDispute)?.disputed
     if (disputed != null) {
