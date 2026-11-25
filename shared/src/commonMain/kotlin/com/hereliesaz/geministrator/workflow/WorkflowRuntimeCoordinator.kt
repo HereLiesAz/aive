@@ -4,6 +4,8 @@ import com.hereliesaz.geministrator.ErrorKind
 import com.hereliesaz.geministrator.classifyError
 import com.hereliesaz.geministrator.domain.ApprovalGateId
 import com.hereliesaz.geministrator.domain.ArtifactId
+import com.hereliesaz.geministrator.domain.ArtifactKind
+import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.BlockingReason
 import com.hereliesaz.geministrator.domain.ContextProvenance
 import com.hereliesaz.geministrator.domain.Project
@@ -103,6 +105,12 @@ class WorkflowRuntimeCoordinator(
     private val enforceDeadlines: Boolean = HARD_DEADLINES_ENABLED,
     /** Learns replayable habits from accepted runs and quarantines one that was turned back; null does neither. */
     private val habitReplayObserver: HabitReplayObserver? = null,
+    /** Journals a new artifact version before its repository write; never replays a historical artifact. */
+    private val stageArtifactEvidence: (suspend (WorkflowRun, ArtifactRef) -> Unit)? = null,
+    /** Reconciles the existing journal against durable artifact receipts without running any work. */
+    private val recoverArtifactEvidence: (suspend () -> Unit)? = null,
+    /** Stages host-observed local process results only at the actual integration receipt boundary. */
+    private val stageLocalTestEvidence: (suspend (WorkflowRun, ArtifactRef, LocalTestReceipt) -> Unit)? = null,
 ) {
     private val gateCoordinator = ApprovalGateCoordinator(
         persistence.approvalGates,
@@ -1084,11 +1092,42 @@ class WorkflowRuntimeCoordinator(
 
     /** Writes the artifacts the store does not have in this form yet; the rest of the run's are as they were. */
     private suspend fun persistArtifacts(run: WorkflowRun) {
+        // Recover a previously written version before staging its replacement.
+        if (recoverArtifactEvidence != null) {
+            try {
+                recoverArtifactEvidence.invoke()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                com.hereliesaz.geministrator.log.AppLog.record("evidence", "Could not recover artifact evidence: ${failure::class.simpleName}")
+            }
+        }
         val current = run.taskRuns.values.flatMap(TaskRun::artifacts)
         for (artifact in current) {
             if (persistedArtifacts[artifact.id] == artifact) continue
+            // The durable repository, not the in-process cache, decides whether this is a new version.
+            // Reopening a run must not repopulate previously erased ledger evidence.
+            if (stageArtifactEvidence != null) {
+                try {
+                    if (persistence.artifacts.get(artifact.id) != artifact) stageArtifactEvidence.invoke(run, artifact)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    // Evidence is descriptive, never a prerequisite for executing or persisting work.
+                    com.hereliesaz.geministrator.log.AppLog.record("evidence", "Could not journal artifact evidence: ${failure::class.simpleName}")
+                }
+            }
             persistence.artifacts.put(artifact)
             persistedArtifacts[artifact.id] = artifact
+        }
+        if (recoverArtifactEvidence != null) {
+            try {
+                recoverArtifactEvidence.invoke()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                com.hereliesaz.geministrator.log.AppLog.record("evidence", "Could not recover artifact evidence: ${failure::class.simpleName}")
+            }
         }
         // Only the run being cycled is remembered: another run's artifacts are written again if it comes back.
         val keep = current.mapTo(mutableSetOf()) { it.id }
@@ -1527,31 +1566,51 @@ class WorkflowRuntimeCoordinator(
             val executor = taskRun.executor ?: task.effectiveExecutor()
             if (!executor.isSystemExecutor()) continue
             val integration = executorIntegrations.integrationFor(executor, project) ?: continue
-            next = applyExecution(
+            val execution = labelOutputs(
+                definition = definition,
                 run = next,
-                id = id,
-                previous = taskRun,
+                task = task,
                 executor = executor,
-                execution = labelOutputs(
-                    definition = definition,
-                    run = next,
-                    task = task,
-                    executor = executor,
-                    execution = integration.reconcile(
-                        TaskExecutorContext(
-                            project = project,
-                            definition = definition,
-                            run = next,
-                            task = task,
-                            taskRun = taskRun,
-                            executor = executor,
-                            nowEpochMillis = now,
-                            role = engine.roleDefinition(next, task.roleId),
-                        ),
+                execution = integration.reconcile(
+                    TaskExecutorContext(
+                        project = project,
+                        definition = definition,
+                        run = next,
+                        task = task,
+                        taskRun = taskRun,
+                        executor = executor,
+                        nowEpochMillis = now,
+                        role = engine.roleDefinition(next, task.roleId),
                     ),
                 ),
-                now = now,
             )
+            next = applyExecution(next, id, taskRun, executor, execution, now)
+            // Only the asynchronous local runner's correlated terminal poll carries an observation.
+            // Historical run data and agent reports cannot manufacture one.
+            val receipt = execution.localTestReceipt
+            if (stageLocalTestEvidence != null && receipt != null &&
+                executor is TaskExecutor.TestRunner &&
+                taskRun.externalRunId != null && execution.externalRunId == taskRun.externalRunId &&
+                execution.status == (if (receipt.passed) TaskRunStatus.Completed else TaskRunStatus.Failed) &&
+                ArtifactKind.TestResult !in definition.payloadRedactionPolicy.excludedArtifactKinds
+            ) {
+                val report = execution.artifacts.singleOrNull {
+                    it.id == receipt.artifactId && it.kind == ArtifactKind.TestResult && it.taskRunId == taskRun.id
+                }
+                if (report != null) {
+                    try {
+                        if (persistence.artifacts.get(report.id) != report) {
+                            val evidenceRun = if (definition.payloadRedactionPolicy.redactObjective)
+                                next.copy(objective = "[REDACTED]") else next
+                            stageLocalTestEvidence.invoke(evidenceRun, report, receipt)
+                        }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        com.hereliesaz.geministrator.log.AppLog.record("evidence", "Could not journal test observation: ${failure::class.simpleName}")
+                    }
+                }
+            }
         }
         return next
     }

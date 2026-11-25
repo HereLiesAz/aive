@@ -78,19 +78,32 @@ fun planningMayCall(
     fun no(reason: GateReason): CallDecision =
         if (caller == PlanningCaller.Reviewer) CallDecision.ChecklistOnly(reason) else CallDecision.Refuse(reason)
     if (callsSoFar >= PlanningLimits.MAX_CALLS) return no(GateReason.CallLimit)
+    return advisoryResourceGate(price, estimateUsd, caps, hourly, caller != PlanningCaller.Reviewer || pacerRoom)
+        ?.let(::no) ?: CallDecision.Allow
+}
+
+/** Shared monetary and Source-room safeguards, independent of any planning or dialogue round count. */
+private fun advisoryResourceGate(
+    price: PriceStatus, estimateUsd: Double?, caps: SpendCaps, hourly: HourlySpend, pacerRoom: Boolean,
+): GateReason? {
     if (caps.anyDollarCap()) {
         // An unknown price under a dollar cap is the keeper's to decide, never hers (see needsKeeper): no call is made.
-        if (needsKeeper(Situation.Spends(price, dollarCap = true)) == KeeperReason.SpendsUnpriced) return no(GateReason.UnpricedUnderCap)
+        if (needsKeeper(Situation.Spends(price, dollarCap = true)) == KeeperReason.SpendsUnpriced) return GateReason.UnpricedUnderCap
         val hourlyCap = caps.hourlySpendCapUsd
         if (hourlyCap != null) {
-            if (hourly.unpricedUsage) return no(GateReason.UnpricedUsage)
-            val cost = if (price == PriceStatus.Free) 0.0 else estimateUsd ?: return no(GateReason.UnpricedUnderCap)
-            if (hourly.knownUsd + cost >= hourlyCap * PlanningLimits.HOURLY_SHARE) return no(GateReason.OverHourlyCap)
+            if (hourly.unpricedUsage) return GateReason.UnpricedUsage
+            val cost = if (price == PriceStatus.Free) 0.0 else estimateUsd ?: return GateReason.UnpricedUnderCap
+            if (hourly.knownUsd + cost >= hourlyCap * PlanningLimits.HOURLY_SHARE) return GateReason.OverHourlyCap
         }
     }
-    if (caller == PlanningCaller.Reviewer && !pacerRoom) return CallDecision.ChecklistOnly(GateReason.NoRoom)
-    return CallDecision.Allow
+    return if (!pacerRoom) GateReason.NoRoom else null
 }
+
+/** Advisory dialogue has no call-count quota. Each actual call still requires money and Source room. */
+internal fun deliberationMayCall(
+    price: PriceStatus, estimateUsd: Double?, caps: SpendCaps, hourly: HourlySpend, pacerRoom: Boolean,
+): CallDecision = advisoryResourceGate(price, estimateUsd, caps, hourly, pacerRoom)
+    ?.let { CallDecision.Refuse(it) } ?: CallDecision.Allow
 
 /** What her own call is for. A ruling settles something that cannot wait; the rest are optional and yield to the keeper's caps. */
 enum class QueenCallKind { Ruling, Checkpoint }

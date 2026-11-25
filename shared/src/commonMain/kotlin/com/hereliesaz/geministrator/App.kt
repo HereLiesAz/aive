@@ -381,7 +381,7 @@ fun App(
     // Gemini in Google Search, when the keeper added it as a Source and left it on (providers/llm GoogleAiMode).
     val aiModeAnswerer = com.hereliesaz.geministrator.research.GoogleAiModeResearch.answerer
         ?.takeIf { enabledProviders.any { it.id.value == ProviderCatalog.GOOGLE_AI_MODE_ID } }
-    val researchStep = remember(mcpHost, mcpConsent, researchBridgeOn, researchServers.isNotEmpty(), researchOn, researchDocNames, aiModeAnswerer) {
+    val researchStep = remember(runtime, mcpHost, mcpConsent, researchBridgeOn, researchServers.isNotEmpty(), researchOn, researchDocNames, aiModeAnswerer) {
         if (!researchOn) return@remember null
         com.hereliesaz.geministrator.research.ResearchStep(
             local = buildList {
@@ -432,6 +432,9 @@ fun App(
             },
             consent = mcpConsent ?: com.hereliesaz.geministrator.mcp.McpConsentGate.DenyUnasked,
             appDocs = com.hereliesaz.geministrator.research.AiveDocsResearch(aiveDocsSource),
+            observeOutcome = { objective, runKey, outcome, budget ->
+                runtime?.collectiveEvidence?.recordResearch(objective, runKey, outcome, budget)
+            },
         )
     }
     val researchContext = com.hereliesaz.geministrator.research.ResearchContext(
@@ -460,7 +463,10 @@ fun App(
                         queen = base,
                         voices = com.hereliesaz.geministrator.queen.disputeVoices(base, roles),
                         research = researchStep?.let { step ->
-                            com.hereliesaz.geministrator.research.ResearchInvestigation(step, { researchContext })
+                            com.hereliesaz.geministrator.research.ResearchInvestigation(
+                                step, { researchContext },
+                                observeClaims = active.collectiveEvidence::recordResearchClaims,
+                            )
                         },
                     )
                 }
@@ -921,8 +927,8 @@ fun App(
             }
             host.specialistTrainer = { roleId: String, domain: String -> runtime?.startTrainingFromActive(roleId, domain) ?: false }
             host.peerMailbox = { runtime?.providerRegistry?.peerMailbox }
-            host.collectiveChat = { question, conversation ->
-                checkNotNull(runtime).collectiveAdvisory(question, conversation)
+            host.collectiveChat = { question, conversation, timeBudget ->
+                checkNotNull(runtime).collectiveAdvisory(question, conversation, timeBudget)
             }
             host.collectiveHistory = { checkNotNull(runtime).collectiveHistory() }
             host.collectiveNew = { checkNotNull(runtime).newCollectiveConversation() }

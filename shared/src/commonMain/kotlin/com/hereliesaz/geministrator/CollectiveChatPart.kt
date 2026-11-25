@@ -22,6 +22,7 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
     var profiles by remember { mutableStateOf<List<SpecialistProfile>>(emptyList()) }
     var selected by remember { mutableStateOf<String?>(null) }
     var question by remember { mutableStateOf("") }
+    var minutes by remember { mutableStateOf((com.hereliesaz.geministrator.queen.DEFAULT_DELIBERATION_MILLIS / 60_000L).toString()) }
     var pending by remember { mutableStateOf<Job?>(null) }
     var busy by remember { mutableStateOf(false) }
     var inspect by remember { mutableStateOf(false) }
@@ -39,7 +40,7 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
         catch (_: Exception) { status = "Conversation history unavailable." }
     }
     ProviderSectionLabel("Ask The Aive")
-    Text("Advisory conversation only. Specialists are selected by relevance and configured model availability. Completed turns are saved locally. Each actual reply is banked separately when memory is enabled; all collective memory participates in associative recall. Deleting chat history does not erase the memories derived from it.",
+    Text("Advisory conversation only. Specialists are selected by relevance and configured model availability. Typed local test observations explicitly linked to a conversation are included in its next model calls; raw test output is not sent. Completed turns are saved locally. Each actual reply is banked separately when memory is enabled; all collective memory participates in associative recall. Deleting chat history does not erase the memories derived from it.",
         style = AzphaltType.body, color = azphaltOnSurface())
     conversations.forEach { conversation ->
         val title = conversation.turns.firstOrNull()?.question?.take(45) ?: "Empty conversation"
@@ -56,10 +57,36 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
             style = AzphaltType.body, color = azphaltOnSurface())
         if (result.unavailable.isNotEmpty()) Text("Unavailable: ${result.unavailable.joinToString()}",
             style = AzphaltType.body, color = azphaltOnSurface())
+        result.stop?.let { stop ->
+            val explanation = when (stop) {
+                com.hereliesaz.geministrator.queen.DeliberationStop.NoFurtherReviewRequested -> "No further conversation requested; agreement is not inferred."
+                com.hereliesaz.geministrator.queen.DeliberationStop.RepeatedObjection -> "Repeated review request; no resolution inferred."
+                com.hereliesaz.geministrator.queen.DeliberationStop.ReviewUnavailable -> "A requested response was unavailable."
+                com.hereliesaz.geministrator.queen.DeliberationStop.TimeBudget -> "Deliberation time budget reached."
+                com.hereliesaz.geministrator.queen.DeliberationStop.NoInitialAssessment -> "No initial assessment obtained."
+            }
+            Text(explanation, style = AzphaltType.body, color = azphaltOnSurface())
+        }
+        if (result.reviewRequested && result.assessments.none { it.crossExamination }) {
+            Text("Further conversation requested but not obtained.", style = AzphaltType.body, color = azphaltOnSurface())
+        }
+        if (result.observationRecipientsMissing.isNotEmpty()) Text(
+            "Previously involved participants without a returned observation-bearing reply: " +
+                result.observationRecipientsMissing.joinToString { it.take(12) },
+            style = AzphaltType.body, color = azphaltOnSurface())
+        if (result.unexaminedRequests.isNotEmpty()) Text(
+            "Unexamined requests: " + result.unexaminedRequests.joinToString { "#$it" },
+            style = AzphaltType.body, color = azphaltOnSurface())
         if (result.assessments.isNotEmpty()) {
-            Text("Specialist assessments (unverified; not a consensus verdict)", style = AzphaltType.body, color = azphaltOnSurface())
-            result.assessments.forEach { assessment ->
-                Text("${assessment.role}: ${assessment.text}", style = AzphaltType.body, color = azphaltOnSurface())
+            Text("Internal conversation (rhetoracracy)", style = AzphaltType.body, color = azphaltOnSurface())
+            result.assessments.forEachIndexed { index, assessment ->
+                val target = assessment.respondsTo?.let { " (responds to #$it)" }
+                    ?: if (assessment.crossExamination) " (response)" else ""
+                val persuasion = assessment.persuadedBy?.let { " (reports persuaded by #$it)" }.orEmpty()
+                Text("#${index + 1} ${assessment.role}$target$persuasion: ${assessment.text}", style = AzphaltType.body, color = azphaltOnSurface())
+                if (assessment.observationIds.isNotEmpty()) Text(
+                    "Prompt observations: " + assessment.observationIds.joinToString(),
+                    style = AzphaltType.body, color = azphaltOnSurface())
                 if (inspect) Text("Configured Source: ${assessment.sourceId ?: "unknown"} / model: ${assessment.modelId ?: "unknown"}; instance ${assessment.specialistId?.take(12) ?: "legacy"}",
                     style = AzphaltType.body, color = azphaltOnSurface())
             }
@@ -75,17 +102,21 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
         }
     }
     AzphaltTextField(value = question, onValueChange = { question = it.take(1500) }, label = "Ask a question")
+    AzphaltTextField(value = minutes, onValueChange = { minutes = it.filter(Char::isDigit).take(3) },
+        label = "Deliberation time budget (minutes, 1–120)")
     AzphaltPill("Ask The Aive", "collective-ask", onClick = {
         val prompt = question.trim()
         val ask = host.collectiveChat
-        if (!busy && prompt.isNotEmpty() && ask != null) {
+        val budget = minutes.toLongOrNull()?.takeIf { it in 1L..120L }?.times(60_000L)
+        if (!busy && budget == null) status = "Enter a deliberation time budget of 1–120 minutes."
+        if (!busy && prompt.isNotEmpty() && ask != null && budget != null) {
             busy = true
             status = ""
             pending = scope.launch {
                 try {
                     val id = selected ?: checkNotNull(host.collectiveNew).invoke().id
                     selected = id
-                    val result = ask(prompt, id)
+                    val result = ask(prompt, id, budget)
                     refresh(result.id)
                     question = ""
                 } catch (cancelled: CancellationException) {

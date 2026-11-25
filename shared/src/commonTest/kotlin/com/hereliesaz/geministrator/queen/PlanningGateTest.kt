@@ -42,6 +42,16 @@ class PlanningGateTest {
     }
 
     @Test
+    fun deliberationUsesResourceGateWithoutPlanningCallQuota() {
+        assertEquals(CallDecision.Allow, deliberationMayCall(PriceStatus.Free, 0.0, SpendCaps(), none, true))
+        assertEquals(CallDecision.Refuse(GateReason.NoRoom), deliberationMayCall(PriceStatus.Free, 0.0, SpendCaps(), none, false))
+        assertEquals(CallDecision.Refuse(GateReason.UnpricedUnderCap),
+            deliberationMayCall(PriceStatus.Unknown, null, SpendCaps(hourlySpendCapUsd = 1.0), none, true))
+        assertEquals(CallDecision.Refuse(GateReason.OverHourlyCap),
+            deliberationMayCall(PriceStatus.Priced, 0.2, SpendCaps(hourlySpendCapUsd = 1.0), HourlySpend(0.4, false), true))
+    }
+
+    @Test
     fun herCheckpointsNeedHelpfulSpacingAndTheKeepersOwnGoal() {
         fun may(level: QueenLevel = QueenLevel.Helpful, calls: Int = 0, last: Long? = null, now: Long = 1_000_000_000L, outside: Boolean = false, waiting: Boolean = false, frozen: Boolean = false) =
             queenMayCall(QueenCallKind.Checkpoint, level, PriceStatus.Free, null, SpendCaps(), none, calls, last, now, frozen, outside, waiting)

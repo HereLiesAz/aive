@@ -16,11 +16,13 @@ class ResearchFactsTest {
     )
 
     @Test
-    fun aFactThatCitesAListedSourceIsKeptMarkedUntrustedAndNamesIt() {
-        val facts = parseResearchFacts("FACT: The app uses SQLite. | SOURCE: 1", leads)
-        assertEquals(1, facts.size)
-        assertTrue(facts.single().startsWith("[untrusted reference | fact from linked repository | Linked repository docs]"))
-        assertTrue("The app uses SQLite." in facts.single())
+    fun onlyCompleteMatchingExcerptIsReturnedAsSourceBacked() {
+        val facts = parseResearchFacts("FACT: README.md | SOURCE: 1", leads)
+        assertEquals(listOf("[untrusted reference | exact excerpt from linked repository | Linked repository docs] README.md"), facts)
+        assertTrue(parseResearchFacts("FACT: The app uses SQLite. | SOURCE: 1", leads).isEmpty())
+        val negative = listOf(ResearchLead("Manual", ResearchSource.Repository, "local", "It is not safe to execute.", true))
+        assertTrue(parseResearchFacts("FACT: safe to execute. | SOURCE: 1", negative).isEmpty())
+        assertTrue(parseResearchFacts("FACT: It is not safe to execute. | SOURCE: 1", negative).single().contains("not safe"))
     }
 
     @Test
@@ -30,18 +32,20 @@ class ResearchFactsTest {
     }
 
     @Test
-    fun repeatedStatementsCountOnceAndAtMostThreeAreKept() {
-        val reply = (1..6).joinToString("\n") { "FACT: Statement ${it % 4}. | SOURCE: ${1 + it % 2}" }
-        val facts = parseResearchFacts(reply, leads)
-        assertEquals(3, facts.size)
-        assertEquals(facts.map { it.lowercase() }.toSet().size, facts.size)
+    fun repeatedStatementSourcePairsCountOnceAndAtMostThreeClaimsAreKept() {
+        val reply = "FACT: Same. | SOURCE: 1\nFACT: Same. | SOURCE: 1\nFACT: Same. | SOURCE: 2\nFACT: Third. | SOURCE: 1\nFACT: Fourth. | SOURCE: 2"
+        val claims = parseResearchClaims(reply, leads)
+        assertEquals(listOf(1, 2, 1), claims.map { it.sourceNumber })
+        assertEquals(listOf("Same.", "Same.", "Third."), claims.map { it.statement })
+        assertTrue(claims.none { it.matchesSourceText })
     }
 
     @Test
     fun aLongFactIsCappedAndLinksAreNamedLink() {
-        val facts = parseResearchFacts("FACT: ${"x".repeat(500)} see https://example.com/a | SOURCE: 2", leads)
-        assertTrue(facts.single().length <= 330)
-        assertTrue("https://" !in facts.single())
+        val claim = parseResearchClaims("FACT: ${"x".repeat(500)} see https://example.com/a | SOURCE: 2", leads).single()
+        assertTrue(claim.statement.length <= 200)
+        assertTrue("https://" !in claim.statement)
+        assertTrue(!claim.matchesSourceText)
     }
 
     @Test
@@ -61,11 +65,15 @@ class ResearchFactsTest {
         ResearchInvestigation(ResearchStep(local = listOf(ResearchSource.Repository to Docs())), { ResearchContext(repositoryLinked = true) }, factModel = model)
 
     @Test
-    fun factsComeFirstThenTheLeads() = runTest {
-        val found = research(QueenModel { "FACT: It is SQLite. | SOURCE: 1" }).findings("Which database does the app use?", "k")!!
+    fun matchingExcerptsComeFirstAndUnsupportedModelClaimsDoNotReachDispute() = runTest {
+        val found = research(QueenModel { "FACT: README.md | SOURCE: 1" }).findings("Which database does the app use?", "k")!!
         assertEquals(2, found.size)
-        assertTrue(found.first().startsWith("[untrusted reference | fact from"))
+        assertTrue(found.first().startsWith("[untrusted reference | exact excerpt from"))
         assertTrue(found.last().startsWith("[untrusted reference | linked repository"))
+        val unsupported = research(QueenModel { "FACT: It is SQLite. | SOURCE: 1" })
+            .findings("Which database does the app use?", "k")!!
+        assertEquals(1, unsupported.size)
+        assertTrue(unsupported.none { "SQLite" in it })
     }
 
     @Test

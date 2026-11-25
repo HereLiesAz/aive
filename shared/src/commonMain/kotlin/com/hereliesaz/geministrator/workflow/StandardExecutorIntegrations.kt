@@ -1,9 +1,25 @@
 package com.hereliesaz.geministrator.workflow
 
+import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.TaskExecutor
 import com.hereliesaz.geministrator.domain.TaskRunStatus
+
+/**
+ * Host-produced local process observation, not parsed from report text or metadata.
+ * A successful exit does not establish acceptance-criteria satisfaction.
+ * [checkoutCommit] identifies the initial detached checkout, not its integrity after execution.
+ */
+data class LocalTestReceipt(
+    val artifactId: ArtifactId,
+    val exitCode: Int,
+    val timedOut: Boolean,
+    val started: Boolean,
+    val checkoutCommit: String? = null,
+) {
+    val passed: Boolean get() = started && !timedOut && exitCode == 0
+}
 
 data class ExternalExecutionRun(
     val id: String,
@@ -16,6 +32,8 @@ data class ExternalExecutionRun(
      * run): the task's own usage becomes this, so the parent run's caps count it.
      */
     val usage: com.hereliesaz.geministrator.domain.TaskUsage? = null,
+    /** Actual local process receipt, never parsed from report text. */
+    val localTestReceipt: LocalTestReceipt? = null,
 ) {
     init {
         require(progress == null || progress in 0f..1f) { "Execution progress must be normalized 0f..1f" }
@@ -104,4 +122,5 @@ internal fun ExternalExecutionRun.toTaskExecution(): TaskExecutorExecution = Tas
     progress = progress ?: if (status == ExternalExecutionStatus.Completed) 1f else null,
     progressMessage = message,
     usage = usage,
+    localTestReceipt = localTestReceipt,
 )

@@ -37,6 +37,156 @@ import kotlin.test.assertFailsWith
 
 class WorkflowRuntimeCoordinatorTest {
     @Test
+    fun correlatedLocalTestPollPublishesSeparateObservationButReportAloneCannot() = runBlocking {
+        val persistence = InMemoryWorkflowPersistence()
+        val settings = com.russhwolf.settings.MapSettings()
+        val book = com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger(settings) { 50L }
+        val gateway = FakeManagedSessionGateway()
+        val id = TaskDefinitionId("test")
+        val executor = TaskExecutor.TestRunner()
+        val definition = definition(TaskDefinition(id, "Test", "Run tests", roleId = null, executor = executor))
+        val task = taskRun(id, TaskRunStatus.Running, executor).copy(externalRunId = "local-test-1")
+        val report = ArtifactRef(ArtifactId("report"), ArtifactKind.TestResult, task.id, "Report",
+            textContent = "All criteria verified (untrusted claim)", createdAtEpochMillis = 20L)
+        val client = object : TestRunnerClient {
+            override suspend fun start(project: Project, command: String?): ExternalExecutionRun = error("Already started")
+            override suspend fun getRun(project: Project, runId: String) = ExternalExecutionRun(
+                id = "local-test-1", status = ExternalExecutionStatus.Completed, artifacts = listOf(report),
+                localTestReceipt = LocalTestReceipt(report.id, 0, timedOut = false, started = true,
+                    checkoutCommit = "a".repeat(40)),
+            )
+        }
+        val coordinator = WorkflowRuntimeCoordinator(
+            persistence, WorkflowEngine(sessionGateway = gateway, roles = BuiltInRoles.all), gateway,
+            executorIntegrations = TaskExecutorIntegrationRegistry(listOf(TestRunnerExecutorIntegration(client))),
+            stageArtifactEvidence = book::stageArtifactEvidence,
+            recoverArtifactEvidence = { book.recoverArtifactEvidence(persistence.artifacts) },
+            stageLocalTestEvidence = book::stageLocalTestEvidence,
+        )
+        val initial = run(definition, WorkflowRunStatus.Running, mapOf(id to task))
+        coordinator.cycle(project = project(), definition = definition, state = WorkflowRuntimeState(initial),
+            nowEpochMillis = 30L, artifactIdFactory = ::artifactId)
+        val restored = com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger(settings) { 60L }
+        val entries = restored.snapshot().entries
+        assertEquals(2, entries.size)
+        val observation = entries.single { it.localTest != null }
+        assertEquals(com.hereliesaz.geministrator.queen.EvidenceKind.Observation, observation.kind)
+        assertEquals("Local test command exited successfully (exit 0).", observation.text)
+        assertEquals("a".repeat(40), observation.localTest?.checkoutCommit)
+        assertEquals(com.hereliesaz.geministrator.queen.EvidenceKind.CitedClaim, entries.single { it.localTest == null }.kind)
+        assertEquals(emptyList(), restored.snapshot().reviews)
+        val voice = com.hereliesaz.geministrator.queen.CollectiveVoice("reviewer",
+            com.hereliesaz.geministrator.queen.QueenModel { error("Linking does not invoke models") }, "a".repeat(64))
+        val issue = restored.issueId()
+        restored.recordAdvisory(issue, "conversation-a", "Does the test pass?", voice, "I think it fails.")
+        restored.recordAdvisory(issue, "conversation-a", "Does the test pass?", voice.copy(role = "peer",
+            specialistId = "b".repeat(64)), "I agree.")
+        restored.recordAdvisory(restored.issueId(), "conversation-b", "Another matter", voice, "Unrelated.")
+        val opinion = restored.snapshot().entries.first { it.conversationId == "conversation-a" }
+        val claimOnly = entries.single { it.localTest == null }
+        restored.review(opinion.id, claimOnly.id, com.hereliesaz.geministrator.queen.EvidenceRelation.Supports,
+            "A report is not a host observation.")
+        assertEquals(emptyList(), restored.linkedObservations("conversation-a").evidenceIds)
+        restored.review(opinion.id, observation.id, com.hereliesaz.geministrator.queen.EvidenceRelation.Contradicts,
+            "PRIVATE REVIEW RATIONALE")
+        val next = com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger(settings) { 70L }
+        val linked = next.linkedObservations("conversation-a")
+        assertEquals(listOf(observation.id), linked.evidenceIds)
+        assertEquals(setOf("a".repeat(64), "b".repeat(64)), linked.participantIds)
+        kotlin.test.assertTrue("exitCode=0" in linked.text && "Does the test pass?" in linked.text)
+        kotlin.test.assertFalse("All criteria verified" in linked.text || "PRIVATE REVIEW RATIONALE" in linked.text)
+        assertEquals(emptyList(), next.linkedObservations("conversation-b").evidenceIds)
+        next.forget(observation.id)
+        assertEquals(emptyList(), restored.linkedObservations("conversation-a").evidenceIds)
+        restored.clear()
+        val saved = requireNotNull(persistence.runs.get(initial.id))
+        coordinator.persist(project(), definition, WorkflowRuntimeState(saved))
+        assertEquals(emptyList(), restored.snapshot().entries)
+        val forged = report.copy(id = ArtifactId("agent-report"), metadata = mapOf("passed" to "true", "exitCode" to "0"))
+        restored.stageArtifactEvidence(initial, forged)
+        persistence.artifacts.put(forged)
+        restored.recoverArtifactEvidence(persistence.artifacts)
+        val claim = restored.snapshot().entries.single()
+        assertEquals(com.hereliesaz.geministrator.queen.EvidenceKind.CitedClaim, claim.kind)
+        assertEquals(null, claim.localTest)
+    }
+
+    @Test
+    fun newlyPersistedArtifactsReachLedgerButRestartDoesNotRestoreErasedEvidence() = runBlocking {
+        val persistence = InMemoryWorkflowPersistence()
+        val settings = com.russhwolf.settings.MapSettings()
+        val ledger = com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger(settings) { 50L }
+        val taskId = TaskDefinitionId("ci")
+        val executor = TaskExecutor.GitHubAction("ci.yml")
+        val definition = definition(TaskDefinition(taskId, "CI", "Run CI", roleId = null, executor = executor))
+        val taskRun = taskRun(taskId, TaskRunStatus.Completed, executor)
+        val artifact = ArtifactRef(
+            id = ArtifactId("ci-result"), kind = ArtifactKind.TestResult, taskRunId = taskRun.id,
+            label = "CI", textContent = "passed", createdAtEpochMillis = 10L,
+        )
+        val run = run(definition, WorkflowRunStatus.Completed, mapOf(taskId to taskRun.copy(artifacts = listOf(artifact))))
+        val gateway = FakeManagedSessionGateway()
+        fun coordinator(book: com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger) = WorkflowRuntimeCoordinator(
+            persistence, WorkflowEngine(sessionGateway = gateway, roles = BuiltInRoles.all), gateway,
+            stageArtifactEvidence = book::stageArtifactEvidence,
+            recoverArtifactEvidence = { book.recoverArtifactEvidence(persistence.artifacts) },
+        )
+        // Simulate a process loss after the journal and artifact write but before publication.
+        ledger.stageArtifactEvidence(run, artifact)
+        assertEquals(emptyList(), ledger.snapshot().entries)
+        persistence.artifacts.put(artifact)
+        val afterCrash = com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger(settings) { 55L }
+        val first = coordinator(afterCrash)
+        first.persist(project(), definition, WorkflowRuntimeState(run))
+        first.persist(project(), definition, WorkflowRuntimeState(run))
+        val entry = ledger.snapshot().entries.single()
+        assertEquals(com.hereliesaz.geministrator.queen.EvidenceKind.CitedClaim, entry.kind)
+        assertEquals("TestResult: CI\npassed", entry.text)
+        assertEquals("Run run-definition-ci | task run task-run-ci | artifact ci-result", entry.source)
+        assertEquals(emptyList(), ledger.snapshot().reviews)
+        afterCrash.forget(entry.id)
+        val restored = com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger(settings) { 60L }
+        coordinator(restored).persist(project(), definition, WorkflowRuntimeState(run))
+        assertEquals(emptyList(), restored.snapshot().entries)
+        val updated = artifact.copy(textContent = "failed")
+        val changedRun = run.copy(taskRuns = mapOf(taskId to taskRun.copy(artifacts = listOf(updated))))
+        coordinator(restored).persist(project(), definition, WorkflowRuntimeState(changedRun))
+        assertEquals("TestResult: CI\nfailed", restored.snapshot().entries.single().text)
+    }
+
+    @Test
+    fun journalCannotPublishAbsentOrMismatchedArtifactOrResurrectAfterClear() = runBlocking {
+        val persistence = InMemoryWorkflowPersistence()
+        val settings = com.russhwolf.settings.MapSettings()
+        val book = com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger(settings) { 50L }
+        val taskId = TaskDefinitionId("ci")
+        val executor = TaskExecutor.GitHubAction("ci.yml")
+        val definition = definition(TaskDefinition(taskId, "CI", "Run CI", roleId = null, executor = executor))
+        val taskRun = taskRun(taskId, TaskRunStatus.Completed, executor)
+        val artifact = ArtifactRef(
+            ArtifactId("result"), ArtifactKind.TestResult, taskRun.id, "CI",
+            textContent = "token=abcdefghijklmnop", createdAtEpochMillis = 10L,
+        )
+        val run = run(definition, WorkflowRunStatus.Completed, mapOf(taskId to taskRun.copy(artifacts = listOf(artifact))))
+        book.stageArtifactEvidence(run, artifact)
+        val restarted = com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger(settings) { 60L }
+        restarted.recoverArtifactEvidence(persistence.artifacts)
+        assertEquals(emptyList(), restarted.snapshot().entries)
+        persistence.artifacts.put(artifact.copy(textContent = "different"))
+        restarted.recoverArtifactEvidence(persistence.artifacts)
+        assertEquals(emptyList(), restarted.snapshot().entries)
+        restarted.clear()
+        persistence.artifacts.put(artifact)
+        restarted.recoverArtifactEvidence(persistence.artifacts)
+        assertEquals(emptyList(), restarted.snapshot().entries)
+        restarted.stageArtifactEvidence(run, artifact)
+        restarted.recoverArtifactEvidence(persistence.artifacts)
+        assertEquals("TestResult: CI\ntoken=[redacted]", restarted.snapshot().entries.single().text)
+        restarted.recoverArtifactEvidence(persistence.artifacts)
+        assertEquals(1, restarted.snapshot().entries.size)
+    }
+
+    @Test
     fun awaitingHumanWithoutProviderHandlesIsPreserved() = runBlocking {
         val taskId = TaskDefinitionId("approval")
         val definition = definition(

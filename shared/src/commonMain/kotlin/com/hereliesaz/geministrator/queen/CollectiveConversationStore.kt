@@ -36,12 +36,18 @@ internal data class CollectiveConversation(
             "Keeper: ${it.question}\nAive: ${it.result.answer.orEmpty()}"
         }
         val assessments = turns.lastOrNull { it.result.assessments.isNotEmpty() }
-            ?.result?.assessments.orEmpty().take(2)
+            ?.result?.assessments.orEmpty()
         if (assessments.isEmpty()) return dialogue.takeLast(1800)
-        val notes = assessments.joinToString("\n") {
-            "${it.role.take(40)}: ${it.text.take(300)}"
-        }
-        val reference = "\nLatest available specialist assessment excerpts (unverified; may be from an earlier turn):\n$notes"
+        val latest = assessments.asReversed().distinctBy { it.role }.asReversed()
+        val sample = latest.takeLast(4)
+        val notes = sample.joinToString("\n") {
+            val persuasion = it.persuadedBy?.let { number ->
+                val source = assessments.getOrNull(number - 1)
+                source?.let { previous -> " (reports persuaded by ${previous.role.take(40)}: ${previous.text.take(100)})" }
+            }.orEmpty()
+            "${it.role.take(40)}$persuasion: ${it.text.take(225)}"
+        } + if (latest.size > sample.size) "\nAdditional participants' positions omitted." else ""
+        val reference = ("\nLatest available specialist assessment excerpts (unverified; may be from an earlier turn):\n$notes").take(1800)
         return dialogue.takeLast(1800 - reference.length) + reference
     }
 
@@ -51,7 +57,7 @@ internal data class CollectiveConversation(
      * The controller must reject import into any previously registered conversation bank.
      */
     fun historicalMemoryRequests(importedAt: Long): List<MemoryBankRequest> = buildList {
-        turns.takeLast(16).forEachIndexed { index, turn ->
+        turns.takeLast(MAX_COLLECTIVE_HISTORY_TURNS).forEachIndexed { index, turn ->
             fun addUtterance(slot: String, text: String, role: String?, label: String, kind: MemorySourceKind) {
                 val clean = ControlRedaction.scrub(text).trim()
                 if (clean.isBlank()) return
@@ -66,11 +72,14 @@ internal data class CollectiveConversation(
                 ))
             }
             addUtterance("keeper", turn.question, null, "Keeper question (retained transcript)", MemorySourceKind.UserPrompt)
-            turn.result.assessments.take(2).forEachIndexed { slot, assessment ->
+            turn.result.assessments.forEachIndexed { slot, assessment ->
                 if (assessment.role.isNotBlank()) addUtterance("assessment:$slot", assessment.text,
                     assessment.role, "Historical agent advisory excerpt (unverified); role=${assessment.role}; " +
                         "instance=${assessment.specialistId ?: "unknown"}; configured Source=${assessment.sourceId ?: "unknown"}; " +
-                        "model=${assessment.modelId ?: "unknown"}", MemorySourceKind.AgentNote)
+                        "model=${assessment.modelId ?: "unknown"}; phase=${if (assessment.crossExamination) "cross-examination" else "initial"}; " +
+                        "utterance=${slot + 1}; respondsTo=${assessment.respondsTo ?: "not recorded"}; " +
+                        "persuadedBy=${assessment.persuadedBy ?: "not reported"}; " +
+                        "promptObservations=${assessment.observationIds.joinToString()}", MemorySourceKind.AgentNote)
             }
             turn.result.answer?.let { answer ->
                 addUtterance("facilitator", answer, BuiltInRoles.Orchestrator.id.value,
@@ -124,7 +133,7 @@ internal class CollectiveConversationStore(settings: Settings, private val now: 
         fun clean(text: String, max: Int) = ControlRedaction.scrub(text).take(max)
         val turn = CollectiveTurn(clean(question, 1500), result.copy(
             answer = result.answer?.let { clean(it, 1200) },
-            assessments = result.assessments.take(2).map {
+            assessments = result.assessments.map {
                 it.copy(role = clean(it.role, 128), text = clean(it.text, 1200),
                     sourceId = it.sourceId?.let { source -> clean(source, 128) },
                     modelId = it.modelId?.let { model -> clean(model, 128) },
@@ -146,6 +155,6 @@ internal class CollectiveConversationStore(settings: Settings, private val now: 
     private companion object {
         const val KEY = "aive.collective.conversations.v1"
         const val MAX_CONVERSATIONS = 12
-        const val MAX_TURNS = 16
+        const val MAX_TURNS = MAX_COLLECTIVE_HISTORY_TURNS
     }
 }

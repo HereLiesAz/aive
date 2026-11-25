@@ -162,6 +162,8 @@ class ApplicationRuntime private constructor(
     private val queenLedger: com.hereliesaz.geministrator.workflow.improvement.ImprovementStore? = null,
     /** The keeper's allowances, so she can say a run is close to its own. */
     private val queenCaps: () -> SpendCaps = { SpendCaps() },
+    /** Shared by this runtime and all its child coordinators: one mutex for the durable evidence book. */
+    internal val collectiveEvidence: com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger,
 ) {
     private data class QueenReview(
         val runId: String,
@@ -243,9 +245,14 @@ class ApplicationRuntime private constructor(
         callsSoFar: Int,
     ): com.hereliesaz.geministrator.queen.CallDecision = directAdvisoryGateFor(reviewer.uses, callsSoFar)
 
-    /** Reuse the same fail-closed price, hourly allowance, call and Source-room gate for advisory chats. */
+    /** Plan review retains its original call quota; collective dialogue shares only the resource gate. */
     internal suspend fun directAdvisoryGateFor(
         uses: List<com.hereliesaz.geministrator.queen.ModelUse>, callsSoFar: Int,
+    ): com.hereliesaz.geministrator.queen.CallDecision =
+        advisoryGateFor(uses, planningCalls = callsSoFar)
+
+    private suspend fun advisoryGateFor(
+        uses: List<com.hereliesaz.geministrator.queen.ModelUse>, planningCalls: Int? = null,
     ): com.hereliesaz.geministrator.queen.CallDecision {
         val caps = queenCaps()
         val read = com.hereliesaz.geministrator.queen.priceRead(
@@ -261,9 +268,9 @@ class ApplicationRuntime private constructor(
         }
         val noRoom = providerRegistry.keylessWithoutRoom()
         val room = uses.isEmpty() || uses.any { it.sourceId !in noRoom }
-        return com.hereliesaz.geministrator.queen.planningMayCall(
-            com.hereliesaz.geministrator.queen.PlanningCaller.Reviewer, read.status, read.estimateUsd, caps, hourly, callsSoFar, room,
-        )
+        return if (planningCalls != null) com.hereliesaz.geministrator.queen.planningMayCall(
+            com.hereliesaz.geministrator.queen.PlanningCaller.Reviewer, read.status, read.estimateUsd, caps, hourly, planningCalls, room,
+        ) else com.hereliesaz.geministrator.queen.deliberationMayCall(read.status, read.estimateUsd, caps, hourly, room)
     }
 
     /**
@@ -418,10 +425,6 @@ class ApplicationRuntime private constructor(
     private val collectiveChatMutex = Mutex()
     private val collectiveConversations by lazy {
         com.hereliesaz.geministrator.queen.CollectiveConversationStore(persistence.inferenceSettings, ::nowEpochMillis)
-    }
-
-    internal val collectiveEvidence by lazy {
-        com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger(persistence.inferenceSettings, ::nowEpochMillis)
     }
 
     private val collectiveProfiles get() = providerRegistry.specialistProfiles
@@ -579,9 +582,13 @@ class ApplicationRuntime private constructor(
     /** Host-owned conversation history; an absent/deleted identity cannot be resumed. */
     internal suspend fun collectiveAdvisory(
         question: String, conversationId: String,
+        timeBudgetMillis: Long = com.hereliesaz.geministrator.queen.DEFAULT_DELIBERATION_MILLIS,
     ): com.hereliesaz.geministrator.queen.CollectiveConversation = collectiveChatMutex.withLock {
         require(question.isNotBlank() && question.length <= 1500)
         val conversation = requireNotNull(collectiveConversations.get(conversationId))
+        val observations = runCatchingCancellable { collectiveEvidence.linkedObservations(conversationId) }
+            .onFailure { com.hereliesaz.geministrator.log.AppLog.record("evidence", "Linked observations unavailable: ${it::class.simpleName}") }
+            .getOrDefault(com.hereliesaz.geministrator.queen.LinkedConversationObservations())
         val roster = activeRoles(resolveRoleCollection(persistence.roles.all()))
         val models = resolveDisputeModels()
         // Conversation identity is provenance/attention context only. Recall is collective.
@@ -594,6 +601,7 @@ class ApplicationRuntime private constructor(
             roster.any { it.id.value == match.roleId && it.executionSource == com.hereliesaz.geministrator.domain.RoleExecutionSource.Agent }
         }
         val capture = com.hereliesaz.geministrator.queen.CollectiveMemoryCapture(conversationId, question, ::nowEpochMillis)
+        var captureAvailable = true
         val evidenceIssue = collectiveEvidence.issueId()
         fun voice(role: com.hereliesaz.geministrator.domain.RoleDefinition, model: com.hereliesaz.geministrator.queen.QueenModel):
             com.hereliesaz.geministrator.queen.CollectiveVoice? {
@@ -609,11 +617,12 @@ class ApplicationRuntime private constructor(
         val facilitator = queenRole?.let { role -> models?.queen?.let { voice(role, it) } }
         try {
         val result = if (facilitator == null || models == null) {
-            com.hereliesaz.geministrator.queen.CollectiveAnswer(null, emptyList(), listOf("Queen"))
+            com.hereliesaz.geministrator.queen.CollectiveAnswer(null, emptyList(), listOf("Queen"),
+                observationRecipientsMissing = observations.participantIds.sorted())
         } else {
             val specialists = com.hereliesaz.geministrator.queen.selectCollectiveSpecialists(
                 question, roster, facilitator.model.uses, collectiveModelFor,
-                models.voices, experience = directory,
+                models.voices, experience = directory, returningInstances = observations.participantIds,
             ).mapNotNull { (role, model) -> voice(role, model) }
             com.hereliesaz.geministrator.queen.answerCollectively(
                 question, conversation.context(), specialists, facilitator,
@@ -626,8 +635,11 @@ class ApplicationRuntime private constructor(
                     voice.specialistId?.let { id -> collectiveProfiles.observe(id, voice.role, outcome) }
                 },
                 recordContribution = { voice, reply ->
-                    capture.record(voice, reply)
                     withContext(NonCancellable) {
+                        runCatchingCancellable { capture.record(voice, reply) }.onFailure {
+                            captureAvailable = false
+                            com.hereliesaz.geministrator.log.AppLog.record("memory", "Collective capture unavailable: ${it::class.simpleName}")
+                        }
                         runCatchingCancellable {
                             collectiveEvidence.recordAdvisory(evidenceIssue, conversationId, question, voice, reply)
                         }.onFailure {
@@ -636,9 +648,11 @@ class ApplicationRuntime private constructor(
                     }
                 },
                 directory = directory,
-            ) { model, count ->
-                models.mayCall() && queenCallAllowed() &&
-                    directAdvisoryGateFor(model.uses, count) == com.hereliesaz.geministrator.queen.CallDecision.Allow
+                timeBudgetMillis = timeBudgetMillis,
+                observations = observations,
+            ) { model, _ ->
+                captureAvailable && models.mayCall() && queenCallAllowed() &&
+                    advisoryGateFor(model.uses) == com.hereliesaz.geministrator.queen.CallDecision.Allow
             }
         }
         requireNotNull(collectiveConversations.append(conversationId, question, result))
@@ -2553,6 +2567,10 @@ class ApplicationRuntime private constructor(
                     ),
                 )
 
+            val collectiveEvidence = com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger(
+                persistence.inferenceSettings, ::nowEpochMillis,
+            )
+
             fun build(roles: List<RoleDefinition>): ApplicationRuntime {
                 val engine = WorkflowEngine(
                     sessionGateway = gateway,
@@ -2571,6 +2589,9 @@ class ApplicationRuntime private constructor(
                     engine = engine,
                     sessionGateway = gateway,
                     executorIntegrations = runtimeIntegrations,
+                    stageArtifactEvidence = collectiveEvidence::stageArtifactEvidence,
+                    recoverArtifactEvidence = { collectiveEvidence.recoverArtifactEvidence(persistence.artifacts) },
+                    stageLocalTestEvidence = collectiveEvidence::stageLocalTestEvidence,
                     orchestrationUtilities = orchestrationUtilities,
                     surfaceRuntime = roleSurfaceRuntime,
                     spendCaps = spendCaps,
@@ -2626,6 +2647,7 @@ class ApplicationRuntime private constructor(
                     queenLevel,
                     queenLedger,
                     spendCaps,
+                    collectiveEvidence,
                 )
             }
 
@@ -2644,6 +2666,15 @@ class ApplicationRuntime private constructor(
             }
 
             gateway.dormantSpecialistAnswer = runtime::answerDormantSpecialist
+
+            // A terminal run may never cycle again; settle only previously journaled receipts at bootstrap.
+            try {
+                collectiveEvidence.recoverArtifactEvidence(persistence.artifacts)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                com.hereliesaz.geministrator.log.AppLog.record("evidence", "Could not recover artifact evidence: ${failure::class.simpleName}")
+            }
 
             traceExport?.attach(
                 scope = runtimeScope,
