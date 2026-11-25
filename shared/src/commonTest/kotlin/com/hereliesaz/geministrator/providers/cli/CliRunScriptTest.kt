@@ -192,6 +192,23 @@ class CliRunScriptTest {
     }
 
     @Test
+    fun aptPreparesGuestCacheAndListsBeforeUpdateOrInstall() {
+        val update = CliRunScript.installScript(nonce, listOf("git"), null, true)!!
+        val retry = CliRunScript.installScript(nonce, listOf("codex"), null, false)!!
+        val listsOnly = CliRunScript.installScript(nonce, emptyList(), null, true)!!
+        for (script in listOf(update, retry, listsOnly)) {
+            assertTrue(script.contains("APT_ARCHIVES='/data/data/com.termux/cache/apt/archives'"))
+            assertTrue(script.contains("APT_LISTS='/data/data/com.termux/files/usr/var/lib/apt/lists'"))
+            assertTrue(script.contains("mkdir -p -- \"\$APT_ARCHIVES/partial\" \"\$APT_LISTS/partial\""))
+            assertTrue(script.contains("Dir::Cache::archives=\$APT_ARCHIVES/"))
+            assertTrue(script.contains("Dir::State::lists=\$APT_LISTS/"))
+            assertTrue(script.indexOf("mkdir -p --") < script.indexOf("apt-get"))
+            assertTrue(script.contains("apt-get \"\${APT_DIR_OPTIONS[@]}\" update"))
+            assertTrue(script.contains("apt-get \"\${APT_DIR_OPTIONS[@]}\" install"))
+        }
+    }
+
+    @Test
     fun everyAndroidInstallRecipeIsAPlainPackageNameTheScriptAccepts() {
         val recipes = CliAgentSpecs.all.mapNotNull { it.androidInstall }
         assertTrue(recipes.isNotEmpty())

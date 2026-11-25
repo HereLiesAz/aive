@@ -10,6 +10,8 @@ import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.providers.PromptContext
 import com.hereliesaz.geministrator.providers.PromptContextBlock
 import com.hereliesaz.geministrator.providers.cli.CliAgentSpecs
+import com.hereliesaz.geministrator.providers.cli.CliRunScript
+import com.hereliesaz.geministrator.providers.cli.CliRunResultParser
 import com.hereliesaz.geministrator.workflow.APPROVED_PLAN_CONTEXT_LABEL
 import java.io.File
 import java.util.UUID
@@ -31,6 +33,73 @@ import kotlinx.coroutines.withTimeout
 
 class CliAgentProviderTest {
     private val spec = CliAgentSpecs.Claude
+
+    /** Exercise the generated installer using an APT stub that refuses missing directories. */
+    @Test
+    fun androidInstallerRepairsCacheAndStopsWhenDirectoryCreationFails() {
+        // Bash and GNU timeout are available on Linux desktop CI.
+        if (System.getProperty("os.name") != "Linux") return
+        val root = createTempDirectory("aive-apt-").toFile()
+        try {
+            val bin = File(root, "bin").apply { mkdirs() }
+            val cache = File(root, "cache/apt/archives")
+            val lists = File(root, "usr/var/lib/apt/lists")
+            val log = File(root, "calls")
+            fun executable(name: String, source: String) {
+                File(bin, name).apply {
+                    writeText(source.replace('§', '$'))
+                    assertTrue(setExecutable(true))
+                }
+            }
+            executable("apt-get", """
+                #!/bin/bash
+                set -eu
+                [[ "§1" = -o && "§2" = "Dir::Cache::archives=§EXPECT_CACHE/" ]]
+                [[ "§3" = -o && "§4" = "Dir::State::lists=§EXPECT_LISTS/" ]]
+                [[ -d "§EXPECT_CACHE/partial" && -d "§EXPECT_LISTS/partial" ]]
+                printf '%s\n' "§5" >> "§CALLS"
+            """.trimIndent())
+            executable("npm", """
+                #!/bin/bash
+                printf '%s\n' npm >> "§CALLS"
+            """.trimIndent())
+            val nonce = "0123456789abcdef0123456789abcdef"
+            fun install(update: Boolean): Boolean {
+                val script = assertNotNull(CliRunScript.installScript(nonce, listOf("git"), "example", update))
+                    .replace("/data/data/com.termux/cache/apt/archives", cache.absolutePath)
+                    .replace("/data/data/com.termux/files/usr/var/lib/apt/lists", lists.absolutePath)
+                val process = ProcessBuilder("bash").redirectErrorStream(true).apply {
+                    environment().putAll(mapOf(
+                        "PATH" to bin.absolutePath + ":/usr/bin:/bin",
+                        "EXPECT_CACHE" to cache.absolutePath,
+                        "EXPECT_LISTS" to lists.absolutePath,
+                        "CALLS" to log.absolutePath,
+                    ))
+                }.start()
+                try {
+                    process.outputStream.bufferedWriter().use { it.write(script) }
+                    assertTrue(process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS), "Installer hung")
+                    return CliRunResultParser.parseInstall(process.inputStream.bufferedReader().readText(), nonce).ok
+                } finally {
+                    process.destroyForcibly()
+                }
+            }
+            assertTrue(install(true))
+            assertEquals(listOf("update", "install", "npm"), log.readLines())
+            val partial = File(cache, "partial")
+            assertTrue(partial.delete())
+            log.delete()
+            assertTrue(install(false))
+            assertEquals(listOf("install", "npm"), log.readLines())
+            assertTrue(partial.delete())
+            partial.writeText("not a directory")
+            log.delete()
+            assertFalse(install(true))
+            assertFalse(log.exists(), "Neither APT nor npm may run after directory preparation fails")
+        } finally {
+            root.deleteRecursively()
+        }
+    }
 
     /** A fake CLI: records how it was run, optionally edits the worktree, and speaks in Claude's stream-json. */
     private class FakeCli(

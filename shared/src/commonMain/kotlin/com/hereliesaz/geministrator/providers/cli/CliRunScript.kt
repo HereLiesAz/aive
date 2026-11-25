@@ -63,6 +63,10 @@ object CliRunScript {
     const val RUNTIME_HOME = "/data/data/com.termux/files/home"
     const val RUNTIME_PATH = "$RUNTIME_PREFIX/bin"
 
+    /** APT archives live in the guest app cache, outside usr; list state stays inside usr. */
+    private const val APT_ARCHIVES = "/data/data/com.termux/cache/apt/archives"
+    private const val APT_LISTS = "$RUNTIME_PREFIX/var/lib/apt/lists"
+
     /** The Termux packages every CLI needs, installed once when the runtime is prepared (the bootstrap itself has bash and the core tools). */
     val BASE_PACKAGES: List<String> = listOf("git", "openssh", "ripgrep", "nodejs-lts")
     const val DEFAULT_TIMEOUT_SECONDS = 30 * 60
@@ -192,14 +196,16 @@ object CliRunScript {
     /**
      * A script that installs Termux packages (`apt-get install`, after `apt-get update` when [update]) and then, when [npmSpec]
      * is given, `npm install -g <name[@version]>`, and reports the exit code and the tail of the output. Null when a name is not
-     * a plain package name.
+     * a plain package name. Every APT operation repairs its guest cache and list staging directories first, without
+     * replacing the bootstrap or changing repository signature checks.
      */
     fun installScript(nonce: String, aptPackages: List<String>, npmSpec: String?, update: Boolean): String? {
         if (!nonceShape.matches(nonce) || aptPackages.size > 16 || aptPackages.any { !aptPackageShape.matches(it) }) return null
         if (npmSpec != null && !npmSpecShape.matches(npmSpec)) return null
         if (aptPackages.isEmpty() && npmSpec == null && !update) return null
         return "NONCE=${PosixShell.quote(nonce)}\nUPDATE=${if (update) "1" else "0"}\nNPMSPEC=${PosixShell.quote(npmSpec.orEmpty())}\n" +
-            "APTPKGS=(${aptPackages.joinToString(" ") { PosixShell.quote(it) }})\n" + INSTALL_BODY.replace('§', '$')
+            "APTPKGS=(${aptPackages.joinToString(" ") { PosixShell.quote(it) }})\n" +
+            "APT_ARCHIVES=${PosixShell.quote(APT_ARCHIVES)}\nAPT_LISTS=${PosixShell.quote(APT_LISTS)}\n" + INSTALL_BODY.replace('§', '$')
     }
 
     // Fixed texts. `§` stands for `$` (Kotlin would read it as its own), and is replaced before the text is used.
@@ -218,11 +224,15 @@ done
 export DEBIAN_FRONTEND=noninteractive
 CODE=0
 OUT=""
-if [ "§UPDATE" = 1 ]; then
-  OUT="§(timeout -k 10 600 apt-get update 2>&1)"; CODE=§?
+APT_DIR_OPTIONS=(-o "Dir::Cache::archives=§APT_ARCHIVES/" -o "Dir::State::lists=§APT_LISTS/")
+if [ "§UPDATE" = 1 ] || [ "§{#APTPKGS[@]}" -gt 0 ]; then
+  OUT="§(mkdir -p -- "§APT_ARCHIVES/partial" "§APT_LISTS/partial" 2>&1)"; CODE=§?
+fi
+if [ "§CODE" = 0 ] && [ "§UPDATE" = 1 ]; then
+  OUT="§OUT§(timeout -k 10 600 apt-get "§{APT_DIR_OPTIONS[@]}" update 2>&1)"; CODE=§?
 fi
 if [ "§CODE" = 0 ] && [ "§{#APTPKGS[@]}" -gt 0 ]; then
-  OUT="§OUT§(timeout -k 10 1500 apt-get install -y -o Dpkg::Options::=--force-confold -- "§{APTPKGS[@]}" 2>&1)"; CODE=§?
+  OUT="§OUT§(timeout -k 10 1500 apt-get "§{APT_DIR_OPTIONS[@]}" install -y -o Dpkg::Options::=--force-confold -- "§{APTPKGS[@]}" 2>&1)"; CODE=§?
 fi
 if [ "§CODE" = 0 ] && [ -n "§NPMSPEC" ]; then
   if ! command -v npm >/dev/null 2>&1; then printf 'AIVE-NONPM %s\n' "§NONCE"; exit 0; fi
