@@ -214,6 +214,12 @@ internal fun newWorkflowInstruction(objective: String, repository: RepositoryRef
     if (repository != null) {
         append(" A repository is linked (").append(repository.name).append("). A step sees only short excerpts of it, its README and docs first,")
         append(" so name the files or parts each step should read in that step's objective.")
+        if (repository.source == com.hereliesaz.geministrator.domain.RepositorySource.GitHub) {
+            append(" For a file-editing objective with known exact paths, choose the prepare-files-for-repository template and ")
+            append(" declare those literal paths in its repository_files resource (no globs). Aive reads and commits the files ")
+            append(" itself after reviewing the proposed contents; leave the target branch input empty unless the keeper specifies one. ")
+            append(" Do not request repository editing for a task that only answers a question.")
+        }
     }
     if (TEACHING_WORDS.containsMatchIn(objective)) {
         append(" The objective is to teach: plan a survey of the material, a curriculum ordered by prerequisites, then one step per major part")

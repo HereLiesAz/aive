@@ -13,7 +13,7 @@ Repository-operation tasks support:
 - `status`
 - `create-branch:<branch>`
 - `open-pull-request:<source>:<target>:<title>`
-- `commit-files:<proposal-task-id>:<new-aive-branch>` (host-owned GitHub file commit; explicitly authored workflow only)
+- `commit-files:<proposal-task-id>:<new-aive-branch>` or `commit-files:<proposal-task-id>:auto` (host-owned GitHub file commit; `auto` derives a dedicated branch from the run and task identity)
 
 The host commit consumes one `CodeChange` text artifact from the named completed, released proposal task. It must be a direct dependency of both the commit and an unconditional human approval task, which must itself be a completed direct dependency of the commit. Inspect the proposal artifact before approving. An inference provider need not have a repository token or native write capability to generate this artifact; the repository executor uses the already linked GitHub credential. The proposal is data, never a command or script.
 
@@ -27,7 +27,9 @@ Replace the example SHA with the linked base's actual commit. `expectedBlob: nul
 
 A keeper-authored read-only `read-file-proposal-context` task uses exactly one `repository_files` resource with literal paths, not globs. It returns complete bounded UTF-8 files and their immutable blob SHAs, or null for paths absent from the complete tree, as a JSON `CommandOutput` artifact. A subsequent model-only proposal task can depend on that artifact, retain the base and expected blob IDs, and supply the desired contents. The read operation uses the linked GitHub credential in Aive, never the model. It does not write or require a repository-capable inference provider.
 
-These are explicit GitHub executor operations, not an automatic conversion of coding roles or a dynamic tool exposed to all models. GitLab and Local Git retain their existing workspace agents; this operation is unavailable for those backends. The existing repository mutation approval and context-taint rules remain in force.
+At workflow preparation, an Auto, local, single-inference file-write contract with no external tools, one CodeChange/files-change output, no specified target branch and a literal repository_files path list is compiled into four steps: host snapshot, model proposal, human approval of the proposal, and host commit. The final step retains the original ID and output contract (BRANCH and FILES lines), so downstream dependencies are unchanged. The model retains its role but receives neither a repository handle nor tools, and repository capabilities inherited from its role are not required. The host rejects any proposal whose base or blob IDs differ from its snapshot or that adds an unlisted path. Any original plan gate stays on the proposal; the host commit additionally waits for a person's approval of the actual contents.
+
+The planner is told to choose this route for known file paths. Unbounded, explicitly pinned, conditional, optional, distributed, compound, or otherwise incompatible write steps are not rewritten. GitLab and Local Git retain their existing workspace agents; these host file operations are unavailable for those backends. The existing repository mutation approval and context-taint rules remain in force.
 
 The same GitHub connection is also used by the GitHub Actions executor.
 

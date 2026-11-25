@@ -168,7 +168,7 @@ class ProviderFailoverTest {
     )
 
     private fun auto(first: String) = ProviderSelectionRequest(
-        constraints = ProviderConstraints.RequireProvider(AgentProviderId(first)),
+        resolvedProviderId = AgentProviderId(first),
         failoverAllowed = true,
     )
 
@@ -190,6 +190,25 @@ class ProviderFailoverTest {
             )
             // Benched: the next automatic choice goes straight to Claude.
             assertEquals(AgentProviderId("anthropic"), registry.select(ProviderSelectionRequest()).id)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun explicitProviderIsNeverDiscardedByAutoFlag() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val a = FailoverFakeProvider("openai", startError = "HTTP 402 Payment Required")
+        val b = FailoverFakeProvider("anthropic")
+        try {
+            val registry = AgentProviderRegistry(listOf(a, b), inferenceSettings = InMemorySettings())
+            val gateway = ProviderBackedManagedSessionGateway(registry, scope)
+            val selection = ProviderSelectionRequest(
+                constraints = ProviderConstraints.RequireProvider(a.id), failoverAllowed = true,
+            )
+            assertFailsWith<ManagedSessionFailure> { gateway.createSession(request("pinned", selection)) }
+            assertEquals(1, a.starts)
+            assertEquals(0, b.starts)
         } finally {
             scope.cancel()
         }

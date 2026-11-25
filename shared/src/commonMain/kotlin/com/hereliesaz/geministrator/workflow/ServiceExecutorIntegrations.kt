@@ -51,7 +51,12 @@ class RepositoryOperationExecutorIntegration(
             } else if (executor.operation.startsWith(CommitFileProposalOperation.PREFIX)) {
                 require(client.supportsFileProposals(context.project)) { "Host file commits are unavailable for this repository" }
                 val operation = CommitFileProposalOperation.parse(executor.operation)
-                client.commitFileProposal(context.project, operation.branch, context.approvedFileProposal(operation.producer))
+                val branch = if (operation.branch == "auto") {
+                    val identity = listOf(context.run.id.value, context.task.id.value)
+                        .joinToString("") { "${it.length}:$it" }
+                    "aive/" + com.hereliesaz.geministrator.Sha256.hex(identity.encodeToByteArray())
+                } else operation.branch
+                client.commitFileProposal(context.project, branch, context.approvedFileProposal(operation.producer))
             } else {
                 client.start(context.project, executor.operation, repositoryOperationIdentity(context))
             }

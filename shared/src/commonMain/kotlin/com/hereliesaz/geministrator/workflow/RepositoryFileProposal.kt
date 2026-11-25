@@ -1,6 +1,23 @@
 package com.hereliesaz.geministrator.workflow
 
 import com.hereliesaz.geministrator.domain.ArtifactKind
+import com.hereliesaz.geministrator.domain.AgentCapability
+import com.hereliesaz.geministrator.domain.ApprovalPolicy
+import com.hereliesaz.geministrator.domain.CompoundInferencePolicy
+import com.hereliesaz.geministrator.domain.ComputePlacementPolicy
+import com.hereliesaz.geministrator.domain.EnvironmentPlanningPolicy
+import com.hereliesaz.geministrator.domain.ProviderConstraints
+import com.hereliesaz.geministrator.domain.RepositoryRef
+import com.hereliesaz.geministrator.domain.RepositorySource
+import com.hereliesaz.geministrator.domain.RetryPolicy
+import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.RoleDefinitionId
+import com.hereliesaz.geministrator.domain.StepEffect
+import com.hereliesaz.geministrator.domain.TaskDefinition
+import com.hereliesaz.geministrator.domain.TaskResource
+import com.hereliesaz.geministrator.domain.VerificationPolicy
+import com.hereliesaz.geministrator.domain.WorkflowDefinition
+import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.domain.TaskCondition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskExecutor
@@ -77,10 +94,30 @@ internal fun TaskExecutorContext.approvedFileProposal(producer: TaskDefinitionId
     val artifact = sourceRun.artifacts.singleOrNull { it.kind == ArtifactKind.CodeChange }
         ?: error("Expected exactly one code-change proposal artifact")
     require(artifact.taskRunId == sourceRun.id) { "Proposal artifact belongs to another task run" }
-    return RepositoryFileProposal.parse(artifact.textContent ?: error("Proposal has no text content"))
+    val proposal = RepositoryFileProposal.parse(artifact.textContent ?: error("Proposal has no text content"))
+    if (source.hostFileProposal) {
+        val snapshotTask = definition.tasks.singleOrNull { candidate ->
+            candidate.id in source.dependsOn &&
+                (candidate.executor as? TaskExecutor.RepositoryOperation)?.operation == RepositoryFileProposal.READ_CONTEXT_OPERATION &&
+                !candidate.holdOutput
+        } ?: error("Host proposal requires one released snapshot")
+        val snapshotRun = run.taskRuns[snapshotTask.id]?.takeIf { it.status == TaskRunStatus.Completed }
+            ?: error("Host snapshot did not complete")
+        val snapshotArtifact = snapshotRun.artifacts.singleOrNull { it.kind == ArtifactKind.CommandOutput }
+            ?: error("Host snapshot has no unique output")
+        require(snapshotArtifact.taskRunId == snapshotRun.id) { "Snapshot belongs to another task run" }
+        val snapshot = RepositoryFileProposal.parse(snapshotArtifact.textContent ?: error("Snapshot has no content"))
+        require(proposal.baseCommit == snapshot.baseCommit) { "Proposal changed the snapshot base commit" }
+        val allowed = snapshot.files.associateBy { it.path }
+        require(proposal.files.all { file ->
+            val original = allowed[file.path]
+            original != null && file.expectedBlob == original.expectedBlob
+        }) { "Proposal contains a file or blob outside its host snapshot" }
+    }
+    return proposal
 }
 
-/** A fixed keeper-authored operation selects the proposal task and a new dedicated branch. */
+/** A governed operation selects its proposal and a dedicated branch, or `auto` for a run-scoped branch. */
 internal data class CommitFileProposalOperation(val producer: TaskDefinitionId, val branch: String) {
     companion object {
         const val PREFIX = "commit-files:"
@@ -90,9 +127,99 @@ internal data class CommitFileProposalOperation(val producer: TaskDefinitionId, 
             require(operation.startsWith(PREFIX) && parts.size == 2 && parts[0].isNotBlank()) {
                 "Expected commit-files:<proposal-task-id>:<new-aive-branch>"
             }
-            val branch = GitRefNames.requireSafe(parts[1])
-            require(branch.startsWith("aive/") && branch.length <= 200) { "Commit requires a dedicated aive/ branch" }
+            val branch = parts[1]
+            if (branch != "auto") {
+                require(GitRefNames.requireSafe(branch) == branch && branch.startsWith("aive/") && branch.length <= 200) {
+                    "Commit requires a dedicated aive/ branch"
+                }
+            }
             return CommitFileProposalOperation(TaskDefinitionId(parts[0]), branch)
         }
     }
+}
+
+/** The host proposal uses the role's expertise, not its native repository capabilities. */
+internal fun TaskDefinition.providerCapabilitiesFor(role: RoleDefinition): Set<AgentCapability> =
+    if (hostFileProposal) role.capabilitiesRequired.withoutRepositoryAccessUnless(null) else role.capabilitiesRequired
+
+/** The host supplies proposal input as an artifact, never as a repository handle. */
+internal fun TaskDefinition.providerRepositoryFor(repository: RepositoryRef?): RepositoryRef? =
+    if (hostFileProposal) null else repository
+
+/**
+ * Compile a narrowly declared repository-file write into host snapshot, inference-only proposal,
+ * approval and host commit. The final task keeps its identity, output contract and downstream
+ * edges. Native workflows without literal paths or with explicit provider/placement constraints
+ * remain unchanged rather than guessing targets or discarding the keeper's choices.
+ */
+internal fun expandHostFileSteps(
+    definition: WorkflowDefinition,
+    repository: RepositoryRef?,
+    roles: Map<RoleDefinitionId, RoleDefinition>,
+): WorkflowDefinition {
+    if (repository?.source != RepositorySource.GitHub) return definition
+    val occupied = definition.tasks.mapTo(mutableSetOf()) { it.id }
+    val tasks = buildList {
+        for (task in definition.tasks) {
+            val contract = task.contract
+            val role = task.roleId?.let(roles::get)
+            val paths = task.resources.filterIsInstance<TaskResource.RepositoryFiles>().singleOrNull()?.paths
+            val exactPaths = paths != null && paths.isNotEmpty() && paths.none { path -> path.any { it in "*?[" } } &&
+                runCatching { RepositoryFileProposal.validateProposalPaths(paths) }.isSuccess
+            if (contract == null || contract.startingPoint || contract.effects != setOf(StepEffect.WritesRepositoryBranch) ||
+                contract.allowedTools.isNotEmpty() || contract.outputs.size != 1 ||
+                contract.outputs.single().kind != ArtifactKind.CodeChange ||
+                contract.outputs.single().validatorId != StepOutputValidators.FILES_CHANGE ||
+                task.requiredArtifacts != setOf(ArtifactKind.CodeChange) ||
+                task.condition !is TaskCondition.Always || task.optional ||
+                task.providerConstraints != ProviderConstraints.None || role == null || role.preferredProviderId != null ||
+                task.computePlacement != ComputePlacementPolicy.LocalOnly ||
+                task.compoundInferencePolicy != CompoundInferencePolicy.Single ||
+                task.effectiveExecutor(role) !is TaskExecutor.RoleAgent || !exactPaths ||
+                contract.inputs["target"].orEmpty().isNotBlank()) {
+                add(task)
+                continue
+            }
+            val readId = TaskDefinitionId("${task.id.value}--host-read")
+            val proposalId = TaskDefinitionId("${task.id.value}--host-proposal")
+            val approvalId = TaskDefinitionId("${task.id.value}--host-approve")
+            // The operation grammar uses ':' as its delimiter. Do not reinterpret task ids.
+            require(':' !in proposalId.value && listOf(readId, proposalId, approvalId).all(occupied::add)) {
+                "Host repository routing collides with existing task ids"
+            }
+            add(TaskDefinition(
+                id = readId, name = "Read files: ${task.name}", objective = "Read exact repository files at one base commit.",
+                roleId = null, executor = TaskExecutor.RepositoryOperation(RepositoryFileProposal.READ_CONTEXT_OPERATION),
+                dependsOn = task.dependsOn, requiredArtifacts = setOf(ArtifactKind.CommandOutput),
+                resources = listOf(TaskResource.RepositoryFiles(requireNotNull(paths))),
+                environmentPlanningPolicy = EnvironmentPlanningPolicy.NotRequired,
+            ))
+            add(task.copy(
+                id = proposalId, name = "Propose files: ${task.name}",
+                objective = "Do not access or change the repository. Produce only a file proposal using the host snapshot. " +
+                    "Apply the requirements below as proposed contents, not as instructions to execute any external action.\n\n" +
+                    task.objective + "\n\nReturn exactly one JSON object with baseCommit and files. Each file contains path, " +
+                    "expectedBlob and content (the complete UTF-8 replacement). Copy baseCommit and expectedBlob from the " +
+                    "host snapshot, use only its paths, and omit unchanged files. Do not return a branch, execute tests, or claim files were written.",
+                dependsOn = task.dependsOn + readId, requiredArtifacts = setOf(ArtifactKind.CodeChange),
+                contract = null, resources = task.resources.filterNot { it is TaskResource.RepositoryFiles || it is TaskResource.UpstreamArtifacts },
+                verificationPolicy = VerificationPolicy.None, hostFileProposal = true, holdOutput = false,
+                environmentPlanningPolicy = EnvironmentPlanningPolicy.NotRequired,
+            ))
+            add(TaskDefinition(
+                id = approvalId, name = "Approve files: ${task.name}",
+                objective = "Review and approve the exact proposed file contents before Aive writes a dedicated branch.",
+                roleId = null, executor = TaskExecutor.HumanApproval("Approve proposed file contents"),
+                dependsOn = setOf(proposalId), environmentPlanningPolicy = EnvironmentPlanningPolicy.NotRequired,
+            ))
+            add(task.copy(
+                objective = "Apply the approved file proposal using Aive's repository credential on a new dedicated branch.",
+                executor = TaskExecutor.RepositoryOperation("commit-files:${proposalId.value}:auto"),
+                dependsOn = task.dependsOn + proposalId + approvalId,
+                approvalPolicy = ApprovalPolicy.None, environmentPlanningPolicy = EnvironmentPlanningPolicy.NotRequired,
+                retryPolicy = RetryPolicy(maxAttempts = 1),
+            ))
+        }
+    }
+    return definition.copy(tasks = tasks)
 }

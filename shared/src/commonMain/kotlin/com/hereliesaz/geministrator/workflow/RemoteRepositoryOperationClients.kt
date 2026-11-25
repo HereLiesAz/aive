@@ -185,7 +185,7 @@ class GitHubRestRepositoryOperationClient(
             source = RepositorySource.GitHub,
             operation = "commit-files",
             label = "Commit approved files",
-            text = "Created $branch at ${newCommit.sha} from ${proposal.baseCommit}",
+            text = "BRANCH: $branch\nFILES: ${proposal.files.joinToString(", ") { it.path }}\nCOMMIT: ${newCommit.sha}",
             artifactKind = ArtifactKind.CodeChange,
             metadata = mapOf("branch" to branch, "headCommit" to newCommit.sha, "baseCommit" to proposal.baseCommit),
         ).also { runs.put(it) }
