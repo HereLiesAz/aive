@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -393,19 +392,6 @@ private fun CommaList(items: List<String>) {
 
 @Composable
 private fun RoleCapsule(label: String, description: String, fill: Color, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .semantics {
-                role = Role.Button
-                contentDescription = description
-            }
-            .defaultMinSize(minHeight = AzphaltMinTouchTarget, minWidth = AzphaltMinTouchTarget)
-            .clip(RoundedCornerShape(999.dp))
-            .background(fill)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(label.uppercase(), style = AzphaltType.capsule.copy(fontSize = 14.sp), color = fill.onOpposite())
-    }
+    AzphaltPill(label = label, seed = "rolecapsule-$label", onClick = onClick,
+        description = description, fillOverride = fill, textOverride = fill.onOpposite())
 }

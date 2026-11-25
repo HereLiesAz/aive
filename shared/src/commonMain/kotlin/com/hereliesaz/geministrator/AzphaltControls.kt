@@ -5,17 +5,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TextField
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldColors
-import androidx.compose.material3.Button
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,7 +27,7 @@ import androidx.compose.ui.unit.dp
  * Primary Azphalt button: an Ink pill (white where Ink would vanish into the surface) with the exact
  * opposite of its container for its label, readable on every ground, including Mustard where a
  * Yellow container would vanish. Disabled, it
- * is an opaque, softened Ink with a label still at 3:1 or better against it. At least 48dp tall.
+ * is an opaque, softened Ink with a label still at 3:1 or better against it. The shared compact pill has a 48dp touch target.
  */
 @Composable
 internal fun AzphaltButton(
@@ -46,21 +41,12 @@ internal fun AzphaltButton(
     // (navy, an Ink well); the label is always the exact opposite of whichever container it is.
     val container = primaryButtonContainerOn(surface)
     val disabledContainer = container.copy(alpha = 0.45f).compositeOver(surface)
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.defaultMinSize(minHeight = AzphaltMinTouchTarget),
-        shape = RoundedCornerShape(999.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = container,
-            contentColor = container.onOpposite(),
-            disabledContainerColor = disabledContainer,
-            disabledContentColor = disabledContainer.mutedOnOpposite(),
-        ),
-        contentPadding = PaddingValues(horizontal = AzphaltSpacing.xl, vertical = AzphaltSpacing.m),
-    ) {
-        Text(label.uppercase(), style = AzphaltType.capsule)
-    }
+    AzphaltPill(
+        label = label, seed = "primary-$label", onClick = onClick, modifier = modifier,
+        enabled = enabled, fillOverride = if (enabled) container else disabledContainer,
+        textOverride = if (enabled) container.onOpposite() else disabledContainer.mutedOnOpposite(),
+        dimDisabled = false,
+    )
 }
 
 /**
@@ -77,21 +63,11 @@ internal fun AzphaltOutlinedButton(
 ) {
     val onSurface = azphaltOnSurface()
     val muted = azphaltMutedOnSurface()
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.defaultMinSize(minHeight = AzphaltMinTouchTarget),
-        shape = RoundedCornerShape(999.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = onSurface.copy(alpha = FIELD_WASH),
-            contentColor = onSurface,
-            disabledContainerColor = onSurface.copy(alpha = FIELD_WASH),
-            disabledContentColor = muted,
-        ),
-        contentPadding = PaddingValues(horizontal = AzphaltSpacing.xl, vertical = AzphaltSpacing.m),
-    ) {
-        Text(label.uppercase(), style = AzphaltType.capsule)
-    }
+    AzphaltPill(
+        label = label, seed = "secondary-$label", onClick = onClick, modifier = modifier,
+        enabled = enabled, fillOverride = onSurface.copy(alpha = FIELD_WASH),
+        textOverride = if (enabled) onSurface else muted, dimDisabled = false,
+    )
 }
 
 /**

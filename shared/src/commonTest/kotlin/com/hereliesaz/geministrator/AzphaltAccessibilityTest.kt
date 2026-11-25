@@ -1,6 +1,7 @@
 package com.hereliesaz.geministrator
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -56,6 +57,13 @@ class AzphaltAccessibilityTest {
             assertTrue(style.fontSize.value >= 11f)
             assertTrue(style.lineHeight.value >= style.fontSize.value * 1.2f)
         }
+    }
+
+    @Test
+    fun compactPillsKeepThePaintedCapsuleSeparateFromTheTapTarget() {
+        assertEquals(18.dp, AzphaltPillHeight)
+        assertEquals(48.dp, AzphaltMinTouchTarget)
+        assertTrue(AzphaltPillHeight < AzphaltMinTouchTarget)
     }
 
     @Test

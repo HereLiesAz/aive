@@ -71,10 +71,10 @@ kotlin {
             implementation(compose.material3)
             implementation(compose.ui)
             implementation(compose.components.resources)
-            // Pinned to h2g2's release tag (JitPack), so a build is reproducible; bump it by hand when h2g2 ships what aive needs.
+            // Pinned to h2g2's immutable revision (JitPack), including the shared compact pill renderer.
             // Builds that have the checkout under vendor/conveyance-h2g2 (CI, and local builds with it cloned) include it
             // instead (settings.gradle.kts), whatever this says. Keep the version in build.gradle.kts's substitution the same.
-            implementation("com.github.HereLiesAz:conveyance-h2g2:0.6.0")
+            implementation("com.github.HereLiesAz:conveyance-h2g2:bb3325b8594bfade69850ed19be16c58d62b0ff5")
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.multiplatform.settings.no.arg)

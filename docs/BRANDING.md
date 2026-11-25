@@ -52,7 +52,7 @@ default that might not match the surface it lands on.
 Hues belong to living things: creatures, hives and the tissue they live in. Controls and cards are
 calm, so colour on them always says something (`AzphaltUi.kt`):
 
-- **Pills** (`AzphaltPill`, `tone`): `Quiet` (the default) is filled with a hue chosen by hashing its
+- **Pills** (`AzphaltPill`, `tone`): the shared `conveyance-h2g2` compact renderer draws an 18dp capsule, a 14dp end cap and 11sp text, with a separate 48dp minimum interactive target. Primary and secondary buttons, tabs and mode switches use it too; selection never enlarges the painted capsule.  `Quiet` (the default) is filled with a hue chosen by hashing its
   seed (HG2Gui: a stack reads as a stack; the hue carries no meaning), with the hue's darker mate on its end cap;
   `Primary`, the one main action in view (Launch, Connect), and any selected pill are filled
   with the surface's strong colour (Ink, or Yellow on a dark surface); `Danger` is red, and only for

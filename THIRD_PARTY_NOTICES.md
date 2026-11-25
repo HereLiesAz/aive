@@ -46,7 +46,8 @@ Princeton University and LICENSEE agrees to preserve same.
 ## Font: Azrienoch
 
 Bundled as `shared/src/commonMain/composeResources/font/azrienoch_vf.ttf`, the variable build from
-https://github.com/HereLiesAz/azrienoch (`fonts/variable/Azrienoch-VF.ttf`, unmodified), for titles and
+https://github.com/HereLiesAz/azrienoch (release `1.2`, version 1.2.0, commit `672a5575ff869e761597b32f0e35c73911c16ec1`,
+`fonts/variable/Azrienoch-VF.ttf`, unmodified; SHA-256 `1932c8156fb65aee5c0ca05cb229ec78ee4f487240034c84595b359fdb8f46b4`), for titles and
 everything else, mapped in `AzphaltType`. It is a Modified Version of Jost (with `c`, `e` and `s` derived from
 Arimo), licensed under the SIL Open Font License, Version 1.1; the font is not sold on its own.
 
