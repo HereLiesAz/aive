@@ -173,7 +173,7 @@ class RemoteRepositoryOperationClientsTest {
     }
 
     @Test
-    fun gitLabSnapshotDoesNotTreatSymlinkOrIncompleteDirectoryAsMissing() = runBlocking {
+    fun gitLabSnapshotRejectsSymlinkTargetsAndAncestors() = runBlocking {
         val base = "a".repeat(40)
         var treePages = 0
         val engine = MockEngine { request ->
@@ -196,6 +196,49 @@ class RemoteRepositoryOperationClientsTest {
             }
         }
         assertEquals(2, treePages)
+    }
+
+    @Test
+    fun gitLabSnapshotFindsTargetOnLaterPageAndFailsClosedWhenNextPageFails() = runBlocking {
+        val base = "a".repeat(40)
+        val blob = "b".repeat(40)
+        val pages = mutableListOf<String?>()
+        var failSecondPage = false
+        val engine = MockEngine { request ->
+            assertEquals(HttpMethod.Get, request.method)
+            when {
+                request.url.encodedPath.contains("/repository/branches/") ->
+                    respondJson("""{"name":"main","commit":{"id":"$base"}}""")
+                request.url.encodedPath.endsWith("/repository/tree") -> {
+                    val page = request.url.parameters["page"]
+                    pages += page
+                    when (page) {
+                        "1" -> respondJson((0 until 100).joinToString(",", "[", "]") {
+                            """{"path":"other-$it.txt","mode":"100644","type":"blob","id":"$blob"}"""
+                        })
+                        "2" -> if (failSecondPage) {
+                            respondJson("""{"message":"unavailable"}""", HttpStatusCode.ServiceUnavailable)
+                        } else {
+                            respondJson("""[{"path":"target.txt","mode":"100644","type":"blob","id":"$blob"}]""")
+                        }
+                        else -> error("Unexpected page $page")
+                    }
+                }
+                request.url.encodedPath.endsWith("/raw") -> respondJson("found on page two")
+                else -> respondJson("""{"default_branch":"main","web_url":"https://gitlab.com/team/app"}""")
+            }
+        }
+        val client = GitLabRestRepositoryOperationClient(RepositoryServiceTokenProvider { "gitlab-token" }, trackedClient(engine))
+        val result = client.readFileProposalContext(gitLabProject(), listOf("target.txt"))
+        assertEquals(RepositoryProposedFile("target.txt", blob, "found on page two"),
+            RepositoryFileProposal.parse(result.artifacts.single().textContent!!).files.single())
+        assertEquals(listOf("1", "2"), pages)
+        failSecondPage = true
+        pages.clear()
+        kotlin.test.assertFailsWith<IllegalStateException> {
+            client.readFileProposalContext(gitLabProject(), listOf("target.txt"))
+        }
+        assertEquals(listOf("1", "2"), pages)
     }
 
     @Test

@@ -146,7 +146,7 @@ internal val TaskDefinition.usesHostFileContext: Boolean
 internal fun TaskDefinition.providerCapabilitiesFor(role: RoleDefinition): Set<AgentCapability> =
     if (usesHostFileContext) role.capabilitiesRequired.withoutRepositoryAccessUnless(null) else role.capabilitiesRequired
 
-/** The host supplies proposal input as an artifact, never as a repository handle. */
+/** The host supplies repository input as an artifact, never as a repository handle. */
 internal fun TaskDefinition.providerRepositoryFor(repository: RepositoryRef?): RepositoryRef? =
     if (usesHostFileContext) null else repository
 
@@ -193,16 +193,15 @@ internal fun expandHostFileSteps(
                 continue
             }
             val readId = TaskDefinitionId("${task.id.value}--host-read")
+            require(occupied.add(readId)) { "Host repository read collides with existing task ids" }
+            add(TaskDefinition(
+                id = readId, name = "Read files: ${task.name}", objective = "Read exact repository files at one base commit.",
+                roleId = null, executor = TaskExecutor.RepositoryOperation(RepositoryFileProposal.READ_CONTEXT_OPERATION),
+                dependsOn = task.dependsOn, requiredArtifacts = setOf(ArtifactKind.CommandOutput),
+                resources = listOf(TaskResource.RepositoryFiles(requireNotNull(paths))),
+                environmentPlanningPolicy = EnvironmentPlanningPolicy.NotRequired,
+            ))
             if (readOnly) {
-                require(occupied.add(readId)) { "Host repository read collides with existing task ids" }
-                add(TaskDefinition(
-                    id = readId, name = "Read files: ${task.name}",
-                    objective = "Read exact repository files at one base commit.",
-                    roleId = null, executor = TaskExecutor.RepositoryOperation(RepositoryFileProposal.READ_CONTEXT_OPERATION),
-                    dependsOn = task.dependsOn, requiredArtifacts = setOf(ArtifactKind.CommandOutput),
-                    resources = listOf(TaskResource.RepositoryFiles(requireNotNull(paths))),
-                    environmentPlanningPolicy = EnvironmentPlanningPolicy.NotRequired,
-                ))
                 add(task.copy(
                     objective = "Answer from the host's repository snapshot artifact. Do not access the repository or use tools. " +
                         "A null expectedBlob means that file does not exist at the snapshot commit. Identify missing evidence; " +
@@ -217,16 +216,9 @@ internal fun expandHostFileSteps(
             val proposalId = TaskDefinitionId("${task.id.value}--host-proposal")
             val approvalId = TaskDefinitionId("${task.id.value}--host-approve")
             // The operation grammar uses ':' as its delimiter. Do not reinterpret task ids.
-            require(':' !in proposalId.value && listOf(readId, proposalId, approvalId).all(occupied::add)) {
+            require(':' !in proposalId.value && listOf(proposalId, approvalId).all(occupied::add)) {
                 "Host repository routing collides with existing task ids"
             }
-            add(TaskDefinition(
-                id = readId, name = "Read files: ${task.name}", objective = "Read exact repository files at one base commit.",
-                roleId = null, executor = TaskExecutor.RepositoryOperation(RepositoryFileProposal.READ_CONTEXT_OPERATION),
-                dependsOn = task.dependsOn, requiredArtifacts = setOf(ArtifactKind.CommandOutput),
-                resources = listOf(TaskResource.RepositoryFiles(requireNotNull(paths))),
-                environmentPlanningPolicy = EnvironmentPlanningPolicy.NotRequired,
-            ))
             add(task.copy(
                 id = proposalId, name = "Propose files: ${task.name}",
                 objective = "Do not access or change the repository. Produce only a file proposal using the host snapshot. " +

@@ -390,22 +390,27 @@ class GitLabRestRepositoryOperationClient(
             var page = 1
             while (true) {
                 require(pagesRemaining-- > 0) { "GitLab snapshot directory page limit exceeded" }
-                val body = httpClient.get("$url/repository/tree") {
+                val response = httpClient.get("$url/repository/tree") {
                     gitlabHeaders(token)
                     parameter("ref", base)
                     parameter("recursive", false)
                     if (path.isNotEmpty()) parameter("path", path)
                     parameter("per_page", 100)
                     parameter("page", page)
-                }.requireSuccessBody("read GitLab snapshot tree")
-                val items = json.decodeFromString<List<GitLabSnapshotTreeEntry>>(body)
+                }
+                val items = json.decodeFromString<List<GitLabSnapshotTreeEntry>>(
+                    response.requireSuccessBody("read GitLab snapshot tree"),
+                )
                 require(items.size <= 100) { "GitLab returned an oversized tree page" }
                 for (item in items) {
                     require(item.path.substringBeforeLast('/', "") == path && entries.put(item.path, item) == null) {
                         "GitLab returned an invalid or repeated tree entry"
                     }
                 }
-                if (items.size < 100) break
+                // A full page is never proof of completion, even if pagination headers are omitted.
+                val nextPage = response.headers["X-Next-Page"]?.takeIf(String::isNotBlank)
+                require(nextPage == null || nextPage.toIntOrNull() == page + 1) { "Invalid GitLab snapshot pagination" }
+                if (items.size < 100 && nextPage == null) break
                 page++
             }
             directories[path] = entries
