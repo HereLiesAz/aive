@@ -72,24 +72,38 @@ class ResearchInvestigation(
     /** The same research with [model] answering the facts (the queen's model, held to the keeper's caps by the caller). */
     fun withFactModel(model: QueenModel?): ResearchInvestigation = ResearchInvestigation(step, context, budget, model, memoryProvider)
 
-    /** [memoryRunIds] contains only existing workflow banks authorized by the caller; never use the external lookup key as a bank ID. */
-    suspend fun findings(missingFact: String, runKey: String, memoryRunIds: List<String> = emptyList()): List<String>? {
+    /**
+     * [memoryRunIds] contains existing authorized workflow banks. [captureWorkflowId] is an explicit
+     * host-owned destination for the returned model reply, not the external lookup key or a source grant.
+     * Without a destination, the inference is cue-only. Captured replies are unverified agent notes;
+     * only source-checked facts are returned to the investigation.
+     */
+    suspend fun findings(missingFact: String, runKey: String, memoryRunIds: List<String> = emptyList(),
+        captureWorkflowId: String? = null): List<String>? {
+        require(captureWorkflowId == null || memoryRunIds == listOf(captureWorkflowId))
         val objective = ResearchText.clean(missingFact, 200)
         if (objective.isEmpty()) return null
         // "Learn about" is a word the step's own deterministic rule reads as a request to look something up.
         val outcome = step.run("Learn about $objective", context(), runKey)
         val tools = outcome.leads.toAvailableTools(budget)
-        val facts = factsFrom(objective, outcome.leads, memoryRunIds)
+        val facts = factsFrom(objective, outcome.leads, memoryRunIds, captureWorkflowId)
         return (facts + tools).takeIf { it.isNotEmpty() }
     }
 
-    private suspend fun factsFrom(objective: String, leads: List<ResearchLead>, memoryRunIds: List<String>): List<String> {
+    private suspend fun factsFrom(objective: String, leads: List<ResearchLead>, memoryRunIds: List<String>,
+        captureWorkflowId: String?): List<String> {
         val model = factModel ?: return emptyList()
         if (leads.isEmpty()) return emptyList()
         val reply = try {
-            val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(memoryRunIds, memoryProvider)
-            memory.voice(model, com.hereliesaz.geministrator.domain.BuiltInRoles.Orchestrator.id.value)
-                .answer(researchFactsPrompt(objective, leads))
+            val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(
+                memoryRunIds, memoryProvider, captureWorkflowId = captureWorkflowId,
+            )
+            try {
+                memory.voice(model, com.hereliesaz.geministrator.domain.BuiltInRoles.Orchestrator.id.value)
+                    .answer(researchFactsPrompt(objective, leads))
+            } finally {
+                memory.flushReplies()
+            }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
