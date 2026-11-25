@@ -241,6 +241,7 @@ class WorkflowRuntimeCoordinator(
                     role = resolvedRole,
                     orchestrationUtilities = orchestrationUtilities,
                     resolvedSurfaces = resolvedSurfaces,
+                    correctiveContext = engine.correctiveContextFor(definition, run, task, taskRun, resolvedRole),
                 )
                 sessionGateway.reconnect(
                     handle,

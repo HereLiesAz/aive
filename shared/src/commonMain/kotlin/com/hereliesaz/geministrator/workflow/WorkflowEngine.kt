@@ -80,6 +80,8 @@ class WorkflowEngine(
     private val outputValidators: TaskOutputValidatorRegistry = TaskOutputValidatorRegistry.Empty,
     /** Decides whether an approved habit answers a task with no model call; null (the default) never replays. */
     private val habitReplay: com.hereliesaz.geministrator.memory.procedural.HabitReplayPlanner? = null,
+    /** Host-owned receipt lookup for already released test artifacts; no extra inference or tool call. */
+    private val dependencyEvidence: (suspend (WorkflowRun, List<ArtifactRef>) -> List<PromptContextBlock>)? = null,
 ) {
     private val rolesById: Map<RoleDefinitionId, RoleDefinition> = roles.associateBy { it.id }
 
@@ -116,15 +118,41 @@ class WorkflowEngine(
      * their input. Their usage lands only when their session reports it, and until then the role's budget
      * would not see them.
      */
-    private fun roleTokensInFlight(definition: WorkflowDefinition, run: WorkflowRun, roleId: RoleDefinitionId): Long {
+    private suspend fun roleTokensInFlight(definition: WorkflowDefinition, run: WorkflowRun, roleId: RoleDefinitionId): Long {
         val role = roleDefinition(run, roleId) ?: return 0L
         val tasks = definition.tasks.associateBy { it.id }
         return run.taskRuns.values
             .filter { it.status.isActive() && it.assignedRoleId == roleId && (it.usage?.totalTokens ?: 0L) == 0L }
             .sumOf { taskRun ->
                 val task = tasks[taskRun.taskDefinitionId] ?: return@sumOf 0L
-                estimateTaskInputTokens(definition, run, task, role).toLong()
+                estimateTaskInputTokens(definition, run, task, role,
+                    correctiveContextFor(definition, run, task, taskRun, role)).toLong()
             }
+    }
+
+    /**
+     * Only read-only role-agent requests may receive the bounded typed receipt projection.
+     * A held dependency, excluded TestResult, effectful task or unavailable ledger must not
+     * add context to a provider request. Never send new evidence into an existing live session.
+     */
+    internal suspend fun correctiveContextFor(
+        definition: WorkflowDefinition, run: WorkflowRun, task: TaskDefinition,
+        taskRun: TaskRun, role: RoleDefinition,
+    ): List<PromptContextBlock> {
+        val lookup = dependencyEvidence ?: return emptyList()
+        val executor = taskRun.executor ?: task.effectiveExecutor()
+        if (executor !is TaskExecutor.RoleAgent || executor.canMutate(task, role) ||
+            ArtifactKind.TestResult in definition.payloadRedactionPolicy.excludedArtifactKinds) return emptyList()
+        val reports = definition.contextInputs(run, task).filter { it.kind == ArtifactKind.TestResult }
+        if (reports.isEmpty()) return emptyList()
+        return try {
+            lookup(run, reports)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            com.hereliesaz.geministrator.log.AppLog.record("evidence", "Dependency observation unavailable: ${failure::class.simpleName}")
+            emptyList()
+        }
     }
 
     /**
@@ -305,7 +333,8 @@ class WorkflowEngine(
                     // budget and together over it. What the running ones are expected to spend (their input,
                     // which is the least they will bill) is set aside, so a task that would take the role over
                     // waits Ready until their usage lands. The first task of a role always starts.
-                    val ownEstimate = estimateTaskInputTokens(definition, nextRun, task, role)
+                    val correctiveContext = correctiveContextFor(definition, nextRun, task, taskRun, role)
+                    val ownEstimate = estimateTaskInputTokens(definition, nextRun, task, role, correctiveContext)
                     val roleBudget = roleTokenBudget(nextRun, budgetRoleId)
                     if (roleBudget != null) {
                         val reserved = roleTokensInFlight(definition, nextRun, budgetRoleId) +
@@ -341,6 +370,7 @@ class WorkflowEngine(
                         role = role,
                         orchestrationUtilities = orchestrationUtilities,
                         resolvedSurfaces = resolvedSurfaces,
+                        correctiveContext = if (replays) emptyList() else correctiveContext,
                     )
                     val approvedPlan = taskRun.approvedEnginePlan()
                     val request = if (approvedPlan != null) {

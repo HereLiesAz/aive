@@ -2665,6 +2665,9 @@ class ApplicationRuntime private constructor(
                     surfaceRuntime = roleSurfaceRuntime,
                     habitReplay = habitReplay,
                     outputValidators = com.hereliesaz.geministrator.tour.LessonArtifactBridge.registry(),
+                    dependencyEvidence = { run, reports ->
+                        collectiveEvidence.dependencyProcessObservations(run, reports, persistence.artifacts)
+                    },
                 )
                 // Nested workflow nodes run child runs through this same engine and persistence.
                 // Each child gets its own coordinator because coordinator cycles are not reentrant.
