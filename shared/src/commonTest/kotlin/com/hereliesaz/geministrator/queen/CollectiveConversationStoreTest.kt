@@ -10,6 +10,27 @@ import kotlin.test.assertTrue
 
 class CollectiveConversationStoreTest {
     @Test
+    fun crossExaminationSurvivesRestartAndFullTranscriptImport() = runTest {
+        val settings = MapSettings()
+        val store = CollectiveConversationStore(settings) { 100L }
+        val id = store.create().id
+        repeat(16) {
+            store.append(id, "Question", CollectiveAnswer("Answer", listOf(
+                CollectiveAssessment("reviewer", "Initial objection"),
+                CollectiveAssessment("skeptic", "Initial estimate"),
+                CollectiveAssessment("skeptic", "Measurement still missing", crossExamination = true),
+            ), emptyList(), reviewRequested = true))
+        }
+        val restored = requireNotNull(CollectiveConversationStore(settings) { 200L }.get(id))
+        assertTrue(restored.turns.last().result.reviewRequested)
+        assertTrue(restored.turns.last().result.assessments.last().crossExamination)
+        assertTrue("Measurement still missing" in restored.context())
+        val requests = restored.historicalMemoryRequests(200L)
+        assertEquals(80, requests.size)
+        assertEquals(16, requests.count { it.text == "Measurement still missing" })
+    }
+
+    @Test
     fun restoredHistoryUsesOnlyItsOwnCompletedRedactedTurns() = runTest {
         val settings = MapSettings()
         val first = CollectiveConversationStore(settings) { 100L }

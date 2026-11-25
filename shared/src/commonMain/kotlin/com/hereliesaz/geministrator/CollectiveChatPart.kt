@@ -56,10 +56,13 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
             style = AzphaltType.body, color = azphaltOnSurface())
         if (result.unavailable.isNotEmpty()) Text("Unavailable: ${result.unavailable.joinToString()}",
             style = AzphaltType.body, color = azphaltOnSurface())
+        if (result.reviewRequested && result.assessments.none { it.crossExamination }) {
+            Text("Cross-examination requested but not obtained.", style = AzphaltType.body, color = azphaltOnSurface())
+        }
         if (result.assessments.isNotEmpty()) {
             Text("Specialist assessments (unverified; not a consensus verdict)", style = AzphaltType.body, color = azphaltOnSurface())
             result.assessments.forEach { assessment ->
-                Text("${assessment.role}: ${assessment.text}", style = AzphaltType.body, color = azphaltOnSurface())
+                Text("${assessment.role}${if (assessment.crossExamination) " (cross-examination)" else ""}: ${assessment.text}", style = AzphaltType.body, color = azphaltOnSurface())
                 if (inspect) Text("Configured Source: ${assessment.sourceId ?: "unknown"} / model: ${assessment.modelId ?: "unknown"}; instance ${assessment.specialistId?.take(12) ?: "legacy"}",
                     style = AzphaltType.body, color = azphaltOnSurface())
             }

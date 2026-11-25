@@ -118,7 +118,7 @@ class MemoryConsolidationQueue(
      * Never retries a changed bank or replaces anything that was explicitly forgotten.
      */
     internal suspend fun enqueueBankBatch(requests: List<MemoryBankRequest>): Boolean {
-        require(requests.size in 1..64)
+        require(requests.size in 1..com.hereliesaz.geministrator.queen.MAX_COLLECTIVE_HISTORY_UTTERANCES)
         val snapshot = store.read()
         if (snapshot.episodes.isNotEmpty() || snapshot.queue.isNotEmpty() || snapshot.nodes.isNotEmpty() ||
             snapshot.sections.isNotEmpty() || snapshot.edges.isNotEmpty() || snapshot.declinedCondensations.isNotEmpty()) return false

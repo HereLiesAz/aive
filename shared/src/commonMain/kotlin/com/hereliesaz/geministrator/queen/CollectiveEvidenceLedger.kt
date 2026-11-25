@@ -72,13 +72,17 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
     }
 
     /**
-     * Retain exactly the bounded lead projection and bundled excerpts returned by the research step.
+     * Retain the redacted, bounded lead projection and bundled excerpts returned by the research step.
      * Source text remains a cited claim, not an observation proving its contents or a Keeper decision.
      * The lookup key identifies the originating operation; it grants no memory or execution permission.
      * Empty results (including declined or failed lookups with no returned content) create no entry.
      */
     suspend fun recordResearch(question: String, runKey: String, outcome: ResearchOutcome, budget: ResearchBudget) {
-        val lines = (outcome.leads.toAvailableTools(budget) + outcome.docs).distinct()
+        val leads = outcome.leads.map {
+            it.copy(name = ControlRedaction.scrub(it.name), trust = ControlRedaction.scrub(it.trust),
+                why = ControlRedaction.scrub(it.why))
+        }
+        val lines = (leads.toAvailableTools(budget) + outcome.docs).distinct()
         if (lines.isEmpty()) return
         val issue = issueId()
         mutex.withLock {
@@ -106,8 +110,8 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
     suspend fun recordArtifact(run: WorkflowRun, artifact: ArtifactRef) {
         val question = run.objective.ifBlank { "Workflow ${run.id.value}" }
         val text = buildString {
-            append(artifact.kind.name).append(": ").append(artifact.label.take(512))
-            artifact.textContent?.let { append("\n").append(it.take(12_000)) }
+            append(artifact.kind.name).append(": ").append(clean(artifact.label, 512))
+            artifact.textContent?.let { append("\n").append(clean(it, 12_000)) }
             if (artifact.textContent == null) append("\nArtifact content not read (reference only).")
         }
         append(

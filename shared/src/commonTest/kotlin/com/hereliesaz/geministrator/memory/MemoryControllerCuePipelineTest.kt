@@ -271,6 +271,35 @@ class MemoryControllerCuePipelineTest {
     }
 
     @Test
+    fun fourAdvisoryRepliesReleaseTogetherWithKeeperQuestion() = runBlocking {
+        val conversation = "collective:revision"
+        val bank = InMemoryMemoryStore()
+        val controller = MemoryLayerController(
+            banks = MemoryBanks.inMemory(mapOf(conversation to bank)),
+            settingsStore = MemoryLayerSettingsStore(MapSettings()),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined), nowEpochMillis = { 1000L },
+        )
+        controller.updateSettings { it.copy(consolidationPaused = true) }
+        val capture = com.hereliesaz.geministrator.queen.CollectiveMemoryCapture(
+            conversation, "Question", { 1000L }, controller.promptContextProvider)
+        val first = com.hereliesaz.geministrator.queen.CollectiveVoice("reviewer", QueenModel { "REVIEW: needed\nMissing sample." })
+        var calls = 0
+        val second = com.hereliesaz.geministrator.queen.CollectiveVoice("skeptic", QueenModel {
+            if (++calls == 1) "Initial estimate." else "Estimate remains unverified."
+        })
+        val queen = com.hereliesaz.geministrator.queen.CollectiveVoice("queen", QueenModel { "Unresolved." })
+        com.hereliesaz.geministrator.queen.answerCollectively(
+            "Question", "", listOf(first, second), queen, recordContribution = capture::record,
+        ) { _, _ -> true }
+        assertTrue(bank.read().episodes.isEmpty())
+        capture.flush()
+        assertEquals(setOf("Question", "REVIEW: needed\nMissing sample.", "Initial estimate.",
+            "Estimate remains unverified.", "Unresolved."), bank.read().episodes.map { it.chunks.single().text }.toSet())
+        assertEquals(5, bank.read().episodes.size)
+    }
+
+    @Test
     fun collectiveCaptureSurvivesRestartWithoutEarlyRecallOrDuplicateEpisodes() = runBlocking {
         val settings = MapSettings()
         val conversation = "collective:crash"
