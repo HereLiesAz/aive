@@ -25,8 +25,8 @@ import kotlin.time.ExperimentalTime
 
 /**
  * Direct conversations do not have a managed provider session. Compute fresh, bounded tags
- * for each actual model call using caller-authorized existing workflow banks and shared
- * lessons, independent of recipient role. No full passages or memory addresses enter a planning packet.
+ * for each actual model call across the one collective memory, independent of originating or
+ * receiving role, workflow, project or conversation. No full passages or memory addresses enter a planning packet.
  * The wrappers preserve model selection, pricing metadata, cancellation and response contracts.
  */
 internal class DirectChatMemory(
