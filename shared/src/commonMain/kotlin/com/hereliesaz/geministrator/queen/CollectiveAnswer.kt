@@ -52,6 +52,8 @@ internal data class CollectiveAnswer(
     val unexaminedRequests: List<Int> = emptyList(),
     /** Previously involved exact instances that did not return an observation-bearing reply. */
     val observationRecipientsMissing: List<String> = emptyList(),
+    /** Automatic topic matches included in the turn; not Keeper assertions of relevance. */
+    val automaticEvidenceIds: List<String> = emptyList(),
 )
 
 internal data class CollectiveVoice(val role: String, val model: QueenModel,
@@ -308,7 +310,8 @@ internal suspend fun answerCollectively(
         .sorted()
     if (assessments.isEmpty()) return CollectiveAnswer(null, emptyList(), unavailable.distinct(),
         reviewRequested = reviewRequested, stop = if (explored == null) stop else DeliberationStop.NoInitialAssessment,
-        observationRecipientsMissing = observations.participantIds.sorted())
+        observationRecipientsMissing = observations.participantIds.sorted(),
+        automaticEvidenceIds = observations.automaticEvidenceIds)
 
     val (evidence, _) = renderAssessments()
     val reviewStatus = when (stop) {
@@ -339,5 +342,6 @@ internal suspend fun answerCollectively(
     return CollectiveAnswer(final, assessments.toList(), unavailable.distinct(), reviewRequested = reviewRequested, stop = stop,
         unexaminedRequests = unexamined.toList(),
         observationRecipientsMissing = missingObservationRecipients() +
-            listOfNotNull(facilitator.specialistId?.takeIf { final == null && it in observations.participantIds }))
+            listOfNotNull(facilitator.specialistId?.takeIf { final == null && it in observations.participantIds }),
+        automaticEvidenceIds = observations.automaticEvidenceIds)
 }

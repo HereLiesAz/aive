@@ -104,6 +104,61 @@ class CollectiveEvidenceLedgerTest {
     }
 
     @Test
+    fun automaticDeliveryRetriesMissingRecipientsAndRedeliversRetractionsWithoutInventingLinks() = runTest {
+        val settings = MapSettings()
+        var time = 100L
+        val ledger = CollectiveEvidenceLedger(settings) { time }
+        val model = QueenModel { error("Local selection must not invoke a model") }
+        val a = CollectiveVoice("reviewer", model, "instance-a")
+        val b = CollectiveVoice("peer", model, "instance-b")
+        val question = "Quartz oscillator temperature drift"
+        val issue = ledger.issueId()
+        ledger.recordAdvisory(issue, "conversation-a", question, a, "Stable.")
+        ledger.recordAdvisory(issue, "conversation-a", question, b, "Stable.")
+        ledger.recordAdvisory(ledger.issueId(), "conversation-b", "Orchid irrigation schedule", a, "Water daily.")
+        time = 200L
+        val observation = ledger.recordKeeper(null, question, EvidenceKind.Observation, "Measured drift.", "Meter")
+        ledger.recordKeeper(null, "Orchid irrigation schedule", EvidenceKind.Observation, "Soil is wet.", "Sensor")
+        ledger.recordKeeper(null, question, EvidenceKind.Opinion, "I suspect drift.", "Keeper")
+        ledger.recordKeeper(null, "Quartz oscillator temperature drift [REDACTED]", EvidenceKind.Observation, "Private.", "Keeper")
+        val before = ledger.snapshot()
+        assertEquals(emptyList(), ledger.linkedObservations("conversation-a").evidenceIds)
+        val selected = ledger.linkedObservations("conversation-a", automatic = true)
+        assertEquals(listOf(observation.id), selected.evidenceIds)
+        assertEquals(listOf(observation.id), selected.automaticEvidenceIds)
+        assertEquals(setOf("instance-a", "instance-b"), selected.participantIds)
+        assertTrue("possible relevance only" in selected.text)
+        assertTrue("Measured drift." in selected.text)
+        assertTrue("Private." !in selected.text && "Soil is wet." !in selected.text)
+        assertEquals(before, ledger.snapshot())
+        time = 300L
+        val replyIssue = ledger.issueId()
+        ledger.recordAdvisory(replyIssue, "conversation-a", "Reconsider", a, "Reconsidered.",
+            promptEvidenceIds = selected.evidenceIds)
+        val restored = CollectiveEvidenceLedger(settings) { time }
+        val retry = restored.linkedObservations("conversation-a", automatic = true)
+        assertEquals(setOf("instance-b"), retry.participantIds)
+        restored.recordAdvisory(replyIssue, "conversation-a", "Reconsider", b, "Not persuaded.",
+            promptEvidenceIds = retry.evidenceIds)
+        assertEquals(emptyList(), restored.linkedObservations("conversation-a", automatic = true).evidenceIds)
+        // Retraction at the SAME clock tick must be a new delivery, not lost to time equality.
+        val retraction = restored.review(observation.id, null, EvidenceRelation.RetractedByKeeper, "Private note.")
+        val corrected = restored.linkedObservations("conversation-a", automatic = true)
+        assertEquals(listOf(observation.id), corrected.evidenceIds)
+        assertEquals(mapOf(observation.id to retraction.id), corrected.retractionIds)
+        assertEquals(setOf("instance-a", "instance-b"), corrected.participantIds)
+        assertTrue("Keeper recorded a retraction." in corrected.text)
+        assertTrue("Private note." !in corrected.text)
+        for (voice in listOf(a, b)) restored.recordAdvisory(replyIssue, "conversation-a", "Reconsider", voice,
+            "Noted.", promptEvidenceIds = corrected.evidenceIds, promptEvidenceRetractions = corrected.retractionIds)
+        assertEquals(emptyList(), restored.linkedObservations("conversation-a", automatic = true).evidenceIds)
+        assertEquals(emptyList(), restored.linkedObservations("conversation-a", automatic = false).evidenceIds)
+        assertEquals(listOf(retraction.id), restored.snapshot().reviews.map { it.id })
+        restored.forget(observation.id)
+        assertEquals(emptyList(), ledger.linkedObservations("conversation-a", automatic = true).evidenceIds)
+    }
+
+    @Test
     fun researchStepRetainsReturnedClaimsWithoutVerification() = runTest {
         val settings = MapSettings()
         val ledger = CollectiveEvidenceLedger(settings) { 100L }

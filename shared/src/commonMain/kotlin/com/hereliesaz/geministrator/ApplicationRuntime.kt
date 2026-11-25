@@ -441,6 +441,9 @@ class ApplicationRuntime private constructor(
             .importCollectiveHistory(id, conversation.historicalMemoryRequests(nowEpochMillis()))
     }
     internal suspend fun newCollectiveConversation() = collectiveChatMutex.withLock { collectiveConversations.create() }
+    internal suspend fun setCollectiveAutomaticEvidence(id: String, enabled: Boolean) = collectiveChatMutex.withLock {
+        collectiveConversations.setAutomaticEvidence(id, enabled)
+    }
     internal suspend fun deleteCollectiveConversation(id: String) = collectiveChatMutex.withLock { collectiveConversations.delete(id) }
     internal suspend fun clearCollectiveConversations() = collectiveChatMutex.withLock {
         collectiveConversations.clear()
@@ -586,7 +589,7 @@ class ApplicationRuntime private constructor(
     ): com.hereliesaz.geministrator.queen.CollectiveConversation = collectiveChatMutex.withLock {
         require(question.isNotBlank() && question.length <= 1500)
         val conversation = requireNotNull(collectiveConversations.get(conversationId))
-        val observations = runCatchingCancellable { collectiveEvidence.linkedObservations(conversationId) }
+        val observations = runCatchingCancellable { collectiveEvidence.linkedObservations(conversationId, automatic = conversation.automaticEvidence) }
             .onFailure { com.hereliesaz.geministrator.log.AppLog.record("evidence", "Linked observations unavailable: ${it::class.simpleName}") }
             .getOrDefault(com.hereliesaz.geministrator.queen.LinkedConversationObservations())
         val roster = activeRoles(resolveRoleCollection(persistence.roles.all()))
@@ -618,7 +621,8 @@ class ApplicationRuntime private constructor(
         try {
         val result = if (facilitator == null || models == null) {
             com.hereliesaz.geministrator.queen.CollectiveAnswer(null, emptyList(), listOf("Queen"),
-                observationRecipientsMissing = observations.participantIds.sorted())
+                observationRecipientsMissing = observations.participantIds.sorted(),
+                automaticEvidenceIds = observations.automaticEvidenceIds)
         } else {
             val specialists = com.hereliesaz.geministrator.queen.selectCollectiveSpecialists(
                 question, roster, facilitator.model.uses, collectiveModelFor,
@@ -641,7 +645,8 @@ class ApplicationRuntime private constructor(
                             com.hereliesaz.geministrator.log.AppLog.record("memory", "Collective capture unavailable: ${it::class.simpleName}")
                         }
                         runCatchingCancellable {
-                            collectiveEvidence.recordAdvisory(evidenceIssue, conversationId, question, voice, reply)
+                            collectiveEvidence.recordAdvisory(evidenceIssue, conversationId, question, voice, reply,
+                                promptEvidenceIds = observations.evidenceIds, promptEvidenceRetractions = observations.retractionIds)
                         }.onFailure {
                             com.hereliesaz.geministrator.log.AppLog.record("evidence", "Could not retain advisory evidence: ${it::class.simpleName}")
                         }

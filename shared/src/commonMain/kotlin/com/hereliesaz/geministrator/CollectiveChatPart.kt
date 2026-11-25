@@ -50,6 +50,26 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
             })
     }
     val destination = conversations.singleOrNull { it.id == selected }
+    val autoEvidence = host.collectiveAutomaticEvidence
+    if (destination != null && autoEvidence != null) {
+        Text("Automatic evidence delivery searches the shared local ledger for new topic matches to earlier questions and sends bounded evidence to configured models on the next turn. Other issues may be included; topic similarity is not proof of relevance. Disable to stop automatic delivery.",
+            style = AzphaltType.body, color = azphaltOnSurface())
+        AzphaltPill(if (destination.automaticEvidence) "Automatic evidence: on" else "Automatic evidence: off",
+            "collective-auto-evidence", onClick = {
+                if (!busy) {
+                    busy = true
+                    scope.launch {
+                        try {
+                            checkNotNull(autoEvidence(destination.id, !destination.automaticEvidence))
+                            refresh(destination.id)
+                            status = ""
+                        } catch (cancelled: CancellationException) { throw cancelled }
+                        catch (_: Exception) { status = "Evidence delivery preference could not be saved." }
+                        finally { busy = false }
+                    }
+                }
+            })
+    }
     destination?.turns.orEmpty().forEach { turn ->
         val result = turn.result
         Text("You: ${turn.question}", style = AzphaltType.body, color = azphaltOnSurface())
@@ -70,6 +90,9 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
         if (result.reviewRequested && result.assessments.none { it.crossExamination }) {
             Text("Further conversation requested but not obtained.", style = AzphaltType.body, color = azphaltOnSurface())
         }
+        if (result.automaticEvidenceIds.isNotEmpty()) Text(
+            "Automatically selected evidence: " + result.automaticEvidenceIds.joinToString(),
+            style = AzphaltType.body, color = azphaltOnSurface())
         if (result.observationRecipientsMissing.isNotEmpty()) Text(
             "Previously involved participants without a returned evidence-bearing reply: " +
                 result.observationRecipientsMissing.joinToString { it.take(12) },

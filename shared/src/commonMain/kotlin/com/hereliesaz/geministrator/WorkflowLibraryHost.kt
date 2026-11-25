@@ -52,6 +52,7 @@ class WorkflowLibraryHost(
     internal var collectiveHistory: (suspend () -> List<com.hereliesaz.geministrator.queen.CollectiveConversation>)? = null
     internal var collectiveNew: (suspend () -> com.hereliesaz.geministrator.queen.CollectiveConversation)? = null
     internal var collectiveDelete: (suspend (String) -> Unit)? = null
+    internal var collectiveAutomaticEvidence: (suspend (String, Boolean) -> com.hereliesaz.geministrator.queen.CollectiveConversation?)? = null
     internal var collectiveImportHistory: (suspend (String) -> Int?)? = null
     internal var evidenceLedger: (() -> com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger?)? = null
     internal var collectiveProfiles: (suspend () -> List<com.hereliesaz.geministrator.queen.SpecialistProfile>)? = null

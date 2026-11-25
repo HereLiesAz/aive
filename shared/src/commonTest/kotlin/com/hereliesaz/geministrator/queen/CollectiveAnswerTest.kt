@@ -216,11 +216,13 @@ class CollectiveAnswerTest {
         val denied = voice("denied", "denied")
         val queen = voice("queen", "queen")
         val observations = LinkedConversationObservations(
-            "Observation e: local process exited 1", setOf("b", "c", "old-instance", "denied"), listOf("e"))
+            "Observation e: local process exited 1", setOf("b", "c", "old-instance", "denied"), listOf("e"),
+            automaticEvidenceIds = listOf("e"))
         val result = answerCollectively("Question", "", listOf(a, replacement, b, c, denied), queen,
             observations = observations, admitRole = { it.role != "denied" }) { _, _ -> true }
         assertEquals(setOf("b", "c"), result.assessments.map { it.role }.toSet())
         assertTrue(result.assessments.all { it.observationIds == listOf("e") })
+        assertEquals(listOf("e"), result.automaticEvidenceIds)
         assertTrue(prompts.values.flatten().all { "local process exited 1" in it })
         assertEquals(listOf("denied", "old-instance"), result.observationRecipientsMissing)
         assertTrue("Do not infer their agreement" in prompts.getValue("queen").single())
