@@ -267,7 +267,7 @@ Before drafting a plan for an objective that asks to teach, explain, learn or in
 
 ### Repository operations
 
-GitHub and GitLab operations are implemented in `RemoteRepositoryOperationClients.kt`: `status`, `create-branch:<branch>`, `open-pull-request:…`, and `open-merge-request:…`. Local Git operations (desktop) cover `status`, `fetch`, `pull`, `add-all`, `push`, `checkout`, `create-branch`, `worktree-branch`, `commit`, and `push-set-upstream`. See `docs/Repository-Services.md` and `docs/Local-Git-Repository-Operations.md`.
+GitHub and GitLab operations are implemented in `RemoteRepositoryOperationClients.kt`: `status`, `create-branch:<branch>`, `open-pull-request:…`, and `open-merge-request:…`. GitHub also supports the host-owned `read-file-proposal-context` (read only) and `commit-files:…` (mutation) operations. The reader resolves a single base commit and reads exact paths with bounded UTF-8 decoding; the commit validates the approved proposal and creates a new ref, never updating an existing ref. Local Git operations (desktop) cover `status`, `fetch`, `pull`, `add-all`, `push`, `checkout`, `create-branch`, `worktree-branch`, `commit`, and `push-set-upstream`. See `docs/Repository-Services.md` and `docs/Local-Git-Repository-Operations.md`.
 
 **Threats**
 - An operation string is crafted to inject options or shell syntax.
@@ -685,7 +685,7 @@ The following invariants must hold regardless of the integration used:
 1. A task moves to `Completed` only when the executor integration explicitly returns `Completed` after polling the external system. No task self-completes on dispatch.
 2. Provider credentials never appear in workflow state, audit events, or exported bundles.
 3. The Aive runtime never executes artifact content as code or instructions. Remote agents with shell access (OpenCode) may act on it, and that risk is covered as a residual risk above.
-4. Every mutating `RepositoryOperation` task (anything other than `status`/`fetch`) has a `HumanApproval` ancestor in the workflow DAG. Workspace agents write only to new dedicated branches.
+4. Every mutating `RepositoryOperation` task (anything other than `status`, `fetch`, or `read-file-proposal-context`) has a `HumanApproval` ancestor in the workflow DAG. Workspace agents and host file commits write only to new dedicated branches. A host file commit additionally requires the proposal and its completed unconditional human approval as direct dependencies.
 5. Provider payloads are subject to `PayloadRedactionPolicy` before transmission.
 6. Dispatch-to-run-ID correlation is API-returned. The one exception is when OpenCode resumes after a restart: it matches the unique per-run `run-name` among up to 1,000 recent dispatches of its app-managed workflow.
 7. A task whose executor can change something does not run on external, unknown-provenance or externally derived inputs until a person approves a gate that names those inputs. An artifact without a provenance label counts as external, and so does a run's objective that did not come from the keeper's own typing.

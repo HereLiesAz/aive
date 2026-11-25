@@ -55,7 +55,7 @@ fun WorkflowValidationError.humanReadable(): String = when (this) {
 }
 
 /** Repository operations that only read; every other operation mutates and needs human approval. */
-val READ_ONLY_REPOSITORY_OPERATIONS: Set<String> = setOf("status", "fetch")
+val READ_ONLY_REPOSITORY_OPERATIONS: Set<String> = setOf("status", "fetch", RepositoryFileProposal.READ_CONTEXT_OPERATION)
 
 fun TaskExecutor.RepositoryOperation.isMutation(): Boolean = operation.trim() !in READ_ONLY_REPOSITORY_OPERATIONS
 

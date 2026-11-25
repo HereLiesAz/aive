@@ -9,6 +9,15 @@ import kotlinx.coroutines.CancellationException
 
 interface RepositoryOperationClient {
     fun supports(project: Project): Boolean = true
+    /** Opt in to exact-file snapshots separately from branch writes. */
+    fun supportsFileProposalContext(project: Project): Boolean = false
+    suspend fun readFileProposalContext(project: Project, paths: List<String>): ExternalExecutionRun =
+        error("Host file snapshots are not supported for this repository")
+    /** Explicitly opt in to host-owned file commits; unsupported clients never silently perform another operation. */
+    fun supportsFileProposals(project: Project): Boolean = false
+    /** Apply a validated proposal to a new branch. Only the governed repository executor calls this. */
+    suspend fun commitFileProposal(project: Project, branch: String, proposal: RepositoryFileProposal): ExternalExecutionRun =
+        error("Host file commits are not supported for this repository")
     suspend fun start(project: Project, operation: String): ExternalExecutionRun
     suspend fun start(
         project: Project,
@@ -26,16 +35,27 @@ class RepositoryOperationExecutorIntegration(
     override fun supports(executor: TaskExecutor): Boolean = executor is TaskExecutor.RepositoryOperation
 
     override fun supports(executor: TaskExecutor, project: Project): Boolean =
-        executor is TaskExecutor.RepositoryOperation && client.supports(project)
+        executor is TaskExecutor.RepositoryOperation && client.supports(project) &&
+            (!executor.operation.startsWith(CommitFileProposalOperation.PREFIX) || client.supportsFileProposals(project)) &&
+            (executor.operation.trim() != RepositoryFileProposal.READ_CONTEXT_OPERATION || client.supportsFileProposalContext(project))
 
     override suspend fun dispatch(context: TaskExecutorContext): TaskExecutorExecution {
         val executor = context.executor as TaskExecutor.RepositoryOperation
         return repositoryOperation("Repository operation '${executor.operation}' failed") {
-            client.start(
-                context.project,
-                executor.operation,
-                repositoryOperationIdentity(context),
-            ).toRepositoryTaskExecution(context)
+            val result = if (executor.operation.trim() == RepositoryFileProposal.READ_CONTEXT_OPERATION) {
+                require(client.supportsFileProposalContext(context.project)) { "Host file snapshots are unavailable for this repository" }
+                val paths = context.task.resources.filterIsInstance<com.hereliesaz.geministrator.domain.TaskResource.RepositoryFiles>()
+                    .singleOrNull()?.paths ?: error("Snapshot task requires exactly one repository_files resource")
+                RepositoryFileProposal.validateProposalPaths(paths)
+                client.readFileProposalContext(context.project, paths)
+            } else if (executor.operation.startsWith(CommitFileProposalOperation.PREFIX)) {
+                require(client.supportsFileProposals(context.project)) { "Host file commits are unavailable for this repository" }
+                val operation = CommitFileProposalOperation.parse(executor.operation)
+                client.commitFileProposal(context.project, operation.branch, context.approvedFileProposal(operation.producer))
+            } else {
+                client.start(context.project, executor.operation, repositoryOperationIdentity(context))
+            }
+            result.toRepositoryTaskExecution(context)
         }
     }
 
