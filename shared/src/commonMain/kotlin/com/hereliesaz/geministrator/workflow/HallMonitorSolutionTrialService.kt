@@ -173,8 +173,14 @@ class HallMonitorSolutionTrialService(
                 the modified version and inspect the evidence for themselves.
             """.trimIndent(),
         )
-        val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(listOf(sourceRun.id.value), memoryProvider)
-        val plan = memory.planner(orchestrationRuntime, BuiltInRoles.Planner.id.value).repair(packet)
+        val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(
+            listOf(sourceRun.id.value), memoryProvider, captureWorkflowId = sourceRun.id.value,
+        )
+        val plan = try {
+            memory.planner(orchestrationRuntime, BuiltInRoles.Planner.id.value).repair(packet)
+        } finally {
+            memory.flushReplies()
+        }
         val planned = OrchestratedWorkflowFactory.create(
             id = trialDefinitionId,
             objective = experimentObjective,

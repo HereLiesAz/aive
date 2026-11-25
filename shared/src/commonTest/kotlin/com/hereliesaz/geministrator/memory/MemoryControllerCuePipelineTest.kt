@@ -114,6 +114,55 @@ class MemoryControllerCuePipelineTest {
     }
 
     @Test
+    fun structuredDirectOutputsAreAttributedNotesNotExecutablePlansOrPromptCopies() = runBlocking {
+        val run = "structured-run"
+        val store = InMemoryMemoryStore()
+        val settings = MapSettings()
+        val controller = MemoryLayerController(
+            banks = MemoryBanks.inMemory(mapOf(run to store)),
+            settingsStore = MemoryLayerSettingsStore(settings),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            nowEpochMillis = { 1000L },
+        )
+        controller.updateSettings { it.copy(consolidationPaused = true) }
+        controller.registerWorkflow(run, "project")
+        val memory = DirectChatMemory(listOf(run), controller.promptContextProvider, captureWorkflowId = run)
+        val packet = OrchestrationPacket("Host-only objective", availableAgents = emptyList(),
+            artifacts = listOf("Host-only artifact"), instruction = "Host-only instruction")
+        val result = OrchestrationPlan(
+            listOf(com.hereliesaz.geministrator.orchestration.OrchestrationPlanStep(
+                "check", "Check result", "Compare two outputs", "reviewer",
+                templateId = "example", templateInputs = mapOf("payload" to "Not retained input payload"),
+            )), hiveSigns = listOf("artifact:check"), blockers = listOf("Missing sample"),
+        )
+        val planner = memory.planner(object : OrchestrationAgentRuntime {
+            override val lastSourceId = "source-a"
+            override suspend fun plan(packet: OrchestrationPacket) = result
+            override suspend fun repair(packet: OrchestrationPacket) = result
+        }, "planner")
+        assertEquals(result, planner.plan(packet))
+        assertEquals(result, planner.repair(packet))
+        val opinion = PlanVerdict.Reject("No independent sample", answeredBy = "source-b")
+        val reviewer = memory.reviewer(PlanReviewer { opinion }, "reviewer")
+        assertEquals(opinion, reviewer.review(PlanReviewRequest(packet, result, "Reviewer", "Review.", null)))
+        assertTrue(store.read().episodes.isEmpty())
+        assertEquals(3, SettingsMemoryCaptureJournal(settings).pending().size)
+        memory.flushReplies()
+        val notes = store.read().episodes
+        assertEquals(3, notes.size)
+        assertTrue(notes.all { it.chunks.single().kind == MemorySourceKind.AgentNote && it.workflowRunId == run })
+        val plans = notes.filter { it.roleId == "planner" }.map { it.chunks.single() }
+        assertEquals(2, plans.size)
+        assertTrue(plans.all { "Compare two outputs" in it.text && "artifact:check" in it.text && "Missing sample" in it.text })
+        assertTrue(plans.any { "Returned initial plan" in it.text })
+        assertTrue(plans.any { "Returned repair plan" in it.text })
+        val review = notes.single { it.roleId == "reviewer" }.chunks.single()
+        assertTrue("No independent sample" in review.text && "not Keeper approval" in review.text)
+        assertTrue(notes.all { "Host-only" !in it.chunks.single().text && "Not retained input payload" !in it.chunks.single().text })
+    }
+
+    @Test
     fun directReplyCaptureRespectsDisabledMemoryAndClearBeforeRelease() = runBlocking {
         val run = "direct-run"
         val store = InMemoryMemoryStore()
