@@ -23,6 +23,7 @@ internal fun selectCollectiveSpecialists(
     modelFor: ((String?) -> QueenModel?)?,
     fallback: Map<String, QueenModel>,
     experience: List<CollectiveExpertiseMatch> = emptyList(),
+    returningInstances: Set<String> = emptySet(),
 ): List<Pair<RoleDefinition, QueenModel>> {
     val candidates = roster.filter {
         it.enabled && it.executionSource == RoleExecutionSource.Agent && it.id != BuiltInRoles.Orchestrator.id
@@ -55,8 +56,7 @@ internal fun selectCollectiveSpecialists(
     for (role in ordered) {
         val pin = role.preferredProviderId?.value
         val choices = if (pin != null) listOf(pin) else sourceIds.sortedBy { it in used }
-        val model = if (experienced != null && role.id == experienced.first.id) experienced.second
-        else if (modelFor == null) {
+        val model = if (modelFor == null) {
             fallback[role.id.value]?.takeIf {
                 pin == null || (it.uses.isNotEmpty() && it.uses.all { use -> use.sourceId == pin })
             }
@@ -65,7 +65,10 @@ internal fun selectCollectiveSpecialists(
                 modelFor(source)?.takeIf { it.uses.isNotEmpty() && it.uses.all { use -> use.sourceId == source } }
             }
             // Prefer distinct configured identifiers among unused Sources; unknown is not diversity.
-            val chosen = if (usedModels.isEmpty() || pin != null) available.firstOrNull()
+            val returning = available.firstOrNull { specialistInstanceId(role, it.uses) in returningInstances }
+            val chosen = returning ?: available.firstOrNull { candidate ->
+                experienced != null && experienced.first.id == role.id && candidate.uses == experienced.second.uses
+            } ?: if (usedModels.isEmpty() || pin != null) available.firstOrNull()
             else available.sortedWith(compareBy<QueenModel> { candidate ->
                 candidate.uses.any { it.sourceId in used }
             }.thenBy { candidate ->

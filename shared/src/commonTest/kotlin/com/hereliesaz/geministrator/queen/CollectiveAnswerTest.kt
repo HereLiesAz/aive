@@ -203,6 +203,30 @@ class CollectiveAnswerTest {
     }
 
     @Test
+    fun linkedObservationReachesAffectedInstancesAndRecordsOnlyReturnedReplies() = runTest {
+        val prompts = mutableMapOf<String, MutableList<String>>()
+        fun voice(role: String, id: String) = CollectiveVoice(role, QueenModel {
+            prompts.getOrPut(role) { mutableListOf() }.add(it)
+            "REVIEW: none\nI have reconsidered."
+        }, id)
+        val a = voice("a", "a")
+        val b = voice("b", "b")
+        val c = voice("c", "c")
+        val replacement = voice("old", "replacement")
+        val denied = voice("denied", "denied")
+        val queen = voice("queen", "queen")
+        val observations = LinkedConversationObservations(
+            "Observation e: local process exited 1", setOf("b", "c", "old-instance", "denied"), listOf("e"))
+        val result = answerCollectively("Question", "", listOf(a, replacement, b, c, denied), queen,
+            observations = observations, admitRole = { it.role != "denied" }) { _, _ -> true }
+        assertEquals(setOf("b", "c"), result.assessments.map { it.role }.toSet())
+        assertTrue(result.assessments.all { it.observationIds == listOf("e") })
+        assertTrue(prompts.values.flatten().all { "local process exited 1" in it })
+        assertEquals(listOf("denied", "old-instance"), result.observationRecipientsMissing)
+        assertTrue("Do not infer their agreement" in prompts.getValue("queen").single())
+    }
+
+    @Test
     fun newObservationCanPersuadeParticipantsAwayFromTheirEarlierAgreement() = runTest {
         val history = "a: I favor X.\nb: I was persuaded by a and now favor X."
         var aCalls = 0

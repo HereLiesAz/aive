@@ -62,6 +62,17 @@ internal data class EvidenceReview(
     val reason: String, val recordedAt: Long,
 )
 
+/**
+ * Bounded host-observed process results explicitly associated with a prior conversation.
+ * The association is a routing hint, not a truth verdict. No raw test output or command is included.
+ * Participant IDs refer to previously recorded contributors, not inferred competence.
+ */
+internal data class LinkedConversationObservations(
+    val text: String = "",
+    val participantIds: Set<String> = emptySet(),
+    val evidenceIds: List<String> = emptyList(),
+)
+
 /** A redacted projection awaiting confirmation of the exact durable artifact version. */
 @Serializable
 internal data class PendingArtifactEvidence(
@@ -96,6 +107,46 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
     /** One issue per host turn, not per specialist. */
     fun issueId(): String = identity()
     suspend fun snapshot(): EvidenceBook = mutex.withLock { read().copy(pendingArtifacts = emptyList()) }
+
+    /**
+     * Return only durable typed local-process observations directly linked by the Keeper to
+     * this conversation's opinions. Never send raw artifact/report contents, review rationales,
+     * unrelated observations, claimed test metadata or opinions as corrective evidence.
+     * Both link directions are accepted; a relation says only that the entries are relevant.
+     * No call, memory write, change of belief or authorization occurs here.
+     */
+    suspend fun linkedObservations(conversation: String): LinkedConversationObservations = mutex.withLock {
+        val book = read()
+        val opinions = book.entries.filter { it.conversationId == conversation && it.kind == EvidenceKind.Opinion }
+        val opinionById = opinions.associateBy { it.id }
+        val byId = book.entries.associateBy { it.id }
+        val linked = linkedMapOf<String, MutableSet<String>>()
+        val linkedQuestions = linkedMapOf<String, String>()
+        for (review in book.reviews) {
+            val related = review.relatedId ?: continue
+            val opinion = opinionById[review.targetId] ?: opinionById[related] ?: continue
+            val observation = byId[if (opinion.id == review.targetId) related else review.targetId] ?: continue
+            if (observation.kind != EvidenceKind.Observation || observation.localTest == null ||
+                observation.recordedByKeeper) continue
+            // Every actual contributor to that issue can encounter the same corrective observation.
+            val participants = linked.getOrPut(observation.id) { linkedSetOf() }
+            if (observation.id !in linkedQuestions) linkedQuestions[observation.id] = opinion.question
+            opinions.filter { it.issueId == opinion.issueId }.mapNotNullTo(participants) { it.specialistId }
+        }
+        val selected = book.entries.asReversed().filter { it.id in linked }.take(4)
+        if (selected.isEmpty()) return@withLock LinkedConversationObservations()
+        val context = selected.joinToString("\n") { entry ->
+            val receipt = requireNotNull(entry.localTest)
+            // Use typed values and the conversation's own question, never the raw report,
+            // workflow objective, arbitrary metadata or Keeper review's assertion of truth.
+            "Observation ${entry.id}, linked to earlier question: ${clean(linkedQuestions.getValue(entry.id), 200)}. " +
+                "Local test process started=${receipt.started}; " +
+                "timedOut=${receipt.timedOut}; exitCode=${receipt.exitCode}; " +
+                "initial checkout=${receipt.checkoutCommit ?: "unknown"}."
+        }
+        LinkedConversationObservations(context,
+            selected.flatMap { linked.getValue(it.id) }.toSet(), selected.map { it.id })
+    }
 
     /** Actual advisory text stays an opinion regardless of its author or the number agreeing. */
     suspend fun recordAdvisory(issue: String, conversation: String, question: String, voice: CollectiveVoice, reply: String) {

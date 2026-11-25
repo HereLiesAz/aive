@@ -75,6 +75,29 @@ class WorkflowRuntimeCoordinatorTest {
         assertEquals("a".repeat(40), observation.localTest?.checkoutCommit)
         assertEquals(com.hereliesaz.geministrator.queen.EvidenceKind.CitedClaim, entries.single { it.localTest == null }.kind)
         assertEquals(emptyList(), restored.snapshot().reviews)
+        val voice = com.hereliesaz.geministrator.queen.CollectiveVoice("reviewer",
+            com.hereliesaz.geministrator.queen.QueenModel { error("Linking does not invoke models") }, "a".repeat(64))
+        val issue = restored.issueId()
+        restored.recordAdvisory(issue, "conversation-a", "Does the test pass?", voice, "I think it fails.")
+        restored.recordAdvisory(issue, "conversation-a", "Does the test pass?", voice.copy(role = "peer",
+            specialistId = "b".repeat(64)), "I agree.")
+        restored.recordAdvisory(restored.issueId(), "conversation-b", "Another matter", voice, "Unrelated.")
+        val opinion = restored.snapshot().entries.first { it.conversationId == "conversation-a" }
+        val claimOnly = entries.single { it.localTest == null }
+        restored.review(opinion.id, claimOnly.id, com.hereliesaz.geministrator.queen.EvidenceRelation.Supports,
+            "A report is not a host observation.")
+        assertEquals(emptyList(), restored.linkedObservations("conversation-a").evidenceIds)
+        restored.review(opinion.id, observation.id, com.hereliesaz.geministrator.queen.EvidenceRelation.Contradicts,
+            "PRIVATE REVIEW RATIONALE")
+        val next = com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger(settings) { 70L }
+        val linked = next.linkedObservations("conversation-a")
+        assertEquals(listOf(observation.id), linked.evidenceIds)
+        assertEquals(setOf("a".repeat(64), "b".repeat(64)), linked.participantIds)
+        kotlin.test.assertTrue("exitCode=0" in linked.text && "Does the test pass?" in linked.text)
+        kotlin.test.assertFalse("All criteria verified" in linked.text || "PRIVATE REVIEW RATIONALE" in linked.text)
+        assertEquals(emptyList(), next.linkedObservations("conversation-b").evidenceIds)
+        next.forget(observation.id)
+        assertEquals(emptyList(), restored.linkedObservations("conversation-a").evidenceIds)
         restored.clear()
         val saved = requireNotNull(persistence.runs.get(initial.id))
         coordinator.persist(project(), definition, WorkflowRuntimeState(saved))

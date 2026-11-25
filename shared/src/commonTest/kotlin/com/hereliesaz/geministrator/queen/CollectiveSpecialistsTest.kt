@@ -79,6 +79,31 @@ class CollectiveSpecialistsTest {
     }
 
     @Test
+    fun returningExactInstanceCanUseItsPreviousSourceButCannotOverridePin() {
+        val role = RoleDefinition(RoleDefinitionId("a"), "Indexing", "indexing", "")
+        val a = model("a")
+        val b = model("b")
+        val factory: (String?) -> QueenModel? = { pin ->
+            when (pin) {
+                "a" -> a
+                "b" -> b
+                else -> object : QueenModel {
+                    override val uses = a.uses + b.uses
+                    override suspend fun answer(prompt: String): String = error("No calls during selection")
+                }
+            }
+        }
+        val previous = specialistInstanceId(role, b.uses)
+        val result = selectCollectiveSpecialists("indexing", listOf(role), a.uses, factory, emptyMap(),
+            returningInstances = setOf(previous))
+        assertEquals(b.uses, result.single().second.uses)
+        val pinned = role.copy(preferredProviderId = AgentProviderId("a"))
+        val changed = selectCollectiveSpecialists("indexing", listOf(pinned), a.uses, factory, emptyMap(),
+            returningInstances = setOf(previous))
+        assertEquals(a.uses, changed.single().second.uses)
+    }
+
+    @Test
     fun explicitPinNeverFallsBackToAnotherSource() {
         val role = BuiltInRoles.Architect.copy(preferredProviderId = AgentProviderId("pinned"))
         val result = selectCollectiveSpecialists("Architecture", listOf(role), model("other").uses,

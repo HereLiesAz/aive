@@ -78,7 +78,8 @@ internal data class CollectiveConversation(
                         "instance=${assessment.specialistId ?: "unknown"}; configured Source=${assessment.sourceId ?: "unknown"}; " +
                         "model=${assessment.modelId ?: "unknown"}; phase=${if (assessment.crossExamination) "cross-examination" else "initial"}; " +
                         "utterance=${slot + 1}; respondsTo=${assessment.respondsTo ?: "not recorded"}; " +
-                        "persuadedBy=${assessment.persuadedBy ?: "not reported"}", MemorySourceKind.AgentNote)
+                        "persuadedBy=${assessment.persuadedBy ?: "not reported"}; " +
+                        "promptObservations=${assessment.observationIds.joinToString()}", MemorySourceKind.AgentNote)
             }
             turn.result.answer?.let { answer ->
                 addUtterance("facilitator", answer, BuiltInRoles.Orchestrator.id.value,

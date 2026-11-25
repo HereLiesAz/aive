@@ -586,6 +586,9 @@ class ApplicationRuntime private constructor(
     ): com.hereliesaz.geministrator.queen.CollectiveConversation = collectiveChatMutex.withLock {
         require(question.isNotBlank() && question.length <= 1500)
         val conversation = requireNotNull(collectiveConversations.get(conversationId))
+        val observations = runCatchingCancellable { collectiveEvidence.linkedObservations(conversationId) }
+            .onFailure { com.hereliesaz.geministrator.log.AppLog.record("evidence", "Linked observations unavailable: ${it::class.simpleName}") }
+            .getOrDefault(com.hereliesaz.geministrator.queen.LinkedConversationObservations())
         val roster = activeRoles(resolveRoleCollection(persistence.roles.all()))
         val models = resolveDisputeModels()
         // Conversation identity is provenance/attention context only. Recall is collective.
@@ -614,11 +617,12 @@ class ApplicationRuntime private constructor(
         val facilitator = queenRole?.let { role -> models?.queen?.let { voice(role, it) } }
         try {
         val result = if (facilitator == null || models == null) {
-            com.hereliesaz.geministrator.queen.CollectiveAnswer(null, emptyList(), listOf("Queen"))
+            com.hereliesaz.geministrator.queen.CollectiveAnswer(null, emptyList(), listOf("Queen"),
+                observationRecipientsMissing = observations.participantIds.sorted())
         } else {
             val specialists = com.hereliesaz.geministrator.queen.selectCollectiveSpecialists(
                 question, roster, facilitator.model.uses, collectiveModelFor,
-                models.voices, experience = directory,
+                models.voices, experience = directory, returningInstances = observations.participantIds,
             ).mapNotNull { (role, model) -> voice(role, model) }
             com.hereliesaz.geministrator.queen.answerCollectively(
                 question, conversation.context(), specialists, facilitator,
@@ -645,6 +649,7 @@ class ApplicationRuntime private constructor(
                 },
                 directory = directory,
                 timeBudgetMillis = timeBudgetMillis,
+                observations = observations,
             ) { model, _ ->
                 captureAvailable && models.mayCall() && queenCallAllowed() &&
                     advisoryGateFor(model.uses) == com.hereliesaz.geministrator.queen.CallDecision.Allow
