@@ -88,8 +88,14 @@ suspend fun ApplicationRuntime.repairFailureEscalation(
         instruction = "Repair the failed remainder of the plan. Every completed step must remain in the plan unchanged by id so its existing artifacts remain valid. Revise only work that has not completed.",
     )
 
-    val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(listOf(presentation.run.id.value))
-    val repairPlan = memory.planner(orchestrationRuntime, com.hereliesaz.geministrator.domain.BuiltInRoles.Planner.id.value).repair(packet)
+    val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(
+        listOf(presentation.run.id.value), captureWorkflowId = presentation.run.id.value,
+    )
+    val repairPlan = try {
+        memory.planner(orchestrationRuntime, com.hereliesaz.geministrator.domain.BuiltInRoles.Planner.id.value).repair(packet)
+    } finally {
+        memory.flushReplies()
+    }
     val repairedById = repairPlan.steps.associateBy { it.id }
     require(completedTaskIds.all(repairedById::containsKey)) {
         "Plan repair attempted to discard completed work"
