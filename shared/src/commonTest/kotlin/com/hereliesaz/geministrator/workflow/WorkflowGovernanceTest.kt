@@ -106,7 +106,8 @@ class WorkflowGovernanceTest {
             assertEquals(null, answer.providerRepositoryFor(repo))
             assertEquals(prepared, preparer.prepare(prepared, repo))
             val unknown = definition.copy(tasks = listOf(task.copy(resources = emptyList())))
-            if (source == com.hereliesaz.geministrator.domain.RepositorySource.GitHub) {
+            if (source in setOf(com.hereliesaz.geministrator.domain.RepositorySource.GitHub,
+                    com.hereliesaz.geministrator.domain.RepositorySource.GitLab)) {
                 val discovered = preparer.prepare(unknown, repo)
                 assertEquals(listOf("answer--host-read", "answer"), discovered.tasks.map { it.id.value })
                 assertEquals(com.hereliesaz.geministrator.domain.TaskExecutor.RepositoryOperation("read-discovered-repository-files"),

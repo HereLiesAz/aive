@@ -182,7 +182,7 @@ internal fun TaskDefinition.providerRepositoryFor(repository: RepositoryRef?): R
 /**
  * Compile narrowly declared repository reads into a host snapshot and inference-only answer, and writes into host snapshot, inference-only proposal,
  * approval and host commit. The final task keeps its identity, output contract and downstream
- * edges. An eligible GitHub read with no path resource uses host-ranked text files; writes without
+ * edges. An eligible GitHub or GitLab read with no path resource uses host-ranked text files; writes without
  * literal paths and workflows with explicit provider/placement constraints remain unchanged.
  */
 internal fun expandHostFileSteps(
@@ -198,7 +198,7 @@ internal fun expandHostFileSteps(
             val role = task.roleId?.let(roles::get)
             val fileResources = task.resources.filterIsInstance<TaskResource.RepositoryFiles>()
             val paths = fileResources.singleOrNull()?.paths
-            val discoverRead = repository?.source == RepositorySource.GitHub && fileResources.isEmpty() &&
+            val discoverRead = repository?.source in setOf(RepositorySource.GitHub, RepositorySource.GitLab) && fileResources.isEmpty() &&
                 contract?.let { it.template.id == "read-repository-files" && it.effects == setOf(StepEffect.None) } == true
             val exactPaths = paths != null && runCatching { RepositoryFileProposal.validateSnapshotPaths(paths) }.isSuccess
             if (task.usesHostFileContext || contract == null || contract.startingPoint ||

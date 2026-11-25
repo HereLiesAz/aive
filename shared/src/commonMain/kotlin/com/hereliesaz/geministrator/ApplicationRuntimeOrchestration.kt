@@ -219,7 +219,8 @@ internal fun newWorkflowInstruction(objective: String, repository: RepositoryRef
                 com.hereliesaz.geministrator.domain.RepositorySource.Local)) {
             append(" For a read-only question about known repository files, choose the read-repository-files template, ")
             append(" declare the literal paths in repository_files, and leave the target input empty. Aive supplies the files. ")
-            if (repository.source == com.hereliesaz.geministrator.domain.RepositorySource.GitHub) {
+            if (repository.source in setOf(com.hereliesaz.geministrator.domain.RepositorySource.GitHub,
+                    com.hereliesaz.geministrator.domain.RepositorySource.GitLab)) {
                 append(" If exact paths are unknown, omit repository_files for that read template; Aive discovers and reads a bounded relevant sample. ")
                 append(" Never invent paths or claim that the sample is exhaustive.")
             }

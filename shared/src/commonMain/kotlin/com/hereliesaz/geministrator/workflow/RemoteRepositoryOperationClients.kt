@@ -14,6 +14,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
+import io.ktor.client.request.head
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
@@ -438,14 +439,36 @@ class GitLabRestRepositoryOperationClient(
         project.repository?.source == RepositorySource.GitLab
 
     override fun supportsFileProposalContext(project: Project): Boolean = supports(project)
+    override fun supportsFileDiscovery(project: Project): Boolean = supports(project)
+
+    /** Read-only path discovery uses the same committed tree and page budget as exact snapshots. */
+    override suspend fun discoverFiles(project: Project, objective: String): ExternalExecutionRun =
+        snapshotOperation(project, objective = objective, manifestOnly = true)
+
+    /** Bounded relevant text snapshot, without granting the inference provider repository access. */
+    override suspend fun readDiscoveredFiles(project: Project, objective: String): ExternalExecutionRun =
+        snapshotOperation(project, objective = objective)
 
     /**
      * Read literal regular-file paths from a single GitLab commit. Directory pages are cached and
      * exhausted before declaring a path absent; the page budget fails closed on oversized trees.
      * No workspace checkout, model credential, or write request is needed.
      */
-    override suspend fun readFileProposalContext(project: Project, paths: List<String>): ExternalExecutionRun {
-        RepositoryFileProposal.validateSnapshotPaths(paths)
+    override suspend fun readFileProposalContext(project: Project, paths: List<String>): ExternalExecutionRun =
+        snapshotOperation(project, explicitPaths = paths)
+
+    /**
+     * Share commit resolution, cached directory listings and strict blob reads across all read operations.
+     * Discovery never follows a symlink/submodule and fails closed when the directory page budget is exhausted.
+     * HEAD file metadata supplies size and blob identity before any discovered content is requested.
+     */
+    private suspend fun snapshotOperation(
+        project: Project,
+        explicitPaths: List<String>? = null,
+        objective: String = "",
+        manifestOnly: Boolean = false,
+    ): ExternalExecutionRun {
+        explicitPaths?.let(RepositoryFileProposal::validateSnapshotPaths)
         val repository = requireRepository(project, RepositorySource.GitLab)
         val apiBase = repository.gitLabApiBase()
         val token = tokenProvider.requireToken("GitLab")
@@ -492,6 +515,61 @@ class GitLabRestRepositoryOperationClient(
             directories[path] = entries
             return entries
         }
+        val sizes = mutableMapOf<String, Int>()
+        val paths = if (explicitPaths != null) explicitPaths else {
+            val words = com.hereliesaz.geministrator.vector.BuiltInTextEmbedder.tokens(objective.take(4096)).toSet()
+            val pending = ArrayDeque<String>().apply { add("") }
+            val candidates = mutableListOf<GitLabSnapshotTreeEntry>()
+            while (pending.isNotEmpty()) {
+                for (entry in directory(pending.removeFirst()).values) {
+                    if (runCatching { RepositoryFileProposal.validateSnapshotPaths(listOf(entry.path)) }.isFailure) continue
+                    require(isGitObjectId(entry.id)) { "Invalid GitLab discovery object ID" }
+                    if (entry.type == "tree" && entry.mode == "040000") pending.addLast(entry.path)
+                    if (entry.type == "blob" && entry.mode in setOf("100644", "100755")) candidates += entry
+                }
+            }
+            val ranked = candidates.sortedWith(compareByDescending<GitLabSnapshotTreeEntry> {
+                com.hereliesaz.geministrator.retrieval.GitHubRepositoryChunkSource.pathScore(it.path, words)
+            }.thenBy { it.path })
+            if (manifestOnly) {
+                var bytes = 0
+                val selected = ranked.take(64).takeWhile {
+                    bytes += it.path.encodeToByteArray().size
+                    bytes <= 24_000
+                }.map { it.path }
+                val manifest = RepositoryDiscoveryManifest(base, selected, ranked.size, selected.size < ranked.size)
+                return completedRun(
+                    source = RepositorySource.GitLab, operation = RepositoryFileProposal.DISCOVER_OPERATION,
+                    label = "Repository file candidates", text = Json.encodeToString(manifest),
+                    metadata = mapOf("baseCommit" to base),
+                ).also { runs.put(it) }
+            }
+            val selected = mutableListOf<String>()
+            var available = RepositoryFileProposal.MAX_TOTAL_BYTES
+            // At most 32 metadata probes, even if every candidate is too large.
+            val relevant = ranked.filter {
+                com.hereliesaz.geministrator.retrieval.GitHubRepositoryChunkSource.isReadable(it.path) &&
+                    com.hereliesaz.geministrator.retrieval.GitHubRepositoryChunkSource.pathScore(it.path, words) > 0
+            }
+            for (entry in relevant.take(32)) {
+                if (selected.size >= 8) break
+                if (runCatching { RepositoryFileProposal.validateSnapshotPaths(selected + entry.path) }.isFailure) continue
+                val metadata = httpClient.head("$url/repository/files/${entry.path.encodeURLPathPart()}") {
+                    gitlabHeaders(token)
+                    parameter("ref", base)
+                }
+                check(metadata.status.value in 200..299) { "Unable to read GitLab file metadata: HTTP ${metadata.status.value}" }
+                require(metadata.headers["X-Gitlab-Blob-Id"] == entry.id) { "GitLab metadata blob differs from committed tree" }
+                val size = requireNotNull(metadata.headers["X-Gitlab-Size"]?.toLongOrNull()) { "GitLab file size unavailable" }
+                require(size >= 0) { "Invalid GitLab file size" }
+                if (size > minOf(available, RepositoryFileProposal.MAX_FILE_BYTES)) continue
+                selected += entry.path
+                sizes[entry.path] = size.toInt()
+                available -= size.toInt()
+            }
+            require(selected.isNotEmpty()) { "No relevant bounded text files found in the committed repository; specify exact paths" }
+            selected
+        }
         var remaining = RepositoryFileProposal.MAX_TOTAL_BYTES
         val files = paths.map { path ->
             val parts = path.split('/')
@@ -509,6 +587,7 @@ class GitLabRestRepositoryOperationClient(
             }
             val entry = if (absent) null else directory(parent)[path]
             if (entry == null) {
+                require(explicitPaths != null) { "Discovered file disappeared from its immutable tree" }
                 RepositoryProposedFile(path, null, "")
             } else {
                 require(entry.type == "blob" && entry.mode in setOf("100644", "100755") && isGitObjectId(entry.id)) {
@@ -520,12 +599,17 @@ class GitLabRestRepositoryOperationClient(
                 }
                 check(response.status.value in 200..299) { "Unable to read GitLab snapshot file: HTTP ${response.status.value}" }
                 val bytes = response.boundedBytes(minOf(remaining, RepositoryFileProposal.MAX_FILE_BYTES))
+                sizes[path]?.let { require(bytes.size == it) { "GitLab file bytes differ from metadata size" } }
                 remaining -= bytes.size
                 RepositoryProposedFile(path, entry.id, bytes.decodeToString(throwOnInvalidSequence = true))
             }
         }
         val snapshot = RepositoryFileProposal(base, files).also { it.validate() }
-        return snapshot.toSnapshotRun(RepositorySource.GitLab).also { runs.put(it) }
+        return (if (explicitPaths != null) snapshot.toSnapshotRun(RepositorySource.GitLab) else completedRun(
+            source = RepositorySource.GitLab, operation = RepositoryFileProposal.DISCOVER_READ_OPERATION,
+            label = "Bounded discovered repository snapshot", text = Json.encodeToString(snapshot),
+            metadata = mapOf("baseCommit" to base, "partial" to "true"),
+        )).also { runs.put(it) }
     }
 
     override suspend fun start(project: Project, operation: String): ExternalExecutionRun {
