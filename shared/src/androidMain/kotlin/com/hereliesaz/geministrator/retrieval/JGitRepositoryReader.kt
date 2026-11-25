@@ -137,6 +137,7 @@ object JGitRepositoryReader : LocalRepositoryReader {
                             val head = inserter.insert(commit)
                             inserter.flush()
                             require(repository.resolve("HEAD^{commit}") == base) { "Linked base changed; regenerate and approve the proposal" }
+                            require(repository.exactRef(ref) == null) { "Dedicated branch already exists" }
                             val update = repository.updateRef(ref, true)
                             update.setExpectedOldObjectId(ObjectId.zeroId())
                             update.setNewObjectId(head)

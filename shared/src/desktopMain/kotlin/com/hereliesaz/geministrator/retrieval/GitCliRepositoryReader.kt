@@ -117,8 +117,14 @@ object GitCliRepositoryReader : LocalRepositoryReader {
             val commit = command("commit-tree", tree, "-p", proposal.baseCommit,
                 input = "Apply approved Aive file proposal\n".encodeToByteArray()).trim()
             require(commit.matches(Regex("[0-9a-f]{40}"))) { "Invalid local commit SHA" }
+            val ref = "refs/heads/$branch"
+            // A dangling symbolic ref can look absent to create. Refuse symbolic destinations
+            // before the transaction, and never dereference the destination during creation.
+            require(git(root, "symbolic-ref", "-q", ref, maxBytes = 4096) == null) {
+                "Dedicated branch is a symbolic ref"
+            }
             command("update-ref", "--stdin", input =
-                "verify HEAD ${proposal.baseCommit}\ncreate refs/heads/$branch $commit\n".encodeToByteArray())
+                "verify HEAD ${proposal.baseCommit}\noption no-deref\ncreate $ref $commit\n".encodeToByteArray())
             return commit
         } finally {
             withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { temporary.deleteRecursively() }

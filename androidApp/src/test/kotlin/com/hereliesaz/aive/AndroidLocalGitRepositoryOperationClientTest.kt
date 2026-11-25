@@ -99,6 +99,16 @@ class AndroidLocalGitRepositoryOperationClientTest {
             runBlocking { client.commitFileProposal(project(root), "aive/reviewed", proposal) }
         }
         assertEquals(head, Git.open(root).use { it.repository.resolve("aive/reviewed").name })
+        Git.open(root).use { git ->
+            git.repository.updateRef("refs/heads/aive/alias", true).link("refs/heads/aive/unborn")
+        }
+        kotlin.test.assertFailsWith<IllegalArgumentException> {
+            runBlocking { client.commitFileProposal(project(root), "aive/alias", proposal) }
+        }
+        Git.open(root).use { git ->
+            assertTrue(git.repository.exactRef("refs/heads/aive/alias").isSymbolic)
+            assertEquals(null, git.repository.resolve("refs/heads/aive/unborn"))
+        }
     }
 
     @Test

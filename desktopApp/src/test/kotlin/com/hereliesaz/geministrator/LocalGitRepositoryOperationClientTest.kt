@@ -88,6 +88,12 @@ class LocalGitRepositoryOperationClientTest {
             runBlocking { client.commitFileProposal(project(root), "aive/reviewed", proposal) }
         }
         assertEquals(head, git(root, "rev-parse", "aive/reviewed").trim())
+        git(root, "symbolic-ref", "refs/heads/aive/alias", "refs/heads/aive/unborn")
+        assertFailsWith<IllegalArgumentException> {
+            runBlocking { client.commitFileProposal(project(root), "aive/alias", proposal) }
+        }
+        assertEquals("refs/heads/aive/unborn", git(root, "symbolic-ref", "refs/heads/aive/alias").trim())
+        assertTrue("refs/heads/aive/unborn" !in git(root, "show-ref"))
         git(root, "add", "README.md")
         git(root, "commit", "-m", "Advance source branch")
         assertFailsWith<IllegalArgumentException> {
