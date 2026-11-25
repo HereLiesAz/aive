@@ -38,6 +38,72 @@ class CollectiveEvidenceLedgerTest {
     }
 
     @Test
+    fun associatedReportsAndResearchExcerptsReachOnlyTheRelevantConversation() = runTest {
+        val settings = MapSettings()
+        val ledger = CollectiveEvidenceLedger(settings) { 100L }
+        val voice = CollectiveVoice("reviewer", QueenModel { error("Projection must not invoke models") }, "instance-a")
+        val issue = ledger.issueId()
+        ledger.recordAdvisory(issue, "conversation-a", "Does the circuit work?", voice, "It works.")
+        ledger.recordAdvisory(ledger.issueId(), "conversation-b", "Unrelated issue", voice, "Another view.")
+        val opinion = ledger.snapshot().entries.first { it.conversationId == "conversation-a" }
+        val observation = ledger.recordKeeper(issue, opinion.question, EvidenceKind.Observation, "Measured zero volts.", "Meter")
+        ledger.recordKeeper(issue, opinion.question, EvidenceKind.Opinion, "An unsupported opinion.", "Keeper")
+        ledger.recordKeeper(null, opinion.question, EvidenceKind.Observation, "Same words, different issue.", "Meter")
+        val source = LocalResearchSource {
+            listOf(ResearchLead("Manual", ResearchSource.Repository, "local", "It requires 5 volts.", true))
+        }
+        val research = com.hereliesaz.geministrator.research.ResearchInvestigation(
+            ResearchStep(local = listOf(ResearchSource.Repository to source)),
+            { ResearchContext(repositoryLinked = true) },
+            observeClaims = ledger::recordResearchClaims,
+        ).withFactModel(QueenModel { "FACT: It requires 10 volts. | SOURCE: 1" })
+        research.findings("Circuit manual", "lookup-a")
+        val citation = ledger.snapshot().entries.single { it.researchCitation != null }
+        ledger.review(citation.id, opinion.id, EvidenceRelation.Contradicts, "PRIVATE REVIEW")
+        ledger.review(observation.id, null, EvidenceRelation.RetractedByKeeper, "PRIVATE RETRACTION")
+        val restored = CollectiveEvidenceLedger(settings) { 200L }
+        val evidence = restored.linkedObservations("conversation-a")
+        assertEquals(listOf(citation.id, observation.id), evidence.evidenceIds)
+        assertEquals(setOf("instance-a"), evidence.participantIds)
+        assertTrue("Measured zero volts." in evidence.text && "Keeper-reported Observation" in evidence.text)
+        assertTrue("Keeper recorded a retraction." in evidence.text)
+        assertTrue("It requires 5 volts." in evidence.text && "It requires 10 volts." in evidence.text)
+        assertTrue("matches bounded source excerpt=false" in evidence.text)
+        assertTrue("PRIVATE" !in evidence.text && "unsupported opinion" !in evidence.text &&
+            "different issue" !in evidence.text)
+        assertEquals(emptyList(), restored.linkedObservations("conversation-b").evidenceIds)
+        restored.forget(citation.id)
+        assertEquals(listOf(observation.id), ledger.linkedObservations("conversation-a").evidenceIds)
+    }
+
+    @Test
+    fun localReconsiderationDiscoveryDoesNotLinkOrSendCandidatesUntilKeeperAssociatesThem() = runTest {
+        val settings = MapSettings()
+        val ledger = CollectiveEvidenceLedger(settings) { 100L }
+        val voice = CollectiveVoice("reviewer", QueenModel { error("Discovery must not call a model") }, "instance-a")
+        val question = "Does the quartz oscillator drift?"
+        ledger.recordAdvisory(ledger.issueId(), "conversation-a", question, voice, "No drift.")
+        val opinion = ledger.snapshot().entries.single()
+        val other = ledger.recordKeeper(null, "Unrelated garden", EvidenceKind.Observation, "Flowers bloom.", "Keeper")
+        val exact = ledger.recordKeeper(null, question, EvidenceKind.Observation, "Measured drift.", "Meter")
+        val unsupported = ledger.recordKeeper(null, question, EvidenceKind.Opinion, "I think so.", "Keeper")
+        val initial = ledger.snapshot()
+        val candidates = initial.reconsiderationCandidates(opinion.id)
+        assertEquals(exact.id, candidates.first().id)
+        assertEquals(setOf(exact.id, other.id), candidates.map { it.id }.toSet())
+        assertTrue(unsupported.id !in candidates.map { it.id })
+        assertEquals(emptyList(), ledger.linkedObservations("conversation-a").evidenceIds)
+        assertEquals(initial, ledger.snapshot())
+        ledger.review(opinion.id, exact.id, EvidenceRelation.Relevant, "For reconsideration.")
+        val restored = CollectiveEvidenceLedger(settings) { 200L }
+        assertEquals(listOf(exact.id), restored.linkedObservations("conversation-a").evidenceIds)
+        assertEquals(listOf(other.id), restored.snapshot().reconsiderationCandidates(opinion.id).map { it.id })
+        assertEquals(EvidenceRelation.Relevant, restored.snapshot().reviews.single().relation)
+        restored.forget(exact.id)
+        assertEquals(emptyList(), ledger.linkedObservations("conversation-a").evidenceIds)
+    }
+
+    @Test
     fun researchStepRetainsReturnedClaimsWithoutVerification() = runTest {
         val settings = MapSettings()
         val ledger = CollectiveEvidenceLedger(settings) { 100L }

@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator.queen
 
 import com.hereliesaz.geministrator.Sha256
 import com.hereliesaz.geministrator.control.ControlRedaction
+import com.hereliesaz.geministrator.orchestration.bySimilarityTo
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.persistence.ArtifactRepository
 import com.hereliesaz.geministrator.domain.ArtifactRef
@@ -54,7 +55,7 @@ internal data class EvidenceResearchCitation(
 
 /** A separate Keeper-recorded assessment; neither support nor verification rewrites the original. */
 @Serializable
-internal enum class EvidenceRelation { Supports, Contradicts, VerifiedByKeeper, RetractedByKeeper }
+internal enum class EvidenceRelation { Supports, Contradicts, VerifiedByKeeper, RetractedByKeeper, Relevant }
 
 @Serializable
 internal data class EvidenceReview(
@@ -63,8 +64,9 @@ internal data class EvidenceReview(
 )
 
 /**
- * Bounded host-observed process results explicitly associated with a prior conversation.
- * The association is a routing hint, not a truth verdict. No raw test output or command is included.
+ * Bounded evidence references explicitly associated with a prior conversation: host process
+ * observations, Keeper-reported observations/claims, and typed research excerpts.
+ * Association is a routing hint, not a truth verdict. No raw test output or command is included.
  * Participant IDs refer to previously recorded contributors, not inferred competence.
  */
 internal data class LinkedConversationObservations(
@@ -85,7 +87,40 @@ internal data class EvidenceBook(
     val entries: List<EvidenceEntry> = emptyList(), val reviews: List<EvidenceReview> = emptyList(),
     /** Journal entries are not visible evidence and never enter the Keeper's snapshot. */
     val pendingArtifacts: List<PendingArtifactEvidence> = emptyList(),
-)
+) {
+    /**
+     * Discover local candidates for an advisory issue, not conclusions about the evidence.
+     * Uses the existing deterministic routing similarity on questions only. No model call,
+     * transmission, link, verification or judgment is performed; only the Keeper may link.
+     * Exact question matches come first, then topic similarity; no relevance is asserted.
+     */
+    fun reconsiderationCandidates(opinionId: String): List<EvidenceEntry> {
+        val opinion = entries.singleOrNull { it.id == opinionId && it.conversationId != null &&
+            it.kind == EvidenceKind.Opinion } ?: return emptyList()
+        val issueOpinions = entries.filter { it.issueId == opinion.issueId &&
+            it.conversationId == opinion.conversationId && it.kind == EvidenceKind.Opinion }.map { it.id }.toSet()
+        val alreadyLinked = reviews.mapNotNull { review ->
+            when {
+                review.targetId in issueOpinions -> review.relatedId
+                review.relatedId in issueOpinions -> review.targetId
+                else -> null
+            }
+        }.toSet()
+        return entries.asSequence().filter { it.id !in alreadyLinked && it.canReconsider() &&
+            !(it.recordedByKeeper && it.issueId == opinion.issueId) }
+            .sortedWith(compareByDescending<EvidenceEntry> { it.question == opinion.question }
+                .then(bySimilarityTo<EvidenceEntry>(opinion.question) { it.question })
+                .thenByDescending { it.recordedAt }.thenBy { it.id })
+            .take(6).toList()
+    }
+}
+
+/** Whether an entry has a bounded corrective projection, not whether it is true. */
+private fun EvidenceEntry.canReconsider(): Boolean = when {
+    localTest != null -> kind == EvidenceKind.Observation && !recordedByKeeper
+    researchCitation != null -> !recordedByKeeper && kind in setOf(EvidenceKind.CitedClaim, EvidenceKind.Hypothesis)
+    else -> recordedByKeeper && kind in setOf(EvidenceKind.Observation, EvidenceKind.CitedClaim)
+}
 
 /**
  * Durable deliberation record, not an associative memory store. Records actual contributions
@@ -109,10 +144,12 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
     suspend fun snapshot(): EvidenceBook = mutex.withLock { read().copy(pendingArtifacts = emptyList()) }
 
     /**
-     * Return only durable typed local-process observations directly linked by the Keeper to
-     * this conversation's opinions. Never send raw artifact/report contents, review rationales,
-     * unrelated observations, claimed test metadata or opinions as corrective evidence.
-     * Both link directions are accepted; a relation says only that the entries are relevant.
+     * Return durable, bounded evidence that the Keeper associated with this conversation:
+     * direct links to its opinions, or Keeper reports recorded under the same issue.
+     * Host process results, Keeper reports and research excerpts remain distinct. A research
+     * text mismatch does not exclude the source excerpt; it is provenance, not a merit test.
+     * Never include raw artifact reports, commands, private review rationales or unrelated issues.
+     * Both link directions are accepted. A retraction is reported, not an order to change belief.
      * No call, memory write, change of belief or authorization occurs here.
      */
     suspend fun linkedObservations(conversation: String): LinkedConversationObservations = mutex.withLock {
@@ -122,27 +159,47 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
         val byId = book.entries.associateBy { it.id }
         val linked = linkedMapOf<String, MutableSet<String>>()
         val linkedQuestions = linkedMapOf<String, String>()
+        val byIssue = opinions.groupBy { it.issueId }
+        fun associate(entry: EvidenceEntry, issue: String) {
+            val contributors = byIssue[issue].orEmpty()
+            if (contributors.isEmpty()) return
+            if (!entry.canReconsider()) return
+            val participants = linked.getOrPut(entry.id) { linkedSetOf() }
+            if (entry.id !in linkedQuestions) linkedQuestions[entry.id] = contributors.first().question
+            contributors.mapNotNullTo(participants) { it.specialistId }
+        }
+        // Recording a report against an existing issue is an explicit local Keeper association.
+        for (entry in book.entries) {
+            if (entry.recordedByKeeper && entry.issueId in byIssue) associate(entry, entry.issueId)
+        }
         for (review in book.reviews) {
             val related = review.relatedId ?: continue
             val opinion = opinionById[review.targetId] ?: opinionById[related] ?: continue
-            val observation = byId[if (opinion.id == review.targetId) related else review.targetId] ?: continue
-            if (observation.kind != EvidenceKind.Observation || observation.localTest == null ||
-                observation.recordedByKeeper) continue
-            // Every actual contributor to that issue can encounter the same corrective observation.
-            val participants = linked.getOrPut(observation.id) { linkedSetOf() }
-            if (observation.id !in linkedQuestions) linkedQuestions[observation.id] = opinion.question
-            opinions.filter { it.issueId == opinion.issueId }.mapNotNullTo(participants) { it.specialistId }
+            val evidence = byId[if (opinion.id == review.targetId) related else review.targetId] ?: continue
+            associate(evidence, opinion.issueId)
         }
         val selected = book.entries.asReversed().filter { it.id in linked }.take(4)
         if (selected.isEmpty()) return@withLock LinkedConversationObservations()
+        val retracted = book.reviews.filter { it.relation == EvidenceRelation.RetractedByKeeper }
+            .map { it.targetId }.toSet()
         val context = selected.joinToString("\n") { entry ->
-            val receipt = requireNotNull(entry.localTest)
-            // Use typed values and the conversation's own question, never the raw report,
-            // workflow objective, arbitrary metadata or Keeper review's assertion of truth.
-            "Observation ${entry.id}, linked to earlier question: ${clean(linkedQuestions.getValue(entry.id), 200)}. " +
-                "Local test process started=${receipt.started}; " +
-                "timedOut=${receipt.timedOut}; exitCode=${receipt.exitCode}; " +
-                "initial checkout=${receipt.checkoutCommit ?: "unknown"}."
+            val receipt = entry.localTest
+            val citation = entry.researchCitation
+            val header = "Evidence ${entry.id}, linked to earlier question: " +
+                "${clean(linkedQuestions.getValue(entry.id), 200)}. "
+            val detail = when {
+                receipt != null -> "Host-observed local test process started=${receipt.started}; " +
+                    "timedOut=${receipt.timedOut}; exitCode=${receipt.exitCode}; " +
+                    "initial checkout=${receipt.checkoutCommit ?: "unknown"}."
+                citation != null -> "Research excerpt (source claim, not independently verified): " +
+                    "${clean(citation.sourceType, 60)} / ${clean(citation.sourceName, 60)}: " +
+                    "${clean(citation.sourceExcerpt, 160)}. " +
+                    "Model statement: ${clean(entry.text, 200)}. " +
+                    "Statement exactly matches bounded source excerpt=${citation.matchesSourceText}."
+                else -> "Keeper-reported ${entry.kind.name} (not a host observation): " +
+                    "${clean(entry.text, 400)}. Stated source: ${clean(entry.source, 160)}."
+            }
+            header + detail + if (entry.id in retracted) " Keeper recorded a retraction." else ""
         }
         LinkedConversationObservations(context,
             selected.flatMap { linked.getValue(it.id) }.toSet(), selected.map { it.id })
@@ -324,7 +381,7 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
             val evidence = related?.let { id -> book.entries.singleOrNull { it.id == id } ?: error("Evidence not found") }
             require(related != target)
             when (relation) {
-                EvidenceRelation.Supports, EvidenceRelation.Contradicts -> require(evidence != null)
+                EvidenceRelation.Supports, EvidenceRelation.Contradicts, EvidenceRelation.Relevant -> require(evidence != null)
                 EvidenceRelation.VerifiedByKeeper -> require(evidence?.kind in setOf(EvidenceKind.Observation, EvidenceKind.CitedClaim))
                 EvidenceRelation.RetractedByKeeper -> require(related == null)
             }
