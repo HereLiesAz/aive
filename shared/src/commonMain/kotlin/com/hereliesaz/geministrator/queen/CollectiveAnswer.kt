@@ -210,9 +210,9 @@ internal suspend fun answerCollectively(
         } + if (selected.size < indexed.size)
             "\n\nOther utterances omitted from this prompt; retained in the transcript. Do not infer their positions." else ""
         val omittedCurrent = allCurrent.size - current.size
-        return (text + if (omittedCurrent > 0)
-            "\n\n$omittedCurrent participants' latest positions are not included in this prompt; do not claim collective agreement." else "")
-            to selected.map { it.index + 1 }.toSet()
+        val omissionNotice = if (omittedCurrent > 0)
+            "\n\n$omittedCurrent participants' latest positions are not included in this prompt; do not claim collective agreement." else ""
+        return Pair(text + omissionNotice, selected.map { it.index + 1 }.toSet())
     }
 
     fun add(voice: CollectiveVoice, answer: String, target: Int? = null, shown: Set<Int> = emptySet()) {
