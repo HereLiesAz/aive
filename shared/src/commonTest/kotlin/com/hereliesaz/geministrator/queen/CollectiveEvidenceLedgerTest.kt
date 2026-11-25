@@ -15,6 +15,29 @@ import kotlin.test.assertTrue
 
 class CollectiveEvidenceLedgerTest {
     @Test
+    fun sourceTextChecksPersistWithActualExcerptAndDoNotVerifyTruth() = runTest {
+        val settings = MapSettings()
+        val ledger = CollectiveEvidenceLedger(settings) { 100L }
+        val source = LocalResearchSource {
+            listOf(ResearchLead("Manual", ResearchSource.Repository, "local", "It is not safe.", true))
+        }
+        val research = com.hereliesaz.geministrator.research.ResearchInvestigation(
+            ResearchStep(local = listOf(ResearchSource.Repository to source)),
+            { ResearchContext(repositoryLinked = true) },
+            observeClaims = ledger::recordResearchClaims,
+        ).withFactModel(QueenModel { "FACT: It is safe. | SOURCE: 1\nFACT: It is not safe. | SOURCE: 1\nFACT: Invented. | SOURCE: 9" })
+        val findings = requireNotNull(research.findings("Is this safe?", "lookup-2"))
+        assertTrue(findings.none { "It is safe." in it || "Invented." in it })
+        assertTrue(findings.any { "It is not safe." in it })
+        val book = CollectiveEvidenceLedger(settings) { 200L }.snapshot()
+        assertEquals(listOf(EvidenceKind.Hypothesis, EvidenceKind.CitedClaim), book.entries.map { it.kind })
+        assertEquals(listOf(false, true), book.entries.map { it.researchCitation?.matchesSourceText })
+        assertTrue(book.entries.all { it.researchCitation?.sourceExcerpt == "It is not safe." })
+        assertTrue(book.entries.all { it.researchCitation?.sourceNumber == 1 })
+        assertTrue(book.reviews.isEmpty())
+    }
+
+    @Test
     fun researchStepRetainsReturnedClaimsWithoutVerification() = runTest {
         val settings = MapSettings()
         val ledger = CollectiveEvidenceLedger(settings) { 100L }

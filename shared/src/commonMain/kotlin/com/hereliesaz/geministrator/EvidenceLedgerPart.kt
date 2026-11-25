@@ -57,6 +57,13 @@ internal fun EvidenceLedgerPart(ledger: CollectiveEvidenceLedger, parentBusy: Bo
     matching.drop(page * 20).take(20).forEach { entry ->
         Text("${entry.kind.name}: ${entry.question}\n${entry.text}\nSource: ${entry.source} · ${if (entry.recordedByKeeper) "Keeper" else entry.roleId.orEmpty()} ${entry.modelId.orEmpty()} · instance ${entry.specialistId ?: "not recorded"}",
             style = AzphaltType.body, color = azphaltOnSurface())
+        entry.researchCitation?.let { citation ->
+            Text("Research citation ${citation.sourceNumber}: ${citation.sourceType} / ${citation.sourceName}\n" +
+                "Source excerpt: ${citation.sourceExcerpt}\n" +
+                if (citation.matchesSourceText) "Exact source-text match; truth not verified."
+                else "Claim does not match the complete source excerpt; unverified hypothesis.",
+                style = AzphaltType.body, color = azphaltOnSurface())
+        }
         AzphaltPill(if (selected == entry.id) "Selected" else "Select entry", "evidence-select-${entry.id}", onClick = {
             if (!busy) { selected = entry.id; related = null; confirmForget = false }
         })

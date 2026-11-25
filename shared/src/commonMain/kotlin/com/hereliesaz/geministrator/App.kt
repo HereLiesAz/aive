@@ -463,7 +463,10 @@ fun App(
                         queen = base,
                         voices = com.hereliesaz.geministrator.queen.disputeVoices(base, roles),
                         research = researchStep?.let { step ->
-                            com.hereliesaz.geministrator.research.ResearchInvestigation(step, { researchContext })
+                            com.hereliesaz.geministrator.research.ResearchInvestigation(
+                                step, { researchContext },
+                                observeClaims = active.collectiveEvidence::recordResearchClaims,
+                            )
                         },
                     )
                 }

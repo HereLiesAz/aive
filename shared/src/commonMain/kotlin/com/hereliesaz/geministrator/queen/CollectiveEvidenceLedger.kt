@@ -7,6 +7,8 @@ import com.hereliesaz.geministrator.persistence.ArtifactRepository
 import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.research.ResearchBudget
+import com.hereliesaz.geministrator.research.ResearchClaim
+import com.hereliesaz.geministrator.research.MAX_RESEARCH_FACTS
 import com.hereliesaz.geministrator.research.ResearchOutcome
 import com.hereliesaz.geministrator.research.toAvailableTools
 import com.hereliesaz.geministrator.persistence.ChunkedStringSettings
@@ -29,6 +31,15 @@ internal data class EvidenceEntry(
     val specialistId: String? = null, val modelId: String? = null,
     /** Host-recorded author category, distinct from the source supplied by the author. */
     val recordedByKeeper: Boolean = false,
+    /** Host-computed correspondence to the exact bounded research source, not a truth verdict. */
+    val researchCitation: EvidenceResearchCitation? = null,
+)
+
+/** Local citation evidence with source position and the actual redacted excerpt shown to the model. */
+@Serializable
+internal data class EvidenceResearchCitation(
+    val sourceNumber: Int, val sourceType: String, val sourceName: String,
+    val sourceExcerpt: String, val matchesSourceText: Boolean,
 )
 
 /** A separate Keeper-recorded assessment; neither support nor verification rewrites the original. */
@@ -109,6 +120,31 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
                 val book = read()
                 write(book.copy(entries = book.entries + entries))
             }
+        }
+    }
+
+    /**
+     * Store model claims and their deterministic citation checks. A mismatched claim is a hypothesis,
+     * not a source claim, and never becomes a verification or approval. The exact source excerpt
+     * remains inspectable even when the model quoted it incorrectly.
+     */
+    suspend fun recordResearchClaims(question: String, runKey: String, claims: List<ResearchClaim>) {
+        if (claims.isEmpty()) return
+        val issue = issueId()
+        mutex.withLock {
+            val book = read()
+            val entries = claims.take(MAX_RESEARCH_FACTS).map { claim ->
+                EvidenceEntry(
+                    identity(), issue, clean(question, 1500).ifBlank { "Research" },
+                    if (claim.matchesSourceText) EvidenceKind.CitedClaim else EvidenceKind.Hypothesis,
+                    clean(claim.statement, 12_000), clean("Research operation: $runKey", 512), now(),
+                    researchCitation = EvidenceResearchCitation(
+                        claim.sourceNumber, claim.source.label, clean(claim.sourceName, 60),
+                        clean(claim.sourceExcerpt, 160), claim.matchesSourceText,
+                    ),
+                )
+            }
+            write(book.copy(entries = book.entries + entries))
         }
     }
 
