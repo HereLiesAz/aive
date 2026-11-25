@@ -250,13 +250,14 @@ class MemoryControllerCuePipelineTest {
         capture.flush()
         capture.flush()
         val episodes = bank.read().episodes
-        assertEquals(4, episodes.size)
+        assertEquals(6, episodes.size)
         assertEquals(setOf(null, "reviewer", "skeptic", "queen"), episodes.map { it.roleId }.toSet())
         assertEquals("Which route?", episodes.single { it.roleId == null }.chunks.single().text)
-        val reviewer = episodes.single { it.roleId == "reviewer" }.chunks.single()
-        assertTrue(reviewer.text.endsWith("a".repeat(1300)))
-        assertTrue("reviewer-instance" in reviewer.label)
-        assertEquals("Reject route X: missing measurements.", episodes.single { it.roleId == "skeptic" }.chunks.single().text)
+        val reviewer = episodes.filter { it.roleId == "reviewer" }.map { it.chunks.single() }
+        assertEquals(2, reviewer.size)
+        assertTrue(reviewer.all { it.text.endsWith("a".repeat(1300)) && "reviewer-instance" in it.label })
+        assertEquals(listOf("Reject route X: missing measurements.", "Reject route X: missing measurements."),
+            episodes.filter { it.roleId == "skeptic" }.map { it.chunks.single().text })
         assertTrue(episodes.filter { it.roleId != null }.all { it.chunks.single().kind == MemorySourceKind.AgentNote })
         assertEquals("Choose route X.", episodes.single { it.roleId == "queen" }.chunks.single().text)
         assertTrue(other.read().episodes.isEmpty())
@@ -267,11 +268,11 @@ class MemoryControllerCuePipelineTest {
             conversation, "Do not bank", { 1001L }, controller.promptContextProvider)
         disabled.record(first, "Not retained")
         disabled.flush()
-        assertEquals(4, bank.read().episodes.size)
+        assertEquals(6, bank.read().episodes.size)
     }
 
     @Test
-    fun fourAdvisoryRepliesReleaseTogetherWithKeeperQuestion() = runBlocking {
+    fun reciprocalAdvisoryRepliesReleaseTogetherWithKeeperQuestion() = runBlocking {
         val conversation = "collective:revision"
         val bank = InMemoryMemoryStore()
         val controller = MemoryLayerController(
@@ -283,7 +284,10 @@ class MemoryControllerCuePipelineTest {
         controller.updateSettings { it.copy(consolidationPaused = true) }
         val capture = com.hereliesaz.geministrator.queen.CollectiveMemoryCapture(
             conversation, "Question", { 1000L }, controller.promptContextProvider)
-        val first = com.hereliesaz.geministrator.queen.CollectiveVoice("reviewer", QueenModel { "REVIEW: needed\nMissing sample." })
+        var firstCalls = 0
+        val first = com.hereliesaz.geministrator.queen.CollectiveVoice("reviewer", QueenModel {
+            if (++firstCalls == 1) "REVIEW: needed\nMissing sample." else "REVIEW: none\nStill missing sample."
+        })
         var calls = 0
         val second = com.hereliesaz.geministrator.queen.CollectiveVoice("skeptic", QueenModel {
             if (++calls == 1) "Initial estimate." else "Estimate remains unverified."
@@ -295,8 +299,9 @@ class MemoryControllerCuePipelineTest {
         assertTrue(bank.read().episodes.isEmpty())
         capture.flush()
         assertEquals(setOf("Question", "REVIEW: needed\nMissing sample.", "Initial estimate.",
-            "Estimate remains unverified.", "Unresolved."), bank.read().episodes.map { it.chunks.single().text }.toSet())
-        assertEquals(5, bank.read().episodes.size)
+            "REVIEW: none\nStill missing sample.", "Estimate remains unverified.", "Unresolved."),
+            bank.read().episodes.map { it.chunks.single().text }.toSet())
+        assertEquals(6, bank.read().episodes.size)
     }
 
     @Test
