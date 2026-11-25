@@ -1,6 +1,9 @@
 package com.hereliesaz.geministrator.queen
 
+import com.hereliesaz.geministrator.Sha256
 import com.hereliesaz.geministrator.control.ControlRedaction
+import com.hereliesaz.geministrator.domain.ArtifactId
+import com.hereliesaz.geministrator.persistence.ArtifactRepository
 import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.research.ResearchBudget
@@ -38,9 +41,17 @@ internal data class EvidenceReview(
     val reason: String, val recordedAt: Long,
 )
 
+/** A redacted projection awaiting confirmation of the exact durable artifact version. */
+@Serializable
+internal data class PendingArtifactEvidence(
+    val artifactId: ArtifactId, val fingerprint: String, val entry: EvidenceEntry,
+)
+
 @Serializable
 internal data class EvidenceBook(
     val entries: List<EvidenceEntry> = emptyList(), val reviews: List<EvidenceReview> = emptyList(),
+    /** Journal entries are not visible evidence and never enter the Keeper's snapshot. */
+    val pendingArtifacts: List<PendingArtifactEvidence> = emptyList(),
 )
 
 /**
@@ -62,7 +73,7 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
 
     /** One issue per host turn, not per specialist. */
     fun issueId(): String = identity()
-    suspend fun snapshot(): EvidenceBook = mutex.withLock { read() }
+    suspend fun snapshot(): EvidenceBook = mutex.withLock { read().copy(pendingArtifacts = emptyList()) }
 
     /** Actual advisory text stays an opinion regardless of its author or the number agreeing. */
     suspend fun recordAdvisory(issue: String, conversation: String, question: String, voice: CollectiveVoice, reply: String) {
@@ -102,22 +113,67 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
     }
 
     /**
-     * Project a newly persisted workflow artifact into the shared ledger. Even a test result can contain
-     * an author's unsupported assertion: only the receipt of an artifact is host-observed. Preserve
-     * its run, producing task and artifact reference without treating its payload as verified.
-     * A URI-only artifact is recorded by reference; no resource is fetched or executed.
+     * Journal a redacted projection before the coordinator writes a new artifact version. It is not
+     * visible until [recoverArtifactEvidence] confirms that exact version in the artifact repository.
+     * Even a test result can contain an unsupported assertion: receipt does not verify the payload.
+     * URI-only artifacts are recorded by reference; nothing is fetched or executed. Pending versions
+     * are replaced only by a newly staged version of the same artifact and are erased on clear.
      */
-    suspend fun recordArtifact(run: WorkflowRun, artifact: ArtifactRef) {
+    suspend fun stageArtifactEvidence(run: WorkflowRun, artifact: ArtifactRef) {
         val question = run.objective.ifBlank { "Workflow ${run.id.value}" }
         val text = buildString {
             append(artifact.kind.name).append(": ").append(clean(artifact.label, 512))
             artifact.textContent?.let { append("\n").append(clean(it, 12_000)) }
             if (artifact.textContent == null) append("\nArtifact content not read (reference only).")
         }
-        append(
-            "workflow:${run.id.value}", question, EvidenceKind.CitedClaim, text,
-            "Run ${run.id.value} | task run ${artifact.taskRunId.value} | artifact ${artifact.id.value}",
-        )
+        // Raw artifact IDs are needed only to read the authoritative repository; reject IDs that
+        // look like credentials rather than writing them unredacted into the recovery journal.
+        require(ControlRedaction.scrub(artifact.id.value) == artifact.id.value)
+        val fingerprint = artifactFingerprint(artifact)
+        mutex.withLock {
+            val book = read()
+            val prior = book.pendingArtifacts.singleOrNull { it.artifactId == artifact.id }
+            if (prior?.fingerprint == fingerprint) return@withLock
+            require(prior != null || book.pendingArtifacts.size < MAX_PENDING_ARTIFACTS) {
+                "Evidence recovery journal is full"
+            }
+            val entry = EvidenceEntry(
+                identity(), "workflow:${clean(run.id.value, 256)}", clean(question, 1500),
+                EvidenceKind.CitedClaim, clean(text, 12_000),
+                clean("Run ${run.id.value} | task run ${artifact.taskRunId.value} | artifact ${artifact.id.value}", 512),
+                now(),
+            )
+            require(entry.question.isNotBlank() && entry.text.isNotBlank())
+            write(book.copy(pendingArtifacts = book.pendingArtifacts.filterNot { it.artifactId == artifact.id } +
+                PendingArtifactEvidence(artifact.id, fingerprint, entry)))
+        }
+    }
+
+    /** Canonicalize metadata ordering; retain only the digest, not the raw artifact or its URI. */
+    private fun artifactFingerprint(artifact: ArtifactRef): String = Sha256.hex(
+        Json.encodeToString(ArtifactRef.serializer(),
+            artifact.copy(metadata = artifact.metadata.entries.sortedBy { it.key }.associate { it.key to it.value }),
+        ).encodeToByteArray(),
+    )
+
+    /**
+     * Finalize matching durable receipts in a single ledger write. Called after coordinator writes
+     * and during bootstrap; an interrupted commit is replayed only from the existing journal.
+     * Missing or changed artifacts stay pending, never become evidence on their own, and an erased
+     * journal cannot be reconstructed from historical artifacts. No provider or verifier is called.
+     */
+    suspend fun recoverArtifactEvidence(artifacts: ArtifactRepository) = mutex.withLock {
+        val book = read()
+        if (book.pendingArtifacts.isEmpty()) return@withLock
+        val confirmed = mutableListOf<PendingArtifactEvidence>()
+        for (pending in book.pendingArtifacts) {
+            val artifact = artifacts.get(pending.artifactId) ?: continue
+            if (artifactFingerprint(artifact) == pending.fingerprint) confirmed += pending
+        }
+        if (confirmed.isNotEmpty()) write(book.copy(
+            entries = book.entries + confirmed.map { it.entry },
+            pendingArtifacts = book.pendingArtifacts.filterNot { it in confirmed },
+        ))
     }
 
     /** Explicit local Keeper contribution with a stated source. */
@@ -167,5 +223,8 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
     }
     suspend fun clear() = mutex.withLock { storage.remove(KEY) }
 
-    private companion object { const val KEY = "aive.collective.evidence.v1" }
+    private companion object {
+        const val KEY = "aive.collective.evidence.v1"
+        const val MAX_PENDING_ARTIFACTS = 256
+    }
 }

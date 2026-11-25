@@ -53,9 +53,15 @@ class WorkflowRuntimeCoordinatorTest {
         val gateway = FakeManagedSessionGateway()
         fun coordinator(book: com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger) = WorkflowRuntimeCoordinator(
             persistence, WorkflowEngine(sessionGateway = gateway, roles = BuiltInRoles.all), gateway,
-            observeArtifact = book::recordArtifact,
+            stageArtifactEvidence = book::stageArtifactEvidence,
+            recoverArtifactEvidence = { book.recoverArtifactEvidence(persistence.artifacts) },
         )
-        val first = coordinator(ledger)
+        // Simulate a process loss after the journal and artifact write but before publication.
+        ledger.stageArtifactEvidence(run, artifact)
+        assertEquals(emptyList(), ledger.snapshot().entries)
+        persistence.artifacts.put(artifact)
+        val afterCrash = com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger(settings) { 55L }
+        val first = coordinator(afterCrash)
         first.persist(project(), definition, WorkflowRuntimeState(run))
         first.persist(project(), definition, WorkflowRuntimeState(run))
         val entry = ledger.snapshot().entries.single()
@@ -63,10 +69,46 @@ class WorkflowRuntimeCoordinatorTest {
         assertEquals("TestResult: CI\npassed", entry.text)
         assertEquals("Run run-definition-ci | task run task-run-ci | artifact ci-result", entry.source)
         assertEquals(emptyList(), ledger.snapshot().reviews)
-        ledger.forget(entry.id)
+        afterCrash.forget(entry.id)
         val restored = com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger(settings) { 60L }
         coordinator(restored).persist(project(), definition, WorkflowRuntimeState(run))
         assertEquals(emptyList(), restored.snapshot().entries)
+        val updated = artifact.copy(textContent = "failed")
+        val changedRun = run.copy(taskRuns = mapOf(taskId to taskRun.copy(artifacts = listOf(updated))))
+        coordinator(restored).persist(project(), definition, WorkflowRuntimeState(changedRun))
+        assertEquals("TestResult: CI\nfailed", restored.snapshot().entries.single().text)
+    }
+
+    @Test
+    fun journalCannotPublishAbsentOrMismatchedArtifactOrResurrectAfterClear() = runBlocking {
+        val persistence = InMemoryWorkflowPersistence()
+        val settings = com.russhwolf.settings.MapSettings()
+        val book = com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger(settings) { 50L }
+        val taskId = TaskDefinitionId("ci")
+        val executor = TaskExecutor.GitHubAction("ci.yml")
+        val definition = definition(TaskDefinition(taskId, "CI", "Run CI", roleId = null, executor = executor))
+        val taskRun = taskRun(taskId, TaskRunStatus.Completed, executor)
+        val artifact = ArtifactRef(
+            ArtifactId("result"), ArtifactKind.TestResult, taskRun.id, "CI",
+            textContent = "token=abcdefghijklmnop", createdAtEpochMillis = 10L,
+        )
+        val run = run(definition, WorkflowRunStatus.Completed, mapOf(taskId to taskRun.copy(artifacts = listOf(artifact))))
+        book.stageArtifactEvidence(run, artifact)
+        val restarted = com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger(settings) { 60L }
+        restarted.recoverArtifactEvidence(persistence.artifacts)
+        assertEquals(emptyList(), restarted.snapshot().entries)
+        persistence.artifacts.put(artifact.copy(textContent = "different"))
+        restarted.recoverArtifactEvidence(persistence.artifacts)
+        assertEquals(emptyList(), restarted.snapshot().entries)
+        restarted.clear()
+        persistence.artifacts.put(artifact)
+        restarted.recoverArtifactEvidence(persistence.artifacts)
+        assertEquals(emptyList(), restarted.snapshot().entries)
+        restarted.stageArtifactEvidence(run, artifact)
+        restarted.recoverArtifactEvidence(persistence.artifacts)
+        assertEquals("TestResult: CI\ntoken=[redacted]", restarted.snapshot().entries.single().text)
+        restarted.recoverArtifactEvidence(persistence.artifacts)
+        assertEquals(1, restarted.snapshot().entries.size)
     }
 
     @Test

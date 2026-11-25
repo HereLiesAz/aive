@@ -104,8 +104,10 @@ class WorkflowRuntimeCoordinator(
     private val enforceDeadlines: Boolean = HARD_DEADLINES_ENABLED,
     /** Learns replayable habits from accepted runs and quarantines one that was turned back; null does neither. */
     private val habitReplayObserver: HabitReplayObserver? = null,
-    /** Receives newly persisted artifact versions, not artifacts merely encountered again on restart. */
-    private val observeArtifact: (suspend (WorkflowRun, ArtifactRef) -> Unit)? = null,
+    /** Journals a new artifact version before its repository write; never replays a historical artifact. */
+    private val stageArtifactEvidence: (suspend (WorkflowRun, ArtifactRef) -> Unit)? = null,
+    /** Reconciles the existing journal against durable artifact receipts without running any work. */
+    private val recoverArtifactEvidence: (suspend () -> Unit)? = null,
 ) {
     private val gateCoordinator = ApprovalGateCoordinator(
         persistence.approvalGates,
@@ -1087,28 +1089,41 @@ class WorkflowRuntimeCoordinator(
 
     /** Writes the artifacts the store does not have in this form yet; the rest of the run's are as they were. */
     private suspend fun persistArtifacts(run: WorkflowRun) {
+        // Recover a previously written version before staging its replacement.
+        if (recoverArtifactEvidence != null) {
+            try {
+                recoverArtifactEvidence.invoke()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                com.hereliesaz.geministrator.log.AppLog.record("evidence", "Could not recover artifact evidence: ${failure::class.simpleName}")
+            }
+        }
         val current = run.taskRuns.values.flatMap(TaskRun::artifacts)
         for (artifact in current) {
             if (persistedArtifacts[artifact.id] == artifact) continue
             // The durable repository, not the in-process cache, decides whether this is a new version.
             // Reopening a run must not repopulate previously erased ledger evidence.
-            val newEvidence = if (observeArtifact == null) false else try {
-                persistence.artifacts.get(artifact.id) != artifact
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (failure: Exception) {
-                com.hereliesaz.geministrator.log.AppLog.record("evidence", "Could not inspect artifact receipt: ${failure::class.simpleName}")
-                false
+            if (stageArtifactEvidence != null) {
+                try {
+                    if (persistence.artifacts.get(artifact.id) != artifact) stageArtifactEvidence.invoke(run, artifact)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Exception) {
+                    // Evidence is descriptive, never a prerequisite for executing or persisting work.
+                    com.hereliesaz.geministrator.log.AppLog.record("evidence", "Could not journal artifact evidence: ${failure::class.simpleName}")
+                }
             }
             persistence.artifacts.put(artifact)
             persistedArtifacts[artifact.id] = artifact
-            if (newEvidence) {
-                try {
-                    withContext(NonCancellable) { observeArtifact?.invoke(run, artifact) }
-                } catch (failure: Exception) {
-                    // Evidence is descriptive, never a prerequisite for executing or persisting work.
-                    com.hereliesaz.geministrator.log.AppLog.record("evidence", "Could not retain artifact evidence: ${failure::class.simpleName}")
-                }
+        }
+        if (recoverArtifactEvidence != null) {
+            try {
+                recoverArtifactEvidence.invoke()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                com.hereliesaz.geministrator.log.AppLog.record("evidence", "Could not recover artifact evidence: ${failure::class.simpleName}")
             }
         }
         // Only the run being cycled is remembered: another run's artifacts are written again if it comes back.

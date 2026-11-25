@@ -2573,7 +2573,8 @@ class ApplicationRuntime private constructor(
                     engine = engine,
                     sessionGateway = gateway,
                     executorIntegrations = runtimeIntegrations,
-                    observeArtifact = collectiveEvidence::recordArtifact,
+                    stageArtifactEvidence = collectiveEvidence::stageArtifactEvidence,
+                    recoverArtifactEvidence = { collectiveEvidence.recoverArtifactEvidence(persistence.artifacts) },
                     orchestrationUtilities = orchestrationUtilities,
                     surfaceRuntime = roleSurfaceRuntime,
                     spendCaps = spendCaps,
@@ -2648,6 +2649,15 @@ class ApplicationRuntime private constructor(
             }
 
             gateway.dormantSpecialistAnswer = runtime::answerDormantSpecialist
+
+            // A terminal run may never cycle again; settle only previously journaled receipts at bootstrap.
+            try {
+                collectiveEvidence.recoverArtifactEvidence(persistence.artifacts)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                com.hereliesaz.geministrator.log.AppLog.record("evidence", "Could not recover artifact evidence: ${failure::class.simpleName}")
+            }
 
             traceExport?.attach(
                 scope = runtimeScope,
