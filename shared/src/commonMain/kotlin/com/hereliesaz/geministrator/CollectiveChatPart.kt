@@ -13,6 +13,7 @@ import com.hereliesaz.geministrator.queen.SpecialistProfile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collectLatest
 
 /** Local Keeper conversation with explicit history selection and deletion. */
 @Composable
@@ -34,10 +35,14 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
         profiles = host.collectiveProfiles?.invoke().orEmpty()
         selected = preferred?.takeIf { id -> conversations.any { it.id == id } } ?: conversations.firstOrNull()?.id
     }
-    LaunchedEffect(Unit) {
-        try { refresh() }
-        catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { status = "Conversation history unavailable." }
+    LaunchedEffect(host.collectiveBackgroundRevision) {
+        suspend fun refreshSafely() {
+            try { if (!busy) refresh() }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { status = "Conversation history unavailable." }
+        }
+        val revision = host.collectiveBackgroundRevision
+        if (revision == null) refreshSafely() else revision.collectLatest { refreshSafely() }
     }
     ProviderSectionLabel("Ask The Aive")
     Text("Advisory conversation only. Specialists are selected by relevance and configured model availability. Evidence associated with this conversation, including local process results, Keeper reports and research excerpts, is included in its next model calls; raw test output is not sent. Completed turns are saved locally. Each actual reply is banked separately when memory is enabled; all collective memory participates in associative recall. Deleting chat history does not erase the memories derived from it.",
@@ -70,9 +75,30 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
                 }
             })
     }
+    val backgroundEvidence = host.collectiveBackgroundEvidence
+    if (destination?.automaticEvidence == true && backgroundEvidence != null) {
+        Text("Unattended reconsideration while the app is open uses only configured free routes. It may send bounded topic-matched evidence without another question. Disabling cancels the current wake; returned replies already retained remain in the evidence ledger.",
+            style = AzphaltType.body, color = azphaltOnSurface())
+        AzphaltPill(if (destination.backgroundEvidence) "Unattended reconsideration: on" else "Unattended reconsideration: off",
+            "collective-background-evidence", onClick = {
+                if (!busy) {
+                    busy = true
+                    scope.launch {
+                        try {
+                            checkNotNull(backgroundEvidence(destination.id, !destination.backgroundEvidence))
+                            refresh(destination.id)
+                            status = ""
+                        } catch (cancelled: CancellationException) { throw cancelled }
+                        catch (_: Exception) { status = "Unattended reconsideration preference could not be saved." }
+                        finally { busy = false }
+                    }
+                }
+            })
+    }
     destination?.turns.orEmpty().forEach { turn ->
         val result = turn.result
-        Text("You: ${turn.question}", style = AzphaltType.body, color = azphaltOnSurface())
+        val author = if (turn.automaticReconsideration) "Automatic reconsideration of earlier question" else "You"
+        Text("$author: ${turn.question}", style = AzphaltType.body, color = azphaltOnSurface())
         Text(result.answer?.let { "The Aive: $it" } ?: "The Aive: No synthesized answer was obtained.",
             style = AzphaltType.body, color = azphaltOnSurface())
         if (result.unavailable.isNotEmpty()) Text("Unavailable: ${result.unavailable.joinToString()}",

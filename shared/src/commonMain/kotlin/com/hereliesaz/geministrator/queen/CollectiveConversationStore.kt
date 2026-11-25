@@ -13,9 +13,14 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.random.Random
 
+/** Durable unattended retry spacing; failed or cancelled attempts also consume this interval. */
+internal const val BACKGROUND_EVIDENCE_RETRY_MILLIS = 10L * 60_000L
+
 /** A completed advisory turn, not a record of executed work. */
 @Serializable
-internal data class CollectiveTurn(val question: String, val result: CollectiveAnswer)
+internal data class CollectiveTurn(val question: String, val result: CollectiveAnswer,
+    /** Host-initiated reconsideration of an earlier question, not a new Keeper utterance. */
+    val automaticReconsideration: Boolean = false)
 
 /** One local conversation; its identity also scopes participant attention. */
 @Serializable
@@ -26,7 +31,15 @@ internal data class CollectiveConversation(
     val recallSourceIds: List<String> = emptyList(),
     /** Explicit Keeper permission to include locally discovered evidence in subsequent turns. */
     val automaticEvidence: Boolean = false,
+    /** Separate opt-in for unattended free-route reconsideration while the app is open. */
+    val backgroundEvidence: Boolean = false,
+    /** Attempt reservation survives restart, including failed or cancelled inference. */
+    val lastBackgroundEvidenceAttempt: Long? = null,
 ) {
+    /** A retry interval, not an argument quota; wall-clock rollback fails closed. */
+    fun backgroundEvidenceDue(now: Long): Boolean = automaticEvidence && backgroundEvidence &&
+        (lastBackgroundEvidenceAttempt?.let { now >= it && now - it >= BACKGROUND_EVIDENCE_RETRY_MILLIS } ?: true)
+
     /**
      * Keep recent dialogue and a separately bounded sample of each specialist's latest actual
      * assessment, not merely the facilitator's interpretation. These are untrusted excerpts,
@@ -35,7 +48,8 @@ internal data class CollectiveConversation(
      */
     fun context(): String {
         val dialogue = turns.joinToString("\n") {
-            "Keeper: ${it.question}\nAive: ${it.result.answer.orEmpty()}"
+            val author = if (it.automaticReconsideration) "Host reconsideration of earlier question" else "Keeper"
+            "$author: ${it.question}\nAive: ${it.result.answer.orEmpty()}"
         }
         val assessments = turns.lastOrNull { it.result.assessments.isNotEmpty() }
             ?.result?.assessments.orEmpty()
@@ -73,7 +87,8 @@ internal data class CollectiveConversation(
                     occurredAtEpochMillis = null,
                 ))
             }
-            addUtterance("keeper", turn.question, null, "Keeper question (retained transcript)", MemorySourceKind.UserPrompt)
+            if (!turn.automaticReconsideration)
+                addUtterance("keeper", turn.question, null, "Keeper question (retained transcript)", MemorySourceKind.UserPrompt)
             turn.result.assessments.forEachIndexed { slot, assessment ->
                 if (assessment.role.isNotBlank()) addUtterance("assessment:$slot", assessment.text,
                     assessment.role, "Historical agent advisory excerpt (unverified); role=${assessment.role}; " +
@@ -129,7 +144,8 @@ internal class CollectiveConversationStore(settings: Settings, private val now: 
     }
 
     /** Refuse a missing/deleted conversation rather than resurrect it with an in-flight answer. */
-    suspend fun append(id: String, question: String, result: CollectiveAnswer): CollectiveConversation? = mutex.withLock {
+    suspend fun append(id: String, question: String, result: CollectiveAnswer,
+        automaticReconsideration: Boolean = false): CollectiveConversation? = mutex.withLock {
         val book = read()
         val old = book.conversations.singleOrNull { it.id == id } ?: return@withLock null
         fun clean(text: String, max: Int) = ControlRedaction.scrub(text).take(max)
@@ -142,7 +158,7 @@ internal class CollectiveConversationStore(settings: Settings, private val now: 
                     specialistId = it.specialistId?.takeIf { id -> id.matches(Regex("[a-f0-9]{64}")) })
             },
             unavailable = result.unavailable.take(16).map { clean(it, 128) },
-        ))
+        ), automaticReconsideration)
         val updated = old.copy(turns = (old.turns + turn).takeLast(MAX_TURNS))
         write(Book(listOf(updated) + book.conversations.filterNot { it.id == id }))
         updated
@@ -152,7 +168,28 @@ internal class CollectiveConversationStore(settings: Settings, private val now: 
     suspend fun setAutomaticEvidence(id: String, enabled: Boolean): CollectiveConversation? = mutex.withLock {
         val book = read()
         val current = book.conversations.singleOrNull { it.id == id } ?: return@withLock null
-        val updated = current.copy(automaticEvidence = enabled)
+        val updated = current.copy(automaticEvidence = enabled, backgroundEvidence = enabled && current.backgroundEvidence)
+        write(Book(book.conversations.map { if (it.id == id) updated else it }))
+        updated
+    }
+
+    /** Explicit local Keeper permission, separate from ordinary automatic delivery. */
+    suspend fun setBackgroundEvidence(id: String, enabled: Boolean): CollectiveConversation? = mutex.withLock {
+        val book = read()
+        val current = book.conversations.singleOrNull { it.id == id } ?: return@withLock null
+        if (enabled && !current.automaticEvidence) return@withLock null
+        val updated = current.copy(backgroundEvidence = enabled)
+        write(Book(book.conversations.map { if (it.id == id) updated else it }))
+        updated
+    }
+
+    /** Persist an attempt before any unattended model call. Concurrent/restarted callers cannot bypass spacing. */
+    suspend fun claimBackgroundEvidence(id: String): CollectiveConversation? = mutex.withLock {
+        val book = read()
+        val current = book.conversations.singleOrNull { it.id == id } ?: return@withLock null
+        val time = now()
+        if (!current.backgroundEvidenceDue(time)) return@withLock null
+        val updated = current.copy(lastBackgroundEvidenceAttempt = time)
         write(Book(book.conversations.map { if (it.id == id) updated else it }))
         updated
     }

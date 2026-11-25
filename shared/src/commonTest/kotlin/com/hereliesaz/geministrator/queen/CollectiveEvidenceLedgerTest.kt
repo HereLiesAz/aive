@@ -159,6 +159,45 @@ class CollectiveEvidenceLedgerTest {
     }
 
     @Test
+    fun unattendedProjectionIsLimitedToOnePriorIssueAndKeepsMissingOriginalRecipients() = runTest {
+        val settings = MapSettings()
+        var time = 100L
+        val ledger = CollectiveEvidenceLedger(settings) { time }
+        val model = QueenModel { error("Projection must not invoke models") }
+        val a = CollectiveVoice("reviewer", model, "instance-a")
+        val b = CollectiveVoice("peer", model, "instance-b")
+        val c = CollectiveVoice("gardener", model, "instance-c")
+        val oscillator = "Quartz oscillator temperature drift"
+        val garden = "Orchid irrigation schedule"
+        val issue = ledger.issueId()
+        ledger.recordAdvisory(issue, "conversation", oscillator, a, "Stable.")
+        ledger.recordAdvisory(issue, "conversation", oscillator, b, "Stable.")
+        ledger.recordAdvisory(ledger.issueId(), "conversation", garden, c, "Water daily.")
+        time = 200L
+        val observed = ledger.recordKeeper(null, oscillator, EvidenceKind.Observation, "Drift measured.", "Meter")
+        val soil = ledger.recordKeeper(null, garden, EvidenceKind.Observation, "Soil saturated.", "Sensor")
+        val manual = ledger.recordKeeper(issue, oscillator, EvidenceKind.Observation, "Manual note.", "Keeper")
+        val first = ledger.linkedObservations("conversation", automatic = true, automaticOnly = true)
+        assertEquals(garden, first.reconsiderationQuestion)
+        assertEquals(listOf(soil.id), first.evidenceIds)
+        assertEquals(setOf("instance-c"), first.participantIds)
+        assertTrue(manual.id !in first.evidenceIds)
+        ledger.recordAdvisory(ledger.issueId(), "conversation", garden, c, "Reconsidered.", first.evidenceIds)
+        val second = ledger.linkedObservations("conversation", automatic = true, automaticOnly = true)
+        assertEquals(oscillator, second.reconsiderationQuestion)
+        assertEquals(listOf(observed.id), second.evidenceIds)
+        assertEquals(setOf("instance-a", "instance-b"), second.participantIds)
+        // Same clock tick and same question: the newer partial issue cannot replace the original.
+        ledger.recordAdvisory(ledger.issueId(), "conversation", oscillator, a, "Reconsidered.", second.evidenceIds)
+        val restored = CollectiveEvidenceLedger(settings) { time }
+        assertEquals(setOf("instance-b"),
+            restored.linkedObservations("conversation", automatic = true, automaticOnly = true).participantIds)
+        restored.review(observed.id, null, EvidenceRelation.RetractedByKeeper, "Correction.")
+        assertEquals(setOf("instance-a", "instance-b"),
+            restored.linkedObservations("conversation", automatic = true, automaticOnly = true).participantIds)
+    }
+
+    @Test
     fun researchStepRetainsReturnedClaimsWithoutVerification() = runTest {
         val settings = MapSettings()
         val ledger = CollectiveEvidenceLedger(settings) { 100L }
