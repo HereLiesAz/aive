@@ -1517,6 +1517,7 @@ private fun MainDestination(
                                     memoryContent = {
                                         MemoryLayerScreen(
                                             controller = memoryLayer,
+                                            projectFileService = projectFileService,
                                             connectedProviderIds = connectedProviderIds,
                                             compact = compact,
                                             modifier = Modifier.fillMaxSize(),
@@ -1608,6 +1609,7 @@ private fun MainDestination(
                 }
                 ControlRoomDestination.Memory -> MemoryLayerScreen(
                     controller = memoryLayer,
+                    projectFileService = projectFileService,
                     connectedProviderIds = connectedProviderIds,
                     compact = compact,
                     modifier = Modifier.fillMaxSize(),

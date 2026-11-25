@@ -56,51 +56,6 @@ class CollectiveConversationStoreTest {
     }
 
     @Test
-    fun recallGrantsAreDirectionalDurableAndNeverTransitive() = runTest {
-        val settings = MapSettings()
-        val store = CollectiveConversationStore(settings) { 100L }
-        val a = store.create().id
-        val b = store.create().id
-        val c = store.create().id
-        assertEquals(listOf(b), store.recallBanks(b))
-        assertFalse(store.setRecallGrant(b, b, true))
-        assertFalse(store.setRecallGrant("collective:missing", b, true))
-        assertFalse(store.setRecallGrant(a, "collective:missing", true))
-        assertTrue(store.setRecallGrant(a, b, true))
-        assertTrue(store.setRecallGrant(b, c, true))
-        val restarted = CollectiveConversationStore(settings) { 200L }
-        assertEquals(listOf(b, a), restarted.recallBanks(b))
-        assertEquals(listOf(a), restarted.recallBanks(a))
-        assertEquals(listOf(c, b), restarted.recallBanks(c))
-        assertTrue(restarted.setRecallGrant(a, b, false))
-        assertEquals(listOf(b), store.recallBanks(b))
-        assertTrue(restarted.setRecallGrant(a, b, true))
-        restarted.delete(a)
-        assertEquals(emptyList(), restarted.recallBanks(a))
-        assertEquals(listOf(b), restarted.recallBanks(b))
-        assertTrue(requireNotNull(restarted.get(b)).recallSourceIds.isEmpty())
-        restarted.clear()
-        assertTrue(restarted.recallBanks(b).isEmpty())
-    }
-
-    @Test
-    fun recallGrantLimitAndEvictionCannotLeaveDanglingAccess() = runTest {
-        val store = CollectiveConversationStore(MapSettings()) { 100L }
-        val oldest = store.create().id
-        val destination = store.create().id
-        val sources = List(7) { store.create().id }
-        assertTrue(store.setRecallGrant(oldest, destination, true))
-        sources.take(6).forEach { assertTrue(store.setRecallGrant(it, destination, true)) }
-        assertFalse(store.setRecallGrant(sources.last(), destination, true))
-        assertEquals(8, store.recallBanks(destination).size)
-        repeat(4) { store.create() }
-        assertNull(store.get(oldest))
-        assertFalse(oldest in store.recallBanks(destination))
-        assertTrue(store.setRecallGrant(sources.last(), destination, true))
-        assertEquals(8, store.recallBanks(destination).size)
-    }
-
-    @Test
     fun boundedConversationsAndTurnsKeepNewestData() = runTest {
         val store = CollectiveConversationStore(MapSettings()) { 100L }
         val oldest = store.create()

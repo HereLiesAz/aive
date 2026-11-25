@@ -43,6 +43,38 @@ class MemoryConsolidationQueue(
     }
 
     /**
+     * Append a bounded batch of lifecycle envelopes atomically. The same stable episode IDs
+     * as enqueueSession make exact archive retries idempotent without a second memory store.
+     */
+    internal suspend fun enqueueSessionBatch(envelopes: List<MemorySessionEnvelope>): Int {
+        require(envelopes.size in 1..64)
+        val incoming = envelopes.map { envelope ->
+            require(envelope.sourceSessionId.isNotBlank() && envelope.userPrompt.isNotBlank())
+            envelope.toEpisode(envelope.episodeId(), maxChunkChars)
+        }.distinctBy { it.id }
+        while (true) {
+            val snapshot = store.read()
+            val retained = snapshot.episodes.mapTo(hashSetOf()) { it.id }
+            val episodes = incoming.filterNot { it.id in retained }
+            if (episodes.isEmpty()) return 0
+            val first = snapshot.nextQueueSequence()
+            val entries = episodes.mapIndexed { index, episode ->
+                val sequence = first + index
+                MemoryQueueEntry(
+                    id = MemoryQueueId("queue-$sequence-${episode.id.value}"),
+                    sequence = sequence,
+                    episodeId = episode.id,
+                    priority = MemoryQueuePriority.Normal,
+                    createdAtEpochMillis = episode.createdAtEpochMillis,
+                )
+            }
+            if (store.commit(snapshot.revision, MemoryStoreMutation(episodesToAdd = episodes, queueUpserts = entries))) {
+                return episodes.size
+            }
+        }
+    }
+
+    /**
      * Deliberate in-session banks jump ahead of ordinary lifecycle backlog. Once consolidated,
      * they are ordinary memory and retain no special reminder or retrieval semantics.
      *
@@ -923,7 +955,10 @@ private fun MemoryConsolidationStage.next(): MemoryConsolidationStage = when (th
 private fun MemorySessionEnvelope.episodeId(): MemoryEpisodeId = MemoryEpisodeId(
     // Collective deposits are host-assigned unique utterances, not a hash of mutable text.
     // Recovery after queue commit but before journal removal must address the exact same episode.
-    if (workflowRunId?.startsWith("collective:") == true &&
+    if (workflowRunId?.startsWith("archive:") == true &&
+        sourceSessionId.startsWith("$workflowRunId:message:") && sequence == 1) {
+        "episode-archive-$sourceSessionId"
+    } else if (workflowRunId?.startsWith("collective:") == true &&
         sourceSessionId.startsWith("$workflowRunId:turn:") && sequence == 1) {
         "episode-collective-$sourceSessionId"
     } else {

@@ -996,3 +996,7 @@ The association clerk computes semantic relatedness through embeddings and cosin
 MEMORY CLERKS ORGANIZE WHAT WAS THOUGHT.
 
 THEY DO NOT DECIDE WHAT SHOULD BE THOUGHT.
+
+### Import external chat history
+
+Memory → Import chat history appends messages from extracted ChatGPT conversation JSON, Claude chat JSON, generic message JSON, JSON Lines, Markdown or plain text. Desktop and Android also accept ZIP exports through the file picker. The paste interface is available on all platforms. Review the selected provider history before confirming: all imported text joins the collective memory, is redacted before storage, and is processed by the normal clerks, without a separate trust category or access grant. Selecting and importing the archive is sufficient authorization to include it. Sender labels and available original timestamps are preserved; non-text attachments and unsupported JSON structures are not decoded. An exact document retry skips retained utterances; a deliberately forgotten source can be re-imported only through another explicit import. The import is bounded to 32 MiB of decoded text and 20,000 messages per operation; large exports may be split. A failed or interrupted import may have queued some utterances; retrying the same document continues without duplicating retained records. No existing graph is replaced.

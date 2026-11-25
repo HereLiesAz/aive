@@ -337,6 +337,53 @@ class MemoryLayerController(
     }
 
     /**
+     * Explicit Keeper import of external chat history. Parse all documents before mutating.
+     * Imported utterances are ordinary collective experience, with their original source attribution.
+     * Exact source-document retries resume by stable utterance identity; no existing memory is replaced.
+     */
+    suspend fun importChatArchives(documents: List<ChatArchiveDocument>): ChatArchiveImportResult {
+        val episodes = ChatArchiveParser.parse(documents)
+        require(episodes.isNotEmpty()) { "No supported chat messages found." }
+        var added = 0
+        var existing = 0
+        try {
+            drainMutex.withLock {
+                collectiveCaptureMutex.withLock {
+                    check(active) { "Enable memory before importing history." }
+                    val known = banks.known().toMutableSet()
+                    for ((source, messages) in episodes.groupBy { it.source }) {
+                        if (source !in known) {
+                            registerWorkflow(source, null)
+                            known += source
+                        }
+                        val queue = layerFor(source).queue
+                        for (batch in messages.chunked(64)) {
+                            val now = nowEpochMillis()
+                            val count = queue.enqueueSessionBatch(batch.map { message ->
+                                MemorySessionEnvelope(
+                                    sourceSessionId = message.id,
+                                    workflowRunId = source,
+                                    userPrompt = message.text,
+                                    parts = listOf(MemorySessionPart(message.kind, message.label, message.text)),
+                                    closedAtEpochMillis = now,
+                                    occurredAtEpochMillis = message.occurredAt,
+                                    sequence = 1,
+                                )
+                            })
+                            added += count
+                            existing += batch.size - count
+                        }
+                    }
+                }
+            }
+        } finally {
+            if (active) drainSoon()
+        }
+        publish()
+        return ChatArchiveImportResult(added, existing)
+    }
+
+    /**
      * The keeper's own memory, written in the Memory Web (docs/Memory-Web.md), banked into the selected swarm's bank the way an agent's
      * deliberate note is: the same queue and consolidation, so afterwards it is an ordinary memory, recalled and linked like any other.
      * Null when no swarm's bank is selected or [text] is blank.
@@ -1346,13 +1393,16 @@ class MemoryLayerController(
         /** Host-owned direct exchanges stage returned agent text, never their synthesized prompt. */
         override suspend fun stageRunDirectReply(workflowId: String, request: MemoryBankRequest) =
             collectiveCaptureMutex.withLock {
-                if (!active || workflowId !in banks.known()) return@withLock
+                if (!active) return@withLock
                 require(!workflowId.startsWith("collective:") && !workflowId.startsWith(ROLE_BANK_PREFIX))
+                val standalone = workflowId.matches(Regex("session:direct:[0-9a-f]{32}"))
+                if (!standalone && workflowId !in banks.known()) return@withLock
                 require(request.sourceSessionId.startsWith("direct-reply:") &&
                     request.sourceKind == MemorySourceKind.AgentNote && !request.scope.roleId.isNullOrBlank() &&
                     request.scope == MemoryBankScope(workflowRunId = workflowId, roleId = request.scope.roleId))
                 val text = com.hereliesaz.geministrator.control.ControlRedaction.scrub(request.text).trim().take(12_000)
                 if (text.isBlank()) return@withLock
+                if (standalone && workflowId !in banks.known()) registerWorkflow(workflowId, null)
                 val envelope = MemorySessionEnvelope(
                     sourceSessionId = request.sourceSessionId,
                     workflowRunId = workflowId,
@@ -1429,13 +1479,12 @@ class MemoryLayerController(
 
         override suspend fun collectiveExpertise(workflowIds: List<String>, question: String): List<CollectiveExpertiseMatch> {
             if (!active || question.isBlank()) return emptyList()
-            val known = banks.known().toSet()
-            val authorized = workflowIds.distinct().take(8).filter { it.startsWith("collective:") && it in known }
+            val sources = banks.known().filter { it.startsWith("collective:") }
             val query = com.hereliesaz.geministrator.control.ControlRedaction.scrub(question).take(1500)
             val counts = mutableMapOf<Pair<String, String>, Int>()
-            for (bank in authorized) {
+            for (bank in sources) {
                 if (!active) return emptyList()
-                val hits = tagCandidates(bank, query, null)
+                val hits = tagCandidates(bank, query, null, physicalOnly = true)
                 // Re-read the physical bank, not a lineage view: only retained local provenance
                 // can contribute. A cleared/forgotten episode or purged attribution is not a pointer.
                 val snapshot = banks.store(bank).read()

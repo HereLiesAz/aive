@@ -284,3 +284,5 @@ The Aive is the intelligence; specialists are its cognitive organs. The persiste
 ## Definition of a useful alpha
 
 The Aive is ready to call an alpha when a user can open a project, give it an objective, approve the generated plan where required, watch a real mixed workflow execute in the H2G2 mindmap, leave/restart the app without losing the run, inspect evidence and failures, intervene at explicit gates, and reach a verified terminal outcome — without any non-agent executor pretending to be an AI employee.
+
+**Memory follow-up:** Pre-run planning and draft replies enter collective recall via standalone provenance. Obsolete conversation recall-grant UI removed. Keeper-selected provider history is imported into the ordinary consolidation queue with provenance and no additional trust classification or grant. Live CI verification and large-corpus performance remain open.

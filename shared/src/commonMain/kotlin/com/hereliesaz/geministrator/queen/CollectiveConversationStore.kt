@@ -22,7 +22,7 @@ internal data class CollectiveTurn(val question: String, val result: CollectiveA
 internal data class CollectiveConversation(
     val id: String,
     val turns: List<CollectiveTurn> = emptyList(),
-    /** Exact other conversation banks the Keeper permits this conversation to consult. */
+    /** Legacy serialized field only; ignored by recall and cleared on the next write. */
     val recallSourceIds: List<String> = emptyList(),
 ) {
     /**
@@ -83,7 +83,7 @@ internal data class CollectiveConversation(
 
 /**
  * Local-only, bounded transcript ledger. Callers never supply history or mint a resumed identity.
- * Saves returned turns, redacted before writing, and explicit directional recall grants.
+ * Saves returned turns, redacted before writing. Conversation identity is not memory eligibility.
  * No bank passages or workflow approval state is stored.
  * Uses the existing crash-safe chunked settings decorator; unknown/corrupt state is not overwritten.
  */
@@ -98,12 +98,7 @@ internal class CollectiveConversationStore(settings: Settings, private val now: 
         Json.decodeFromString(Book.serializer(), it)
     } ?: Book()
     private fun write(book: Book) {
-        // Eviction and deletion revoke incoming and outgoing grants in the same durable write.
-        val retained = book.conversations.map { it.id }.toSet()
-        val cleaned = book.copy(conversations = book.conversations.map { conversation ->
-            conversation.copy(recallSourceIds = conversation.recallSourceIds
-                .filter { it != conversation.id && it in retained }.distinct().take(MAX_RECALL_SOURCES))
-        })
+        val cleaned = book.copy(conversations = book.conversations.map { it.copy(recallSourceIds = emptyList()) })
         settings.putString(KEY, Json.encodeToString(Book.serializer(), cleaned))
     }
 
@@ -121,37 +116,6 @@ internal class CollectiveConversationStore(settings: Settings, private val now: 
     suspend fun get(id: String): CollectiveConversation? = mutex.withLock {
         read().conversations.singleOrNull { it.id == id }
     }
-
-    /**
-     * Direct read-only grants, never reciprocal or transitive. The receiving conversation is first
-     * so the memory adapter's eight-bank bound always includes its own bank. Missing endpoints
-     * are refused even when their old memory banks still exist.
-     */
-    suspend fun recallBanks(destinationId: String): List<String> = mutex.withLock {
-        val book = read()
-        val destination = book.conversations.singleOrNull { it.id == destinationId } ?: return@withLock emptyList()
-        val retained = book.conversations.map { it.id }.toSet()
-        listOf(destinationId) + destination.recallSourceIds
-            .filter { it != destinationId && it in retained }.distinct().take(MAX_RECALL_SOURCES)
-    }
-
-    /** Local Keeper action. A grant covers only the named source -> destination pair. */
-    suspend fun setRecallGrant(sourceId: String, destinationId: String, allowed: Boolean): Boolean = mutex.withLock {
-        val book = read()
-        if (sourceId == destinationId || book.conversations.none { it.id == sourceId }) return@withLock false
-        val destination = book.conversations.singleOrNull { it.id == destinationId } ?: return@withLock false
-        val sources = destination.recallSourceIds.filter { it != destinationId && idExists(book, it) }.distinct()
-        val next = if (allowed) {
-            if (sourceId !in sources && sources.size >= MAX_RECALL_SOURCES) return@withLock false
-            (sources + sourceId).distinct()
-        } else sources.filterNot { it == sourceId }
-        write(book.copy(conversations = book.conversations.map {
-            if (it.id == destinationId) it.copy(recallSourceIds = next) else it
-        }))
-        true
-    }
-
-    private fun idExists(book: Book, id: String): Boolean = book.conversations.any { it.id == id }
 
     /** Refuse a missing/deleted conversation rather than resurrect it with an in-flight answer. */
     suspend fun append(id: String, question: String, result: CollectiveAnswer): CollectiveConversation? = mutex.withLock {
@@ -183,7 +147,5 @@ internal class CollectiveConversationStore(settings: Settings, private val now: 
         const val KEY = "aive.collective.conversations.v1"
         const val MAX_CONVERSATIONS = 12
         const val MAX_TURNS = 16
-        // DirectChatMemory's controller admits eight workflow banks, including the destination.
-        const val MAX_RECALL_SOURCES = 7
     }
 }

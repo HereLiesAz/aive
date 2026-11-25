@@ -8,6 +8,8 @@ import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import com.hereliesaz.geministrator.IVE_FILE_EXTENSION
+import com.hereliesaz.geministrator.memory.ChatArchiveDocument
+import com.hereliesaz.geministrator.memory.readChatArchive
 import com.hereliesaz.geministrator.IVE_MIME_TYPE
 import com.hereliesaz.geministrator.ProjectFileDescriptor
 import com.hereliesaz.geministrator.ProjectFileReadResult
@@ -169,6 +171,22 @@ internal class AndroidProjectFileService(
         return withContext(Dispatchers.IO) {
             val content = readUri(uri) ?: return@withContext null
             ProjectFileReadResult(descriptor = descriptorForUri(uri), content = content)
+        }
+    }
+
+    /** Read the selected history export once, without adding it to project recents. */
+    override suspend fun chooseChatArchive(): List<ChatArchiveDocument>? {
+        check(pendingOpen == null) { "A document picker is already open" }
+        val deferred = CompletableDeferred<Uri?>()
+        pendingOpen = deferred
+        withContext(Dispatchers.Main.immediate) {
+            openLauncher.launch(arrayOf("application/zip", "application/json", "text/*", "application/octet-stream", "*/*"))
+        }
+        val uri = deferred.await() ?: return null
+        return withContext(Dispatchers.IO) {
+            val name = descriptorForUri(uri).displayName
+            resolver.openInputStream(uri)?.use { readChatArchive(name, it) }
+                ?: error("Could not open the selected archive.")
         }
     }
 

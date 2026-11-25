@@ -1,5 +1,9 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.memory.ChatArchiveDocument
+import com.hereliesaz.geministrator.memory.readChatArchive
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -114,6 +118,20 @@ internal class DesktopProjectFileService : ProjectFileService {
             descriptor = requireNotNull(descriptor(path)),
             content = Files.readString(path),
         )
+    }
+
+    /** Native archive chooser; files are read only, never added to project recents. */
+    override suspend fun chooseChatArchive(): List<ChatArchiveDocument>? {
+        val chosen = withContext(Dispatchers.Main) {
+            val chooser = JFileChooser().apply {
+                dialogTitle = "Import chat history"
+                fileSelectionMode = JFileChooser.FILES_ONLY
+                isAcceptAllFileFilterUsed = true
+                fileFilter = FileNameExtensionFilter("Chat history archives", "zip", "json", "jsonl", "ndjson", "txt", "md", "markdown")
+            }
+            if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) chooser.selectedFile else null
+        } ?: return null
+        return withContext(Dispatchers.IO) { chosen.inputStream().use { readChatArchive(chosen.name, it) } }
     }
 
     private fun setupChooser(): JFileChooser = JFileChooser().apply {

@@ -203,6 +203,7 @@ internal fun MemoryLayerScreen(
     connectedProviderIds: Set<String>,
     compact: Boolean = false,
     modifier: Modifier = Modifier,
+    projectFileService: ProjectFileService? = null,
 ) {
     Column(
         modifier = modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(keeperContentPadding(compact)),
@@ -245,6 +246,7 @@ internal fun MemoryLayerScreen(
             )
             return@Column
         }
+        ChatArchiveImportSection(controller, projectFileService)
         when (view) {
             MemoryView.Simple -> MemorySimpleView(controller, onOpenTechnical = { storedView = MemoryView.Technical.name })
             MemoryView.Technical -> MemoryLayerControls(controller, connectedProviderIds)
