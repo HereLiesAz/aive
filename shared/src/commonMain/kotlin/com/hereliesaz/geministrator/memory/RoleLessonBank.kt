@@ -1,6 +1,6 @@
 package com.hereliesaz.geministrator.memory
 
-// A specialist role's lessons live in a memory bank of their own, scoped to that role, with the generic role's bank as its
+// A specialist role's lessons live in a provenance bank, shared for recall across roles, with the generic role's bank as its
 // lineage parent. It is the existing bank and lineage mechanism (one bank per workflow id), keyed by a role id; no new store.
 
 /** Prefix of the bank id a role's lessons are kept under. */

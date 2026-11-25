@@ -52,7 +52,10 @@ fun interface MemoryPromptContextProvider {
     suspend fun recallForNewSession(request: AgentTaskRequest, queryPlan: MemoryQueryPlan): MemoryPromptRecall =
         recallFor(request, queryPlan)
 
-    /** Cue-only recall for a one-shot model conversation, restricted to caller-authorized existing banks. */
+    /**
+     * Cue-only recall in the caller's authorized project/lineage corpus and shared lessons.
+     * The recipient role identifies attention state, not read permission.
+     */
     suspend fun directChatTags(workflowIds: List<String>, roleId: String, text: String): List<String> = emptyList()
 
     /** Each participant opens its own attention session, even when participants share a role. */
@@ -75,6 +78,12 @@ fun interface MemoryPromptContextProvider {
      * to recall. The subsequent bank call releases them; startup recovers interrupted turns.
      */
     suspend fun stageCollectiveContributions(conversationId: String, requests: List<MemoryBankRequest>) {}
+
+    /** Stage one actual direct agent reply in its host-selected existing workflow, not a recall grant. */
+    suspend fun stageRunDirectReply(workflowId: String, request: MemoryBankRequest) {}
+
+    /** Release staged replies only when the exchange exits; never recreate cleared journal entries. */
+    suspend fun bankRunDirectReplies(workflowId: String, sourceIds: List<String>) {}
 
     /**
      * Explicit Keeper import of retained historical utterances into a never-before-registered

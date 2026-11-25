@@ -408,7 +408,12 @@ class ApplicationRuntime private constructor(
 
     internal suspend fun activeRunId(): String? = runtimeMutex.withLock { current?.state?.run?.id?.value }
 
-    internal suspend fun trainingModels(): DisputeModels? = resolveDisputeModels()
+    /** Return the exact roster snapshot used to construct the training voices, not a later revision. */
+    internal suspend fun trainingModels(): Pair<DisputeModels?, List<RoleDefinition>> {
+        val source = disputeModelSource ?: return disputeModels to emptyList()
+        val roles = activeRoles(resolveRoleCollection(persistence.roles.all()))
+        return resolveDisputeModels(source, roles) to roles
+    }
 
     private val collectiveChatMutex = Mutex()
     private val collectiveConversations by lazy {
@@ -1891,9 +1896,12 @@ class ApplicationRuntime private constructor(
      * Her models now: from the app's source with the current roles, each call held to the keeper's hourly spend cap (a call the
      * cap leaves no room for fails, and the dispute goes to the keeper); else the fixed [disputeModels]; else none (she is away).
      */
-    private suspend fun resolveDisputeModels(): DisputeModels? {
-        val source = disputeModelSource ?: return disputeModels
-        val roles = activeRoles(resolveRoleCollection(persistence.roles.all()))
+    private suspend fun resolveDisputeModels(
+        source: com.hereliesaz.geministrator.queen.DisputeModelSource? = disputeModelSource,
+        roleSnapshot: List<RoleDefinition>? = null,
+    ): DisputeModels? {
+        if (source == null) return disputeModels
+        val roles = roleSnapshot ?: activeRoles(resolveRoleCollection(persistence.roles.all()))
         val built = source.models(roles) ?: return null
         val allows: suspend () -> Boolean = { queenCallAllowed() }
         val queen = com.hereliesaz.geministrator.queen.cappedModel(built.queen, allows)

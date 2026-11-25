@@ -100,7 +100,7 @@ class MemoryLayerController(
     private val pause: suspend (millis: Long) -> Unit = { kotlinx.coroutines.delay(it) },
 ) {
     private val drainMutex = Mutex()
-    /** Serialize collective staging, recovery, release and explicit erasure. */
+    /** Serialize conversation staging, recovery, release and explicit erasure. */
     private val collectiveCaptureMutex = Mutex()
     private val liveCollectiveCaptures = mutableSetOf<String>()
     /** Prevent repeated terminal reconciliation from banking duplicate receipts in one process. */
@@ -407,10 +407,47 @@ class MemoryLayerController(
         return roleLessonsIn(lineageStore(bank).read())
     }
 
-    /** The bank of the lessons for [request]'s role, when the role has one; read through the cue path, never verbatim. */
-    private suspend fun roleBankOf(request: AgentTaskRequest?): String? {
-        val bank = roleBankId(request?.orchestrationContext?.roleId?.value.orEmpty())
-        return bank.takeIf { it.isNotEmpty() && it in banks.known() }
+    /** Role lesson banks carry provenance, not role-specific read permission. */
+    private suspend fun sharedLessonBanks(known: List<String>): List<String> = known.filter { bank ->
+        if (!bank.startsWith(ROLE_BANK_PREFIX) || lineage.projectOf(bank) != null) return@filter false
+        val roleId = bank.removePrefix(ROLE_BANK_PREFIX)
+        // Do not treat an imported or project-owned workflow as a globally shared lesson bank
+        // merely because its ID happens to use the reserved prefix. Raw-retention tombstones
+        // preserve the same source and scope metadata after their chunks are purged.
+        val episodes = banks.store(bank).read().episodes
+        roleId.isNotBlank() && episodes.isNotEmpty() && episodes.all { episode ->
+            episode.sourceSessionId == bank && episode.workflowRunId == bank &&
+                episode.roleId == roleId && episode.projectId == null &&
+                episode.taskRunId == null && episode.workflowDefinitionId == null && episode.taskDefinitionId == null &&
+                (episode.purged != null || (episode.chunks.isNotEmpty() && episode.chunks.all { chunk ->
+                    chunk.kind == MemorySourceKind.AgentNote && chunk.label == ROLE_LESSON_LABEL
+                }))
+        }
+    }
+
+    /**
+     * Physical banks in authorized projects and the shared lesson corpus. Never inherit an external
+     * bank's private ancestors. Keep every registered project member eligible, irrespective of age.
+     * The attention gate bounds the results delivered, not the number of eligible memory banks.
+     */
+    private suspend fun sharedRecallBanks(roots: List<String>): List<String> {
+        val known = banks.known()
+        val covered = roots.flatMap { lineage.ancestorsOf(it) }.toSet() + roots
+        val projects = roots.mapNotNull { lineage.projectOf(it) }.distinct()
+        val members = projects.flatMap { lineage.projectWorkflows(it) }.toSet()
+        return (known.filter { it in members } + sharedLessonBanks(known))
+            .distinct().filterNot { it in covered }
+    }
+
+    /** Refuse writes from recall, including the graph tool's missing-pair-summary repair fallback. */
+    private fun readOnlyBank(store: MemoryStore): MemoryStore = object : MemoryStore by store {
+        override suspend fun commit(expectedRevision: Long, mutation: MemoryStoreMutation): Boolean =
+            error("Recall cannot modify a shared bank")
+        override suspend fun replace(snapshot: MemorySnapshot) {
+            error("Recall cannot replace a shared bank")
+        }
+        override suspend fun replaceIfRevision(expectedRevision: Long, snapshot: MemorySnapshot): Boolean =
+            error("Recall cannot replace a shared bank")
     }
 
     /** Appends: [projectId] now also includes every workflow of [incorporatesProjectId]. */
@@ -708,7 +745,7 @@ class MemoryLayerController(
                 for ((key, envelope) in held.pending()) {
                     val owner = envelope.workflowRunId ?: memoryWorkflowOf(null, envelope.taskRunId, envelope.sourceSessionId)
                     if (owner == workflowId) {
-                        if (key.startsWith("collective:")) held.record(key, null)
+                        if (key.startsWith("collective:") || key.startsWith("direct-reply:")) held.record(key, null)
                         else runCatchingCancellable { held.record(key, null) }
                     }
                 }
@@ -735,7 +772,8 @@ class MemoryLayerController(
                 while (true) {
                     val contextual = store.read()
                     val sourceEpisode = contextual.episodes.firstOrNull { it.id == episodeId }
-                    if (workflow.startsWith("collective:") && sourceEpisode != null) {
+                    if (sourceEpisode != null && (workflow.startsWith("collective:") ||
+                        sourceEpisode.sourceSessionId.startsWith("direct-reply:"))) {
                         settingsStore.captureJournal.record(sourceEpisode.sourceSessionId, null)
                     }
                     // Remove procedure dependencies first; a crash cannot leave a runnable orphan.
@@ -1233,13 +1271,14 @@ class MemoryLayerController(
                     }
                     if (text.isBlank()) return@withLock emptyList()
                     val known = banks.known()
-                    val roleBank = roleBankId(roleId).takeIf { it.isNotBlank() && it in known }
-                    val sources = (authorized.filter { it in known } + listOfNotNull(roleBank)).distinct()
+                    val sources = authorized.filter { it in known }
+                    val shared = sharedRecallBanks(sources)
                     val bounded = text.take(12_000)
                     advance { gate ->
                     gate.setBaseline(attention.defaultLevel)
                     gate.consumeTokens(AttentionGatedRecall.approximateTokens(bounded))
-                    val hits = sources.flatMap { tagCandidates(it, null, bounded, null) }
+                    val hits = (sources.flatMap { tagCandidates(it, bounded, null) } +
+                        shared.flatMap { tagCandidates(it, bounded, null, physicalOnly = true) })
                         .filter { hit ->
                             val tag = MemoryCueWatcher.hashtag(hit.node.text)
                             tag.length in 2..81 && tag.drop(1).all { it.isLetterOrDigit() || it in "-_." } &&
@@ -1329,6 +1368,63 @@ class MemoryLayerController(
             }
         }
 
+        /** Host-owned direct exchanges stage returned agent text, never their synthesized prompt. */
+        override suspend fun stageRunDirectReply(workflowId: String, request: MemoryBankRequest) =
+            collectiveCaptureMutex.withLock {
+                if (!active || workflowId !in banks.known()) return@withLock
+                require(!workflowId.startsWith("collective:") && !workflowId.startsWith(ROLE_BANK_PREFIX))
+                require(request.sourceSessionId.startsWith("direct-reply:") &&
+                    request.sourceKind == MemorySourceKind.AgentNote && !request.scope.roleId.isNullOrBlank() &&
+                    request.scope == MemoryBankScope(workflowRunId = workflowId, roleId = request.scope.roleId))
+                val text = com.hereliesaz.geministrator.control.ControlRedaction.scrub(request.text).trim().take(12_000)
+                if (text.isBlank()) return@withLock
+                val envelope = MemorySessionEnvelope(
+                    sourceSessionId = request.sourceSessionId,
+                    workflowRunId = workflowId,
+                    projectId = lineage.projectOf(workflowId),
+                    roleId = request.scope.roleId,
+                    userPrompt = text,
+                    parts = listOf(MemorySessionPart(MemorySourceKind.AgentNote,
+                        com.hereliesaz.geministrator.control.ControlRedaction.scrub(request.label).take(512), text)),
+                    closedAtEpochMillis = request.bankedAtEpochMillis,
+                    occurredAtEpochMillis = request.occurredAtEpochMillis,
+                    sequence = 1,
+                )
+                val held = settingsStore.captureJournal
+                // Reserve the live identity before the journal write: a partial write failure
+                // must not allow recovery to expose this response mid-exchange.
+                liveCollectiveCaptures += request.sourceSessionId
+                held.record(request.sourceSessionId, envelope)
+                check(held.pending()[request.sourceSessionId] == envelope) {
+                    "Direct reply could not be retained in the memory capture journal."
+                }
+            }
+
+        /** Only journaled replies from this live exchange can be released into the original run. */
+        override suspend fun bankRunDirectReplies(workflowId: String, sourceIds: List<String>) {
+            require(sourceIds.all { it.startsWith("direct-reply:") })
+            try {
+                collectiveCaptureMutex.withLock {
+                    val held = settingsStore.captureJournal
+                    try {
+                        if (!active) return@withLock
+                        val pending = held.pending()
+                        for (key in sourceIds.distinct()) {
+                            if (key !in liveCollectiveCaptures) continue
+                            val envelope = pending[key] ?: continue
+                            check(envelope.workflowRunId == workflowId)
+                            layerFor(workflowId).queue.enqueueSession(envelope)
+                            held.record(key, null)
+                        }
+                    } finally {
+                        liveCollectiveCaptures.removeAll(sourceIds.toSet())
+                    }
+                }
+            } finally {
+                if (active) drainSoon()
+            }
+        }
+
         override suspend fun importCollectiveHistory(conversationId: String, requests: List<MemoryBankRequest>): Int? {
             if (requests.isEmpty()) return null
             require(requests.size <= 64 && conversationId.startsWith("collective:") && conversationId.length <= 128)
@@ -1364,7 +1460,7 @@ class MemoryLayerController(
             val counts = mutableMapOf<Pair<String, String>, Int>()
             for (bank in authorized) {
                 if (!active) return emptyList()
-                val hits = tagCandidates(bank, null, query, null)
+                val hits = tagCandidates(bank, query, null)
                 // Re-read the physical bank, not a lineage view: only retained local provenance
                 // can contribute. A cleared/forgotten episode or purged attribution is not a pointer.
                 val snapshot = banks.store(bank).read()
@@ -1401,7 +1497,7 @@ class MemoryLayerController(
             if (!active || projectId.isBlank() || runId.isBlank() || question.isBlank() ||
                 runId.startsWith("collective:") || runId !in banks.known()) return emptyList()
             val query = com.hereliesaz.geministrator.control.ControlRedaction.scrub(question).take(160)
-            val matchingNodes = tagCandidates(runId, null, query, null).map { it.node.id }.toSet()
+            val matchingNodes = tagCandidates(runId, query, null).map { it.node.id }.toSet()
             // The recall layer may include lineage; only the exact physical run/project is eligible.
             val snapshot = banks.store(runId).read()
             val sections = snapshot.nodes.asSequence()
@@ -1468,7 +1564,6 @@ class MemoryLayerController(
                     workflowDefinitionId = context.workflowDefinitionId?.value,
                     taskRunId = request.taskRunId.value,
                     taskDefinitionId = context.taskDefinitionId?.value,
-                    roleId = context.roleId?.value,
                     expansionTerms = querySpec.expansionTerms,
                 ),
             )
@@ -1484,7 +1579,7 @@ class MemoryLayerController(
                 .sortedWith(compareByDescending<MemoryRecallHit> { it.score }.thenBy { it.node.id.value })
                 .take(MAX_RECALL_RESULTS),
         )
-        // Then, read-only and labelled, the other workflows of the project, ranked after the lineage.
+        // Then, read-only and labelled, authorized project and collective lesson banks.
         val readOnly = readOnlyHits(workflow) { tool ->
             queryPlan.queries.flatMap { querySpec ->
                 val hits = tool.grip(MemoryQuery(querySpec.text, querySpec.resolution.toMemoryResolution(), MAX_RECALL_RESULTS, expansionTerms = querySpec.expansionTerms)).hits
@@ -1497,7 +1592,7 @@ class MemoryLayerController(
 
     /**
      * Recall for [workflowId] without gating or side effects: its lineage bank first, then, read-only
-     * and labelled, the other workflows of its project. Every hit carries its provenance.
+     * and labelled, authorized project and collective lesson banks. Every hit carries provenance.
      */
     suspend fun recallFor(
         workflowId: String,
@@ -1528,12 +1623,12 @@ class MemoryLayerController(
     }
 
     /**
-     * Hits from the own banks of the other workflows of [reader]'s project (not its lineage), best
-     * first per workflow, labelled. Read-only: nothing is written to either bank.
+     * Hits from authorized shared physical banks (not the reader's lineage), best first per bank,
+     * labelled. No traversal into another bank's ancestors and no writes to either bank.
      */
     private suspend fun readOnlyHits(reader: String, search: suspend (MemoryTool) -> List<MemoryRecallHit>): List<MemoryRecallHit> =
-        lineage.readOnlyNeighboursOf(reader).flatMap { other ->
-            val store = banks.store(other)
+        sharedRecallBanks(listOf(reader)).flatMap { other ->
+            val store = readOnlyBank(banks.store(other))
             search(GraphMemoryTool(store, MemoryConsolidationQueue(store)))
                 .groupBy { it.node.id }.values.map { group -> group.maxBy(MemoryRecallHit::score) }
                 .sortedWith(compareByDescending<MemoryRecallHit> { it.score }.thenBy { it.node.id.value })
@@ -1646,9 +1741,8 @@ class MemoryLayerController(
         val (timeline, relevant) = hits.partition { it.node.id.value in chronological }
         val blocks = buildList {
             if (firstPrompt) add(PromptContextBlock(MEMORY_PROTOCOL_PROMPT_LABEL, MEMORY_PROTOCOL))
-            // A specialist role's lessons are not listed here: they arrive through the cue path (cloud, phrases,
-            // summaries by depth) when the work touches them. A first-prompt pointer says so.
-            if (firstPrompt && runCatchingCancellable { roleLessons(request.orchestrationContext.roleId?.value.orEmpty()) }.getOrNull()?.isNotEmpty() == true) {
+            // Shared lessons arrive by association, not as a separate role-specific injection.
+            if (firstPrompt && runCatchingCancellable { sharedLessonBanks(banks.known()).isNotEmpty() }.getOrDefault(false)) {
                 add(PromptContextBlock("Role lessons", ROLE_LESSONS_POINTER))
             }
             // The user's prompt draws its own cue cloud, like any thought.
@@ -1761,8 +1855,10 @@ class MemoryLayerController(
         val workflow = request?.let { memoryWorkflowOf(it) } ?: session.request?.let {
             memoryWorkflowOf(it, session.binding?.handle?.providerRunId?.value ?: agentId)
         } ?: workflowOfAgent(agentId)
-        val roleBank = roleBankOf(request ?: session.request)
-        val hits = tagCandidates(workflow, roleBank, text, agentId)
+        val hits = (tagCandidates(workflow, text, agentId) +
+            sharedRecallBanks(listOf(workflow)).flatMap { tagCandidates(it, text, agentId, physicalOnly = true) })
+            .groupBy { it.node.id }.values.map { group -> group.maxBy { it.score } }
+            .sortedByDescending { it.score }.take(MAX_RECALL_RESULTS)
         val cues = (if (alongside) gate.selectAlongside(hits) else gate.select(hits)).take(MemoryAttentionGate(attentionPolicy).cuePolicy(gate.currentState()).maxTags)
         if (cues.isEmpty() || !active) return null
         cueMutex.withLock {
@@ -1771,37 +1867,40 @@ class MemoryLayerController(
             cues.forEach { session.dwell.hit(it.node.text) }
         }
         // Key phrases ride after the tags, as "- " lines like any other injection.
-        val phrases = runCatchingCancellable { cuePhrases(listOfNotNull(workflow, roleBank), cues, gate, agentId) }.getOrDefault(emptyList())
+        val phrases = runCatchingCancellable { cuePhrases(workflow, cues, gate, agentId) }.getOrDefault(emptyList())
         return cueCloudText(cues.map { it.node.text }, phrases)
     }
 
-    /** Shared tag lookup for managed and direct conversations; returns no passages. */
-    private suspend fun tagCandidates(workflow: String, roleBank: String?, text: String, agentId: String?): List<MemoryRecallHit> {
-        val tool = layerFor(workflow).tool
+    /** Shared tag lookup; external banks are read physically, not through their lineage. No passages returned. */
+    private suspend fun tagCandidates(workflow: String, text: String, agentId: String?,
+        physicalOnly: Boolean = false): List<MemoryRecallHit> {
+        val physical = if (physicalOnly) readOnlyBank(banks.store(workflow)) else null
+        val tool = if (physical == null) layerFor(workflow).tool else GraphMemoryTool(
+            physical, MemoryConsolidationQueue(physical),
+            embedder = AgentMemoryLayer.embedderFor(mutableEngines.value.agents),
+        )
+        val triggers = if (physical == null) triggersFor(workflow)
+            else MemoryKeywordTriggers().also { it.ensureCurrent(physical.read()) }
         val words = CONTENT_WORD.findAll(text.lowercase()).map { it.value }.filter { it !in CLOUD_STOPWORDS }.distinct().toList()
         val cueWords = words.filterNot { isCommonWord(tool, it) }.take(MAX_CLOUD_QUERY_WORDS)
         // Keyword triggers: the text's words and 2–3 word phrases looked up in the table held ready
         // (no search), each firing its tag at the relevance its keyword weight earns.
-        val keywordHits = keywordCueHits(workflow, text, tool)
+        val keywordHits = keywordCueHits(text, tool, triggers)
         if (cueWords.isEmpty() && keywordHits.isEmpty()) return emptyList()
         // Each uncommon word seeds its own cues (a word should not be diluted by its neighbours);
         // a tag reached by several words, or by a keyword too, keeps its best score.
         val best = LinkedHashMap<MemoryNodeId, MemoryRecallHit>()
         keywordHits.forEach { hit -> best[hit.node.id] = hit }
-        // The role's lesson bank, when it has one, is read the same way as the workflow's own.
-        val readFrom = listOfNotNull(tool, roleBank?.let { layerFor(it).tool })
         cueWords.forEach { word ->
-            readFrom.forEach { source ->
-                source.grip(
-                    MemoryQuery(
-                        text = word,
-                        resolution = MemoryResolution.Tag,
-                        maxResults = MAX_RECALL_RESULTS,
-                        taskRunId = agentId,
-                    ),
-                ).hits.filter { it.node.kind in AttentionGatedRecall.CUE_KINDS }.forEach { hit ->
-                    if ((best[hit.node.id]?.score ?: -1f) < hit.score) best[hit.node.id] = hit
-                }
+            tool.grip(
+                MemoryQuery(
+                    text = word,
+                    resolution = MemoryResolution.Tag,
+                    maxResults = MAX_RECALL_RESULTS,
+                    taskRunId = agentId,
+                ),
+            ).hits.filter { it.node.kind in AttentionGatedRecall.CUE_KINDS }.forEach { hit ->
+                if ((best[hit.node.id]?.score ?: -1f) < hit.score) best[hit.node.id] = hit
             }
         }
         return best.values.sortedByDescending { it.score }.take(MAX_RECALL_RESULTS)
@@ -1814,27 +1913,24 @@ class MemoryLayerController(
      * Read only; nothing stored changes.
      */
     private suspend fun cuePhrases(
-        readFrom: List<String>,
+        workflow: String,
         cues: List<MemoryRecallHit>,
         gate: AttentionGatedRecall,
         agentId: String,
     ): List<String> {
-        val hits = readFrom.flatMap { bank ->
-            val tool = layerFor(bank).tool
-            withProvenance(
-                bank,
-                cues.take(MAX_CLOUD_PHRASE_TAGS).flatMap { cue ->
-                    tool.grip(
-                        MemoryTagQuery(
-                            tags = listOf(cue.node.text),
-                            resolution = MemoryResolution.Phrase,
-                            maxResults = MAX_CLOUD_PHRASES,
-                            scope = MemoryBankScope(taskRunId = agentId),
-                        ),
-                    ).hits
-                },
-            )
-        }
+        suspend fun search(tool: MemoryTool, taskRunId: String?): List<MemoryRecallHit> =
+            cues.take(MAX_CLOUD_PHRASE_TAGS).flatMap { cue ->
+                tool.grip(
+                    MemoryTagQuery(
+                        tags = listOf(cue.node.text),
+                        resolution = MemoryResolution.Phrase,
+                        maxResults = MAX_CLOUD_PHRASES,
+                        scope = MemoryBankScope(taskRunId = taskRunId),
+                    ),
+                ).hits
+            }
+        val hits = withProvenance(workflow, search(layerFor(workflow).tool, agentId)) +
+            readOnlyHits(workflow) { search(it, null) }
         val best = hits
             .filter { it.node.kind == MemoryNodeKind.Phrase }
             .distinctBy { it.node.id }
@@ -1849,8 +1945,7 @@ class MemoryLayerController(
      * `0.9 * sqrt(weight)` ([MemoryTagKeywords.relevance]), so even a tag's own text (1.0) scores
      * 0.9, under an exact tag-search hit.
      */
-    private suspend fun keywordCueHits(workflow: String, text: String, tool: MemoryTool): List<MemoryRecallHit> {
-        val triggers = triggersFor(workflow)
+    private suspend fun keywordCueHits(text: String, tool: MemoryTool, triggers: MemoryKeywordTriggers): List<MemoryRecallHit> {
         val keys = MemoryKeywordTriggers.keys(text) { word ->
             word.length < 3 || word in CLOUD_STOPWORDS || word in SHORT_STOPWORDS || isCommonWord(tool, word)
         }
@@ -1891,25 +1986,31 @@ class MemoryLayerController(
         }
         // The lineage first; then, read-only and labelled, the project's other workflows.
         val own = withProvenance(workflow, search(layerFor(workflow).tool, request?.taskRunId?.value))
-        // The role's own lessons, when it has a bank, come the same way and at the same depth.
-        val roleBank = roleBankOf(request)
-        val lessons = roleBank?.let { withProvenance(it, search(layerFor(it).tool, request?.taskRunId?.value)) }.orEmpty()
-        if (depth == MemoryDepth.Detail) return condensedFrom(workflow, own) + roleBank?.let { condensedFrom(it, lessons) }.orEmpty()
-        return own + lessons + readOnlyHits(workflow) { search(it, null) }.take(limit)
+        val shared = readOnlyHits(workflow) { search(it, null) }
+            .groupBy { it.node.id }.values.map { group -> group.maxBy { it.score } }
+            .sortedByDescending { it.score }.take(limit)
+        if (depth == MemoryDepth.Detail) {
+            val detail = shared.groupBy { it.provenance?.readOnlyFromWorkflow }.flatMap { (bank, hits) ->
+                if (bank == null) emptyList() else condensedFrom(bank, hits, physicalOnly = true)
+            }
+            return (condensedFrom(workflow, own) + detail).distinctBy { it.node.id }
+        }
+        return (own + shared).distinctBy { it.node.id }
     }
 
-    /** One step down the condensation: the memories [hits] were condensed from, or an ordinary summary's phrases (own bank only). */
-    private suspend fun condensedFrom(workflow: String, hits: List<MemoryRecallHit>): List<MemoryRecallHit> {
-        val snapshot = layerFor(workflow).store.read()
+    /** One step down condensation, restricted to the same authorized bank view as the parent hits. */
+    private suspend fun condensedFrom(workflow: String, hits: List<MemoryRecallHit>,
+        physicalOnly: Boolean = false): List<MemoryRecallHit> {
+        val snapshot = if (physicalOnly) banks.store(workflow).read() else layerFor(workflow).store.read()
         val byId = snapshot.nodes.associateBy { it.id }
-        return hits.filter { it.provenance?.readOnlyFromWorkflow == null }
+        return hits.filter { it.provenance?.readOnlyFromWorkflow == (if (physicalOnly) workflow else null) }
             .flatMap { hit ->
                 // A memory that was rewritten from others points at them (CondensedFrom); an ordinary summary points at its phrases.
                 val outgoing = snapshot.edges.filter { it.from == hit.node.id }
                 outgoing.filter { it.relation == MemoryRelationKind.CondensedFrom }
                     .ifEmpty { outgoing.filter { it.relation == MemoryRelationKind.Summarizes } }
                     .mapNotNull { edge -> byId[edge.to] }
-                    .map { source -> MemoryRecallHit(source, hit.score) }
+                    .map { source -> MemoryRecallHit(source, hit.score, provenance = hit.provenance) }
             }
             .distinctBy { it.node.id }
             .take(MAX_TRIGGER_SUMMARIES + DEEPER_EXTRA_SUMMARIES)
@@ -1978,7 +2079,7 @@ class MemoryLayerController(
         )
 
         const val ROLE_LESSONS_POINTER: String =
-            "Your role has lessons from earlier work. They are not listed here: they arrive as memory lines " +
+            "The Aive has shared lessons from earlier work. They are not listed here: they arrive as memory lines " +
                 "when what you do touches them. Read them as reference."
 
         const val MAX_RECALL_RESULTS = 6

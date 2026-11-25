@@ -73,6 +73,73 @@ class MemoryControllerCuePipelineTest {
     )
 
     private val accept: suspend (String) -> ProviderActionResult = { ProviderActionResult.Accepted }
+ 
+    @Test
+    fun directExchangeBanksActualRepliesOnlyAfterReleaseAndRecoversInterruptedCapture() = runBlocking {
+        val run = "direct-run"
+        val store = InMemoryMemoryStore()
+        val settings = MapSettings()
+        val banks = MemoryBanks.inMemory(mapOf(run to store))
+        fun controller() = MemoryLayerController(
+            banks = banks,
+            settingsStore = MemoryLayerSettingsStore(settings),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            nowEpochMillis = { 1000L },
+        )
+        val first = controller()
+        first.updateSettings { it.copy(consolidationPaused = true) }
+        first.registerWorkflow(run, "project")
+        val capture = DirectChatMemory(listOf(run), first.promptContextProvider, captureWorkflowId = run)
+        val prompt = "Host-generated prompt; do not bank as Keeper speech"
+        assertEquals("Oppose route A", capture.voice(QueenModel { "Oppose route A" }, "antagonist").answer(prompt))
+        assertEquals("Investigate route B", capture.voice(QueenModel { "Investigate route B" }, "queen").answer(prompt))
+        assertTrue(store.read().episodes.isEmpty())
+        assertEquals(0, first.recoverCapturedSessions(), "Active exchange must not release its own journal")
+        val pending = SettingsMemoryCaptureJournal(settings).pending()
+        assertEquals(2, pending.size)
+        capture.flushReplies()
+        capture.flushReplies()
+        val episodes = store.read().episodes
+        assertEquals(setOf("antagonist", "queen"), episodes.map { it.roleId }.toSet())
+        assertEquals(setOf("Oppose route A", "Investigate route B"), episodes.map { it.chunks.single().text }.toSet())
+        assertTrue(episodes.all { it.projectId == "project" && it.workflowRunId == run &&
+            it.chunks.single().kind == MemorySourceKind.AgentNote && prompt !in it.userPrompt })
+        val journal = SettingsMemoryCaptureJournal(settings)
+        assertTrue(journal.pending().isEmpty())
+        // A crash after committing but before journal removal must not duplicate the replies.
+        pending.forEach { (key, envelope) -> journal.record(key, envelope) }
+        assertEquals(2, controller().recoverCapturedSessions())
+        assertEquals(episodes, store.read().episodes)
+    }
+
+    @Test
+    fun directReplyCaptureRespectsDisabledMemoryAndClearBeforeRelease() = runBlocking {
+        val run = "direct-run"
+        val store = InMemoryMemoryStore()
+        val settings = MapSettings()
+        val controller = MemoryLayerController(
+            banks = MemoryBanks.inMemory(mapOf(run to store)),
+            settingsStore = MemoryLayerSettingsStore(settings),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            nowEpochMillis = { 1000L },
+        )
+        controller.updateSettings { it.copy(consolidationPaused = true, enabled = false) }
+        val capture = DirectChatMemory(listOf(run), controller.promptContextProvider, captureWorkflowId = run)
+        val voice = capture.voice(QueenModel { "An actual reply" }, "reviewer")
+        voice.answer("Question")
+        controller.updateSettings { it.copy(enabled = true) }
+        capture.flushReplies()
+        assertTrue(store.read().episodes.isEmpty())
+        voice.answer("Second question")
+        assertEquals(1, SettingsMemoryCaptureJournal(settings).pending().size)
+        controller.selectBank(run)
+        controller.clearAll()
+        capture.flushReplies()
+        assertTrue(SettingsMemoryCaptureJournal(settings).pending().isEmpty())
+        assertTrue(store.read().episodes.isEmpty())
+    }
 
     @Test
     fun collectiveRepliesAreIndependentlyBankedAndScopedToTheirConversation() = runBlocking {
@@ -370,12 +437,13 @@ class MemoryControllerCuePipelineTest {
     }
 
     @Test
-    fun aRolesLessonsArriveByAssociationAndNotAsAVerbatimBlock() = runBlocking {
+    fun sharedLessonsArriveForUnrelatedRolesByAssociationAndNotAsAVerbatimBlock() = runBlocking {
         val lesson = "Check the filing year first (source: IRS, fetched 2026-01-02)"
         val tag = MemoryNode(MemoryNodeId("tag-filing"), MemoryNodeKind.NounTag, "filing", createdAtEpochMillis = 0)
         val phrase = MemoryNode(MemoryNodeId("phrase-filing"), MemoryNodeKind.Phrase, "check the filing year first", createdAtEpochMillis = 0)
         val episode = MemoryEpisode(
-            id = MemoryEpisodeId("e1"), sourceSessionId = "s", userPrompt = lesson, createdAtEpochMillis = 1,
+            id = MemoryEpisodeId("e1"), sourceSessionId = "role:reviewer-tax", userPrompt = lesson, createdAtEpochMillis = 1,
+            workflowRunId = "role:reviewer-tax", roleId = "reviewer-tax",
             chunks = listOf(MemorySourceChunk(MemoryChunkId("e1:c"), MemoryEpisodeId("e1"), 0, MemorySourceKind.AgentNote, ROLE_LESSON_LABEL, lesson)),
         )
         val roleBank = MemorySnapshot(
@@ -393,21 +461,81 @@ class MemoryControllerCuePipelineTest {
         controller.setDefaultAttentionLevel(1f)
         val request = AgentTaskRequest(
             TaskRunId("agent-7"), "Review the filing", "", emptyList(),
-            orchestrationContext = AgentOrchestrationContext(workflowRunId = WorkflowRunId("wf-role"), roleId = RoleDefinitionId("reviewer-tax")),
+            orchestrationContext = AgentOrchestrationContext(workflowRunId = WorkflowRunId("wf-role"), roleId = RoleDefinitionId("unrelated-engineer")),
         )
         val blocks = controller.promptContextProvider.recallFor(request, MemoryQueryPlan(emptyList(), enoughEvidence = false)).blocks
 
         // The lesson itself is not in a block of its own; a pointer says it will arrive.
         val pointer = blocks.single { it.label == "Role lessons" }
         assertTrue("Check the filing year" !in pointer.content, pointer.content)
-        // It arrives with the prompt's cue cloud: the role's tag, then its key phrase.
+        // It arrives with the unrelated role's cue cloud: the shared tag, then its key phrase.
         val cloud = blocks.single { it.label == "Memory" }.content.lines()
         assertEquals("$MEMORY_MESSAGE_MARKER #filing", cloud.first(), "$blocks")
-        assertEquals(listOf("- check the filing year first"), cloud.drop(1), "$blocks")
+        assertEquals(listOf("- [read-only from workflow role:reviewer-tax] check the filing year first"), cloud.drop(1), "$blocks")
+
+        // Direct Queen and other-role calls see the same tag independently, never the raw lesson.
+        val prompts = mutableListOf<String>()
+        val direct = DirectChatMemory(emptyList(), controller.promptContextProvider)
+        for (role in listOf("queen", "reviewer-tax", "unrelated-engineer")) {
+            direct.voice(QueenModel { prompts += it; "Answer" }, role).answer("Review the filing")
+        }
+        assertEquals(3, prompts.size)
+        assertTrue(prompts.all { "#filing" in it && lesson !in it })
 
         // Later prompts do not repeat the pointer.
         val later = controller.promptContextProvider.recallFor(request, MemoryQueryPlan(emptyList(), enoughEvidence = false)).blocks
         assertTrue(later.none { it.label == "Role lessons" }, "$later")
+    }
+
+    @Test
+    fun passiveRecallIncludesOlderProjectBanksButDoesNotTraverseForeignParents() = runBlocking {
+        fun tagged(word: String) = InMemoryMemoryStore(MemorySnapshot(nodes = listOf(
+            MemoryNode(MemoryNodeId("tag-$word"), MemoryNodeKind.NounTag, word, createdAtEpochMillis = 0),
+        )))
+        val older = tagged("capacitor")
+        val privateBank = tagged("zirconium")
+        val prefixedPrivate = tagged("tungsten")
+        val lineage = MemoryLineage()
+        lineage.registerWorkflow("private", "Q", atEpochMillis = 1L)
+        lineage.registerWorkflow("role:private", "Q", atEpochMillis = 1L)
+        lineage.registerWorkflow("old", "P", parents = listOf("private"), atEpochMillis = 2L)
+        lineage.registerWorkflow("reader", "P", atEpochMillis = 3L)
+        val physical = linkedMapOf("reader" to InMemoryMemoryStore(), "old" to older,
+            "private" to privateBank, "role:private" to prefixedPrivate)
+        repeat(MemoryLineage.MAX_READ_ONLY_NEIGHBOURS + 1) { index ->
+            val id = "recent-$index"
+            lineage.registerWorkflow(id, "P", atEpochMillis = 4L + index)
+            physical[id] = InMemoryMemoryStore()
+        }
+        assertTrue("old" !in lineage.readOnlyNeighboursOf("reader"))
+        val controller = MemoryLayerController(
+            banks = MemoryBanks.inMemory(physical),
+            settingsStore = MemoryLayerSettingsStore(MapSettings()),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined), lineage = lineage, nowEpochMillis = { 1_000L },
+        )
+        controller.setDefaultAttentionLevel(1f)
+        val before = older.read()
+        val seen = mutableListOf<String>()
+        val direct = DirectChatMemory(listOf("reader"), controller.promptContextProvider)
+        fun voice() = direct.voice(QueenModel { seen += it; "Answer" }, "unrelated-role")
+        voice().answer("capacitor")
+        assertTrue("#capacitor" in seen.last())
+        voice().answer("zirconium")
+        assertTrue("#zirconium" !in seen.last())
+        voice().answer("tungsten")
+        assertTrue("#tungsten" !in seen.last())
+        val provider = controller.promptContextProvider
+        fun prompt(agent: String, objective: String) = request(agent, "reader", objective)
+        val plan = MemoryQueryPlan(emptyList(), enoughEvidence = false)
+        val visible = provider.recallFor(prompt("reader-1", "capacitor"), plan).blocks
+        assertTrue(visible.any { it.label == "Memory" && "#capacitor" in it.content })
+        val hidden = provider.recallFor(prompt("reader-2", "zirconium"), plan).blocks
+        assertTrue(hidden.none { "#zirconium" in it.content })
+        assertEquals(before, older.read(), "Recall must not write to a shared source")
+        controller.updateSettings { it.copy(enabled = false) }
+        voice().answer("capacitor")
+        assertEquals("capacitor", seen.last())
     }
     @Test
     fun managedDirectoryRequiresMatchingAttributedAgentMessageInExactProjectAndRun() = runBlocking {

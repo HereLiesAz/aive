@@ -53,50 +53,56 @@ internal suspend fun ApplicationRuntime.raiseDispute(
     /** Stable host case key, distinct for each report or training dispute; never model-authored. */
     caseKey: String,
 ): DisputeResolution {
+    val sourceRun = persistence.runs.get(WorkflowRunId(runId))
     val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(
-        if (persistence.runs.get(WorkflowRunId(runId)) != null) listOf(runId) else emptyList(),
+        if (sourceRun != null) listOf(runId) else emptyList(),
+        captureWorkflowId = sourceRun?.id?.value,
     )
-    val roles = activeRoles(resolveRoleCollection(persistence.roles.all()))
-    val conversationId = "dispute:$caseKey"
-    val queenWithMemory = queenModel?.let {
-        memory.configuredVoice(it, BuiltInRoles.Orchestrator.id.value, conversationId, roles)
-    }
-    val voicesWithMemory = voices.mapValues { (roleId, model) ->
-        memory.configuredVoice(model, roleId, conversationId, roles)
-    }
-    var resolution = settleWithAgreement(dispute, parties, queenWithMemory, voicesWithMemory, allowInvestigation = !investigated, mayCall = mayCall, independentProposals = true)
-    var investigationRunId: String? = null
-    val agreed = resolution as? DisputeResolution.Agreed
-    val request = (agreed?.outcome as? DisputeOutcome.Investigate)?.request
-    if (agreed != null && request != null) {
-        investigationRunId = try {
-            launcher?.launch(request)
-        } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            null
+    return try {
+        val roles = activeRoles(resolveRoleCollection(persistence.roles.all()))
+        val conversationId = "dispute:$caseKey"
+        val queenWithMemory = queenModel?.let {
+            memory.configuredVoice(it, BuiltInRoles.Orchestrator.id.value, conversationId, roles)
         }
-        if (investigationRunId == null) {
-            resolution = DisputeResolution.Escalated(Escalation(EscalationReason.CannotInvestigate, agreed.approach, emptyList(), request.missingFact))
+        val voicesWithMemory = voices.mapValues { (roleId, model) ->
+            memory.configuredVoice(model, roleId, conversationId, roles)
         }
-    }
-    rememberDisputeNotes(runId, disputeNotes(runId, dispute.question, parties, resolution, investigationRunId))
-    val found = if (request?.kind == InvestigationKind.Research && investigationRunId != null) findingsOf(investigationRunId) else emptyList()
-    if (found.isNotEmpty()) {
-        // One investigation per dispute: the second pass may not commission another, and both disputants agree again.
-        resolution = settleWithAgreement(dispute.withFindings(found), parties, queenWithMemory, voicesWithMemory, allowInvestigation = false, mayCall = mayCall, independentProposals = true)
-        rememberDisputeNotes(runId, disputeNotes(runId, dispute.question, parties, resolution, null))
-    }
-    val testRun = investigationRunId
-    if (request?.kind == InvestigationKind.Test && testRun != null && testFacts != null && resolution is DisputeResolution.Agreed) {
-        val read = testFacts(testRun).orEmpty()
-        if (read.isNotEmpty()) {
-            // One more agreed ruling on what the test found; she may not commission another investigation.
-            resolution = settleWithAgreement(dispute.withFindings(read), parties, queenWithMemory, voicesWithMemory, allowInvestigation = false, mayCall = mayCall, independentProposals = true)
+        var resolution = settleWithAgreement(dispute, parties, queenWithMemory, voicesWithMemory, allowInvestigation = !investigated, mayCall = mayCall, independentProposals = true)
+        var investigationRunId: String? = null
+        val agreed = resolution as? DisputeResolution.Agreed
+        val request = (agreed?.outcome as? DisputeOutcome.Investigate)?.request
+        if (agreed != null && request != null) {
+            investigationRunId = try {
+                launcher?.launch(request)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                null
+            }
+            if (investigationRunId == null) {
+                resolution = DisputeResolution.Escalated(Escalation(EscalationReason.CannotInvestigate, agreed.approach, emptyList(), request.missingFact))
+            }
+        }
+        rememberDisputeNotes(runId, disputeNotes(runId, dispute.question, parties, resolution, investigationRunId))
+        val found = if (request?.kind == InvestigationKind.Research && investigationRunId != null) findingsOf(investigationRunId) else emptyList()
+        if (found.isNotEmpty()) {
+            // One investigation per dispute: the second pass may not commission another, and both disputants agree again.
+            resolution = settleWithAgreement(dispute.withFindings(found), parties, queenWithMemory, voicesWithMemory, allowInvestigation = false, mayCall = mayCall, independentProposals = true)
             rememberDisputeNotes(runId, disputeNotes(runId, dispute.question, parties, resolution, null))
         }
+        val testRun = investigationRunId
+        if (request?.kind == InvestigationKind.Test && testRun != null && testFacts != null && resolution is DisputeResolution.Agreed) {
+            val read = testFacts(testRun).orEmpty()
+            if (read.isNotEmpty()) {
+                // One more agreed ruling on what the test found; she may not commission another investigation.
+                resolution = settleWithAgreement(dispute.withFindings(read), parties, queenWithMemory, voicesWithMemory, allowInvestigation = false, mayCall = mayCall, independentProposals = true)
+                rememberDisputeNotes(runId, disputeNotes(runId, dispute.question, parties, resolution, null))
+            }
+        }
+        resolution
+    } finally {
+        memory.flushReplies()
     }
-    return resolution
 }
 
 /** How long a finished test report is waited for, and how often it is looked for. The keeper's own waiting is not counted against any creature. */
