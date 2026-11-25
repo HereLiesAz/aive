@@ -420,6 +420,10 @@ class ApplicationRuntime private constructor(
         com.hereliesaz.geministrator.queen.CollectiveConversationStore(persistence.inferenceSettings, ::nowEpochMillis)
     }
 
+    internal val collectiveEvidence by lazy {
+        com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger(persistence.inferenceSettings, ::nowEpochMillis)
+    }
+
     private val collectiveProfiles get() = providerRegistry.specialistProfiles
 
     /** Configured text-only model factory. No managed-session tools or repository access. */
@@ -437,6 +441,7 @@ class ApplicationRuntime private constructor(
     internal suspend fun deleteCollectiveConversation(id: String) = collectiveChatMutex.withLock { collectiveConversations.delete(id) }
     internal suspend fun clearCollectiveConversations() = collectiveChatMutex.withLock {
         collectiveConversations.clear()
+        collectiveEvidence.clear()
         collectiveProfiles.clear()
     }
 
@@ -589,6 +594,7 @@ class ApplicationRuntime private constructor(
             roster.any { it.id.value == match.roleId && it.executionSource == com.hereliesaz.geministrator.domain.RoleExecutionSource.Agent }
         }
         val capture = com.hereliesaz.geministrator.queen.CollectiveMemoryCapture(conversationId, question, ::nowEpochMillis)
+        val evidenceIssue = collectiveEvidence.issueId()
         fun voice(role: com.hereliesaz.geministrator.domain.RoleDefinition, model: com.hereliesaz.geministrator.queen.QueenModel):
             com.hereliesaz.geministrator.queen.CollectiveVoice? {
             if (role.executionSource != com.hereliesaz.geministrator.domain.RoleExecutionSource.Agent) return null
@@ -619,7 +625,16 @@ class ApplicationRuntime private constructor(
                 observeCall = { voice, outcome ->
                     voice.specialistId?.let { id -> collectiveProfiles.observe(id, voice.role, outcome) }
                 },
-                recordContribution = capture::record,
+                recordContribution = { voice, reply ->
+                    capture.record(voice, reply)
+                    withContext(NonCancellable) {
+                        runCatchingCancellable {
+                            collectiveEvidence.recordAdvisory(evidenceIssue, conversationId, question, voice, reply)
+                        }.onFailure {
+                            com.hereliesaz.geministrator.log.AppLog.record("evidence", "Could not retain advisory evidence: ${it::class.simpleName}")
+                        }
+                    }
+                },
                 directory = directory,
             ) { model, count ->
                 models.mayCall() && queenCallAllowed() &&
