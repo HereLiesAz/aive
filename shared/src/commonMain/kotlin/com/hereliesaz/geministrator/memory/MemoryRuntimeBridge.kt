@@ -45,6 +45,14 @@ fun interface DirectChatCueSession {
  */
 data class CollectiveExpertiseMatch(val roleId: String, val specialistId: String, val matchedEpisodes: Int)
 
+/** Reserved host-generated identity for a private pre-run planning conversation. */
+internal const val PLANNING_MEMORY_PREFIX = "session:planning:"
+
+/** Accept only the opaque planning identity format, never an arbitrary run or lesson bank. */
+internal fun isPlanningMemoryBank(id: String): Boolean =
+    id.startsWith(PLANNING_MEMORY_PREFIX) &&
+        id.removePrefix(PLANNING_MEMORY_PREFIX).matches(Regex("[0-9a-f]{32}"))
+
 fun interface MemoryPromptContextProvider {
     suspend fun recallFor(request: AgentTaskRequest, queryPlan: MemoryQueryPlan): MemoryPromptRecall
 
@@ -78,6 +86,15 @@ fun interface MemoryPromptContextProvider {
      * to recall. The subsequent bank call releases them; startup recovers interrupted turns.
      */
     suspend fun stageCollectiveContributions(conversationId: String, requests: List<MemoryBankRequest>) {}
+
+    /** Allocate an isolated memory-only root for a planning conversation; null when unavailable. */
+    suspend fun openPlanningCapture(): String? = null
+
+    /**
+     * Associate an existing planning root with the project of a successfully launched workflow.
+     * Called by the host after launch, never by a planner or a recall grant. No data is copied.
+     */
+    suspend fun adoptPlanningCapture(planningId: String, projectId: String) {}
 
     /** Stage one actual direct agent reply in its host-selected existing workflow, not a recall grant. */
     suspend fun stageRunDirectReply(workflowId: String, request: MemoryBankRequest) {}

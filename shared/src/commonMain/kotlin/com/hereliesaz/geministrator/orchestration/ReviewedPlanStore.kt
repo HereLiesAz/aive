@@ -64,6 +64,8 @@ data class PendingPlanLaunch(
     val notes: com.hereliesaz.geministrator.queen.PlanningNotes? = null,
     /** The keeper's "have every result reviewed" switch when the plan was made, so a restart resumes with the same checklist. Absent in an older blob. */
     val requireReview: Boolean = false,
+    /** Host-owned isolated planning memory identity; older pending plans have none. Not an approval. */
+    val planningMemoryId: String? = null,
 )
 
 /** Settings-backed store for the one [PendingPlanLaunch]. Unreadable state is no state: the keeper is simply asked afresh. */

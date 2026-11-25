@@ -163,6 +163,56 @@ class MemoryControllerCuePipelineTest {
     }
 
     @Test
+    fun planningCaptureStaysPrivateUntilLaunchAssociationAndCannotBeReassigned() = runBlocking {
+        val settings = MapSettings()
+        val banks = MemoryBanks.inMemory()
+        val lineage = MemoryLineage(settings)
+        val controller = MemoryLayerController(
+            banks = banks,
+            settingsStore = MemoryLayerSettingsStore(settings),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined),
+            lineage = lineage,
+            nowEpochMillis = { 1000L },
+        )
+        controller.updateSettings { it.copy(consolidationPaused = true) }
+        controller.registerWorkflow("parent-a", "project-a")
+        controller.registerWorkflow("parent-b", "project-b")
+        val provider = controller.promptContextProvider
+        val memory = DirectChatMemory.forPlanning(listOf("parent-a", "parent-b"), provider)
+        val id = requireNotNull(memory.planningCaptureId)
+        val plan = OrchestrationPlan(emptyList(), blockers = listOf("Planning evidence"))
+        val planner = memory.planner(object : OrchestrationAgentRuntime {
+            override suspend fun plan(packet: OrchestrationPacket) = plan
+            override suspend fun repair(packet: OrchestrationPacket) = plan
+        }, "planner")
+        val packet = OrchestrationPacket("Host objective", availableAgents = emptyList(), instruction = "Plan")
+        planner.plan(packet)
+        val opinion = PlanVerdict.Reject("Independent reviewer objection")
+        memory.reviewer(PlanReviewer { opinion }, "reviewer")
+            .review(PlanReviewRequest(packet, plan, "Reviewer", "Review.", null))
+        assertTrue(banks.store(id).read().episodes.isEmpty())
+        memory.flushReplies()
+        assertEquals(setOf("planner", "reviewer"), banks.store(id).read().episodes.map { it.roleId }.toSet())
+        assertTrue(banks.store("parent-a").read().episodes.isEmpty())
+        assertTrue(banks.store("parent-b").read().episodes.isEmpty())
+        assertEquals(null, lineage.projectOf(id))
+        assertTrue(id !in lineage.projectWorkflows("project-a") && id !in lineage.projectWorkflows("project-b"))
+        assertTrue(lineage.parentsOf(id).isEmpty())
+        provider.adoptPlanningCapture(id, "project-a")
+        provider.adoptPlanningCapture(id, "project-a")
+        assertEquals("project-a", lineage.projectOf(id))
+        assertTrue(id in lineage.projectWorkflows("project-a") && id !in lineage.projectWorkflows("project-b"))
+        assertTrue(runCatching { provider.adoptPlanningCapture(id, "project-b") }.isFailure)
+        assertEquals("project-a", lineage.projectOf(id))
+        val draft = DirectChatMemory.forPlanning(emptyList(), provider)
+        assertTrue(draft.planningCaptureId != id)
+        assertEquals(null, lineage.projectOf(requireNotNull(draft.planningCaptureId)))
+        controller.updateSettings { it.copy(enabled = false) }
+        assertEquals(null, DirectChatMemory.forPlanning(emptyList(), provider).planningCaptureId)
+    }
+
+    @Test
     fun directReplyCaptureRespectsDisabledMemoryAndClearBeforeRelease() = runBlocking {
         val run = "direct-run"
         val store = InMemoryMemoryStore()

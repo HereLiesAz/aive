@@ -1368,6 +1368,35 @@ class MemoryLayerController(
             }
         }
 
+        override suspend fun openPlanningCapture(): String? = collectiveCaptureMutex.withLock {
+            if (!active) return@withLock null
+            val known = banks.known().toSet()
+            var id: String
+            do {
+                id = PLANNING_MEMORY_PREFIX + (1..2).joinToString("") {
+                    kotlin.random.Random.nextLong().toULong().toString(16).padStart(16, '0')
+                }
+            } while (id in known)
+            registerWorkflow(id, null)
+            id
+        }
+
+        override suspend fun adoptPlanningCapture(planningId: String, projectId: String) =
+            collectiveCaptureMutex.withLock {
+                require(isPlanningMemoryBank(planningId) && projectId.isNotBlank())
+                if (!active || planningId !in banks.known()) return@withLock
+                val current = lineage.projectOf(planningId)
+                require(current == null || current == projectId) { "Planning memory already belongs to another project" }
+                require(lineage.parentsOf(planningId).isEmpty()) { "Planning memory must be an isolated root" }
+                val episodes = banks.store(planningId).read().episodes
+                require(episodes.all { episode ->
+                    episode.workflowRunId == planningId && episode.sourceSessionId.startsWith("direct-reply:") &&
+                        !episode.roleId.isNullOrBlank() &&
+                        (episode.purged != null || episode.chunks.all { it.kind == MemorySourceKind.AgentNote })
+                }) { "Planning memory contains non-planning records" }
+                registerWorkflow(planningId, projectId)
+            }
+
         /** Host-owned direct exchanges stage returned agent text, never their synthesized prompt. */
         override suspend fun stageRunDirectReply(workflowId: String, request: MemoryBankRequest) =
             collectiveCaptureMutex.withLock {

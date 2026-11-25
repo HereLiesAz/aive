@@ -3,6 +3,12 @@ package com.hereliesaz.geministrator
 import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.RepositorySource
+import com.hereliesaz.geministrator.memory.MemoryRuntimeBridge
+import com.hereliesaz.geministrator.memory.MemoryPromptContextProvider
+import com.hereliesaz.geministrator.memory.MemoryPromptRecall
+import com.hereliesaz.geministrator.memory.MemoryBankRequest
+import com.hereliesaz.geministrator.orchestration.MemoryQueryPlan
+import com.hereliesaz.geministrator.providers.AgentTaskRequest
 import com.hereliesaz.geministrator.orchestration.OrchestrationAgentRuntime
 import com.hereliesaz.geministrator.orchestration.OrchestrationPacket
 import com.hereliesaz.geministrator.orchestration.OrchestrationPlan
@@ -143,10 +149,32 @@ class ReviewedPlanStoreTest {
     )
 
     @Test
+    @OptIn(kotlin.time.ExperimentalTime::class)
     fun aRestartDuringTheDecisionBringsTheSamePlanBackAndStartingItMakesTheRun() = runBlocking {
         val persistence = InMemoryWorkflowPersistence()
         val settings = InMemorySettings()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val planningId = "session:planning:0123456789abcdef0123456789abcdef"
+        val captured = mutableListOf<MemoryBankRequest>()
+        val released = mutableListOf<String>()
+        val adopted = mutableListOf<Pair<String, String>>()
+        val prior = MemoryRuntimeBridge.promptContextProvider
+        MemoryRuntimeBridge.promptContextProvider = object : MemoryPromptContextProvider {
+            override suspend fun recallFor(request: AgentTaskRequest, queryPlan: MemoryQueryPlan) = MemoryPromptRecall()
+            override suspend fun openPlanningCapture() = planningId
+            override suspend fun stageRunDirectReply(workflowId: String, request: MemoryBankRequest) {
+                assertEquals(planningId, workflowId)
+                captured += request
+            }
+            override suspend fun bankRunDirectReplies(workflowId: String, sourceIds: List<String>) {
+                assertEquals(planningId, workflowId)
+                released += sourceIds
+            }
+            override suspend fun adoptPlanningCapture(planningId: String, projectId: String) {
+                assertTrue(persistence.definitions.all().isNotEmpty(), "Launch must already exist")
+                adopted += planningId to projectId
+            }
+        }
         try {
             val first = ApplicationRuntime.create(providers = emptyList(), scope = scope, persistence = persistence)
             // The app is closed while the keeper is deciding: the launch is cancelled without an answer.
@@ -154,6 +182,10 @@ class ReviewedPlanStoreTest {
                 launch(first, CountingPlanner(onePlan), ReviewedPlanStore(settings)) { throw CancellationException("closed") }
             }
             assertTrue(ReviewedPlanStore(settings).hasPending())
+            assertEquals(planningId, ReviewedPlanStore(settings).pending(kotlin.time.Clock.System.now().toEpochMilliseconds())?.planningMemoryId)
+            assertTrue(captured.any { "Do one" in it.text })
+            assertEquals(captured.map { it.sourceSessionId }, released)
+            assertTrue(adopted.isEmpty(), "A waiting or interrupted decision grants no project access")
             assertTrue(persistence.definitions.all().isEmpty(), "Nothing was started")
 
             // The next launch of the app, nothing changed.
@@ -166,8 +198,11 @@ class ReviewedPlanStoreTest {
             assertEquals("Ship it", shown?.objective)
             assertTrue(shown?.outcome?.approved == true)
             assertEquals(1, persistence.definitions.all().size, "The keeper started it")
+            assertEquals(planningId, adopted.single().first)
+            assertEquals(persistence.projects.all().single().id.value, adopted.single().second)
             assertFalse(ReviewedPlanStore(settings).hasPending(), "Answered: not offered again")
         } finally {
+            MemoryRuntimeBridge.promptContextProvider = prior
             scope.cancel()
         }
     }

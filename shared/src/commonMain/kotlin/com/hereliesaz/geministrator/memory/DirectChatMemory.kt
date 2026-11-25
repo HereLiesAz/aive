@@ -32,11 +32,24 @@ import kotlin.time.ExperimentalTime
 internal class DirectChatMemory(
     private val workflowIds: List<String>,
     private val provider: MemoryPromptContextProvider = MemoryRuntimeBridge.promptContextProvider,
-    /** Explicit host-owned destination for actual replies; null leaves ordinary direct calls cue-only. */
+    /** Explicit host-owned destination for returned output, independent of pre-run parent recall grants. */
     private val captureWorkflowId: String? = null,
 ) {
     init {
-        require(captureWorkflowId == null || workflowIds == listOf(captureWorkflowId))
+        require(captureWorkflowId == null || workflowIds == listOf(captureWorkflowId) ||
+            isPlanningMemoryBank(captureWorkflowId))
+    }
+
+    /** The private planning root, if allocated; carry this exact identity through the Keeper decision. */
+    val planningCaptureId: String? get() = captureWorkflowId?.takeIf(::isPlanningMemoryBank)
+
+    companion object {
+        /** Recall stays in the caller's existing scope; the new planning root is only a write destination. */
+        suspend fun forPlanning(workflowIds: List<String>,
+            provider: MemoryPromptContextProvider = MemoryRuntimeBridge.promptContextProvider): DirectChatMemory {
+            val destination = runCatchingCancellable { provider.openPlanningCapture() }.getOrNull()
+            return DirectChatMemory(workflowIds, provider, captureWorkflowId = destination)
+        }
     }
 
     private val captureMutex = Mutex()
