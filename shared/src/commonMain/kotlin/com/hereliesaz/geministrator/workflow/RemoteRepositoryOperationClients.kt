@@ -48,6 +48,10 @@ class RoutingRepositoryOperationClient(
         (clients.firstOrNull { it.supports(project) && it.supportsFileDiscovery(project) }
             ?: error("No host file-discovery client for the linked repository")).discoverFiles(project, objective)
 
+    override suspend fun readDiscoveredFiles(project: Project, objective: String): ExternalExecutionRun =
+        (clients.firstOrNull { it.supports(project) && it.supportsFileDiscovery(project) && it.supportsFileProposalContext(project) }
+            ?: error("No host discovered-snapshot client for the linked repository")).readDiscoveredFiles(project, objective)
+
     override fun supportsFileProposalContext(project: Project): Boolean =
         clients.any { it.supports(project) && it.supportsFileProposalContext(project) }
 
@@ -112,13 +116,7 @@ class GitHubRestRepositoryOperationClient(
         val repo = getRepository(repository, token)
         val url = "$baseUrl/repos/${repository.owner.encodeURLPathPart()}/${repository.name.encodeURLPathPart()}"
         val base = readFileProposalBase(url, repository.defaultBranch ?: repo.defaultBranch, token)
-        val queryWords = com.hereliesaz.geministrator.vector.BuiltInTextEmbedder.tokens(objective.take(4096)).toSet()
-        val candidates = base.entries.values.filter { entry ->
-            entry.type == "blob" && entry.mode in setOf("100644", "100755") && isGitObjectId(entry.sha) &&
-                runCatching { RepositoryFileProposal.validateSnapshotPaths(listOf(entry.path)) }.isSuccess
-        }.sortedWith(compareByDescending<GitHubFileTreeEntry> {
-            com.hereliesaz.geministrator.retrieval.GitHubRepositoryChunkSource.pathScore(it.path, queryWords)
-        }.thenBy { it.path })
+        val candidates = rankedFiles(base, objective)
         var bytes = 0
         val paths = candidates.take(64).takeWhile {
             bytes += it.path.encodeToByteArray().size
@@ -130,6 +128,46 @@ class GitHubRestRepositoryOperationClient(
             label = "Repository file candidates", text = Json.encodeToString(manifest),
             metadata = mapOf("baseCommit" to base.sha),
         ).also { runs.put(it) }
+    }
+
+    /** Rank safe regular paths consistently for both path-only discovery and discovered snapshots. */
+    private fun rankedFiles(base: GitHubFileProposalBase, objective: String): List<GitHubFileTreeEntry> {
+        val queryWords = com.hereliesaz.geministrator.vector.BuiltInTextEmbedder.tokens(objective.take(4096)).toSet()
+        return base.entries.values.filter { entry ->
+            entry.type == "blob" && entry.mode in setOf("100644", "100755") && isGitObjectId(entry.sha) &&
+                runCatching { RepositoryFileProposal.validateSnapshotPaths(listOf(entry.path)) }.isSuccess
+        }.sortedWith(compareByDescending<GitHubFileTreeEntry> {
+            com.hereliesaz.geministrator.retrieval.GitHubRepositoryChunkSource.pathScore(it.path, queryWords)
+        }.thenBy { it.path })
+    }
+
+    /**
+     * Choose bounded readable regular files using the existing retrieval path policy and ranking.
+     * Resolve the base only once: selection and blob reads use precisely that immutable tree.
+     * Never infer that an omitted file is missing, and fail closed when no eligible text exists.
+     */
+    override suspend fun readDiscoveredFiles(project: Project, objective: String): ExternalExecutionRun {
+        val repository = requireRepository(project, RepositorySource.GitHub)
+        repository.requirePublicRemoteHost("github.com", "GitHub")
+        val token = tokenProvider.requireToken("GitHub")
+        val repo = getRepository(repository, token)
+        val url = "$baseUrl/repos/${repository.owner.encodeURLPathPart()}/${repository.name.encodeURLPathPart()}"
+        val base = readFileProposalBase(url, repository.defaultBranch ?: repo.defaultBranch, token)
+        val queryWords = com.hereliesaz.geministrator.vector.BuiltInTextEmbedder.tokens(objective.take(4096)).toSet()
+        var remaining = RepositoryFileProposal.MAX_TOTAL_BYTES.toLong()
+        val paths = mutableListOf<String>()
+        for (entry in rankedFiles(base, objective)) {
+            if (paths.size >= 8) break
+            val size = entry.size ?: continue
+            if (size !in 0..minOf(remaining, RepositoryFileProposal.MAX_FILE_BYTES.toLong()) ||
+                !com.hereliesaz.geministrator.retrieval.GitHubRepositoryChunkSource.isReadable(entry.path) ||
+                com.hereliesaz.geministrator.retrieval.GitHubRepositoryChunkSource.pathScore(entry.path, queryWords) <= 0 ||
+                runCatching { RepositoryFileProposal.validateSnapshotPaths(paths + entry.path) }.isFailure) continue
+            paths += entry.path
+            remaining -= size
+        }
+        require(paths.isNotEmpty()) { "No relevant bounded text files found in the committed repository; specify exact paths" }
+        return readSnapshot(url, token, base, paths).toSnapshotRun(RepositorySource.GitHub).also { runs.put(it) }
     }
 
     /**
@@ -144,6 +182,17 @@ class GitHubRestRepositoryOperationClient(
         val repo = getRepository(repository, token)
         val url = "$baseUrl/repos/${repository.owner.encodeURLPathPart()}/${repository.name.encodeURLPathPart()}"
         val base = readFileProposalBase(url, repository.defaultBranch ?: repo.defaultBranch, token)
+        return readSnapshot(url, token, base, paths).toSnapshotRun(RepositorySource.GitHub).also { runs.put(it) }
+    }
+
+    /** Fetch exact blobs from an already resolved complete base, with the shared byte and path bounds. */
+    private suspend fun readSnapshot(
+        url: String,
+        token: String,
+        base: GitHubFileProposalBase,
+        paths: List<String>,
+    ): RepositoryFileProposal {
+        RepositoryFileProposal.validateSnapshotPaths(paths)
         var remaining = RepositoryFileProposal.MAX_TOTAL_BYTES
         val files = paths.map { path ->
             val existing = base.entries[path]
@@ -163,8 +212,7 @@ class GitHubRestRepositoryOperationClient(
                 RepositoryProposedFile(path, existing.sha, bytes.decodeToString(throwOnInvalidSequence = true))
             }
         }
-        val snapshot = RepositoryFileProposal(base.sha, files).also { it.validate() }
-        return snapshot.toSnapshotRun(RepositorySource.GitHub).also { runs.put(it) }
+        return RepositoryFileProposal(base.sha, files).also { it.validate() }
     }
 
     /**
@@ -810,7 +858,7 @@ private data class GitHubFileCommitResponse(val tree: GitHubCommitPointer)
 private data class GitHubFileTreeResponse(val tree: List<GitHubFileTreeEntry>, val truncated: Boolean)
 
 @Serializable
-private data class GitHubFileTreeEntry(val path: String, val mode: String, val type: String, val sha: String)
+private data class GitHubFileTreeEntry(val path: String, val mode: String, val type: String, val sha: String, val size: Long? = null)
 
 @Serializable
 private data class GitHubFileTreeChange(val path: String, val mode: String, val type: String, val content: String)

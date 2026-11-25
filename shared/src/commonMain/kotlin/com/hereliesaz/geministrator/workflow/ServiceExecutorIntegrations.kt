@@ -13,6 +13,9 @@ interface RepositoryOperationClient {
     fun supportsFileDiscovery(project: Project): Boolean = false
     suspend fun discoverFiles(project: Project, objective: String): ExternalExecutionRun =
         error("Host file discovery is unavailable for this repository")
+    /** Read bounded discovered files from one immutable tree; never falls back to native provider access. */
+    suspend fun readDiscoveredFiles(project: Project, objective: String): ExternalExecutionRun =
+        error("Host discovered snapshots are unavailable for this repository")
     /** Opt in to exact-file snapshots separately from branch writes. */
     fun supportsFileProposalContext(project: Project): Boolean = false
     suspend fun readFileProposalContext(project: Project, paths: List<String>): ExternalExecutionRun =
@@ -42,7 +45,9 @@ class RepositoryOperationExecutorIntegration(
         executor is TaskExecutor.RepositoryOperation && client.supports(project) &&
             (!executor.operation.startsWith(CommitFileProposalOperation.PREFIX) || client.supportsFileProposals(project)) &&
             (executor.operation.trim() != RepositoryFileProposal.READ_CONTEXT_OPERATION || client.supportsFileProposalContext(project)) &&
-            (executor.operation.trim() != RepositoryFileProposal.DISCOVER_OPERATION || client.supportsFileDiscovery(project))
+            (executor.operation.trim() != RepositoryFileProposal.DISCOVER_OPERATION || client.supportsFileDiscovery(project)) &&
+            (executor.operation.trim() != RepositoryFileProposal.DISCOVER_READ_OPERATION ||
+                (client.supportsFileDiscovery(project) && client.supportsFileProposalContext(project)))
 
     override suspend fun dispatch(context: TaskExecutorContext): TaskExecutorExecution {
         val executor = context.executor as TaskExecutor.RepositoryOperation
@@ -50,6 +55,14 @@ class RepositoryOperationExecutorIntegration(
             val result = if (executor.operation.trim() == RepositoryFileProposal.DISCOVER_OPERATION) {
                 require(client.supportsFileDiscovery(context.project)) { "Host file discovery is unavailable for this repository" }
                 client.discoverFiles(context.project, context.task.objective)
+            } else if (executor.operation.trim() == RepositoryFileProposal.DISCOVER_READ_OPERATION) {
+                require(client.supportsFileDiscovery(context.project) && client.supportsFileProposalContext(context.project)) {
+                    "Host discovered snapshots are unavailable for this repository"
+                }
+                require(context.task.resources.none { it is com.hereliesaz.geministrator.domain.TaskResource.RepositoryFiles }) {
+                    "Discovered snapshots cannot replace an explicit file selection"
+                }
+                client.readDiscoveredFiles(context.project, context.task.objective)
             } else if (executor.operation.trim() == RepositoryFileProposal.READ_CONTEXT_OPERATION) {
                 require(client.supportsFileProposalContext(context.project)) { "Host file snapshots are unavailable for this repository" }
                 val paths = context.task.resources.filterIsInstance<com.hereliesaz.geministrator.domain.TaskResource.RepositoryFiles>()

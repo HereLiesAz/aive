@@ -109,6 +109,49 @@ class RemoteRepositoryOperationClientsTest {
     }
 
     @Test
+    fun discoveredReadUsesOneCommittedTreeAndOnlyRelevantBoundedTextBlobs() = runBlocking {
+        val base = "a".repeat(40)
+        val tree = "b".repeat(40)
+        val readme = "c".repeat(40)
+        val login = "d".repeat(40)
+        val skipped = "e".repeat(40)
+        val blobs = mutableListOf<String>()
+        var refs = 0
+        val engine = MockEngine { request ->
+            assertEquals(HttpMethod.Get, request.method)
+            val path = request.url.encodedPath
+            when {
+                path.endsWith("/git/ref/heads/main") -> {
+                    refs++
+                    respondJson("""{"object":{"sha":"$base"}}""")
+                }
+                path.endsWith("/git/commits/$base") -> respondJson("""{"tree":{"sha":"$tree"}}""")
+                path.endsWith("/git/trees/$tree") -> respondJson("""{"truncated":false,"tree":[
+                    {"path":"README.md","mode":"100644","type":"blob","sha":"$readme","size":7},
+                    {"path":"src/login.kt","mode":"100644","type":"blob","sha":"$login","size":5},
+                    {"path":"src/login-large.kt","mode":"100644","type":"blob","sha":"$skipped","size":120001},
+                    {"path":"login.bin","mode":"100644","type":"blob","sha":"$skipped","size":5},
+                    {"path":"vendor/login.kt","mode":"100644","type":"blob","sha":"$skipped","size":5},
+                    {"path":"other.kt","mode":"100644","type":"blob","sha":"$skipped","size":5}
+                ]}""")
+                path.endsWith("/git/blobs/$readme") -> { blobs += readme; respondJson("read me") }
+                path.endsWith("/git/blobs/$login") -> { blobs += login; respondJson("login") }
+                "/git/" in path -> error("Unexpected discovered read: $path")
+                else -> respondJson("""{"default_branch":"main","html_url":"https://github.com/HereLiesAz/aive"}""")
+            }
+        }
+        val client = GitHubRestRepositoryOperationClient(RepositoryServiceTokenProvider { "github-token" }, trackedClient(engine))
+        val result = client.readDiscoveredFiles(githubProject(), "login")
+        assertEquals(1, refs)
+        assertEquals(listOf(readme, login), blobs)
+        assertEquals(RepositoryFileProposal(base, listOf(
+            RepositoryProposedFile("README.md", readme, "read me"),
+            RepositoryProposedFile("src/login.kt", login, "login"),
+        )), RepositoryFileProposal.parse(result.artifacts.single().textContent!!))
+        assertTrue(!TaskExecutor.RepositoryOperation(RepositoryFileProposal.DISCOVER_READ_OPERATION).isMutation())
+    }
+
+    @Test
     fun hostCommitCreatesTreeCommitAndNewRefWithoutUpdatingTheBase() = runBlocking {
         val base = "a".repeat(40)
         val oldTree = "b".repeat(40)
