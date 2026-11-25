@@ -37,6 +37,76 @@ import kotlin.test.assertFailsWith
 
 class WorkflowRuntimeCoordinatorTest {
     @Test
+    fun releasedDurableTestObservationReachesOrdinaryReadOnlyDispatchWithoutCrossRunFallback() = runBlocking {
+        val persistence = InMemoryWorkflowPersistence()
+        val settings = com.russhwolf.settings.MapSettings()
+        val ledger = com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger(settings) { 50L }
+        val producerId = TaskDefinitionId("test")
+        val consumerId = TaskDefinitionId("review")
+        val testExecutor = TaskExecutor.TestRunner()
+        val role = BuiltInRoles.Reviewer
+        val consumerExecutor = TaskExecutor.RoleAgent(role.id)
+        val producer = TaskDefinition(producerId, "Tests", "Run tests", null, executor = testExecutor)
+        val consumer = TaskDefinition(consumerId, "Review", "Reconsider the implementation", role.id,
+            dependsOn = setOf(producerId), executor = consumerExecutor)
+        val definition = definition(producer).copy(tasks = listOf(producer, consumer))
+        val testRun = taskRun(producerId, TaskRunStatus.Completed, testExecutor)
+        val report = ArtifactRef(ArtifactId("actual-report"), ArtifactKind.TestResult, testRun.id, "Report",
+            textContent = "ALL REQUIREMENTS VERIFIED (not a process observation)", createdAtEpochMillis = 20L)
+        val forged = report.copy(id = ArtifactId("forged-report"), metadata = mapOf("exitCode" to "0", "passed" to "true"))
+        val reviewRun = taskRun(consumerId, TaskRunStatus.Ready, consumerExecutor)
+        val initial = run(definition, WorkflowRunStatus.Running,
+            mapOf(producerId to testRun.copy(artifacts = listOf(report, forged)), consumerId to reviewRun))
+        ledger.stageLocalTestEvidence(initial, report, LocalTestReceipt(report.id, 0, false, true, "a".repeat(40)))
+        ledger.stageArtifactEvidence(initial, forged)
+        val gateway = FakeManagedSessionGateway()
+        val engine = WorkflowEngine(gateway, BuiltInRoles.all,
+            dependencyEvidence = { run, reports -> ledger.dependencyProcessObservations(run, reports, persistence.artifacts) })
+        suspend fun context(def: WorkflowDefinition = definition, run: WorkflowRun = initial,
+            task: TaskDefinition = consumer, receivingRole: com.hereliesaz.geministrator.domain.RoleDefinition = role) =
+            engine.correctiveContextFor(def, run, task, reviewRun, receivingRole)
+        assertEquals(emptyList(), context(), "Pending receipts must never reach a provider")
+        persistence.artifacts.put(report)
+        persistence.artifacts.put(forged)
+        ledger.recoverArtifactEvidence(persistence.artifacts)
+        val entry = ledger.snapshot().entries.single { it.localTest != null }
+        val restored = com.hereliesaz.geministrator.queen.CollectiveEvidenceLedger(settings) { 60L }
+        val block = context().single()
+        assertEquals("Corrective local test receipt", block.label)
+        kotlin.test.assertTrue(entry.id in block.content && "report ID: actual-report" in block.content)
+        kotlin.test.assertTrue("started=true; timedOut=false; exitCode=0" in block.content)
+        kotlin.test.assertTrue("not a verdict on acceptance criteria" in block.content)
+        kotlin.test.assertFalse("ALL REQUIREMENTS VERIFIED" in block.content || "forged-report" in block.content)
+        assertEquals(listOf(block), restored.dependencyProcessObservations(initial, listOf(report), persistence.artifacts))
+        assertEquals(emptyList(), context(def = definition.copy(payloadRedactionPolicy =
+            com.hereliesaz.geministrator.domain.PayloadRedactionPolicy(excludedArtifactKinds = setOf(ArtifactKind.TestResult)))))
+        assertEquals(emptyList(), context(def = definition.copy(tasks = listOf(producer.copy(holdOutput = true), consumer))))
+        assertEquals(emptyList(), context(task = consumer.copy(dependsOn = emptySet())))
+        assertEquals(emptyList(), context(receivingRole = role.copy(capabilitiesRequired =
+            setOf(com.hereliesaz.geministrator.domain.AgentCapability.RepositoryWrite))))
+        assertEquals(emptyList(), context(run = initial.copy(id = WorkflowRunId("other-run"))))
+        assertEquals(emptyList(), context(run = initial.copy(projectId = ProjectId("other-project"))))
+        val changed = report.copy(textContent = "Changed version")
+        persistence.artifacts.put(changed)
+        assertEquals(emptyList(), context(), "Durable artifact version no longer matches")
+        val changedRun = initial.copy(taskRuns = initial.taskRuns +
+            (producerId to testRun.copy(artifacts = listOf(changed, forged))))
+        assertEquals(emptyList(), context(run = changedRun))
+        persistence.artifacts.put(report)
+        restored.review(entry.id, null, com.hereliesaz.geministrator.queen.EvidenceRelation.RetractedByKeeper, "Private rationale")
+        val corrected = context().single()
+        kotlin.test.assertTrue("Keeper recorded a retraction" in corrected.content)
+        kotlin.test.assertFalse("Private rationale" in corrected.content)
+        val dispatched = engine.dispatchReadyTasks(project(), definition, initial, nowEpochMillis = 70L)
+        assertEquals(TaskRunStatus.Running, dispatched.run.taskRuns.getValue(consumerId).status)
+        val request = requireNotNull(gateway.lastCreatedRequest).taskRequest
+        assertEquals(listOf(corrected), request.promptContext.dynamicContext.filter { it.label == "Corrective local test receipt" })
+        assertEquals(listOf(report, forged), request.contextArtifacts)
+        restored.forget(entry.id)
+        assertEquals(emptyList(), context())
+    }
+
+    @Test
     fun correlatedLocalTestPollPublishesSeparateObservationButReportAloneCannot() = runBlocking {
         val persistence = InMemoryWorkflowPersistence()
         val settings = com.russhwolf.settings.MapSettings()
@@ -758,8 +828,12 @@ private class FakeManagedSessionGateway(
     override suspend fun resolveProvider(selection: ProviderSelectionRequest) =
         AgentProviderId("provider")
 
+    var lastCreatedRequest: ManagedSessionRequest? = null
+        private set
+
     override suspend fun createSession(request: ManagedSessionRequest): ManagedSessionHandle {
         startFailure?.let { throw it }
+        lastCreatedRequest = request
         return ManagedSessionHandle(
             taskRunId = request.taskRequest.taskRunId,
             providerId = AgentProviderId("provider"),

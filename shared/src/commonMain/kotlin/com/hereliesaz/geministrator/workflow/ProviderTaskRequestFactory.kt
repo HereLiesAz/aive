@@ -52,6 +52,7 @@ internal fun buildProviderTaskRequest(
     orchestrationUtilities: LocalOrchestrationUtilityFamily =
         DeterministicLocalOrchestrationUtilities,
     resolvedSurfaces: List<AiveRoleSurfaceEnvelope> = emptyList(),
+    correctiveContext: List<PromptContextBlock> = emptyList(),
 ): AgentTaskRequest {
     val redaction = definition.payloadRedactionPolicy
     val objective = if (redaction.redactObjective) "[redacted]" else task.objective
@@ -136,6 +137,9 @@ internal fun buildProviderTaskRequest(
                     add(PromptContextBlock("Criteria to check", it.requirements, ContextProvenance.KeeperWritten))
                 }
                 addAll(utilityBlocks)
+                if (com.hereliesaz.geministrator.domain.ArtifactKind.TestResult !in redaction.excludedArtifactKinds) {
+                    addAll(correctiveContext)
+                }
             },
             reusePolicy = definition.promptReusePolicy,
             cacheNamespace = "${run.id.value}:${role.id.value}",
@@ -162,6 +166,7 @@ internal fun estimateTaskInputTokens(
     run: WorkflowRun,
     task: TaskDefinition,
     role: RoleDefinition,
+    correctiveContext: List<PromptContextBlock> = emptyList(),
 ): Int {
     val redaction = definition.payloadRedactionPolicy
     val artifactChars = definition.releasedDependencies(task)
@@ -172,7 +177,7 @@ internal fun estimateTaskInputTokens(
     val chars = task.objective.length +
         role.promptInstructions().length +
         task.acceptanceCriteria.sumOf { it.description.length } +
-        artifactChars
+        artifactChars + correctiveContext.sumOf { it.label.length + it.content.length }
     return OnDeviceTextAgentProvider.estimateTokens(chars)
 }
 

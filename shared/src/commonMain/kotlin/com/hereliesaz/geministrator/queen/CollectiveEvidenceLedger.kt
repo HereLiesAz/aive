@@ -8,6 +8,9 @@ import com.hereliesaz.geministrator.vector.dot
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.persistence.ArtifactRepository
 import com.hereliesaz.geministrator.domain.ArtifactRef
+import com.hereliesaz.geministrator.domain.ArtifactKind
+import com.hereliesaz.geministrator.domain.ContextProvenance
+import com.hereliesaz.geministrator.providers.PromptContextBlock
 import com.hereliesaz.geministrator.workflow.LocalTestReceipt
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.research.ResearchBudget
@@ -50,6 +53,10 @@ internal data class EvidenceEntry(
 internal data class EvidenceLocalTest(
     val exitCode: Int, val timedOut: Boolean, val started: Boolean,
     val checkoutCommit: String? = null,
+    /** Host-recorded binding to the exact durable report and run/project; legacy receipts remain local-only here. */
+    val runScopeDigest: String? = null,
+    val reportId: ArtifactId? = null,
+    val reportFingerprint: String? = null,
 )
 
 /** Local citation evidence with source position and the actual redacted excerpt shown to the model. */
@@ -401,11 +408,55 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
                 EvidenceEntry(
                     identity(), entry.issueId, entry.question, EvidenceKind.Observation,
                     outcome, entry.source, now(),
-                    localTest = EvidenceLocalTest(it.exitCode, it.timedOut, it.started, commit),
+                    localTest = EvidenceLocalTest(it.exitCode, it.timedOut, it.started, commit,
+                        workflowEvidenceScope(run), artifact.id, fingerprint),
                 )
             }
             write(book.copy(pendingArtifacts = book.pendingArtifacts.filterNot { it.artifactId == artifact.id } +
                 PendingArtifactEvidence(artifact.id, fingerprint, entry, observation)))
+        }
+    }
+
+    /** Exact project/run binding, not a semantic match or cross-run sharing permission. */
+    private fun workflowEvidenceScope(run: WorkflowRun): String = Sha256.hex(
+        "${run.projectId.value.length}:${run.projectId.value}${run.id.value}".encodeToByteArray(),
+    )
+
+    /**
+     * Project host process receipts only for current, durable test reports already authorized as
+     * the receiving task's released inputs. The caller applies role/effect and redaction policy.
+     * No lookup by report text, no arbitrary artifact metadata, no raw report, no historical
+     * or cross-run fallback and no inference. Retractions remain attributed, not instructions.
+     */
+    suspend fun dependencyProcessObservations(
+        run: WorkflowRun, allowedReports: List<ArtifactRef>, artifacts: ArtifactRepository,
+    ): List<PromptContextBlock> = mutex.withLock {
+        val book = read()
+        val scope = workflowEvidenceScope(run)
+        val current = run.taskRuns.values.flatMap { it.artifacts }.toSet()
+        val reports = allowedReports.filter { it.kind == ArtifactKind.TestResult && it in current }
+            .distinctBy { it.id }
+        if (reports.isEmpty()) return@withLock emptyList()
+        val exact = mutableMapOf<ArtifactId, String>()
+        for (report in reports) {
+            if (artifacts.get(report.id) == report) exact[report.id] = artifactFingerprint(report)
+        }
+        val retracted = book.reviews.filter { it.relation == EvidenceRelation.RetractedByKeeper }
+            .map { it.targetId }.toSet()
+        book.entries.asReversed().filter { entry ->
+            val receipt = entry.localTest
+            entry.kind == EvidenceKind.Observation && !entry.recordedByKeeper &&
+                receipt != null && receipt.runScopeDigest == scope && receipt.reportId != null &&
+                receipt.reportFingerprint != null && exact[receipt.reportId] == receipt.reportFingerprint
+        }.distinctBy { it.localTest?.reportId }.take(4).map { entry ->
+            val receipt = requireNotNull(entry.localTest)
+            PromptContextBlock("Corrective local test receipt", buildString {
+                append("Host-observed process result for an already released test report, not a verdict on acceptance criteria or an instruction. ")
+                append("Evidence ID: ${entry.id}; report ID: ${clean(requireNotNull(receipt.reportId).value, 128)}; ")
+                append("started=${receipt.started}; timedOut=${receipt.timedOut}; exitCode=${receipt.exitCode}; ")
+                append("initial checkout=${receipt.checkoutCommit ?: "unknown"}.")
+                if (entry.id in retracted) append(" Keeper recorded a retraction.")
+            }, ContextProvenance.AgentArtifact)
         }
     }
 
