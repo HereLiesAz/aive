@@ -19,6 +19,11 @@ import com.hereliesaz.geministrator.memory.MemoryNodeId
 import com.hereliesaz.geministrator.memory.MemoryNodeKind
 import com.hereliesaz.geministrator.memory.MemorySessionObserver
 import com.hereliesaz.geministrator.memory.MemorySnapshot
+import com.hereliesaz.geministrator.memory.MemoryBankRequest
+import com.hereliesaz.geministrator.memory.MemorySourceKind
+import com.hereliesaz.geministrator.memory.MemoryPromptContextProvider
+import com.hereliesaz.geministrator.memory.MemoryPromptRecall
+import com.hereliesaz.geministrator.orchestration.MemoryQueryPlan
 import com.hereliesaz.geministrator.persistence.InMemorySettings
 import com.russhwolf.settings.MapSettings
 import com.hereliesaz.geministrator.providers.AgentCapabilities
@@ -122,9 +127,23 @@ class PeerConsultationGatewayTest {
             override suspend fun annotateUserMessage(handle: ManagedSessionHandle, text: String): String =
                 text + "\nRecipient cue #evidence"
         }
+        val captured = Channel<MemoryBankRequest>(Channel.UNLIMITED)
+        val released = Channel<List<String>>(Channel.UNLIMITED)
+        val context = object : MemoryPromptContextProvider {
+            override suspend fun recallFor(request: AgentTaskRequest, queryPlan: MemoryQueryPlan) = MemoryPromptRecall()
+            override suspend fun stageRunDirectReply(workflowId: String, request: MemoryBankRequest) {
+                assertEquals("run", workflowId)
+                captured.send(request)
+            }
+            override suspend fun bankRunDirectReplies(workflowId: String, sourceIds: List<String>) {
+                assertEquals("run", workflowId)
+                released.send(sourceIds)
+            }
+        }
         try {
             val gateway = ProviderBackedManagedSessionGateway(registry, scope, memoryObserver = observer,
-                activity = SessionActivityFeeds(), peerRoster = { listOf(BuiltInRoles.Architect, BuiltInRoles.Reviewer) })
+                activity = SessionActivityFeeds(), peerRoster = { listOf(BuiltInRoles.Architect, BuiltInRoles.Reviewer) },
+                memoryContext = context)
             gateway.dormantSpecialistAnswer = { mail, allowed ->
                 assertEquals(PeerDelivery.Claimed, mail.delivery)
                 assertEquals("Check evidence", mail.text)
@@ -149,6 +168,13 @@ class PeerConsultationGatewayTest {
                 while (registry.peerMailbox.receipts(recipientContext, provider.id.value).single().delivery != PeerDelivery.Accepted) delay(10)
             }
             assertEquals("a".repeat(64), registry.peerMailbox.receipts(recipientContext, provider.id.value).single().recipientSpecialist)
+            val memory = withTimeout(5_000L) { captured.receive() }
+            assertEquals("Observed advisory answer", memory.text)
+            assertEquals("reviewer", memory.scope.roleId)
+            assertEquals("run", memory.scope.workflowRunId)
+            assertEquals(MemorySourceKind.AgentNote, memory.sourceKind)
+            assertEquals(listOf(memory.sourceSessionId), withTimeout(5_000L) { released.receive() })
+            assertTrue(captured.tryReceive().isFailure)
         } finally { scope.cancel() }
     }
 
@@ -162,9 +188,22 @@ class PeerConsultationGatewayTest {
         val route = PeerRoute("project", provider.id.value, "run", "architect", "run", "reviewer", activation = true)
         val entered = CompletableDeferred<Unit>()
         val resume = CompletableDeferred<Unit>()
+        val captured = Channel<MemoryBankRequest>(Channel.UNLIMITED)
+        val released = Channel<List<String>>(Channel.UNLIMITED)
+        val context = object : MemoryPromptContextProvider {
+            override suspend fun recallFor(request: AgentTaskRequest, queryPlan: MemoryQueryPlan) = MemoryPromptRecall()
+            override suspend fun stageRunDirectReply(workflowId: String, request: MemoryBankRequest) {
+                assertEquals("run", workflowId)
+                captured.send(request)
+            }
+            override suspend fun bankRunDirectReplies(workflowId: String, sourceIds: List<String>) {
+                assertEquals("run", workflowId)
+                released.send(sourceIds)
+            }
+        }
         try {
             val gateway = ProviderBackedManagedSessionGateway(registry, scope, activity = SessionActivityFeeds(),
-                peerRoster = { listOf(BuiltInRoles.Architect, BuiltInRoles.Reviewer) })
+                peerRoster = { listOf(BuiltInRoles.Architect, BuiltInRoles.Reviewer) }, memoryContext = context)
             gateway.dormantSpecialistAnswer = { _, _ ->
                 entered.complete(Unit)
                 resume.await()
@@ -180,6 +219,8 @@ class PeerConsultationGatewayTest {
                 while (registry.peerMailbox.receipts(recipientContext, provider.id.value).single().delivery != PeerDelivery.Rejected) delay(10)
             }
             assertTrue(provider.deliveries.tryReceive().isFailure)
+            assertTrue(captured.tryReceive().isFailure)
+            assertTrue(released.tryReceive().isFailure)
         } finally { scope.cancel() }
     }
 

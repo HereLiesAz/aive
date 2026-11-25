@@ -17,6 +17,11 @@ import com.hereliesaz.geministrator.inference.InferenceTerminalStatus
 import com.hereliesaz.geministrator.memory.MemoryRuntimeBridge
 import com.hereliesaz.geministrator.memory.MEMORY_MESSAGE_MARKER
 import com.hereliesaz.geministrator.memory.MemorySessionObserver
+import com.hereliesaz.geministrator.memory.MemoryBankRequest
+import com.hereliesaz.geministrator.memory.MemoryBankScope
+import com.hereliesaz.geministrator.memory.MemorySourceKind
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import com.hereliesaz.geministrator.orchestration.ContextEvidence
 import com.hereliesaz.geministrator.orchestration.ContextPackingInput
 import com.hereliesaz.geministrator.orchestration.DeterministicLocalOrchestrationUtilities
@@ -1030,6 +1035,7 @@ class ProviderBackedManagedSessionGateway(
      * One non-recursive, cancellable advisory activation across this gateway. The worker belongs
      * to the actual requesting session; a busy gateway refuses rather than queues new inference.
      */
+    @OptIn(ExperimentalTime::class)
     private suspend fun scheduleDormantActivation(sender: ManagedSessionHandle, origin: PeerConsultationContext,
         note: PeerConsultationNote) {
         val answer = dormantSpecialistAnswer ?: return
@@ -1077,14 +1083,40 @@ class ProviderBackedManagedSessionGateway(
                                 ProviderActionResult.Accepted -> PeerDelivery.Accepted
                                 is ProviderActionResult.Rejected -> PeerDelivery.Rejected
                             }
+                            // Only the accepted advisory, never the augmented transport or
+                            // an answer from a revoked activation, becomes shared run experience.
+                            if (outcome == PeerDelivery.Accepted) withContext(NonCancellable) {
+                                recordMemory {
+                                    if (allowed()) {
+                                        val text = com.hereliesaz.geministrator.control.ControlRedaction.scrub(reply.text).trim().take(1200)
+                                        if (text.isNotBlank()) {
+                                            val id = "direct-reply:wake:${claim.id}"
+                                            val now = Clock.System.now().toEpochMilliseconds()
+                                            try {
+                                                memoryContext.stageRunDirectReply(origin.runId, MemoryBankRequest(
+                                                    sourceSessionId = id,
+                                                    text = text,
+                                                    label = "Dormant specialist advisory (unverified); role=${note.roleId}; instance=${reply.specialistId}; Source=${sender.providerId.value}",
+                                                    sourceKind = MemorySourceKind.AgentNote,
+                                                    scope = MemoryBankScope(workflowRunId = origin.runId, roleId = note.roleId),
+                                                    bankedAtEpochMillis = now,
+                                                    occurredAtEpochMillis = now,
+                                                ))
+                                            } finally {
+                                                memoryContext.bankRunDirectReplies(origin.runId, listOf(id))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     } catch (_: TimeoutCancellationException) {
-                        outcome = PeerDelivery.Uncertain
+                        if (outcome != PeerDelivery.Accepted) outcome = PeerDelivery.Uncertain
                     } catch (cancelled: CancellationException) {
-                        outcome = PeerDelivery.Uncertain
+                        if (outcome != PeerDelivery.Accepted) outcome = PeerDelivery.Uncertain
                         throw cancelled
                     } catch (_: Exception) {
-                        outcome = PeerDelivery.Uncertain
+                        if (outcome != PeerDelivery.Accepted) outcome = PeerDelivery.Uncertain
                     } finally {
                         withContext(NonCancellable) {
                             mailbox.finish(claim, outcome, specialist)
