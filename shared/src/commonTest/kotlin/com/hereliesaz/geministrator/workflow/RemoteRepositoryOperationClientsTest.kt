@@ -242,7 +242,7 @@ class RemoteRepositoryOperationClientsTest {
     fun gitLabSnapshotFindsTargetOnLaterPageAndFailsClosedWhenNextPageFails() = runBlocking {
         val base = "a".repeat(40)
         val blob = "b".repeat(40)
-        val pages = mutableListOf<String?>()
+        val pages = mutableListOf<String>()
         var failSecondPage = false
         val engine = MockEngine { request ->
             assertEquals(HttpMethod.Get, request.method)
@@ -250,7 +250,7 @@ class RemoteRepositoryOperationClientsTest {
                 request.url.encodedPath.contains("/repository/branches/") ->
                     respondJson("""{"name":"main","commit":{"id":"$base"}}""")
                 request.url.encodedPath.endsWith("/repository/tree") -> {
-                    val page = request.url.parameters["page"]
+                    val page = requireNotNull(request.url.parameters["page"])
                     pages += page
                     when (page) {
                         "1" -> respondJson((0 until 100).joinToString(",", "[", "]") {
