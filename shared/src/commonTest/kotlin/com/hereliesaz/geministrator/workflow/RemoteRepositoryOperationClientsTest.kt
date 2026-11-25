@@ -211,6 +211,81 @@ class RemoteRepositoryOperationClientsTest {
     }
 
     @Test
+    fun gitLabDiscoveryAndDiscoveredSnapshotUseCommittedTreeAndMetadataBounds() = runBlocking {
+        val base = "a".repeat(40)
+        val tree = "b".repeat(40)
+        val blob = "c".repeat(40)
+        val big = "d".repeat(40)
+        val metadataPaths = mutableListOf<String>()
+        val rawPaths = mutableListOf<String>()
+        var refs = 0
+        var wrongBlob = false
+        val engine = MockEngine { request ->
+            assertEquals("gitlab-token", request.headers["PRIVATE-TOKEN"])
+            val path = request.url.encodedPath
+            when {
+                path.endsWith("/repository/branches/main") -> {
+                    assertEquals(HttpMethod.Get, request.method)
+                    refs++
+                    respondJson("""{"name":"main","commit":{"id":"$base"}}""")
+                }
+                path.endsWith("/repository/tree") -> {
+                    assertEquals(HttpMethod.Get, request.method)
+                    assertEquals(base, request.url.parameters["ref"])
+                    when (request.url.parameters["path"].orEmpty()) {
+                        "" -> respondJson("""[{"path":"src","type":"tree","mode":"040000","id":"$tree"},
+                            {"path":"alias","type":"blob","mode":"120000","id":"$blob"},
+                            {"path":"README.md","type":"blob","mode":"100644","id":"$blob"}]""")
+                        "src" -> respondJson("""[{"path":"src/login.kt","type":"blob","mode":"100644","id":"$blob"},
+                            {"path":"src/login-big.kt","type":"blob","mode":"100644","id":"$big"},
+                            {"path":"src/login.bin","type":"blob","mode":"100644","id":"$blob"}]""")
+                        else -> error("Unexpected directory")
+                    }
+                }
+                request.method == HttpMethod.Head -> {
+                    assertEquals(base, request.url.parameters["ref"])
+                    metadataPaths += path
+                    val oversized = path.endsWith("login-big.kt")
+                    respond("", headers = headersOf(
+                        "X-Gitlab-Blob-Id" to listOf(if (wrongBlob) "e".repeat(40) else if (oversized) big else blob),
+                        "X-Gitlab-Size" to listOf(if (oversized) "120001" else "5"),
+                    ))
+                }
+                path.endsWith("/raw") -> {
+                    assertEquals(HttpMethod.Get, request.method)
+                    assertEquals(base, request.url.parameters["ref"])
+                    rawPaths += path
+                    check(path.contains("README.md") || path.contains("login.kt"))
+                    respondJson("hello")
+                }
+                else -> {
+                    assertEquals(HttpMethod.Get, request.method)
+                    respondJson("""{"default_branch":"main","web_url":"https://gitlab.com/team/app"}""")
+                }
+            }
+        }
+        val client = GitLabRestRepositoryOperationClient(RepositoryServiceTokenProvider { "gitlab-token" }, trackedClient(engine))
+        val manifest = client.discoverFiles(gitLabProject(), "login")
+        assertEquals(RepositoryDiscoveryManifest(base, listOf("README.md", "src/login-big.kt", "src/login.bin", "src/login.kt"), 4, false),
+            Json.decodeFromString<RepositoryDiscoveryManifest>(manifest.artifacts.single().textContent!!))
+        assertTrue(metadataPaths.isEmpty() && rawPaths.isEmpty())
+        val snapshot = client.readDiscoveredFiles(gitLabProject(), "login")
+        assertEquals(2, refs)
+        assertEquals(3, metadataPaths.size)
+        assertEquals(2, rawPaths.size)
+        assertEquals(RepositoryFileProposal(base, listOf(
+            RepositoryProposedFile("README.md", blob, "hello"),
+            RepositoryProposedFile("src/login.kt", blob, "hello"),
+        )), RepositoryFileProposal.parse(snapshot.artifacts.single().textContent!!))
+        assertEquals("true", snapshot.artifacts.single().metadata["partial"])
+        assertTrue(!client.supportsFileProposals(gitLabProject()))
+        wrongBlob = true
+        rawPaths.clear()
+        kotlin.test.assertFailsWith<IllegalArgumentException> { client.readDiscoveredFiles(gitLabProject(), "login") }
+        assertTrue(rawPaths.isEmpty())
+    }
+
+    @Test
     fun gitLabSnapshotPinsReadsToCommitAndCachesDirectoryListings() = runBlocking {
         val base = "a".repeat(40)
         val blob = "b".repeat(40)
