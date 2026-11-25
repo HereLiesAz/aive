@@ -33,11 +33,18 @@ internal class DirectChatMemory(
     private val workflowIds: List<String>,
     private val provider: MemoryPromptContextProvider = MemoryRuntimeBridge.promptContextProvider,
     /** Explicit host-owned destination for actual replies; null leaves ordinary direct calls cue-only. */
-    private val captureWorkflowId: String? = null,
+    captureWorkflowId: String? = null,
+    /** Host-owned standalone inference uses a source identity, not a separate recall corpus. */
+    captureStandalone: Boolean = false,
 ) {
     init {
         require(captureWorkflowId == null || workflowIds == listOf(captureWorkflowId))
+        require(!captureStandalone || captureWorkflowId == null)
     }
+
+    private val captureWorkflowId = captureWorkflowId ?: if (captureStandalone) {
+        "session:direct:" + (1..2).joinToString("") { Random.nextLong().toULong().toString(16).padStart(16, '0') }
+    } else null
 
     private val captureMutex = Mutex()
     private val captureTurn = Random.nextLong().toString()

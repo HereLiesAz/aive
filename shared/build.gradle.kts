@@ -87,6 +87,9 @@ kotlin {
             implementation(libs.sqldelight.async.extensions)
         }
 
+        // Both JVM targets use the same bounded archive reader; no platform-specific duplicate.
+        getByName("androidMain").kotlin.srcDir("src/jvmArchiveMain/kotlin")
+        getByName("desktopMain").kotlin.srcDir("src/jvmArchiveMain/kotlin")
         getByName("androidMain").dependencies {
             implementation(libs.androidx.activity.compose)
             implementation(libs.onnxruntime.android)

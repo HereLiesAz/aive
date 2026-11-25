@@ -43,6 +43,9 @@ interface ProjectFileService {
      */
     suspend fun saveSetupFileAs(fileName: String, content: String): ProjectFileDescriptor? = null
 
+    /** Local history picker, separate from project/setup recents. Null on cancellation or unsupported platform. */
+    suspend fun chooseChatArchive(): List<com.hereliesaz.geministrator.memory.ChatArchiveDocument>? = null
+
     /** Open picker for a setup file; also not remembered as a project file. */
     suspend fun chooseAndReadSetupFile(): ProjectFileReadResult? = null
 }

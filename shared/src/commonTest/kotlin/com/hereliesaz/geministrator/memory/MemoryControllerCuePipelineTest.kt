@@ -163,6 +163,36 @@ class MemoryControllerCuePipelineTest {
     }
 
     @Test
+    fun standalonePlanningRepliesJoinCollectiveMemoryWithoutAWorkflow() = runBlocking {
+        val settings = MapSettings()
+        val banks = MemoryBanks.inMemory()
+        val controller = MemoryLayerController(
+            banks = banks, settingsStore = MemoryLayerSettingsStore(settings),
+            engineProvider = object : MemoryEngineProvider {},
+            scope = CoroutineScope(Dispatchers.Unconfined), nowEpochMillis = { 1000L },
+        )
+        controller.updateSettings { it.copy(consolidationPaused = true) }
+        val memory = DirectChatMemory(emptyList(), controller.promptContextProvider, captureStandalone = true)
+        val packet = OrchestrationPacket("Host-only objective", availableAgents = emptyList(), instruction = "Plan")
+        val plan = OrchestrationPlan(emptyList(), blockers = listOf("Missing capacitor"))
+        memory.planner(object : OrchestrationAgentRuntime {
+            override suspend fun plan(packet: OrchestrationPacket) = plan
+            override suspend fun repair(packet: OrchestrationPacket) = plan
+        }, "planner").plan(packet)
+        memory.reviewer(PlanReviewer { PlanVerdict.Reject("No independent sample") }, "reviewer")
+            .review(PlanReviewRequest(packet, plan, "Reviewer", "Review.", null))
+        val id = banks.known().single()
+        assertTrue(id.startsWith("session:direct:"))
+        assertTrue(banks.store(id).read().episodes.isEmpty())
+        memory.flushReplies()
+        val notes = banks.store(id).read().episodes
+        assertEquals(setOf("planner", "reviewer"), notes.mapNotNull { it.roleId }.toSet())
+        assertTrue(notes.any { "Missing capacitor" in it.chunks.single().text })
+        assertTrue(notes.any { "No independent sample" in it.chunks.single().text })
+        assertTrue(notes.none { "Host-only objective" in it.chunks.single().text })
+    }
+
+    @Test
     fun directReplyCaptureRespectsDisabledMemoryAndClearBeforeRelease() = runBlocking {
         val run = "direct-run"
         val store = InMemoryMemoryStore()
@@ -627,7 +657,7 @@ class MemoryControllerCuePipelineTest {
     }
 
     @Test
-    fun transactiveDirectoryUsesOnlyRetainedAttributedAuthorizedEpisodes() = runBlocking {
+    fun transactiveDirectoryUsesAllRetainedAttributedCollectiveEpisodes() = runBlocking {
         val settings = MapSettings()
         val history = com.hereliesaz.geministrator.queen.CollectiveConversationStore(settings) { 100L }
         val source = history.create().id
@@ -656,25 +686,21 @@ class MemoryControllerCuePipelineTest {
         capture(privateBank, privateId)
         controller.drain()
         val provider = controller.promptContextProvider
-        suspend fun lookup() = provider.collectiveExpertise(history.recallBanks(destination), "Check keystore")
-        assertTrue(lookup().isEmpty())
-        assertTrue(history.setRecallGrant(source, destination, true))
-        assertEquals(listOf(CollectiveExpertiseMatch("reviewer", id, 1)), lookup())
-        assertTrue(history.setRecallGrant(source, destination, false))
-        assertTrue(lookup().isEmpty())
-        assertTrue(history.setRecallGrant(source, destination, true))
+        suspend fun lookup() = provider.collectiveExpertise(listOf(destination), "Check keystore")
+        assertEquals(setOf(CollectiveExpertiseMatch("reviewer", id, 1),
+            CollectiveExpertiseMatch("reviewer", privateId, 1)), lookup().toSet())
         controller.updateSettings { it.copy(enabled = false) }
         assertTrue(lookup().isEmpty())
         controller.updateSettings { it.copy(enabled = true) }
         controller.selectBank(source)
         val reply = bank.read().episodes.single { it.roleId == "reviewer" }
         controller.forgetEpisode(reply.id)
-        assertTrue(lookup().isEmpty())
+        assertEquals(listOf(CollectiveExpertiseMatch("reviewer", privateId, 1)), lookup())
         assertTrue(other.read().episodes.any { it.roleId == "reviewer" })
     }
 
     @Test
-    fun conversationGrantsDoNotDetermineCollectiveCueEligibility() = runBlocking {
+    fun unrelatedConversationsParticipateInCollectiveCueEligibility() = runBlocking {
         val settings = MapSettings()
         val history = com.hereliesaz.geministrator.queen.CollectiveConversationStore(settings) { 100L }
         val source = history.create().id
@@ -695,19 +721,13 @@ class MemoryControllerCuePipelineTest {
         controller.setDefaultAttentionLevel(1f)
         val prompts = mutableListOf<String>()
         suspend fun ask(question: String) {
-            val memory = DirectChatMemory(history.recallBanks(destination), controller.promptContextProvider)
+            val memory = DirectChatMemory(listOf(destination), controller.promptContextProvider)
             memory.voice(QueenModel { prompts += it; "Reply" }, "reviewer").answer(question)
         }
         ask("Check keystore")
         assertTrue("#keystore" in prompts.last() && "CI secrets" !in prompts.last())
         ask("Check turnip orchard")
         assertTrue("#turnip" in prompts.last() && "#keystore" !in prompts.last())
-        assertTrue(history.setRecallGrant(source, destination, true))
-        ask("Check keystore")
-        assertTrue("#keystore" in prompts.last())
-        assertTrue(history.setRecallGrant(source, destination, false))
-        ask("Check keystore")
-        assertTrue("#keystore" in prompts.last())
         controller.updateSettings { it.copy(enabled = false) }
         ask("Check keystore")
         assertEquals("Check keystore", prompts.last())

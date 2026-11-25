@@ -92,7 +92,7 @@ fun interface MemoryPromptContextProvider {
     suspend fun importCollectiveHistory(conversationId: String, requests: List<MemoryBankRequest>): Int? = null
 
     /**
-     * Discover prior contributors from the exact caller-authorized collective banks. No raw memory
+     * Discover prior contributors from retained collective conversation provenance. No raw memory
      * or new permissions are returned; implementations must honor disabled memory and forgetting.
      */
     suspend fun collectiveExpertise(workflowIds: List<String>, question: String): List<CollectiveExpertiseMatch> = emptyList()
