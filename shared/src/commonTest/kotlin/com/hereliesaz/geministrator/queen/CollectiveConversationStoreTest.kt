@@ -10,6 +10,26 @@ import kotlin.test.assertTrue
 
 class CollectiveConversationStoreTest {
     @Test
+    fun automaticEvidencePermissionIsPerConversationPersistentAndRevocable() = runTest {
+        val settings = MapSettings()
+        val store = CollectiveConversationStore(settings) { 100L }
+        val a = store.create()
+        val b = store.create()
+        assertFalse(a.automaticEvidence)
+        assertFalse(b.automaticEvidence)
+        assertTrue(requireNotNull(store.setAutomaticEvidence(a.id, true)).automaticEvidence)
+        store.append(a.id, "Question", CollectiveAnswer("Answer", emptyList(), emptyList()))
+        val restored = CollectiveConversationStore(settings) { 200L }
+        assertTrue(requireNotNull(restored.get(a.id)).automaticEvidence)
+        assertFalse(requireNotNull(restored.get(b.id)).automaticEvidence)
+        assertFalse(requireNotNull(restored.setAutomaticEvidence(a.id, false)).automaticEvidence)
+        assertFalse(requireNotNull(store.get(a.id)).automaticEvidence)
+        restored.delete(a.id)
+        assertNull(store.setAutomaticEvidence(a.id, true))
+        assertNull(store.get(a.id))
+    }
+
+    @Test
     fun allAdaptiveExaminationsSurviveRestartAndHistoryImport() = runTest {
         val settings = MapSettings()
         val store = CollectiveConversationStore(settings) { 100L }

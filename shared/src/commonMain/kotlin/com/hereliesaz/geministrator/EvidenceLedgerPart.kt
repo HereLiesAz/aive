@@ -39,11 +39,26 @@ internal fun EvidenceLedgerPart(ledger: CollectiveEvidenceLedger, parentBusy: Bo
         }
     })
     if (!open) return
-    Text("Original statements and Keeper assessments remain visible. Agreement does not establish a fact.",
+    Text("Original statements and Keeper assessments remain visible. Agreement does not establish a fact. Linking a typed result or research excerpt to a conversation opinion, or recording a Keeper observation or source claim against its issue, shares bounded evidence with its next participants.",
         style = AzphaltType.body, color = azphaltOnSurface())
     AzphaltPill("Refresh evidence", "evidence-refresh", onClick = { act {} })
     val target = book.entries.singleOrNull { it.id == selected }
     val counterpart = book.entries.singleOrNull { it.id == related }
+    val candidates = remember(book, selected) { selected?.let(book::reconsiderationCandidates).orEmpty() }
+    if (candidates.isNotEmpty()) {
+        Text("Possible connections, ranked by topic only. Linking exposes bounded evidence to this issue's participants on the next conversation turn; it asserts neither support nor contradiction.",
+            style = AzphaltType.body, color = azphaltOnSurface())
+        candidates.forEach { entry ->
+            Text("${entry.kind.name}: ${entry.question}\n${entry.text.take(400)}",
+                style = AzphaltType.body, color = azphaltOnSurface())
+            AzphaltPill("Link for reconsideration", "evidence-reconsider-${entry.id}", onClick = {
+                if (target != null) act {
+                    ledger.review(target.id, entry.id, EvidenceRelation.Relevant,
+                        "Keeper associated evidence for reconsideration.")
+                }
+            })
+        }
+    }
     var filter by remember { mutableStateOf("") }
     AzphaltTextField(value = filter, onValueChange = { filter = it }, label = "Find evidence")
     LaunchedEffect(parentBusy, open) {

@@ -40,7 +40,7 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
         catch (_: Exception) { status = "Conversation history unavailable." }
     }
     ProviderSectionLabel("Ask The Aive")
-    Text("Advisory conversation only. Specialists are selected by relevance and configured model availability. Typed local test observations explicitly linked to a conversation are included in its next model calls; raw test output is not sent. Completed turns are saved locally. Each actual reply is banked separately when memory is enabled; all collective memory participates in associative recall. Deleting chat history does not erase the memories derived from it.",
+    Text("Advisory conversation only. Specialists are selected by relevance and configured model availability. Evidence associated with this conversation, including local process results, Keeper reports and research excerpts, is included in its next model calls; raw test output is not sent. Completed turns are saved locally. Each actual reply is banked separately when memory is enabled; all collective memory participates in associative recall. Deleting chat history does not erase the memories derived from it.",
         style = AzphaltType.body, color = azphaltOnSurface())
     conversations.forEach { conversation ->
         val title = conversation.turns.firstOrNull()?.question?.take(45) ?: "Empty conversation"
@@ -50,6 +50,26 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
             })
     }
     val destination = conversations.singleOrNull { it.id == selected }
+    val autoEvidence = host.collectiveAutomaticEvidence
+    if (destination != null && autoEvidence != null) {
+        Text("Automatic evidence delivery searches the shared local ledger for new topic matches to earlier questions and sends bounded evidence to configured models on the next turn. Other issues may be included; topic similarity is not proof of relevance. Disable to stop automatic delivery.",
+            style = AzphaltType.body, color = azphaltOnSurface())
+        AzphaltPill(if (destination.automaticEvidence) "Automatic evidence: on" else "Automatic evidence: off",
+            "collective-auto-evidence", onClick = {
+                if (!busy) {
+                    busy = true
+                    scope.launch {
+                        try {
+                            checkNotNull(autoEvidence(destination.id, !destination.automaticEvidence))
+                            refresh(destination.id)
+                            status = ""
+                        } catch (cancelled: CancellationException) { throw cancelled }
+                        catch (_: Exception) { status = "Evidence delivery preference could not be saved." }
+                        finally { busy = false }
+                    }
+                }
+            })
+    }
     destination?.turns.orEmpty().forEach { turn ->
         val result = turn.result
         Text("You: ${turn.question}", style = AzphaltType.body, color = azphaltOnSurface())
@@ -70,8 +90,11 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
         if (result.reviewRequested && result.assessments.none { it.crossExamination }) {
             Text("Further conversation requested but not obtained.", style = AzphaltType.body, color = azphaltOnSurface())
         }
+        if (result.automaticEvidenceIds.isNotEmpty()) Text(
+            "Automatically selected evidence: " + result.automaticEvidenceIds.joinToString(),
+            style = AzphaltType.body, color = azphaltOnSurface())
         if (result.observationRecipientsMissing.isNotEmpty()) Text(
-            "Previously involved participants without a returned observation-bearing reply: " +
+            "Previously involved participants without a returned evidence-bearing reply: " +
                 result.observationRecipientsMissing.joinToString { it.take(12) },
             style = AzphaltType.body, color = azphaltOnSurface())
         if (result.unexaminedRequests.isNotEmpty()) Text(
@@ -85,7 +108,7 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
                 val persuasion = assessment.persuadedBy?.let { " (reports persuaded by #$it)" }.orEmpty()
                 Text("#${index + 1} ${assessment.role}$target$persuasion: ${assessment.text}", style = AzphaltType.body, color = azphaltOnSurface())
                 if (assessment.observationIds.isNotEmpty()) Text(
-                    "Prompt observations: " + assessment.observationIds.joinToString(),
+                    "Prompt evidence: " + assessment.observationIds.joinToString(),
                     style = AzphaltType.body, color = azphaltOnSurface())
                 if (inspect) Text("Configured Source: ${assessment.sourceId ?: "unknown"} / model: ${assessment.modelId ?: "unknown"}; instance ${assessment.specialistId?.take(12) ?: "legacy"}",
                     style = AzphaltType.body, color = azphaltOnSurface())

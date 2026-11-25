@@ -24,6 +24,8 @@ internal data class CollectiveConversation(
     val turns: List<CollectiveTurn> = emptyList(),
     /** Legacy serialized field only; ignored by recall and cleared on the next write. */
     val recallSourceIds: List<String> = emptyList(),
+    /** Explicit Keeper permission to include locally discovered evidence in subsequent turns. */
+    val automaticEvidence: Boolean = false,
 ) {
     /**
      * Keep recent dialogue and a separately bounded sample of each specialist's latest actual
@@ -143,6 +145,15 @@ internal class CollectiveConversationStore(settings: Settings, private val now: 
         ))
         val updated = old.copy(turns = (old.turns + turn).takeLast(MAX_TURNS))
         write(Book(listOf(updated) + book.conversations.filterNot { it.id == id }))
+        updated
+    }
+
+    /** Change only an existing conversation's delivery permission; never resurrect a deleted one. */
+    suspend fun setAutomaticEvidence(id: String, enabled: Boolean): CollectiveConversation? = mutex.withLock {
+        val book = read()
+        val current = book.conversations.singleOrNull { it.id == id } ?: return@withLock null
+        val updated = current.copy(automaticEvidence = enabled)
+        write(Book(book.conversations.map { if (it.id == id) updated else it }))
         updated
     }
 

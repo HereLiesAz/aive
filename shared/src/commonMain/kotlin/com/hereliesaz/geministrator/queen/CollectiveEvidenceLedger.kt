@@ -2,6 +2,9 @@ package com.hereliesaz.geministrator.queen
 
 import com.hereliesaz.geministrator.Sha256
 import com.hereliesaz.geministrator.control.ControlRedaction
+import com.hereliesaz.geministrator.orchestration.bySimilarityTo
+import com.hereliesaz.geministrator.vector.BuiltInTextEmbedder
+import com.hereliesaz.geministrator.vector.dot
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.persistence.ArtifactRepository
 import com.hereliesaz.geministrator.domain.ArtifactRef
@@ -36,6 +39,10 @@ internal data class EvidenceEntry(
     val researchCitation: EvidenceResearchCitation? = null,
     /** Only the actual local executor result can populate this observation. */
     val localTest: EvidenceLocalTest? = null,
+    /** Evidence IDs included in the prompt of this actual returned advisory contribution. */
+    val promptEvidenceIds: List<String> = emptyList(),
+    /** Latest retraction IDs present when the actual reply was obtained, if any. */
+    val promptEvidenceRetractions: Map<String, String> = emptyMap(),
 )
 
 /** Process result independent of report content, not an acceptance-criteria verdict. */
@@ -54,7 +61,7 @@ internal data class EvidenceResearchCitation(
 
 /** A separate Keeper-recorded assessment; neither support nor verification rewrites the original. */
 @Serializable
-internal enum class EvidenceRelation { Supports, Contradicts, VerifiedByKeeper, RetractedByKeeper }
+internal enum class EvidenceRelation { Supports, Contradicts, VerifiedByKeeper, RetractedByKeeper, Relevant }
 
 @Serializable
 internal data class EvidenceReview(
@@ -63,14 +70,19 @@ internal data class EvidenceReview(
 )
 
 /**
- * Bounded host-observed process results explicitly associated with a prior conversation.
- * The association is a routing hint, not a truth verdict. No raw test output or command is included.
+ * Bounded evidence references explicitly associated with a prior conversation: host process
+ * observations, Keeper-reported observations/claims, and typed research excerpts.
+ * Association is a routing hint, not a truth verdict. No raw test output or command is included.
  * Participant IDs refer to previously recorded contributors, not inferred competence.
  */
 internal data class LinkedConversationObservations(
     val text: String = "",
     val participantIds: Set<String> = emptySet(),
     val evidenceIds: List<String> = emptyList(),
+    /** Locally discovered matches, distinct from Keeper-established associations. */
+    val automaticEvidenceIds: List<String> = emptyList(),
+    /** Latest retraction IDs included in the projected evidence. */
+    val retractionIds: Map<String, String> = emptyMap(),
 )
 
 /** A redacted projection awaiting confirmation of the exact durable artifact version. */
@@ -85,7 +97,40 @@ internal data class EvidenceBook(
     val entries: List<EvidenceEntry> = emptyList(), val reviews: List<EvidenceReview> = emptyList(),
     /** Journal entries are not visible evidence and never enter the Keeper's snapshot. */
     val pendingArtifacts: List<PendingArtifactEvidence> = emptyList(),
-)
+) {
+    /**
+     * Discover local candidates for an advisory issue, not conclusions about the evidence.
+     * Uses the existing deterministic routing similarity on questions only. No model call,
+     * transmission, link, verification or judgment is performed; only the Keeper may link.
+     * Exact question matches come first, then topic similarity; no relevance is asserted.
+     */
+    fun reconsiderationCandidates(opinionId: String): List<EvidenceEntry> {
+        val opinion = entries.singleOrNull { it.id == opinionId && it.conversationId != null &&
+            it.kind == EvidenceKind.Opinion } ?: return emptyList()
+        val issueOpinions = entries.filter { it.issueId == opinion.issueId &&
+            it.conversationId == opinion.conversationId && it.kind == EvidenceKind.Opinion }.map { it.id }.toSet()
+        val alreadyLinked = reviews.mapNotNull { review ->
+            when {
+                review.targetId in issueOpinions -> review.relatedId
+                review.relatedId in issueOpinions -> review.targetId
+                else -> null
+            }
+        }.toSet()
+        return entries.asSequence().filter { it.id !in alreadyLinked && it.canReconsider() &&
+            !(it.recordedByKeeper && it.issueId == opinion.issueId) }
+            .sortedWith(compareByDescending<EvidenceEntry> { it.question == opinion.question }
+                .then(bySimilarityTo<EvidenceEntry>(opinion.question) { it.question })
+                .thenByDescending { it.recordedAt }.thenBy { it.id })
+            .take(6).toList()
+    }
+}
+
+/** Whether an entry has a bounded corrective projection, not whether it is true. */
+private fun EvidenceEntry.canReconsider(): Boolean = when {
+    localTest != null -> kind == EvidenceKind.Observation && !recordedByKeeper
+    researchCitation != null -> !recordedByKeeper && kind in setOf(EvidenceKind.CitedClaim, EvidenceKind.Hypothesis)
+    else -> recordedByKeeper && kind in setOf(EvidenceKind.Observation, EvidenceKind.CitedClaim)
+}
 
 /**
  * Durable deliberation record, not an associative memory store. Records actual contributions
@@ -109,50 +154,124 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
     suspend fun snapshot(): EvidenceBook = mutex.withLock { read().copy(pendingArtifacts = emptyList()) }
 
     /**
-     * Return only durable typed local-process observations directly linked by the Keeper to
-     * this conversation's opinions. Never send raw artifact/report contents, review rationales,
-     * unrelated observations, claimed test metadata or opinions as corrective evidence.
-     * Both link directions are accepted; a relation says only that the entries are relevant.
+     * Return durable, bounded evidence explicitly associated with this conversation, plus
+     * newly relevant evidence discovered locally when the Keeper enabled automatic delivery.
+     * Direct links and same-issue Keeper reports do not need automatic-delivery permission.
+     * Automatic matches never create an evidence relation or a judgment of truth.
+     * Host process results, Keeper reports and research excerpts remain distinct. A research
+     * text mismatch does not exclude the source excerpt; it is provenance, not a merit test.
+     * Never include raw artifact reports, commands, private review rationales or unrelated issues.
+     * Both link directions are accepted. A retraction is reported, not an order to change belief.
      * No call, memory write, change of belief or authorization occurs here.
      */
-    suspend fun linkedObservations(conversation: String): LinkedConversationObservations = mutex.withLock {
+    suspend fun linkedObservations(
+        conversation: String, automatic: Boolean = false,
+    ): LinkedConversationObservations = mutex.withLock {
         val book = read()
         val opinions = book.entries.filter { it.conversationId == conversation && it.kind == EvidenceKind.Opinion }
         val opinionById = opinions.associateBy { it.id }
         val byId = book.entries.associateBy { it.id }
         val linked = linkedMapOf<String, MutableSet<String>>()
         val linkedQuestions = linkedMapOf<String, String>()
+        val byIssue = opinions.groupBy { it.issueId }
+        fun associate(entry: EvidenceEntry, issue: String) {
+            val contributors = byIssue[issue].orEmpty()
+            if (contributors.isEmpty()) return
+            if (!entry.canReconsider()) return
+            val participants = linked.getOrPut(entry.id) { linkedSetOf() }
+            if (entry.id !in linkedQuestions) linkedQuestions[entry.id] = contributors.first().question
+            contributors.mapNotNullTo(participants) { it.specialistId }
+        }
+        // Recording a report against an existing issue is an explicit local Keeper association.
+        for (entry in book.entries) {
+            if (entry.recordedByKeeper && entry.issueId in byIssue) associate(entry, entry.issueId)
+        }
         for (review in book.reviews) {
             val related = review.relatedId ?: continue
             val opinion = opinionById[review.targetId] ?: opinionById[related] ?: continue
-            val observation = byId[if (opinion.id == review.targetId) related else review.targetId] ?: continue
-            if (observation.kind != EvidenceKind.Observation || observation.localTest == null ||
-                observation.recordedByKeeper) continue
-            // Every actual contributor to that issue can encounter the same corrective observation.
-            val participants = linked.getOrPut(observation.id) { linkedSetOf() }
-            if (observation.id !in linkedQuestions) linkedQuestions[observation.id] = opinion.question
-            opinions.filter { it.issueId == opinion.issueId }.mapNotNullTo(participants) { it.specialistId }
+            val evidence = byId[if (opinion.id == review.targetId) related else review.targetId] ?: continue
+            associate(evidence, opinion.issueId)
         }
-        val selected = book.entries.asReversed().filter { it.id in linked }.take(4)
+        val retractions = book.reviews.filter { it.relation == EvidenceRelation.RetractedByKeeper }
+            .associateBy { it.targetId }
+        val explicitIds = linked.keys.toSet()
+        val autoIds = linkedSetOf<String>()
+        if (automatic && opinions.isNotEmpty()) {
+            // Topic matching is a local routing hint. Ignore empty/redacted objectives and
+            // avoid matching common single words. No model call and no automatic association.
+            val embedder = BuiltInTextEmbedder()
+            val vectors = mutableMapOf<String, FloatArray>()
+            val tokenSets = mutableMapOf<String, Set<String>>()
+            fun words(question: String) = tokenSets.getOrPut(question) { BuiltInTextEmbedder.tokens(question).toSet() }
+            fun matches(a: String, b: String): Boolean {
+                if ("redacted" in a.lowercase() || "redacted" in b.lowercase()) return false
+                val common = words(a) intersect words(b)
+                if (common.size < 2) return false
+                if (a.trim().equals(b.trim(), ignoreCase = true)) return true
+                return dot(vectors.getOrPut(a) { embedder.embedOne(a) },
+                    vectors.getOrPut(b) { embedder.embedOne(b) }) >= AUTO_TOPIC_SIMILARITY
+            }
+            val received = opinions.filter { it.specialistId != null }.groupBy { it.specialistId }
+            val issues = byIssue.values.sortedByDescending { contributors -> contributors.maxOf { it.recordedAt } }
+            for (entry in book.entries.asReversed()) {
+                if (entry.id in explicitIds || !entry.canReconsider()) continue
+                val retraction = retractions[entry.id]
+                val revision = maxOf(entry.recordedAt, retraction?.recordedAt ?: Long.MIN_VALUE)
+                // Return to the newest matching issue, not every earlier repetition of a question.
+                val issue = issues.firstOrNull { contributors ->
+                    contributors.minOf { it.recordedAt } <= revision &&
+                        matches(contributors.first().question, entry.question)
+                } ?: continue
+                val pending = issue.mapNotNull { it.specialistId }.distinct().filter { id ->
+                    received[id].orEmpty().none { reply ->
+                        entry.id in reply.promptEvidenceIds &&
+                            reply.promptEvidenceRetractions[entry.id] == retraction?.id
+                    }
+                }
+                if (pending.isEmpty()) continue
+                linked[entry.id] = pending.toMutableSet()
+                linkedQuestions[entry.id] = issue.first().question
+                autoIds += entry.id
+            }
+        }
+        val explicit = book.entries.asReversed().filter { it.id in explicitIds }
+        val discovered = book.entries.asReversed().filter { it.id in autoIds }
+        // Reserve space for new discoveries when manual links fill the bounded prompt.
+        val selected = if (discovered.isEmpty()) explicit.take(4) else
+            (explicit.take(if (discovered.size >= 2) 2 else 3) + discovered).take(4)
         if (selected.isEmpty()) return@withLock LinkedConversationObservations()
         val context = selected.joinToString("\n") { entry ->
-            val receipt = requireNotNull(entry.localTest)
-            // Use typed values and the conversation's own question, never the raw report,
-            // workflow objective, arbitrary metadata or Keeper review's assertion of truth.
-            "Observation ${entry.id}, linked to earlier question: ${clean(linkedQuestions.getValue(entry.id), 200)}. " +
-                "Local test process started=${receipt.started}; " +
-                "timedOut=${receipt.timedOut}; exitCode=${receipt.exitCode}; " +
-                "initial checkout=${receipt.checkoutCommit ?: "unknown"}."
+            val receipt = entry.localTest
+            val citation = entry.researchCitation
+            val header = "Evidence ${entry.id}, " +
+                (if (entry.id in autoIds) "automatically matched by topic (possible relevance only)" else "associated by Keeper") +
+                " with earlier question: ${clean(linkedQuestions.getValue(entry.id), 200)}. "
+            val detail = when {
+                receipt != null -> "Host-observed local test process started=${receipt.started}; " +
+                    "timedOut=${receipt.timedOut}; exitCode=${receipt.exitCode}; " +
+                    "initial checkout=${receipt.checkoutCommit ?: "unknown"}."
+                citation != null -> "Research excerpt (source claim, not independently verified): " +
+                    "${clean(citation.sourceType, 60)} / ${clean(citation.sourceName, 60)}: " +
+                    "${clean(citation.sourceExcerpt, 160)}. " +
+                    "Model statement: ${clean(entry.text, 200)}. " +
+                    "Statement exactly matches bounded source excerpt=${citation.matchesSourceText}."
+                else -> "Keeper-reported ${entry.kind.name} (not a host observation): " +
+                    "${clean(entry.text, 400)}. Stated source: ${clean(entry.source, 160)}."
+            }
+            header + detail + if (entry.id in retractions) " Keeper recorded a retraction." else ""
         }
         LinkedConversationObservations(context,
-            selected.flatMap { linked.getValue(it.id) }.toSet(), selected.map { it.id })
+            selected.flatMap { linked.getValue(it.id) }.toSet(), selected.map { it.id },
+            selected.filter { it.id in autoIds }.map { it.id },
+            selected.mapNotNull { entry -> retractions[entry.id]?.let { entry.id to it.id } }.toMap())
     }
 
     /** Actual advisory text stays an opinion regardless of its author or the number agreeing. */
-    suspend fun recordAdvisory(issue: String, conversation: String, question: String, voice: CollectiveVoice, reply: String) {
+    suspend fun recordAdvisory(issue: String, conversation: String, question: String, voice: CollectiveVoice, reply: String,
+        promptEvidenceIds: List<String> = emptyList(), promptEvidenceRetractions: Map<String, String> = emptyMap()) {
         val source = voice.model.uses.singleOrNull()
         append(issue, question, EvidenceKind.Opinion, reply, source?.sourceId ?: "Configured Source not recorded",
-            conversation, voice.role, voice.specialistId, source?.modelId)
+            conversation, voice.role, voice.specialistId, source?.modelId, promptEvidenceIds = promptEvidenceIds, promptEvidenceRetractions = promptEvidenceRetractions)
     }
 
     /**
@@ -302,10 +421,16 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
 
     private suspend fun append(issue: String, question: String, kind: EvidenceKind, text: String, source: String,
         conversation: String? = null, role: String? = null, specialist: String? = null, model: String? = null,
-        keeper: Boolean = false): EvidenceEntry =
+        keeper: Boolean = false, promptEvidenceIds: List<String> = emptyList(),
+        promptEvidenceRetractions: Map<String, String> = emptyMap()): EvidenceEntry =
         mutex.withLock {
+            val delivered = promptEvidenceIds.distinct().filter { it.matches(Regex("evidence:[a-f0-9]{32}")) }.take(4)
             val entry = EvidenceEntry(identity(), issue, clean(question, 1500), kind, clean(text, 12_000),
-                clean(source, 512), now(), conversation, role, specialist, model?.let { clean(it, 128) }, keeper)
+                clean(source, 512), now(), conversation, role, specialist, model?.let { clean(it, 128) }, keeper,
+                promptEvidenceIds = delivered,
+                promptEvidenceRetractions = promptEvidenceRetractions.filter { (id, revision) ->
+                    id in delivered && revision.matches(Regex("evidence:[a-f0-9]{32}"))
+                })
             require(entry.question.isNotBlank() && entry.text.isNotBlank() && entry.source.isNotBlank())
             val book = read()
             write(book.copy(entries = book.entries + entry))
@@ -324,7 +449,7 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
             val evidence = related?.let { id -> book.entries.singleOrNull { it.id == id } ?: error("Evidence not found") }
             require(related != target)
             when (relation) {
-                EvidenceRelation.Supports, EvidenceRelation.Contradicts -> require(evidence != null)
+                EvidenceRelation.Supports, EvidenceRelation.Contradicts, EvidenceRelation.Relevant -> require(evidence != null)
                 EvidenceRelation.VerifiedByKeeper -> require(evidence?.kind in setOf(EvidenceKind.Observation, EvidenceKind.CitedClaim))
                 EvidenceRelation.RetractedByKeeper -> require(related == null)
             }
@@ -346,5 +471,7 @@ internal class CollectiveEvidenceLedger(settings: Settings, private val now: () 
     private companion object {
         const val KEY = "aive.collective.evidence.v1"
         const val MAX_PENDING_ARTIFACTS = 256
+        /** Conservative local topic-routing threshold, not a credibility or argument score. */
+        const val AUTO_TOPIC_SIMILARITY = 0.65f
     }
 }
