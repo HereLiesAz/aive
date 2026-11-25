@@ -159,4 +159,5 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
             }
         })
     if (status.isNotEmpty()) Text(status, style = AzphaltType.body, color = azphaltOnSurface())
+    host.evidenceLedger?.invoke()?.let { EvidenceLedgerPart(it, busy) }
 }
