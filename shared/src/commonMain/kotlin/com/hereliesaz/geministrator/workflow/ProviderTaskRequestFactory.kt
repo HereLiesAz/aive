@@ -90,7 +90,7 @@ internal fun buildProviderTaskRequest(
             .firstOrNull()?.fromTasks?.takeIf { it.isNotEmpty() }
             ?.let { named -> named.mapNotNull { run.taskRuns[it]?.id }.toSet().takeIf { it.isNotEmpty() } },
         // The step's contract names its tools; a role's tool ceiling (none unless a selected revision set one) only narrows them.
-        allowedTools = if (task.hostFileProposal) emptyList() else effectiveAllowedTools(task.contract?.takeUnless { it.startingPoint }?.allowedTools, role.toolCeiling),
+        allowedTools = if (task.usesHostFileContext) emptyList() else effectiveAllowedTools(task.contract?.takeUnless { it.startingPoint }?.allowedTools, role.toolCeiling),
         // The provider stops for approval unless the policy decision point lets the plan proceed.
         requirePlanApproval = !InProcessPolicyDecisionPoint.decide(
             PolicyRequest(

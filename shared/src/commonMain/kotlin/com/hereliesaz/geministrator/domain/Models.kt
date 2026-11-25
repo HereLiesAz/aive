@@ -169,6 +169,8 @@ data class TaskDefinition(
     val resources: List<TaskResource> = emptyList(),
     /** A host-file proposal is inference only: no repository handle or tools go to its provider. */
     val hostFileProposal: Boolean = false,
+    /** Read-only inference over a host-owned repository snapshot, with no repository handle or tools. */
+    val hostFileRead: Boolean = false,
 )
 
 @Serializable

@@ -128,6 +128,77 @@ class RemoteRepositoryOperationClientsTest {
     }
 
     @Test
+    fun gitLabSnapshotPinsReadsToCommitAndCachesDirectoryListings() = runBlocking {
+        val base = "a".repeat(40)
+        val blob = "b".repeat(40)
+        val tree = "c".repeat(40)
+        val directories = mutableListOf<String>()
+        val reads = mutableListOf<String>()
+        val engine = MockEngine { request ->
+            assertEquals(HttpMethod.Get, request.method)
+            assertEquals("gitlab-token", request.headers["PRIVATE-TOKEN"])
+            when {
+                request.url.encodedPath.contains("/repository/branches/") ->
+                    respondJson("""{"name":"main","commit":{"id":"$base"}}""")
+                request.url.encodedPath.endsWith("/repository/tree") -> {
+                    assertEquals(base, request.url.parameters["ref"])
+                    assertEquals("false", request.url.parameters["recursive"])
+                    val dir = request.url.parameters["path"].orEmpty()
+                    directories += dir
+                    when (dir) {
+                        "" -> respondJson("""[{"path":"docs","type":"tree","mode":"040000","id":"$tree"}]""")
+                        "docs" -> respondJson("""[{"path":"docs/readme.md","type":"blob","mode":"100644","id":"$blob"}]""")
+                        else -> error("Unexpected directory $dir")
+                    }
+                }
+                request.url.encodedPath.endsWith("/raw") -> {
+                    assertEquals(base, request.url.parameters["ref"])
+                    reads += request.url.encodedPath
+                    respondJson("exact GitLab contents")
+                }
+                else -> respondJson("""{"default_branch":"main","web_url":"https://gitlab.com/team/app"}""")
+            }
+        }
+        val client = GitLabRestRepositoryOperationClient(RepositoryServiceTokenProvider { "gitlab-token" }, trackedClient(engine))
+        val result = client.readFileProposalContext(gitLabProject(), listOf("docs/readme.md", "docs/new.md", "absent/child.md"))
+        assertEquals(ExternalExecutionStatus.Completed, result.status)
+        assertEquals(listOf("", "docs"), directories)
+        assertEquals(1, reads.size)
+        assertEquals(RepositoryFileProposal(base, listOf(
+            RepositoryProposedFile("docs/readme.md", blob, "exact GitLab contents"),
+            RepositoryProposedFile("docs/new.md", null, ""),
+            RepositoryProposedFile("absent/child.md", null, ""),
+        )), RepositoryFileProposal.parse(result.artifacts.single().textContent!!))
+        assertTrue(!client.supportsFileProposals(gitLabProject()))
+    }
+
+    @Test
+    fun gitLabSnapshotDoesNotTreatSymlinkOrIncompleteDirectoryAsMissing() = runBlocking {
+        val base = "a".repeat(40)
+        var treePages = 0
+        val engine = MockEngine { request ->
+            assertEquals(HttpMethod.Get, request.method)
+            when {
+                request.url.encodedPath.contains("/repository/branches/") ->
+                    respondJson("""{"name":"main","commit":{"id":"$base"}}""")
+                request.url.encodedPath.endsWith("/repository/tree") -> {
+                    treePages++
+                    respondJson("""[{"path":"alias","type":"blob","mode":"120000","id":"${"b".repeat(40)}"}]""")
+                }
+                request.url.encodedPath.endsWith("/raw") -> error("A symlink must never be read")
+                else -> respondJson("""{"default_branch":"main","web_url":"https://gitlab.com/team/app"}""")
+            }
+        }
+        val client = GitLabRestRepositoryOperationClient(RepositoryServiceTokenProvider { "gitlab-token" }, trackedClient(engine))
+        for (path in listOf("alias", "alias/child")) {
+            kotlin.test.assertFailsWith<IllegalArgumentException> {
+                client.readFileProposalContext(gitLabProject(), listOf(path))
+            }
+        }
+        assertEquals(2, treePages)
+    }
+
+    @Test
     fun gitLabStatusReadsProjectAndBranchWithPrivateToken() = runBlocking {
         val requests = mutableListOf<io.ktor.client.request.HttpRequestData>()
         val engine = MockEngine { request ->

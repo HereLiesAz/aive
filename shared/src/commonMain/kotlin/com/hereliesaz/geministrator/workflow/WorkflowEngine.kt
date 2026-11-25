@@ -323,7 +323,7 @@ class WorkflowEngine(
                         estimatedInputTokens = ownEstimate,
                         excludedProviderIds = taskRun.failedProviders.toSet(),
                         failoverAllowed = isProviderAuto(role, task),
-                        requiresToolFilter = task.hostFileProposal || task.contract?.requiresToolFilter() == true || role.toolCeiling.isNotEmpty(),
+                        requiresToolFilter = task.usesHostFileContext || task.contract?.requiresToolFilter() == true || role.toolCeiling.isNotEmpty(),
                         habitReplay = replays,
                     )
                     val providerId = sessionGateway.resolveProvider(selection)
@@ -1090,7 +1090,7 @@ class WorkflowEngine(
         role: RoleDefinition,
         failed: Set<AgentProviderId>,
     ): Boolean {
-        if (task.hostFileProposal) return false
+        if (task.usesHostFileContext) return false
         val planner = habitReplay ?: return false
         if (com.hereliesaz.geministrator.providers.HabitReplayAgentProvider.ID in failed) return false
         return try {
@@ -1134,7 +1134,7 @@ class WorkflowEngine(
             repository = task.providerRepositoryFor(project.repository),
             excludedProviderIds = taskRun.failedProviders.toSet(),
             failoverAllowed = isProviderAuto(role, task),
-            requiresToolFilter = task.hostFileProposal || task.contract?.requiresToolFilter() == true || role.toolCeiling.isNotEmpty(),
+            requiresToolFilter = task.usesHostFileContext || task.contract?.requiresToolFilter() == true || role.toolCeiling.isNotEmpty(),
         )
     }
 

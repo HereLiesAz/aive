@@ -267,7 +267,7 @@ Before drafting a plan for an objective that asks to teach, explain, learn or in
 
 ### Repository operations
 
-GitHub and GitLab operations are implemented in `RemoteRepositoryOperationClients.kt`: `status`, `create-branch:<branch>`, `open-pull-request:…`, and `open-merge-request:…`. GitHub also supports the host-owned `read-file-proposal-context` (read only) and `commit-files:…` (mutation) operations. The reader resolves a single base commit and reads exact paths with bounded UTF-8 decoding; the commit validates the approved proposal and creates a new ref, never updating an existing ref. Local Git operations (desktop) cover `status`, `fetch`, `pull`, `add-all`, `push`, `checkout`, `create-branch`, `worktree-branch`, `commit`, and `push-set-upstream`. See `docs/Repository-Services.md` and `docs/Local-Git-Repository-Operations.md`.
+GitHub and GitLab operations are implemented in `RemoteRepositoryOperationClients.kt`: `status`, `create-branch:<branch>`, `open-pull-request:…`, and `open-merge-request:…`. Both support the host-owned `read-file-proposal-context` (read only) operation; GitHub also supports `commit-files:…` (mutation). The reader resolves a single base commit and reads exact paths with bounded UTF-8 decoding; GitLab exhausts bounded directory listings before treating a path as missing. The GitHub commit validates the approved proposal and creates a new ref, never updating an existing ref. Inference over these snapshots receives no repository handle or tools. Local Git operations (desktop) cover `status`, `fetch`, `pull`, `add-all`, `push`, `checkout`, `create-branch`, `worktree-branch`, `commit`, and `push-set-upstream`. See `docs/Repository-Services.md` and `docs/Local-Git-Repository-Operations.md`.
 
 **Threats**
 - An operation string is crafted to inject options or shell syntax.
@@ -277,7 +277,7 @@ GitHub and GitLab operations are implemented in `RemoteRepositoryOperationClient
 **Mitigations in place**
 - Operation strings are parsed into a fixed vocabulary. Remote operations are REST calls. Local operations are fixed `ProcessBuilder` argument lists, not shell commands.
 - Branch names are validated: they cannot be empty, cannot start with `-`, and cannot contain NUL or newline characters.
-- `WorkflowGraphValidator` rejects any `RepositoryOperation` task other than `status` or `fetch` that lacks a `HumanApproval` ancestor, including one placed on another device through `TaskExecutor.Distributed`.
+- `WorkflowGraphValidator` rejects any mutating `RepositoryOperation` task (all except `status`, `fetch`, and `read-file-proposal-context`) that lacks a `HumanApproval` ancestor, including one placed on another device through `TaskExecutor.Distributed`.
 - Running a finished run again from a task (`TaskRerunPlanner`) never reuses an earlier approval for a repository change that runs again: when no unconditional `HumanApproval` ancestor of the change runs again, its approvals run again too, and replacing an output behind such an approval is refused. The finished run is not reopened; the rerun is a new run whose carried results came from tasks that completed, and output the keeper wrote is marked `editedBy: keeper`.
 - No remote operation merges, deletes, or force-pushes.
 - Remote repository credentials are scoped to `github.com` and `gitlab.com`.

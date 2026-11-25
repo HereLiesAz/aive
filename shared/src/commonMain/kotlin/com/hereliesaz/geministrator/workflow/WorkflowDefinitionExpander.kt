@@ -50,7 +50,7 @@ object WorkflowDefinitionExpander {
                     ?: role?.authorities?.singleOrNull()
                 val roleAgent = task.effectiveExecutor(role) as? TaskExecutor.RoleAgent
                 if (
-                    task.hostFileProposal ||
+                    task.usesHostFileContext ||
                     role == null ||
                     roleAgent == null ||
                     effectiveAuthority != RoleAuthority.Implement ||

@@ -74,6 +74,36 @@ class WorkflowGovernanceTest {
     }
 
     @Test
+    fun exactRepositoryReadUsesHostAndPreservesAnswerContractAcrossBothRemoteSources() = runBlocking {
+        val role = BuiltInRoles.Reviewer.copy(capabilitiesRequired = setOf(AgentCapability.RepositoryRead))
+        val template = com.hereliesaz.geministrator.template.StepPresets.ReadRepositoryFiles
+        val id = TaskDefinitionId("answer")
+        val task = com.hereliesaz.geministrator.template.StepInstantiation.task(
+            template, template.base(), id, "Read docs", mapOf("question" to "What does the README say?"),
+        ).copy(resources = listOf(com.hereliesaz.geministrator.domain.TaskResource.RepositoryFiles(listOf("README.md"))))
+        val definition = WorkflowDefinition(WorkflowDefinitionId("read"), "Host read", tasks = listOf(task),
+            testDesignPolicy = com.hereliesaz.geministrator.domain.TestDesignPolicy.None)
+        val registry = AgentProviderRegistry(emptyList(), inferenceSettings = InMemorySettings())
+        val preparer = WorkflowDefinitionPreparer(registry, listOf(role))
+        for (source in listOf(com.hereliesaz.geministrator.domain.RepositorySource.GitHub,
+            com.hereliesaz.geministrator.domain.RepositorySource.GitLab)) {
+            val repo = com.hereliesaz.geministrator.domain.RepositoryRef("owner", "project", source = source)
+            val prepared = preparer.prepare(definition, repo)
+            assertEquals(listOf("answer--host-read", "answer"), prepared.tasks.map { it.id.value })
+            val snapshot = prepared.tasks.first()
+            val answer = prepared.tasks.last()
+            assertEquals(com.hereliesaz.geministrator.domain.TaskExecutor.RepositoryOperation("read-file-proposal-context"), snapshot.executor)
+            assertEquals(task.resources, snapshot.resources)
+            assertEquals(setOf(snapshot.id), answer.dependsOn)
+            assertEquals(task.contract, answer.contract)
+            assertTrue(answer.hostFileRead)
+            assertEquals(emptySet(), answer.providerCapabilitiesFor(role))
+            assertEquals(null, answer.providerRepositoryFor(repo))
+            assertEquals(prepared, preparer.prepare(prepared, repo))
+        }
+    }
+
+    @Test
     fun providerRequiredEnvironmentPlanningInjectsEpaBeforeWorker() = runBlocking {
         val worker = GovernanceFakeProvider(
             id = AgentProviderId("worker"),

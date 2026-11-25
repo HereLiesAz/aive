@@ -360,6 +360,97 @@ class GitLabRestRepositoryOperationClient(
     override fun supports(project: Project): Boolean =
         project.repository?.source == RepositorySource.GitLab
 
+    override fun supportsFileProposalContext(project: Project): Boolean = supports(project)
+
+    /**
+     * Read literal regular-file paths from a single GitLab commit. Directory pages are cached and
+     * exhausted before declaring a path absent; the page budget fails closed on oversized trees.
+     * No workspace checkout, model credential, or write request is needed.
+     */
+    override suspend fun readFileProposalContext(project: Project, paths: List<String>): ExternalExecutionRun {
+        RepositoryFileProposal.validateProposalPaths(paths)
+        require(paths.none { path -> path.any { it in "*?[" } }) { "Snapshot requires literal file paths, not globs" }
+        val repository = requireRepository(project, RepositorySource.GitLab)
+        val apiBase = repository.gitLabApiBase()
+        val token = tokenProvider.requireToken("GitLab")
+        val url = "$apiBase/projects/${repository.displayName().encodeURLPathPart()}"
+        val info = json.decodeFromString<GitLabProjectResponse>(httpClient.get(url) {
+            gitlabHeaders(token)
+        }.requireSuccessBody("read GitLab project"))
+        val baseBranch = repository.defaultBranch ?: info.defaultBranch
+        val base = json.decodeFromString<GitLabBranchResponse>(httpClient.get(
+            "$url/repository/branches/${baseBranch.encodeURLPathPart()}",
+        ) { gitlabHeaders(token) }.requireSuccessBody("read GitLab base branch")).commit.id
+        require(isGitObjectId(base)) { "GitLab returned an invalid base commit SHA" }
+        val directories = mutableMapOf<String, Map<String, GitLabSnapshotTreeEntry>>()
+        var pagesRemaining = 100
+        suspend fun directory(path: String): Map<String, GitLabSnapshotTreeEntry> {
+            directories[path]?.let { return it }
+            val entries = linkedMapOf<String, GitLabSnapshotTreeEntry>()
+            var page = 1
+            while (true) {
+                require(pagesRemaining-- > 0) { "GitLab snapshot directory page limit exceeded" }
+                val body = httpClient.get("$url/repository/tree") {
+                    gitlabHeaders(token)
+                    parameter("ref", base)
+                    parameter("recursive", false)
+                    if (path.isNotEmpty()) parameter("path", path)
+                    parameter("per_page", 100)
+                    parameter("page", page)
+                }.requireSuccessBody("read GitLab snapshot tree")
+                val items = json.decodeFromString<List<GitLabSnapshotTreeEntry>>(body)
+                require(items.size <= 100) { "GitLab returned an oversized tree page" }
+                for (item in items) {
+                    require(item.path.substringBeforeLast('/', "") == path && entries.put(item.path, item) == null) {
+                        "GitLab returned an invalid or repeated tree entry"
+                    }
+                }
+                if (items.size < 100) break
+                page++
+            }
+            directories[path] = entries
+            return entries
+        }
+        var remaining = RepositoryFileProposal.MAX_TOTAL_BYTES
+        val files = paths.map { path ->
+            val parts = path.split('/')
+            var parent = ""
+            var absent = false
+            for (part in parts.dropLast(1)) {
+                val next = if (parent.isEmpty()) part else "$parent/$part"
+                val entry = directory(parent)[next]
+                if (entry == null) {
+                    absent = true
+                    break
+                }
+                require(entry.type == "tree" && entry.mode == "040000") { "A file path crosses a non-directory" }
+                parent = next
+            }
+            val entry = if (absent) null else directory(parent)[path]
+            if (entry == null) {
+                RepositoryProposedFile(path, null, "")
+            } else {
+                require(entry.type == "blob" && entry.mode in setOf("100644", "100755") && isGitObjectId(entry.id)) {
+                    "Snapshot target is not a regular file"
+                }
+                val response = httpClient.get("$url/repository/files/${path.encodeURLPathPart()}/raw") {
+                    gitlabHeaders(token)
+                    parameter("ref", base)
+                }
+                check(response.status.value in 200..299) { "Unable to read GitLab snapshot file: HTTP ${response.status.value}" }
+                val bytes = response.boundedBytes(minOf(remaining, RepositoryFileProposal.MAX_FILE_BYTES))
+                remaining -= bytes.size
+                RepositoryProposedFile(path, entry.id, bytes.decodeToString(throwOnInvalidSequence = true))
+            }
+        }
+        val snapshot = RepositoryFileProposal(base, files).also { it.validate() }
+        return completedRun(
+            source = RepositorySource.GitLab, operation = RepositoryFileProposal.READ_CONTEXT_OPERATION,
+            label = "Repository file proposal context", text = Json.encodeToString(snapshot),
+            metadata = mapOf("baseCommit" to base),
+        ).also { runs.put(it) }
+    }
+
     override suspend fun start(project: Project, operation: String): ExternalExecutionRun {
         val repository = requireRepository(project, RepositorySource.GitLab)
         repository.requirePublicRemoteHost("gitlab.com", "GitLab")
@@ -708,6 +799,9 @@ private data class GitLabBranchResponse(
     val commit: GitLabCommitResponse,
     @SerialName("web_url") val webUrl: String? = null,
 )
+
+@Serializable
+private data class GitLabSnapshotTreeEntry(val path: String, val type: String, val mode: String, val id: String)
 
 @Serializable
 private data class GitLabCommitResponse(

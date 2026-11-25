@@ -81,7 +81,7 @@ class WorkflowDefinitionPreparer(
                         requiredCapabilities = task.providerCapabilitiesFor(role),
                         constraints = task.providerConstraints,
                         repository = task.providerRepositoryFor(repository),
-                        requiresToolFilter = task.hostFileProposal,
+                        requiresToolFilter = task.usesHostFileContext,
                     ),
                 )
                 val providerRequiresPlanning = selectedProvider.capabilities().requiresEnvironmentPlanning
