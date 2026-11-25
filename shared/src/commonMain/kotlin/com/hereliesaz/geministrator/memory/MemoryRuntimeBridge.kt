@@ -53,8 +53,8 @@ fun interface MemoryPromptContextProvider {
         recallFor(request, queryPlan)
 
     /**
-     * Cue-only recall in the caller's authorized project/lineage corpus and shared lessons.
-     * The recipient role identifies attention state, not read permission.
+     * Cue-only recall across all retained collective memory. Workflow IDs and role identify
+     * context/attention only, not read permission. Explicit message and execution gates are separate.
      */
     suspend fun directChatTags(workflowIds: List<String>, roleId: String, text: String): List<String> = emptyList()
 

@@ -142,7 +142,7 @@ class MemoryLineageBanksTest {
     }
 
     @Test
-    fun otherWorkflowsOfTheProjectAreReadOnlyAndLabelledAndOtherProjectsInvisible() = runBlocking<Unit> {
+    fun allProjectsParticipateInRecallWithReadOnlyProvenance() = runBlocking<Unit> {
         val w = World()
         w.memory.registerWorkflow("mine", "P")
         w.memory.registerWorkflow("sibling", "P")
@@ -153,14 +153,15 @@ class MemoryLineageBanksTest {
         val siblingBefore = w.banks.store("sibling").read()
 
         val hits = w.memory.recallFor("mine", "keystore")
-        assertEquals(listOf("m1", "s1"), hits.map { it.node.id.value })
-        val sibling = hits.last()
+        assertEquals(setOf("m1", "s1", "x1"), hits.map { it.node.id.value }.toSet())
+        val sibling = hits.single { it.node.id.value == "s1" }
+        assertEquals("Q", hits.single { it.node.id.value == "x1" }.provenance!!.projectId)
         assertEquals("sibling", sibling.provenance!!.readOnlyFromWorkflow)
         assertNull(sibling.provenance!!.lineagePath)
         assertTrue(sibling.sourceLabel().contains("read-only from workflow sibling"))
         assertEquals(siblingBefore, w.banks.store("sibling").read())
 
-        // The project expands to incorporate Q: its workflows become readable too (append-only).
+        // Project expansion records history; it is not required for cognitive recall.
         w.memory.expandProject("P", "Q", by = "user", reason = "Q was folded into P")
         assertTrue(w.memory.recallFor("mine", "keystore").any { it.node.id.value == "x1" && it.provenance?.readOnlyFromWorkflow == "elsewhere" })
         assertEquals(1, w.lineage.log().expansions.size)

@@ -514,9 +514,8 @@ class MemoryControllerCuePipelineTest {
         )
         val blocks = controller.promptContextProvider.recallFor(request, MemoryQueryPlan(emptyList(), enoughEvidence = false)).blocks
 
-        // The lesson itself is not in a block of its own; a pointer says it will arrive.
-        val pointer = blocks.single { it.label == "Role lessons" }
-        assertTrue("Check the filing year" !in pointer.content, pointer.content)
+        // Lessons are ordinary associations, not a special role-specific prompt block.
+        assertTrue(blocks.none { it.label == "Role lessons" || lesson in it.content })
         // It arrives with the unrelated role's cue cloud: the shared tag, then its key phrase.
         val cloud = blocks.single { it.label == "Memory" }.content.lines()
         assertEquals("$MEMORY_MESSAGE_MARKER #filing", cloud.first(), "$blocks")
@@ -537,7 +536,7 @@ class MemoryControllerCuePipelineTest {
     }
 
     @Test
-    fun passiveRecallIncludesOlderProjectBanksButDoesNotTraverseForeignParents() = runBlocking {
+    fun passiveRecallIncludesAllProjectsAndOlderBanksWithoutWritingSources() = runBlocking {
         fun tagged(word: String) = InMemoryMemoryStore(MemorySnapshot(nodes = listOf(
             MemoryNode(MemoryNodeId("tag-$word"), MemoryNodeKind.NounTag, word, createdAtEpochMillis = 0),
         )))
@@ -571,16 +570,16 @@ class MemoryControllerCuePipelineTest {
         voice().answer("capacitor")
         assertTrue("#capacitor" in seen.last())
         voice().answer("zirconium")
-        assertTrue("#zirconium" !in seen.last())
+        assertTrue("#zirconium" in seen.last())
         voice().answer("tungsten")
-        assertTrue("#tungsten" !in seen.last())
+        assertTrue("#tungsten" in seen.last())
         val provider = controller.promptContextProvider
         fun prompt(agent: String, objective: String) = request(agent, "reader", objective)
         val plan = MemoryQueryPlan(emptyList(), enoughEvidence = false)
         val visible = provider.recallFor(prompt("reader-1", "capacitor"), plan).blocks
         assertTrue(visible.any { it.label == "Memory" && "#capacitor" in it.content })
-        val hidden = provider.recallFor(prompt("reader-2", "zirconium"), plan).blocks
-        assertTrue(hidden.none { "#zirconium" in it.content })
+        val otherProject = provider.recallFor(prompt("reader-2", "zirconium"), plan).blocks
+        assertTrue(otherProject.any { it.label == "Memory" && "#zirconium" in it.content })
         assertEquals(before, older.read(), "Recall must not write to a shared source")
         controller.updateSettings { it.copy(enabled = false) }
         voice().answer("capacitor")
@@ -675,7 +674,7 @@ class MemoryControllerCuePipelineTest {
     }
 
     @Test
-    fun grantedConversationBanksSupplyOnlyRelevantTagsToActualVoices() = runBlocking {
+    fun conversationGrantsDoNotDetermineCollectiveCueEligibility() = runBlocking {
         val settings = MapSettings()
         val history = com.hereliesaz.geministrator.queen.CollectiveConversationStore(settings) { 100L }
         val source = history.create().id
@@ -695,29 +694,28 @@ class MemoryControllerCuePipelineTest {
         )
         controller.setDefaultAttentionLevel(1f)
         val prompts = mutableListOf<String>()
-        val question = "Check keystore and turnip orchard"
-        suspend fun ask() {
+        suspend fun ask(question: String) {
             val memory = DirectChatMemory(history.recallBanks(destination), controller.promptContextProvider)
-            memory.voice(QueenModel { prompts += it; "Reply" }, "reviewer", destination, "instance").answer(question)
+            memory.voice(QueenModel { prompts += it; "Reply" }, "reviewer").answer(question)
         }
-        ask()
-        assertEquals(question, prompts.last())
+        ask("Check keystore")
+        assertTrue("#keystore" in prompts.last() && "CI secrets" !in prompts.last())
+        ask("Check turnip orchard")
+        assertTrue("#turnip" in prompts.last() && "#keystore" !in prompts.last())
         assertTrue(history.setRecallGrant(source, destination, true))
-        ask()
-        assertTrue("#keystore" in prompts.last(), prompts.last())
-        assertTrue("#turnip" !in prompts.last() && "CI secrets" !in prompts.last(), prompts.last())
+        ask("Check keystore")
+        assertTrue("#keystore" in prompts.last())
         assertTrue(history.setRecallGrant(source, destination, false))
-        ask()
-        assertEquals(question, prompts.last())
-        assertTrue(history.setRecallGrant(source, destination, true))
+        ask("Check keystore")
+        assertTrue("#keystore" in prompts.last())
         controller.updateSettings { it.copy(enabled = false) }
-        ask()
-        assertEquals(question, prompts.last())
+        ask("Check keystore")
+        assertEquals("Check keystore", prompts.last())
         assertTrue(sourceController.settings.value.enabled)
     }
 
     @Test
-    fun directModelsReceiveScopedTagsNotPassagesAndRespectDisabledMemory() = runBlocking {
+    fun directModelsReceiveCollectiveTagsNotPassagesAndRespectDisabledMemory() = runBlocking {
         val (controller, _) = keystoreController()
         val provider = controller.promptContextProvider
         val memory = DirectChatMemory(listOf("wf-keys"), provider)
@@ -755,14 +753,14 @@ class MemoryControllerCuePipelineTest {
         assertEquals("Answer", queen.answer("Check keystore"))
         assertTrue(queenPrompt.startsWith("Check keystore") && "#keystore" in queenPrompt)
         assertTrue("CI secrets" !in queenPrompt)
-        assertTrue(provider.directChatTags(listOf("unrelated-run"), "unknown-role", "Check keystore").isEmpty())
-        assertTrue(provider.directChatTags(emptyList(), "unknown-role", "Check keystore").isEmpty())
+        assertTrue("#keystore" in provider.directChatTags(listOf("unrelated-run"), "unknown-role", "Check keystore"))
+        assertTrue("#keystore" in provider.directChatTags(emptyList(), "unknown-role", "Check keystore"))
         controller.updateSettings { it.copy(enabled = false) }
         queen.answer("Check keystore")
         assertEquals("Check keystore", queenPrompt)
     }
     @Test
-    fun tutorialVoicesUseTheirOwnRoleBanksWithoutWorkflowAccess() = runBlocking {
+    fun tutorialVoicesParticipateEvenWithoutWorkflowContext() = runBlocking {
         val calls = mutableListOf<String>()
         val prompts = mutableListOf<String>()
         val provider = object : MemoryPromptContextProvider {
@@ -888,7 +886,7 @@ class MemoryControllerCuePipelineTest {
         }
         DirectChatMemory(emptyList(), recreate().promptContextProvider)
             .configuredVoice(route, queen.id.value, case, roles).answer(question)
-        assertEquals(question, prompts.last(), "case identity never grants bank access")
+        assertTrue("#keystore" in prompts.last(), "memory eligibility does not depend on case scope")
     }
 
     @Test
@@ -921,7 +919,7 @@ class MemoryControllerCuePipelineTest {
         assertTrue(prompts.last().contains("#keystore"))
         DirectChatMemory(emptyList(), restarted.promptContextProvider)
             .voice(model, "planner", "wording:wf-keys", "primary").answer(question)
-        assertEquals(question, prompts.last())
+        assertTrue("#keystore" in prompts.last())
         memory.voice(model, "planner", "another-conversation", "primary").answer(question)
         assertTrue(prompts.last().contains("#keystore"))
 

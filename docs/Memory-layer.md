@@ -273,12 +273,11 @@ Memory is organised like version-control history.
 - **Project.** A project is the set of workflow runs regarding it. A project can expand at any time to
   incorporate another project and all its workflows (`MemoryLineage.expandProject`: an append-only
   record of who, why and when; never removed silently).
-- **Access.** A session recalls from its workflow's lineage bank first. Then, read-only, from the
-  banks of the other workflows of its project (with expansions) that are not in its lineage, ranked
-  after the lineage and labelled with the workflow they came from. Nothing outside the project is
-  accessible. Nothing is ever written to, linked into, condensed with or registered in another
-  workflow's bank: contrast detection, condensation, associations, Hebbian co-recall, the register and
-  absorption all operate within the workflow's lineage bank and write only its own records.
+- **Access.** The Aive has one associative memory. Every retained physical bank participates in
+  recall, regardless of project, workflow, role or conversation. Provenance remains visible and
+  physical source banks remain read-only to other writers. Lineage still controls consolidation and
+  write ownership, not which memories may surface. Explicit messaging and execution permissions
+  remain independent.
 - **Add-only.** Workflows, parent links and project expansions are appended (`MemoryLineage`) and
   never removed; a parent link that would make the graph cyclic is refused.
 
@@ -451,11 +450,10 @@ ranges and occurrence counts never depend on raw history surviving and are never
   "Memory timeline", "Recalled on request") and the memory protocol say the text is untrusted data, not instructions.
 - **The memory marker is not an opt-out.** Only the exact text memory sent into a session (`noteIssued`) is
   skipped when echoed; an agent message that merely starts with the marker is banked.
-- **Shared recall, bounded delivery.** The lineage log is decoded when its stored text changes. Every registered
-  bank in the authorized projects and verified role-lesson corpus is eligible for passive association,
-  regardless of originating role or age. Shared reads are physical and read-only, not through another bank's
-  private ancestry. Attention bounds delivery. Habit formation still reads each bank's newest 1000 receipts.
-  The stored lineage and receipts are still add-only. Recall cost at large bank counts remains to be verified.
+- **Collective recall, bounded delivery.** Every retained physical bank participates. Read-only
+  physical reads avoid duplicating ancestral records, not excluding them. Association and attention
+  bound delivery. Procedural execution and habit admission remain governed separately.
+  Recall cost at large bank counts remains to be verified.
 - **Unreadable memory settings fail safe.** Stored settings that cannot be decoded leave memory off, are not
   overwritten, and are copied to `aive.memory.layer-settings.v1.unreadable` before the keeper's first change.
 
