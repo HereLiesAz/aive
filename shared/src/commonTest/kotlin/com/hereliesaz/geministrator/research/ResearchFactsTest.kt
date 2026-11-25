@@ -1,6 +1,8 @@
 package com.hereliesaz.geministrator.research
 
 import com.hereliesaz.geministrator.queen.QueenModel
+import com.hereliesaz.geministrator.memory.MemoryBankRequest
+import com.hereliesaz.geministrator.memory.MemorySourceKind
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -76,6 +78,8 @@ class ResearchFactsTest {
     fun factModelReceivesScopedTagsButLookupDoesNot() = runTest {
         val queries = mutableListOf<String>()
         val prompts = mutableListOf<String>()
+        val staged = mutableListOf<MemoryBankRequest>()
+        val released = mutableListOf<String>()
         val provider = object : com.hereliesaz.geministrator.memory.MemoryPromptContextProvider {
             override suspend fun recallFor(request: com.hereliesaz.geministrator.providers.AgentTaskRequest,
                 queryPlan: com.hereliesaz.geministrator.orchestration.MemoryQueryPlan) =
@@ -84,6 +88,16 @@ class ResearchFactsTest {
                 assertEquals(listOf("authorized-run"), workflowIds)
                 assertEquals(com.hereliesaz.geministrator.domain.BuiltInRoles.Orchestrator.id.value, roleId)
                 return listOf("#sqlite")
+            }
+            override suspend fun stageRunDirectReply(workflowId: String, request: MemoryBankRequest) {
+                assertEquals("authorized-run", workflowId)
+                assertTrue(released.isEmpty())
+                staged += request
+            }
+            override suspend fun bankRunDirectReplies(workflowId: String, sourceIds: List<String>) {
+                assertEquals("authorized-run", workflowId)
+                assertEquals(staged.map { it.sourceSessionId }, sourceIds)
+                released += sourceIds
             }
         }
         val source = LocalResearchSource { objective -> queries += objective; leads }
@@ -97,5 +111,15 @@ class ResearchFactsTest {
         assertTrue(prompts.single().contains("#sqlite"))
         assertTrue(queries.none { "#sqlite" in it })
         assertTrue(found.none { "Unsupported" in it || "#sqlite" in it })
+        assertTrue(staged.isEmpty(), "Read access alone is not capture authority")
+        val captured = investigation.findings("Which database does the app use?", "external-key",
+            memoryRunIds = listOf("authorized-run"), captureWorkflowId = "authorized-run")!!
+        assertTrue(captured.none { "Unsupported" in it || "#sqlite" in it })
+        val note = staged.single()
+        assertEquals(MemorySourceKind.AgentNote, note.sourceKind)
+        assertEquals("authorized-run", note.scope.workflowRunId)
+        assertEquals("FACT: Unsupported. | SOURCE: 9", note.text)
+        assertTrue("#sqlite" !in note.text && "external-key" !in note.sourceSessionId)
+        assertEquals(listOf(note.sourceSessionId), released)
     }
 }

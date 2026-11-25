@@ -1802,10 +1802,16 @@ class ApplicationRuntime private constructor(
         val rolesNow = roles
         wordingJob = runtimeScope.launch(callContext) {
             try {
-                val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(listOf(run.id.value))
-                val voice = memory.voice(models.queen, com.hereliesaz.geministrator.domain.BuiltInRoles.Orchestrator.id.value,
-                    conversationId = "wording:${run.id.value}")
-                val made = com.hereliesaz.geministrator.queen.generateWordings(voice, definition, run, rolesNow, checkpoint)
+                val memory = com.hereliesaz.geministrator.memory.DirectChatMemory(
+                    listOf(run.id.value), captureWorkflowId = run.id.value,
+                )
+                val made = try {
+                    val voice = memory.voice(models.queen, com.hereliesaz.geministrator.domain.BuiltInRoles.Orchestrator.id.value,
+                        conversationId = "wording:${run.id.value}")
+                    com.hereliesaz.geministrator.queen.generateWordings(voice, definition, run, rolesNow, checkpoint)
+                } finally {
+                    memory.flushReplies()
+                }
                 if (made.isNotEmpty()) {
                     queenWordings[runId] = made
                     while (queenWordings.size > 32) queenWordings.remove(queenWordings.keys.first())
@@ -1871,8 +1877,11 @@ class ApplicationRuntime private constructor(
                 val models = resolveDisputeModels()
                 val researcher = models?.research
                 val researchPass: (suspend (String) -> List<String>?)? =
-                    if (researcher == null) null else { missing -> researcher.findings(missing, "dispute-$runId",
-                        memoryRunIds = if (persistence.runs.get(WorkflowRunId(runId)) != null) listOf(runId) else emptyList()) }
+                    if (researcher == null) null else { missing ->
+                        val owner = persistence.runs.get(WorkflowRunId(runId))?.id?.value
+                        researcher.findings(missing, "dispute-$runId",
+                            memoryRunIds = listOfNotNull(owner), captureWorkflowId = owner)
+                    }
                 val investigator = com.hereliesaz.geministrator.queen.DisputeInvestigator(
                     research = researchPass,
                     test = { request -> launchDisputeTestSwarm(runId, case.dispute, request) },
