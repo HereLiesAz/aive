@@ -38,10 +38,15 @@ internal data class CollectiveConversation(
         val assessments = turns.lastOrNull { it.result.assessments.isNotEmpty() }
             ?.result?.assessments.orEmpty()
         if (assessments.isEmpty()) return dialogue.takeLast(1800)
-        val sample = assessments.filterNot { it.crossExamination } + assessments.filter { it.crossExamination }.takeLast(1)
+        val latest = assessments.asReversed().distinctBy { it.role }.asReversed()
+        val sample = latest.takeLast(4)
         val notes = sample.joinToString("\n") {
-            "${it.role.take(40)}${if (it.crossExamination) " (cross-examination)" else ""}: ${it.text.take(300)}"
-        }
+            val persuasion = it.persuadedBy?.let { number ->
+                val source = assessments.getOrNull(number - 1)
+                source?.let { previous -> " (reports persuaded by ${previous.role.take(40)}: ${previous.text.take(100)})" }
+            }.orEmpty()
+            "${it.role.take(40)}$persuasion: ${it.text.take(225)}"
+        } + if (latest.size > sample.size) "\nAdditional participants' positions omitted." else ""
         val reference = ("\nLatest available specialist assessment excerpts (unverified; may be from an earlier turn):\n$notes").take(1800)
         return dialogue.takeLast(1800 - reference.length) + reference
     }
@@ -72,7 +77,8 @@ internal data class CollectiveConversation(
                     assessment.role, "Historical agent advisory excerpt (unverified); role=${assessment.role}; " +
                         "instance=${assessment.specialistId ?: "unknown"}; configured Source=${assessment.sourceId ?: "unknown"}; " +
                         "model=${assessment.modelId ?: "unknown"}; phase=${if (assessment.crossExamination) "cross-examination" else "initial"}; " +
-                        "argument=${slot + 1}; respondsTo=${assessment.respondsTo ?: "not recorded"}", MemorySourceKind.AgentNote)
+                        "utterance=${slot + 1}; respondsTo=${assessment.respondsTo ?: "not recorded"}; " +
+                        "persuadedBy=${assessment.persuadedBy ?: "not reported"}", MemorySourceKind.AgentNote)
             }
             turn.result.answer?.let { answer ->
                 addUtterance("facilitator", answer, BuiltInRoles.Orchestrator.id.value,

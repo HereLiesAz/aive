@@ -59,26 +59,27 @@ internal fun CollectiveChatPart(host: WorkflowLibraryHost) {
             style = AzphaltType.body, color = azphaltOnSurface())
         result.stop?.let { stop ->
             val explanation = when (stop) {
-                com.hereliesaz.geministrator.queen.DeliberationStop.NoFurtherReviewRequested -> "No further review requested; not a verification."
+                com.hereliesaz.geministrator.queen.DeliberationStop.NoFurtherReviewRequested -> "No further conversation requested; agreement is not inferred."
                 com.hereliesaz.geministrator.queen.DeliberationStop.RepeatedObjection -> "Repeated review request; no resolution inferred."
-                com.hereliesaz.geministrator.queen.DeliberationStop.ReviewUnavailable -> "Review unavailable under current admission or resource constraints."
+                com.hereliesaz.geministrator.queen.DeliberationStop.ReviewUnavailable -> "A requested response was unavailable."
                 com.hereliesaz.geministrator.queen.DeliberationStop.TimeBudget -> "Deliberation time budget reached."
                 com.hereliesaz.geministrator.queen.DeliberationStop.NoInitialAssessment -> "No initial assessment obtained."
             }
             Text(explanation, style = AzphaltType.body, color = azphaltOnSurface())
         }
         if (result.reviewRequested && result.assessments.none { it.crossExamination }) {
-            Text("Cross-examination requested but not obtained.", style = AzphaltType.body, color = azphaltOnSurface())
+            Text("Further conversation requested but not obtained.", style = AzphaltType.body, color = azphaltOnSurface())
         }
         if (result.unexaminedRequests.isNotEmpty()) Text(
             "Unexamined requests: " + result.unexaminedRequests.joinToString { "#$it" },
             style = AzphaltType.body, color = azphaltOnSurface())
         if (result.assessments.isNotEmpty()) {
-            Text("Internal debate (rhetoracracy; arguments, not votes)", style = AzphaltType.body, color = azphaltOnSurface())
+            Text("Internal conversation (rhetoracracy)", style = AzphaltType.body, color = azphaltOnSurface())
             result.assessments.forEachIndexed { index, assessment ->
                 val target = assessment.respondsTo?.let { " (responds to #$it)" }
-                    ?: if (assessment.crossExamination) " (cross-examination)" else ""
-                Text("#${index + 1} ${assessment.role}$target: ${assessment.text}", style = AzphaltType.body, color = azphaltOnSurface())
+                    ?: if (assessment.crossExamination) " (response)" else ""
+                val persuasion = assessment.persuadedBy?.let { " (reports persuaded by #$it)" }.orEmpty()
+                Text("#${index + 1} ${assessment.role}$target$persuasion: ${assessment.text}", style = AzphaltType.body, color = azphaltOnSurface())
                 if (inspect) Text("Configured Source: ${assessment.sourceId ?: "unknown"} / model: ${assessment.modelId ?: "unknown"}; instance ${assessment.specialistId?.take(12) ?: "legacy"}",
                     style = AzphaltType.body, color = azphaltOnSurface())
             }

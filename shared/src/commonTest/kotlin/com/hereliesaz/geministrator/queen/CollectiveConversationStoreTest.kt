@@ -15,12 +15,15 @@ class CollectiveConversationStoreTest {
         val store = CollectiveConversationStore(settings) { 100L }
         val id = store.create().id
         val assessments = (1..9).map { CollectiveAssessment("role-$it", "Actual assessment $it",
-            crossExamination = it > 2, respondsTo = if (it > 2) it - 1 else null) }
+            crossExamination = it > 2, respondsTo = if (it > 2) it - 1 else null,
+            persuadedBy = if (it == 9) 8 else null) }
         store.append(id, "Question", CollectiveAnswer("Answer", assessments, emptyList(),
             reviewRequested = true, stop = DeliberationStop.RepeatedObjection))
         val restored = requireNotNull(CollectiveConversationStore(settings) { 200L }.get(id))
         assertEquals(assessments, restored.turns.single().result.assessments)
         assertEquals(11, restored.historicalMemoryRequests(200L).size)
+        assertTrue("reports persuaded by role-8" in restored.context())
+        assertTrue(restored.historicalMemoryRequests(200L).any { "persuadedBy=8" in it.label })
         assertEquals(DeliberationStop.RepeatedObjection, restored.turns.single().result.stop)
     }
 
