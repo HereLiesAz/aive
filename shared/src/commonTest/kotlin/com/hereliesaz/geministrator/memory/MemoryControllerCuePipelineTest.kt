@@ -450,10 +450,12 @@ class MemoryControllerCuePipelineTest {
             "We decided to replace SettingsMemoryStore with an append-only log in MemoryLog.kt because every commit re-encoded the snapshot.",
             "Move the memory store off JSON settings.",
         )
+        val session = handle("agent-1")
+        controller.observer.onSessionStarted(session, request("agent-1", "session:agent-1"))
         val before = store.read()
         val sent = mutableListOf<String>()
         controller.observer.onSessionEvent(
-            handle("agent-1"),
+            session,
             AgentEvent.Message(ProviderRunId("run-agent-1"), "Check #SettingsMemoryStore and how MemoryLog encodes the snapshot."),
         ) { sent += it; ProviderActionResult.Accepted }
 
