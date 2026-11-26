@@ -89,5 +89,6 @@ class ChatArchiveTest {
         assertEquals(1024, snapshot.episodes.flatMap { it.chunks }.map { it.text }.toSet().size)
         controller.updateSettings { it.copy(enabled = false) }
         assertFailsWith<IllegalStateException> { controller.importChatArchives(docs) }
+        Unit // JUnit requires a void test method, not the exception returned by assertFailsWith.
     }
 }
