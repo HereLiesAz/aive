@@ -30,11 +30,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Resolve h2g2 version from catalog
+        id: h2g2-version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(awk -F '"' '/^conveyance-h2g2 = "/ { print $2 }' gradle/libs.versions.toml)
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Invalid h2g2 catalog version"; exit 1; }
+          echo "ref=refs/tags/$version" >> "$GITHUB_OUTPUT"
+
       - name: Check out h2g2
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: HereLiesAz/conveyance-h2g2
-          ref: 966f3b99212fada0498f83f0fd8d63b3b87340fd # pinned: README "Bumping the vendor pins"
+          ref: ${{ steps.h2g2-version.outputs.ref }}
           path: vendor/conveyance-h2g2
 
       - name: Check out Conveyance
@@ -127,11 +136,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Resolve h2g2 version from catalog
+        id: h2g2-version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(awk -F '"' '/^conveyance-h2g2 = "/ { print $2 }' gradle/libs.versions.toml)
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Invalid h2g2 catalog version"; exit 1; }
+          echo "ref=refs/tags/$version" >> "$GITHUB_OUTPUT"
+
       - name: Check out h2g2
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: HereLiesAz/conveyance-h2g2
-          ref: 966f3b99212fada0498f83f0fd8d63b3b87340fd # pinned: README "Bumping the vendor pins"
+          ref: ${{ steps.h2g2-version.outputs.ref }}
           path: vendor/conveyance-h2g2
 
       - name: Check out Conveyance

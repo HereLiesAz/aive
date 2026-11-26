@@ -31,7 +31,7 @@ Swarm nodes may be performed by AI sources such as specialized model agents, LLM
 - `buildSrc/` — Gradle build logic for generating and verifying brand assets
 - `native/` — Rust native code: `bitcos/` (BITCOS ternary-weight runtime) and `djl-tokenizer/` (16 KB-aligned Android build of DJL's tokenizer JNI library)
 - `tools/` — offline tooling: Azphalt package builder (`azp/`), BitNet benchmark, specialist optimization pipeline, Google Play asset generator
-- `vendor/` — not committed. `conveyance-h2g2` (the H2G2 style library) is built as a composite when present at `vendor/conveyance-h2g2`, with Conveyance at `vendor/conveyance-h2g2/vendor/Conveyance`. CI checks both out at pinned commit SHAs (`ref:` on each checkout in `.github/workflows/`); to build locally, clone them there at those SHAs (the JitPack fallback has no desktop variant). See "Bumping the vendor pins" below.
+- `vendor/` — not committed. `conveyance-h2g2` (the H2G2 style library) is built as a composite when present at `vendor/conveyance-h2g2`, with Conveyance at `vendor/conveyance-h2g2/vendor/Conveyance`. CI checks h2g2 out at the release tag in `gradle/libs.versions.toml` and Conveyance at the pinned commit SHA in `.github/workflows/`; to build locally, clone them there at the same revisions (the JitPack fallback has no desktop variant). See "Bumping the vendor pins" below.
 - `docs/` — current product documentation and privacy policy
 - `docs/azphalt-packages/` — source for the Azphalt swarm/role packages packed by `tools/azp`
 - `docs/swarm-terrarium/` — terrarium node-creature design brief, character art and manifests
@@ -57,11 +57,7 @@ The sideloaded GitHub-flavor APK is built and signed by `multiplatform.yml` on e
 
 ### Bumping the vendor pins
 
-The `ref:` values for `HereLiesAz/conveyance-h2g2` and `HereLiesAz/Conveyance` are repeated in `multiplatform.yml`, `android-ci.yml`, `bitcos-engine.yml` and `dependency-submission.yml`, and must stay identical. To move them:
-
-1. Resolve the new commits: `git ls-remote https://github.com/HereLiesAz/conveyance-h2g2 HEAD`, and the same for `Conveyance`.
-2. Replace every `ref:` that carries the old SHA (`grep -rn "pinned: README" .github/workflows`).
-3. Check the local `vendor/` clones out at the same SHAs and run the tests before pushing.
+Change `conveyance-h2g2` in the `[versions]` section of `gradle/libs.versions.toml` to a published release tag. Gradle and every CI h2g2 checkout consume that value. The separate Conveyance commit pin remains identical across the four vendor workflows. Check local `vendor/` clones out at those same revisions and run the tests before pushing.
 
 The shared `HereLiesAz/workflows` actions (version, release and CI report) are still referenced at `@main`: that repository is owner-controlled, so repinning them is the owner's call. Third-party actions are pinned to full commit SHAs with the tag in a trailing comment; Dependabot (`github-actions`) updates both.
 
