@@ -41,6 +41,9 @@ jobs:
           version=$(awk -F '"' '/^conveyance-h2g2 = "/ { print $2 }' gradle/libs.versions.toml)
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Invalid h2g2 catalog version"; exit 1; }
           echo "ref=refs/tags/$version" >> "$GITHUB_OUTPUT"
+          conveyance=$(awk -F '"' '/^conveyance = "/ { print $2 }' gradle/libs.versions.toml)
+          [[ "$conveyance" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "conveyance-ref=refs/tags/$conveyance" >> "$GITHUB_OUTPUT"
 
       - name: Check out h2g2
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -53,7 +56,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: HereLiesAz/Conveyance
-          ref: 9d9a694c64d0bdfd1d6e9f38a1ad972bb5618ac4 # pinned: README "Bumping the vendor pins"
+          ref: ${{ steps.h2g2-version.outputs.conveyance-ref }}
           path: vendor/conveyance-h2g2/vendor/Conveyance
 
       - name: Set up JDK 21
