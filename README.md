@@ -31,7 +31,7 @@ Swarm nodes may be performed by AI sources such as specialized model agents, LLM
 - `buildSrc/` — Gradle build logic for generating and verifying brand assets
 - `native/` — Rust native code: `bitcos/` (BITCOS ternary-weight runtime) and `djl-tokenizer/` (16 KB-aligned Android build of DJL's tokenizer JNI library)
 - `tools/` — offline tooling: Azphalt package builder (`azp/`), BitNet benchmark, specialist optimization pipeline, Google Play asset generator
-- H2G2 and Conveyance are published Kotlin Multiplatform Maven dependencies. Set `GITHUB_ACTOR` and `GH_TOKEN` (package read access) for local builds. The H2G2 version is in `gradle/libs.versions.toml`; Conveyance is its transitive dependency.
+- H2G2 resolves from GitHub Packages and its Conveyance dependencies from public JitPack. Set `GITHUB_ACTOR` and `GH_TOKEN` (package read access) for local builds. The H2G2 version is in `gradle/libs.versions.toml`; Conveyance is its transitive dependency.
 - `docs/` — current product documentation and privacy policy
 - `docs/azphalt-packages/` — source for the Azphalt swarm/role packages packed by `tools/azp`
 - `docs/swarm-terrarium/` — terrarium node-creature design brief, character art and manifests
@@ -40,7 +40,7 @@ Swarm nodes may be performed by AI sources such as specialized model agents, LLM
 
 ## Building
 
-Requirements: JDK 21, the Android SDK (the project reads `local.properties` or `ANDROID_HOME`), and for the Android and desktop builds a Rust toolchain with `cargo-ndk` (Android targets `aarch64-linux-android`, `armv7-linux-androideabi`, `x86_64-linux-android`) because `native/` is compiled during the build. Clone `conveyance-h2g2` and Conveyance under `vendor/` first (see the `vendor/` note above).
+Requirements: JDK 21, the Android SDK (the project reads `local.properties` or `ANDROID_HOME`), and for the Android and desktop builds a Rust toolchain with `cargo-ndk` (Android targets `aarch64-linux-android`, `armv7-linux-androideabi`, `x86_64-linux-android`) because `native/` is compiled during the build.
 
 ~~~
 ./gradlew test                              # unit tests, all targets that run on the host
@@ -55,9 +55,9 @@ node tools/puppet-rig/test/rig-core.mjs     # puppet-rig editor tests
 
 The sideloaded GitHub-flavor APK is built and signed by `multiplatform.yml` on every non-PR run: the `./.github/actions/android-keystore` action rebuilds and verifies the keystore from the repository's signing settings, exports `AIVE_KEYSTORE_PATH` and `AIVE_KEYSTORE_TYPE`, and the `release` job publishes the APK as `TheAive-<version>-android.apk` in the grouped GitHub release (the in-app update feed looks for that name). It also builds the signed Play bundle and uploads it, with the R8 mapping, as workflow artifacts. Publishing to Google Play tracks is done only by the central `HereLiesAz/workflows` `android-play-release` run (the repo's `android-play-release.yml` is a hand-off stub), which writes its key to `app/keystore.jks` and exports `KEYSTORE_FILE`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD`. `androidApp/build.gradle.kts` signs the release build with whichever keystore it finds (`AIVE_KEYSTORE_PATH`, `KEYSTORE_FILE` or `app/keystore.jks`) and leaves it unsigned when none exists (local builds, pull requests).
 
-### Bumping the vendor pins
+### Updating H2G2
 
-Change `conveyance-h2g2` in the `[versions]` section of `gradle/libs.versions.toml` to a published release tag. Gradle and every CI h2g2 checkout consume that value. The separate Conveyance commit pin remains identical across the four vendor workflows. Check local `vendor/` clones out at those same revisions and run the tests before pushing.
+Change `conveyance-h2g2` in the `[versions]` section of `gradle/libs.versions.toml` to a release whose complete multiplatform Maven publication is available. The catalog controls the dependency version; no vendor checkout is required.
 
 The shared `HereLiesAz/workflows` actions (version, release and CI report) are still referenced at `@main`: that repository is owner-controlled, so repinning them is the owner's call. Third-party actions are pinned to full commit SHAs with the tag in a trailing comment; Dependabot (`github-actions`) updates both.
 
