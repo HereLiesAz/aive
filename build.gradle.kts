@@ -37,10 +37,12 @@ if (useMavenLocalH2g2) {
         ?.readLines()
         ?.firstNotNullOfOrNull { line -> Regex("^conveyance\\s*=\\s*\"([^\"]+)\"").find(line.trim())?.groupValues?.get(1) }
         ?: "0.5.0"
+    val h2g2Dependency = libs.conveyance.h2g2.get()
+    val h2g2Coordinate = "${h2g2Dependency.module}:${h2g2Dependency.versionConstraint.requiredVersion}"
     allprojects {
         configurations.configureEach {
             resolutionStrategy.dependencySubstitution {
-                substitute(module("com.github.HereLiesAz:conveyance-h2g2:6e9893774c3f41f06ec71ee02d44e96baaf54147"))
+                substitute(module(h2g2Coordinate))
                     .using(module("com.hereliesaz.conveyance:conveyance-h2g2:$h2g2Local"))
                 substitute(module("com.github.HereLiesAz.Conveyance:conveyance-core:$conveyanceRevision"))
                     .using(module("com.hereliesaz.conveyance:conveyance-core:$conveyanceLocal"))
