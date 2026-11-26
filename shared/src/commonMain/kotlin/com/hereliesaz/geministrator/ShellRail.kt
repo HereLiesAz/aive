@@ -140,6 +140,8 @@ internal fun railHiveStep(destination: ControlRoomDestination, inDistrict: Boole
 
 /** Line icons on a 24-unit grid, stroked like the Figma design's (1.8 units, round caps). */
 internal enum class ShellIcon(val paths: List<String>) {
+    /** Three adjoining hexagons mark the district, rather than a single goal. */
+    District(listOf("M12 1.5l5.2 3v6L12 13.5l-5.2-3v-6z", "M6.8 10.5l5.2 3v6l-5.2 3-5.2-3v-6z", "M17.2 10.5l5.2 3v6l-5.2 3-5.2-3v-6z")),
     Hive(listOf("M12 3l7.8 4.5v9L12 21l-7.8-4.5v-9L12 3z", "M12 8l3.5 2v4L12 16l-3.5-2v-4L12 8z")),
     Inbox(listOf("M4 4h16v13H4z", "M4 13h4l2 3h4l2-3h4")),
     Swarm(listOf("M12 9m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M17 7m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0", "M3 20c0-4 2-6 6-6s6 2 6 6M15 13c4 0 6 2 6 5")),
@@ -425,7 +427,11 @@ private fun WideCrumbs(crumbs: List<ShellCrumb>, modifier: Modifier = Modifier) 
                 }
             }
             Box(step.padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
-                Text(crumb.label, style = style, color = on, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 360.dp))
+                if (crumb.icon != null) {
+                    ShellGlyph(crumb.icon, on, size = 24.dp)
+                } else {
+                    Text(crumb.label, style = style, color = on, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 360.dp))
+                }
             }
         }
     }

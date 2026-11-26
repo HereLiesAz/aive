@@ -1291,6 +1291,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="nav_runtime_resume_failed">STOPPED</string>
     <string name="nav_the_aive">THE AIVE</string>
     <string name="crumb_hive">District</string>
+    <string name="crumb_goal">Hive</string>
     <string name="crumb_label">Where you are</string>
     <string name="crumb_here">You are here</string>
     <string name="creature_tab_needs">Needs</string>

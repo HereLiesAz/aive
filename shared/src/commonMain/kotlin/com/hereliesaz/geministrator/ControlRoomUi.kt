@@ -126,7 +126,7 @@ import com.hereliesaz.geministrator.resources.place_overview
 import com.hereliesaz.geministrator.resources.place_swarm_library
 import com.hereliesaz.geministrator.resources.place_memory_swarm
 import com.hereliesaz.geministrator.resources.crumb_here
-import com.hereliesaz.geministrator.resources.first_hive
+import com.hereliesaz.geministrator.resources.crumb_goal
 import com.hereliesaz.geministrator.resources.crumb_hive
 import com.hereliesaz.geministrator.resources.crumb_label
 import com.hereliesaz.geministrator.resources.nav_the_aive
@@ -597,21 +597,10 @@ fun ControlRoom(
         inDistrict = district.value,
         // Only show a repository belonging to this hive. A resting hive need not belong
         // to the project of the live run that may be open behind it.
-        repositoryName = when {
+        repository = when {
             restingShown -> null
             liveWorkflow != null -> liveWorkflow.run.repositorySnapshot ?: liveWorkflow.project.repository
             runtimeState is ApplicationRuntimeState.NoRun -> runtimeState.project.repository
-            else -> null
-        }?.let(::shellRepositoryLabel),
-        hiveName = when {
-            restingShown -> restingDefinition?.name
-            // Objective-created workflows historically use the first 80 prompt characters as
-            // their name. That is not a hive name: prefer the named project in that case.
-            liveWorkflow != null -> shellHiveLabel(
-                liveWorkflow.definition, liveWorkflow.run, liveWorkflow.project,
-            )
-            runtimeState is ApplicationRuntimeState.NoRun -> runtimeState.project.name
-            runtimeState is ApplicationRuntimeState.NoProject -> stringResource(Res.string.first_hive)
             else -> null
         },
         creatureName = selectedTaskId?.takeIf { inspectorVisible }?.let { id -> creatureCrumb(id, liveWorkflow, restingDefinition) },
@@ -957,13 +946,12 @@ internal fun openSpendLimits(
 /** Where the spend caps are: Allowance (the Limits part), on every width. */
 internal fun spendLimitsSection(@Suppress("UNUSED_PARAMETER") compact: Boolean): KeeperSection = KeeperSection.Limits
 
-/** A repository's source and short, credential-free name; local Git uses its folder name. */
-internal fun shellRepositoryLabel(repository: RepositoryRef): String =
-    "${repository.source.displayName()}: ${repository.displayName()}"
-
-/** An explicitly named hive stays named. A legacy objective-named hive uses its project name instead. */
-internal fun shellHiveLabel(definition: WorkflowDefinition, run: WorkflowRun, project: Project): String =
-    definition.name.takeUnless { it.isBlank() || it == run.objective.take(80) } ?: project.name
+/** Credential-free owner/group and repository labels, in breadcrumb order. Local Git has no owner. */
+internal fun shellRepositoryLabels(repository: RepositoryRef): List<String> =
+    listOfNotNull(
+        repository.owner.takeIf { repository.source != RepositorySource.Local && it.isNotBlank() },
+        repository.name.takeIf(String::isNotBlank),
+    )
 
 /** One step of the breadcrumb: where the keeper is, and the way back up. */
 internal data class ShellCrumb(
@@ -977,18 +965,19 @@ internal data class ShellCrumb(
     val onMenuSelect: ((String) -> Unit)? = null,
     /** Hosts the menu starts opened on, outermost first. */
     val menuPath: List<String> = emptyList(),
+    /** Optional glyph instead of visible text; [label] remains its accessible name. */
+    val icon: ShellIcon? = null,
 )
 
 /**
- * The breadcrumb (docs/Keepers-Room.md, stage 2): Hive › repository › hive › creature, or Hive › a place
- * opened from it. It replaces the navigation and the page titles; the last step is where you are.
+ * The breadcrumb: District glyph › owner › repository › Hive › creature › tab, or District › a place.
+ * Hive is the goal, never its prompt or project name. The last step is where you are.
  */
 @Composable
 private fun shellCrumbs(
     destination: ControlRoomDestination,
     inDistrict: Boolean,
-    repositoryName: String?,
-    hiveName: String?,
+    repository: RepositoryRef?,
     creatureName: String?,
     creatureTab: String?,
     timelineName: String?,
@@ -1011,14 +1000,18 @@ private fun shellCrumbs(
     add(
         ShellCrumb(
             stringResource(Res.string.crumb_hive), "crumb-hive", onOpenDistrict,
-            menu = places, menuSelected = placesSelected, onMenuSelect = onPlace,
+            menu = places, menuSelected = placesSelected, onMenuSelect = onPlace, icon = ShellIcon.District,
         ),
     )
     when {
         destination == ControlRoomDestination.Overview -> {
             if (inDistrict) return@buildList
-            repositoryName?.takeIf(String::isNotBlank)?.let { add(ShellCrumb(it, "crumb-repository", onOpenRepository)) }
-            hiveName?.takeIf(String::isNotBlank)?.let { add(ShellCrumb(it, "crumb-a-hive", onOpenHive)) }
+            repository?.let { repo ->
+                val labels = shellRepositoryLabels(repo)
+                if (labels.size == 2) add(ShellCrumb(labels.first(), "crumb-owner", null))
+                labels.lastOrNull()?.let { add(ShellCrumb(it, "crumb-repository", onOpenRepository)) }
+            }
+            add(ShellCrumb(stringResource(Res.string.crumb_goal), "crumb-a-hive", onOpenHive))
             if (creatureName == null) timelineName?.let {
                 add(ShellCrumb(it, "crumb-timeline", null, menu = story, menuSelected = storySelected, onMenuSelect = onStory, menuPath = storyPath))
             }
@@ -1126,12 +1119,7 @@ private fun Breadcrumb(crumbs: List<ShellCrumb>, openMenu: String?, onMenu: (Str
             val last = index == crumbs.lastIndex
             // A step with a stack opens it under itself; one without goes where it always went.
             val onClick = if (crumb.menu != null) ({ onMenu(if (openMenu == crumb.seed) null else crumb.seed) }) else crumb.onClick
-            Text(
-                text = crumb.label,
-                style = AzphaltType.body.copy(fontWeight = if (last) FontWeight.ExtraBold else FontWeight.Medium),
-                color = azphaltOnSurface(),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            Box(
                 modifier = Modifier
                     .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
                     // The text sits in the middle of its touch target, level with the chevrons beside it.
@@ -1147,7 +1135,20 @@ private fun Breadcrumb(crumbs: List<ShellCrumb>, openMenu: String?, onMenu: (Str
                         }
                     }
                     .padding(horizontal = 4.dp),
-            )
+                contentAlignment = Alignment.Center,
+            ) {
+                if (crumb.icon != null) {
+                    ShellGlyph(crumb.icon, azphaltOnSurface(), size = 24.dp)
+                } else {
+                    Text(
+                        text = crumb.label,
+                        style = AzphaltType.body.copy(fontWeight = if (last) FontWeight.ExtraBold else FontWeight.Medium),
+                        color = azphaltOnSurface(),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
         }
     }
 }
