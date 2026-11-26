@@ -13,37 +13,36 @@ plugins {
 // Dependency security floors (Guava, Jackson, BouncyCastle, ...) for every project: one script.
 apply(from = "gradle/security-floors.settings.gradle.kts")
 
-// Kotlin/Wasm package tasks cannot safely traverse the nested composite
-// Aive -> H2G2 -> Conveyance. Production web tasks therefore resolve the exact Maven-local
-// publications prepared by CI. Android/Desktop and ordinary development keep compiling H2G2 source.
-val isolatedWebBuild = gradle.startParameter.taskNames.any { task ->
-    task.startsWith(":webApp:") && (
-        task.contains("wasmJsBrowser", ignoreCase = true)
-        )
-}
-val useLocalH2g2 = providers.gradleProperty("aive.useLocalH2g2")
-    .orNull
-    ?.toBooleanStrictOrNull()
-    ?: !isolatedWebBuild
-val useMavenLocalH2g2 = providers.gradleProperty("aive.useMavenLocalH2g2")
-    .orNull
-    ?.toBooleanStrictOrNull()
-    ?: isolatedWebBuild
-val localH2g2 = file("vendor/conveyance-h2g2")
-if (useLocalH2g2 && localH2g2.exists()) {
-    includeBuild(localH2g2) {
-        dependencySubstitution {
-            substitute(module("com.github.HereLiesAz:conveyance-h2g2"))
-                .using(project(":"))
-        }
-    }
-}
-
 dependencyResolutionManagement {
     repositories {
-        if (useMavenLocalH2g2) mavenLocal()
         google()
         mavenCentral()
+        // The two upstream libraries share a group, but are published to distinct repositories.
+        // Include variant modules as well as the KMP root metadata.
+        exclusiveContent {
+            forRepository {
+                maven("https://maven.pkg.github.com/HereLiesAz/Conveyance") {
+                    credentials {
+                        username = providers.environmentVariable("GITHUB_ACTOR").orNull
+                        password = providers.environmentVariable("GH_TOKEN")
+                            .orElse(providers.environmentVariable("GITHUB_TOKEN")).orNull
+                    }
+                }
+            }
+            filter { includeModuleByRegex("com\\.hereliesaz\\.conveyance", "conveyance-(core|compose)(-.*)?") }
+        }
+        exclusiveContent {
+            forRepository {
+                maven("https://maven.pkg.github.com/HereLiesAz/conveyance-h2g2") {
+                    credentials {
+                        username = providers.environmentVariable("GITHUB_ACTOR").orNull
+                        password = providers.environmentVariable("GH_TOKEN")
+                            .orElse(providers.environmentVariable("GITHUB_TOKEN")).orNull
+                    }
+                }
+            }
+            filter { includeModuleByRegex("com\\.hereliesaz\\.conveyance", "conveyance-h2g2(-.*)?") }
+        }
         // Scoped: JitPack only serves this account's own artifacts, so every other coordinate
         // is never requested from it (an unscoped JitPack made unrelated resolutions fail on its 504s).
         maven("https://jitpack.io") {
