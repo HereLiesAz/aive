@@ -17,19 +17,6 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        // H2G2 publishes its own variants separately; its Conveyance dependencies use JitPack.
-        exclusiveContent {
-            forRepository {
-                maven("https://maven.pkg.github.com/HereLiesAz/conveyance-h2g2") {
-                    credentials {
-                        username = providers.environmentVariable("GITHUB_ACTOR").orNull
-                        password = providers.environmentVariable("GH_TOKEN")
-                            .orElse(providers.environmentVariable("GITHUB_TOKEN")).orNull
-                    }
-                }
-            }
-            filter { includeModuleByRegex("com\\.hereliesaz\\.conveyance", "conveyance-h2g2(-.*)?") }
-        }
         // Scoped: JitPack only serves this account's own artifacts, so every other coordinate
         // is never requested from it (an unscoped JitPack made unrelated resolutions fail on its 504s).
         maven("https://jitpack.io") {

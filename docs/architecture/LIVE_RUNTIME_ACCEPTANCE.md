@@ -50,7 +50,7 @@ Browsers enforce CORS. The Kilo Gateway (`https://api.kilo.ai/api/gateway`) send
 that work there are `llm7` and `ovhcloud`, which both send `access-control-allow-origin: *`. Both are
 rate-limited anonymous tiers. LLM7's catalog default is its `default` alias (a named model,
 `GLM-5.3-Flash`, answered HTTP 400 "currently unavailable" on 2026-09-29);
-`AIVE_LIVE_HOSTED_MODEL` still overrides it. Web builds resolve the published H2G2 Maven variants. Set `GITHUB_ACTOR` and `GH_TOKEN` with package-read access before running:
+`AIVE_LIVE_HOSTED_MODEL` still overrides it. Web builds resolve the published H2G2 Maven variants. Run:
 
 ~~~
 AIVE_LIVE_RUNTIME_VERIFICATION=1 AIVE_LIVE_PROVIDER=llm7 AIVE_LIVE_HOSTED_MODEL=default \

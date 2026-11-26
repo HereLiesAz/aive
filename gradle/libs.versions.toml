@@ -1,6 +1,6 @@
 [versions]
 conveyance = "0.5.2"
-conveyance-h2g2 = "0.7.4"
+conveyance-h2g2 = "0.7.6"
 play-billing = "9.1.0"
 # Retain the 5.13 line for Android API 26; newer JGit lines need a device-tested migration.
 # JGit 7.8 reads loose refs through InputStream.readNBytes (Android API 33).
@@ -39,7 +39,7 @@ sqldelight = "2.4.1"
 quickjs4j = "0.1.1"
 
 [libraries]
-conveyance-h2g2 = { module = "com.hereliesaz.conveyance:conveyance-h2g2", version.ref = "conveyance-h2g2" }
+conveyance-h2g2 = { module = "com.github.HereLiesAz:conveyance-h2g2", version.ref = "conveyance-h2g2" }
 quickjs4j = { module = "io.roastedroot:quickjs4j", version.ref = "quickjs4j" }
 play-billing-ktx = { module = "com.android.billingclient:billing-ktx", version.ref = "play-billing" }
 jgit = { module = "org.eclipse.jgit:org.eclipse.jgit", version.ref = "jgit" }
