@@ -17,20 +17,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        // The two upstream libraries share a group, but are published to distinct repositories.
-        // Include variant modules as well as the KMP root metadata.
-        exclusiveContent {
-            forRepository {
-                maven("https://maven.pkg.github.com/HereLiesAz/Conveyance") {
-                    credentials {
-                        username = providers.environmentVariable("GITHUB_ACTOR").orNull
-                        password = providers.environmentVariable("GH_TOKEN")
-                            .orElse(providers.environmentVariable("GITHUB_TOKEN")).orNull
-                    }
-                }
-            }
-            filter { includeModuleByRegex("com\\.hereliesaz\\.conveyance", "conveyance-(core|compose)(-.*)?") }
-        }
+        // H2G2 publishes its own variants separately; its Conveyance dependencies use JitPack.
         exclusiveContent {
             forRepository {
                 maven("https://maven.pkg.github.com/HereLiesAz/conveyance-h2g2") {
