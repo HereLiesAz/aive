@@ -74,7 +74,7 @@ kotlin {
             // Pinned to h2g2's immutable revision (JitPack), including the shared compact pill renderer.
             // Builds that have the checkout under vendor/conveyance-h2g2 (CI, and local builds with it cloned) include it
             // instead (settings.gradle.kts), whatever this says. Keep the version in build.gradle.kts's substitution the same.
-            implementation("com.github.HereLiesAz:conveyance-h2g2:966f3b99212fada0498f83f0fd8d63b3b87340fd")
+            implementation("com.github.HereLiesAz:conveyance-h2g2:6e9893774c3f41f06ec71ee02d44e96baaf54147")
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.multiplatform.settings.no.arg)
