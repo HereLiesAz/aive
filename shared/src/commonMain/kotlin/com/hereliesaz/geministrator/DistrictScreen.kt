@@ -127,6 +127,7 @@ internal fun DistrictScreen(
         }
     }
     val scroll = rememberScrollState()
+    LaunchedEffect(directoryScope) { scroll.scrollTo(0) }
     Box(modifier.clip(RoundedCornerShape(26.dp))) {
     Column(
         modifier = Modifier
@@ -179,7 +180,7 @@ internal fun DistrictScreen(
                         .groupBy { it.location.owner!!.key }.values.forEach { groups ->
                             val owner = groups.first().location.owner!!
                             LinkText(
-                                stringResource(Res.string.directory_owner_count, owner.label, groups.size),
+                                stringResource(Res.string.directory_owner_count, "${owner.label} (${owner.key.substringBefore(':')})", groups.size),
                                 onClick = { onOpenDirectory(HiveDirectoryScope.Owner(owner)) },
                             )
                         }

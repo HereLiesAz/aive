@@ -537,7 +537,7 @@ fun ControlRoom(
         reconfigureProvider = onReconfigureProvider,
         openCreature = { id, tab -> openCreatureOn(id, tab) },
     )
-    // Back zooms out of a hive to the district before it leaves the app; the panel and other places
+    // Back ascends from a hive through its repository and owner to the district; the panel and other places
     // handle Back themselves first.
     PlatformBackHandler(
         enabled = destination == ControlRoomDestination.Overview && !district.value && !inspectorVisible &&
@@ -604,7 +604,6 @@ fun ControlRoom(
                 district.value = false
             } else {
                 zoomOut()
-                onDestinationSelected(ControlRoomDestination.Overview)
             }
         } else {
             sectionsList.firstOrNull { it.name == key }?.let { section ->

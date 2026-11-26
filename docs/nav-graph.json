@@ -5176,6 +5176,46 @@
    "kind": "link",
    "status": "present",
    "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "hive.repository_directory",
+   "trigger": "Back with repository/project",
+   "callback": "openDirectory",
+   "source": "ControlRoomUi.kt:545",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.repository_directory",
+   "to": "hive.owner_directory",
+   "trigger": "Back with owner",
+   "callback": "directoryScope",
+   "source": "ControlRoomUi.kt:545",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.repository_directory",
+   "to": "hive.district",
+   "trigger": "Back without owner",
+   "callback": "directoryScope",
+   "source": "ControlRoomUi.kt:545",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.owner_directory",
+   "to": "hive.district",
+   "trigger": "Back",
+   "callback": "directoryScope",
+   "source": "ControlRoomUi.kt:545",
+   "kind": "link",
+   "status": "present",
+   "auto": false
   }
  ],
  "flows": [
