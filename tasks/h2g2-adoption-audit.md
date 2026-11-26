@@ -359,3 +359,7 @@ floating snapshot "makes KMP metadata non-reproducible" and can resolve stale pe
 bump the pin manually for future library changes; `0.6.0`'s own build was not run here, and whether JitPack has built that tag was not
 checked (the library's `jitpack.yml` exists). The library's own dependency on Conveyance is pinned to its `0.5.0` tag (per its README), so aive stays on that
 transitive version either way.
+
+### Breadcrumb migration follow-up
+
+The local animated PillStack implementation was replaced with the published `H2g2PillMenu` using `MenuNode` and `TopLeft` placement. The persistent navigation path uses the published `Pill` primitive on both widths. The old Aive-only selected-menu-item and initial-path state is intentionally not emulated; the menu owns its transient state. The existing breadcrumb anchor is host positioning only. The original audit above records the pre-migration state.
