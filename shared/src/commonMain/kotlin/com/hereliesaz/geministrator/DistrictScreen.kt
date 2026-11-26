@@ -4,6 +4,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,10 +41,16 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.directory_projects
+import com.hereliesaz.geministrator.resources.directory_hives
+import com.hereliesaz.geministrator.resources.directory_counts
+import com.hereliesaz.geministrator.resources.directory_owner_count
+import com.hereliesaz.geministrator.resources.directory_empty
 import com.hereliesaz.geministrator.resources.district_loading
 import com.hereliesaz.geministrator.resources.district_load_failed
 import com.hereliesaz.geministrator.resources.district_creatures
@@ -78,8 +86,8 @@ private val Hatched = ClaspGreen
 @Composable
 internal fun DistrictScreen(
     onLoadDefinitions: suspend () -> List<WorkflowDefinition>,
-    /** Runs grouped by the project they ran in; the whole hive is laid out by project. */
-    onLoadRuns: suspend () -> List<Pair<String, List<WorkflowRun>>>,
+    /** Stored runs and their projects, including repository identity for scoped navigation. */
+    onLoadRuns: suspend () -> List<Pair<Project, List<WorkflowRun>>>,
     onEnterNeighbourhood: (Neighbourhood) -> Unit,
     onNewHive: () -> Unit = {},
     /**
@@ -92,10 +100,13 @@ internal fun DistrictScreen(
     roles: Collection<RoleDefinition> = emptyList(),
     onAdopt: (RoleDefinition) -> Unit = {},
     modifier: Modifier = Modifier,
+    directoryScope: HiveDirectoryScope? = null,
+    onOpenDirectory: (HiveDirectoryScope?) -> Unit = {},
 ) {
     var cardImportOpen by remember { mutableStateOf(false) }
     var district by remember { mutableStateOf<List<Neighbourhood>?>(null) }
     var projectOfRun by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var directoryGroups by remember { mutableStateOf<List<HiveDirectoryGroup>>(emptyList()) }
     var loadFailure by remember { mutableStateOf<String?>(null) }
     // The hive whose long-press menu is open, and the one being asked about deleting; the district is read again after a delete.
     var menuFor by remember { mutableStateOf<Neighbourhood?>(null) }
@@ -105,8 +116,11 @@ internal fun DistrictScreen(
         // A store that cannot be read says so here rather than taking the whole screen down.
         runCatching {
             val byProject = onLoadRuns()
-            projectOfRun = byProject.flatMap { (project, runs) -> runs.map { it.id.value to project } }.toMap()
-            district = projectDistrict(onLoadDefinitions(), byProject.flatMap { it.second })
+            val definitions = onLoadDefinitions()
+            projectOfRun = byProject.flatMap { (project, runs) -> runs.map { it.id.value to project.name } }.toMap()
+            directoryGroups = projectHiveDirectory(definitions, byProject)
+            district = projectDistrict(definitions, byProject.flatMap { it.second })
+            loadFailure = null
         }.onFailure { failure ->
             if (failure is kotlinx.coroutines.CancellationException) throw failure
             loadFailure = failure.message ?: failure::class.simpleName
@@ -123,17 +137,56 @@ internal fun DistrictScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         AzphaltThemedSurface(Azphalt.Ink) {
-            Text(stringResource(Res.string.district_your_swarm), style = AzphaltType.section, color = azphaltOnSurface())
-            AzphaltPill(label = stringResource(Res.string.hive_new), seed = "hive-new", onClick = onNewHive)
+            val heading = when (directoryScope) {
+                is HiveDirectoryScope.Owner -> directoryScope.owner.label
+                is HiveDirectoryScope.Repository -> directoryScope.location.label
+                null -> stringResource(Res.string.district_your_swarm)
+            }
+            Text(heading, style = AzphaltType.section, color = azphaltOnSurface())
+            if (directoryScope == null) AzphaltPill(label = stringResource(Res.string.hive_new), seed = "hive-new", onClick = onNewHive)
             loadFailure?.let { message ->
                 Text(stringResource(Res.string.district_load_failed, message), style = AzphaltType.body, color = azphaltOnSurface())
             }
-            importCard?.invoke(cardImportOpen) { cardImportOpen = it }
+            if (directoryScope == null) importCard?.invoke(cardImportOpen) { cardImportOpen = it }
             val neighbourhoods = district ?: run {
                 if (loadFailure == null) {
                     Text(stringResource(Res.string.district_loading), style = AzphaltType.body, color = azphaltOnSurface())
                 }
                 return@AzphaltThemedSurface
+            }
+            when (directoryScope) {
+                is HiveDirectoryScope.Owner -> {
+                    Text(stringResource(Res.string.directory_projects), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+                    val groups = directoryGroups.filter { it.location.owner?.key == directoryScope.owner.key }
+                    if (groups.isEmpty()) Text(stringResource(Res.string.directory_empty), style = AzphaltType.body, color = azphaltOnSurface())
+                    groups.forEach { group -> DirectoryProjectRow(group) { onOpenDirectory(HiveDirectoryScope.Repository(group.location)) } }
+                    return@AzphaltThemedSurface
+                }
+                is HiveDirectoryScope.Repository -> {
+                    Text(stringResource(Res.string.directory_hives), style = AzphaltType.eyebrow, color = azphaltOnSurface())
+                    val group = directoryGroups.firstOrNull { it.location.key == directoryScope.location.key }
+                    if (group == null) Text(stringResource(Res.string.directory_empty), style = AzphaltType.body, color = azphaltOnSurface())
+                    else {
+                        Text(stringResource(Res.string.directory_counts, group.hives.size, group.runCount, group.hives.sumOf { it.needsYou }), style = AzphaltType.body, color = azphaltOnSurface())
+                        group.hives.forEach { hive ->
+                            DirectoryHiveRow(hive, { onEnterNeighbourhood(hive) }, { menuFor = hive })
+                        }
+                    }
+                    return@AzphaltThemedSurface
+                }
+                null -> {
+                    directoryGroups.filter { it.location.owner != null }
+                        .groupBy { it.location.owner!!.key }.values.forEach { groups ->
+                            val owner = groups.first().location.owner!!
+                            LinkText(
+                                stringResource(Res.string.directory_owner_count, owner.label, groups.size),
+                                onClick = { onOpenDirectory(HiveDirectoryScope.Owner(owner)) },
+                            )
+                        }
+                    directoryGroups.filter { it.location.owner == null }.forEach { group ->
+                        DirectoryProjectRow(group) { onOpenDirectory(HiveDirectoryScope.Repository(group.location)) }
+                    }
+                }
             }
             if (neighbourhoods.isEmpty()) {
                 Text(stringResource(Res.string.district_empty), style = AzphaltType.body, color = azphaltOnSurface())
@@ -189,6 +242,48 @@ internal fun DistrictScreen(
             }
         }
     }
+    }
+}
+
+/** Informative project/repository row; its entire touch target opens the scoped hive list. */
+@Composable
+private fun DirectoryProjectRow(group: HiveDirectoryGroup, onClick: () -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().heightIn(min = AzphaltMinTouchTarget)
+            .clip(RoundedCornerShape(16.dp)).background(azphaltOnSurface().copy(alpha = 0.08f))
+            .clickable(role = Role.Button, onClick = onClick).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(group.location.label, style = AzphaltType.lead, color = azphaltOnSurface())
+        if (group.projectNames.any { it != group.location.label }) {
+            Text(group.projectNames.joinToString(" · "), style = AzphaltType.body, color = azphaltOnSurface())
+        }
+        Text(stringResource(Res.string.directory_counts, group.hives.size, group.runCount, group.hives.sumOf { it.needsYou }),
+            style = AzphaltType.body, color = azphaltOnSurface())
+    }
+}
+
+/** Scoped hive row opens the latest run in this repository, with the existing options on long press. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun DirectoryHiveRow(hive: Neighbourhood, onClick: () -> Unit, onLongClick: () -> Unit) {
+    val stateLabel = stringResource(when (hive.state) {
+        NeighbourhoodState.Idle -> Res.string.district_state_idle
+        NeighbourhoodState.Gestating -> Res.string.district_state_gestating
+        NeighbourhoodState.Hatched -> Res.string.district_state_hatched
+        NeighbourhoodState.Withered -> Res.string.district_state_withered
+    })
+    Column(
+        Modifier.fillMaxWidth().heightIn(min = AzphaltMinTouchTarget)
+            .clip(RoundedCornerShape(16.dp)).background(azphaltOnSurface().copy(alpha = 0.08f))
+            .combinedClickable(role = Role.Button, onClick = onClick, onLongClick = onLongClick).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(hive.name, style = AzphaltType.lead, color = azphaltOnSurface())
+        Text("$stateLabel · " + pluralStringResource(Res.plurals.district_creatures, hive.creatures, hive.creatures),
+            style = AzphaltType.body, color = azphaltOnSurface())
+        if (hive.needsYou > 0) Text("${hive.needsYou} " + stringResource(Res.string.district_needs_you),
+            style = AzphaltType.body, color = azphaltOnSurface())
     }
 }
 

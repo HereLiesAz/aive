@@ -276,7 +276,7 @@ class HiveScreenshotTest {
         shoot("3-whole-hive", 900, 1400) {
             DistrictScreen(
                 onLoadDefinitions = { listOf(definition, definition.copy(id = WorkflowDefinitionId("research"), name = "Deep research")) },
-                onLoadRuns = { listOf("The Aive" to listOf(liveRun)) },
+                onLoadRuns = { listOf(Project(liveRun.projectId, "The Aive", createdAtEpochMillis = 1, updatedAtEpochMillis = 1) to listOf(liveRun)) },
                 onEnterNeighbourhood = {},
                 modifier = Modifier.fillMaxSize(),
             )
