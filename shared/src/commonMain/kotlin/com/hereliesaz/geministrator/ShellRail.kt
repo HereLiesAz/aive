@@ -3,7 +3,6 @@ package com.hereliesaz.geministrator
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +17,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
@@ -26,7 +24,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,7 +43,6 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -56,8 +52,6 @@ import androidx.compose.ui.unit.sp
 import com.hereliesaz.geministrator.tour.TourTargetId
 import com.hereliesaz.geministrator.tour.tourTarget
 import com.hereliesaz.geministrator.resources.Res
-import com.hereliesaz.geministrator.resources.crumb_here
-import com.hereliesaz.geministrator.resources.crumb_label
 import com.hereliesaz.geministrator.resources.keeper_room
 import com.hereliesaz.geministrator.resources.nav_the_aive
 import com.hereliesaz.geministrator.resources.rail_brand_the
@@ -358,7 +352,7 @@ private fun RailKeeper(labelled: Boolean) {
 /**
  * The wide header (Figma: `.aive-header`): THE AIVE / the breadcrumb, the hive's state, and the
  * Inbox. The rail holds the Keeper's room, so the gear is not repeated here. Earlier crumbs are
- * text buttons that go back up; the last is where you are.
+ * shared h2g2 pills that go back up; the last is where you are.
  */
 @Composable
 internal fun WideShellHeader(
@@ -377,7 +371,7 @@ internal fun WideShellHeader(
         ) {
             Text(stringResource(Res.string.nav_the_aive), style = AzphaltType.eyebrow.copy(letterSpacing = 0.1.em), color = on)
             Text("/", style = AzphaltType.eyebrow, color = azphaltMutedOnSurface(), modifier = Modifier.clearAndSetSemantics {})
-            WideCrumbs(crumbs, Modifier.weight(1f))
+            Breadcrumb(crumbs.map { it.copy(menu = null) }, openMenu = null, onMenu = {}, modifier = Modifier.weight(1f))
             Row(
                 modifier = Modifier.azphaltLiveRegion(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -393,47 +387,6 @@ internal fun WideShellHeader(
             InboxBadge(unread = unreadInbox, onClick = onOpenInbox, modifier = Modifier.tourTarget(TourTargetId.MESSAGES_BUTTON))
         }
         Box(Modifier.fillMaxWidth().height(2.dp).background(on.copy(alpha = 0.18f)))
-    }
-}
-
-@Composable
-private fun WideCrumbs(crumbs: List<ShellCrumb>, modifier: Modifier = Modifier) {
-    val label = stringResource(Res.string.crumb_label)
-    val here = stringResource(Res.string.crumb_here)
-    val on = azphaltOnSurface()
-    val scroll = rememberScrollState()
-    // A long trail scrolls so where you are, its last step, stays in view.
-    LaunchedEffect(crumbs.map { it.label }, scroll.maxValue) { scroll.scrollTo(scroll.maxValue) }
-    Row(
-        modifier = modifier.semantics { contentDescription = label }.horizontalScroll(scroll),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        crumbs.forEachIndexed { index, crumb ->
-            if (index > 0) Text(">", style = AzphaltType.body, color = azphaltMutedOnSurface(), modifier = Modifier.clearAndSetSemantics {})
-            val last = index == crumbs.lastIndex
-            val style = if (last) AzphaltType.body.copy(fontWeight = FontWeight.ExtraBold) else AzphaltType.body.copy(fontWeight = FontWeight.Medium)
-            val onClick = crumb.onClick
-            val base = Modifier
-                .defaultMinSize(minHeight = AzphaltMinTouchTarget)
-                .clip(RoundedCornerShape(999.dp))
-            val step = if (onClick != null) {
-                base.semantics(mergeDescendants = true) { role = Role.Button; contentDescription = crumb.label }.clickable(onClick = onClick)
-            } else {
-                base.clearAndSetSemantics {
-                    contentDescription = crumb.label
-                    heading()
-                    if (last) stateDescription = here
-                }
-            }
-            Box(step.padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
-                if (crumb.icon != null) {
-                    ShellGlyph(crumb.icon, on, size = 24.dp)
-                } else {
-                    Text(crumb.label, style = style, color = on, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 360.dp))
-                }
-            }
-        }
     }
 }
 

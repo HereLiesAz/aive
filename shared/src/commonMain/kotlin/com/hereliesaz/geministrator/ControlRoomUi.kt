@@ -22,17 +22,16 @@ import com.hereliesaz.geministrator.resources.hive_stop_text
 import com.hereliesaz.geministrator.resources.hive_stop_title
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.key
+import com.hereliesaz.conveyance.h2g2.menu.MenuNode
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -44,7 +43,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.BottomSheetDefaults
@@ -52,8 +50,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
@@ -67,12 +63,6 @@ import com.hereliesaz.geministrator.tour.tourTarget
 import com.hereliesaz.geministrator.log.sessionScope
 import com.hereliesaz.geministrator.workflow.SessionActivityFeeds
 import com.hereliesaz.geministrator.workflow.ProgressiveDelegationStore
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.hereliesaz.geministrator.domain.displayName
 import com.hereliesaz.geministrator.domain.effectiveExecutor
 import androidx.compose.runtime.getValue
@@ -84,8 +74,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import com.hereliesaz.geministrator.azphalt.AzphaltPackageImportRequest
 import com.hereliesaz.geministrator.azphalt.AzphaltStoreService
 import com.hereliesaz.geministrator.domain.Project
@@ -125,10 +113,8 @@ import com.hereliesaz.geministrator.resources.rail_store
 import com.hereliesaz.geministrator.resources.place_overview
 import com.hereliesaz.geministrator.resources.place_swarm_library
 import com.hereliesaz.geministrator.resources.place_memory_swarm
-import com.hereliesaz.geministrator.resources.crumb_here
 import com.hereliesaz.geministrator.resources.crumb_goal
 import com.hereliesaz.geministrator.resources.crumb_hive
-import com.hereliesaz.geministrator.resources.crumb_label
 import com.hereliesaz.geministrator.resources.nav_the_aive
 import com.russhwolf.settings.Settings
 import org.jetbrains.compose.resources.stringResource
@@ -565,17 +551,16 @@ fun ControlRoom(
     val logLabel = stringResource(Res.string.timeline_view_log)
     val logSourceLabels = com.hereliesaz.geministrator.log.LogSource.entries.associateWith { logSourceLabel(it) }
     val storyStack = listOf(
-        PillStackItem(TIMELINE_WATERFALL, waterfallLabel),
-        PillStackItem(TIMELINE_EVENTS, eventsLabel),
-        PillStackItem(TIMELINE_MEMORY, memoryViewLabel),
-        PillStackItem(
-            TIMELINE_LOG, logLabel,
+        MenuNode(TIMELINE_WATERFALL, waterfallLabel, value = TIMELINE_WATERFALL),
+        MenuNode(TIMELINE_EVENTS, eventsLabel, value = TIMELINE_EVENTS),
+        MenuNode(TIMELINE_MEMORY, memoryViewLabel, value = TIMELINE_MEMORY),
+        MenuNode(
+            TIMELINE_LOG, logLabel, emitsToken = false,
             children = com.hereliesaz.geministrator.log.LogSource.entries
                 .filter { it != com.hereliesaz.geministrator.log.LogSource.Memory || memoryLayer?.journal != null }
-                .map { PillStackItem("log:${it.name}", logSourceLabels.getValue(it)) },
+                .map { MenuNode("log:${it.name}", logSourceLabels.getValue(it), value = "log:${it.name}") },
         ),
     )
-    val storySelected = if (timelineView.value == TIMELINE_LOG) "log:${logSourceChoice.value}" else timelineView.value
     val onStory: (String) -> Unit = { key ->
         when {
             key.startsWith("log:") -> {
@@ -590,13 +575,9 @@ fun ControlRoom(
     val sectionsList = ControlRoomDestination.OverviewSections.filter { it != ControlRoomDestination.Memory }
     val sectionLabels = sectionsList.map { it.displayLabel() }
     val placesStack = if (compact) {
-        listOf(PillStackItem("hives", hivesLabel)) + sectionsList.mapIndexed { i, section -> PillStackItem(section.name, sectionLabels[i]) }
+        listOf(MenuNode("hives", hivesLabel, value = "hives")) + sectionsList.mapIndexed { i, section -> MenuNode(section.name, sectionLabels[i], value = section.name) }
     } else {
         null
-    }
-    val placesSelected = when {
-        destination == ControlRoomDestination.Overview && district.value -> "hives"
-        else -> sectionsList.firstOrNull { it == destination }?.name
     }
     val onPlace: (String) -> Unit = { key ->
         if (key == "hives") {
@@ -642,12 +623,9 @@ fun ControlRoom(
         onOpenOwner = { owner -> openDirectory(HiveDirectoryScope.Owner(owner)) },
         onOpenRepository = { location -> openDirectory(HiveDirectoryScope.Repository(location)) },
         places = placesStack,
-        placesSelected = placesSelected,
         onPlace = onPlace,
         story = storyStack,
-        storySelected = storySelected,
         onStory = onStory,
-        storyPath = if (timelineView.value == TIMELINE_LOG) listOf(TIMELINE_LOG) else emptyList(),
     )
 
     // The creature's panel: in a sheet on a phone, docked beside the page on wide screens.
@@ -973,13 +951,10 @@ internal data class ShellCrumb(
     val label: String,
     val seed: String,
     val onClick: (() -> Unit)?,
-    /** A stack that hangs under this step when it is opened (HG2Gui's pill menu, PillStack.kt); null for a plain step. */
-    val menu: List<PillStackItem>? = null,
+    /** A stack that hangs under this step when it is opened (conveyance-h2g2's H2g2PillMenu); null for a plain step. */
+    val menu: List<MenuNode>? = null,
     /** The menu's leaf that is open now. */
-    val menuSelected: String? = null,
     val onMenuSelect: ((String) -> Unit)? = null,
-    /** Hosts the menu starts opened on, outermost first. */
-    val menuPath: List<String> = emptyList(),
     /** Optional glyph instead of visible text; [label] remains its accessible name. */
     val icon: ShellIcon? = null,
 )
@@ -1005,19 +980,16 @@ private fun shellCrumbs(
     onOpenOwner: (HiveDirectoryOwner) -> Unit,
     onOpenRepository: (HiveDirectoryLocation) -> Unit,
     /** The places (Hives, Breeds, Nursery, Shop) that hang under the first step on a phone; null where the rail holds them. */
-    places: List<PillStackItem>? = null,
-    placesSelected: String? = null,
+    places: List<MenuNode>? = null,
     onPlace: ((String) -> Unit)? = null,
     /** The Story's views (and the Log's sources) that hang under its step. */
-    story: List<PillStackItem>? = null,
-    storySelected: String? = null,
+    story: List<MenuNode>? = null,
     onStory: ((String) -> Unit)? = null,
-    storyPath: List<String> = emptyList(),
 ): List<ShellCrumb> = buildList {
     add(
         ShellCrumb(
             stringResource(Res.string.crumb_hive), "crumb-hive", onOpenDistrict,
-            menu = places, menuSelected = placesSelected, onMenuSelect = onPlace, icon = ShellIcon.District,
+            menu = places, onMenuSelect = onPlace, icon = ShellIcon.District,
         ),
     )
     when {
@@ -1033,7 +1005,7 @@ private fun shellCrumbs(
             if (inDistrict) return@buildList
             add(ShellCrumb(stringResource(Res.string.crumb_goal), "crumb-a-hive", onOpenHive))
             if (creatureName == null) timelineName?.let {
-                add(ShellCrumb(it, "crumb-timeline", null, menu = story, menuSelected = storySelected, onMenuSelect = onStory, menuPath = storyPath))
+                add(ShellCrumb(it, "crumb-timeline", null, menu = story, onMenuSelect = onStory))
             }
             creatureName?.let { add(ShellCrumb(it, "crumb-creature", onCloseCreature)) }
             if (creatureName != null) creatureTab?.let { add(ShellCrumb(it, "crumb-creature-tab", null)) }
@@ -1101,75 +1073,17 @@ private fun ShellHeader(
         }
         if (compact) Breadcrumb(crumbs, openMenu, { openMenu = it }, Modifier.fillMaxWidth())
         crumbs.firstOrNull { it.seed == openMenu && it.menu != null }?.let { crumb ->
-            PillStack(
-                modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
-                items = crumb.menu.orEmpty(),
-                selectedKey = crumb.menuSelected,
-                onSelect = { key ->
-                    openMenu = null
-                    crumb.onMenuSelect?.invoke(key)
-                },
-                seedPrefix = crumb.seed,
-                anchorKey = crumb.seed,
-                initialPath = crumb.menuPath,
-            )
-        }
-    }
-    }
-}
-
-@Composable
-private fun Breadcrumb(crumbs: List<ShellCrumb>, openMenu: String?, onMenu: (String?) -> Unit, modifier: Modifier = Modifier) {
-    val anchors = LocalCrumbAnchors.current
-    val label = stringResource(Res.string.crumb_label)
-    val here = stringResource(Res.string.crumb_here)
-    val scroll = rememberScrollState()
-    // A long trail scrolls so where you are, its last step, stays in view.
-    LaunchedEffect(crumbs.map { it.label }, scroll.maxValue) { scroll.scrollTo(scroll.maxValue) }
-    Row(
-        modifier = modifier
-            .semantics { contentDescription = label }
-            .horizontalScroll(scroll),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        crumbs.forEachIndexed { index, crumb ->
-            // ">" and not "›": that glyph fell back to another font on some phones and dropped a line below its steps.
-            if (index > 0) Text(">", style = AzphaltType.lead, color = azphaltOnSurface(), modifier = Modifier.clearAndSetSemantics {})
-            val last = index == crumbs.lastIndex
-            // A step with a stack opens it under itself; one without goes where it always went.
-            val onClick = if (crumb.menu != null) ({ onMenu(if (openMenu == crumb.seed) null else crumb.seed) }) else crumb.onClick
-            Box(
-                modifier = Modifier
-                    .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
-                    // The text sits in the middle of its touch target, level with the chevrons beside it.
-                    .defaultMinSize(minHeight = AzphaltMinTouchTarget)
-                    .wrapContentHeight(Alignment.CenterVertically)
-                    .onGloballyPositioned { anchors?.put(crumb.seed, it.positionInRoot().x) }
-                    .semantics(mergeDescendants = true) {
-                        contentDescription = crumb.label
-                        if (crumb.menu != null) stateDescription = if (openMenu == crumb.seed) "open" else "closed"
-                        if (last) {
-                            heading()
-                            stateDescription = here
-                        }
-                    }
-                    .padding(horizontal = 4.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (crumb.icon != null) {
-                    ShellGlyph(crumb.icon, azphaltOnSurface(), size = 24.dp)
-                } else {
-                    Text(
-                        text = crumb.label,
-                        style = AzphaltType.body.copy(fontWeight = if (last) FontWeight.ExtraBold else FontWeight.Medium),
-                        color = azphaltOnSurface(),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+            key(crumb.seed) {
+                BreadcrumbMenu(
+                    host = crumb,
+                    onSelect = { key ->
+                        openMenu = null
+                        crumb.onMenuSelect?.invoke(key)
+                    },
+                )
             }
         }
+    }
     }
 }
 
