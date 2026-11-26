@@ -31,7 +31,7 @@ Swarm nodes may be performed by AI sources such as specialized model agents, LLM
 - `buildSrc/` — Gradle build logic for generating and verifying brand assets
 - `native/` — Rust native code: `bitcos/` (BITCOS ternary-weight runtime) and `djl-tokenizer/` (16 KB-aligned Android build of DJL's tokenizer JNI library)
 - `tools/` — offline tooling: Azphalt package builder (`azp/`), BitNet benchmark, specialist optimization pipeline, Google Play asset generator
-- `vendor/` — not committed. `conveyance-h2g2` (the H2G2 style library) is built as a composite when present at `vendor/conveyance-h2g2`, with Conveyance at `vendor/conveyance-h2g2/vendor/Conveyance`. CI checks h2g2 out at the release tag in `gradle/libs.versions.toml` and Conveyance at the pinned commit SHA in `.github/workflows/`; to build locally, clone them there at the same revisions (the JitPack fallback has no desktop variant). See "Bumping the vendor pins" below.
+- H2G2 and Conveyance are published Kotlin Multiplatform Maven dependencies. Set `GITHUB_ACTOR` and `GH_TOKEN` (package read access) for local builds. The H2G2 version is in `gradle/libs.versions.toml`; Conveyance is its transitive dependency.
 - `docs/` — current product documentation and privacy policy
 - `docs/azphalt-packages/` — source for the Azphalt swarm/role packages packed by `tools/azp`
 - `docs/swarm-terrarium/` — terrarium node-creature design brief, character art and manifests

@@ -241,16 +241,7 @@ Pushes to `main`:
 The full Aive Wasm browser app remains a CI build target, not a deployed Pages artifact;
 its integration is deferred. See [Puppet rig deployment](../../tools/puppet-rig/README.md#deployment).
 
-The composite build runs on JDK 21, and every module (Android included) targets JVM 21 bytecode. The Aive and the pinned H2G2 renderer also use the same Android Gradle Plugin version because Gradle does not permit incompatible AGP versions inside one composite Android build.
-
-Web packaging uses isolated Maven publications because Kotlin/Wasm package generation cannot
-resolve the nested H2G2 composite build from within itself. CI publishes the pinned source
-checkouts with their native coordinates and enables `aive.useMavenLocalH2g2` to substitute
-the exact pinned dependencies with those local publications. Publication files are not
-renamed or rewritten: Maven and embedded JS package versions must stay consistent, or
-Yarn can try to download a local library from the npm registry. Rebuild the pinned
-publications before using this option locally; their native version alone does not identify
-the source revision.
+The build runs on JDK 21, and every module (Android included) targets JVM 21 bytecode. H2G2 and its Conveyance dependencies resolve published Kotlin Multiplatform metadata and platform variants from GitHub Packages. Android, desktop and Wasm use the same release coordinates; no composite source checkouts or Maven Local substitutions are required. Local builds require `GITHUB_ACTOR` and a package-read `GH_TOKEN`.
 
 The sideloaded GitHub-flavor APK is built and signed by `multiplatform.yml` (the `android-keystore`
 action, then `assembleGithubRelease` and `bundlePlayRelease` with a timestamp-derived monotonic

@@ -24,6 +24,10 @@ concurrency:
   group: aive-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  GH_TOKEN: ${{ secrets.GH_TOKEN }}
+  GITHUB_TOKEN: ${{ github.token }}
+
 jobs:
   version:
     name: Resolve four-part version
@@ -69,32 +73,6 @@ jobs:
           prerelease-major-max: "0"
           environment-variable: AIVE_VERSION
 
-
-      - name: Resolve h2g2 version from catalog
-        id: h2g2-version
-        shell: bash
-        run: |
-          set -euo pipefail
-          version=$(awk -F '"' '/^conveyance-h2g2 = "/ { print $2 }' gradle/libs.versions.toml)
-          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Invalid h2g2 catalog version"; exit 1; }
-          echo "ref=refs/tags/$version" >> "$GITHUB_OUTPUT"
-          conveyance=$(awk -F '"' '/^conveyance = "/ { print $2 }' gradle/libs.versions.toml)
-          [[ "$conveyance" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          echo "conveyance-ref=refs/tags/$conveyance" >> "$GITHUB_OUTPUT"
-
-      - name: Check out h2g2
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: HereLiesAz/conveyance-h2g2
-          ref: ${{ steps.h2g2-version.outputs.ref }}
-          path: vendor/conveyance-h2g2
-
-      - name: Check out Conveyance
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: HereLiesAz/Conveyance
-          ref: ${{ steps.h2g2-version.outputs.conveyance-ref }}
-          path: vendor/conveyance-h2g2/vendor/Conveyance
 
       - name: Set up JDK 21
         uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
@@ -230,9 +208,6 @@ jobs:
       - name: Test distributed compute relay
         run: ./gradlew :computeRelay:test
 
-      - name: Test semantic workflow renderer
-        run: ./gradlew -p vendor/conveyance-h2g2 desktopTest
-
       - name: Test LLM providers
         run: ./gradlew :providers:llm:desktopTest
 
@@ -309,17 +284,7 @@ jobs:
           done
           exit $bad
 
-      - name: Publish Conveyance for isolated web builds
-        run: |
-          ./gradlew -p vendor/conveyance-h2g2/vendor/Conveyance \
-            :conveyance-core:publishToMavenLocal \
-            :conveyance-compose:publishToMavenLocal
-
-      - name: Publish h2g2 for isolated web builds
-        run: ./gradlew -p vendor/conveyance-h2g2 publishToMavenLocal
-
-      # Three builds (root 4g, Conveyance 3g, h2g2 2g heaps) leave their Gradle and Kotlin
-      # daemons alive; with webpack on top the runner runs out of memory and is shut down.
+      # Release Gradle daemon memory before webpack.
       - name: Free memory before web bundles
         run: |
           ./gradlew --stop
@@ -493,32 +458,6 @@ jobs:
           echo "AIVE_VERSION=$AIVE_VERSION" >> "$GITHUB_ENV"
           echo "Aive build version: $AIVE_VERSION"
 
-      - name: Resolve h2g2 version from catalog
-        id: h2g2-version
-        shell: bash
-        run: |
-          set -euo pipefail
-          version=$(awk -F '"' '/^conveyance-h2g2 = "/ { print $2 }' gradle/libs.versions.toml)
-          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Invalid h2g2 catalog version"; exit 1; }
-          echo "ref=refs/tags/$version" >> "$GITHUB_OUTPUT"
-          conveyance=$(awk -F '"' '/^conveyance = "/ { print $2 }' gradle/libs.versions.toml)
-          [[ "$conveyance" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          echo "conveyance-ref=refs/tags/$conveyance" >> "$GITHUB_OUTPUT"
-
-      - name: Check out h2g2
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: HereLiesAz/conveyance-h2g2
-          ref: ${{ steps.h2g2-version.outputs.ref }}
-          path: vendor/conveyance-h2g2
-
-      - name: Check out Conveyance
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: HereLiesAz/Conveyance
-          ref: ${{ steps.h2g2-version.outputs.conveyance-ref }}
-          path: vendor/conveyance-h2g2/vendor/Conveyance
-
       - name: Set up JDK 21
         uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
@@ -565,17 +504,6 @@ jobs:
               exit 1
             fi
           done
-
-      - name: Publish Conveyance to Maven Local
-        shell: bash
-        run: |
-          ./gradlew -p vendor/conveyance-h2g2/vendor/Conveyance \
-            :conveyance-core:publishToMavenLocal \
-            :conveyance-compose:publishToMavenLocal
-
-      - name: Publish h2g2 to Maven Local
-        shell: bash
-        run: ./gradlew -p vendor/conveyance-h2g2 publishToMavenLocal
 
       - name: Package native installer
         shell: bash

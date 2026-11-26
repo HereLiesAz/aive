@@ -50,16 +50,11 @@ Browsers enforce CORS. The Kilo Gateway (`https://api.kilo.ai/api/gateway`) send
 that work there are `llm7` and `ovhcloud`, which both send `access-control-allow-origin: *`. Both are
 rate-limited anonymous tiers. LLM7's catalog default is its `default` alias (a named model,
 `GLM-5.3-Flash`, answered HTTP 400 "currently unavailable" on 2026-09-29);
-`AIVE_LIVE_HOSTED_MODEL` still overrides it. Web builds resolve h2g2 from Maven Local (see `settings.gradle.kts`),
-so publish it first, as CI does:
+`AIVE_LIVE_HOSTED_MODEL` still overrides it. Web builds resolve the published H2G2 Maven variants. Set `GITHUB_ACTOR` and `GH_TOKEN` with package-read access before running:
 
 ~~~
-./gradlew -p vendor/conveyance-h2g2/vendor/Conveyance \
-  :conveyance-core:publishToMavenLocal :conveyance-compose:publishToMavenLocal
-./gradlew -p vendor/conveyance-h2g2 publishToMavenLocal
-
 AIVE_LIVE_RUNTIME_VERIFICATION=1 AIVE_LIVE_PROVIDER=llm7 AIVE_LIVE_HOSTED_MODEL=default \
-  ./gradlew -Paive.useLocalH2g2=false -Paive.useMavenLocalH2g2=true \
+  ./gradlew \
   :providers:llm:wasmJsBrowserTest \
   --tests 'com.hereliesaz.geministrator.providers.llm.ProviderNeutralLiveRuntimeVerificationTest'
 ~~~
@@ -165,7 +160,7 @@ bank's episodes). The script wraps `Worker` to record worker names and lists the
 (1) first start with a write to each of `wf-a` and `wf-b`; (2) reload with another write to `wf-a`;
 (3) reload.
 
-Build a development bundle (web builds resolve h2g2 from Maven Local, published as above), serve the
+Build a development bundle (web builds resolve published H2G2 artifacts), serve the
 distribution together with the webpack output, and run:
 
 ~~~
