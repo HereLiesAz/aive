@@ -31,7 +31,7 @@ Swarm nodes may be performed by AI sources such as specialized model agents, LLM
 - `buildSrc/` — Gradle build logic for generating and verifying brand assets
 - `native/` — Rust native code: `bitcos/` (BITCOS ternary-weight runtime) and `djl-tokenizer/` (16 KB-aligned Android build of DJL's tokenizer JNI library)
 - `tools/` — offline tooling: Azphalt package builder (`azp/`), BitNet benchmark, specialist optimization pipeline, Google Play asset generator
-- H2G2 resolves from GitHub Packages and its Conveyance dependencies from public JitPack. Set `GITHUB_ACTOR` and `GH_TOKEN` (package read access) for local builds. The H2G2 version is in `gradle/libs.versions.toml`; Conveyance is its transitive dependency.
+- H2G2 and its Conveyance dependencies resolve from public JitPack without package credentials. The H2G2 version is in `gradle/libs.versions.toml`; Conveyance is its transitive dependency.
 - `docs/` — current product documentation and privacy policy
 - `docs/azphalt-packages/` — source for the Azphalt swarm/role packages packed by `tools/azp`
 - `docs/swarm-terrarium/` — terrarium node-creature design brief, character art and manifests
