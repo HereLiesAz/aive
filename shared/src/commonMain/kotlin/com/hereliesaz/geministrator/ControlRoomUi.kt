@@ -331,6 +331,7 @@ fun ControlRoom(
     // Semantic zoom (docs/Swarm-OS.md): the district is all the way out; a neighbourhood is one workflow.
     // Held here so the breadcrumb, Back and the hive agree on where the keeper is.
     val district = rememberDurableBooleanState("overview.zoom.district")
+    var directoryScope by remember { mutableStateOf<HiveDirectoryScope?>(null) }
     // A hive that never ran opens at rest (its id here); a hive that ran opens on its latest swarm.
     val restingHive = rememberDurableStringState("overview.resting-hive")
     val restingDefinition by produceState<WorkflowDefinition?>(null, restingHive.value) {
@@ -356,6 +357,14 @@ fun ControlRoom(
     // The hive on screen: a resting hive when one is open (it shows even while another run is live),
     // else the live run's. The breadcrumb and the panel follow what is shown.
     val restingShown = restingHive.value.isNotBlank()
+    val shownProject = when {
+        restingShown -> null
+        liveWorkflow != null -> liveWorkflow.project
+        runtimeState is ApplicationRuntimeState.NoRun -> runtimeState.project
+        else -> null
+    }
+    val shownLocation = shownProject?.let { hiveDirectoryLocation(it, liveWorkflow?.run?.repositorySnapshot ?: it.repository) }
+    LaunchedEffect(district.value) { if (!district.value) directoryScope = null }
     // The hive's Timeline, held here so a creature's "Open its trace" can open it.
     val showTimeline = rememberDurableBooleanState("overview.timeline")
     // A creature whose panel was set aside for its trace: still selected on the Timeline, its panel
@@ -431,10 +440,13 @@ fun ControlRoom(
         destination == ControlRoomDestination.Overview &&
         !district.value
     // Out to the district: the creature panel belongs to a hive, so it closes on the way.
-    val zoomOut = {
+    val openDirectory: (HiveDirectoryScope?) -> Unit = { scope ->
         if (inspectorVisible) selectedTaskId?.let(onTaskSelected)
+        directoryScope = scope
         district.value = true
+        onDestinationSelected(ControlRoomDestination.Overview)
     }
+    val zoomOut = { openDirectory(null) }
     // The creature panel's tab (Needs, Work, Mind). A creature opens on Needs when it waits on you,
     // else on Work; the tab survives a restart while the same creature stays open.
     var creatureTabName by rememberDurableStringState("creature.panel.tab", CreatureTab.Work.name)
@@ -525,12 +537,20 @@ fun ControlRoom(
         reconfigureProvider = onReconfigureProvider,
         openCreature = { id, tab -> openCreatureOn(id, tab) },
     )
-    // Back zooms out of a hive to the district before it leaves the app; the panel and other places
+    // Back ascends from a hive through its repository and owner to the district; the panel and other places
     // handle Back themselves first.
     PlatformBackHandler(
         enabled = destination == ControlRoomDestination.Overview && !district.value && !inspectorVisible &&
             (liveWorkflow != null || restingHive.value.isNotBlank()),
-    ) { zoomOut() }
+    ) { openDirectory(shownLocation?.let { HiveDirectoryScope.Repository(it) }) }
+    PlatformBackHandler(
+        enabled = destination == ControlRoomDestination.Overview && district.value && directoryScope != null,
+    ) {
+        directoryScope = when (val scope = directoryScope) {
+            is HiveDirectoryScope.Repository -> scope.location.owner?.let { HiveDirectoryScope.Owner(it) }
+            else -> null
+        }
+    }
     // On a live hive's Timeline, Back returns to the hive itself before it zooms out to the district.
     PlatformBackHandler(
         enabled = destination == ControlRoomDestination.Overview && !district.value && !inspectorVisible &&
@@ -580,11 +600,10 @@ fun ControlRoom(
     }
     val onPlace: (String) -> Unit = { key ->
         if (key == "hives") {
-            if (destination == ControlRoomDestination.Overview && district.value) {
+            if (destination == ControlRoomDestination.Overview && district.value && directoryScope == null) {
                 district.value = false
             } else {
                 zoomOut()
-                onDestinationSelected(ControlRoomDestination.Overview)
             }
         } else {
             sectionsList.firstOrNull { it.name == key }?.let { section ->
@@ -595,14 +614,8 @@ fun ControlRoom(
     val crumbs = shellCrumbs(
         destination = destination,
         inDistrict = district.value,
-        // Only show a repository belonging to this hive. A resting hive need not belong
-        // to the project of the live run that may be open behind it.
-        repository = when {
-            restingShown -> null
-            liveWorkflow != null -> liveWorkflow.run.repositorySnapshot ?: liveWorkflow.project.repository
-            runtimeState is ApplicationRuntimeState.NoRun -> runtimeState.project.repository
-            else -> null
-        },
+        location = shownLocation,
+        directoryScope = directoryScope.takeIf { district.value },
         creatureName = selectedTaskId?.takeIf { inspectorVisible }?.let { id -> creatureCrumb(id, liveWorkflow, restingDefinition) },
         creatureTab = creatureTab.takeIf { inspectorVisible }?.label(),
         timelineName = stringResource(Res.string.hive_show_timeline).takeIf {
@@ -626,8 +639,8 @@ fun ControlRoom(
         },
         onCloseCreature = { selectedTaskId?.let(onTaskSelected) },
         onCloseKeeperPart = if (compact && keeperOpen.value) ({ keeperOpen.value = false }) else null,
-        // The repository is linked and changed in Connections.
-        onOpenRepository = openConnections,
+        onOpenOwner = { owner -> openDirectory(HiveDirectoryScope.Owner(owner)) },
+        onOpenRepository = { location -> openDirectory(HiveDirectoryScope.Repository(location)) },
         places = placesStack,
         placesSelected = placesSelected,
         onPlace = onPlace,
@@ -865,6 +878,8 @@ fun ControlRoom(
                 modifier = Modifier.weight(1f),
                 compact = compact,
                 district = district,
+                directoryScope = directoryScope,
+                onOpenDirectory = openDirectory,
                 restingHive = restingHive,
                 onZoomOut = zoomOut,
                 keeperSectionName = keeperSectionName,
@@ -977,7 +992,8 @@ internal data class ShellCrumb(
 private fun shellCrumbs(
     destination: ControlRoomDestination,
     inDistrict: Boolean,
-    repository: RepositoryRef?,
+    location: HiveDirectoryLocation?,
+    directoryScope: HiveDirectoryScope?,
     creatureName: String?,
     creatureTab: String?,
     timelineName: String?,
@@ -986,7 +1002,8 @@ private fun shellCrumbs(
     onOpenHive: () -> Unit,
     onCloseCreature: () -> Unit,
     onCloseKeeperPart: (() -> Unit)?,
-    onOpenRepository: (() -> Unit)? = null,
+    onOpenOwner: (HiveDirectoryOwner) -> Unit,
+    onOpenRepository: (HiveDirectoryLocation) -> Unit,
     /** The places (Hives, Breeds, Nursery, Shop) that hang under the first step on a phone; null where the rail holds them. */
     places: List<PillStackItem>? = null,
     placesSelected: String? = null,
@@ -1005,12 +1022,15 @@ private fun shellCrumbs(
     )
     when {
         destination == ControlRoomDestination.Overview -> {
-            if (inDistrict) return@buildList
-            repository?.let { repo ->
-                val labels = shellRepositoryLabels(repo)
-                if (labels.size == 2) add(ShellCrumb(labels.first(), "crumb-owner", null))
-                labels.lastOrNull()?.let { add(ShellCrumb(it, "crumb-repository", onOpenRepository)) }
+            val scopeLocation = when (directoryScope) {
+                is HiveDirectoryScope.Repository -> directoryScope.location
+                is HiveDirectoryScope.Owner -> null
+                null -> location.takeUnless { inDistrict }
             }
+            val owner = (directoryScope as? HiveDirectoryScope.Owner)?.owner ?: scopeLocation?.owner
+            owner?.let { add(ShellCrumb(it.label, "crumb-owner", { onOpenOwner(it) })) }
+            scopeLocation?.let { add(ShellCrumb(it.label, "crumb-repository", { onOpenRepository(it) })) }
+            if (inDistrict) return@buildList
             add(ShellCrumb(stringResource(Res.string.crumb_goal), "crumb-a-hive", onOpenHive))
             if (creatureName == null) timelineName?.let {
                 add(ShellCrumb(it, "crumb-timeline", null, menu = story, menuSelected = storySelected, onMenuSelect = onStory, menuPath = storyPath))
@@ -1258,6 +1278,8 @@ private fun MainDestination(
     onDestinationSelected: (ControlRoomDestination) -> Unit = {},
     computeAvailable: Boolean = true,
     district: MutableState<Boolean> = remember { mutableStateOf(false) },
+    directoryScope: HiveDirectoryScope? = null,
+    onOpenDirectory: (HiveDirectoryScope?) -> Unit = {},
     restingHive: MutableState<String> = remember { mutableStateOf("") },
     onZoomOut: () -> Unit = { district.value = true },
     keeperSectionName: MutableState<String> = remember { mutableStateOf(KeeperSection.Connections.name) },
@@ -1379,7 +1401,9 @@ private fun MainDestination(
                     if (inDistrict) {
                         DistrictScreen(
                             onLoadDefinitions = onLoadWorkflowDefinitions,
-                            onLoadRuns = { onLoadRunHistory().map { (project, runs) -> project.name to runs } },
+                            onLoadRuns = onLoadRunHistory,
+                            directoryScope = directoryScope,
+                            onOpenDirectory = onOpenDirectory,
                             onEnterNeighbourhood = { neighbourhood ->
                                 val runId = neighbourhood.latestRunId
                                 if (runId != null) {

@@ -16,6 +16,7 @@ import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProjectId
+import com.hereliesaz.geministrator.domain.RepositoryRef
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
@@ -276,9 +277,29 @@ class HiveScreenshotTest {
         shoot("3-whole-hive", 900, 1400) {
             DistrictScreen(
                 onLoadDefinitions = { listOf(definition, definition.copy(id = WorkflowDefinitionId("research"), name = "Deep research")) },
-                onLoadRuns = { listOf("The Aive" to listOf(liveRun)) },
+                onLoadRuns = { listOf(Project(liveRun.projectId, "The Aive", createdAtEpochMillis = 1, updatedAtEpochMillis = 1) to listOf(liveRun)) },
                 onEnterNeighbourhood = {},
                 modifier = Modifier.fillMaxSize(),
+            )
+        }
+        val directoryProject = Project(liveRun.projectId, "The Aive", RepositoryRef("HereLiesAz", "aive"),
+            createdAtEpochMillis = 1, updatedAtEpochMillis = 1)
+        val directoryLocation = hiveDirectoryLocation(directoryProject, directoryProject.repository)
+        val directoryHistory = listOf(directoryProject to listOf(liveRun))
+        shoot("41-owner-directory", 720, 1400) {
+            DistrictScreen(
+                onLoadDefinitions = { listOf(definition) },
+                onLoadRuns = { directoryHistory },
+                onEnterNeighbourhood = {},
+                directoryScope = HiveDirectoryScope.Owner(requireNotNull(directoryLocation.owner)),
+            )
+        }
+        shoot("42-repository-directory", 720, 1400) {
+            DistrictScreen(
+                onLoadDefinitions = { listOf(definition) },
+                onLoadRuns = { directoryHistory },
+                onEnterNeighbourhood = {},
+                directoryScope = HiveDirectoryScope.Repository(directoryLocation),
             )
         }
         shoot("5-launch-bar", 900, 600) {

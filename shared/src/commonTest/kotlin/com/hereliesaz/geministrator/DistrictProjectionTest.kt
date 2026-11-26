@@ -1,6 +1,9 @@
 package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.domain.BuiltInRoles
+import com.hereliesaz.geministrator.domain.Project
+import com.hereliesaz.geministrator.domain.RepositoryRef
+import com.hereliesaz.geministrator.domain.RepositorySource
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
@@ -80,4 +83,31 @@ class DistrictProjectionTest {
         )
         assertEquals(listOf("b", "a"), scars.map { it.id.value })
     }
+    @Test
+    fun directoryUsesHistoricalRepositoriesAndScopedLatestRuns() {
+        val project = Project(ProjectId("p"), "Project A", RepositoryRef("Team", "current"), createdAtEpochMillis = 1, updatedAtEpochMillis = 9)
+        val other = Project(ProjectId("other"), "Project B", RepositoryRef("team", "OLD"), createdAtEpochMillis = 1, updatedAtEpochMillis = 9)
+        val lab = Project(ProjectId("lab"), "Lab", RepositoryRef("Team", "old", source = RepositorySource.GitLab), createdAtEpochMillis = 1, updatedAtEpochMillis = 9)
+        val solo = Project(ProjectId("solo"), "Solo", createdAtEpochMillis = 1, updatedAtEpochMillis = 9)
+        val groups = projectHiveDirectory(
+            listOf(wf("ship"), wf("second"), wf("never")),
+            listOf(
+                project to listOf(run("old", "ship", WorkflowRunStatus.Completed, 2).copy(repositorySnapshot = RepositoryRef("Team", "old")),
+                    run("new", "ship", WorkflowRunStatus.Running, 8), run("deleted", "gone", WorkflowRunStatus.Completed, 9)),
+                other to listOf(run("second", "second", WorkflowRunStatus.Completed, 4).copy(projectId = other.id)),
+                lab to listOf(run("lab", "ship", WorkflowRunStatus.Failed, 5).copy(projectId = lab.id)),
+                solo to listOf(run("solo", "ship", WorkflowRunStatus.Completed, 3).copy(projectId = solo.id)),
+            ),
+        )
+        assertEquals(4, groups.size)
+        val old = groups.single { it.location.key == "GitHub:team/old" }
+        assertEquals(listOf("Project A", "Project B"), old.projectNames)
+        assertEquals(2, old.runCount)
+        assertEquals(listOf("old", "second"), old.hives.map { it.latestRunId })
+        assertEquals("new", groups.single { it.location.key == "GitHub:team/current" }.hives.single().latestRunId)
+        assertEquals("lab", groups.single { it.location.key == "GitLab:Team/old" }.hives.single().latestRunId)
+        assertEquals("solo", groups.single { it.location.key == "project:solo" }.hives.single().latestRunId)
+        assertNull(groups.single { it.location.key == "project:solo" }.location.owner)
+    }
+
 }

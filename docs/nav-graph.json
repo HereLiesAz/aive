@@ -2122,6 +2122,48 @@
    "inplace_editor": false,
    "back_to": "hive.live",
    "source_resolved": true
+  },
+  {
+   "id": "hive.owner_directory",
+   "kind": "place",
+   "area": "Hive",
+   "label": "Owner projects and repositories",
+   "source": "DistrictScreen.kt:79",
+   "reachable_via": "owner crumb or District owner row",
+   "files": [
+    "DistrictScreen.kt",
+    "NewHive.kt",
+    "ClosestHives.kt"
+   ],
+   "symbols": [
+    "DistrictScreen"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.district",
+   "source_resolved": true
+  },
+  {
+   "id": "hive.repository_directory",
+   "kind": "place",
+   "area": "Hive",
+   "label": "Repository/project hives",
+   "source": "DistrictScreen.kt:79",
+   "reachable_via": "repository crumb or project row",
+   "files": [
+    "DistrictScreen.kt",
+    "NewHive.kt",
+    "ClosestHives.kt"
+   ],
+   "symbols": [
+    "DistrictScreen"
+   ],
+   "edits": [],
+   "canonical_for": [],
+   "inplace_editor": false,
+   "back_to": "hive.owner_directory",
+   "source_resolved": true
   }
  ],
  "edges": [
@@ -5071,6 +5113,106 @@
    "trigger": "artifact card: See it in this creature's Work",
    "callback": "Task(taskId, Work)",
    "source": "LiveInboxScreen.kt:WaitDetail",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "shell.crumbs",
+   "to": "hive.owner_directory",
+   "trigger": "owner crumb",
+   "callback": "onOpenOwner",
+   "source": "ControlRoomUi.kt:595",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "shell.crumbs",
+   "to": "hive.repository_directory",
+   "trigger": "repository/project crumb",
+   "callback": "onOpenRepository",
+   "source": "ControlRoomUi.kt:595",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.district",
+   "to": "hive.owner_directory",
+   "trigger": "owner row",
+   "callback": "onOpenDirectory",
+   "source": "ControlRoomUi.kt:595",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.district",
+   "to": "hive.repository_directory",
+   "trigger": "ownerless project row",
+   "callback": "onOpenDirectory",
+   "source": "ControlRoomUi.kt:595",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.owner_directory",
+   "to": "hive.repository_directory",
+   "trigger": "project/repository row",
+   "callback": "onOpenDirectory",
+   "source": "ControlRoomUi.kt:595",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.repository_directory",
+   "to": "hive.live",
+   "trigger": "hive row",
+   "callback": "onEnterNeighbourhood",
+   "source": "ControlRoomUi.kt:595",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.live",
+   "to": "hive.repository_directory",
+   "trigger": "Back with repository/project",
+   "callback": "openDirectory",
+   "source": "ControlRoomUi.kt:545",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.repository_directory",
+   "to": "hive.owner_directory",
+   "trigger": "Back with owner",
+   "callback": "directoryScope",
+   "source": "ControlRoomUi.kt:545",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.repository_directory",
+   "to": "hive.district",
+   "trigger": "Back without owner",
+   "callback": "directoryScope",
+   "source": "ControlRoomUi.kt:545",
+   "kind": "link",
+   "status": "present",
+   "auto": false
+  },
+  {
+   "from": "hive.owner_directory",
+   "to": "hive.district",
+   "trigger": "Back",
+   "callback": "directoryScope",
+   "source": "ControlRoomUi.kt:545",
    "kind": "link",
    "status": "present",
    "auto": false
