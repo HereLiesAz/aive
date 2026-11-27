@@ -225,6 +225,8 @@ data class ProviderUsageRecorded(
     /** Length in characters of that request text. Null with [requestSha256]. */
     val requestChars: Int? = null,
     override val occurredAtEpochMillis: Long,
+    /** True if every report in this batch names the same model; null for legacy events. */
+    val modelConsistent: Boolean? = null,
 ) : WorkflowEvent
 
 /**

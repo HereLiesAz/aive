@@ -45,9 +45,10 @@ class ModelCallRecordTest {
     @Test
     fun anEventPersistedBeforeTheFieldsExistedStillDecodesWithThemUnknown() {
         val encoded = json.encodeToJsonElement(WorkflowEvent.serializer(), usage("m", fingerprintRequestText("x"))) as JsonObject
-        val old = JsonObject(encoded - setOf("model", "requestSha256", "requestChars"))
+        val old = JsonObject(encoded - setOf("model", "requestSha256", "requestChars", "modelConsistent"))
         val decoded = json.decodeFromJsonElement(WorkflowEvent.serializer(), old) as ProviderUsageRecorded
         assertNull(decoded.model)
+        assertNull(decoded.modelConsistent)
         assertNull(decoded.requestSha256)
         assertNull(decoded.requestChars)
         assertEquals(10L, decoded.inputTokens)
@@ -61,7 +62,7 @@ class ModelCallRecordTest {
 
     @Test
     fun theNewFieldsRoundTrip() {
-        val event = usage("claude-sonnet-5-5", fingerprintRequestText("the prompt"))
+        val event = usage("claude-sonnet-5-5", fingerprintRequestText("the prompt")).copy(modelConsistent=true)
         val decoded = json.decodeFromString(WorkflowEvent.serializer(), json.encodeToString(WorkflowEvent.serializer(), event))
         assertEquals(event, decoded)
     }

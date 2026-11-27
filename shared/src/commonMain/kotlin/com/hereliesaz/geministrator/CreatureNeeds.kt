@@ -9,14 +9,16 @@ import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
+import com.hereliesaz.geministrator.events.ProviderUsageRecorded
+import androidx.compose.runtime.staticCompositionLocalOf
 
 /**
  * Swarm OS step 2 (docs/Swarm-OS.md): a creature's four needs, read from the run and nothing else
  * (docs/Ecology-and-the-Swarm.md, the binding rule). A need with no data behind it is null and shown
  * as not reported, never estimated.
  *
- * Echo exposure is a partial, graph-based proxy. Actual per-input and memory-read
- * model provenance is not available here. It must never certify contamination, sepsis,
+ * Echo exposure is a graph proxy using recorded session model evidence. Actual per-input
+ * and memory-read provenance is not available here. It must never certify contamination, sepsis,
  * independence or a completed review.
  */
 internal data class CreatureNeeds(
@@ -31,7 +33,7 @@ internal data class CreatureNeeds(
     val tokensSpent: Long?,
     /** 0..100: how much of its downstream has taken its output; null when nothing depends on it. */
     val outputUsed: Int?,
-    /** Another task with high known configuration overlap, not necessarily the same actual model. */
+    /** Another task with high configuration overlap and matching reported provider/model. */
     val nearClone: String?,
     /** Comparable active reviewer paths with high configuration overlap; not proof of a review. */
     val selfReviews: Int,
@@ -73,23 +75,45 @@ internal val TAKEN_UP = setOf(
 )
 
 /**
- * A bounded configuration comparison, independent of identity, cosmetics and ancestry labels.
- * The assigned provider is required; Auto/unassigned is unknown, never a match or a stranger.
- * Provider identity has half the weight, exact instruction text has three tenths, and the
- * declared tool/role contract has two tenths. Empty tool ceilings compare as declared settings,
- * not as evidence that the actual offered tools match. A task does not record actual model id,
- * so this is deliberately a configuration-overlap proxy, not complete functional kinship.
+ * Resolve only consistent model reports bound to the run's exact current task session.
+ * Old, missing, mixed and replayed reports cannot establish a single model. This is
+ * provider-reported identity, not independent attestation or an exhaustive inference trace.
  */
-internal fun configurationKinship(a: RoleDefinition, providerA: String?, b: RoleDefinition, providerB: String?): Int? {
+internal fun reportedSessionModels(run: WorkflowRun, reports: List<ProviderUsageRecorded>): Map<TaskDefinitionId,String> {
+    val grouped=reports.filter { event ->
+        val task=run.taskRuns[event.taskDefinitionId]
+        event.workflowRunId==run.id && task!=null &&
+            event.providerId==task.assignedProviderId && event.providerRunId==task.providerRunId
+    }.groupBy { it.taskDefinitionId }
+    return grouped.mapNotNull { (id, events) ->
+        if(events.any { it.modelConsistent!=true || it.model.isNullOrBlank() || it.tokensAvoided!=0L }) null
+        else events.mapNotNull { it.model }.distinct().singleOrNull()?.let { id to it }
+    }.toMap()
+}
+
+/** Shared run-correlated journal projection for the inspector and tissue, never the GPU. */
+internal val LocalModelUsageReports = staticCompositionLocalOf<List<ProviderUsageRecorded>> { emptyList() }
+
+/**
+ * Provisional overlap: provider 20 and model 30 retain the previous provider-half weight;
+ * exact instructions 30 and declared capability/authority/tool/surface contract 20.
+ * Missing model/provider evidence is unknown, not a clone or a stranger.
+ */
+internal fun configurationKinship(
+    a: RoleDefinition, providerA: String?, b: RoleDefinition, providerB: String?,
+    modelA: String?, modelB: String?,
+): Int? {
     if(a.executionSource!=RoleExecutionSource.Agent || b.executionSource!=RoleExecutionSource.Agent ||
-        providerA.isNullOrBlank() || providerB.isNullOrBlank()) return null
-    val provider=if(providerA==providerB) 50 else 0
-    // Exact instructions: token overlap can miss a negation or a changed safety constraint.
+        providerA.isNullOrBlank() || providerB.isNullOrBlank() ||
+        modelA.isNullOrBlank() || modelB.isNullOrBlank()) return null
+    val provider=if(providerA==providerB) 20 else 0
+    val model=if(modelA==modelB) 30 else 0
+    // Exact instruction text avoids treating a negated safety constraint as equivalent.
     val instructions=if(a.instructions==b.instructions && a.keeperInstructions==b.keeperInstructions) 30 else 0
     val contract=if(a.capabilitiesRequired==b.capabilitiesRequired &&
         a.authorities==b.authorities && a.toolCeiling.toSet()==b.toolCeiling.toSet() &&
         a.surfaces==b.surfaces) 20 else 0
-    return provider+instructions+contract
+    return provider+model+instructions+contract
 }
 
 /** Near-clone threshold from Node-Creature-Genome.md; applied only to comparable configurations. */
@@ -100,6 +124,7 @@ internal fun creatureNeeds(
     definition: WorkflowDefinition,
     run: WorkflowRun,
     roles: Collection<RoleDefinition>,
+    modelReports: List<ProviderUsageRecorded> = emptyList(),
 ): CreatureNeeds? {
     val tasks = definition.tasks.associateBy(TaskDefinition::id)
     val task = tasks[taskId] ?: return null
@@ -115,12 +140,13 @@ internal fun creatureNeeds(
         return (run.taskRuns[id]?.executor ?: t.effectiveExecutor()).isAgent
     }
 
+    val models=reportedSessionModels(run,modelReports)
     fun kinship(other: TaskDefinitionId): Int? {
         if(!agent(taskId) || !agent(other)) return null
         val own=role(taskId) ?: return null
         val peer=role(other) ?: return null
         return configurationKinship(own,run.taskRuns[taskId]?.assignedProviderId?.value,
-            peer,run.taskRuns[other]?.assignedProviderId?.value)
+            peer,run.taskRuns[other]?.assignedProviderId?.value,models[taskId],models[other])
     }
 
     fun isReviewer(id: TaskDefinitionId): Boolean =

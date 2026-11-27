@@ -357,7 +357,8 @@ internal fun TechnicalInspector(
         }
         when (tab) {
             CreatureTab.Needs -> {
-                creatureNeeds(taskId, liveWorkflow.definition, liveWorkflow.run, liveWorkflow.roles)
+                creatureNeeds(taskId, liveWorkflow.definition, liveWorkflow.run, liveWorkflow.roles,
+                    LocalModelUsageReports.current)
                     ?.let { needs ->
                         // The meters are how it is doing, not a decision: folded away, so this tab shows what is asked of you.
                         var healthOpen by remember(taskId) { mutableStateOf(false) }

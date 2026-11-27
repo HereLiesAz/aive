@@ -20,4 +20,19 @@ class TaskUsageTest {
         val existing = TaskUsage(inputTokens = 1)
         assertEquals(existing, existing.plus(ManagedSessionUsage(cacheHitFraction = 0.5f)))
     }
+
+    @Test
+    fun modelAgreementCannotBeRestoredByLaterReportsInAMixedBatch() {
+        val a=ManagedSessionUsage(inputTokens=10,model="a")
+        val b=ManagedSessionUsage(inputTokens=20,model="b")
+        val unknown=ManagedSessionUsage(inputTokens=5)
+        assertEquals(true,a.plusReport(a).modelConsistent)
+        val mixed=a.plusReport(b)
+        assertEquals("b",mixed.model)
+        assertEquals(30L,mixed.inputTokens)
+        assertEquals(false,mixed.modelConsistent)
+        assertEquals(false,mixed.plusReport(b).modelConsistent)
+        assertEquals(false,a.plusReport(unknown).modelConsistent)
+        assertEquals(false,unknown.plusReport(a).modelConsistent)
+    }
 }
