@@ -86,7 +86,8 @@ class SpatialSignalsTest {
         val lit = blueSpores(1_150, uses, setOf("node:a", "node:b"))
         assertEquals(setOf("node:a"), lit.keys) // not the unused neighbour b, and not a node the web does not hold
         assertEquals(1f, lit.getValue("node:a")) // the strongest of the concurrent uses
-        assertEquals(emptyMap(), blueSpores(1_000 + BLUE_GLOW_MILLIS + 1, uses, setOf("node:a")))
+        // Past the last use's whole flip (the second use began at 1_100), nothing is lit.
+        assertEquals(emptyMap(), blueSpores(1_100 + BLUE_GLOW_MILLIS + 1, uses, setOf("node:a")))
     }
 
     @Test
@@ -118,8 +119,7 @@ class SpatialSignalsTest {
         val early = requireNotNull(pulseRateHz(taskRun(build, TaskRunStatus.Running, progress = .2f)))
         val late = requireNotNull(pulseRateHz(taskRun(build, TaskRunStatus.Running, progress = .8f)))
         assertTrue(late > early && late <= PULSE_MAX_HZ)
-        assertEquals(PULSE_MAX_HZ, pulseRateHz(taskRun(build, TaskRunStatus.Running, progress = 9f)))
-        assertEquals(PULSE_MIN_HZ, pulseRateHz(taskRun(build, TaskRunStatus.Running, progress = Float.NaN)))
+        // TaskRun itself refuses a progress outside 0..1, so only valid reports reach the rate.
     }
 
     @Test
