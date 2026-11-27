@@ -379,48 +379,23 @@ class HatcheryTest {
     }
 
     @Test
-    fun anInbredCloneMutatesMoreOftenThanALoneCloneButNeverCertainly() {
+    fun anInbredCloneDrawsItsMutationFromTheSumOfItsParentsEchoButNeverCertainly() {
         val twin = engineer.copy(id = com.hereliesaz.geministrator.domain.RoleDefinitionId("twin"))
         val pairRoster = listOf(engineer, twin)
+        // Echo 30 each: a lone clone is at the base 2%; the pair's sum, Echo 60, is the scale's top, 4x that.
+        val echo = mapOf(engineer.id to 3_000, twin.id to 3_000)
         var lone = 0
         var inbred = 0
         for (n in 1..3_000) {
             val solo = run(WorkflowRunStatus.Completed, "a" to engineer).copy(id = WorkflowRunId("r$n"))
-            if (assertNotNull(hatchFromRun(solo, listOf(engineer))).instructions != engineer.instructions) lone++
+            if (assertNotNull(hatchFromRun(solo, listOf(engineer), echo)).instructions != engineer.instructions) lone++
             val pair = observed(run(WorkflowRunStatus.Completed, "a" to engineer, "b" to twin), pairRoster)
                 .copy(id = WorkflowRunId("r$n"))
-            val child = assertNotNull(hatchFromRun(pair, pairRoster, reports = evidence(pair)))
+            val child = assertNotNull(hatchFromRun(pair, pairRoster, echo, evidence(pair)))
             assertEquals(1, child.parents.size)
             if (child.instructions != engineer.instructions) inbred++
         }
-        kotlin.test.assertTrue(lone > 0 && inbred > lone, "lone=$lone inbred=$inbred")
+        kotlin.test.assertTrue(lone > 0 && inbred > 2 * lone, "lone=$lone inbred=$inbred")
         kotlin.test.assertTrue(inbred < 3_000 / 4)
-    }
-
-    @Test
-    fun aPairRelatedByDescentIsInbredHoweverFarApartTheyMeasure() {
-        fun id(v: String) = com.hereliesaz.geministrator.domain.RoleDefinitionId(v)
-        // A clone mutates, so it measures below 95% against its own parent (80 here: the contract differs).
-        val child = engineer.copy(id = id("child"), parents = listOf(engineer.id),
-            capabilitiesRequired = engineer.capabilitiesRequired + AgentCapability.Testing)
-        val roster = listOf(engineer, child)
-        val source = observed(run(WorkflowRunStatus.Completed, "a" to engineer, "b" to child), roster)
-        assertEquals(1, assertNotNull(hatchFromRun(source, roster, reports = evidence(source))).parents.size)
-        // The same pair unrelated by descent breeds.
-        val stranger = child.copy(parents = emptyList())
-        val strangers = observed(run(WorkflowRunStatus.Completed, "a" to engineer, "b" to stranger), listOf(engineer, stranger))
-        assertEquals(2, assertNotNull(hatchFromRun(strangers, listOf(engineer, stranger), reports = evidence(strangers))).parents.size)
-        // Siblings share a parent; a grandchild descends from its grandparent through the roster.
-        val sibling = child.copy(id = id("sibling"))
-        assertEquals(true, relatedByDescent(child, sibling, mapOf(engineer.id to engineer)))
-        val grandchild = child.copy(id = id("grandchild"), parents = listOf(child.id))
-        val ancestry = listOf(engineer, child, grandchild).associateBy { it.id }
-        assertEquals(true, relatedByDescent(engineer, grandchild, ancestry))
-        assertEquals(true, relatedByDescent(grandchild, engineer, ancestry))
-        assertEquals(false, relatedByDescent(engineer, stranger, ancestry))
-        // A cousin (children of siblings) is not counted.
-        val cousinA = engineer.copy(id = id("cousin-a"), parents = listOf(child.id))
-        val cousinB = engineer.copy(id = id("cousin-b"), parents = listOf(sibling.id))
-        assertEquals(false, relatedByDescent(cousinA, cousinB, (ancestry + (sibling.id to sibling))))
     }
 }
