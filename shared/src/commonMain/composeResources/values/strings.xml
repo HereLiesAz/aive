@@ -1003,6 +1003,11 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="needs_echo_insane">INSANE</string>
     <string name="needs_integrity">INTEGRITY (reliable this swarm)</string>
     <string name="needs_budget">BUDGET (its specialty's token budget)</string>
+    <string name="needs_trophic">TROPHIC RESERVE (OUTPUT ACCEPTED DOWNSTREAM)</string>
+    <string name="needs_trophic_fed">fed</string>
+    <string name="needs_trophic_hungry">hungry</string>
+    <string name="needs_trophic_starving">starving</string>
+    <string name="needs_trophic_starved">starved</string>
     <string name="needs_output_used">OUTPUT DELIVERED (REPORTING SESSIONS)</string>
     <string name="needs_not_reported">not reported</string>
     <string name="needs_tokens_spent">%1$s tokens · no budget set</string>

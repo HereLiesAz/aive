@@ -2394,16 +2394,41 @@ class ApplicationRuntime private constructor(
      */
     internal suspend fun loadEchoHistory(before: WorkflowRun): Map<RoleDefinitionId, Int> {
         var history = EchoHistory()
-        val prior = loadRunHistory().flatMap { it.second }.distinctBy { it.id }
-            .filter { it.id != before.id && it.updatedAtEpochMillis <= before.createdAtEpochMillis &&
-                it.status in setOf(WorkflowRunStatus.Completed, WorkflowRunStatus.Failed, WorkflowRunStatus.Cancelled) }
-            .sortedWith(compareBy({ it.updatedAtEpochMillis }, { it.id.value }))
-        for (run in prior) {
-            if (run.definitionSnapshot == null || run.roleSnapshot.isEmpty()) continue
-            history = history.advance(run, persistence.events.forRun(run.id)
-                .filterIsInstance<com.hereliesaz.geministrator.events.ProviderUsageRecorded>())
+        for (run in settledRunsBefore(before)) {
+            history = history.advance(run, usageReports(run))
         }
         return history.withBirths(before.roleSnapshot).balances
+    }
+
+    /** Settled runs with exact snapshots, oldest first; only those settled by [before]'s creation (all settled runs when null). */
+    private suspend fun settledRunsBefore(before: WorkflowRun?): List<WorkflowRun> =
+        loadRunHistory().flatMap { it.second }.distinctBy { it.id }
+            .filter { it.id != before?.id && (before == null || it.updatedAtEpochMillis <= before.createdAtEpochMillis) &&
+                it.status in setOf(WorkflowRunStatus.Completed, WorkflowRunStatus.Failed, WorkflowRunStatus.Cancelled) &&
+                it.definitionSnapshot != null && it.roleSnapshot.isNotEmpty() }
+            .sortedWith(compareBy({ it.updatedAtEpochMillis }, { it.id.value }))
+
+    private suspend fun usageReports(run: WorkflowRun) = persistence.events.forRun(run.id)
+        .filterIsInstance<com.hereliesaz.geministrator.events.ProviderUsageRecorded>()
+
+    /** The trophic reserve each role held when [before] began, from settled earlier runs only (see Trophic.kt). */
+    internal suspend fun loadTrophicHistory(before: WorkflowRun): Map<RoleDefinitionId, Int> =
+        settledRunsBefore(before).fold(TrophicHistory()) { history, run -> history.advance(run, usageReports(run)) }.balances
+
+    /**
+     * Retire the roles whose trophic reserve is spent by disabling them (never deleting; lineage stays).
+     * Skips any role a saved hive still names and everything while a run is live, so no plan loses a worker
+     * mid-flight. Returns the roles retired. Called only when the keeper has switched pruning on.
+     */
+    internal suspend fun pruneStarvedRoles(): List<RoleDefinitionId> {
+        if (runtimeMutex.withLock { current?.state?.run?.status?.let { it == WorkflowRunStatus.Created || it == WorkflowRunStatus.Running || it == WorkflowRunStatus.AwaitingHuman } } == true) return emptyList()
+        val balances = settledRunsBefore(null)
+            .fold(TrophicHistory()) { history, run -> history.advance(run, usageReports(run)) }.balances
+        val named = persistence.definitions.all().flatMap { it.tasks }.mapNotNull { it.roleId }.toSet()
+        val retired = starvedRoles(persistence.roles.all(), balances).filter { it.id !in named }
+        retired.forEach { persistence.roles.put(it.copy(enabled = false)) }
+        if (retired.isNotEmpty()) loadLatest()
+        return retired.map { it.id }
     }
 
     /**

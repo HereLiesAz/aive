@@ -205,6 +205,23 @@ Successful hosted text generations with usage reports and on-device text generat
 
 The Needs inspector now reads explicit approve, revise and reject verdicts from current consumer artifacts using the existing engine verdict parser. A review is attributed only when the reviewing agent has one declared upstream producer, current-session delivery identifies that producer's artifacts without additional unidentified inputs, and the reviewer completed or was failed specifically by a blocking verdict. Conflicting or missing verdicts, stale sessions and multi-source reviews remain unknown. Hall Monitor verdicts also require an exact delivered report identifier. Counts describe stated review outcomes, not independent proof of quality, approval authority, or feedback received by the producer. Echo exposure now uses incoming artifact delivery only; outgoing verdicts are shown separately until a subsequent input actually carries that feedback. No routing, approval, spend or execution decisions read these projections.
 
+### Trophic support: delivery, consumption, acceptance
+
+`Trophic.kt`. Delivery (an artifact reached a consumer's request) is what Echo counts; it is not what feeds. One producer-to-consumer path in a settled run is judged by what the consumer did with it:
+
+| Outcome | Evidence | Effect on the producer's role |
+|---|---|---|
+| Unknown | No delivery report for the consumer's session, or the consumer has not finished | none |
+| Ignored | Consumer finished, its session reported its inputs, the artifact was not among them | starvation evidence |
+| Delivered | Reached the consumer, which then failed | none |
+| Consumed | A reviewer completed with it but stated no attributable verdict | none (acceptance unproven) |
+| Accepted | A non-reviewer completed with it (+4), or a reviewer stated Approve (+8, replaces the +4) | fed |
+| Rejected | A reviewer stated Revise or Reject | starvation evidence |
+
+A task with no planned dependents is exempt (its output goes to the keeper). A role is **barren** in a run only when every one of its downstream paths is known and none was accepted; any unknown path blocks starvation. The reserve (0 to 100, in hundredths) starts at 50 when a role is first observed, gains the rates above, and loses 10 per barren run (provisional: the documented 0.08 a tick has no tick to run on in a settled run). Fed from 50, hungry from 20, starving above 0, starved at 0. Replaying a run changes nothing; a role with no downstream evidence is unreported. The Needs tab shows the reserve and its state.
+
+**Pruning** retires a role by disabling it (never deleting; lineage stays). Only a hatched, enabled agent role whose reserve is 0 is eligible: founders keep the starting roster's coverage, and a role a saved hive still names, or any role while a run is live, is skipped. It runs after a run settles, only when the durable switch `trophic.prune` is on; it is off by default and has no control yet. What would show the rates wrong: a role that starves while its output is plainly used downstream. Not done: a reviewer's verdict on a consumer's work does not reach back to the consumer's own producers, and the integrity and echo effects of rejection are separate.
+
 ### Cumulative delivery-based Echo
 
 Needs and tissue now share a deterministic per-agent balance reconstructed from the existing persisted run snapshots and usage journals, rather than the percentage of current near-clone paths. For each comparable delivered producer/current consumer session path, count once, using the documented bench rates: own output +0.6, a near-clone +0.4, stranger below 85% kinship −4 × (0.9 − kinship), with kinship normalized to 0–1. Intermediate similarities are neutral. Integer hundredths preserve fractional changes and clamp after each path to 0–100. Within a run, order by first matching report timestamp and task IDs; across runs fold by settlement timestamp and run ID. The shown run starts from terminal runs settled by its creation, excluding overlapping runs that settled later until a subsequent run. Reopening or refreshing a run recomputes rather than increments. Missing snapshots or model evidence remain unknown; a recorded challenge can establish a known zero. Current-attempt evidence only; batch delivery does not prove semantic reliance. A solo hatch inherits its parent's recorded balance at that run's settlement when its exact lineage is subsequently observed. Actual memory reads, per-call counts and returned review challenge effects remain outstanding; subsequent sections describe hybrid inheritance and mutation. No additional persisted store, authority or execution changes.
