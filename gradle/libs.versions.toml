@@ -9,6 +9,8 @@ jgit = "5.13.5.202508271544-r"
 agp = "9.5.1"
 kotlin = "2.4.21"
 compose = "1.12.2"
+# JOGL GL3 desktop drawable; the main artifacts pull platform-native jars from Maven Central.
+jogamp = "2.6.0"
 android-compileSdk = "37"
 android-minSdk = "26"
 android-targetSdk = "37"
@@ -39,6 +41,8 @@ sqldelight = "2.4.1"
 quickjs4j = "0.1.1"
 
 [libraries]
+jogamp-jogl = { module = "org.jogamp.jogl:jogl-all-main", version.ref = "jogamp" }
+jogamp-gluegen = { module = "org.jogamp.gluegen:gluegen-rt-main", version.ref = "jogamp" }
 conveyance-h2g2 = { module = "com.github.HereLiesAz.conveyance-h2g2:conveyance-h2g2", version.ref = "conveyance-h2g2" }
 quickjs4j = { module = "io.roastedroot:quickjs4j", version.ref = "quickjs4j" }
 play-billing-ktx = { module = "com.android.billingclient:billing-ktx", version.ref = "play-billing" }

@@ -100,6 +100,9 @@ kotlin {
         }
 
         getByName("desktopMain").dependencies {
+            // Native GL3 inside the Compose desktop field, with platform-native jars.
+            implementation(libs.jogamp.jogl)
+            implementation(libs.jogamp.gluegen)
             implementation(libs.sqldelight.sqlite.driver)
             // The MCP script sandbox (QuickJsScriptSandbox): QuickJS in WebAssembly on a pure-JVM runtime.
             implementation(libs.quickjs4j)
