@@ -214,3 +214,7 @@ The first functional mutation locus now alters actual offspring role instruction
 Tool-ceiling and model-source variation also operate on the persisted disabled child; see [Tool and model-source mutation](Node-Creature-Genome.md#tool-and-model-source-mutation). There is no per-role same-provider model selector, and no inferred model tier.
 
 Functional fertility and hybrid Echo inheritance now use current-session parent kinship, actual catalog genus evidence at birth, and the recorded child lineage; see [Kinship-based functional fertility and Echo inheritance](Node-Creature-Genome.md#kinship-based-functional-fertility-and-echo-inheritance). Unknown evidence fails closed for fertility or leaves inheritance unreported. The legacy visual stable pace remains separate.
+
+Birth now also preserves the parent's actual budget limit and validates the child's provider/contract compatibility before saving; see [Birth-time functional compatibility and budget inheritance](Node-Creature-Genome.md#birth-time-functional-compatibility-and-budget-inheritance). No new policy engine or authority is introduced.
+
+Energy capacity is now an inherited effective token allowance: a solo parent's cap or the median of the selected hybrid parents' caps. A keeper override always wins; the existing spend engine consumes the effective cap.

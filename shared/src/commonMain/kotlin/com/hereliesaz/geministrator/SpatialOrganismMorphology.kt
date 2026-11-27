@@ -4,6 +4,7 @@ import com.hereliesaz.geministrator.domain.AgentCapability
 import com.hereliesaz.geministrator.domain.RoleAuthority
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.RoleExecutionSource
+import com.hereliesaz.geministrator.domain.effectiveTokenBudget
 import kotlinx.serialization.Serializable
 import kotlin.math.PI
 import kotlin.math.atan2
@@ -152,8 +153,7 @@ internal fun spatialAgentGenome(role: RoleDefinition, stable: Stable? = null): S
         add(role.instructions)
         add(role.keeperInstructions)
         add(role.preferredProviderId?.value.orEmpty())
-        add(role.tokenBudget?.toString().orEmpty())
-        add(role.budgetClass?.name.orEmpty())
+        add(role.effectiveTokenBudget()?.toString().orEmpty())
         add(authorities.map { it.name }.sorted().joinToString(","))
         add(capabilities.map { it.name }.sorted().joinToString(","))
         add(role.toolCeiling.distinct().sorted().joinToString("") { "${it.length}:$it" })

@@ -1,6 +1,17 @@
 package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.domain.AgentProviderId
+import com.hereliesaz.geministrator.domain.AgentCapability
+import com.hereliesaz.geministrator.domain.RoleAuthority
+import com.hereliesaz.geministrator.domain.TaskDefinition
+import com.hereliesaz.geministrator.domain.WorkflowDefinition
+import com.hereliesaz.geministrator.domain.effectiveTokenBudget
+import com.hereliesaz.geministrator.domain.RoleSurface
+import com.hereliesaz.geministrator.workflow.AgentProviderRegistry
+import com.hereliesaz.geministrator.workflow.ScriptedProvider
+import com.hereliesaz.geministrator.persistence.InMemorySettings
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.runBlocking
 import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.events.ProviderUsageRecorded
 import com.hereliesaz.geministrator.domain.effectiveAllowedTools
@@ -189,6 +200,61 @@ class HatcheryTest {
         assertFalse(hybrid.enabled)
         assertNull(hatchFromRun(source, roster, reports = reports.dropLast(1), genera = genera))
         assertNull(hatchFromRun(source, roster, reports = reports, genera = genera + (third.id to "genus-two")))
+    }
+
+    @Test
+    fun budgetsUseParentalMedianAndConflictingSurfacesCannotRecombine() {
+        val solo = assertNotNull(hatchFromRun(run(WorkflowRunStatus.Completed, "a" to engineer), listOf(engineer)))
+        assertEquals(engineer.effectiveTokenBudget(), solo.geneticTokenCap)
+        assertNull(solo.tokenBudget)
+        assertEquals(engineer.effectiveTokenBudget(), solo.effectiveTokenBudget())
+        val a = engineer.copy(tokenBudget = 900L)
+        val b = engineer.copy(id = com.hereliesaz.geministrator.domain.RoleDefinitionId("second"), tokenBudget = 400L)
+        val source = observed(run(WorkflowRunStatus.Completed, "a" to a, "b" to b), listOf(a,b))
+        val child = assertNotNull(hatchFromRun(source, listOf(a,b), reports = evidence(source)))
+        assertNull(child.tokenBudget)
+        assertEquals(650L, child.geneticTokenCap)
+        assertEquals(650L, child.effectiveTokenBudget())
+        assertEquals(900L, child.copy(tokenBudget = 900L).effectiveTokenBudget())
+        val first = a.copy(surfaces = listOf(RoleSurface.Flowchart("diagram", source = "graph TD; A-->B")))
+        val second = b.copy(surfaces = listOf(RoleSurface.Flowchart("diagram", source = "graph TD; C-->D")))
+        val conflict = source.copy(roleSnapshot = listOf(first,second))
+        assertNull(hatchFromRun(conflict, conflict.roleSnapshot, reports = evidence(conflict)))
+    }
+
+    @Test
+    fun medianHandlesOddTotalsUnlimitedParentsAndLargeCaps() {
+        assertEquals(650L, medianParentalCap(900L, 400L))
+        assertEquals(650L, medianParentalCap(400L, 901L))
+        assertEquals(900L, medianParentalCap(null, 900L))
+        assertEquals(400L, medianParentalCap(400L, null))
+        assertNull(medianParentalCap(null, null))
+        assertEquals(Long.MAX_VALUE - 1L, medianParentalCap(Long.MAX_VALUE, Long.MAX_VALUE - 2L))
+    }
+
+    @Test
+    fun birthPreflightUsesRealRegistryWithoutDispatchOrPermissionExpansion() = runBlocking<Unit> {
+        val provider = ScriptedProvider("read-only") { emptyFlow() }
+        val registry = AgentProviderRegistry(listOf(provider), inferenceSettings = InMemorySettings())
+        val parent = engineer.copy(capabilitiesRequired = setOf(AgentCapability.RepositoryRead),
+            preferredProviderId = provider.id)
+        val source = run(WorkflowRunStatus.Completed, "a" to parent).let { r ->
+            r.copy(roleSnapshot = listOf(parent), definitionSnapshot = WorkflowDefinition(r.workflowDefinitionId,
+                "parent workflow", tasks = listOf(TaskDefinition(TaskDefinitionId("a"), "read", "read", parent.id))))
+        }
+        val child = assertNotNull(hatchFromRun(source, listOf(parent)))
+        kotlin.test.assertTrue(hatchCanExecute(source, child, registry))
+        assertFalse(hatchCanExecute(source, child.copy(preferredProviderId = AgentProviderId("missing")), registry))
+        assertFalse(hatchCanExecute(source, child.copy(capabilitiesRequired = setOf(AgentCapability.ShellExecution)), registry))
+        assertFalse(hatchCanExecute(source, child.copy(toolCeiling = listOf("read")), registry))
+        assertFalse(hatchCanExecute(source, child.copy(enabled = true), registry))
+        val authority = RoleAuthority.ApproveRelease
+        val restricted = source.copy(definitionSnapshot = source.definitionSnapshot!!.let { d ->
+            d.copy(tasks = d.tasks.map { it.copy(requiredRoleAuthority = authority) })
+        })
+        assertFalse(hatchCanExecute(restricted, child.copy(authorities = emptySet()), registry))
+        assertFalse(hatchCanExecute(source.copy(definitionSnapshot = null), child, registry))
+        assertFalse(provider.observed.isCompleted)
     }
 
     @Test

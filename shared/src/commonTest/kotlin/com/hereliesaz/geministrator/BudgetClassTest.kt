@@ -50,6 +50,15 @@ class BudgetClassTest {
     }
 
     @Test
+    fun geneticAllowanceIsStableAndExplicitOverrideWins() {
+        val role = writer.copy(geneticTokenCap = 250L, tokenBudget = null)
+        assertEquals(250L, role.effectiveTokenBudget(BudgetClassSettings(100L, 200L, 300L)))
+        assertEquals(250L, role.effectiveTokenBudget(BudgetClassSettings(100L, 400L, 500L)))
+        assertEquals(900L, role.copy(tokenBudget = 900L).effectiveTokenBudget())
+        assertEquals(250L, role.copy(tokenBudget = 900L).copy(tokenBudget = null).effectiveTokenBudget())
+    }
+
+    @Test
     fun theBuiltInMirrorsNameTheirClassesByIdEvenWhenStoredWithoutOne() {
         assertEquals(BudgetClassSettings.DEFAULT_LARGE, BuiltInRoles.Antagonist.effectiveTokenBudget())
         assertEquals(BudgetClassSettings.DEFAULT_MEDIUM, BuiltInRoles.Planner.effectiveTokenBudget())

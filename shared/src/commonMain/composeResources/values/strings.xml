@@ -992,7 +992,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="build_step_repo_fetch">Fetch repository</string>
     <string name="build_step_chat_post">Post to my chat</string>
     <string name="swarm_token_budget">Token budget per swarm</string>
-    <string name="swarm_token_budget_hint">Leave empty for no budget.</string>
+    <string name="swarm_token_budget_hint">Set a token limit, or leave empty to use the inherited or class limit (unlimited if neither exists).</string>
     <string name="needs_echo">ECHO · %1$s</string>
     <string name="needs_echo_exposure">CUMULATIVE ECHO (REPORTED DELIVERY)</string>
     <string name="needs_near_config">NEAR-CLONE CONFIGURATION</string>
