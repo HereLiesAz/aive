@@ -17,11 +17,12 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.w3c.dom.HTMLCanvasElement
 import kotlin.js.js
+import kotlin.io.encoding.Base64
 
 private fun spatialAvailable(): Boolean = js("() => !!globalThis.AiveSpatialGpu && globalThis.AiveSpatialGpu.available()")
-private fun attach(canvas: HTMLCanvasElement): Unit = js("(canvas) => globalThis.AiveSpatialGpu.attach(canvas)")
+private fun attach(canvas: HTMLCanvasElement, vertex: String, fragment: String): Unit = js("(canvas,vertex,fragment) => globalThis.AiveSpatialGpu.attach(canvas,vertex,fragment)")
 private fun detach(canvas: HTMLCanvasElement): Unit = js("(canvas) => globalThis.AiveSpatialGpu.detach(canvas)")
-private fun upload(canvas: HTMLCanvasElement, frame: String): Unit = js("(canvas,frame) => globalThis.AiveSpatialGpu.frame(canvas,frame)")
+private fun upload(canvas: HTMLCanvasElement, vertices: String): Unit = js("(canvas,vertices) => globalThis.AiveSpatialGpu.frame(canvas,vertices)")
 private fun view(canvas: HTMLCanvasElement, camera: String): Unit = js("(canvas,camera) => globalThis.AiveSpatialGpu.camera(canvas,camera)")
 private fun poll(canvas: HTMLCanvasElement): String? = js("(canvas) => globalThis.AiveSpatialGpu.poll(canvas)")
 private val codec = Json { encodeDefaults = true }
@@ -34,18 +35,33 @@ internal actual fun SpatialHiveSurface(frame: SpatialRenderFrame, camera: Spatia
     onInput: (SpatialRenderInput) -> Unit, modifier: Modifier) {
     var canvas by remember { mutableStateOf<HTMLCanvasElement?>(null) }
     val input by rememberUpdatedState(onInput)
+    val mesh by rememberSpatialMesh(frame)
+    val currentCamera by rememberUpdatedState(camera)
     DisposableEffect(canvas) {
         val mounted = canvas
         onDispose { mounted?.let(::detach) }
     }
-    LaunchedEffect(canvas, frame) { canvas?.let { upload(it, codec.encodeToString(frame)) } }
+    LaunchedEffect(canvas, mesh) {
+        val mounted = canvas ?: return@LaunchedEffect
+        val snapshot = mesh ?: return@LaunchedEffect
+        val bytes = ByteArray(snapshot.vertices.size * 4)
+        snapshot.vertices.forEachIndexed { i, value ->
+            val bits = value.toBits()
+            for (j in 0..3) bytes[i * 4 + j] = (bits ushr (j * 8)).toByte()
+        }
+        upload(mounted, Base64.Default.encode(bytes))
+    }
     LaunchedEffect(canvas, camera) { canvas?.let { view(it, codec.encodeToString(camera)) } }
     LaunchedEffect(canvas) {
         val mounted = canvas ?: return@LaunchedEffect
         while (true) {
             repeat(128) {
                 val event = poll(mounted) ?: return@repeat
-                runCatching { codec.decodeFromString<SpatialRenderInput>(event) }.getOrNull()?.let(input)
+                val request = runCatching { codec.decodeFromString<SpatialRenderInput>(event) }.getOrNull() ?: return@repeat
+                if (request.type == "tap") {
+                    val picked = mesh?.frame?.pick(currentCamera, request.x, request.y, request.z)
+                    input(picked?.let { SpatialRenderInput(if (it.form == "Spore") "memory" else "agent", it.id) } ?: SpatialRenderInput("empty"))
+                } else input(request)
             }
             delay(16)
         }
@@ -56,7 +72,7 @@ internal actual fun SpatialHiveSurface(frame: SpatialRenderFrame, camera: Spatia
             setAttribute("tabindex", "0")
             style.backgroundColor = "#031414"
             style.touchAction = "none"
-            attach(this)
+            attach(this, SPATIAL_VERTEX_SHADER, SPATIAL_FRAGMENT_SHADER)
             canvas = this
         }
     }, modifier = modifier)
