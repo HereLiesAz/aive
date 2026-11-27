@@ -49,4 +49,37 @@ class SpatialOrganismMorphologyTest {
         assertTrue(Triple(.012f,.025f,.038f) in colors)
         assertTrue(colors.size>20)
     }
+
+    @Test fun sculptPullsRootShouldersOutAndRecessesEyeSockets() {
+        val x=SpatialPoint(1f,0f,0f)
+        val y=SpatialPoint(0f,1f,0f)
+        val shape=SpatialPoint(1f,1f,1f)
+        val neutral=spatialSomaOffset(x,shape,3,.15f,0f,emptyList(),emptyList())
+        val shoulder=spatialSomaOffset(x,shape,3,.15f,0f,listOf(x),emptyList())
+        val socket=spatialSomaOffset(x,shape,3,.15f,0f,emptyList(),listOf(x))
+        assertTrue(shoulder.x-neutral.x>.25f)
+        assertTrue(neutral.x-socket.x>.17f)
+        assertEquals(spatialSomaOffset(y,shape,3,.15f,0f,emptyList(),emptyList()),
+            spatialSomaOffset(y,shape,3,.15f,0f,listOf(x),listOf(x)))
+        assertEquals(1f,spatialRootProfile(0f,0f),.0001f)
+        assertEquals(.025f,spatialRootProfile(1f,0f),.0001f)
+        assertTrue(spatialRootProfile(.75f,0f)<.25f)
+    }
+
+    @Test fun liveSculptHasUnitNormalsAndBranchingHairGeometry() {
+        val creature=SpatialRenderBody("weaver",SpatialPoint.Origin,3,"Creature","Pending",0f,1f)
+        val data=SpatialRenderFrame(listOf(creature),emptyList(),emptyList()).triangles()
+        val somaVertices=24*48*6
+        for(i in 0 until somaVertices*16 step 16) {
+            val n=SpatialPoint(data[i+3],data[i+4],data[i+5])
+            assertEquals(1f,n.length(),.001f)
+        }
+        // Canopy has 84 primary hairs; each fourth hair also has a four-segment fork.
+        // Seven segments * four sides * six vertices, plus 21 four-segment branches.
+        val hairVertices=(0 until data.size step 16).count {
+            data[it+13]==.38f && data[it+14]==.22f && data[it+15]==0f
+        }
+        assertEquals(16128,hairVertices)
+        assertTrue(data.all(Float::isFinite))
+    }
 }
