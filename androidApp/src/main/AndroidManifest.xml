@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!--
@@ -68,6 +69,20 @@
             </intent-filter>
         </service>
 
+        <!-- litertlm 0.20.0 pulls WorkManager in transitively (litert-api -> Play ai-delivery -> asset-delivery).
+             The app never uses it, and its startup initializer built WorkManager's Room database at process
+             start, which crashed release builds before the first activity. Dropping the initializer restores
+             the behavior before that bump; WorkManager would only start if something asks for it. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
 
     </application>
 </manifest>
