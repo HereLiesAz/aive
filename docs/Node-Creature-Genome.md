@@ -304,6 +304,16 @@ Every keeper tool is a real control:
 
 The keeper's real job is **diversity and challenge**: breed across lines as fast as possible, and keep enough competition in every circuit that nothing is only listening to itself.
 
+### Echo beyond reads: memory, returned criticism, fever, sepsis
+
+`EchoEffects.kt`, steps of `EchoHistory.advance`, in hundredths, each read from the run's own records and failing closed.
+
+- **Memory it wrote itself (+0.6).** A task whose successful requests carried a memory node written by its own role alone (`memoryAuthorsOf`: from the memory layer's episodes, each of which records its role; a node with any role-less source episode, a keeper's own memory say, is unknown and left out) takes the rate of reading its own output. One step per task however many such nodes, so a long memory does not swamp a run (provisional). A node written by another role is not scored: the authors' provider and model are not recorded, so near-clone cannot be told from stranger, and that exposure stays unreported.
+- **Criticism that came back.** A review that turned work back (Revise or Reject, stated, attributable) lowers the producer's Echo by 15 x (90 - kinship) hundredths, nothing for a near-clone reviewer, only if the producer's current session actually received the reviewer's artifact. A verdict nobody returned to the producer is not criticism it heard.
+- **Fevered creatures ignore it.** At 60 or more a creature no longer responds to returned criticism; only reading very different creatures (kinship under 85) still lowers it. (Contests and inhibition are not modelled yet.)
+- **Septic contagion.** A reader of a producer whose role stands at 85 or more takes +3 Echo on top of the read, and 2 integrity in the Needs tab (septic inputs, an unchallenged producer: the proxy the app can show, not a finding that the output is wrong).
+- **Not built:** the stain that lingers until consolidation clears it, quarantine, recovery by consolidation, and the memory layer's own writes (+0.06 / -0.04 per step). `memoryAuthorsOf` is not yet fed to the live history: wiring it needs each settled run's memory bank (`webSourceForRun`), so only the pure projection and its tests exist for memory exposure.
+
 ### The reviewer pollinates
 
 `ReviewerPollen.kt`. A reviewer (the reviewer kinds except the Antagonist) is a pollinator: it visits the work it reviews and carries the producers' genes. Its nth attributable review in a workflow is born to **the reviewer and every distinct producer it has reviewed through review n**, counted across the workflow's settled runs. So review 1's child has the reviewer and producer 1; review 2's has the reviewer, producers 1 and 2; and so on, up to eight parents (the reviewer and the seven most recently reviewed distinct producers). A producer reviewed again moves to its newest position and is not repeated.

@@ -1004,6 +1004,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="needs_integrity">INTEGRITY (reliable this swarm)</string>
     <string name="needs_budget">BUDGET (its specialty's token budget)</string>
     <string name="needs_memory_carried">MEMORY NODES CARRIED (SUCCESSFUL REQUESTS)</string>
+    <string name="needs_septic_inputs">SEPTIC INPUTS (UNCHALLENGED PRODUCER)</string>
     <string name="needs_trophic">TROPHIC RESERVE (OUTPUT ACCEPTED DOWNSTREAM)</string>
     <string name="needs_trophic_fed">fed</string>
     <string name="needs_trophic_hungry">hungry</string>
