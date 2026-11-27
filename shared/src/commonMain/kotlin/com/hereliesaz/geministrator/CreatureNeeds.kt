@@ -222,12 +222,18 @@ internal data class EchoBirthSeed(
     fun inherited(parents: List<RoleDefinitionId>): Int? {
         val unique = parents.toSet()
         if (parents.size != unique.size || !contributors.containsAll(unique)) return null
-        if (parents.size == 1) return balances[parents.single()].takeIf { contributors.size == 1 }
-        if (parents.size != 2) return null
-        val kinship = kinships[unique] ?: return null
+        if (parents.size == 1) {
+            // Solo, or the clone made instead of inbreeding (Hatchery.hatchFromRun): a run with several
+            // contributors hatches a single-parent child only that way.
+            return balances[parents.single()]
+        }
+        // The first two are the pair the child was recombined from; later parents each gave one functional
+        // locus (Hatchery.withExtraParents) and add nothing to the inherited Echo.
+        val pair = parents.take(2)
+        val kinship = kinships[pair.toSet()] ?: return null
         if (kinship >= NEAR_CLONE_KINSHIP) {
-            val a = balances[parents[0]] ?: return null
-            val b = balances[parents[1]] ?: return null
+            val a = balances[pair[0]] ?: return null
+            val b = balances[pair[1]] ?: return null
             return (a + b).coerceAtMost(10_000)
         }
         val values = contributors.map { balances[it] ?: return null }

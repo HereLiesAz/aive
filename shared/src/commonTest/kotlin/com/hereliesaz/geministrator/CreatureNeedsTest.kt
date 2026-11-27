@@ -356,7 +356,7 @@ class CreatureNeedsTest {
     }
 
     @Test
-    fun actualHybridLineageInheritsOnlyOnceFromItsBirthRun() {
+    fun aNearIdenticalPairClonesAndInheritsOnlyItsOneParentsBalanceOnce() {
         val clone = engineer.copy(id = com.hereliesaz.geministrator.domain.RoleDefinitionId("clone"))
         val plan = TaskDefinitionId("plan")
         val build = TaskDefinitionId("build")
@@ -369,9 +369,11 @@ class CreatureNeedsTest {
         val child = assertNotNull(hatchFromRun(source, source.roleSnapshot, reports = evidence))
         val settled = EchoHistory(balances = mapOf(engineer.id to 2_000, clone.id to 3_000)).advance(source, evidence)
         assertNull(settled.balances[child.id])
-        // The consumer receives the clone's output once (+40); both known parent balances sum.
+        // Two near-identical parents are inbreeding, so one of them clones: the child has a single parent and
+        // inherits only that parent's balance, never the sum of both (the clone trap).
+        assertEquals(listOf(clone.id), child.parents)
         val inherited = settled.withBirths(listOf(child))
-        assertEquals(5_040, inherited.balances[child.id])
+        assertEquals(3_000, inherited.balances[child.id])
         assertEquals(inherited, inherited.withBirths(listOf(child)))
         assertEquals(inherited, inherited.advance(source, evidence))
         assertNull(settled.withBirths(listOf(child.copy(hatchedFromRunId = "wrong"))).balances[child.id])

@@ -2466,7 +2466,11 @@ class ApplicationRuntime private constructor(
             providerRegistry.provider(id)?.configuredModelId?.takeIf { it.isNotBlank() }?.let { id to it }
         }.toMap()
         val child = hatchFromRun(run, roles, echo, reports, configuredModels, genera) ?: return null
-        return child.takeIf { hatchCanExecute(run, it, providerRegistry) }
+        if (hatchCanExecute(run, child, providerRegistry)) return child
+        // An additional parent must never cost the pair its birth: retry without them.
+        if (child.parents.size <= 2) return null
+        return hatchFromRun(run, roles, echo, reports, configuredModels, genera, extraParents = false)
+            ?.takeIf { hatchCanExecute(run, it, providerRegistry) }
     }
 
     suspend fun saveRole(role: RoleDefinition) {
