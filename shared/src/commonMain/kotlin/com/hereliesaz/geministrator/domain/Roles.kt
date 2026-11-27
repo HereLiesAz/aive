@@ -165,7 +165,7 @@ data class RoleDefinition(
     val surfaces: List<RoleSurface> = emptyList(),
     val capabilitiesRequired: Set<AgentCapability> = emptySet(),
     val authorities: Set<RoleAuthority> = emptySet(),
-    /** Tokens this agent may spend in one run, set by the user; null means no budget. */
+    /** Keeper's explicit per-run token override; null uses the inherited cap/class, if any. */
     val tokenBudget: Long? = null,
     /** The configs it was hatched from (docs/Node-Creature-Genome.md); empty for founders. */
     val parents: List<RoleDefinitionId> = emptyList(),
@@ -184,6 +184,8 @@ data class RoleDefinition(
      * or a revision never sets it. It is advice about how to work and never relaxes an approval, budget or permission.
      */
     val keeperInstructions: String = "",
+    /** Inherited effective token allowance at birth; an explicit keeper override always wins. */
+    val geneticTokenCap: Long? = null,
 )
 
 /** The keeper's per-role instructions: how long they may be, how they reach a prompt, and what they cannot do. */

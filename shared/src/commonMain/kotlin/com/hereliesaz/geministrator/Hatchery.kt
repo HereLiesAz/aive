@@ -1,6 +1,17 @@
 package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.domain.AgentProviderId
+import com.hereliesaz.geministrator.domain.ProviderConstraints
+import com.hereliesaz.geministrator.domain.effectiveTokenBudget
+import com.hereliesaz.geministrator.domain.requiresToolFilter
+import com.hereliesaz.geministrator.workflow.AgentProviderRegistry
+import com.hereliesaz.geministrator.workflow.ProviderSelectionRequest
+import com.hereliesaz.geministrator.workflow.providerCapabilitiesFor
+import com.hereliesaz.geministrator.workflow.providerRepositoryFor
+import com.hereliesaz.geministrator.workflow.usesHostFileContext
+import com.hereliesaz.geministrator.providers.HabitReplayAgentProvider
+import com.hereliesaz.geministrator.providers.OnDeviceTextAgentProvider
+import kotlinx.coroutines.CancellationException
 import com.hereliesaz.geministrator.domain.RoleExecutionSource
 import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.events.ProviderUsageRecorded
@@ -32,6 +43,10 @@ internal fun hatchFromRun(
         name = "${first.name} · clone",
         enabled = false,
         parents = listOf(first.id),
+        // Freeze the parent's effective allowance at birth, independently of later keeper edits.
+        budgetClass = null,
+        tokenBudget = null,
+        geneticTokenCap = first.effectiveTokenBudget(),
         hatchedFromRunId = run.id.value,
     ), echo, reports, configuredModels)
     // Fertility is not inferred from the currently edited roster or provider names.
@@ -49,6 +64,7 @@ internal fun hatchFromRun(
             // Empty means no ceiling; an empty intersection would widen two disjoint restrictions.
             if (a.toolCeiling.isNotEmpty() && b.toolCeiling.isNotEmpty() &&
                 a.toolCeiling.none { it in b.toolCeiling }) return@mapNotNull null
+            if ((a.surfaces + b.surfaces).groupBy { it.alias }.values.any { it.distinct().size > 1 }) return@mapNotNull null
             Triple(a, b, score)
         }
     }
@@ -63,6 +79,9 @@ internal fun hatchFromRun(
         name = "${a.name} × ${b.name}",
         instructions = listOf(a.instructions, b.instructions).filter(String::isNotBlank).distinct().joinToString("\n\n"),
         toolCeiling = ceiling,
+        tokenBudget = null,
+        geneticTokenCap = medianParentalCap(a.effectiveTokenBudget(), b.effectiveTokenBudget()),
+        budgetClass = null,
         preferredProviderId = b.preferredProviderId ?: a.preferredProviderId,
         capabilitiesRequired = a.capabilitiesRequired + b.capabilitiesRequired,
         surfaces = (a.surfaces + b.surfaces).distinctBy { it.alias },
@@ -70,6 +89,18 @@ internal fun hatchFromRun(
         parents = listOf(a.id, b.id),
         hatchedFromRunId = run.id.value,
     ), echo, reports, configuredModels)
+}
+
+/**
+ * Median of two finite effective parent caps, rounded down to whole tokens without overflow.
+ * An unlimited parent has no finite observation: use the other parent's cap, or null if neither
+ * has one. The result is a birth default, not a keeper override or a mutation locus.
+ */
+internal fun medianParentalCap(a: Long?, b: Long?): Long? {
+    if (a == null || b == null) return a ?: b
+    val lower = minOf(a, b)
+    val upper = maxOf(a, b)
+    return lower + (upper - lower) / 2
 }
 
 /** Actual completed agent contributors, ordered by work count then ID; deterministic work is not a parent. */
@@ -196,4 +227,64 @@ private fun mutateHatchedGenome(
         variant = variant.copy(name = child.name.removeSuffix(" · clone") + " · variant")
     }
     return variant
+}
+
+/**
+ * Birth-time compatibility preflight using the actual completed parent task contracts and the
+ * existing provider registry's resolved-provider validation. This neither dispatches work nor
+ * reserves a provider slot or keyless request. It cannot certify arbitrary future tasks.
+ * Unknown snapshots, unavailable providers, ambiguous surface aliases or missing task authority
+ * fail closed; a child never receives extra authority merely to make a contract fit.
+ */
+internal suspend fun hatchCanExecute(
+    run: WorkflowRun, child: RoleDefinition, registry: AgentProviderRegistry,
+): Boolean {
+    if (child.enabled || child.executionSource != RoleExecutionSource.Agent ||
+        child.parents.isEmpty() || child.hatchedFromRunId != run.id.value ||
+        run.status != WorkflowRunStatus.Completed) return false
+    val definition = run.definitionSnapshot ?: return false
+    if (child.surfaces.groupBy { it.alias }.values.any { it.distinct().size > 1 }) return false
+    if (child.effectiveTokenBudget()?.let { it <= 0 } == true) return false
+    val completed = run.taskRuns.values.filter {
+        it.assignedRoleId in child.parents && it.status == TaskRunStatus.Completed && it.byAgent
+    }
+    if (completed.isEmpty() || completed.mapNotNull { it.assignedRoleId }.toSet() != child.parents.toSet()) return false
+    val tasks = definition.tasks.associateBy { it.id }
+    val checkedParents = mutableSetOf<RoleDefinitionId>()
+    for (entry in completed) {
+        val task = tasks[entry.taskDefinitionId] ?: return false
+        if (!(entry.executor ?: task.effectiveExecutor()).isAgent) continue
+        if (task.requiredRoleAuthority?.let { it !in child.authorities } == true) return false
+        val requiredSource = (task.providerConstraints as? ProviderConstraints.RequireProvider)?.providerId
+        val pinned = requiredSource ?: child.preferredProviderId
+        val ids = if (pinned != null) listOf(pinned) else registry.linkedSourceIds().map(::AgentProviderId)
+        var compatible = false
+        for (id in ids) {
+            val provider = registry.provider(id) ?: continue
+            // A role-level preflight cannot certify the size/availability of an unknown future local prompt.
+            if (provider is OnDeviceTextAgentProvider || id == HabitReplayAgentProvider.ID) continue
+            val request = ProviderSelectionRequest(
+                preferredProviderId = child.preferredProviderId,
+                requiredCapabilities = task.providerCapabilitiesFor(child),
+                constraints = task.providerConstraints,
+                repository = task.providerRepositoryFor(run.repositorySnapshot),
+                requiresToolFilter = task.usesHostFileContext || task.contract?.requiresToolFilter() == true ||
+                    child.toolCeiling.isNotEmpty(),
+                resolvedProviderId = id,
+            )
+            try {
+                if (registry.select(request).id == id) {
+                    compatible = true
+                    break
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // No compatible provider established by this probe.
+            }
+        }
+        if (!compatible) return false
+        entry.assignedRoleId?.let(checkedParents::add)
+    }
+    return checkedParents == child.parents.toSet()
 }

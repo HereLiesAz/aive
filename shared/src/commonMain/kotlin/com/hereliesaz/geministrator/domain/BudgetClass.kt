@@ -86,9 +86,9 @@ object BudgetClassesInUse {
 /** The class [role] runs under: its own, else the class its starting template names; null for a role with neither. */
 fun RoleDefinition.effectiveBudgetClass(): BudgetClass? = budgetClass ?: RoleStartingTemplates.classOf(id.value)
 
-/** The tokens [role] may spend in one run: its own number, else its class's number, else null (no budget). */
+/** Keeper override wins, then the genetic birth allowance, then the current class allowance. */
 fun RoleDefinition.effectiveTokenBudget(classes: BudgetClassSettings = BudgetClassesInUse.current): Long? =
-    tokenBudget ?: effectiveBudgetClass()?.let(classes::tokensFor)
+    tokenBudget ?: geneticTokenCap ?: effectiveBudgetClass()?.let(classes::tokensFor)
 
 /**
  * The tools a step may use: [contractTools] (null means the step names none, so no filter), narrowed by the role's

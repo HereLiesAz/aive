@@ -2421,7 +2421,8 @@ class ApplicationRuntime private constructor(
         val configuredModels = providerRegistry.providerIds.mapNotNull { id ->
             providerRegistry.provider(id)?.configuredModelId?.takeIf { it.isNotBlank() }?.let { id to it }
         }.toMap()
-        return hatchFromRun(run, roles, echo, reports, configuredModels, genera)
+        val child = hatchFromRun(run, roles, echo, reports, configuredModels, genera) ?: return null
+        return child.takeIf { hatchCanExecute(run, it, providerRegistry) }
     }
 
     suspend fun saveRole(role: RoleDefinition) {

@@ -894,6 +894,7 @@ internal fun CustomCompanyProviderScreen(
                             roleExecutionSourceDraft.isConfiguredExecutionSource() &&
                             roleSurfacesDraft.isConfiguredRoleSurfaces()
                         ) {
+                            val previous = draftRoles.firstOrNull { it.id.value == editingRoleId }
                             val role = RoleDefinition(
                                 id = RoleDefinitionId(cleanId),
                                 name = cleanName,
@@ -911,6 +912,11 @@ internal fun CustomCompanyProviderScreen(
                                 capabilitiesRequired = roleCapabilitiesDraft,
                                 authorities = roleAuthoritiesDraft,
                                 tokenBudget = roleTokenBudgetDraft.toLongOrNull()?.takeIf { it > 0 },
+                                parents = previous?.parents.orEmpty(),
+                                hatchedFromRunId = previous?.hatchedFromRunId,
+                                budgetClass = previous?.budgetClass,
+                                geneticTokenCap = previous?.geneticTokenCap,
+                                toolCeiling = previous?.toolCeiling.orEmpty(),
                             )
                             val editingIndex = editingRoleId?.let { oldId ->
                                 draftRoles.indexOfFirst { it.id.value == oldId }
