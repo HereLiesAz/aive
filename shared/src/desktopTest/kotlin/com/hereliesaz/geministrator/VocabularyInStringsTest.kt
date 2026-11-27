@@ -41,6 +41,8 @@ class VocabularyInStringsTest {
         "settings_engineering_names_explain" to "lists the engineering names the switch reveals",
         // "project" in a path the keeper types.
         "repositories_entire_reference_hint" to "a path example the keeper types",
+        // "project" as the plain word for a repository's group in the directory: immediately understandable, not interpreted (owner, 2026-11-27).
+        "directory_projects" to "the plain word for a repository's group in the directory",
     )
 
     private val stringElement = Regex("""<string\s+name="([^"]+)"[^>]*>(.*?)</string>""", RegexOption.DOT_MATCHES_ALL)

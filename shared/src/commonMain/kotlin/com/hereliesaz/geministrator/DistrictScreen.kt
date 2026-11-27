@@ -168,7 +168,7 @@ internal fun DistrictScreen(
                     val group = directoryGroups.firstOrNull { it.location.key == directoryScope.location.key }
                     if (group == null) Text(stringResource(Res.string.directory_empty), style = AzphaltType.body, color = azphaltOnSurface())
                     else {
-                        Text(stringResource(Res.string.directory_counts, group.hives.size, group.runCount, group.hives.sumOf { it.needsYou }), style = AzphaltType.body, color = azphaltOnSurface())
+                        Text(stringResource(Res.string.directory_counts, group.hives.size, group.hives.sumOf { it.needsYou }), style = AzphaltType.body, color = azphaltOnSurface())
                         group.hives.forEach { hive ->
                             DirectoryHiveRow(hive, { onEnterNeighbourhood(hive) }, { menuFor = hive })
                         }
@@ -259,7 +259,7 @@ private fun DirectoryProjectRow(group: HiveDirectoryGroup, onClick: () -> Unit) 
         if (group.projectNames.any { it != group.location.label }) {
             Text(group.projectNames.joinToString(" · "), style = AzphaltType.body, color = azphaltOnSurface())
         }
-        Text(stringResource(Res.string.directory_counts, group.hives.size, group.runCount, group.hives.sumOf { it.needsYou }),
+        Text(stringResource(Res.string.directory_counts, group.hives.size, group.hives.sumOf { it.needsYou }),
             style = AzphaltType.body, color = azphaltOnSurface())
     }
 }

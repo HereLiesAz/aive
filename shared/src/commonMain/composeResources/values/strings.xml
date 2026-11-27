@@ -1311,7 +1311,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="crumb_goal">Hive</string>
     <string name="directory_projects">Projects and repositories</string>
     <string name="directory_hives">Hives</string>
-    <string name="directory_counts">%1$d hives · %2$d runs · %3$d awaiting you</string>
+    <string name="directory_counts">%1$d hives · %2$d awaiting you</string>
     <string name="directory_owner_count">%1$s · %2$d repositories</string>
     <string name="directory_empty">No hives in this location.</string>
     <string name="crumb_label">Where you are</string>
