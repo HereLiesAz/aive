@@ -223,10 +223,9 @@ internal data class EchoBirthSeed(
         val unique = parents.toSet()
         if (parents.size != unique.size || !contributors.containsAll(unique)) return null
         if (parents.size == 1) {
-            // Solo, or the clone a near-identical pair makes instead of inbreeding (Hatchery.hatchFromRun).
-            val parent = parents.single()
-            val twin = kinships.any { (pair, kinship) -> parent in pair && kinship >= NEAR_CLONE_KINSHIP }
-            return balances[parent].takeIf { contributors.size == 1 || twin }
+            // Solo, or the clone made instead of inbreeding (Hatchery.hatchFromRun): a run with several
+            // contributors hatches a single-parent child only that way.
+            return balances[parents.single()]
         }
         // The first two are the pair the child was recombined from; later parents each gave one functional
         // locus (Hatchery.withExtraParents) and add nothing to the inherited Echo.

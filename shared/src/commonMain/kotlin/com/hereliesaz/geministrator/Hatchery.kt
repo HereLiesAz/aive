@@ -74,7 +74,10 @@ internal fun hatchFromRun(
     // is no outside voice (docs/Node-Creature-Genome.md, the clone trap). Prefer the most alike pair that is
     // not a near-clone; if every viable pair is one, a single parent clones instead of pretending to breed.
     // That clone is inbred, and inbreeding raises the chance of a mutation (see [mutationDraw]): a gamble.
-    val outbred = pairs.filter { it.third < NEAR_CLONE_KINSHIP }
+    // Measured similarity is not enough: a clone mutates, so a parent and its own clone can measure 94%. Descent is
+    // known exactly, so a pair related by it is inbred however far apart the two now measure.
+    val byId = (roles.associateBy { it.id } + run.roleSnapshot.associateBy { it.id })
+    val outbred = pairs.filter { it.third < NEAR_CLONE_KINSHIP && !relatedByDescent(it.first, it.second, byId) }
     val (a, b) = outbred.maxByOrNull { it.third } ?: return pairs.firstOrNull()?.let { cloneOf(it.first, inbred = true) }
     val ceiling = when {
         a.toolCeiling.isEmpty() -> b.toolCeiling
@@ -99,6 +102,24 @@ internal fun hatchFromRun(
     val grown = if (extraParents) withExtraParents(run, pairChild, contributors.filter { it.id != a.id && it.id != b.id })
     else pairChild
     return mutateHatchedGenome(run, grown, echo, reports, configuredModels)
+}
+
+/**
+ * Related by descent: one is an ancestor of the other, at any depth the roster still records, or they share
+ * a parent (siblings). Cousins and more distant kin are not counted. A role whose parents are unknown
+ * (absent from [byId]) contributes only the parents it names itself.
+ */
+internal fun relatedByDescent(a: RoleDefinition, b: RoleDefinition, byId: Map<RoleDefinitionId, RoleDefinition>): Boolean {
+    fun ancestors(role: RoleDefinition): Set<RoleDefinitionId> {
+        val seen = mutableSetOf<RoleDefinitionId>()
+        val queue = ArrayDeque(role.parents)
+        while (queue.isNotEmpty()) {
+            val id = queue.removeFirst()
+            if (seen.add(id)) byId[id]?.parents?.let(queue::addAll)
+        }
+        return seen
+    }
+    return b.id in ancestors(a) || a.id in ancestors(b) || a.parents.toSet().intersect(b.parents.toSet()).isNotEmpty()
 }
 
 /** A child has at most this many parents, the same bound a pollinated child has. */
