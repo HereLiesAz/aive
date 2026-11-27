@@ -90,6 +90,17 @@ class SpatialSignalsTest {
     }
 
     @Test
+    fun aReleasedSporeFlipsWhetherOrNotATardigradeHasCollectedItYet() {
+        val released = CompletionBurst(build, 900, setOf("node:fresh"))
+        val held = heldSpores(setOf("node:a"), listOf(released))
+        assertEquals(setOf("node:a", "node:fresh"), held)
+        val lit = blueSpores(1_150, listOf(SporeUse(check, "node:fresh", 1_000)), held)
+        assertEquals(setOf("node:fresh"), lit.keys)
+        // Left out of the held set it would draw nothing: the set, not the web alone, is what the renderer holds.
+        assertEquals(emptyMap(), blueSpores(1_150, listOf(SporeUse(check, "node:fresh", 1_000)), setOf("node:a")))
+    }
+
+    @Test
     fun aDeliveryIsAPulseFromTheSenderToTheReceiver() {
         val pulses = transferPulses(run, listOf(report(check, 7_000, delivered = setOf("a-build"))))
         assertEquals(listOf(TransferPulse(build, check, 7_000)), pulses)

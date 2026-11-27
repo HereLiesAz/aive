@@ -62,9 +62,19 @@ internal fun blueGlow(nowEpochMillis: Long, usedAtEpochMillis: Long): Float {
 }
 
 /**
- * The blue mix for each spore at [nowEpochMillis], for the spores actually in the constellation only: [spores] are the
- * ids of the web nodes the world draws. A used memory the web does not hold draws nothing, and nothing else flips:
- * not its neighbours, not its hyphae, not the rest of the network. Concurrent uses of one spore take the strongest.
+ * Every spore the world holds: the web's nodes, and the spores a finished task has released that no tardigrade has
+ * collected yet. A released spore is actual memory data from the moment it is released, so it exists in the world
+ * (floating by its creature) before it joins the web. Use this set for [blueSpores].
+ */
+internal fun heldSpores(webNodeIds: Set<String>, bursts: List<CompletionBurst>): Set<String> =
+    webNodeIds + bursts.flatMap { it.spores }
+
+/**
+ * The blue mix for each spore at [nowEpochMillis], for the spores the world actually holds only ([spores], see
+ * [heldSpores]): a used memory the world does not hold draws nothing, since the renderer can light only what it has.
+ * Collected or not makes no difference: a released spore that no tardigrade has reached yet flips just the same.
+ * Nothing else flips: not its neighbours, not its hyphae, not the rest of the network. Concurrent uses of one spore
+ * take the strongest.
  */
 internal fun blueSpores(nowEpochMillis: Long, uses: List<SporeUse>, spores: Set<String>): Map<String, Float> =
     uses.asSequence().filter { it.sporeId in spores }
