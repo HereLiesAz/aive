@@ -39,18 +39,17 @@ internal fun hatchFromRun(
     val contributors = hatchContributors(run, roles)
     val first = contributors.firstOrNull() ?: return null
     val childId = RoleDefinitionId("hatch-${run.id.value}")
-    fun cloneOf(parent: RoleDefinition, birthEcho: Int? = null) = mutateHatchedGenome(run, parent.copy(
+    if (contributors.size == 1) return mutateHatchedGenome(run, first.copy(
         id = childId,
-        name = "${parent.name} · clone",
+        name = "${first.name} · clone",
         enabled = false,
-        parents = listOf(parent.id),
+        parents = listOf(first.id),
         // Freeze the parent's effective allowance at birth, independently of later keeper edits.
         budgetClass = null,
         tokenBudget = null,
-        geneticTokenCap = parent.effectiveTokenBudget(),
+        geneticTokenCap = first.effectiveTokenBudget(),
         hatchedFromRunId = run.id.value,
-    ), echo, reports, configuredModels, birthEcho)
-    if (contributors.size == 1) return cloneOf(first)
+    ), echo, reports, configuredModels)
     // Fertility is not inferred from the currently edited roster or provider names.
     if (run.roleSnapshot.isEmpty()) return null
     val kinships = hatchKinships(run, contributors, reports)
@@ -70,13 +69,7 @@ internal fun hatchFromRun(
             Triple(a, b, score)
         }
     }
-    // Two near-identical parents are inbreeding: a child of both is a copy of either, and the second parent
-    // is no outside voice (docs/Node-Creature-Genome.md, the clone trap). Prefer the most alike pair that is
-    // not a near-clone; if every viable pair is one, a single parent clones instead of pretending to breed.
-    // That clone is inbred: near-clone parents pass on the sum of their Echo, and mutation reads Echo, so its
-    // mutation chance is drawn from that sum (see [mutationDraw]).
-    val outbred = pairs.filter { it.third < NEAR_CLONE_KINSHIP }
-    val (a, b) = outbred.maxByOrNull { it.third } ?: return pairs.firstOrNull()?.let { (lead, mate) -> cloneOf(lead, birthEcho = sumOfKnown(echo, lead, mate)) }
+    val (a, b) = pairs.maxByOrNull { it.third } ?: return null
     val ceiling = when {
         a.toolCeiling.isEmpty() -> b.toolCeiling
         b.toolCeiling.isEmpty() -> a.toolCeiling
@@ -101,10 +94,6 @@ internal fun hatchFromRun(
     else pairChild
     return mutateHatchedGenome(run, grown, echo, reports, configuredModels)
 }
-
-/** The sum of the Echo of the parents whose balance is known, capped at the scale's top; null if none is. */
-private fun sumOfKnown(echo: Map<RoleDefinitionId, Int>, vararg parents: RoleDefinition): Int? =
-    parents.mapNotNull { echo[it.id] }.takeIf { it.isNotEmpty() }?.sum()?.coerceAtMost(10_000)
 
 /** A child has at most this many parents, the same bound a pollinated child has. */
 internal const val MAX_HATCH_PARENTS = 8
@@ -224,9 +213,9 @@ internal fun fertilityAllowsPair(score: Int, bridge: Boolean, contributors: Int,
  * retrying a hatch reproducible. Only the new disabled configuration is changed.
  */
 private fun mutateHatchedInstructions(
-    run: WorkflowRun, child: RoleDefinition, echo: Map<RoleDefinitionId, Int>, birthEcho: Int?,
+    run: WorkflowRun, child: RoleDefinition, echo: Map<RoleDefinitionId, Int>,
 ): RoleDefinition {
-    if (!mutationDraw(run, child, echo, "instruction", birthEcho)) return child
+    if (!mutationDraw(run, child, echo, "instruction")) return child
     val variants = listOf(
         "Within the assigned scope, compare plausible explanations against the available evidence before choosing an approach.",
         "Within the assigned scope, prefer a small falsifiable check of a material assumption before committing to an approach.",
@@ -241,11 +230,8 @@ private fun mutateHatchedInstructions(
 }
 
 /** Each functional locus has its own stable, independently keyed draw. */
-private fun mutationDraw(
-    run: WorkflowRun, child: RoleDefinition, echo: Map<RoleDefinitionId, Int>, locus: String, birthEcho: Int? = null,
-): Boolean {
-    // An inbred clone reads the sum of its near-clone parents' Echo ([birthEcho]); any other birth, the highest parent's.
-    val highest = birthEcho ?: child.parents.mapNotNull(echo::get).maxOrNull() ?: 0
+private fun mutationDraw(run: WorkflowRun, child: RoleDefinition, echo: Map<RoleDefinitionId, Int>, locus: String): Boolean {
+    val highest = child.parents.mapNotNull(echo::get).maxOrNull() ?: 0
     val chance = 200 + (highest.coerceIn(3_000, 6_000) - 3_000) * 600 / 3_000
     return ("${run.id.value}:$locus-mutation-v1").hashCode().toUInt() % 10_000u < chance.toUInt()
 }
@@ -258,16 +244,16 @@ private fun mutationDraw(
  */
 private fun mutateHatchedGenome(
     run: WorkflowRun, child: RoleDefinition, echo: Map<RoleDefinitionId, Int>,
-    reports: List<ProviderUsageRecorded>, configuredModels: Map<AgentProviderId, String>, birthEcho: Int? = null,
+    reports: List<ProviderUsageRecorded>, configuredModels: Map<AgentProviderId, String>,
 ): RoleDefinition {
-    var variant = mutateHatchedInstructions(run, child, echo, birthEcho)
+    var variant = mutateHatchedInstructions(run, child, echo)
     val ceiling = child.toolCeiling.distinct().sorted()
-    if (ceiling.size > 1 && mutationDraw(run, child, echo, "tool", birthEcho)) {
+    if (ceiling.size > 1 && mutationDraw(run, child, echo, "tool")) {
         val index = (("${run.id.value}:tool-variant-v1").hashCode().toUInt() % ceiling.size.toUInt()).toInt()
         variant = variant.copy(toolCeiling = ceiling.filterIndexed { i, _ -> i != index })
     }
     val parent = child.parents.singleOrNull()
-    if (parent != null && mutationDraw(run, child, echo, "source", birthEcho)) {
+    if (parent != null && mutationDraw(run, child, echo, "source")) {
         val models = reportedSessionModels(run, reports)
         val observed = run.taskRuns.values.filter { it.assignedRoleId == parent &&
             it.status == TaskRunStatus.Completed && it.byAgent }.mapNotNull { task ->
