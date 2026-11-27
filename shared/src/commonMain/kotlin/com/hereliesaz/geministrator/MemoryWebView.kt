@@ -412,7 +412,7 @@ private fun NoteList(graph: WebGraph, matching: Set<String>?, selected: String?,
 /** One note, read: what it is, its words, where it came from, then what it links to and what links to it. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun NotePanel(note: WebNote, onSelect: (String) -> Unit, onClose: () -> Unit) {
+internal fun NotePanel(note: WebNote, onSelect: (String) -> Unit, onClose: () -> Unit) {
     val node = note.node
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Azphalt.Ink).padding(16.dp),

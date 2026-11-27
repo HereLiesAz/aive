@@ -695,6 +695,7 @@ fun ControlRoom(
     }
     CompositionLocalProvider(
         LocalReleaseCreature provides releaseCreature,
+        LocalSpatialHiveMemory provides memoryLayer,
         LocalFlowchartLinks provides flowchartLinks,
         LocalPlaceLinks provides placeLinks,
         LocalCardFlip provides flipHost,
