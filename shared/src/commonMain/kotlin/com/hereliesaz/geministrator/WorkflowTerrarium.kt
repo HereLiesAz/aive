@@ -141,12 +141,14 @@ internal fun GeministratorWorkflowTerrarium(
     }
     val run = rehearsal?.getOrNull(rehearsalFrame) ?: liveRun
 
-    val projection = remember(stagedDefinition, run, roles, positions) {
+    val stable = LocalStableHost.current?.stable
+    val projection = remember(stagedDefinition, run, roles, positions, stable) {
         projectWorkflowTerrarium(
             definition = stagedDefinition,
             run = run,
             roles = roles,
             persistedPositions = positions,
+            stable = stable,
         )
     }
     val tissue = remember(projection, stagedDefinition, run) {

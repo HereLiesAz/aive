@@ -217,4 +217,27 @@ class WorkflowTerrariumTest {
         createdAtEpochMillis = 1L,
         updatedAtEpochMillis = 1L,
     )
+
+    @Test
+    fun spatialGenomesFollowActualAgentConfigurationsAndExistingPartInheritance() {
+        val implement=agentTask("implement",BuiltInRoles.ImplementationEngineer.id)
+        val again=agentTask("again",BuiltInRoles.ImplementationEngineer.id)
+        val verify=agentTask("verify",BuiltInRoles.QaEngineer.id)
+        val program=TaskDefinition(id=TaskDefinitionId("test"),name="Test",objective="Run tests",
+            roleId=null,executor=TaskExecutor.TestRunner("./gradlew test"))
+        val definition=workflow(implement,again,verify,program)
+        val stable=Stable(starter="founder",bred=listOf(BredCreature("mixed","body","arbor","tail",
+            listOf("body","arbor","tail"),2)),assignments=mapOf(BuiltInRoles.ImplementationEngineer.id.value to "mixed"))
+        val projection=projectWorkflowTerrarium(definition,runFor(definition),
+            listOf(BuiltInRoles.ImplementationEngineer,BuiltInRoles.QaEngineer),stable=stable)
+        val genome=assertNotNull(projection.agentGenomes["implement"])
+        assertEquals(genome,projection.agentGenomes["again"])
+        assertEquals(SpatialCellSignal.Excitatory,genome.pigment)
+        assertEquals(SpatialCellSignal.Inhibitory,projection.agentGenomes["verify"]?.pigment)
+        assertTrue("test" !in projection.agentGenomes)
+        // FNV visual seeds for the three literal inherited part keys (computed independently).
+        assertEquals(-1980955423,genome.bodySeed)
+        assertEquals(-1329093359,genome.arborSeed)
+        assertEquals(2022627999,genome.tailSeed)
+    }
 }

@@ -56,4 +56,19 @@ class HatcheryTest {
     fun aRunThatHasNotClearedHatchesNothing() {
         assertNull(hatchFromRun(run(WorkflowRunStatus.Failed, "a" to engineer), listOf(engineer)))
     }
+
+    @Test
+    fun actualHatchedConfigurationsExpressFunctionalInheritanceWithoutNewAuthority() {
+        val parent=assertNotNull(spatialAgentGenome(engineer))
+        val clone=assertNotNull(hatchFromRun(run(WorkflowRunStatus.Completed,"a" to engineer),listOf(engineer)))
+        assertEquals(parent,spatialAgentGenome(clone))
+        val hybrid=assertNotNull(hatchFromRun(run(WorkflowRunStatus.Completed,"a" to engineer,"b" to engineer,"c" to qa),
+            listOf(engineer,qa)))
+        val genes=assertNotNull(spatialAgentGenome(hybrid))
+        assertEquals(SpatialCellSignal.Excitatory,genes.pigment)
+        assertEquals(SpatialCellSignal.Inhibitory,genes.accent)
+        assertEquals(engineer.authorities,hybrid.authorities)
+        assertFalse(hybrid.enabled)
+        kotlin.test.assertNotEquals(parent.configurationSeed,genes.configurationSeed)
+    }
 }

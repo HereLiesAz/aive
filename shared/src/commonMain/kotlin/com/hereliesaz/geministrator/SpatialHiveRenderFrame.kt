@@ -8,6 +8,7 @@ internal data class SpatialRenderBody(
     val id: String, val position: SpatialPoint, val seed: Int, val form: String,
     val state: String, val growth: Float, val radius: Float,
     val blurScale: Float = 1f,
+    val genome: SpatialAgentGenome? = null,
 )
 
 @Serializable
@@ -37,7 +38,7 @@ internal fun SpatialHiveScene.renderFrame(journal: SpatialTissueJournal): Spatia
             SpatialForm.WitheredEgg -> .29f
             else -> .43f + (body.morphologySeed and 255) / 255f * .2f
         }
-        SpatialRenderBody(body.id, body.position, body.morphologySeed, body.form.name, body.state.name, body.growth, radius)
+        SpatialRenderBody(body.id, body.position, body.morphologySeed, body.form.name, body.state.name, body.growth, radius, genome = body.genome)
     }
     val spores = memory.spores.map { spore ->
         SpatialRenderBody(spore.id, spore.position, spatialSeed(spore.id), "Spore", spore.group.name, 0f,

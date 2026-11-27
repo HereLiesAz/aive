@@ -41,6 +41,8 @@ internal data class WorkflowTerrariumProjection(
     val programmaticNodeIds: Set<String> = emptySet(),
     /** Which provider answers for each agent creature, by task id: Auto or Pinned (a badge on the creature). */
     val providerBadges: Map<String, CreatureProviderBadge> = emptyMap(),
+    /** Actual assigned agent configurations and inherited anatomy, by task id. */
+    val agentGenomes: Map<String, SpatialAgentGenome> = emptyMap(),
 )
 
 /**
@@ -57,6 +59,7 @@ internal fun projectWorkflowTerrarium(
     run: WorkflowRun,
     roles: Collection<RoleDefinition>,
     persistedPositions: Map<String, H2g2TerrariumPosition> = emptyMap(),
+    stable: Stable? = null,
 ): WorkflowTerrariumProjection {
     val tasksById = definition.tasks.associateBy(TaskDefinition::id)
     val rolesById = roles.associateBy(RoleDefinition::id)
@@ -203,6 +206,12 @@ internal fun projectWorkflowTerrarium(
         providerBadges = creatureProviderBadges(agentTasks) { task ->
             run.taskRuns[task.id]?.assignedRoleId?.let(rolesById::get) ?: task.roleId?.let(rolesById::get)
         },
+        agentGenomes = agentTasks.mapNotNull { task ->
+            val taskRun = run.taskRuns[task.id]
+            if (!(taskRun?.executor ?: task.effectiveExecutor()).isAgent()) return@mapNotNull null
+            val role = taskRun?.assignedRoleId?.let(rolesById::get) ?: task.roleId?.let(rolesById::get)
+            role?.let { spatialAgentGenome(it, stable) }?.let { task.id.value to it }
+        }.toMap(),
     )
 }
 

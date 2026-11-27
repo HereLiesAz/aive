@@ -1,5 +1,10 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.domain.AgentCapability
+import com.hereliesaz.geministrator.domain.RoleAuthority
+import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.RoleExecutionSource
+import kotlinx.serialization.Serializable
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.sqrt
@@ -93,4 +98,71 @@ internal fun spatialRootProfile(t: Float, phase: Float): Float {
     val remaining=1f-u
     return .025f+.975f*remaining.pow(1.65f)+
         .09f*sin(PI.toFloat()*u).pow(2)*(.5f+.5f*sin(phase+u*17f))
+}
+
+/**
+ * Visible functional families backed by a role's actual declared authorities and required
+ * capabilities. They describe configuration, not successful execution, new authority,
+ * or a physiological simulation. Unimplemented cell functions have no invented allele.
+ */
+@Serializable
+internal enum class SpatialCellSignal { Excitatory, Inhibitory, Modulatory, Unclassified }
+
+/**
+ * Renderer-safe expression of the existing agent configuration and existing stable inheritance.
+ * Part seeds preserve the body, tendrils and tail loci independently. Configuration seed
+ * excludes role identity, display name and run identity: a true clone is not made genetically
+ * different by a new name. It is a visual seed, never a credential or kinship measurement.
+ */
+@Serializable
+internal data class SpatialAgentGenome(
+    val configurationSeed: Int,
+    val bodySeed: Int,
+    val arborSeed: Int,
+    val tailSeed: Int,
+    val pigment: SpatialCellSignal,
+    val accent: SpatialCellSignal?,
+)
+
+/**
+ * Read, never mutate, the role and its assigned creature. The stable owns anatomy, while
+ * the role owns real functionality. Buying or assigning a breed cannot grant permissions.
+ * Programmatic roles deliberately have no agent genome. Model tier, tolerance, actual
+ * synaptic capacity, resilience and physiological behavior are not inferred from artwork.
+ */
+internal fun spatialAgentGenome(role: RoleDefinition, stable: Stable? = null): SpatialAgentGenome? {
+    if(role.executionSource != RoleExecutionSource.Agent) return null
+    val authorities=role.authorities
+    val capabilities=role.capabilitiesRequired
+    val signals=buildList {
+        if(authorities.any { it in setOf(RoleAuthority.RejectPlan,RoleAuthority.Verify,RoleAuthority.ReviewCode) })
+            add(SpatialCellSignal.Inhibitory)
+        if(authorities.any { it in setOf(RoleAuthority.ProposePlan,RoleAuthority.Implement,RoleAuthority.AuthorTests) })
+            add(SpatialCellSignal.Excitatory)
+        if(capabilities.any { it in setOf(AgentCapability.Messaging,AgentCapability.Research) })
+            add(SpatialCellSignal.Modulatory)
+        if(capabilities.any { it in setOf(AgentCapability.Testing,AgentCapability.TestAuthoring) })
+            add(SpatialCellSignal.Inhibitory)
+        if(capabilities.any { it in setOf(AgentCapability.PlanGeneration,AgentCapability.RepositoryWrite) })
+            add(SpatialCellSignal.Excitatory)
+    }.distinct()
+    // Canonical, length-delimited fields. Only the visual integer survives the projection.
+    // No role instructions, tool names, provider ids or surface contents cross the GPU boundary.
+    val configurationSeed=spatialSeed(buildList {
+        add(role.instructions)
+        add(role.keeperInstructions)
+        add(role.preferredProviderId?.value.orEmpty())
+        add(role.tokenBudget?.toString().orEmpty())
+        add(role.budgetClass?.name.orEmpty())
+        add(authorities.map { it.name }.sorted().joinToString(","))
+        add(capabilities.map { it.name }.sorted().joinToString(","))
+        add(role.toolCeiling.distinct().sorted().joinToString("") { "${it.length}:$it" })
+        add(role.surfaces.map { it.alias }.sorted().joinToString("") { "${it.length}:$it" })
+    }.joinToString("") { "${it.length}:$it" })
+    val key=stable?.creatureOf(role.id)
+    val inherited=stable?.bred?.firstOrNull { it.id==key }
+    fun seed(part: String?): Int = part?.let { spatialSeed("breed:$it") } ?: configurationSeed
+    return SpatialAgentGenome(configurationSeed,
+        seed(inherited?.body ?: key),seed(inherited?.tendrils ?: key),seed(inherited?.tail ?: key),
+        signals.firstOrNull() ?: SpatialCellSignal.Unclassified,signals.getOrNull(1))
 }
