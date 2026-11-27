@@ -36,7 +36,7 @@ import com.hereliesaz.geministrator.resources.needs_tokens_spent
 import org.jetbrains.compose.resources.stringResource
 
 private val NeedTrack = Color(0xFF4A4139)
-// Delivery exposure is not a diagnosis of sepsis.
+// Cumulative delivery evidence is not a diagnosis of sepsis.
 private val EchoWarm = Azphalt.Yellow
 private val IntegrityGreen = Azphalt.Yellow
 private val OutputTeal = Azphalt.Yellow
@@ -55,7 +55,8 @@ internal fun CreatureNeedsPanel(
         if (titled) Text(stringResource(Res.string.needs_needs), style = AzphaltType.eyebrow, color = azphaltOnSurface())
         NeedMeter(
             label = stringResource(Res.string.needs_echo_exposure),
-            value = needs.echo.takeIf { needs.echoComparablePaths > 0 },
+            value = needs.echoHundredths?.div(100),
+            shownValue = needs.echoHundredths?.let { "${it / 100}.${(it % 100).toString().padStart(2, '0')}" },
             color = EchoWarm,
             missing = stringResource(Res.string.needs_not_reported),
         )
@@ -88,8 +89,8 @@ internal fun CreatureNeedsPanel(
 }
 
 @Composable
-private fun NeedMeter(label: String, value: Int?, color: Color, missing: String = "", onClick: (() -> Unit)? = null) {
-    val shown = value?.toString() ?: missing
+private fun NeedMeter(label: String, value: Int?, color: Color, missing: String = "", shownValue: String? = null, onClick: (() -> Unit)? = null) {
+    val shown = shownValue ?: value?.toString() ?: missing
     Column(
         verticalArrangement = Arrangement.spacedBy(5.dp),
         modifier = Modifier

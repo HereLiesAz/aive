@@ -2387,6 +2387,25 @@ class ApplicationRuntime private constructor(
         return persistence.events.forRun(runId)
     }
 
+    /**
+     * Rebuild the shown run's starting Echo from settled earlier runs and their own journals.
+     * Only runs settled by this run's creation are included, so historical inspection cannot
+     * import future activity. Legacy runs without exact snapshots contribute nothing.
+     */
+    internal suspend fun loadEchoHistory(before: WorkflowRun): Map<RoleDefinitionId, Int> {
+        var history = EchoHistory()
+        val prior = loadRunHistory().flatMap { it.second }.distinctBy { it.id }
+            .filter { it.id != before.id && it.updatedAtEpochMillis <= before.createdAtEpochMillis &&
+                it.status in setOf(WorkflowRunStatus.Completed, WorkflowRunStatus.Failed, WorkflowRunStatus.Cancelled) }
+            .sortedWith(compareBy({ it.updatedAtEpochMillis }, { it.id.value }))
+        for (run in prior) {
+            if (run.definitionSnapshot == null || run.roleSnapshot.isEmpty()) continue
+            history = history.advance(run, persistence.events.forRun(run.id)
+                .filterIsInstance<com.hereliesaz.geministrator.events.ProviderUsageRecorded>())
+        }
+        return history.withBirths(before.roleSnapshot).balances
+    }
+
     suspend fun saveRole(role: RoleDefinition) {
         persistence.roles.put(role)
         loadLatest()

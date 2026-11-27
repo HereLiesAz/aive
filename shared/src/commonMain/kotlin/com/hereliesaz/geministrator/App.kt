@@ -1435,6 +1435,7 @@ fun App(
                             }
                         },
                         onLoadRunTimeline = { runtime?.loadRunTimeline(shown = true) ?: emptyList() },
+                        onLoadEchoHistory = { run -> runtime?.loadEchoHistory(run) ?: emptyMap() },
                         onLoadLogIntegrity = { runtime?.loadRunLogIntegrity() ?: com.hereliesaz.geministrator.events.ChainStatus.NoChain },
                         onLoadWorkflowDefinitions = { runtime?.persistence?.definitions?.all() ?: emptyList() },
                         onExportDiagnosticBundle = { runtime?.exportDiagnosticBundle() },

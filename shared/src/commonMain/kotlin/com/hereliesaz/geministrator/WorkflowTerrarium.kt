@@ -152,8 +152,9 @@ internal fun GeministratorWorkflowTerrarium(
         )
     }
     val modelReports = LocalModelUsageReports.current
-    val tissue = remember(projection, stagedDefinition, run, roles, modelReports) {
-        projectTissue(stagedDefinition, run, projection.subjects.associate { it.node.id to it.position }, roles, modelReports)
+    val cumulativeEcho = LocalCumulativeEcho.current
+    val tissue = remember(projection, stagedDefinition, run, roles, modelReports, cumulativeEcho) {
+        projectTissue(stagedDefinition, run, projection.subjects.associate { it.node.id to it.position }, roles, modelReports, cumulativeEcho)
     }
     // Who is born and who is still an egg, from the run's task statuses: the hive grows as the work does.
     // Edit shows every creature. Outside Edit one round button on the controls bar shows every creature at once

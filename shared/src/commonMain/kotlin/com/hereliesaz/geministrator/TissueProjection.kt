@@ -5,6 +5,7 @@ import com.hereliesaz.geministrator.domain.TaskCondition
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
+import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
 import com.hereliesaz.geministrator.events.ProviderUsageRecorded
 
@@ -100,6 +101,7 @@ internal fun projectTissue(
     positions: Map<String, H2g2TerrariumPosition>,
     roles: Collection<com.hereliesaz.geministrator.domain.RoleDefinition> = emptyList(),
     modelReports: List<ProviderUsageRecorded> = emptyList(),
+    cumulativeEcho: Map<RoleDefinitionId, Int> = emptyMap(),
 ): TissueScene {
     val taskIds = definition.tasks.map { it.id.value }
     val providerOf = run.taskRuns.entries
@@ -175,7 +177,7 @@ internal fun projectTissue(
         atSurface = atSurface,
         held = definition.tasks.filter { it.holdOutput }.mapTo(mutableSetOf()) { it.id.value },
         echo = definition.tasks.mapNotNull { task ->
-            creatureNeeds(task.id, definition, run, roles, modelReports)
+            creatureNeeds(task.id, definition, run, roles, modelReports, cumulativeEcho)
                 ?.echoState
                 ?.takeIf { it != EchoState.Grounded }
                 ?.let { task.id.value to it }
