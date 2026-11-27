@@ -333,9 +333,10 @@ fun App(
         val presentation = liveRun ?: return@LaunchedEffect
         // Each cleared run counts toward the stable's next generation (counted once per run).
         stableHost.runCleared(presentation.run)
-        val child = hatchFromRun(presentation.run, presentation.roles) ?: return@LaunchedEffect
+        if (presentation.run.status != com.hereliesaz.geministrator.domain.WorkflowRunStatus.Completed) return@LaunchedEffect
         val target = runtime ?: return@LaunchedEffect
         try {
+            val child = target.hatchWithEcho(presentation.run, presentation.roles) ?: return@LaunchedEffect
             if (target.persistence.roles.all().none { it.id == child.id }) target.saveRole(child)
         } catch (failure: CancellationException) {
             throw failure

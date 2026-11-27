@@ -12,6 +12,7 @@ import com.hereliesaz.geministrator.domain.WorkflowDefinitionId
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
+import com.hereliesaz.geministrator.domain.promptInstructions
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -50,6 +51,40 @@ class HatcheryTest {
         val child = assertNotNull(hatchFromRun(run(WorkflowRunStatus.Completed, "a" to engineer), listOf(engineer)))
         assertEquals(listOf(engineer.id), child.parents)
         assertEquals(engineer.instructions, child.instructions)
+    }
+
+    @Test
+    fun functionalMutationChangesTheActualPromptWithoutChangingAuthority() {
+        val source = run(WorkflowRunStatus.Completed, "a" to engineer)
+            .copy(id = WorkflowRunId("mutation-58"))
+        val variant = assertNotNull(hatchFromRun(source, listOf(engineer)))
+        assertEquals(engineer.instructions + "\n\nWhen otherwise comparable approaches are available within the assigned scope, favor reversible choices and identify material trade-offs.", variant.instructions)
+        assertEquals(variant.instructions, variant.promptInstructions())
+        assertEquals(engineer.authorities, variant.authorities)
+        assertEquals(engineer.capabilitiesRequired, variant.capabilitiesRequired)
+        assertEquals(engineer.surfaces, variant.surfaces)
+        assertEquals(engineer.toolCeiling, variant.toolCeiling)
+        assertEquals(engineer.keeperInstructions, variant.keeperInstructions)
+        assertEquals(engineer.preferredProviderId, variant.preferredProviderId)
+        assertFalse(variant.enabled)
+        assertEquals(listOf(engineer.id), variant.parents)
+        assertEquals(variant, hatchFromRun(source, listOf(engineer)))
+        assertEquals(70, configurationKinship(engineer, "p", variant, "p", "m", "m"))
+    }
+
+    @Test
+    fun highEchoIncreasesTheChanceButNeverForcesMutation() {
+        val source = run(WorkflowRunStatus.Completed, "a" to engineer)
+            .copy(id = WorkflowRunId("mutation-0"))
+        assertEquals(engineer.instructions, assertNotNull(hatchFromRun(source, listOf(engineer))).instructions)
+        val high = assertNotNull(hatchFromRun(source, listOf(engineer), mapOf(engineer.id to 6_000)))
+        kotlin.test.assertNotEquals(engineer.instructions, high.instructions)
+        val noDraw = source.copy(id = WorkflowRunId("mutation-1"))
+        assertEquals(engineer.instructions, assertNotNull(hatchFromRun(noDraw, listOf(engineer),
+            mapOf(engineer.id to 10_000))).instructions)
+        val historical = source.copy(roleSnapshot = listOf(engineer))
+        val edited = engineer.copy(instructions = "Later roster edit")
+        assertEquals(high, hatchFromRun(historical, listOf(edited), mapOf(engineer.id to 6_000)))
     }
 
     @Test
