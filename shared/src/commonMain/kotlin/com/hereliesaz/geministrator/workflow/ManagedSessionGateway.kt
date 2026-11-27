@@ -201,6 +201,8 @@ data class ManagedSessionUsage(
     /** Fingerprint of the request text as sent: SHA-256 hex and length, never the text. */
     val requestSha256: String? = null,
     val requestChars: Int? = null,
+    /** True only when every report in this batch names the same nonblank model. */
+    val modelConsistent: Boolean = !model.isNullOrBlank(),
 )
 
 /**
@@ -218,6 +220,7 @@ internal fun ManagedSessionUsage.sanitized(): ManagedSessionUsage {
         cacheHitFraction = cacheHitFraction?.takeIf { it in 0f..1f },
         latencyMillis = latencyMillis?.takeIf { it >= 0L },
         tokensAvoided = tokensAvoided.coerceAtLeast(0L),
+        modelConsistent = modelConsistent && !model.isNullOrBlank(),
     )
 }
 
@@ -235,6 +238,9 @@ internal fun ManagedSessionUsage?.plusReport(next: ManagedSessionUsage): Managed
         tokensAvoided = base.tokensAvoided + next.tokensAvoided,
         // The later report's request wins as a whole: a fingerprint and its length must describe one request.
         model = next.model ?: base.model,
+        // A later report cannot restore certainty to a mixed or unknown batch.
+        modelConsistent = base.modelConsistent && next.modelConsistent &&
+            !base.model.isNullOrBlank() && base.model == next.model,
         requestSha256 = if (next.requestSha256 != null) next.requestSha256 else base.requestSha256,
         requestChars = if (next.requestSha256 != null) next.requestChars else base.requestChars,
     )

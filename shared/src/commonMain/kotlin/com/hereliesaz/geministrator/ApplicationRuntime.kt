@@ -2379,8 +2379,11 @@ class ApplicationRuntime private constructor(
         return persistence.eventChainStatus(runId)
     }
 
-    suspend fun loadRunTimeline(): List<WorkflowEvent> {
-        val runId = runtimeMutex.withLock { current?.state?.run?.id } ?: return emptyList()
+    /** Load the active journal, or the historical run currently shown when explicitly requested by the UI. */
+    suspend fun loadRunTimeline(shown: Boolean = false): List<WorkflowEvent> {
+        val runId = runtimeMutex.withLock {
+            if (shown) viewingRun?.run?.id ?: current?.state?.run?.id else current?.state?.run?.id
+        } ?: return emptyList()
         return persistence.events.forRun(runId)
     }
 

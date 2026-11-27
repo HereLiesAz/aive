@@ -6,6 +6,7 @@ import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.domain.WorkflowRunStatus
+import com.hereliesaz.geministrator.events.ProviderUsageRecorded
 
 /**
  * Swarm OS step 1 (docs/Swarm-OS.md): the workflow field drawn as neural tissue.
@@ -98,6 +99,7 @@ internal fun projectTissue(
     run: WorkflowRun,
     positions: Map<String, H2g2TerrariumPosition>,
     roles: Collection<com.hereliesaz.geministrator.domain.RoleDefinition> = emptyList(),
+    modelReports: List<ProviderUsageRecorded> = emptyList(),
 ): TissueScene {
     val taskIds = definition.tasks.map { it.id.value }
     val providerOf = run.taskRuns.entries
@@ -173,7 +175,7 @@ internal fun projectTissue(
         atSurface = atSurface,
         held = definition.tasks.filter { it.holdOutput }.mapTo(mutableSetOf()) { it.id.value },
         echo = definition.tasks.mapNotNull { task ->
-            creatureNeeds(task.id, definition, run, roles)
+            creatureNeeds(task.id, definition, run, roles, modelReports)
                 ?.echoState
                 ?.takeIf { it != EchoState.Grounded }
                 ?.let { task.id.value to it }

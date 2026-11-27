@@ -3,6 +3,8 @@ package com.hereliesaz.geministrator
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.ProjectId
+import com.hereliesaz.geministrator.domain.ProviderRunId
+import com.hereliesaz.geministrator.events.ProviderUsageRecorded
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
@@ -59,27 +61,28 @@ class CreatureNeedsTest {
                 attempt = providerAndAttempt.second,
                 assignedRoleId = t.roleId,
                 assignedProviderId = AgentProviderId(providerAndAttempt.first),
+                providerRunId = ProviderRunId("session-$id"),
             )
         },
         createdAtEpochMillis = 1L,
         updatedAtEpochMillis = 1L,
     )
 
+    /** Explicit evidence per exact session, not inferred from its role. */
+    private fun reports(run: WorkflowRun) = run.taskRuns.values.map { task ->
+        ProviderUsageRecorded(run.id,task.taskDefinitionId,requireNotNull(task.assignedProviderId),
+            requireNotNull(task.providerRunId),model="model-a",modelConsistent=true,occurredAtEpochMillis=2L)
+    }
+
     @Test
     fun readingANearClonesOutputIsEcho() {
         // build reads plan (same role, same provider) and is reviewed by qa (different role)
-        val needs = assertNotNull(
-            creatureNeeds(
-                TaskDefinitionId("build"),
-                definition,
-                run(
-                    Triple("plan", TaskRunStatus.Completed, "a" to 1),
-                    Triple("build", TaskRunStatus.Completed, "a" to 1),
-                    Triple("review", TaskRunStatus.Running, "b" to 1),
-                ),
-                roles,
-            ),
+        val r=run(
+            Triple("plan", TaskRunStatus.Completed, "a" to 1),
+            Triple("build", TaskRunStatus.Completed, "a" to 1),
+            Triple("review", TaskRunStatus.Running, "b" to 1),
         )
+        val needs=assertNotNull(creatureNeeds(TaskDefinitionId("build"),definition,r,roles,reports(r)))
         assertEquals(50, needs.echo)
         assertEquals(EchoState.SelfAbsorbed, needs.echoState)
         assertEquals("plan", needs.nearClone)
@@ -134,11 +137,13 @@ class CreatureNeedsTest {
     fun clonedRoleIdsAndCosmeticNamesDoNotAlterConfigurationKinship() {
         val clone=engineer.copy(id=com.hereliesaz.geministrator.domain.RoleDefinitionId("new-id"),
             name="Different name",parents=listOf(engineer.id),enabled=false)
-        assertEquals(100,configurationKinship(engineer,"provider-a",clone,"provider-a"))
-        assertEquals(50,configurationKinship(engineer,"provider-a",clone,"provider-b"))
-        assertEquals(70,configurationKinship(engineer,"provider-a",clone.copy(instructions="Different instructions"),"provider-a"))
-        assertEquals(80,configurationKinship(engineer,"provider-a",clone.copy(toolCeiling=listOf("read")),"provider-a"))
-        assertNull(configurationKinship(engineer,null,clone,null))
+        assertEquals(100,configurationKinship(engineer,"provider-a",clone,"provider-a","model-a","model-a"))
+        assertEquals(80,configurationKinship(engineer,"provider-a",clone,"provider-b","model-a","model-a"))
+        assertEquals(70,configurationKinship(engineer,"provider-a",clone,"provider-a","model-a","model-b"))
+        assertEquals(70,configurationKinship(engineer,"provider-a",clone.copy(instructions="Different instructions"),"provider-a","model-a","model-a"))
+        assertEquals(80,configurationKinship(engineer,"provider-a",clone.copy(toolCeiling=listOf("read")),"provider-a","model-a","model-a"))
+        assertNull(configurationKinship(engineer,null,clone,null,"model-a","model-a"))
+        assertNull(configurationKinship(engineer,"provider-a",clone,"provider-a",null,"model-a"))
     }
 
     @Test
@@ -154,13 +159,13 @@ class CreatureNeedsTest {
             Triple("review",TaskRunStatus.Ready,"b" to 1),
         ).let { original -> original.copy(roleSnapshot=listOf(clone,engineer,qa),
             taskRuns=original.taskRuns + (plan.id to original.taskRuns.getValue(plan.id).copy(assignedRoleId=clone.id))) }
-        val needs=assertNotNull(creatureNeeds(build.id,d,r,listOf(engineer.copy(instructions="Edited after launch"),qa)))
+        val needs=assertNotNull(creatureNeeds(build.id,d,r,listOf(engineer.copy(instructions="Edited after launch"),qa),reports(r)))
         assertEquals("plan",needs.nearClone)
         assertEquals(100,needs.echo)
         assertEquals(1,needs.echoComparablePaths)
         assertEquals(0,needs.reviews)
         val unknown=r.copy(taskRuns=r.taskRuns+(plan.id to r.taskRuns.getValue(plan.id).copy(assignedProviderId=null)))
-        val missing=assertNotNull(creatureNeeds(build.id,d,unknown,roles))
+        val missing=assertNotNull(creatureNeeds(build.id,d,unknown,roles,reports(r)))
         assertNull(missing.nearClone)
         assertEquals(0,missing.echoComparablePaths)
     }
@@ -175,5 +180,32 @@ class CreatureNeedsTest {
         assertNull(needs.nearClone)
         assertEquals(1,needs.echoComparablePaths)
         assertEquals(0,needs.echo)
+    }
+
+    @Test
+    fun onlyUnambiguousCurrentSessionModelReportsEstablishKinship() {
+        val r=run(Triple("plan",TaskRunStatus.Completed,"a" to 1),Triple("build",TaskRunStatus.Running,"a" to 1))
+        val plan=TaskDefinitionId("plan")
+        val build=TaskDefinitionId("build")
+        val events=reports(r)
+        val source=events.single { it.taskDefinitionId==plan }
+        val target=events.single { it.taskDefinitionId==build }
+        assertEquals(mapOf(plan to "model-a",build to "model-a"),reportedSessionModels(r,events))
+        fun needs(reports: List<ProviderUsageRecorded>)=assertNotNull(creatureNeeds(build,definition,r,roles,reports))
+        assertEquals(100,needs(events).echo)
+        assertEquals(0,needs(emptyList()).echoComparablePaths)
+        assertNull(needs(emptyList()).nearClone)
+        val different=listOf(source.copy(model="model-b"),target)
+        assertEquals(1,needs(different).echoComparablePaths)
+        assertEquals(0,needs(different).echo)
+        assertNull(needs(different).nearClone)
+        for(unreliable in listOf(
+            source.copy(modelConsistent=null),source.copy(modelConsistent=false),
+            source.copy(model=null),source.copy(tokensAvoided=20),
+            source.copy(workflowRunId=WorkflowRunId("other-run")),
+            source.copy(providerRunId=ProviderRunId("prior-attempt")),
+            source.copy(providerId=AgentProviderId("different-provider")),
+        )) assertEquals(0,needs(listOf(unreliable,target)).echoComparablePaths)
+        assertEquals(0,needs(events+source.copy(model="model-b")).echoComparablePaths)
     }
 }

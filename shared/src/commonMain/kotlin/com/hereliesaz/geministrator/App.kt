@@ -1434,7 +1434,7 @@ fun App(
                                 }
                             }
                         },
-                        onLoadRunTimeline = { runtime?.loadRunTimeline() ?: emptyList() },
+                        onLoadRunTimeline = { runtime?.loadRunTimeline(shown = true) ?: emptyList() },
                         onLoadLogIntegrity = { runtime?.loadRunLogIntegrity() ?: com.hereliesaz.geministrator.events.ChainStatus.NoChain },
                         onLoadWorkflowDefinitions = { runtime?.persistence?.definitions?.all() ?: emptyList() },
                         onExportDiagnosticBundle = { runtime?.exportDiagnosticBundle() },

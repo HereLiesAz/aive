@@ -21,6 +21,9 @@ import com.hereliesaz.geministrator.resources.hive_resume_run
 import com.hereliesaz.geministrator.resources.hive_stop_text
 import com.hereliesaz.geministrator.resources.hive_stop_title
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
+import com.hereliesaz.geministrator.events.ProviderUsageRecorded
 import androidx.compose.runtime.key
 import com.hereliesaz.conveyance.h2g2.menu.MenuNode
 import androidx.compose.runtime.rememberCoroutineScope
@@ -289,6 +292,29 @@ fun ControlRoom(
 ) {
     val ground = Azphalt.currentGround
     val liveWorkflow = (runtimeState as? ApplicationRuntimeState.Live)?.presentation
+    val journalRun = liveWorkflow?.run
+    val loadJournal by rememberUpdatedState(onLoadRunTimeline)
+    // Refresh on a bounded cadence rather than on every render or progress tick.
+    // Run/session matching prevents stale evidence leaking between hives.
+    val modelReports by produceState<List<ProviderUsageRecorded>>(emptyList(), journalRun?.id, journalRun?.status) {
+        value = emptyList()
+        val observed = journalRun ?: return@produceState
+        do {
+            value = try {
+                loadJournal().filterIsInstance<ProviderUsageRecorded>().filter { it.workflowRunId == observed.id }
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (_: Exception) {
+                emptyList()
+            }
+            if (observed.status in setOf(
+                com.hereliesaz.geministrator.domain.WorkflowRunStatus.Completed,
+                com.hereliesaz.geministrator.domain.WorkflowRunStatus.Failed,
+                com.hereliesaz.geministrator.domain.WorkflowRunStatus.Cancelled,
+            )) break
+            delay(2_000)
+        } while (true)
+    }
     // The tour waits on what the swarm does as well as on taps: each publish of the live run is read against the last one
     // (tour/RunSignals.kt) and what changed is handed to the layer, only while a tour is showing.
     val seenByTour = remember { RunSeenByTour() }
@@ -696,6 +722,7 @@ fun ControlRoom(
     CompositionLocalProvider(
         LocalReleaseCreature provides releaseCreature,
         LocalSpatialHiveMemory provides memoryLayer,
+        LocalModelUsageReports provides modelReports,
         LocalFlowchartLinks provides flowchartLinks,
         LocalPlaceLinks provides placeLinks,
         LocalCardFlip provides flipHost,

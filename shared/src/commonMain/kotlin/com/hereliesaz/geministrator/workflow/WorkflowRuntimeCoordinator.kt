@@ -1037,6 +1037,7 @@ class WorkflowRuntimeCoordinator(
                     latencyMillis = usage.latencyMillis,
                     costUnknown = usage.costUnknown,
                     model = usage.model,
+                    modelConsistent = usage.modelConsistent,
                     requestSha256 = usage.requestSha256,
                     requestChars = usage.requestChars,
                     occurredAtEpochMillis = nowEpochMillis,
