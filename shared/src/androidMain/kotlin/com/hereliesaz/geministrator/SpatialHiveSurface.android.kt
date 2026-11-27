@@ -170,11 +170,11 @@ private class SpatialGlRenderer(private val failed: () -> Unit) : GLSurfaceView.
             val ids = IntArray(1)
             GLES30.glGenVertexArrays(1,ids,0); vao=ids[0]; GLES30.glBindVertexArray(vao)
             GLES30.glGenBuffers(1,ids,0); buffer=ids[0]; GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER,buffer)
-            listOf("p","n","c","optical").forEachIndexed { i,name ->
+            listOf("p","n","c","optical","material").forEachIndexed { i,name ->
                 val loc=GLES30.glGetAttribLocation(p,name)
                 require(loc >= 0)
                 GLES30.glEnableVertexAttribArray(loc)
-                GLES30.glVertexAttribPointer(loc,if(i==3) 4 else 3,GLES30.GL_FLOAT,false,SPATIAL_VERTEX_FLOATS*4,i*12)
+                GLES30.glVertexAttribPointer(loc,if(i==3) 4 else 3,GLES30.GL_FLOAT,false,SPATIAL_VERTEX_FLOATS*4,if(i==4) 52 else i*12)
             }
             uniforms=listOf("eye","forward","right","up","aspect","motionPhase","focusDepth","aperture","encodeBlur").map { GLES30.glGetUniformLocation(p,it) }.toIntArray()
             GLES30.glEnable(GLES30.GL_DEPTH_TEST)

@@ -37,4 +37,15 @@ class SpatialDesktopShaderTest {
         assertTrue(fragment.startsWith("#version 150\n"))
         assertFalse(fragment.contains("precision highp"))
     }
+
+    @Test fun materialResponseAndGlowDoNotOverwriteSignedDefocus() {
+        val vertex=spatialDesktopShader(SPATIAL_VERTEX_SHADER)
+        val fragment=spatialDesktopShader(SPATIAL_FRAGMENT_SHADER)
+        val optics=spatialDesktopShader(SPATIAL_OPTICS_FRAGMENT_SHADER)
+        assertTrue(vertex.contains("materialResponse=material"))
+        assertTrue(fragment.contains("lit+=pigment*emission"))
+        assertTrue(fragment.contains("(128.+127.*blurAmount)/255."))
+        assertTrue(optics.contains("resolved+=glow/max(1.,glowWeight)*.64"))
+        assertTrue(optics.contains("frag=vec4(resolved,1.)"))
+    }
 }

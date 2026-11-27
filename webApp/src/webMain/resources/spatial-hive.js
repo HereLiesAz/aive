@@ -11,7 +11,7 @@
         const r=norm(cross(f,Math.abs(f[1])>.999?[0,0,1]:[0,1,0]));
         return {eye,f,r,u:cross(r,f)};
     };
-    const vertexFloats=13, vertexBytes=vertexFloats*4;
+    const vertexFloats=16, vertexBytes=vertexFloats*4;
     // Shared Kotlin owns the triangle stream; decode its little-endian float transport.
     function decodeMesh(encoded) {
         const raw=root.atob(encoded);
@@ -100,7 +100,7 @@
             const p=gl.createProgram();gl.attachShader(p,vs);gl.attachShader(p,fs);gl.linkProgram(p);gl.deleteShader(vs);gl.deleteShader(fs);
             if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));
             s.program=p;s.buffer=gl.createBuffer();s.vao=gl.createVertexArray();gl.bindVertexArray(s.vao);gl.bindBuffer(gl.ARRAY_BUFFER,s.buffer);
-            for(const [name,size,offset] of [["p",3,0],["n",3,12],["c",3,24],["optical",4,36]]){const loc=gl.getAttribLocation(p,name);gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,size,gl.FLOAT,false,vertexBytes,offset);}
+            for(const [name,size,offset] of [["p",3,0],["n",3,12],["c",3,24],["optical",4,36],["material",3,52]]){const loc=gl.getAttribLocation(p,name);gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,size,gl.FLOAT,false,vertexBytes,offset);}
             s.uniforms=Object.fromEntries(["eye","forward","right","up","aspect","motionPhase","focusDepth","aperture","encodeBlur"].map(n=>[n,gl.getUniformLocation(p,n)]));
             s.count=0;
         }catch(e){emit({type:"error"});return;}

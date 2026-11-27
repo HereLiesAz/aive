@@ -65,7 +65,8 @@ void main(){
  * The far layer gathers only into an already defocused center, while a nearer defocused
  * silhouette can contribute coverage over the farther layer. Background highlights get
  * a restrained bokeh emphasis and a radially compressed aperture toward frame edges.
- * This is a bounded screen-space approximation, not a traced lens or HDR bloom.
+ * The same bounded sample pattern gathers bright color into a separate focus-independent halo.
+ * This is LDR screen-space bloom, not a traced lens or HDR light transport.
  */
 internal const val SPATIAL_OPTICS_FRAGMENT_SHADER = """#version 300 es
 precision highp float;
@@ -101,6 +102,8 @@ void main(){
     float baseWeight=1.;
     vec3 foreground=vec3(0.);
     float foregroundWeight=0.;
+    vec3 glow=vec3(0.);
+    float glowWeight=0.;
     for(int i=0;i<32;i++){
         float q=(float(i)+.5)/32.;
         float radius=limit*1.15*pow(q,1.5);
@@ -123,6 +126,13 @@ void main(){
         ivec2 nearPixel=clamp(ivec2(vec2(centerPixel)+.5+offset),ivec2(0),extent-1);
         vec4 nearColor=texelFetch(sceneColor,nearPixel,0);
         float nearCoc=signedCoc(nearColor),nearZ=eyeDepth(nearPixel);
+        // Bloom is optical scatter: bright sources can illuminate adjacent image pixels even
+        // when both are in focus. Use a bounded color excess, not the signed alpha channel.
+        float scatter=exp(-3.8*radius*radius/(limit*limit));
+        float brightness=max(nearColor.r,max(nearColor.g,nearColor.b));
+        vec3 bright=nearColor.rgb*max(0.,brightness-.72);
+        glow+=bright*scatter;
+        glowWeight+=scatter;
         if(nearCoc>0. && nearZ<centerZ-.12){
             float footprint=nearCoc*limit*1.15;
             if(footprint>=.35){
@@ -137,5 +147,6 @@ void main(){
         float coverage=clamp(foregroundWeight/12.,0.,1.);
         resolved=mix(resolved,foreground/foregroundWeight,coverage);
     }
+    resolved+=glow/max(1.,glowWeight)*.64;
     frag=vec4(resolved,1.);
 }"""
