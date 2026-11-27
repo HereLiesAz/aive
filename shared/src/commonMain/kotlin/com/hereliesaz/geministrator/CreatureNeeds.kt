@@ -1,6 +1,8 @@
 package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.RoleExecutionSource
+import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.domain.effectiveTokenBudget
 import com.hereliesaz.geministrator.domain.TaskDefinition
 import com.hereliesaz.geministrator.domain.TaskDefinitionId
@@ -13,11 +15,12 @@ import com.hereliesaz.geministrator.domain.WorkflowRun
  * (docs/Ecology-and-the-Swarm.md, the binding rule). A need with no data behind it is null and shown
  * as not reported, never estimated.
  *
- * A creature's config here is its role plus its provider: two tasks with the same pair are
- * near-clones.
+ * Echo exposure is a partial, graph-based proxy. Actual per-input and memory-read
+ * model provenance is not available here. It must never certify contamination, sepsis,
+ * independence or a completed review.
  */
 internal data class CreatureNeeds(
-    /** 0..100: how much of what it hears is its own config (inputs, and reviews of its work). */
+    /** 0..100 of comparable active input/review paths with near-identical declared configuration. */
     val echo: Int,
     val echoState: EchoState,
     /** 0..100: its reliability in this run; retries and failures cost it. */
@@ -28,11 +31,13 @@ internal data class CreatureNeeds(
     val tokensSpent: Long?,
     /** 0..100: how much of its downstream has taken its output; null when nothing depends on it. */
     val outputUsed: Int?,
-    /** The other task with the same config, if any. */
+    /** Another task with high known configuration overlap, not necessarily the same actual model. */
     val nearClone: String?,
-    /** How many of the reviews of its work came from its own config. */
+    /** Comparable active reviewer paths with high configuration overlap; not proof of a review. */
     val selfReviews: Int,
     val reviews: Int,
+    /** Number of comparable active paths. Zero means Echo exposure is not reported. */
+    val echoComparablePaths: Int = 0,
 )
 
 internal enum class EchoState { Grounded, SelfAbsorbed, Fevered, Insane }
@@ -67,6 +72,29 @@ internal val TAKEN_UP = setOf(
     TaskRunStatus.Completed,
 )
 
+/**
+ * A bounded configuration comparison, independent of identity, cosmetics and ancestry labels.
+ * The assigned provider is required; Auto/unassigned is unknown, never a match or a stranger.
+ * Provider identity has half the weight, exact instruction text has three tenths, and the
+ * declared tool/role contract has two tenths. Empty tool ceilings compare as declared settings,
+ * not as evidence that the actual offered tools match. A task does not record actual model id,
+ * so this is deliberately a configuration-overlap proxy, not complete functional kinship.
+ */
+internal fun configurationKinship(a: RoleDefinition, providerA: String?, b: RoleDefinition, providerB: String?): Int? {
+    if(a.executionSource!=RoleExecutionSource.Agent || b.executionSource!=RoleExecutionSource.Agent ||
+        providerA.isNullOrBlank() || providerB.isNullOrBlank()) return null
+    val provider=if(providerA==providerB) 50 else 0
+    // Exact instructions: token overlap can miss a negation or a changed safety constraint.
+    val instructions=if(a.instructions==b.instructions && a.keeperInstructions==b.keeperInstructions) 30 else 0
+    val contract=if(a.capabilitiesRequired==b.capabilitiesRequired &&
+        a.authorities==b.authorities && a.toolCeiling.toSet()==b.toolCeiling.toSet() &&
+        a.surfaces==b.surfaces) 20 else 0
+    return provider+instructions+contract
+}
+
+/** Near-clone threshold from Node-Creature-Genome.md; applied only to comparable configurations. */
+internal const val NEAR_CLONE_KINSHIP = 95
+
 internal fun creatureNeeds(
     taskId: TaskDefinitionId,
     definition: WorkflowDefinition,
@@ -75,27 +103,46 @@ internal fun creatureNeeds(
 ): CreatureNeeds? {
     val tasks = definition.tasks.associateBy(TaskDefinition::id)
     val task = tasks[taskId] ?: return null
-    val rolesById = roles.associateBy(RoleDefinition::id)
+    // Historical runs keep their own configurations; later roster edits cannot rewrite their ancestry.
+    val rolesById = if(run.roleSnapshot.isNotEmpty()) run.roleSnapshot.associateBy(RoleDefinition::id)
+        else roles.associateBy(RoleDefinition::id)
 
-    fun config(id: TaskDefinitionId): Pair<String?, String?> {
-        val taskRun = run.taskRuns[id]
-        val role = taskRun?.assignedRoleId?.value ?: tasks[id]?.roleId?.value
-        return role to taskRun?.assignedProviderId?.value
-    }
-    fun isReviewer(id: TaskDefinitionId): Boolean {
-        val t = tasks[id] ?: return false
-        val roleName = (run.taskRuns[id]?.assignedRoleId ?: t.roleId)?.let { rolesById[it]?.name ?: it.value }
-        return roleName != null && isReviewerRoleName(roleName)
+    fun role(id: TaskDefinitionId): RoleDefinition? =
+        (run.taskRuns[id]?.assignedRoleId ?: tasks[id]?.roleId)?.let(rolesById::get)
+
+    fun agent(id: TaskDefinitionId): Boolean {
+        val t=tasks[id] ?: return false
+        return (run.taskRuns[id]?.executor ?: t.effectiveExecutor()).isAgent
     }
 
-    val own = config(taskId)
+    fun kinship(other: TaskDefinitionId): Int? {
+        if(!agent(taskId) || !agent(other)) return null
+        val own=role(taskId) ?: return null
+        val peer=role(other) ?: return null
+        return configurationKinship(own,run.taskRuns[taskId]?.assignedProviderId?.value,
+            peer,run.taskRuns[other]?.assignedProviderId?.value)
+    }
+
+    fun isReviewer(id: TaskDefinitionId): Boolean =
+        agent(id) && role(id)?.let { isReviewerRoleName(it.name) } == true
+
     val dependents = definition.tasks.filter { taskId in it.dependsOn }.map(TaskDefinition::id)
-    val reviewers = dependents.filter(::isReviewer)
-    // Everything it hears: the inputs it reads, and the reviews of its work.
-    val voices = task.dependsOn.toList() + reviewers
-    val ownVoices = voices.count { config(it) == own }
-    val selfReviews = reviewers.count { config(it) == own }
-    val echo = if (voices.isEmpty()) 0 else ownVoices * 100 / voices.size
+    // These are graph paths eligible to carry voices, not recorded reads or verdicts.
+    // Ignore future paths and unknown agents rather than counting their absence as diversity.
+    val active = run.taskRuns[taskId]?.status in TAKEN_UP
+    val inputs = if(active) task.dependsOn.filter { run.taskRuns[it]?.status == TaskRunStatus.Completed } else emptyList()
+    val reviewers = if(run.taskRuns[taskId]?.status == TaskRunStatus.Completed) {
+        dependents.filter { isReviewer(it) && run.taskRuns[it]?.status in TAKEN_UP }
+    } else emptyList()
+    fun exposure(id: TaskDefinitionId): Int? {
+        if(!agent(taskId)) return null
+        // A completed programmatic dependency is a distinct source, not a model clone.
+        return if(!agent(id)) 0 else kinship(id)
+    }
+    val voices=(inputs+reviewers).distinct().mapNotNull(::exposure)
+    val reviewScores=reviewers.mapNotNull(::kinship)
+    val selfReviews=reviewScores.count { it>=NEAR_CLONE_KINSHIP }
+    val echo=if(voices.isEmpty()) 0 else voices.count { it>=NEAR_CLONE_KINSHIP }*100/voices.size
 
     val taskRun = run.taskRuns[taskId]
     val attempt = taskRun?.attempt ?: 1
@@ -114,9 +161,12 @@ internal fun creatureNeeds(
     } else {
         dependents.count { run.taskRuns[it]?.status in TAKEN_UP } * 100 / dependents.size
     }
-    val nearClone = definition.tasks
-        .firstOrNull { it.id != taskId && own.first != null && config(it.id) == own }
-        ?.name
+    val nearClone = definition.tasks.asSequence()
+        .filter { it.id != taskId }
+        .mapNotNull { peer -> kinship(peer.id)?.let { peer to it } }
+        .filter { (_, score) -> score >= NEAR_CLONE_KINSHIP }
+        .sortedWith(compareByDescending<Pair<TaskDefinition,Int>> { it.second }.thenBy { it.first.id.value })
+        .firstOrNull()?.first?.name
 
     return CreatureNeeds(
         echo = echo,
@@ -127,6 +177,7 @@ internal fun creatureNeeds(
         outputUsed = outputUsed,
         nearClone = nearClone,
         selfReviews = selfReviews,
-        reviews = reviewers.size,
+        reviews = reviewScores.size,
+        echoComparablePaths = voices.size,
     )
 }
