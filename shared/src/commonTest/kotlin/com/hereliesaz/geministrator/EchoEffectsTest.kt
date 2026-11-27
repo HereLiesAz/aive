@@ -154,4 +154,26 @@ class EchoEffectsTest {
             memoryAuthorsOf(snapshot),
         )
     }
+
+    @Test
+    fun theAntagonistHasNoEchoOfItsOwnWhateverItReadsOrTakesOver() {
+        val antagonist = BuiltInRoles.Antagonist
+        val build = TaskDefinitionId("build")
+        val base0 = run()
+        // The Antagonist takes over "build" and stays the Antagonist: its task run carries its own id.
+        val taken = base0.copy(roleSnapshot = roles + antagonist,
+            taskRuns = base0.taskRuns + (build to base0.taskRuns.getValue(build).copy(assignedRoleId = antagonist.id)))
+        val withMemory = base + report("build", 3, artifacts = null, memory = setOf("memory-node:n1"))
+        val history = EchoHistory().advance(taken, withMemory, mapOf("memory-node:n1" to setOf(antagonist.id)))
+        // Reading plan's output, and its own memory, build no Echo for it.
+        assertEquals(null, history.balances[antagonist.id])
+        // A reviewer's criticism of its work lowers nothing either: it has no Echo to lower.
+        val rejected = taken.copy(taskRuns = taken.taskRuns + (TaskDefinitionId("review") to
+            taken.taskRuns.getValue(TaskDefinitionId("review")).copy(status = TaskRunStatus.Completed,
+                artifacts = listOf(ArtifactRef(ArtifactId("artifact-review"), ArtifactKind.Verification, TaskRunId("r-review"), "review",
+                    textContent = "VERDICT: reject", createdAtEpochMillis = 1L)))))
+        val returned = base + report("build", 5, setOf("artifact-review"))
+        assertEquals(null, EchoHistory(balances = mapOf(antagonist.id to 5_000)).advance(rejected, returned).balances.get(antagonist.id)
+            ?.takeIf { it != 5_000 })
+    }
 }

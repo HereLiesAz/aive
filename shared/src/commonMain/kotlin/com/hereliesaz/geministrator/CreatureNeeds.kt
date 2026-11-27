@@ -292,7 +292,7 @@ internal data class EchoHistory(
             val target = run.taskRuns[consumer.id] ?: continue
             if (!(target.executor ?: consumer.effectiveExecutor()).isAgent) continue
             val own = target.assignedRoleId?.let(roles::get) ?: continue
-            if (own.executionSource != RoleExecutionSource.Agent) continue
+            if (own.executionSource != RoleExecutionSource.Agent || isAntagonist(own)) continue
             for (sourceId in consumer.dependsOn) {
                 if (artifactDelivered(run, sourceId, consumer.id, deliveries) != true) continue
                 val source = run.taskRuns[sourceId] ?: continue

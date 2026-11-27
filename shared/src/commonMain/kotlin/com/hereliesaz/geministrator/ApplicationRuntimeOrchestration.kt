@@ -138,11 +138,14 @@ private suspend fun ApplicationRuntime.planInputs(
     val plannerRoles = launchRoles
         .filter { role -> providerRegistry.canStaff(role.capabilitiesRequired, normalizedRepository) }
         .ifEmpty { launchRoles }
+    // What each role is made of and the numbers it has earned, so the queen can plan with the creatures she is choosing from.
+    val details = roleReportsFor(plannerRoles)
     val agents = plannerRoles.map { role ->
         OrchestrationRole(
             id = role.id.value,
             name = role.name,
             authorities = role.authorities.map { it.name }.sorted(),
+            details = details[role.id],
         )
     }
     val staffing = com.hereliesaz.geministrator.queen.staffQueen(launchRoles)
