@@ -245,6 +245,7 @@ fun ControlRoom(
     onLoadRunTimeline: suspend () -> List<WorkflowEvent> = { emptyList() },
     onLoadEchoHistory: suspend (WorkflowRun) -> Map<RoleDefinitionId, Int> = { emptyMap() },
     onLoadTrophicHistory: suspend (WorkflowRun) -> Map<RoleDefinitionId, Int> = { emptyMap() },
+    onLoadOperationalProfiles: suspend (WorkflowRun) -> Map<RoleDefinitionId, RoleProfile> = { emptyMap() },
     onLoadLogIntegrity: suspend () -> com.hereliesaz.geministrator.events.ChainStatus = { com.hereliesaz.geministrator.events.ChainStatus.NoChain },
     onLoadWorkflowDefinitions: suspend () -> List<WorkflowDefinition> = { emptyList() },
     onExportDiagnosticBundle: suspend () -> String? = { null },
@@ -341,6 +342,32 @@ fun ControlRoom(
         } catch (_: Exception) {
             // Incomplete history must not masquerade as a full reserve.
         }
+    }
+    val loadProfiles by rememberUpdatedState(onLoadOperationalProfiles)
+    val profileBaseline by produceState<Pair<WorkflowRunId, Map<RoleDefinitionId, RoleProfile>>?>(null, journalRun?.id) {
+        value = null
+        val observed = journalRun ?: return@produceState
+        try {
+            value = observed.id to loadProfiles(observed)
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            // Incomplete history must not masquerade as no evidence.
+        }
+    }
+    // Only a settled run adds to the baseline, so a live task's transient retry is never counted.
+    val traitsByRole = remember(journalRun, modelReports, profileBaseline) {
+        val observed = journalRun
+        val baseline = profileBaseline
+        if (observed != null && baseline?.first == observed.id) {
+            val settled = observed.status in setOf(
+                com.hereliesaz.geministrator.domain.WorkflowRunStatus.Completed,
+                com.hereliesaz.geministrator.domain.WorkflowRunStatus.Failed,
+                com.hereliesaz.geministrator.domain.WorkflowRunStatus.Cancelled,
+            )
+            val history = OperationalHistory(profiles = baseline.second)
+            operationalTraits((if (settled) history.advance(observed, modelReports) else history).profiles)
+        } else emptyMap()
     }
     val cumulativeTrophic = remember(journalRun, modelReports, trophicBaseline) {
         val observed = journalRun
@@ -766,6 +793,7 @@ fun ControlRoom(
         LocalModelUsageReports provides modelReports,
         LocalCumulativeEcho provides cumulativeEcho,
         LocalCumulativeTrophic provides cumulativeTrophic,
+        LocalOperationalTraits provides traitsByRole,
         LocalFlowchartLinks provides flowchartLinks,
         LocalPlaceLinks provides placeLinks,
         LocalCardFlip provides flipHost,

@@ -86,7 +86,8 @@ class SpatialSignalsTest {
         val lit = blueSpores(1_150, uses, setOf("node:a", "node:b"))
         assertEquals(setOf("node:a"), lit.keys) // not the unused neighbour b, and not a node the web does not hold
         assertEquals(1f, lit.getValue("node:a")) // the strongest of the concurrent uses
-        assertEquals(emptyMap(), blueSpores(1_000 + BLUE_GLOW_MILLIS + 1, uses, setOf("node:a")))
+        // Past the last use's whole flip (the second use began at 1_100), nothing is lit.
+        assertEquals(emptyMap(), blueSpores(1_100 + BLUE_GLOW_MILLIS + 1, uses, setOf("node:a")))
     }
 
     @Test
@@ -118,8 +119,7 @@ class SpatialSignalsTest {
         val early = requireNotNull(pulseRateHz(taskRun(build, TaskRunStatus.Running, progress = .2f)))
         val late = requireNotNull(pulseRateHz(taskRun(build, TaskRunStatus.Running, progress = .8f)))
         assertTrue(late > early && late <= PULSE_MAX_HZ)
-        assertEquals(PULSE_MAX_HZ, pulseRateHz(taskRun(build, TaskRunStatus.Running, progress = 9f)))
-        assertEquals(PULSE_MIN_HZ, pulseRateHz(taskRun(build, TaskRunStatus.Running, progress = Float.NaN)))
+        // TaskRun itself refuses a progress outside 0..1, so only valid reports reach the rate.
     }
 
     @Test
@@ -163,6 +163,36 @@ class SpatialSignalsTest {
         // A completion event for a task the run does not show as completed draws nothing.
         val running = run.copy(taskRuns = run.taskRuns + (build to taskRun(build, TaskRunStatus.Running)))
         assertEquals(emptyList(), completionBursts(running, listOf(TaskCompleted(run.id, build, 9_000)), listOf(episode), nodes))
+    }
+
+    @Test
+    fun aFinishedCreatureKeepsPulsingUntilAllItsContextIsParsedAndThenBurstsWithEveryOneOfItsSpores() {
+        val episode = MemoryEpisode(MemoryEpisodeId("ep-1"), sourceSessionId = "sess", taskRunId = "tr-build",
+            userPrompt = "p", chunks = emptyList(), createdAtEpochMillis = 1L)
+        val done = taskRun(build)
+        fun node(id: String, at: Long, vararg sources: String) = WebNode(id, WebGroup.Tag, "NounTag", id, "t", .5f, at, sources.toList())
+        val nodes = listOf(node("episode:ep-1", 1), node("node:a", 20_000, "ep-1"), node("node:b", 25_000, "ep-1"))
+        val finish = listOf(TaskCompleted(run.id, build, 9_000))
+
+        // Its episode is still queued: the context is not all parsed, so it keeps pulsing at the top rate and does not burst.
+        assertEquals(ContextParse.Parsing, contextParse(done, listOf(episode), setOf("ep-1")))
+        assertEquals(PULSE_MAX_HZ, pulseRateHz(done, ContextParse.Parsing))
+        assertEquals(emptyList(), completionBursts(run, finish, listOf(episode), nodes, queuedEpisodes = setOf("ep-1")))
+
+        // Parsed: it stops pulsing and bursts with all its spores, no earlier than the last of them was recorded.
+        assertEquals(ContextParse.Parsed, contextParse(done, listOf(episode), emptySet()))
+        assertNull(pulseRateHz(done, ContextParse.Parsed))
+        val burst = completionBursts(run, finish, listOf(episode), nodes).single()
+        assertEquals(setOf("episode:ep-1", "node:a", "node:b"), burst.spores)
+        assertEquals(25_000L, burst.atEpochMillis)
+
+        // Nothing banked: it neither waits nor pulses, and bursts at its finish with no spores.
+        assertEquals(ContextParse.Unbanked, contextParse(done, emptyList(), emptySet()))
+        assertNull(pulseRateHz(done, ContextParse.Unbanked))
+        assertEquals(CompletionBurst(build, 9_000, emptySet()), completionBursts(run, finish, emptyList(), nodes).single())
+
+        // A task still working is judged by its progress, whatever its context.
+        assertEquals(PULSE_MAX_HZ, pulseRateHz(taskRun(build, TaskRunStatus.Running, progress = 1f), ContextParse.Parsing))
     }
 
     @Test

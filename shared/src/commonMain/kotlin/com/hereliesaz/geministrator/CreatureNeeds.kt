@@ -59,6 +59,15 @@ internal data class CreatureNeeds(
     val trophicHundredths: Int? = null,
     /** Distinct stored memory nodes carried in this task's successful requests (MemoryProvenance.kt); null when unreported. */
     val memoryNodesCarried: Int? = null,
+    /** Delivered inputs whose producer's role is septic (Echo 85 or more): each costs this task 2 integrity. */
+    val septicInputs: Int = 0,
+    /** Distinct partner tasks (upstream and downstream) against what its token allowance lets it hold; null for a programmatic task. */
+    val synapses: Int? = null,
+    val synapseCapacity: Int? = null,
+    /** Partners beyond its capacity: each costs 2 integrity. */
+    val synapseExcess: Int = 0,
+    /** Observed model tier, tolerance, resilience and signal efficiency (OperationalGenome.kt); null where there is no evidence. */
+    val traits: OperationalTraits? = null,
 )
 
 internal enum class EchoState { Grounded, SelfAbsorbed, Fevered, Insane }
@@ -168,6 +177,9 @@ internal fun reportedReviewVerdict(
 /** Shared run-correlated journal projection for the inspector and tissue, never the GPU. */
 internal val LocalModelUsageReports = staticCompositionLocalOf<List<ProviderUsageRecorded>> { emptyList() }
 
+/** Observed operational traits per agent role (OperationalGenome.kt), rebuilt like Echo. */
+internal val LocalOperationalTraits = staticCompositionLocalOf<Map<RoleDefinitionId, OperationalTraits>> { emptyMap() }
+
 /** Shared trophic reserve per agent role (Trophic.kt), rebuilt the same way as Echo. */
 internal val LocalCumulativeTrophic = staticCompositionLocalOf<Map<RoleDefinitionId, Int>> { emptyMap() }
 
@@ -250,9 +262,16 @@ internal data class EchoHistory(
      * Count each positively reported source/current consumer session path once. Rates are
      * the documented bench rates in hundredths: own output +60, near-clone +40,
      * a stranger below 85 kinship -4 * (90 - kinship). The intermediate band is neutral.
-     * Delivery is an exposure proxy, not proof of reliance. No inferred memory or contamination.
+     * Delivery is an exposure proxy, not proof of reliance.
+     *
+     * Beyond reads (see EchoEffects.kt): memory the creature's own role wrote, carried in its successful
+     * requests ([memoryAuthors]: `memory-node:<id>` to the roles that wrote it), a criticism returned to the producer
+     * that it received, a fevered creature ignoring that criticism, and a septic producer's contagion.
      */
-    fun advance(run: WorkflowRun, reports: List<ProviderUsageRecorded>): EchoHistory {
+    fun advance(
+        run: WorkflowRun, reports: List<ProviderUsageRecorded>,
+        memoryAuthors: Map<String, Set<RoleDefinitionId>> = emptyMap(),
+    ): EchoHistory {
         if (run.id in seen) return this
         val seeded = withBirths(run.roleSnapshot)
         val definition = run.definitionSnapshot ?: return seeded
@@ -262,7 +281,7 @@ internal data class EchoHistory(
         val deliveries = reportedArtifactDeliveries(run, reports)
         val tasks = definition.tasks.associateBy { it.id }
         // A drained batch contains a set, not individual model calls. Count paths, not reports.
-        val changes = mutableListOf<Triple<Long, Pair<String, String>, Pair<RoleDefinitionId, Int>>>()
+        val steps = mutableListOf<EchoStep>()
         for (consumer in definition.tasks) {
             val target = run.taskRuns[consumer.id] ?: continue
             if (!(target.executor ?: consumer.effectiveExecutor()).isAgent) continue
@@ -291,13 +310,22 @@ internal data class EchoHistory(
                         event.providerId == target.assignedProviderId && event.providerRunId == target.providerRunId &&
                         event.tokensAvoided == 0L && event.deliveredArtifactIds.orEmpty().any { it in sourceArtifacts }
                 }.minOfOrNull { it.occurredAtEpochMillis } ?: continue
-                changes += Triple(time, consumer.id.value to sourceId.value, own.id to delta)
+                steps += EchoStep(time, consumer.id.value, sourceId.value, own.id, delta, EchoStepKind.Read,
+                    peer?.id.takeIf { sourceAgent })
             }
         }
+        steps += memoryEchoSteps(run, reports, roles, memoryAuthors)
+        steps += criticismEchoSteps(run, reports, roles, models)
         val next = seeded.balances.toMutableMap()
-        for ((_, _, change) in changes.sortedWith(compareBy({ it.first }, { it.second.first }, { it.second.second }))) {
-            val (role, delta) = change
-            next[role] = ((next[role] ?: 0) + delta).coerceIn(0, 10_000)
+        for (step in steps.sortedWith(compareBy({ it.time }, { it.a }, { it.b }, { it.kind.ordinal }))) {
+            // A fevered creature stops responding to criticism; only wiring to very different creatures still lowers it.
+            val delta = if (step.kind == EchoStepKind.Criticism && step.delta < 0 &&
+                (next[step.role] ?: 0) >= ECHO_FEVERED) 0 else step.delta
+            var value = (next[step.role] ?: 0) + delta
+            // A septic producer's output contaminates whoever reads it, however the read itself rates.
+            if (step.kind == EchoStepKind.Read && step.source != null && step.source != step.role &&
+                (next[step.source] ?: 0) >= ECHO_SEPTIC) value += ECHO_SEPTIC_CONTAGION
+            next[step.role] = value.coerceIn(0, 10_000)
         }
         val contributors = hatchContributors(run, run.roleSnapshot)
         val newBirths = if (run.status == com.hereliesaz.geministrator.domain.WorkflowRunStatus.Completed &&
@@ -319,6 +347,7 @@ internal fun creatureNeeds(
     modelReports: List<ProviderUsageRecorded> = emptyList(),
     cumulative: Map<RoleDefinitionId, Int> = emptyMap(),
     trophic: Map<RoleDefinitionId, Int> = emptyMap(),
+    traits: Map<RoleDefinitionId, OperationalTraits> = emptyMap(),
 ): CreatureNeeds? {
     val tasks = definition.tasks.associateBy(TaskDefinition::id)
     val task = tasks[taskId] ?: return null
@@ -369,7 +398,17 @@ internal fun creatureNeeds(
     val taskRun = run.taskRuns[taskId]
     val attempt = taskRun?.attempt ?: 1
     val failed = taskRun?.status == TaskRunStatus.Failed || taskRun?.status == TaskRunStatus.Escalated
-    val integrity = (100 - 15 * (attempt - 1) - if (failed) 40 else 0).coerceIn(0, 100)
+    val septicInputs = inputs.distinct().count { id ->
+        val producer = run.taskRuns[id]?.assignedRoleId
+        agent(taskId) && producer != null && producer != taskRun?.assignedRoleId && agent(id) &&
+            (cumulative[producer] ?: 0) >= ECHO_SEPTIC
+    }
+    // Synapses are the distinct tasks it is wired to, both ways. What its token allowance lets it hold is enforced as a
+    // cost, never as a refusal: a workflow is not blocked for wiring a creature past its capacity.
+    val partners = (task.dependsOn + dependents).filter { it != taskId }.toSet()
+    val capacity = if (agent(taskId)) synapseCapacities(rolesById.values)[taskRun?.assignedRoleId ?: task.roleId] else null
+    val synapseExcess = if (capacity == null) 0 else maxOf(0, partners.size - capacity)
+    val integrity = (100 - 15 * (attempt - 1) - (if (failed) 40 else 0) - 2 * septicInputs - 2 * synapseExcess).coerceIn(0, 100)
 
     // The budget belongs to the agent (its role) and covers everything it spends in this run.
     val roleId = taskRun?.assignedRoleId ?: task.roleId
@@ -408,5 +447,10 @@ internal fun creatureNeeds(
         echoHundredths = echoHundredths,
         trophicHundredths = if (agent(taskId)) taskRun?.assignedRoleId?.let(trophic::get) else null,
         memoryNodesCarried = reportedMemoryReads(run, modelReports)[taskId]?.size,
+        septicInputs = septicInputs,
+        synapses = if (capacity == null) null else partners.size,
+        synapseCapacity = capacity,
+        synapseExcess = synapseExcess,
+        traits = if (agent(taskId)) (taskRun?.assignedRoleId ?: task.roleId)?.let(traits::get) else null,
     )
 }
