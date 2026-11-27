@@ -128,7 +128,7 @@
             const ratio=Math.min(2,root.devicePixelRatio||1),w=Math.max(1,Math.round(canvas.clientWidth*ratio)),h=Math.max(1,Math.round(canvas.clientHeight*ratio));
             if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}
             const blurred=s.optics?.begin(w,h)===true;
-            gl.viewport(0,0,w,h);gl.clearColor(.012,.045,.047,1);gl.enable(gl.DEPTH_TEST);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+            gl.viewport(0,0,w,h);gl.clearColor(.012,.045,.047,blurred?1/255:1);gl.enable(gl.DEPTH_TEST);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
             gl.useProgram(s.program);gl.bindVertexArray(s.vao);
             const {eye,f,r,u}=basis(s.camera);
             for(const [name,value] of [["eye",eye],["forward",f],["right",r],["up",u]])gl.uniform3fv(s.uniforms[name],value);

@@ -346,5 +346,5 @@ void main(){
     lit+=vec3(1.,.25,.04)*warm*(.48+.55*rim)+vec3(.03,.22,.32)*rim;
     lit=lit/(vec3(1.)+lit*.35);
     float fog=exp(-length(eye-world)*.026);
-    frag=vec4(mix(vec3(.012,.045,.047),lit,fog),mix(1.,blurAmount,encodeBlur));
+    frag=vec4(mix(vec3(.012,.045,.047),lit,fog),mix(1.,(128.+127.*blurAmount)/255.,encodeBlur));
 }"""

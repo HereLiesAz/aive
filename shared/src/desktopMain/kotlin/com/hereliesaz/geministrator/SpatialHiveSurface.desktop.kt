@@ -219,7 +219,7 @@ private class SpatialDesktopRenderer(private val failed: () -> Unit) : GLEventLi
         val gl = drawable.gl.getGL3()
         val view=camera
         val pass=if(view!=null && program!=0) optics?.takeIf { it.begin(gl,viewportWidth,viewportHeight) } else null
-        gl.glClearColor(.012f, .045f, .047f, 1f)
+        gl.glClearColor(.012f,.045f,.047f,if(pass!=null) SPATIAL_FAR_CLEAR_ALPHA else 1f)
         gl.glClear(GL.GL_COLOR_BUFFER_BIT or GL.GL_DEPTH_BUFFER_BIT)
         if(view==null || program==0) return
         val current = mesh
