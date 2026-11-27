@@ -6,7 +6,7 @@ play-billing = "9.1.0"
 # JGit 7.8 reads loose refs through InputStream.readNBytes (Android API 33).
 # Java compilation targets do not backport that API; core-library desugaring is not configured.
 jgit = "5.13.5.202508271544-r"
-agp = "9.5.1"
+agp = "9.5.3"
 kotlin = "2.4.21"
 compose = "1.12.2"
 # JOGL GL3 desktop drawable; the main artifacts pull platform-native jars from Maven Central.
