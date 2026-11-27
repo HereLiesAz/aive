@@ -209,7 +209,7 @@ class HatcheryTest {
         assertNull(solo.tokenBudget)
         assertEquals(engineer.effectiveTokenBudget(), solo.effectiveTokenBudget())
         val a = engineer.copy(tokenBudget = 900L)
-        val b = partner.copy(id = com.hereliesaz.geministrator.domain.RoleDefinitionId("second"), tokenBudget = 400L)
+        val b = engineer.copy(id = com.hereliesaz.geministrator.domain.RoleDefinitionId("second"), tokenBudget = 400L)
         val source = observed(run(WorkflowRunStatus.Completed, "a" to a, "b" to b), listOf(a,b))
         val child = assertNotNull(hatchFromRun(source, listOf(a,b), reports = evidence(source)))
         assertNull(child.tokenBudget)
@@ -360,42 +360,16 @@ class HatcheryTest {
     }
 
     @Test
-    fun twoNearIdenticalParentsCloneInsteadOfInbreeding() {
-        val twin = engineer.copy(id = com.hereliesaz.geministrator.domain.RoleDefinitionId("twin"))
-        val roster = listOf(engineer, twin)
-        val source = observed(run(WorkflowRunStatus.Completed, "a" to engineer, "b" to twin), roster)
-        val child = assertNotNull(hatchFromRun(source, roster, reports = evidence(source)))
-        assertEquals(1, child.parents.size) // one parent, a clone, not a recombination of two copies of itself
-        assertEquals("${twin.name} · clone", child.name)
-        // A viable pair that is not a near-clone still breeds, even beside an identical twin.
-        val withPartner = listOf(engineer, twin, partner)
-        val mixed = observed(run(WorkflowRunStatus.Completed, "a" to engineer, "b" to twin, "c" to partner), withPartner)
-        assertEquals(2, assertNotNull(hatchFromRun(mixed, withPartner, reports = evidence(mixed))).parents.size)
-        // A clone from a run with several contributors inherits its parent's Echo, not a sum.
-        val a = engineer.id
-        val seed = EchoBirthSeed(WorkflowRunId("r1"), setOf(a, twin.id), mapOf(a to 4_000, twin.id to 3_000),
-            mapOf(setOf(a, twin.id) to 100))
-        assertEquals(4_000, seed.inherited(listOf(a)))
-    }
-
-    @Test
-    fun anInbredCloneDrawsItsMutationFromTheSumOfItsParentsEchoButNeverCertainly() {
-        val twin = engineer.copy(id = com.hereliesaz.geministrator.domain.RoleDefinitionId("twin"))
-        val pairRoster = listOf(engineer, twin)
-        // Echo 30 each: a lone clone is at the base 2%; the pair's sum, Echo 60, is the scale's top, 4x that.
-        val echo = mapOf(engineer.id to 3_000, twin.id to 3_000)
-        var lone = 0
-        var inbred = 0
-        for (n in 1..3_000) {
-            val solo = run(WorkflowRunStatus.Completed, "a" to engineer).copy(id = WorkflowRunId("r$n"))
-            if (assertNotNull(hatchFromRun(solo, listOf(engineer), echo)).instructions != engineer.instructions) lone++
-            val pair = observed(run(WorkflowRunStatus.Completed, "a" to engineer, "b" to twin), pairRoster)
-                .copy(id = WorkflowRunId("r$n"))
-            val child = assertNotNull(hatchFromRun(pair, pairRoster, echo, evidence(pair)))
-            assertEquals(1, child.parents.size)
-            if (child.instructions != engineer.instructions) inbred++
-        }
-        kotlin.test.assertTrue(lone > 0 && inbred > 2 * lone, "lone=$lone inbred=$inbred")
-        kotlin.test.assertTrue(inbred < 3_000 / 4)
+    fun theAntagonistIsNeverAParentHoweverItIsNamed() {
+        val antagonist = BuiltInRoles.Antagonist
+        val renamed = antagonist.copy(name = "Quiet Reader")
+        // Alone, it hatches nothing.
+        assertNull(hatchFromRun(run(WorkflowRunStatus.Completed, "a" to antagonist), listOf(antagonist)))
+        assertNull(hatchFromRun(run(WorkflowRunStatus.Completed, "a" to renamed), listOf(renamed)))
+        // Beside others, it is not a contributor: not a pair member, a bridge or a count of genera.
+        val roster = listOf(engineer, partner, antagonist)
+        val source = observed(run(WorkflowRunStatus.Completed, "a" to engineer, "b" to partner, "c" to antagonist), roster)
+        assertEquals(listOf(engineer.id, partner.id), hatchContributors(source, roster).map { it.id })
+        assertEquals(listOf(engineer.id, partner.id), assertNotNull(hatchFromRun(source, roster, reports = evidence(source))).parents)
     }
 }

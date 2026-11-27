@@ -244,6 +244,7 @@ fun ControlRoom(
     onSwitchRun: (String) -> Unit = {},
     onLoadRunTimeline: suspend () -> List<WorkflowEvent> = { emptyList() },
     onLoadEchoHistory: suspend (WorkflowRun) -> Map<RoleDefinitionId, Int> = { emptyMap() },
+    onLoadMemoryAuthors: suspend (WorkflowRun) -> Map<String, Set<RoleDefinitionId>> = { emptyMap() },
     onLoadTrophicHistory: suspend (WorkflowRun) -> Map<RoleDefinitionId, Int> = { emptyMap() },
     onLoadOperationalProfiles: suspend (WorkflowRun) -> Map<RoleDefinitionId, RoleProfile> = { emptyMap() },
     onLoadLogIntegrity: suspend () -> com.hereliesaz.geministrator.events.ChainStatus = { com.hereliesaz.geministrator.events.ChainStatus.NoChain },
@@ -376,11 +377,23 @@ fun ControlRoom(
             TrophicHistory(balances = baseline.second).advance(observed, modelReports).balances
         } else emptyMap()
     }
-    val cumulativeEcho = remember(journalRun, modelReports, echoBaseline) {
+    val loadAuthors by rememberUpdatedState(onLoadMemoryAuthors)
+    // Memory banked mid-run can be read by a later task, so the authors are read again as the journal grows.
+    val memoryAuthors by produceState<Map<String, Set<RoleDefinitionId>>>(emptyMap(), journalRun?.id, modelReports.size) {
+        val observed = journalRun
+        value = if (observed == null) emptyMap() else try {
+            loadAuthors(observed)
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            emptyMap() // Unknown authorship is not "written by itself".
+        }
+    }
+    val cumulativeEcho = remember(journalRun, modelReports, echoBaseline, memoryAuthors) {
         val observed = journalRun
         val baseline = echoBaseline
         if (observed != null && baseline?.first == observed.id) {
-            EchoHistory(balances = baseline.second).advance(observed, modelReports).balances
+            EchoHistory(balances = baseline.second).advance(observed, modelReports, memoryAuthors).balances
         } else emptyMap()
     }
     // The tour waits on what the swarm does as well as on taps: each publish of the live run is read against the last one

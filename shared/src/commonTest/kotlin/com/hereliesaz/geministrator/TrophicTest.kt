@@ -205,4 +205,21 @@ class TrophicTest {
         assertTrue(one.getValue(dummy.id).barren)
         assertEquals(0, one.getValue(dummy.id).credit)
     }
+
+    @Test
+    fun aProducerWithNothingDeliverableWasNotPassedOver() {
+        // plan produced only a URI: providers hand over text artifacts, so it could not have been shown to build.
+        val base = run()
+        val plan = TaskDefinitionId("plan")
+        val source = base.taskRuns.getValue(plan)
+        val uriOnly = base.copy(taskRuns = base.taskRuns + (plan to source.copy(artifacts = listOf(
+            ArtifactRef(ArtifactId("run-artifact-plan"), ArtifactKind.Research, source.id, "plan", uri = "file:///plan.txt", createdAtEpochMillis = 1L)))))
+        val buildTask = definition.tasks.first { it.id.value == "build" }
+        val deliveries = reportedArtifactDeliveries(uriOnly, reports(uriOnly, mapOf("build" to "unrelated", "review" to "build")))
+        assertEquals(TrophicOutcome.Unknown, trophicOutcome(uriOnly, plan, buildTask, deliveries, uriOnly.roleSnapshot.associateBy { it.id }))
+        // With a text artifact that the consumer was not handed, it is passed over.
+        val withText = base
+        val passedOver = reportedArtifactDeliveries(withText, reports(withText, mapOf("build" to "unrelated", "review" to "build")))
+        assertEquals(TrophicOutcome.Ignored, trophicOutcome(withText, plan, buildTask, passedOver, withText.roleSnapshot.associateBy { it.id }))
+    }
 }

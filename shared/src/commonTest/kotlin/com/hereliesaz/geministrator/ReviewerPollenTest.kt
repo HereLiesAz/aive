@@ -137,4 +137,16 @@ class ReviewerPollenTest {
         val narrow = byId + (qa.id to qa.copy(toolCeiling = listOf("read"))) + (engineer.id to engineer.copy(toolCeiling = listOf("write")))
         assertNull(pollinatedChild(p, narrow))
     }
+
+    @Test
+    fun aReviewerOfItsOwnRolesWorkCarriesNothingAndTheRenamedAntagonistIsStillNotHeritable() {
+        // QA reviewing work QA wrote has no producer's genes to carry; the writer's review is still a visit.
+        val r = run("same")
+        val build = TaskDefinitionId("build")
+        val own = r.copy(taskRuns = r.taskRuns + (build to r.taskRuns.getValue(build).copy(assignedRoleId = qa.id)))
+        assertEquals(listOf(writer.id), pollenVisits(own, reports(own)).map { it.producer })
+        // The Antagonist is known by its id, not only its name: a keeper's rename does not make it a parent.
+        assertEquals(false, heritable(BuiltInRoles.Antagonist.copy(name = "Quiet Reader")))
+        assertEquals(true, heritable(engineer))
+    }
 }

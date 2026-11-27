@@ -151,7 +151,15 @@ object MemoryRuntimeBridge {
     /** The one task an approved executor habit an agent chose (`proc:<operation>@<version>`) proposes, or why not; null while memory is not attached. */
     var habitRefProposer: (suspend (ref: String, idPrefix: String) -> com.hereliesaz.geministrator.memory.procedural.HabitInvocation.Result)? = null
 
+    /**
+     * `memory-node:<id>` to the roles that wrote it, for the memory bank of one workflow run (Echo reads who wrote
+     * what a creature read). Empty when no memory layer is attached or the run has no bank: unknown, not "self".
+     */
+    var memoryAuthors: suspend (workflowRunId: String) -> Map<String, Set<com.hereliesaz.geministrator.domain.RoleDefinitionId>> =
+        { emptyMap() }
+
     fun reset() {
+        memoryAuthors = { emptyMap() }
         observer = NoOpMemorySessionObserver
         promptContextProvider = NoOpMemoryPromptContextProvider
         procedureTraceSink = NoOpProcedureTraceSink

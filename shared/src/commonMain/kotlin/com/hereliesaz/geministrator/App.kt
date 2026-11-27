@@ -1479,6 +1479,7 @@ fun App(
                         },
                         onLoadRunTimeline = { runtime?.loadRunTimeline(shown = true) ?: emptyList() },
                         onLoadEchoHistory = { run -> runtime?.loadEchoHistory(run) ?: emptyMap() },
+                        onLoadMemoryAuthors = { run -> runtime?.memoryAuthorsOfRun(run) ?: emptyMap() },
                         onLoadTrophicHistory = { run -> runtime?.loadTrophicHistory(run) ?: emptyMap() },
                         onLoadOperationalProfiles = { run -> runtime?.loadOperationalProfiles(run) ?: emptyMap() },
                         onLoadLogIntegrity = { runtime?.loadRunLogIntegrity() ?: com.hereliesaz.geministrator.events.ChainStatus.NoChain },

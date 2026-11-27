@@ -2066,6 +2066,10 @@ class MemoryLayerController(
         MemoryRuntimeBridge.promptContextProvider = promptContextProvider
         MemoryRuntimeBridge.procedureTraceSink = procedureTraceSink
         MemoryRuntimeBridge.procedureTraceReader = procedureTraceReader
+        MemoryRuntimeBridge.memoryAuthors = { runId ->
+            // A run with no bank has no memory authors; reading would only create an empty one.
+            if (runId in banks.known()) com.hereliesaz.geministrator.memoryAuthorsOf(lineageStore(runId).read()) else emptyMap()
+        }
         MemoryRuntimeBridge.habitLearningOn = { active && settings.value.proceduralTraceCaptureEnabled }
         MemoryRuntimeBridge.habitStepProposer = { objective ->
             selectedWorkflow()?.let { habitStepTasks(it, objective) }.orEmpty()

@@ -2395,7 +2395,7 @@ class ApplicationRuntime private constructor(
     internal suspend fun loadEchoHistory(before: WorkflowRun): Map<RoleDefinitionId, Int> {
         var history = EchoHistory()
         for (run in settledRunsBefore(before)) {
-            history = history.advance(run, usageReports(run))
+            history = history.advance(run, usageReports(run), memoryAuthorsOfRun(run))
         }
         return history.withBirths(before.roleSnapshot).balances
     }
@@ -2407,6 +2407,11 @@ class ApplicationRuntime private constructor(
                 it.status in setOf(WorkflowRunStatus.Completed, WorkflowRunStatus.Failed, WorkflowRunStatus.Cancelled) &&
                 it.definitionSnapshot != null && it.roleSnapshot.isNotEmpty() }
             .sortedWith(compareBy({ it.updatedAtEpochMillis }, { it.id.value }))
+
+    /** Who wrote each stored memory a run could read, from the live memory layer; empty if none is attached. */
+    internal suspend fun memoryAuthorsOfRun(run: WorkflowRun): Map<String, Set<RoleDefinitionId>> =
+        runCatchingCancellable { com.hereliesaz.geministrator.memory.MemoryRuntimeBridge.memoryAuthors(run.id.value) }
+            .getOrDefault(emptyMap())
 
     private suspend fun usageReports(run: WorkflowRun) = persistence.events.forRun(run.id)
         .filterIsInstance<com.hereliesaz.geministrator.events.ProviderUsageRecorded>()
@@ -2461,7 +2466,7 @@ class ApplicationRuntime private constructor(
         val baseline = loadEchoHistory(run)
         val reports = persistence.events.forRun(run.id)
             .filterIsInstance<com.hereliesaz.geministrator.events.ProviderUsageRecorded>()
-        val echo = EchoHistory(balances = baseline).advance(run, reports).balances
+        val echo = EchoHistory(balances = baseline).advance(run, reports, memoryAuthorsOfRun(run)).balances
         val configuredModels = providerRegistry.providerIds.mapNotNull { id ->
             providerRegistry.provider(id)?.configuredModelId?.takeIf { it.isNotBlank() }?.let { id to it }
         }.toMap()
