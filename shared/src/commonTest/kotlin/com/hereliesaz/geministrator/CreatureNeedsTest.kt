@@ -339,6 +339,45 @@ class CreatureNeedsTest {
     }
 
     @Test
+    fun hybridEchoInheritsActualBirthEvidenceWithoutInventingUnknownBalances() {
+        val a = engineer.id
+        val b = qa.id
+        val c = com.hereliesaz.geministrator.domain.RoleDefinitionId("third")
+        val source = WorkflowRunId("birth")
+        val close = EchoBirthSeed(source, setOf(a,b), mapOf(a to 7_000, b to 6_000),
+            mapOf(setOf(a,b) to 100))
+        assertEquals(10_000, close.inherited(listOf(a,b)))
+        assertNull(close.inherited(listOf(a,a)))
+        val hybrid = EchoBirthSeed(source, setOf(a,b,c), mapOf(a to 1200,b to 2400,c to 3600),
+            mapOf(setOf(a,b) to 80))
+        assertEquals(600, hybrid.inherited(listOf(a,b)))
+        assertNull(hybrid.inherited(listOf(a,c)))
+        assertNull(hybrid.copy(balances = mapOf(a to 1200,b to 2400)).inherited(listOf(a,b)))
+    }
+
+    @Test
+    fun actualHybridLineageInheritsOnlyOnceFromItsBirthRun() {
+        val clone = engineer.copy(id = com.hereliesaz.geministrator.domain.RoleDefinitionId("clone"))
+        val plan = TaskDefinitionId("plan")
+        val build = TaskDefinitionId("build")
+        val original = run(Triple("plan", TaskRunStatus.Completed, "a" to 1),
+            Triple("build", TaskRunStatus.Completed, "a" to 1))
+        val source = original.copy(status = WorkflowRunStatus.Completed,
+            roleSnapshot = listOf(engineer, clone), definitionSnapshot = definition,
+            taskRuns = original.taskRuns + (plan to original.taskRuns.getValue(plan).copy(assignedRoleId = clone.id)))
+        val evidence = reports(source)
+        val child = assertNotNull(hatchFromRun(source, source.roleSnapshot, reports = evidence))
+        val settled = EchoHistory(balances = mapOf(engineer.id to 2_000, clone.id to 3_000)).advance(source, evidence)
+        assertNull(settled.balances[child.id])
+        // The consumer receives the clone's output once (+40); both known parent balances sum.
+        val inherited = settled.withBirths(listOf(child))
+        assertEquals(5_040, inherited.balances[child.id])
+        assertEquals(inherited, inherited.withBirths(listOf(child)))
+        assertEquals(inherited, inherited.advance(source, evidence))
+        assertNull(settled.withBirths(listOf(child.copy(hatchedFromRunId = "wrong"))).balances[child.id])
+    }
+
+    @Test
     fun onlyUnambiguousCurrentSessionModelReportsEstablishKinship() {
         val r=run(Triple("plan",TaskRunStatus.Completed,"a" to 1),Triple("build",TaskRunStatus.Running,"a" to 1))
         val plan=TaskDefinitionId("plan")

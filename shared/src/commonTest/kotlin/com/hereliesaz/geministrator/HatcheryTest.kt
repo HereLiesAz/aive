@@ -39,9 +39,25 @@ class HatcheryTest {
         updatedAtEpochMillis = 1,
     )
 
+    /** Test evidence names the actual session, not the role's preferred source. */
+    private fun observed(source: WorkflowRun, roles: List<RoleDefinition>): WorkflowRun = source.copy(
+        roleSnapshot = roles,
+        taskRuns = source.taskRuns.mapValues { (id, task) ->
+            task.copy(assignedProviderId = AgentProviderId("a"), providerRunId = ProviderRunId("session-${id.value}"))
+        },
+    )
+
+    private fun evidence(source: WorkflowRun) = source.taskRuns.values.map { task ->
+        ProviderUsageRecorded(source.id, task.taskDefinitionId, requireNotNull(task.assignedProviderId),
+            requireNotNull(task.providerRunId), model = "shared-model", modelConsistent = true, occurredAtEpochMillis = 2L)
+    }
+
     @Test
-    fun aClearedRunRecombinesItsTwoBusiestContributors() {
-        val child = assertNotNull(hatchFromRun(run(WorkflowRunStatus.Completed, "a" to engineer, "b" to engineer, "c" to qa), listOf(engineer, qa)))
+    fun aClearedRunRecombinesItsMostRelatedViableContributors() {
+        val compatible = qa.copy(instructions = engineer.instructions, keeperInstructions = engineer.keeperInstructions)
+        val roster = listOf(engineer, compatible)
+        val source = observed(run(WorkflowRunStatus.Completed, "a" to engineer, "b" to engineer, "c" to compatible), roster)
+        val child = assertNotNull(hatchFromRun(source, roster, reports = evidence(source)))
         assertEquals(listOf(engineer.id, qa.id), child.parents)
         assertEquals("hatch-r1", child.id.value)
         assertEquals(AgentProviderId("b"), child.preferredProviderId)
@@ -132,6 +148,50 @@ class HatcheryTest {
     }
 
     @Test
+    fun fertilityRequiresTheDocumentedThresholdsAndKnownEvidence() {
+        assertFalse(fertilityAllowsPair(74, false, 3, 2))
+        kotlin.test.assertTrue(fertilityAllowsPair(75, false, 2, 1))
+        kotlin.test.assertTrue(fertilityAllowsPair(60, true, 3, 1))
+        kotlin.test.assertTrue(fertilityAllowsPair(60, false, 4, 1))
+        assertFalse(fertilityAllowsPair(59, true, 4, 2))
+        kotlin.test.assertTrue(fertilityAllowsPair(59, false, 3, 3))
+        val clone = engineer.copy(id = com.hereliesaz.geministrator.domain.RoleDefinitionId("clone"))
+        val roster = listOf(engineer, clone)
+        val source = observed(run(WorkflowRunStatus.Completed, "a" to engineer, "b" to clone), roster)
+        val reports = evidence(source)
+        val child = assertNotNull(hatchFromRun(source, roster, reports = reports))
+        assertEquals(engineer.instructions, child.instructions) // identical inherited instructions are not doubled
+        assertNull(hatchFromRun(source, roster))
+        assertNull(hatchFromRun(source, roster, reports = reports.dropLast(1)))
+        val incompatible = clone.copy(instructions = "Different instructions")
+        val changed = source.copy(roleSnapshot = listOf(engineer, incompatible))
+        assertNull(hatchFromRun(changed, changed.roleSnapshot, reports = reports))
+        val a = engineer.copy(toolCeiling = listOf("read"))
+        val b = clone.copy(toolCeiling = listOf("search"))
+        val disjoint = source.copy(roleSnapshot = listOf(a,b))
+        assertNull(hatchFromRun(disjoint, disjoint.roleSnapshot, reports = reports))
+    }
+
+    @Test
+    fun lowKinshipRequiresThreeActualComparableGenera() {
+        val second = engineer.copy(id = com.hereliesaz.geministrator.domain.RoleDefinitionId("second"),
+            instructions = "Second approach")
+        val third = engineer.copy(id = com.hereliesaz.geministrator.domain.RoleDefinitionId("third"),
+            instructions = "Third approach")
+        val roster = listOf(engineer, second, third)
+        val source = observed(run(WorkflowRunStatus.Completed, "a" to engineer, "b" to second, "c" to third), roster)
+        val reports = evidence(source).map { it.copy(model = "model-${it.taskDefinitionId.value}") }
+        assertEquals(setOf(40), hatchKinships(source, roster, reports).values.toSet())
+        assertNull(hatchFromRun(source, roster, reports = reports))
+        val genera = mapOf(engineer.id to "genus-one", second.id to "genus-two", third.id to "genus-three")
+        val hybrid = assertNotNull(hatchFromRun(source, roster, reports = reports, genera = genera))
+        assertEquals(listOf(engineer.id, second.id), hybrid.parents)
+        assertFalse(hybrid.enabled)
+        assertNull(hatchFromRun(source, roster, reports = reports.dropLast(1), genera = genera))
+        assertNull(hatchFromRun(source, roster, reports = reports, genera = genera + (third.id to "genus-two")))
+    }
+
+    @Test
     fun aRunThatHasNotClearedHatchesNothing() {
         assertNull(hatchFromRun(run(WorkflowRunStatus.Failed, "a" to engineer), listOf(engineer)))
     }
@@ -141,8 +201,10 @@ class HatcheryTest {
         val parent=assertNotNull(spatialAgentGenome(engineer))
         val clone=assertNotNull(hatchFromRun(run(WorkflowRunStatus.Completed,"a" to engineer),listOf(engineer)))
         assertEquals(parent,spatialAgentGenome(clone))
-        val hybrid=assertNotNull(hatchFromRun(run(WorkflowRunStatus.Completed,"a" to engineer,"b" to engineer,"c" to qa),
-            listOf(engineer,qa)))
+        val compatible = qa.copy(instructions = engineer.instructions, keeperInstructions = engineer.keeperInstructions)
+        val roster = listOf(engineer, compatible)
+        val source = observed(run(WorkflowRunStatus.Completed,"a" to engineer,"b" to engineer,"c" to compatible), roster)
+        val hybrid = assertNotNull(hatchFromRun(source, roster, reports = evidence(source)))
         val genes=assertNotNull(spatialAgentGenome(hybrid))
         assertEquals(SpatialCellSignal.Excitatory,genes.pigment)
         assertEquals(SpatialCellSignal.Inhibitory,genes.accent)
