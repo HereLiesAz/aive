@@ -1,11 +1,9 @@
 const assert = require("node:assert/strict");
-const {pick,mesh} = require("../webApp/src/webMain/resources/spatial-hive.js");
+const {basis,decodeMesh} = require("../webApp/src/webMain/resources/spatial-hive.js");
 const camera={eye:{x:0,y:0,z:10},gaze:{x:0,y:0,z:0},memory:false};
-const a={id:"a",position:{x:0,y:0,z:0},radius:1,seed:1,form:"Nucleus",state:"Pending"};
-const b={...a,id:"b",position:{x:0,y:0,z:4},radius:.5};
-assert.equal(pick([a,b],camera,0,0,1).id,"b");
-assert.equal(pick([a,b],camera,.9,.9,1),null);
-const data=mesh({bodies:[a],spores:[],cords:[{points:[{x:0,y:0,z:0},{x:0,y:0,z:2}],width:.1,kind:"Neural"}]});
-assert.ok(data.length>0&&data.length%27===0&&data.every(Number.isFinite));
-const z=[];for(let i=2;i<data.length;i+=9)z.push(data[i]);
-assert.ok(Math.min(...z)<-.8&&Math.max(...z)>1.9);
+const view=basis(camera);
+assert.deepEqual(view.f,[0,0,-1]);
+assert.equal(view.r[0],1);
+const encoded=Buffer.from("0000803f000000c000004040000000000000803f000000000000003f0000803e00000000","hex").toString("base64");
+assert.deepEqual(Array.from(decodeMesh(encoded)),[1,-2,3,0,1,0,.5,.25,0]);
+assert.throws(()=>decodeMesh("AQID"));
