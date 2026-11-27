@@ -47,3 +47,8 @@ internal fun spatialNeuriteProfile(fraction: Float, phase: Float): Float {
     val neck = .19f+.10f*(.5f+.5f*sin(phase*1.7f))
     return (neck+(1f-neck)*maxOf(left,right))*(1f+.18f*sin(PI.toFloat()*t)*sin(phase+t*11f))
 }
+
+/** Nonplanar asymmetric eyelid opening: radial extent and axial height. */
+internal fun spatialEyelidProfile(angle: Float, phase: Float): Pair<Float,Float> =
+    (.86f+.045f*sin(angle+phase)+.026f*cos(3f*angle-phase)) to
+        (.43f+.085f*sin(angle-phase)+.035f*sin(2f*angle+phase))

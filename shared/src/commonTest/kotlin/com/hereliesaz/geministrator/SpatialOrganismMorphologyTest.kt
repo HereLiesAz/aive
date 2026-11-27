@@ -38,4 +38,15 @@ class SpatialOrganismMorphologyTest {
         val y=(1 until soma.size step 9).map { soma[it] }
         assertTrue(x.max()-x.min() > 2f*(y.max()-y.min()))
     }
+    @Test fun irregularLidAndCurvedIrisAreRendered() {
+        val a=spatialEyelidProfile(0f,1f)
+        val b=spatialEyelidProfile(3.1415927f,1f)
+        assertNotEquals(a,b)
+        assertTrue(a.first in .7f..1f && b.first in .7f..1f)
+        val creature=SpatialRenderBody("agent",SpatialPoint.Origin,3,"Creature","Pending",0f,1f)
+        val data=SpatialRenderFrame(listOf(creature),emptyList(),emptyList()).triangles()
+        val colors=(6 until data.size step 9).map { Triple(data[it],data[it+1],data[it+2]) }.toSet()
+        assertTrue(Triple(.012f,.025f,.038f) in colors)
+        assertTrue(colors.size>20)
+    }
 }

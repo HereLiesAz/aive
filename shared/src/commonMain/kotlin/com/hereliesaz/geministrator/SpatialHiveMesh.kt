@@ -11,7 +11,7 @@ import kotlin.random.Random
 internal const val SPATIAL_VERTEX_FLOATS = 9
 internal const val SPATIAL_FOCAL_SCALE = .52f
 
-/** Shared rendering basis and ray tests use the same perspective as both GPU backends. */
+/** Shared rendering basis and ray tests use the same perspective as all GPU backends. */
 internal data class SpatialViewBasis(val eye: SpatialPoint, val forward: SpatialPoint, val right: SpatialPoint, val up: SpatialPoint)
 
 internal fun SpatialRenderCamera.basis(): SpatialViewBasis {
@@ -56,7 +56,7 @@ private fun rgb(r: Float, g: Float, b: Float) = SpatialPoint(r,g,b)
 private val bodyPalette = listOf(rgb(.12f,.62f,.57f),rgb(.28f,.42f,.85f),rgb(.55f,.24f,.75f),rgb(.12f,.67f,.83f),rgb(.8f,.39f,.2f))
 
 private fun bodyTint(b: SpatialRenderBody): SpatialPoint = when {
-    b.form == "Nucleus" -> rgb(.95f,.33f,.075f)
+    b.form == "Nucleus" -> rgb(.29f,.22f,.39f)
     b.form == "Spore" -> when (b.state) {
         "Source" -> rgb(.32f,.66f,.8f)
         "Context" -> rgb(.1f,.85f,.65f)
@@ -102,10 +102,10 @@ private class SpatialMeshBuilder {
     }
 
     private fun triangle(a: Sample,b: Sample,c: Sample,color: SpatialPoint) {
-        vertex(a.p,a.n,color); vertex(b.p,b.n,color); vertex(c.p,c.n,color)
+        vertex(a.p,a.n,a.tint ?: color); vertex(b.p,b.n,b.tint ?: color); vertex(c.p,c.n,c.tint ?: color)
     }
 
-    private data class Sample(val p: SpatialPoint,val n: SpatialPoint)
+    private data class Sample(val p: SpatialPoint,val n: SpatialPoint,val tint: SpatialPoint? = null)
 
     private fun sphere(center: SpatialPoint,radius: Float,color: SpatialPoint,seed: Int,form: String,detail: Int = 18) {
         val unsigned = seed.toUInt()
@@ -119,8 +119,10 @@ private class SpatialMeshBuilder {
             val phi = pi*i/detail
             val theta = pi*j/detail
             val n = SpatialPoint(sin(phi)*cos(theta),cos(phi),sin(phi)*sin(theta))
-            val ripple = if (shape) 1f+relief*sin(theta*lobes+phase)*sin(phi*3f)+.09f*cos(phi*5f+theta*2f+phase)+.035f*sin(phi*17f+theta*13f+phase) else 1f
-            return Sample(center+SpatialPoint(n.x*scale.x,n.y*scale.y,n.z*scale.z)*(radius*ripple),SpatialPoint(n.x/scale.x,n.y/scale.y,n.z/scale.z).unit())
+            val ripple = if (shape) 1f+relief*sin(theta*lobes+phase)*sin(phi*3f)+(.09f*cos(phi*5f+theta*2f+phase)+.035f*sin(phi*17f+theta*13f+phase))*sin(phi) else 1f
+            val warm = if (shape) ((.12f-n.y)*.72f).coerceIn(0f,.78f) else 0f
+            val tint = color*(1f-warm)+rgb(.97f,.29f,.105f)*warm
+            return Sample(center+SpatialPoint(n.x*scale.x,n.y*scale.y,n.z*scale.z)*(radius*ripple),SpatialPoint(n.x/scale.x,n.y/scale.y,n.z/scale.z).unit(),tint)
         }
         for (i in 0 until detail) for (j in 0 until detail*2) {
             val a = sample(i,j); val b = sample(i+1,j); val c = sample(i+1,j+1); val d = sample(i,j+1)
@@ -182,26 +184,45 @@ private class SpatialMeshBuilder {
         return SpatialPoint(cos(angle)*radial,y,sin(angle)*radial)
     }
 
-    /** Irregular ocular socket, raised iris and dark pupil share the same outward axis. */
+    /** Convex iris with radially varying pigment, a dark pupil and an irregular wet eyelid. */
     private fun eye(center: SpatialPoint,d: SpatialPoint,r: Float,seed: Int,membrane: SpatialPoint) {
-        val phase = (seed.toUInt()%628u).toFloat()/100f
-        val side = d.cross(if (abs(d.y)>.9f) SpatialPoint(1f,0f,0f) else SpatialPoint(0f,1f,0f)).unit()
-        val up = side.cross(d)
-        val palette = when ((seed.toUInt()%4u).toInt()) {
+        val phase=(seed.toUInt()%628u).toFloat()/100f
+        val side=d.cross(if(abs(d.y)>.9f) SpatialPoint(1f,0f,0f) else SpatialPoint(0f,1f,0f)).unit()
+        val up=side.cross(d)
+        val iris=when((seed.toUInt()%4u).toInt()) {
             0 -> rgb(.94f,.29f,.065f)
             1 -> rgb(.88f,.17f,.25f)
             2 -> rgb(.13f,.62f,.69f)
             else -> rgb(.56f,.23f,.69f)
         }
-        sphere(center,r*1.12f,membrane,seed,"Eye",10)
-        sphere(center+d*(r*.37f),r*.90f,palette,seed,"Eye",12)
-        sphere(center+d*(r*1.06f),r*.40f,rgb(.018f,.025f,.035f),seed,"Eye",10)
-        val lid = (0..24).map { i ->
-            val a = i*2f*pi/24f
-            val rad = r*(.86f+.045f*sin(a+phase)+.026f*cos(3f*a-phase))
-            center+(side*cos(a)+up*sin(a))*rad+d*(r*(.43f+.085f*sin(a-phase)+.035f*sin(2f*a+phase)))
+        val globe=center+d*(r*.26f)
+        sphere(globe,r,membrane,seed,"Eye",16)
+        val pupil=.31f+.07f*sin(phase*2f)
+        fun sample(t: Float,angle: Float): Sample {
+            val radial=side*cos(angle)+up*sin(angle)
+            val n=(d*sqrt((1f-t*t).coerceAtLeast(0f))+radial*t).unit()
+            val shade=when {
+                t<=pupil -> rgb(.012f,.025f,.038f)
+                t>=.82f -> rgb(.16f,.065f,.09f)
+                else -> iris*(.69f+.31f*sin(angle*37f+phase+t*13f).let { it*it })
+            }
+            return Sample(globe+n*(r*1.012f),n,shade)
         }
-        tube(lid,r*.12f,membrane,6)
+        val bands=floatArrayOf(0f,pupil*.94f,pupil+.015f,.57f,.79f,.88f)
+        val lid=mutableListOf<SpatialPoint>()
+        for(j in 0..48) {
+            val angle=2f*pi*j/48
+            val (opening,height)=spatialEyelidProfile(angle,phase)
+            lid+=globe+(side*cos(angle)+up*sin(angle))*(r*opening)+d*(r*height)
+            if(j==48) continue
+            val next=2f*pi*(j+1)/48
+            for(i in 0 until bands.lastIndex) {
+                val a=sample(bands[i],angle); val b=sample(bands[i+1],angle)
+                val c=sample(bands[i+1],next); val e=sample(bands[i],next)
+                triangle(a,b,c,iris); triangle(a,c,e,iris)
+            }
+        }
+        tube(lid,r*.085f,membrane,6)
     }
 
     fun organism(b: SpatialRenderBody) {
@@ -229,8 +250,10 @@ private class SpatialMeshBuilder {
             repeat(11) { k ->
                 val d = direction(rng)
                 val a = surface(d)
-                sphere(a,r*(.20f+rng.nextFloat()*.15f),rgb(1f,.34f,.075f),b.seed+k,"Eye",14)
-                sphere(a+d*(r*.15f),r*.095f,rgb(1f,.84f,.39f),b.seed+k,"Eye",9)
+                val lobeRadius=r*(.29f+rng.nextFloat()*.14f)
+                sphere(a,lobeRadius,color,b.seed+k,"Nucleus",16)
+                val pocket=a+d*(lobeRadius*.73f)
+                sphere(pocket,lobeRadius*.56f,rgb(1.45f,.55f,.13f),b.seed+k,"Eye",14)
             }
         } else {
             repeat(morph.eyes) { k ->
