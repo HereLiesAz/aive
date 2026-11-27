@@ -37,15 +37,15 @@ class SpatialHiveOpticsTest {
         val site=SpatialPoint(2f,3f,4f)
         val body=SpatialRenderBody("focus",site,3,"Creature","Pending",0f,1f,.25f)
         val vertices=SpatialRenderFrame(listOf(body),emptyList(),emptyList()).triangles()
-        assertTrue(vertices.isNotEmpty() && vertices.size%39==0)
-        for(i in 0 until vertices.size step 13) {
+        assertTrue(vertices.isNotEmpty() && vertices.size%48==0)
+        for(i in 0 until vertices.size step 16) {
             assertEquals(2f,vertices[i+9]);assertEquals(3f,vertices[i+10]);assertEquals(4f,vertices[i+11])
             assertEquals(.25f,vertices[i+12])
         }
         val line=SpatialRenderCord(listOf(SpatialPoint.Origin,SpatialPoint(0f,0f,2f)),.1f,"Dependency",2f)
         val cord=SpatialRenderFrame(emptyList(),emptyList(),listOf(line)).triangles()
-        assertEquals(setOf(0f,2f),(0 until cord.size step 13).map { cord[it+11] }.toSet())
-        assertTrue((0 until cord.size step 13).all { cord[it+12]==2f })
+        assertEquals(setOf(0f,2f),(0 until cord.size step 16).map { cord[it+11] }.toSet())
+        assertTrue((0 until cord.size step 16).all { cord[it+12]==2f })
     }
 
     @Test fun selectedMovingElementRetainsOpticalFocusDuringManualAim() {

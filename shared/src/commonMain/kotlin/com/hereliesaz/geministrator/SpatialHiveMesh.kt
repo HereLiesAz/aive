@@ -7,8 +7,8 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.random.Random
 
-/** Portable vertex: XYZ, normal, RGB, optical anchor XYZ and independent blur multiplier. */
-internal const val SPATIAL_VERTEX_FLOATS = 13
+/** Portable vertex: XYZ, normal, RGB, optical anchor XYZ, blur multiplier, roughness, transmission, emission. */
+internal const val SPATIAL_VERTEX_FLOATS = 16
 internal const val SPATIAL_FOCAL_SCALE = .52f
 
 /** Shared rendering basis and ray tests use the same perspective as all GPU backends. */
@@ -87,16 +87,31 @@ private fun cordTint(kind: String): SpatialPoint = when (kind) {
     else -> rgb(.15f,.5f,.46f)
 }
 
+/** Artist-tuned optical response, not task health, activity or agent identity. */
+internal data class SpatialMaterial(val roughness: Float, val transmission: Float, val emission: Float)
+
+internal object SpatialMaterials {
+    val Solid = SpatialMaterial(.58f,0f,0f)
+    val Membrane = SpatialMaterial(.23f,.72f,0f)
+    val Tissue = SpatialMaterial(.27f,.58f,0f)
+    val Cornea = SpatialMaterial(.09f,.16f,0f)
+    val Hair = SpatialMaterial(.38f,.22f,0f)
+    val Organelle = SpatialMaterial(.29f,.24f,2.1f)
+    val Spore = SpatialMaterial(.32f,.32f,.35f)
+    val Transfer = SpatialMaterial(.28f,.28f,.85f)
+}
+
 private class SpatialMeshBuilder {
     private var data = FloatArray(8192)
     private var size = 0
     private val pi = PI.toFloat()
     private var opticalAnchor: SpatialPoint? = null
     private var opticalMultiplier = 1f
+    private var surfaceMaterial = SpatialMaterials.Solid
 
     fun finish(): FloatArray = data.copyOf(size)
 
-    private fun vertex(p: SpatialPoint, n: SpatialPoint, c: SpatialPoint) {
+    private fun vertex(p: SpatialPoint, n: SpatialPoint, c: SpatialPoint, material: SpatialMaterial) {
         if (size + SPATIAL_VERTEX_FLOATS > data.size) data = data.copyOf(data.size * 2)
         data[size++] = p.x; data[size++] = p.y; data[size++] = p.z
         data[size++] = n.x; data[size++] = n.y; data[size++] = n.z
@@ -104,15 +119,16 @@ private class SpatialMeshBuilder {
         val anchor = opticalAnchor ?: p
         data[size++] = anchor.x; data[size++] = anchor.y; data[size++] = anchor.z
         data[size++] = opticalMultiplier
+        data[size++] = material.roughness; data[size++] = material.transmission; data[size++] = material.emission
     }
 
-    private fun triangle(a: Sample,b: Sample,c: Sample,color: SpatialPoint) {
-        vertex(a.p,a.n,a.tint ?: color); vertex(b.p,b.n,b.tint ?: color); vertex(c.p,c.n,c.tint ?: color)
+    private fun triangle(a: Sample,b: Sample,c: Sample,color: SpatialPoint,material: SpatialMaterial = surfaceMaterial) {
+        vertex(a.p,a.n,a.tint ?: color,material); vertex(b.p,b.n,b.tint ?: color,material); vertex(c.p,c.n,c.tint ?: color,material)
     }
 
     private data class Sample(val p: SpatialPoint,val n: SpatialPoint,val tint: SpatialPoint? = null)
 
-    private fun sphere(center: SpatialPoint,radius: Float,color: SpatialPoint,seed: Int,form: String,detail: Int = 18) {
+    private fun sphere(center: SpatialPoint,radius: Float,color: SpatialPoint,seed: Int,form: String,detail: Int = 18,material: SpatialMaterial = surfaceMaterial) {
         val unsigned = seed.toUInt()
         val phase = (unsigned % 628u).toFloat()/100f
         val morph = spatialMorphology(seed)
@@ -131,12 +147,12 @@ private class SpatialMeshBuilder {
         }
         for (i in 0 until detail) for (j in 0 until detail*2) {
             val a = sample(i,j); val b = sample(i+1,j); val c = sample(i+1,j+1); val d = sample(i,j+1)
-            triangle(a,b,c,color); triangle(a,c,d,color)
+            triangle(a,b,c,color,material); triangle(a,c,d,color,material)
         }
     }
 
     /** Transport one ring frame along the whole curve, sharing joints rather than leaving cracks. */
-    fun tube(points: List<SpatialPoint>, width: Float, color: SpatialPoint, sides: Int = 7, profile: (Float) -> Float = { 1f }) {
+    fun tube(points: List<SpatialPoint>, width: Float, color: SpatialPoint, sides: Int = 7, material: SpatialMaterial = surfaceMaterial, profile: (Float) -> Float = { 1f }) {
         if (width <= 0f || !width.isFinite()) return
         val path = mutableListOf<SpatialPoint>()
         for (p in points) if (p.finite() && (path.isEmpty() || (p-path.last()).length() > .00001f)) path += p
@@ -159,7 +175,7 @@ private class SpatialMeshBuilder {
         for (i in 1 until rings.size) for (j in 0 until sides) {
             val k = (j+1)%sides
             val a = rings[i-1][j]; val b = rings[i][j]; val c = rings[i][k]; val d = rings[i-1][k]
-            triangle(a,b,c,color); triangle(a,c,d,color)
+            triangle(a,b,c,color,material); triangle(a,c,d,color,material)
         }
     }
 
@@ -167,6 +183,11 @@ private class SpatialMeshBuilder {
     fun cord(c: SpatialRenderCord) {
         opticalAnchor = null
         opticalMultiplier = spatialBlurScale(c.blurScale)
+        surfaceMaterial = when(c.kind) {
+            "Transfer" -> SpatialMaterials.Transfer
+            "Dependency", "Memory" -> SpatialMaterials.Solid
+            else -> SpatialMaterials.Tissue
+        }
         if (c.kind in listOf("Memory","Transfer","Dependency")) {
             tube(c.points,c.width,cordTint(c.kind))
             return
@@ -203,7 +224,7 @@ private class SpatialMeshBuilder {
             else -> rgb(.56f,.23f,.69f)
         }
         val globe=center+d*(r*.26f)
-        sphere(globe,r,membrane,seed,"Eye",16)
+        sphere(globe,r,membrane,seed,"Eye",16,SpatialMaterials.Cornea)
         val pupil=.31f+.07f*sin(phase*2f)
         fun sample(t: Float,angle: Float): Sample {
             val radial=side*cos(angle)+up*sin(angle)
@@ -226,7 +247,7 @@ private class SpatialMeshBuilder {
             for(i in 0 until bands.lastIndex) {
                 val a=sample(bands[i],angle); val b=sample(bands[i+1],angle)
                 val c=sample(bands[i+1],next); val e=sample(bands[i],next)
-                triangle(a,b,c,iris); triangle(a,c,e,iris)
+                triangle(a,b,c,iris,SpatialMaterials.Cornea); triangle(a,c,e,iris,SpatialMaterials.Cornea)
             }
         }
         tube(lid,r*.085f,membrane,6)
@@ -237,6 +258,12 @@ private class SpatialMeshBuilder {
         opticalMultiplier = spatialBlurScale(b.blurScale)
         val c = b.position; val color = bodyTint(b); val r = b.radius
         val organic = b.form in listOf("Nucleus","Creature","ProgrammaticNeuron")
+        surfaceMaterial = when {
+            organic -> SpatialMaterials.Membrane
+            b.form == "Spore" -> SpatialMaterials.Spore
+            b.form == "Egg" -> SpatialMaterials.Membrane
+            else -> SpatialMaterials.Solid
+        }
         sphere(c,r,color,b.seed,b.form,if (b.form == "Spore") 7 else if (organic) 24 else 18)
         if (!organic) return
         val rng = Random(b.seed)
@@ -262,7 +289,7 @@ private class SpatialMeshBuilder {
                 val lobeRadius=r*(.29f+rng.nextFloat()*.14f)
                 sphere(a,lobeRadius,color,b.seed+k,"Nucleus",16)
                 val pocket=a+d*(lobeRadius*.73f)
-                sphere(pocket,lobeRadius*.56f,rgb(1.45f,.55f,.13f),b.seed+k,"Eye",14)
+                sphere(pocket,lobeRadius*.56f,rgb(1.45f,.55f,.13f),b.seed+k,"Eye",14,SpatialMaterials.Organelle)
             }
         } else {
             repeat(morph.eyes) { k ->
@@ -306,7 +333,7 @@ private class SpatialMeshBuilder {
                 2 -> rgb(.56f,.16f,.59f)
                 else -> rgb(.19f,.62f,.63f)
             }
-            tube(path,width,tint,4) { t -> 1f-.92f*t }
+            tube(path,width,tint,4,SpatialMaterials.Hair) { t -> 1f-.92f*t }
         }
     }
 
@@ -315,10 +342,10 @@ private class SpatialMeshBuilder {
 /** OpenGL ES 3 / WebGL2 share the same projection and material shaders. */
 internal const val SPATIAL_VERTEX_SHADER = """#version 300 es
 precision highp float;
-in vec3 p; in vec3 n; in vec3 c; in vec4 optical;
+in vec3 p; in vec3 n; in vec3 c; in vec4 optical; in vec3 material;
 uniform vec3 eye,forward,right,up;
 uniform float aspect,motionPhase,focusDepth,aperture;
-out vec3 normal,color,world;
+out vec3 normal,color,world,rest,materialResponse;
 out float blurAmount;
 ${SPATIAL_MOTION_GLSL}
 ${SPATIAL_ELEMENT_BLUR_GLSL}
@@ -326,25 +353,48 @@ void main(){
     vec3 moved=deformSpatial(p,motionPhase);
     vec3 d=moved-eye; float z=dot(d,forward);
     gl_Position=vec4(dot(d,right)/(.52*aspect),dot(d,up)/.52,1.0002*z-.20002,z);
-    normal=n; color=c; world=moved;
+    normal=n; color=c; world=moved; rest=p; materialResponse=material;
     blurAmount=elementBlur(deformSpatial(optical.xyz,motionPhase),eye,focusDepth,aperture,optical.w);
 }"""
 
 internal const val SPATIAL_FRAGMENT_SHADER = """#version 300 es
 precision highp float;
-in vec3 normal,color,world;
+in vec3 normal,color,world,rest,materialResponse;
 in float blurAmount;
 uniform vec3 eye;
 uniform float encodeBlur;
 out vec4 frag;
 void main(){
-    vec3 n=normalize(normal),v=normalize(eye-world),l=normalize(vec3(-.4,.9,.7));
-    float diffuse=max(dot(n,l),0.),rim=pow(1.-abs(dot(n,v)),2.),spec=pow(max(dot(n,normalize(l+v)),0.),42.);
-    float membrane=0.5+0.5*sin(world.x*37.+sin(world.y*29.)*2.+world.z*31.);
-    float warm=max(0.,color.r-max(color.g,color.b));
-    vec3 lit=color*(.29+.85*diffuse+.55*rim)*(0.88+0.20*membrane)+vec3(.42,.82,.98)*spec*1.2;
-    lit+=vec3(1.,.25,.04)*warm*(.48+.55*rim)+vec3(.03,.22,.32)*rim;
-    lit=lit/(vec3(1.)+lit*.35);
+    vec3 n=normalize(normal),v=normalize(eye-world);
+    float rough=clamp(materialResponse.x,.06,1.);
+    float transmission=clamp(materialResponse.y,0.,1.);
+    float emission=max(0.,materialResponse.z);
+    // Fine membrane relief remains anchored to the undeformed geometry, rather than swimming
+    // through the material as the creature sways. Derivatives are not needed for the pattern.
+    vec3 q=rest*vec3(38.,47.,43.);
+    float grain=sin(q.x+1.7*sin(q.y))*sin(q.z+.8*sin(q.x));
+    vec3 bump=vec3(cos(q.x+1.7*sin(q.y)),cos(q.y+q.z*.7),cos(q.z+.8*sin(q.x)));
+    n=normalize(n+(bump-n*dot(bump,n))*.055*transmission);
+    vec3 key=normalize(vec3(-.42,.86,.56)),fill=normalize(vec3(.68,.16,-.73));
+    float ndv=max(.001,abs(dot(n,v)));
+    float rim=pow(1.-ndv,2.4);
+    float fresnel=.035+.965*pow(1.-ndv,5.);
+    float diffuse=max(0.,dot(n,key));
+    float back=max(0.,dot(-n,key));
+    float gloss=mix(140.,12.,rough);
+    float spec=pow(max(0.,dot(n,normalize(key+v))),gloss);
+    float specFill=pow(max(0.,dot(n,normalize(fill+v))),gloss*.67);
+    vec3 pigment=max(vec3(0.),color)*(.94+.06*grain*transmission);
+    vec3 lit=pigment*(.22+.65*diffuse);
+    // Thin tissue transmits more warm light at grazing angles and through backlit surfaces.
+    // This approximates subsurface scattering; it does not sample geometry behind the membrane.
+    vec3 transmitted=mix(pigment,vec3(1.,.30,.075),.44);
+    lit+=transmitted*transmission*(.24+.52*back+.26*rim);
+    lit+=vec3(.16,.56,.72)*rim*transmission*.43;
+    lit+=vec3(.68,.88,1.)*(spec*.95+specFill*.48)*(1.-rough*.6);
+    lit+=vec3(.17,.43,.57)*fresnel*(1.-rough*.75);
+    lit+=pigment*emission;
+    lit=lit/(vec3(1.)+lit*.45);
     float fog=exp(-length(eye-world)*.026);
     frag=vec4(mix(vec3(.012,.045,.047),lit,fog),mix(1.,(128.+127.*blurAmount)/255.,encodeBlur));
 }"""

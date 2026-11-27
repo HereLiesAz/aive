@@ -192,11 +192,11 @@ private class SpatialDesktopRenderer(private val failed: () -> Unit) : GLEventLi
             gl.glBindVertexArray(vao)
             gl.glGenBuffers(1, ids, 0); buffer = ids[0]
             gl.glBindBuffer(GL.GL_ARRAY_BUFFER, buffer)
-            listOf("p", "n", "c", "optical").forEachIndexed { i, name ->
+            listOf("p", "n", "c", "optical", "material").forEachIndexed { i, name ->
                 val loc = gl.glGetAttribLocation(program, name)
                 require(loc >= 0)
                 gl.glEnableVertexAttribArray(loc)
-                gl.glVertexAttribPointer(loc, if(i==3) 4 else 3, GL.GL_FLOAT, false, SPATIAL_VERTEX_FLOATS * 4, i * 12L)
+                gl.glVertexAttribPointer(loc, if(i==3) 4 else 3, GL.GL_FLOAT, false, SPATIAL_VERTEX_FLOATS * 4, if(i==4) 52L else i*12L)
             }
             uniforms = listOf("eye","forward","right","up","aspect","motionPhase","focusDepth","aperture","encodeBlur").map {
                 gl.glGetUniformLocation(program, it)

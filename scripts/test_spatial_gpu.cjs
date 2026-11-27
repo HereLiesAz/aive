@@ -4,8 +4,8 @@ const camera={eye:{x:0,y:0,z:10},gaze:{x:0,y:0,z:0},memory:false};
 const view=basis(camera);
 assert.deepEqual(view.f,[0,0,-1]);
 assert.equal(view.r[0],1);
-const encoded=Buffer.from("0000803f000000c000004040000000000000803f000000000000003f0000803e000000000000803f00000040000040400000003f","hex").toString("base64");
-assert.deepEqual(Array.from(decodeMesh(encoded)),[1,-2,3,0,1,0,.5,.25,0,1,2,3,.5]);
+const encoded=Buffer.from("0000803f000000c000004040000000000000803f000000000000003f0000803e000000000000803f00000040000040400000003f0000803e0000003f00000040","hex").toString("base64");
+assert.deepEqual(Array.from(decodeMesh(encoded)),[1,-2,3,0,1,0,.5,.25,0,1,2,3,.5,.25,.5,2]);
 assert.throws(()=>decodeMesh("AQID"));
 
 
