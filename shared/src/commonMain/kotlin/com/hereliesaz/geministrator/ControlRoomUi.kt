@@ -244,6 +244,7 @@ fun ControlRoom(
     onSwitchRun: (String) -> Unit = {},
     onLoadRunTimeline: suspend () -> List<WorkflowEvent> = { emptyList() },
     onLoadEchoHistory: suspend (WorkflowRun) -> Map<RoleDefinitionId, Int> = { emptyMap() },
+    onLoadTrophicHistory: suspend (WorkflowRun) -> Map<RoleDefinitionId, Int> = { emptyMap() },
     onLoadLogIntegrity: suspend () -> com.hereliesaz.geministrator.events.ChainStatus = { com.hereliesaz.geministrator.events.ChainStatus.NoChain },
     onLoadWorkflowDefinitions: suspend () -> List<WorkflowDefinition> = { emptyList() },
     onExportDiagnosticBundle: suspend () -> String? = { null },
@@ -328,6 +329,25 @@ fun ControlRoom(
         } catch (_: Exception) {
             // Incomplete history must not masquerade as a zero balance.
         }
+    }
+    val loadTrophic by rememberUpdatedState(onLoadTrophicHistory)
+    val trophicBaseline by produceState<Pair<WorkflowRunId, Map<RoleDefinitionId, Int>>?>(null, journalRun?.id) {
+        value = null
+        val observed = journalRun ?: return@produceState
+        try {
+            value = observed.id to loadTrophic(observed)
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            // Incomplete history must not masquerade as a full reserve.
+        }
+    }
+    val cumulativeTrophic = remember(journalRun, modelReports, trophicBaseline) {
+        val observed = journalRun
+        val baseline = trophicBaseline
+        if (observed != null && baseline?.first == observed.id) {
+            TrophicHistory(balances = baseline.second).advance(observed, modelReports).balances
+        } else emptyMap()
     }
     val cumulativeEcho = remember(journalRun, modelReports, echoBaseline) {
         val observed = journalRun
@@ -745,6 +765,7 @@ fun ControlRoom(
         LocalSpatialHiveMemory provides memoryLayer,
         LocalModelUsageReports provides modelReports,
         LocalCumulativeEcho provides cumulativeEcho,
+        LocalCumulativeTrophic provides cumulativeTrophic,
         LocalFlowchartLinks provides flowchartLinks,
         LocalPlaceLinks provides placeLinks,
         LocalCardFlip provides flipHost,

@@ -55,6 +55,8 @@ internal data class CreatureNeeds(
     val reviewRejections: Int = 0,
     /** Cumulative recorded Echo in hundredths of one point; null when no comparable history exists. */
     val echoHundredths: Int? = null,
+    /** Cumulative trophic reserve in hundredths (see Trophic.kt); null when no downstream evidence exists. */
+    val trophicHundredths: Int? = null,
 )
 
 internal enum class EchoState { Grounded, SelfAbsorbed, Fevered, Insane }
@@ -163,6 +165,9 @@ internal fun reportedReviewVerdict(
 
 /** Shared run-correlated journal projection for the inspector and tissue, never the GPU. */
 internal val LocalModelUsageReports = staticCompositionLocalOf<List<ProviderUsageRecorded>> { emptyList() }
+
+/** Shared trophic reserve per agent role (Trophic.kt), rebuilt the same way as Echo. */
+internal val LocalCumulativeTrophic = staticCompositionLocalOf<Map<RoleDefinitionId, Int>> { emptyMap() }
 
 /** Shared cumulative projection, keyed by actual agent role rather than task or visual breed. */
 internal val LocalCumulativeEcho = staticCompositionLocalOf<Map<RoleDefinitionId, Int>> { emptyMap() }
@@ -311,6 +316,7 @@ internal fun creatureNeeds(
     roles: Collection<RoleDefinition>,
     modelReports: List<ProviderUsageRecorded> = emptyList(),
     cumulative: Map<RoleDefinitionId, Int> = emptyMap(),
+    trophic: Map<RoleDefinitionId, Int> = emptyMap(),
 ): CreatureNeeds? {
     val tasks = definition.tasks.associateBy(TaskDefinition::id)
     val task = tasks[taskId] ?: return null
@@ -398,5 +404,6 @@ internal fun creatureNeeds(
         reviewRevisions = reviewOutcomes.count { it.second == ArtifactVerdict.Revise },
         reviewRejections = reviewOutcomes.count { it.second == ArtifactVerdict.Reject },
         echoHundredths = echoHundredths,
+        trophicHundredths = if (agent(taskId)) taskRun?.assignedRoleId?.let(trophic::get) else null,
     )
 }

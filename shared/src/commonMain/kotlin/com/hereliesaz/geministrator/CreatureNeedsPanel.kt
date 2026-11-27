@@ -28,6 +28,11 @@ import com.hereliesaz.geministrator.resources.needs_needs
 import com.hereliesaz.geministrator.resources.needs_not_reported
 import com.hereliesaz.geministrator.resources.needs_nothing_downstream
 import com.hereliesaz.geministrator.resources.needs_output_used
+import com.hereliesaz.geministrator.resources.needs_trophic
+import com.hereliesaz.geministrator.resources.needs_trophic_fed
+import com.hereliesaz.geministrator.resources.needs_trophic_hungry
+import com.hereliesaz.geministrator.resources.needs_trophic_starved
+import com.hereliesaz.geministrator.resources.needs_trophic_starving
 import com.hereliesaz.geministrator.resources.needs_near_config_review_paths
 import com.hereliesaz.geministrator.resources.needs_reviews_of
 import com.hereliesaz.geministrator.resources.needs_review_outcomes
@@ -72,6 +77,20 @@ internal fun CreatureNeedsPanel(
         NeedMeter(stringResource(Res.string.needs_output_used), needs.outputUsed, OutputTeal,
             stringResource(if (needs.hasDownstream) Res.string.needs_not_reported else Res.string.needs_nothing_downstream))
         if (needs.hasDownstream) {
+            val trophic = needs.trophicHundredths
+            val state = trophic?.let(::trophicStateOf)
+            NeedMeter(
+                label = stringResource(Res.string.needs_trophic),
+                value = trophic?.div(100),
+                shownValue = trophic?.let { "${it / 100}.${(it % 100).toString().padStart(2, '0')} · " + stringResource(when (state) {
+                    TrophicState.Fed -> Res.string.needs_trophic_fed
+                    TrophicState.Hungry -> Res.string.needs_trophic_hungry
+                    TrophicState.Starving -> Res.string.needs_trophic_starving
+                    else -> Res.string.needs_trophic_starved
+                }) },
+                color = OutputTeal,
+                missing = stringResource(Res.string.needs_not_reported),
+            )
             val outcomes = needs.reviewApprovals + needs.reviewRevisions + needs.reviewRejections
             NeedLine(stringResource(Res.string.needs_review_outcomes),
                 if (outcomes == 0) stringResource(Res.string.needs_not_reported)

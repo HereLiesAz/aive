@@ -350,6 +350,24 @@ fun App(
         }
     }
 
+    // Apoptosis (docs/Node-Creature-Genome.md, Survival): a hatched config whose trophic reserve is spent is retired
+    // (disabled, never deleted) once a run settles. Off by default; no control for it yet, so the key is the switch.
+    val pruneStarved = rememberDurableBooleanState("trophic.prune").value
+    LaunchedEffect(liveRun?.run?.id, liveRun?.run?.status, pruneStarved) {
+        val presentation = liveRun ?: return@LaunchedEffect
+        if (!pruneStarved || presentation.run.status !in setOf(
+                com.hereliesaz.geministrator.domain.WorkflowRunStatus.Completed,
+                com.hereliesaz.geministrator.domain.WorkflowRunStatus.Failed,
+                com.hereliesaz.geministrator.domain.WorkflowRunStatus.Cancelled)) return@LaunchedEffect
+        try {
+            runtime?.pruneStarvedRoles()
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: Exception) {
+            // Pruning is best effort; a failure leaves the roster as it was.
+        }
+    }
+
     // Self-updating procedural memory (docs/architecture/PROCEDURAL_MEMORY.md §10): the live run's
     // failures, fixes and executor receipts redraft proposed edits of its roles' instructions. This
     // only queues proposals on each creature's Mind tab; a role changes only when the keeper approves.
@@ -1442,6 +1460,7 @@ fun App(
                         },
                         onLoadRunTimeline = { runtime?.loadRunTimeline(shown = true) ?: emptyList() },
                         onLoadEchoHistory = { run -> runtime?.loadEchoHistory(run) ?: emptyMap() },
+                        onLoadTrophicHistory = { run -> runtime?.loadTrophicHistory(run) ?: emptyMap() },
                         onLoadLogIntegrity = { runtime?.loadRunLogIntegrity() ?: com.hereliesaz.geministrator.events.ChainStatus.NoChain },
                         onLoadWorkflowDefinitions = { runtime?.persistence?.definitions?.all() ?: emptyList() },
                         onExportDiagnosticBundle = { runtime?.exportDiagnosticBundle() },
