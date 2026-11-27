@@ -192,27 +192,48 @@ internal fun configurationKinship(
 /** Near-clone threshold from Node-Creature-Genome.md; applied only to comparable configurations. */
 internal const val NEAR_CLONE_KINSHIP = 95
 
-/** The parent's recorded balance at the solo hatch, not its balance when the child first works. */
-internal data class EchoBirthSeed(val source: WorkflowRunId, val parent: RoleDefinitionId, val hundredths: Int)
+/** Settlement evidence for the actual persisted lineage, not a newly simulated hatch. */
+internal data class EchoBirthSeed(
+    val source: WorkflowRunId,
+    val contributors: Set<RoleDefinitionId>,
+    val balances: Map<RoleDefinitionId, Int>,
+    val kinships: Map<Set<RoleDefinitionId>, Int>,
+) {
+    /** Solo copies the parent; near-clones sum both; other hybrids inherit a quarter of the contributors' mean. */
+    fun inherited(parents: List<RoleDefinitionId>): Int? {
+        val unique = parents.toSet()
+        if (parents.size != unique.size || !contributors.containsAll(unique)) return null
+        if (parents.size == 1) return balances[parents.single()].takeIf { contributors.size == 1 }
+        if (parents.size != 2) return null
+        val kinship = kinships[unique] ?: return null
+        if (kinship >= NEAR_CLONE_KINSHIP) {
+            val a = balances[parents[0]] ?: return null
+            val b = balances[parents[1]] ?: return null
+            return (a + b).coerceAtMost(10_000)
+        }
+        val values = contributors.map { balances[it] ?: return null }
+        return values.sum() / (values.size * 4)
+    }
+}
 
 /**
  * Pure projection over retained run snapshots and their existing journals. Replaying a run is
- * idempotent. Birth candidates have no effect until the exact solo lineage appears in a snapshot.
- * Multiple-parent inheritance and evidence from missing historical snapshots remain unreported.
+ * idempotent. Birth candidates have no effect until the actual lineage appears in a snapshot.
+ * Missing historical snapshots, kinship or parental balances remain unreported.
  */
 internal data class EchoHistory(
     val balances: Map<RoleDefinitionId, Int> = emptyMap(),
     private val births: Map<RoleDefinitionId, EchoBirthSeed> = emptyMap(),
     private val seen: Set<WorkflowRunId> = emptySet(),
 ) {
-    /** Apply an observed solo hatch once; later changes to the parent never rewrite the seed. */
+    /** Apply an observed hatch once; later changes to parents never rewrite the seed. */
     fun withBirths(roles: List<RoleDefinition>): EchoHistory {
         val next = balances.toMutableMap()
         for (role in roles) {
             val seed = births[role.id] ?: continue
             if (role.id !in next && role.executionSource == RoleExecutionSource.Agent &&
-                role.parents == listOf(seed.parent) && role.hatchedFromRunId == seed.source.value) {
-                next[role.id] = seed.hundredths
+                role.hatchedFromRunId == seed.source.value) {
+                seed.inherited(role.parents)?.let { next[role.id] = it }
             }
         }
         return copy(balances = next)
@@ -271,11 +292,13 @@ internal data class EchoHistory(
             val (role, delta) = change
             next[role] = ((next[role] ?: 0) + delta).coerceIn(0, 10_000)
         }
-        val child = hatchFromRun(run, run.roleSnapshot)
-        val parent = child?.parents?.singleOrNull()
-        val seed = parent?.let { next[it] }
-        val newBirths = if (child != null && parent != null && seed != null) {
-            seeded.births + (child.id to EchoBirthSeed(run.id, parent, seed))
+        val contributors = hatchContributors(run, run.roleSnapshot)
+        val newBirths = if (run.status == com.hereliesaz.geministrator.domain.WorkflowRunStatus.Completed &&
+            contributors.isNotEmpty()) {
+            val ids = contributors.map { it.id }.toSet()
+            val seed = EchoBirthSeed(run.id, ids, next.filterKeys { it in ids },
+                hatchKinships(run, contributors, reports))
+            seeded.births + (RoleDefinitionId("hatch-${run.id.value}") to seed)
         } else seeded.births
         return EchoHistory(next, newBirths, seeded.seen + run.id)
     }

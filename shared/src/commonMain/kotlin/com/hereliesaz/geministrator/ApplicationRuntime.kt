@@ -2410,7 +2410,9 @@ class ApplicationRuntime private constructor(
      * Use the completed run's own journal and historical starting balance at birth.
      * The caller retains the existing disabled-child adoption and save-once path.
      */
-    internal suspend fun hatchWithEcho(run: WorkflowRun, roles: Collection<RoleDefinition>): RoleDefinition? {
+    internal suspend fun hatchWithEcho(run: WorkflowRun, roles: Collection<RoleDefinition>,
+        genera: Map<RoleDefinitionId, String>,
+    ): RoleDefinition? {
         if (run.status != WorkflowRunStatus.Completed) return null
         val baseline = loadEchoHistory(run)
         val reports = persistence.events.forRun(run.id)
@@ -2419,7 +2421,7 @@ class ApplicationRuntime private constructor(
         val configuredModels = providerRegistry.providerIds.mapNotNull { id ->
             providerRegistry.provider(id)?.configuredModelId?.takeIf { it.isNotBlank() }?.let { id to it }
         }.toMap()
-        return hatchFromRun(run, roles, echo, reports, configuredModels)
+        return hatchFromRun(run, roles, echo, reports, configuredModels, genera)
     }
 
     suspend fun saveRole(role: RoleDefinition) {

@@ -336,7 +336,12 @@ fun App(
         if (presentation.run.status != com.hereliesaz.geministrator.domain.WorkflowRunStatus.Completed) return@LaunchedEffect
         val target = runtime ?: return@LaunchedEffect
         try {
-            val child = target.hatchWithEcho(presentation.run, presentation.roles) ?: return@LaunchedEffect
+            // Catalog genera are evidence of assigned breed lineage, never inferred from agent names or hue.
+            val genera = presentation.roles.mapNotNull { role ->
+                val key = stableHost.stable.creatureOf(role.id) ?: return@mapNotNull null
+                stableHost.catalog[key]?.genus?.let { role.id to it }
+            }.toMap()
+            val child = target.hatchWithEcho(presentation.run, presentation.roles, genera) ?: return@LaunchedEffect
             if (target.persistence.roles.all().none { it.id == child.id }) target.saveRole(child)
         } catch (failure: CancellationException) {
             throw failure
