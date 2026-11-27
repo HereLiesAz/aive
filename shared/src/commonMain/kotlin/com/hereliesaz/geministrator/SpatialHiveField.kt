@@ -17,6 +17,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
@@ -93,9 +94,20 @@ internal fun SpatialHiveField(
         val frame = remember(scene, journal) { scene.renderFrame(journal) }
         var camera by remember { mutableStateOf(SpatialCameraState()) }
         var memoryId by remember { mutableStateOf<String?>(null) }
+        var colonyFocusId by remember { mutableStateOf<String?>(null) }
+        var focusPosition by remember { mutableStateOf(SpatialPoint.Origin) }
+        val focusGoal by rememberUpdatedState(
+            if (camera.mode == SpatialCameraMode.Memory) {
+                frame.spores.firstOrNull { it.id == memoryId }?.position ?: camera.target.gaze
+            } else {
+                frame.spores.firstOrNull { it.id == memoryId }?.position
+                    ?: frame.bodies.firstOrNull { it.id == colonyFocusId }?.position ?: camera.target.gaze
+            },
+        )
         val reduced = AzphaltMotion.reduceMotion
         var motionPhase by remember { mutableStateOf(0f) }
         LaunchedEffect(selected) {
+            colonyFocusId = selected
             val point = frame.bodies.firstOrNull { it.id == selected }?.position
             if (point != null) camera = camera.focus(point, explicit = true)
             else camera = camera.clearFocus()
@@ -113,6 +125,7 @@ internal fun SpatialHiveField(
                     val next = camera.advance(elapsed, reduced)
                     if (next != camera) camera = next
                     motionPhase = advanceSpatialMotion(motionPhase, elapsed, reduced)
+                    focusPosition = advanceSpatialFocus(focusPosition, focusGoal, elapsed, reduced)
                 }
             }
         }
@@ -125,10 +138,11 @@ internal fun SpatialHiveField(
                     Text(stringResource(Res.string.spatial_memory_view))
                 }
             }
-            SpatialHiveSurface(frame, camera.renderCamera(if (reduced) 0f else motionPhase), onInput = { input ->
+            SpatialHiveSurface(frame, camera.renderCamera(if (reduced) 0f else motionPhase, if (reduced) focusGoal else focusPosition), onInput = { input ->
                 if (frame.accepts(input)) when (input.type) {
                     "agent" -> {
                         memoryId = null
+                        colonyFocusId = input.id
                         frame.bodies.firstOrNull { it.id == input.id }?.let { camera = camera.focus(it.position, explicit = true) }
                         onAgent(input.id)
                     }
@@ -136,7 +150,7 @@ internal fun SpatialHiveField(
                         memoryId = input.id
                         frame.spores.firstOrNull { it.id == input.id }?.let { camera = camera.focus(it.position, explicit = true) }
                     }
-                    "empty" -> { memoryId = null; camera = camera.clearFocus(); onEmpty() }
+                    "empty" -> { memoryId = null; colonyFocusId = null; camera = camera.clearFocus(); onEmpty() }
                     "orbit" -> camera = camera.orbit(input.x, input.y)
                     "pan" -> camera = camera.pan(SpatialPoint(input.x, input.y, input.z))
                     "zoom" -> camera = camera.zoom(input.x)

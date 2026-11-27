@@ -13,11 +13,11 @@ class SpatialHiveMeshTest {
     @Test fun trianglesHaveVolumeAndFiniteNormals() {
         val frame=SpatialRenderFrame(listOf(body("site",0f,1f)),emptyList(),emptyList())
         val data=frame.triangles()
-        assertTrue(data.isNotEmpty() && data.size%27==0)
+        assertTrue(data.isNotEmpty() && data.size%39==0)
         assertTrue(data.all(Float::isFinite))
-        val z=(2 until data.size step 9).map { data[it] }
+        val z=(2 until data.size step 13).map { data[it] }
         assertTrue(z.min() < -.99f && z.max() > .99f)
-        for (i in 0 until data.size step 9) {
+        for (i in 0 until data.size step 13) {
             val n=data[i+3]*data[i+3]+data[i+4]*data[i+4]+data[i+5]*data[i+5]
             assertTrue(abs(n-1f)<.001f)
         }
@@ -26,9 +26,9 @@ class SpatialHiveMeshTest {
     @Test fun tubeHasSharedRingAtCornerAndNoZeroSegment() {
         val a=SpatialPoint(0f,0f,0f); val b=SpatialPoint(0f,0f,2f); val c=SpatialPoint(2f,0f,2f)
         val data=SpatialRenderFrame(emptyList(),emptyList(),listOf(SpatialRenderCord(listOf(a,b,b,c),.1f,"Dependency"))).triangles()
-        assertEquals(2*7*2*3*9,data.size)
-        val first=(0 until data.size/2 step 9).map { SpatialPoint(data[it],data[it+1],data[it+2]) }.toSet()
-        val second=(data.size/2 until data.size step 9).map { SpatialPoint(data[it],data[it+1],data[it+2]) }.toSet()
+        assertEquals(2*7*2*3*13,data.size)
+        val first=(0 until data.size/2 step 13).map { SpatialPoint(data[it],data[it+1],data[it+2]) }.toSet()
+        val second=(data.size/2 until data.size step 13).map { SpatialPoint(data[it],data[it+1],data[it+2]) }.toSet()
         assertEquals(7,first.intersect(second).size)
     }
 

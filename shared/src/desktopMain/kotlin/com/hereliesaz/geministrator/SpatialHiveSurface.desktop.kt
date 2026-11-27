@@ -154,7 +154,7 @@ private class SpatialDesktopRenderer(private val failed: () -> Unit) : GLEventLi
     private var buffer = 0
     private var count = 0
     private var aspect = 1f
-    private var uniforms = IntArray(6)
+    private var uniforms = IntArray(9)
     private var viewportWidth = 1
     private var viewportHeight = 1
     private var optics: SpatialDesktopOptics? = null
@@ -192,13 +192,13 @@ private class SpatialDesktopRenderer(private val failed: () -> Unit) : GLEventLi
             gl.glBindVertexArray(vao)
             gl.glGenBuffers(1, ids, 0); buffer = ids[0]
             gl.glBindBuffer(GL.GL_ARRAY_BUFFER, buffer)
-            listOf("p", "n", "c").forEachIndexed { i, name ->
+            listOf("p", "n", "c", "optical").forEachIndexed { i, name ->
                 val loc = gl.glGetAttribLocation(program, name)
                 require(loc >= 0)
                 gl.glEnableVertexAttribArray(loc)
-                gl.glVertexAttribPointer(loc, 3, GL.GL_FLOAT, false, SPATIAL_VERTEX_FLOATS * 4, i * 12L)
+                gl.glVertexAttribPointer(loc, if(i==3) 4 else 3, GL.GL_FLOAT, false, SPATIAL_VERTEX_FLOATS * 4, i * 12L)
             }
-            uniforms = listOf("eye", "forward", "right", "up", "aspect", "motionPhase").map {
+            uniforms = listOf("eye","forward","right","up","aspect","motionPhase","focusDepth","aperture","encodeBlur").map {
                 gl.glGetUniformLocation(program, it)
             }.toIntArray()
             gl.glEnable(GL.GL_DEPTH_TEST)
@@ -242,8 +242,12 @@ private class SpatialDesktopRenderer(private val failed: () -> Unit) : GLEventLi
         }
         gl.glUniform1f(uniforms[4], aspect)
         gl.glUniform1f(uniforms[5], view.motionPhase)
+        val params=view.optics()
+        gl.glUniform1f(uniforms[6],params.focusDepth)
+        gl.glUniform1f(uniforms[7],params.aperture)
+        gl.glUniform1f(uniforms[8],if(pass!=null) 1f else 0f)
         gl.glDrawArrays(GL.GL_TRIANGLES, 0, count)
-        pass?.finish(gl,view.optics())
+        pass?.finish(gl)
     }
 
     override fun dispose(drawable: GLAutoDrawable) {
@@ -266,7 +270,7 @@ private class SpatialDesktopOptics(initialGl: GL3, private val program: Int) {
     private var ready=false
     private var previousFramebuffer=IntArray(1)
     private var previousViewport=IntArray(4)
-    private val uniforms=listOf("sceneColor","sceneDepth","focusDepth","aperture").map { initialGl.glGetUniformLocation(program,it) }.toIntArray()
+    private val uniforms=listOf("sceneColor","sceneDepth").map { initialGl.glGetUniformLocation(program,it) }.toIntArray()
 
     /** Preserve the drawable's framebuffer, especially GLJPanel's nonzero backing target. */
     fun begin(gl: GL3, w: Int,h: Int): Boolean {
@@ -303,7 +307,7 @@ private class SpatialDesktopOptics(initialGl: GL3, private val program: Int) {
         return ready
     }
 
-    fun finish(gl: GL3, params: SpatialOptics) {
+    fun finish(gl: GL3) {
         gl.glBindFramebuffer(0x8CA9,previousFramebuffer[0])
         gl.glViewport(previousViewport[0],previousViewport[1],previousViewport[2],previousViewport[3])
         gl.glDisable(GL.GL_DEPTH_TEST)
@@ -312,8 +316,6 @@ private class SpatialDesktopOptics(initialGl: GL3, private val program: Int) {
         gl.glUniform1i(uniforms[0],0)
         gl.glActiveTexture(GL.GL_TEXTURE1);gl.glBindTexture(GL.GL_TEXTURE_2D,textures[1])
         gl.glUniform1i(uniforms[1],1)
-        gl.glUniform1f(uniforms[2],params.focusDepth)
-        gl.glUniform1f(uniforms[3],params.aperture)
         gl.glDrawArrays(GL.GL_TRIANGLES,0,3)
         gl.glBindTexture(GL.GL_TEXTURE_2D,0);gl.glActiveTexture(GL.GL_TEXTURE0)
         gl.glBindTexture(GL.GL_TEXTURE_2D,0)

@@ -140,7 +140,7 @@ private class SpatialGlRenderer(private val failed: () -> Unit) : GLSurfaceView.
     private var vao = 0
     private var count = 0
     private var aspect = 1f
-    private var uniforms = IntArray(6)
+    private var uniforms = IntArray(9)
     private var viewportWidth = 1
     private var viewportHeight = 1
     private var optics: SpatialAndroidOptics? = null
@@ -170,13 +170,13 @@ private class SpatialGlRenderer(private val failed: () -> Unit) : GLSurfaceView.
             val ids = IntArray(1)
             GLES30.glGenVertexArrays(1,ids,0); vao=ids[0]; GLES30.glBindVertexArray(vao)
             GLES30.glGenBuffers(1,ids,0); buffer=ids[0]; GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER,buffer)
-            listOf("p","n","c").forEachIndexed { i,name ->
+            listOf("p","n","c","optical").forEachIndexed { i,name ->
                 val loc=GLES30.glGetAttribLocation(p,name)
                 require(loc >= 0)
                 GLES30.glEnableVertexAttribArray(loc)
-                GLES30.glVertexAttribPointer(loc,3,GLES30.GL_FLOAT,false,SPATIAL_VERTEX_FLOATS*4,i*12)
+                GLES30.glVertexAttribPointer(loc,if(i==3) 4 else 3,GLES30.GL_FLOAT,false,SPATIAL_VERTEX_FLOATS*4,i*12)
             }
-            uniforms=listOf("eye","forward","right","up","aspect","motionPhase").map { GLES30.glGetUniformLocation(p,it) }.toIntArray()
+            uniforms=listOf("eye","forward","right","up","aspect","motionPhase","focusDepth","aperture","encodeBlur").map { GLES30.glGetUniformLocation(p,it) }.toIntArray()
             GLES30.glEnable(GLES30.GL_DEPTH_TEST)
             program=p
             optics=runCatching { SpatialAndroidOptics(link(SPATIAL_OPTICS_VERTEX_SHADER,SPATIAL_OPTICS_FRAGMENT_SHADER)) }.getOrNull()
@@ -214,8 +214,12 @@ private class SpatialGlRenderer(private val failed: () -> Unit) : GLSurfaceView.
         }
         GLES30.glUniform1f(uniforms[4],aspect)
         GLES30.glUniform1f(uniforms[5],view.motionPhase)
+        val params=view.optics()
+        GLES30.glUniform1f(uniforms[6],params.focusDepth)
+        GLES30.glUniform1f(uniforms[7],params.aperture)
+        GLES30.glUniform1f(uniforms[8],if(pass!=null) 1f else 0f)
         GLES30.glDrawArrays(GLES30.GL_TRIANGLES,0,count)
-        pass?.finish(view.optics())
+        pass?.finish()
     }
 }
 
@@ -229,7 +233,7 @@ private class SpatialAndroidOptics(private val program: Int) {
     private var ready=false
     private var previousFramebuffer=IntArray(1)
     private var previousViewport=IntArray(4)
-    private val uniforms=listOf("sceneColor","sceneDepth","focusDepth","aperture").map { GLES30.glGetUniformLocation(program,it) }.toIntArray()
+    private val uniforms=listOf("sceneColor","sceneDepth").map { GLES30.glGetUniformLocation(program,it) }.toIntArray()
 
     /** Preserve the drawable's framebuffer, especially GLJPanel's nonzero backing target. */
     fun begin(w: Int,h: Int): Boolean {
@@ -266,7 +270,7 @@ private class SpatialAndroidOptics(private val program: Int) {
         return ready
     }
 
-    fun finish(params: SpatialOptics) {
+    fun finish() {
         GLES30.glBindFramebuffer(GLES30.GL_DRAW_FRAMEBUFFER,previousFramebuffer[0])
         GLES30.glViewport(previousViewport[0],previousViewport[1],previousViewport[2],previousViewport[3])
         GLES30.glDisable(GLES30.GL_DEPTH_TEST)
@@ -275,8 +279,6 @@ private class SpatialAndroidOptics(private val program: Int) {
         GLES30.glUniform1i(uniforms[0],0)
         GLES30.glActiveTexture(GLES30.GL_TEXTURE1);GLES30.glBindTexture(GLES30.GL_TEXTURE_2D,textures[1])
         GLES30.glUniform1i(uniforms[1],1)
-        GLES30.glUniform1f(uniforms[2],params.focusDepth)
-        GLES30.glUniform1f(uniforms[3],params.aperture)
         GLES30.glDrawArrays(GLES30.GL_TRIANGLES,0,3)
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D,0);GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D,0)
