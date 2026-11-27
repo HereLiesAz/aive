@@ -109,15 +109,15 @@ class ReviewerPollenTest {
     }
 
     @Test
-    fun exactlyOneChildInSixFollowsTheReviewer() {
+    fun exactlyOneChildInFiveFollowsTheReviewer() {
         val byId = roles.associateBy { it.id }
         val leads = (1..60).map {
             val p = Pollination(workflow, qa.id, it, listOf(qa.id, engineer.id, writer.id), WorkflowRunId("r$it"))
             assertEquals(followsReviewer(p), isReviewerRoleName(assertNotNull(pollinatedChild(p, byId)).name))
             followsReviewer(p)
         }
-        assertEquals(10, leads.count { it }) // reviewers to producers born: 1:5
-        assertTrue(leads.chunked(6).all { block -> block.count { it } == 1 })
+        assertEquals(12, leads.count { it }) // one out of every five
+        assertTrue(leads.chunked(5).all { block -> block.count { it } == 1 })
     }
 
     @Test

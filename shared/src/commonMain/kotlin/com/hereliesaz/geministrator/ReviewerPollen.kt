@@ -107,13 +107,13 @@ internal data class PollenHistory(
     }
 }
 
-/** Children per reviewer lineage in each block: one follows the reviewer, the other five a producer. */
-internal const val POLLEN_BLOCK = 6
+/** Children per reviewer lineage in each block: one follows the reviewer, the other four a producer. */
+internal const val POLLEN_BLOCK = 5
 
 /**
- * Exactly one child in every block of [POLLEN_BLOCK] (reviews 1 to 6, 7 to 12, ...) of a reviewer in a workflow follows
- * the reviewer's own line, which makes reviewers to producers born 1:5. A stable hash of the workflow, the reviewer and
- * the block picks which of the six it is, so the position varies but the ratio never does.
+ * Exactly one child in every block of [POLLEN_BLOCK] (reviews 1 to 5, 6 to 10, ...) of a reviewer in a workflow follows
+ * the reviewer's own line: one out of every five. A stable hash of the workflow, the reviewer and the block picks which
+ * of the five it is, so the position varies but the ratio never does.
  */
 internal fun followsReviewer(p: Pollination): Boolean {
     val block = (p.index - 1) / POLLEN_BLOCK
@@ -124,8 +124,8 @@ internal fun followsReviewer(p: Pollination): Boolean {
 /**
  * The child of one pollination, born unadopted (disabled) like every hatch, or null when its parents cannot be
  * joined: a parent missing from [roles], not an agent, disjoint tool ceilings, or one surface alias bound two ways.
- * [followsReviewer] decides whose line it follows: one in six follows the reviewer, so the reviewer lineage can itself
- * improve, and the other five follow one of the producers. The child takes its lead's name, authorities and
+ * [followsReviewer] decides whose line it follows: one in five follows the reviewer, so the reviewer lineage can itself
+ * improve, and the other four follow one of the producers. The child takes its lead's name, authorities and
  * keeper instructions; the other parents add instructions, capabilities and surfaces. It never gains an authority.
  */
 internal fun pollinatedChild(pollination: Pollination, roles: Map<RoleDefinitionId, RoleDefinition>): RoleDefinition? {
