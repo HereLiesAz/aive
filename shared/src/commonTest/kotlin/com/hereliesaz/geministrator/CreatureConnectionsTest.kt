@@ -77,17 +77,17 @@ class CreatureConnectionsTest {
     }
 
     @Test
-    fun takeUpReadsTheFedCreaturesRunOnly() {
+    fun aRunningDependentWithoutDeliveryEvidenceIsUnknown() {
         val connections = creatureConnections(
             TaskDefinitionId("build"),
             definition,
             run("build" to TaskRunStatus.Completed, "review" to TaskRunStatus.Running, "docs" to TaskRunStatus.Blocked),
             roles,
         )
-        assertEquals(listOf(true, false), connections.feeds.map { it.tookOutput })
-        // No run yet: not taken.
+        assertEquals(listOf<Boolean?>(null, null), connections.feeds.map { it.tookOutput })
+        // No run yet: unknown.
         val none = creatureConnections(TaskDefinitionId("build"), definition, run(), roles)
-        assertEquals(listOf(false, false), none.feeds.map { it.tookOutput })
+        assertEquals(listOf<Boolean?>(null, null), none.feeds.map { it.tookOutput })
     }
 
     @Test

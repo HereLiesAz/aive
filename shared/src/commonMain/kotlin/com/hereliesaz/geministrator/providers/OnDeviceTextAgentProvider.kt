@@ -176,6 +176,8 @@ class OnDeviceTextAgentProvider(
                     outputTokens = result.outputTokens,
                     costUsd = 0.0,
                     latencyMillis = latency,
+                    deliveredArtifactIds = session.request.contextArtifacts.filter { !it.textContent.isNullOrBlank() }
+                        .mapTo(linkedSetOf()) { it.id.value },
                 ),
             )
             emit(AgentEvent.Completed(runId))

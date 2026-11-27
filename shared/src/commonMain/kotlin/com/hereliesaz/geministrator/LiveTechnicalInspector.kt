@@ -92,6 +92,7 @@ import com.hereliesaz.geministrator.workflow.SessionActivityKind
 import com.hereliesaz.geministrator.workflow.attemptsOf
 import com.hereliesaz.geministrator.log.formatLogTime
 import com.hereliesaz.geministrator.resources.Res
+import com.hereliesaz.geministrator.resources.needs_not_reported
 import com.hereliesaz.geministrator.resources.inspector_payload_role_instructions
 import com.hereliesaz.geministrator.resources.inspector_payload_redacted
 import com.hereliesaz.geministrator.resources.inspector_payload_objective
@@ -670,7 +671,7 @@ internal fun TechnicalInspector(
                     }
                 })
                 // Its Connections (docs/Swarm-OS.md): who feeds it, and whom it feeds and whether they took it.
-                val connections = creatureConnections(taskId, liveWorkflow.definition, liveWorkflow.run, liveWorkflow.roles)
+                val connections = creatureConnections(taskId, liveWorkflow.definition, liveWorkflow.run, liveWorkflow.roles, LocalModelUsageReports.current)
                 // Each neighbour is a link: one tap opens that creature.
                 if (connections.fedBy.isNotEmpty()) {
                     Text(stringResource(Res.string.inspector_fed_by), style = AzphaltType.eyebrow, color = azphaltOnSurface())
@@ -681,10 +682,11 @@ internal fun TechnicalInspector(
                 if (connections.feeds.isNotEmpty()) {
                     val took = stringResource(Res.string.inspector_took_its_output)
                     val notYet = stringResource(Res.string.inspector_not_taken_yet)
+                    val unreported = stringResource(Res.string.needs_not_reported)
                     Text(stringResource(Res.string.inspector_feeds), style = AzphaltType.eyebrow, color = azphaltOnSurface())
                     connections.feeds.forEach { link ->
                         AzphaltPill(
-                            label = "${link.name} · ${if (link.tookOutput) took else notYet}",
+                            label = "${link.name} · ${when (link.tookOutput) { true -> took; false -> notYet; null -> unreported }}",
                             seed = "feeds-${link.taskId.value}",
                             onClick = { onSelectTask(link.taskId.value) },
                         )

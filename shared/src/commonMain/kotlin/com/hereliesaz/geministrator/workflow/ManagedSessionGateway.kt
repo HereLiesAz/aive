@@ -203,6 +203,8 @@ data class ManagedSessionUsage(
     val requestChars: Int? = null,
     /** True only when every report in this batch names the same nonblank model. */
     val modelConsistent: Boolean = !model.isNullOrBlank(),
+    /** Union of positively observed deliveries, null if unreported. */
+    val deliveredArtifactIds: Set<String>? = null,
 )
 
 /**
@@ -243,6 +245,8 @@ internal fun ManagedSessionUsage?.plusReport(next: ManagedSessionUsage): Managed
             !base.model.isNullOrBlank() && base.model == next.model,
         requestSha256 = if (next.requestSha256 != null) next.requestSha256 else base.requestSha256,
         requestChars = if (next.requestSha256 != null) next.requestChars else base.requestChars,
+        deliveredArtifactIds = if (base.deliveredArtifactIds == null && next.deliveredArtifactIds == null) null
+            else base.deliveredArtifactIds.orEmpty() + next.deliveredArtifactIds.orEmpty(),
     )
 }
 

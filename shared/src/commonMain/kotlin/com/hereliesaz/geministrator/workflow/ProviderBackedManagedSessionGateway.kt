@@ -1560,6 +1560,7 @@ class ProviderBackedManagedSessionGateway(
         model = model?.takeIf { it.isNotBlank() },
         requestSha256 = requestSha256,
         requestChars = requestChars,
+        deliveredArtifactIds = deliveredArtifactIds,
     ).sanitized()
 
     private fun AgentEvent.memoryReplayKey(): String = when (this) {

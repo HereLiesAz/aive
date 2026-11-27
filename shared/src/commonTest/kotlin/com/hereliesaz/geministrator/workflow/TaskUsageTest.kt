@@ -22,6 +22,16 @@ class TaskUsageTest {
     }
 
     @Test
+    fun deliveryEvidenceIsAUnionAndMissingReportsDoNotEraseIt() {
+        val a = ManagedSessionUsage(deliveredArtifactIds = setOf("a"))
+        val b = ManagedSessionUsage(deliveredArtifactIds = setOf("b"))
+        assertEquals(setOf("a", "b"), a.plusReport(b).plusReport(a).deliveredArtifactIds)
+        assertEquals(setOf("a"), a.plusReport(ManagedSessionUsage()).deliveredArtifactIds)
+        assertEquals(null, ManagedSessionUsage().plusReport(ManagedSessionUsage()).deliveredArtifactIds)
+        assertEquals(emptySet<String>(), ManagedSessionUsage().plusReport(ManagedSessionUsage(deliveredArtifactIds = emptySet())).deliveredArtifactIds)
+    }
+
+    @Test
     fun modelAgreementCannotBeRestoredByLaterReportsInAMixedBatch() {
         val a=ManagedSessionUsage(inputTokens=10,model="a")
         val b=ManagedSessionUsage(inputTokens=20,model="b")

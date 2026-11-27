@@ -353,8 +353,8 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="inspector_inputs">INPUTS</string>
     <string name="inspector_fed_by">FED BY</string>
     <string name="inspector_feeds">FEEDS</string>
-    <string name="inspector_took_its_output">took its output</string>
-    <string name="inspector_not_taken_yet">has not taken it yet</string>
+    <string name="inspector_took_its_output">output delivered</string>
+    <string name="inspector_not_taken_yet">no matching delivery reported</string>
     <string name="inspector_input_objective">Objective</string>
     <string name="inspector_external_inputs">EXTERNAL INPUTS</string>
     <string name="inspector_hint_external_inputs">This task can change things, and some of what it reads came from outside your control: %1$s. Approve only if you trust that content to steer it.</string>
@@ -994,7 +994,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="swarm_token_budget">Token budget per swarm</string>
     <string name="swarm_token_budget_hint">Leave empty for no budget.</string>
     <string name="needs_echo">ECHO · %1$s</string>
-    <string name="needs_echo_exposure">ECHO EXPOSURE (REPORTED-MODEL PROXY)</string>
+    <string name="needs_echo_exposure">ECHO EXPOSURE (REPORTED DELIVERY)</string>
     <string name="needs_near_config">NEAR-CLONE CONFIGURATION</string>
     <string name="needs_near_config_review_paths">NEAR-CLONE REVIEW PATHS</string>
     <string name="needs_echo_grounded">GROUNDED</string>
@@ -1003,13 +1003,13 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="needs_echo_insane">INSANE</string>
     <string name="needs_integrity">INTEGRITY (reliable this swarm)</string>
     <string name="needs_budget">BUDGET (its specialty's token budget)</string>
-    <string name="needs_output_used">OUTPUT USED</string>
+    <string name="needs_output_used">OUTPUT DELIVERED (REPORTING SESSIONS)</string>
     <string name="needs_not_reported">not reported</string>
     <string name="needs_tokens_spent">%1$s tokens · no budget set</string>
     <string name="needs_nothing_downstream">nothing downstream</string>
     <string name="needs_near_clone">NEAR-CLONE</string>
     <string name="needs_reviewed_by_itself">REVIEWED BY ITS OWN CONFIG</string>
-    <string name="needs_reviews_of">%1$d of %2$d reviews</string>
+    <string name="needs_reviews_of">%1$d of %2$d review paths</string>
     <string name="inspector_state">STATE</string>
     <string name="inspector_stop_workflow">Stop swarm</string>
     <string name="inspector_stored_evidence">stored evidence</string>
