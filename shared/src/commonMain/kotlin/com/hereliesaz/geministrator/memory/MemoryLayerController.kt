@@ -1783,45 +1783,41 @@ class MemoryLayerController(
         }
         // Hits a chronological query found read in time order, apart from the rest.
         val (timeline, relevant) = hits.partition { it.node.id.value in chronological }
+        // The stored memory nodes whose text each block actually carries, in block order. Only the two hit blocks
+        // name nodes; the cue cloud, habits and on-request recalls carry text no node address identifies.
+        val blockAddresses = mutableListOf<Set<String>>()
         val blocks = buildList {
-            if (firstPrompt) add(PromptContextBlock(MEMORY_PROTOCOL_PROMPT_LABEL, MEMORY_PROTOCOL))
+            fun put(block: PromptContextBlock, nodes: Set<String> = emptySet()) {
+                add(block)
+                blockAddresses += nodes
+            }
+            fun hitBlock(label: String, hits: List<MemoryRecallHit>) {
+                val lines = hits.map { it.recallLine() }
+                put(
+                    PromptContextBlock(label, untrustedRecall(lines.joinWholeUnits(MAX_RECALL_CHARS))),
+                    lines.wholeUnitIndices(MAX_RECALL_CHARS).mapTo(linkedSetOf()) { "memory-node:${hits[it].node.id.value}" },
+                )
+            }
+            if (firstPrompt) put(PromptContextBlock(MEMORY_PROTOCOL_PROMPT_LABEL, MEMORY_PROTOCOL))
             // The user's prompt draws its own cue cloud, like any thought.
             runCatchingCancellable { cueCloud(agentId, request.objective, request, alongside = true,
-                expected = session, boundGate = agentAttention) }.getOrNull()?.let { add(PromptContextBlock("Memory", it)) }
+                expected = session, boundGate = agentAttention) }.getOrNull()?.let { put(PromptContextBlock("Memory", it)) }
             if (pending.isNotEmpty()) {
-                add(PromptContextBlock("Recalled on request", untrustedRecall(pending.joinToString("\n\n") { it.removePrefix(MEMORY_MESSAGE_MARKER).trim() }.take(MAX_RECALL_CHARS))))
+                put(PromptContextBlock("Recalled on request", untrustedRecall(pending.joinToString("\n\n") { it.removePrefix(MEMORY_MESSAGE_MARKER).trim() }.take(MAX_RECALL_CHARS))))
             }
             // Habits already formed from earlier runs that this task names: counts and facts, offer only.
             runCatchingCancellable { habitOfferText(memoryWorkflowOf(request), request.objective) }.getOrNull()
-                ?.let { add(PromptContextBlock("Habits", it)) }
-            if (relevant.isNotEmpty()) {
-                add(
-                    PromptContextBlock(
-                        "Relevant memory",
-                        untrustedRecall(
-                            relevant.map { it.recallLine() }
-                                .joinWholeUnits(MAX_RECALL_CHARS),
-                        ),
-                    ),
-                )
-            }
+                ?.let { put(PromptContextBlock("Habits", it)) }
+            if (relevant.isNotEmpty()) hitBlock("Relevant memory", relevant)
             if (timeline.isNotEmpty()) {
-                add(
-                    PromptContextBlock(
-                        "Memory timeline",
-                        untrustedRecall(
-                            timeline.sortedWith(compareBy<MemoryRecallHit> { it.node.createdAtEpochMillis }.thenBy { it.node.id.value })
-                                .map { it.recallLine() }
-                                .joinWholeUnits(MAX_RECALL_CHARS),
-                        ),
-                    ),
-                )
+                hitBlock("Memory timeline", timeline.sortedWith(compareBy<MemoryRecallHit> { it.node.createdAtEpochMillis }.thenBy { it.node.id.value }))
             }
         }
         if (!active || cueMutex.withLock { cueSessions[agentId] !== session }) return MemoryPromptRecall()
         runCatchingCancellable { saveManagedAttention(agentId, session) }
         return MemoryPromptRecall(
             blocks = blocks,
+            blockAddresses = blockAddresses,
             memoryAddresses = hits.mapTo(linkedSetOf()) { "memory-node:${it.node.id.value}" },
             maxContextTokens = if (hits.isEmpty() && pending.isEmpty()) null else MAX_RECALL_CHARS / APPROXIMATE_CHARS_PER_TOKEN,
         )
@@ -2216,6 +2212,20 @@ internal fun MemorySnapshot.without(episodeId: MemoryEpisodeId): MemorySnapshot 
         edges = survivingEdges.filter { it.from in nodeIds && it.to in nodeIds },
         queue = queue.filter { it.episodeId != episodeId },
     )
+}
+
+/** The positions [joinWholeUnits] keeps for the same arguments, so a caller can say which units reached the text. */
+internal fun List<String>.wholeUnitIndices(maxChars: Int, separator: String = "\n\n"): List<Int> {
+    val kept = mutableListOf<Int>()
+    val text = StringBuilder()
+    forEachIndexed { index, unit ->
+        val extra = if (text.isEmpty()) unit.length else separator.length + unit.length
+        if (text.isNotEmpty() && text.length + extra > maxChars) return@forEachIndexed
+        if (text.isNotEmpty()) text.append(separator)
+        text.append(unit)
+        kept += index
+    }
+    return kept
 }
 
 /**

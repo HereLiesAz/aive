@@ -57,6 +57,8 @@ internal data class CreatureNeeds(
     val echoHundredths: Int? = null,
     /** Cumulative trophic reserve in hundredths (see Trophic.kt); null when no downstream evidence exists. */
     val trophicHundredths: Int? = null,
+    /** Distinct stored memory nodes carried in this task's successful requests (MemoryProvenance.kt); null when unreported. */
+    val memoryNodesCarried: Int? = null,
 )
 
 internal enum class EchoState { Grounded, SelfAbsorbed, Fevered, Insane }
@@ -405,5 +407,6 @@ internal fun creatureNeeds(
         reviewRejections = reviewOutcomes.count { it.second == ArtifactVerdict.Reject },
         echoHundredths = echoHundredths,
         trophicHundredths = if (agent(taskId)) taskRun?.assignedRoleId?.let(trophic::get) else null,
+        memoryNodesCarried = reportedMemoryReads(run, modelReports)[taskId]?.size,
     )
 }

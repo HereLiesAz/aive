@@ -96,6 +96,11 @@ data class AgentTaskRequest(
     /** The runs whose artifacts an UpstreamArtifacts resource narrows retrieval to; null means no narrowing. */
     val resourceTaskRuns: Set<TaskRunId>? = null,
     val orchestrationContext: AgentOrchestrationContext = AgentOrchestrationContext(),
+    /**
+     * The stored memory nodes whose text is in [promptContext] after the context packer's selection. Set by the
+     * gateway, never by a role; it is what the request carries, not proof the model read or used it.
+     */
+    val recalledMemoryAddresses: Set<String> = emptySet(),
     val compoundInference: CompoundInferenceContext = CompoundInferenceContext.single(
         taskRunId = taskRunId,
         workflowRunId = orchestrationContext.workflowRunId,

@@ -11,10 +11,18 @@ import com.hereliesaz.geministrator.providers.PromptContextBlock
 data class MemoryPromptRecall(
     val blocks: List<PromptContextBlock> = emptyList(),
     val memoryAddresses: Set<String> = emptySet(),
+    /**
+     * Per block, at the same index as [blocks], the stored memory nodes whose text that block carries after its own
+     * trimming; empty for a block that carries no node's text. An empty list means the recall does not say, which is
+     * unknown, not "read nothing".
+     */
+    val blockAddresses: List<Set<String>> = emptyList(),
     /** Optional provider-context budget used by the local Context Packer. */
     val maxContextTokens: Int? = null,
 ) {
     init {
+        require(blockAddresses.isEmpty() || blockAddresses.size == blocks.size) { "Block addresses must align with blocks" }
+        require(blockAddresses.all { set -> set.none(String::isBlank) }) { "Memory recall addresses must not be blank" }
         require(memoryAddresses.none(String::isBlank)) { "Memory recall addresses must not be blank" }
     }
 }
