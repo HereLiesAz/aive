@@ -2408,6 +2408,23 @@ class ApplicationRuntime private constructor(
                 it.definitionSnapshot != null && it.roleSnapshot.isNotEmpty() }
             .sortedWith(compareBy({ it.updatedAtEpochMillis }, { it.id.value }))
 
+    /**
+     * What each role is made of and the numbers the settled runs have given it (RoleReport.kt), for the queen's planning
+     * and the nanny's and antagonist's tasks. Only settled runs count, the same as for the inspector.
+     */
+    internal suspend fun roleReportsFor(roles: Collection<RoleDefinition>): Map<RoleDefinitionId, String> {
+        var echo = EchoHistory()
+        var trophic = TrophicHistory()
+        var operational = OperationalHistory()
+        for (run in settledRunsBefore(null)) {
+            val reports = usageReports(run)
+            echo = echo.advance(run, reports, memoryAuthorsOfRun(run))
+            trophic = trophic.advance(run, reports)
+            operational = operational.advance(run, reports)
+        }
+        return roleReports(roles, echo.withBirths(roles.toList()).balances, trophic.balances, operationalTraits(operational.profiles))
+    }
+
     /** Who wrote each stored memory a run could read, from the live memory layer; empty if none is attached. */
     internal suspend fun memoryAuthorsOfRun(run: WorkflowRun): Map<String, Set<RoleDefinitionId>> =
         runCatchingCancellable { com.hereliesaz.geministrator.memory.MemoryRuntimeBridge.memoryAuthors(run.id.value) }
@@ -2750,6 +2767,7 @@ class ApplicationRuntime private constructor(
                 persistence.inferenceSettings, ::nowEpochMillis,
             )
 
+            var builtRuntime: ApplicationRuntime? = null
             fun build(roles: List<RoleDefinition>): ApplicationRuntime {
                 val engine = WorkflowEngine(
                     sessionGateway = gateway,
@@ -2761,6 +2779,15 @@ class ApplicationRuntime private constructor(
                     outputValidators = com.hereliesaz.geministrator.tour.LessonArtifactBridge.registry(),
                     dependencyEvidence = { run, reports ->
                         collectiveEvidence.dependencyProcessObservations(run, reports, persistence.artifacts)
+                    },
+                    creatureReports = { run ->
+                        // The whole hive, not only the run's creatures: a weak spot can sit in one that is starving, one that
+                        // has never worked, or an unadopted child. The run's own snapshot wins for a role it holds.
+                        val roster = (persistence.roles.all().associateBy { it.id } + run.roleSnapshot.associateBy { it.id })
+                            .values.filter { it.executionSource == com.hereliesaz.geministrator.domain.RoleExecutionSource.Agent }
+                            .sortedBy { it.name }
+                        val reports = builtRuntime?.roleReportsFor(roster).orEmpty()
+                        roster.mapNotNull { reports[it.id] }
                     },
                 )
                 // Nested workflow nodes run child runs through this same engine and persistence.
@@ -2830,7 +2857,7 @@ class ApplicationRuntime private constructor(
                     queenLedger,
                     spendCaps,
                     collectiveEvidence,
-                )
+                ).also { builtRuntime = it }
             }
 
             val runtime = try {

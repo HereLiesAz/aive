@@ -222,4 +222,12 @@ class TrophicTest {
         val passedOver = reportedArtifactDeliveries(withText, reports(withText, mapOf("build" to "unrelated", "review" to "build")))
         assertEquals(TrophicOutcome.Ignored, trophicOutcome(withText, plan, buildTask, passedOver, withText.roleSnapshot.associateBy { it.id }))
     }
+
+    @Test
+    fun theAntagonistNeverStarvesOrIsRetired() {
+        val antagonist = BuiltInRoles.Antagonist.copy(hatchedFromRunId = "run-1", enabled = true)
+        val hatched = engineer.copy(id = RoleDefinitionId("child"), hatchedFromRunId = "run-1", enabled = true)
+        // Even spent and "hatched", the Antagonist is not on the list; the ordinary child is.
+        assertEquals(listOf(hatched.id), starvedRoles(listOf(antagonist, hatched), mapOf(antagonist.id to 0, hatched.id to 0)).map { it.id })
+    }
 }

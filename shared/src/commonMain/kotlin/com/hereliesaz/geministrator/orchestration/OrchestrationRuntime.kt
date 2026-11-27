@@ -7,6 +7,8 @@ data class OrchestrationRole(
     val id: String,
     val name: String,
     val authorities: List<String>,
+    /** What the role is made of and the numbers it has earned (see RoleReport.kt); null when none is available. */
+    val details: String? = null,
 )
 
 @Serializable

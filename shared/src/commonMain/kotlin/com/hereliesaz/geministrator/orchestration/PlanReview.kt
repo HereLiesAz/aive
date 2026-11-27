@@ -240,7 +240,10 @@ fun planReviewPrompt(request: PlanReviewRequest): String = buildString {
         append(request.memoryTags.joinToString(" "))
     }
     append("\n\nRoles available:")
-    request.packet.availableAgents.forEach { append("\n- ${it.id}: ${it.name}") }
+    request.packet.availableAgents.forEach {
+        append("\n- ${it.id}: ${it.name}")
+        it.details?.substringAfter(" | ", "")?.takeIf(String::isNotEmpty)?.let { stats -> append(" | ").append(stats) }
+    }
     append("\n\nPlan (${request.plan.steps.size} step${if (request.plan.steps.size == 1) "" else "s"}):")
     request.plan.steps.forEach { step ->
         append("\n- ${step.id} | ${step.name} | role ${step.roleId}")

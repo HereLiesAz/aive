@@ -120,7 +120,7 @@ internal fun trophicEvidence(run: WorkflowRun, reports: List<ProviderUsageRecord
         if (source.status != TaskRunStatus.Completed) continue
         if (!(source.executor ?: producer.effectiveExecutor()).isAgent) continue
         val role = source.assignedRoleId?.let(roles::get) ?: continue
-        if (role.executionSource != RoleExecutionSource.Agent) continue
+        if (role.executionSource != RoleExecutionSource.Agent || isAntagonist(role)) continue // the Antagonist never starves
         val dependents = definition.tasks.filter { producer.id in it.dependsOn }
         for (consumer in dependents) {
             val outcome = trophicOutcome(run, producer.id, consumer, deliveries, roles)
@@ -210,6 +210,6 @@ internal data class TrophicHistory(
  */
 internal fun starvedRoles(roles: Collection<RoleDefinition>, balances: Map<RoleDefinitionId, Int>): List<RoleDefinition> =
     roles.filter {
-        it.enabled && it.executionSource == RoleExecutionSource.Agent &&
+        it.enabled && it.executionSource == RoleExecutionSource.Agent && !isAntagonist(it) &&
             it.hatchedFromRunId != null && balances[it.id] == 0
     }.sortedBy { it.id.value }

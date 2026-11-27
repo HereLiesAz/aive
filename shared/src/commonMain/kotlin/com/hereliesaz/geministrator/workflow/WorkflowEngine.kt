@@ -6,6 +6,9 @@ import com.hereliesaz.geministrator.domain.ApprovalPolicy
 import com.hereliesaz.geministrator.domain.ArtifactId
 import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.ArtifactKind
+import com.hereliesaz.geministrator.domain.BuiltInRoles
+import com.hereliesaz.geministrator.domain.ContextProvenance
+import com.hereliesaz.geministrator.domain.HallMonitorRole
 import com.hereliesaz.geministrator.domain.BlockingReason
 import com.hereliesaz.geministrator.domain.Project
 import com.hereliesaz.geministrator.domain.ProviderConstraints
@@ -82,6 +85,8 @@ class WorkflowEngine(
     private val habitReplay: com.hereliesaz.geministrator.memory.procedural.HabitReplayPlanner? = null,
     /** Host-owned receipt lookup for already released test artifacts; no extra inference or tool call. */
     private val dependencyEvidence: (suspend (WorkflowRun, List<ArtifactRef>) -> List<PromptContextBlock>)? = null,
+    /** What each role of a run is made of and has earned, as lines the Nanny and the Antagonist read; none by default. */
+    private val creatureReports: (suspend (WorkflowRun) -> List<String>)? = null,
 ) {
     private val rolesById: Map<RoleDefinitionId, RoleDefinition> = roles.associateBy { it.id }
 
@@ -136,6 +141,26 @@ class WorkflowEngine(
      * add context to a provider request. Never send new evidence into an existing live session.
      */
     internal suspend fun correctiveContextFor(
+        definition: WorkflowDefinition, run: WorkflowRun, task: TaskDefinition,
+        taskRun: TaskRun, role: RoleDefinition,
+    ): List<PromptContextBlock> = receiptContextFor(definition, run, task, taskRun, role) + creatureContextFor(run, role)
+
+    /** The Nanny and the Antagonist look through the stats of every creature in the hive, including ones not in this run. */
+    private suspend fun creatureContextFor(run: WorkflowRun, role: RoleDefinition): List<PromptContextBlock> {
+        if (role.id != HallMonitorRole.id && role.id != BuiltInRoles.Antagonist.id) return emptyList()
+        val lines = try {
+            creatureReports?.invoke(run).orEmpty()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            com.hereliesaz.geministrator.log.AppLog.record("evidence", "Creature stats unavailable: ${failure::class.simpleName}")
+            emptyList()
+        }
+        if (lines.isEmpty()) return emptyList()
+        return listOf(PromptContextBlock("Every creature in the hive (Echo is 0 to 100)", lines.joinToString("\n") { "- $it" }, ContextProvenance.KeeperWritten))
+    }
+
+    private suspend fun receiptContextFor(
         definition: WorkflowDefinition, run: WorkflowRun, task: TaskDefinition,
         taskRun: TaskRun, role: RoleDefinition,
     ): List<PromptContextBlock> {

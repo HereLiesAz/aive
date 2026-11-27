@@ -14,8 +14,9 @@ The live H2G2 mindmap is a projection of runtime truth. It is not a second state
 
 The workflow engine prepends shared working rules to every role-agent task request,
 including custom roles. These are provider instructions, not mechanical enforcement.
-Code Reviewer and Antagonist retain separate instructions. The starter workflow still
-uses Code Reviewer; Antagonist is available in the roster for explicit assignment.
+Code Reviewer and Antagonist retain separate instructions. The Antagonist is a required agent
+alongside the queen (see "The Antagonist" in [Node-Creature-Genome.md](Node-Creature-Genome.md)); the
+starter workflow still uses Code Reviewer for its review step.
 
 ### Architecture
 

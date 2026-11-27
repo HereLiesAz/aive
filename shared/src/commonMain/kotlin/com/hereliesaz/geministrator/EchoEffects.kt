@@ -52,7 +52,7 @@ internal fun memoryEchoSteps(
         val target = run.taskRuns[taskId] ?: return@mapNotNull null
         val task = tasks[taskId] ?: return@mapNotNull null
         if (!(target.executor ?: task.effectiveExecutor()).isAgent) return@mapNotNull null
-        val own = target.assignedRoleId?.let(roles::get)?.takeIf { it.executionSource == RoleExecutionSource.Agent }
+        val own = target.assignedRoleId?.let(roles::get)?.takeIf { it.executionSource == RoleExecutionSource.Agent && !isAntagonist(it) }
             ?: return@mapNotNull null
         if (nodes.none { memoryAuthors[it] == setOf(own.id) }) return@mapNotNull null
         val time = reports.asSequence().filter { event ->
@@ -87,7 +87,7 @@ internal fun criticismEchoSteps(
         val producerDef = tasks[producerId] ?: return@mapNotNull null
         if (!(producerRun.executor ?: producerDef.effectiveExecutor()).isAgent) return@mapNotNull null
         val producer = producerRun.assignedRoleId?.let(roles::get)
-            ?.takeIf { it.executionSource == RoleExecutionSource.Agent } ?: return@mapNotNull null
+            ?.takeIf { it.executionSource == RoleExecutionSource.Agent && !isAntagonist(it) } ?: return@mapNotNull null
         reportedReviewVerdict(run, producerId, review, deliveries)?.takeIf { it.blocks } ?: return@mapNotNull null
         val criticism = reviewRun.artifacts.filter { it.taskRunId == reviewRun.id }.map { it.id.value }.toSet()
         val time = reports.asSequence().filter { event ->

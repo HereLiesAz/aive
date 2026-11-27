@@ -27,7 +27,8 @@ class RoleCollectionsTest {
         val stored = roleCollectionEntries(active, emptyList())
         val resolved = resolveRoleCollection(stored)
 
-        assertEquals(active.map { it.id }, activeRoles(resolved).map { it.id })
+        // The Antagonist is a required agent, so it joins the active roster though the saved collection left it out.
+        assertEquals(active.map { it.id } + BuiltInRoles.Antagonist.id, activeRoles(resolved).map { it.id })
         val removedDefault = resolved.first { it.id == BuiltInRoles.ImplementationEngineer.id }
         assertFalse(removedDefault.enabled)
         assertTrue(resolved.any { it.id == custom.id && it.enabled })
@@ -49,5 +50,15 @@ class RoleCollectionsTest {
 
         assertEquals(aiveBuiltInRoles.map { it.id }, activeRoles(resolved).map { it.id })
         assertFalse(resolved.first { it.id == custom.id }.enabled)
+    }
+
+    @Test
+    fun theAntagonistIsAlwaysInTheActiveRosterAndKeepsTheKeepersEdits() {
+        val edited = BuiltInRoles.Antagonist.copy(keeperInstructions = "Be thorough.", enabled = false)
+        val resolved = resolveRoleCollection(roleCollectionEntries(listOf(BuiltInRoles.Orchestrator), listOf(edited)))
+        val antagonist = activeRoles(resolved).single { it.id == BuiltInRoles.Antagonist.id }
+        assertEquals("Be thorough.", antagonist.keeperInstructions)
+        // Nothing stored at all: still there.
+        assertTrue(activeRoles(resolveRoleCollection(emptyList())).any { it.id == BuiltInRoles.Antagonist.id })
     }
 }

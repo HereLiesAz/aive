@@ -19,8 +19,17 @@ import com.hereliesaz.geministrator.events.ProviderUsageRecorded
 
 /** The Antagonist does not improve genetically: it neither pollinates nor is pollen, and it never leads a child. */
 internal fun heritable(role: RoleDefinition): Boolean =
-    role.executionSource == RoleExecutionSource.Agent && role.id != com.hereliesaz.geministrator.domain.BuiltInRoles.Antagonist.id &&
-        classifyNodeCreatureRole(role.name) != NodeCreatureRoleKind.Antagonist
+    role.executionSource == RoleExecutionSource.Agent && !isAntagonist(role)
+
+/**
+ * The Antagonist is the hive's built-in cure for feedback loops, so it has none of its own: it does not mutate, give
+ * birth, starve or die, and it builds no Echo. It is known by its id as well as its name, so a rename does not change that.
+ * When it takes over a task it does so still as the Antagonist: what that task does is the Antagonist's, never the
+ * role it stood in for.
+ */
+internal fun isAntagonist(role: RoleDefinition): Boolean =
+    role.id == com.hereliesaz.geministrator.domain.BuiltInRoles.Antagonist.id ||
+        classifyNodeCreatureRole(role.name) == NodeCreatureRoleKind.Antagonist
 
 /** Reviewers whose reviews pollinate: the reviewer kinds, minus the Antagonist. */
 private fun pollinates(role: RoleDefinition): Boolean = heritable(role) && isReviewerRoleName(role.name)
