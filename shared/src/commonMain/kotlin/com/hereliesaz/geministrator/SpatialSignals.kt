@@ -19,7 +19,7 @@ import kotlin.math.pow
  * creates one. Procedural morphology is still not evidence. The renderer's wiring of these into the GPU is separate.
  */
 
-// ---- memory in use lights blue ---------------------------------------------------------------------------------
+// ---- memory in use flips from its warm glow to blue ------------------------------------------------------------
 
 /** A stored memory whose text a task's successful request carried (MemoryProvenance.kt), at the report's time. */
 internal data class SporeUse(val task: TaskDefinitionId, val sporeId: String, val atEpochMillis: Long)
@@ -29,7 +29,7 @@ internal fun sporeIdOfAddress(address: String): String? =
     address.removePrefix("memory-node:").takeIf { it != address && it.isNotBlank() }?.let { "node:$it" }
 
 /**
- * Tags, keywords, key phrases, summaries and every other kind alike: any carried node lights. One use per node per
+ * Tags, keywords, key phrases, summaries and every other kind alike: any carried node is activated. One use per node per
  * report, in time order. Replayed work, stale sessions and uninstrumented reports contribute nothing.
  */
 internal fun memorySporeUses(run: WorkflowRun, reports: List<ProviderUsageRecorded>): List<SporeUse> =
@@ -44,12 +44,21 @@ internal fun memorySporeUses(run: WorkflowRun, reports: List<ProviderUsageRecord
     }.sortedWith(compareBy({ it.atEpochMillis }, { it.sporeId }, { it.task.value }))
 
 internal const val BLUE_GLOW_MILLIS = 2_500L
+private const val BLUE_RISE_MILLIS = 150L
+private const val BLUE_HOLD_MILLIS = 1_000L
 
-/** 1 at the moment of use, easing to 0 over [BLUE_GLOW_MILLIS]; 0 before it and after. */
+/**
+ * How far an activated memory's glow has flipped from its resting warm toward blue: 0 is the warm glow the network
+ * has at rest, 1 is fully blue. A quick flip at the moment of use, a hold, then an ease back to warm over a total
+ * of [BLUE_GLOW_MILLIS]; 0 before the use and after. The renderer mixes the two colours by this.
+ */
 internal fun blueGlow(nowEpochMillis: Long, usedAtEpochMillis: Long): Float {
     val dt = nowEpochMillis - usedAtEpochMillis
     if (dt < 0 || dt >= BLUE_GLOW_MILLIS) return 0f
-    return (1f - dt.toFloat() / BLUE_GLOW_MILLIS).pow(2)
+    if (dt < BLUE_RISE_MILLIS) return dt.toFloat() / BLUE_RISE_MILLIS
+    if (dt < BLUE_RISE_MILLIS + BLUE_HOLD_MILLIS) return 1f
+    val x = (dt - BLUE_RISE_MILLIS - BLUE_HOLD_MILLIS).toFloat() / (BLUE_GLOW_MILLIS - BLUE_RISE_MILLIS - BLUE_HOLD_MILLIS)
+    return 1f - x * x * (3f - 2f * x)
 }
 
 // ---- communication pulses --------------------------------------------------------------------------------------

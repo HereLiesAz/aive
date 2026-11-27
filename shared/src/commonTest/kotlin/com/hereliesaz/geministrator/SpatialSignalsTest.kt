@@ -60,7 +60,7 @@ class SpatialSignalsTest {
             deliveredArtifactIds = delivered, deliveredMemoryAddresses = memory)
 
     @Test
-    fun carriedMemoryOfEveryKindLightsAndAnUnreportedOneDoesNot() {
+    fun carriedMemoryOfEveryKindIsActivatedAndAnUnreportedOneIsNot() {
         val uses = memorySporeUses(run, listOf(report(check, 5_000, memory = setOf("memory-node:tag-1", "memory-node:sum-2")),
             report(build, 1_000, memory = null)))
         assertEquals(listOf("node:sum-2", "node:tag-1"), uses.map { it.sporeId })
@@ -70,9 +70,11 @@ class SpatialSignalsTest {
     }
 
     @Test
-    fun blueFadesFromTheMomentOfUse() {
-        assertEquals(1f, blueGlow(1_000, 1_000))
-        assertTrue(blueGlow(1_500, 1_000) in 0.01f..0.99f)
+    fun anActivatedMemoryFlipsFromWarmToBlueHoldsAndReturns() {
+        assertEquals(0f, blueGlow(1_000, 1_000)) // still its warm resting glow at the instant
+        assertEquals(1f, blueGlow(1_150, 1_000)) // flipped
+        assertEquals(1f, blueGlow(2_000, 1_000)) // held
+        assertTrue(blueGlow(2_800, 1_000) in 0.01f..0.99f) // easing back to warm
         assertEquals(0f, blueGlow(1_000 + BLUE_GLOW_MILLIS, 1_000))
         assertEquals(0f, blueGlow(500, 1_000)) // never before the event
     }
