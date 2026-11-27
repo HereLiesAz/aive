@@ -5,6 +5,7 @@ import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.BuiltInRoles
+import com.hereliesaz.geministrator.domain.BlockingReason
 import com.hereliesaz.geministrator.domain.ProjectId
 import com.hereliesaz.geministrator.domain.ProviderRunId
 import com.hereliesaz.geministrator.events.ProviderUsageRecorded
@@ -86,19 +87,20 @@ class CreatureNeedsTest {
 
     @Test
     fun readingANearClonesOutputIsEcho() {
-        // build reads plan (same role, same provider) and is reviewed by qa (different role)
+        // build reads plan; delivery to QA does not show that build received any feedback.
         val r=run(
             Triple("plan", TaskRunStatus.Completed, "a" to 1),
             Triple("build", TaskRunStatus.Completed, "a" to 1),
             Triple("review", TaskRunStatus.Running, "b" to 1),
         )
         val needs=assertNotNull(creatureNeeds(TaskDefinitionId("build"),definition,r,roles,reports(r)))
-        assertEquals(50, needs.echo)
-        assertEquals(EchoState.SelfAbsorbed, needs.echoState)
+        assertEquals(100, needs.echo)
+        assertEquals(EchoState.Insane, needs.echoState)
         assertEquals("plan", needs.nearClone)
         assertEquals(0, needs.selfReviews)
-        assertEquals(1, needs.reviews)
+        assertEquals(0, needs.reviews)
         assertEquals(100, needs.outputUsed)
+        assertEquals(0, needs.reviewApprovals)
     }
 
     @Test
@@ -210,7 +212,76 @@ class CreatureNeedsTest {
         assertNull(needs(listOf(own, review.copy(tokensAvoided = 5))).outputUsed)
         assertEquals(0, needs(listOf(own, review.copy(deliveredArtifactIds = setOf("unrelated")))).outputUsed)
         assertEquals(100, needs(events + review).outputUsed)
-        assertEquals(2, needs(events + review).echoComparablePaths)
+        assertEquals(1, needs(events + review).echoComparablePaths)
+    }
+
+    @Test
+    fun reviewOutcomesRequireDeliveryAndAnUnambiguousFinishedVerdict() {
+        val r = run(Triple("plan", TaskRunStatus.Completed, "a" to 1),
+            Triple("build", TaskRunStatus.Completed, "a" to 1),
+            Triple("review", TaskRunStatus.Completed, "b" to 1))
+        val build = TaskDefinitionId("build")
+        val review = TaskDefinitionId("review")
+        val reviewer = r.taskRuns.getValue(review)
+        val artifact = reviewer.artifacts.single().copy(kind = ArtifactKind.Verification,
+            textContent = "VERDICT: approve")
+        val evidence = reports(r)
+        fun withReview(vararg artifacts: ArtifactRef, status: TaskRunStatus = TaskRunStatus.Completed,
+            reason: BlockingReason? = null) = r.copy(taskRuns = r.taskRuns + (review to
+            reviewer.copy(artifacts = artifacts.toList(), status = status, blockingReason = reason)))
+        fun needs(run: WorkflowRun, d: WorkflowDefinition = definition,
+            reports: List<ProviderUsageRecorded> = evidence) =
+            assertNotNull(creatureNeeds(build, d, run, roles, reports))
+
+        val approved = needs(withReview(artifact))
+        assertEquals(1, approved.reviewApprovals)
+        assertEquals(1, approved.reviews)
+        assertEquals(100, approved.echo) // outgoing verdict was never delivered back to build
+        assertEquals(0, needs(withReview(artifact), reports = emptyList()).reviewApprovals)
+        assertEquals(0, needs(withReview(artifact, status = TaskRunStatus.Running)).reviewApprovals)
+        assertEquals(0, needs(withReview(artifact, status = TaskRunStatus.Failed)).reviewApprovals)
+        val rejected = artifact.copy(textContent = "VERDICT: reject")
+        val blocked = BlockingReason("gate-verdict-blocked", "The gate turned work back.")
+        assertEquals(1, needs(withReview(rejected, status = TaskRunStatus.Failed, reason = blocked)).reviewRejections)
+        assertEquals(0, needs(withReview(artifact, status = TaskRunStatus.Failed, reason = blocked)).reviewApprovals)
+        assertEquals(1, needs(withReview(artifact.copy(textContent = "VERDICT: revise"))).reviewRevisions)
+        assertEquals(0, needs(withReview(artifact, rejected.copy(id = ArtifactId("other-review")))).reviews)
+        assertEquals(0, needs(withReview(artifact.copy(textContent = "Looks good"))).reviewApprovals)
+        val multiple = definition.copy(tasks = definition.tasks.map {
+            if (it.id == review) it.copy(dependsOn = setOf(build, TaskDefinitionId("plan"))) else it
+        })
+        assertEquals(0, needs(withReview(artifact), d = multiple).reviewApprovals)
+        val stale = evidence.map {
+            if (it.taskDefinitionId == review) it.copy(providerRunId = ProviderRunId("prior")) else it
+        }
+        assertEquals(0, needs(withReview(artifact), reports = stale).reviewApprovals)
+        val extra = evidence.map {
+            if (it.taskDefinitionId == review) it.copy(deliveredArtifactIds = setOf("artifact-build", "unrelated")) else it
+        }
+        assertEquals(0, needs(withReview(artifact), reports = extra).reviewApprovals)
+    }
+
+    @Test
+    fun hallMonitorVerdictMustNameTheDeliveredReport() {
+        val r = run(Triple("build", TaskRunStatus.Completed, "a" to 1),
+            Triple("review", TaskRunStatus.Completed, "b" to 1))
+        val build = TaskDefinitionId("build")
+        val review = TaskDefinitionId("review")
+        val producer = r.taskRuns.getValue(build)
+        val reviewer = r.taskRuns.getValue(review)
+        val report = producer.artifacts.single().copy(kind = ArtifactKind.HallMonitorReport,
+            metadata = mapOf("hall-monitor-report-id" to "report-42"))
+        val verdict = reviewer.artifacts.single().copy(kind = ArtifactKind.HallMonitorReview,
+            metadata = mapOf("hall-monitor-report-id" to "report-42", "hall-monitor-verdict" to "pass"))
+        fun approvals(outcome: ArtifactRef): Int {
+            val current = r.copy(taskRuns = r.taskRuns + mapOf(
+                build to producer.copy(artifacts = listOf(report)),
+                review to reviewer.copy(artifacts = listOf(outcome))))
+            return assertNotNull(creatureNeeds(build, definition, current, roles, reports(current))).reviewApprovals
+        }
+        assertEquals(1, approvals(verdict))
+        assertEquals(0, approvals(verdict.copy(metadata = mapOf("hall-monitor-verdict" to "pass"))))
+        assertEquals(0, approvals(verdict.copy(metadata = verdict.metadata + ("hall-monitor-report-id" to "other"))))
     }
 
     @Test
