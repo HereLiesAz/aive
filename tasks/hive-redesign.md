@@ -68,3 +68,7 @@ Animation: searching head sweeps and probing; targeting alignment and maw openin
 - [ ] Legacy cleanup only after the new UI is completely wired.
 
 This is a documentation checkpoint. The new spatial and infestation invariants are not yet enforced. Existing runtime and security invariants are unchanged. No implementation checklist item is being marked complete.
+
+### Spatial implementation checkpoint
+
+The shared Kotlin spatial core now contains world coordinates, a definition-keyed persistent site store, and a read-only projection of existing runtime subjects, births, roaming sites, transfers and Memory Web associations. The nucleus is at the origin; Y is north. Layout retains previously allocated sites and does not change dependencies. The new world model does not yet drive a visible surface. No renderer, fake backend, iframe integration, role takeover or run growth journal has been installed by this increment. All acceptance gates remain open. Tests accompany the geometry and memory mapping; GitHub owns execution of checks. Legacy UI remains until the replacement is wired.
