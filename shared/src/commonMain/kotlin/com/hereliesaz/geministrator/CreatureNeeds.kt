@@ -17,9 +17,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
  * (docs/Ecology-and-the-Swarm.md, the binding rule). A need with no data behind it is null and shown
  * as not reported, never estimated.
  *
- * Echo exposure is a graph proxy using recorded session model evidence. Actual per-input
- * and memory-read provenance is not available here. It must never certify contamination, sepsis,
- * independence or a completed review.
+ * Echo exposure uses recorded artifact delivery and model evidence. Delivery does not establish
+ * semantic reliance, memory reads, contamination, sepsis, independence or a completed review.
  */
 internal data class CreatureNeeds(
     /** 0..100 of comparable active input/review paths with near-identical declared configuration. */
@@ -31,7 +30,7 @@ internal data class CreatureNeeds(
     val budget: Int?,
     /** Tokens its provider has reported spending on it; null when none were reported. */
     val tokensSpent: Long?,
-    /** 0..100: how much of its downstream has taken its output; null when nothing depends on it. */
+    /** Percentage of reporting downstream sessions with matching delivery; null if none report. */
     val outputUsed: Int?,
     /** Another task with high configuration overlap and matching reported provider/model. */
     val nearClone: String?,
@@ -40,6 +39,8 @@ internal data class CreatureNeeds(
     val reviews: Int,
     /** Number of comparable active paths. Zero means Echo exposure is not reported. */
     val echoComparablePaths: Int = 0,
+    /** Whether there is a planned downstream path, distinct from unknown delivery. */
+    val hasDownstream: Boolean = false,
 )
 
 internal enum class EchoState { Grounded, SelfAbsorbed, Fevered, Insane }
@@ -65,15 +66,6 @@ internal val REVIEWER_KINDS = setOf(
 /** Whether a role, by its name, is a reviewer (see [REVIEWER_KINDS]). */
 internal fun isReviewerRoleName(roleName: String): Boolean = classifyNodeCreatureRole(roleName) in REVIEWER_KINDS
 
-internal val TAKEN_UP = setOf(
-    TaskRunStatus.Planning,
-    TaskRunStatus.AwaitingApproval,
-    TaskRunStatus.Running,
-    TaskRunStatus.Verifying,
-    TaskRunStatus.Retrying,
-    TaskRunStatus.Completed,
-)
-
 /**
  * Resolve only consistent model reports bound to the run's exact current task session.
  * Old, missing, mixed and replayed reports cannot establish a single model. This is
@@ -89,6 +81,31 @@ internal fun reportedSessionModels(run: WorkflowRun, reports: List<ProviderUsage
         if(events.any { it.modelConsistent!=true || it.model.isNullOrBlank() || it.tokensAvoided!=0L }) null
         else events.mapNotNull { it.model }.distinct().singleOrNull()?.let { id to it }
     }.toMap()
+}
+
+/**
+ * Exact current-session delivery evidence from the existing journal. Missing evidence is unknown.
+ * Duplicate reports cannot amplify the set; replayed work is excluded.
+ */
+internal fun reportedArtifactDeliveries(run: WorkflowRun, reports: List<ProviderUsageRecorded>): Map<TaskDefinitionId, Set<String>> =
+    reports.filter { event ->
+        val task = run.taskRuns[event.taskDefinitionId]
+        event.workflowRunId == run.id && task != null && event.providerId == task.assignedProviderId &&
+            event.providerRunId == task.providerRunId && task.status != TaskRunStatus.Ready &&
+            event.tokensAvoided == 0L && event.deliveredArtifactIds != null
+    }.groupBy { it.taskDefinitionId }.mapValues { (_, events) ->
+        events.flatMap { it.deliveredArtifactIds.orEmpty() }.toSet()
+    }
+
+/** Null means unreported; only exact current producer artifact IDs can match. */
+internal fun artifactDelivered(
+    run: WorkflowRun, producer: TaskDefinitionId, consumer: TaskDefinitionId,
+    deliveries: Map<TaskDefinitionId, Set<String>>,
+): Boolean? {
+    val source = run.taskRuns[producer] ?: return null
+    if (source.status != TaskRunStatus.Completed) return null
+    val ids = deliveries[consumer] ?: return null
+    return source.artifacts.any { it.taskRunId == source.id && it.id.value in ids }
 }
 
 /** Shared run-correlated journal projection for the inspector and tissue, never the GPU. */
@@ -153,13 +170,10 @@ internal fun creatureNeeds(
         agent(id) && role(id)?.let { isReviewerRoleName(it.name) } == true
 
     val dependents = definition.tasks.filter { taskId in it.dependsOn }.map(TaskDefinition::id)
-    // These are graph paths eligible to carry voices, not recorded reads or verdicts.
-    // Ignore future paths and unknown agents rather than counting their absence as diversity.
-    val active = run.taskRuns[taskId]?.status in TAKEN_UP
-    val inputs = if(active) task.dependsOn.filter { run.taskRuns[it]?.status == TaskRunStatus.Completed } else emptyList()
-    val reviewers = if(run.taskRuns[taskId]?.status == TaskRunStatus.Completed) {
-        dependents.filter { isReviewer(it) && run.taskRuns[it]?.status in TAKEN_UP }
-    } else emptyList()
+    val deliveries = reportedArtifactDeliveries(run, modelReports)
+    // Delivery to a reviewer is not proof that the producer received its verdict.
+    val inputs = task.dependsOn.filter { artifactDelivered(run, it, taskId, deliveries) == true }
+    val reviewers = dependents.filter { isReviewer(it) && artifactDelivered(run, taskId, it, deliveries) == true }
     fun exposure(id: TaskDefinitionId): Int? {
         if(!agent(taskId)) return null
         // A completed programmatic dependency is a distinct source, not a model clone.
@@ -182,10 +196,9 @@ internal fun creatureNeeds(
         (100 - spent * 100 / cap).coerceIn(0, 100).toInt()
     }
 
-    val outputUsed = if (dependents.isEmpty()) {
-        null
-    } else {
-        dependents.count { run.taskRuns[it]?.status in TAKEN_UP } * 100 / dependents.size
+    val knownDeliveries = dependents.mapNotNull { artifactDelivered(run, taskId, it, deliveries) }
+    val outputUsed = knownDeliveries.takeIf { it.isNotEmpty() }?.let { known ->
+        known.count { it } * 100 / known.size
     }
     val nearClone = definition.tasks.asSequence()
         .filter { it.id != taskId }
@@ -205,5 +218,6 @@ internal fun creatureNeeds(
         selfReviews = selfReviews,
         reviews = reviewScores.size,
         echoComparablePaths = voices.size,
+        hasDownstream = dependents.isNotEmpty(),
     )
 }

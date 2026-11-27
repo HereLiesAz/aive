@@ -225,7 +225,7 @@ open class TextLlmProvider(
             val result = session.planResult ?: generateOrFail(runId, session) ?: return
             if (cancelledDuringGeneration(runId, session, result)) return
             emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text, session.toolOutcomes)))
-            emitUsage(runId, result, session)
+            emitUsage(runId, result, session, delivered = true)
         } else {
             if (session.phase.value == TextLlmSessionPhase.Cancelled) {
                 emit(AgentEvent.Failed(runId, "$displayName session cancelled"))
@@ -235,16 +235,21 @@ open class TextLlmProvider(
             val result = generateOrFail(runId, session) ?: return
             if (cancelledDuringGeneration(runId, session, result)) return
             emit(AgentEvent.ArtifactProduced(runId, responseArtifact(session.request, result.text, session.toolOutcomes)))
-            emitUsage(runId, result, session)
+            emitUsage(runId, result, session, delivered = true)
         }
         emit(AgentEvent.Completed(runId))
         mutex.withLock { sessions.remove(runId) }
     }
 
     /** Token counts and, where the API reported cached input, the prompt-cache hit fraction; priced when the model has a price. */
-    private suspend fun FlowCollector<AgentEvent>.emitUsage(runId: ProviderRunId, result: TextGenerationResult, session: Session) {
+    private suspend fun FlowCollector<AgentEvent>.emitUsage(
+        runId: ProviderRunId, result: TextGenerationResult, session: Session, delivered: Boolean = false,
+    ) {
         val usage = billedUsage(result) ?: return
-        emit(usage.toEvent(runId, api.modelId, session.requestFingerprint))
+        // Match the renderer's nonblank text inputs only after a non-discarded generation.
+        val ids = if (delivered) session.request.contextArtifacts.filter { !it.textContent.isNullOrBlank() }
+            .mapTo(linkedSetOf()) { it.id.value } else null
+        emit(usage.toEvent(runId, api.modelId, session.requestFingerprint).copy(deliveredArtifactIds = ids))
     }
 
     /** What [result] cost: its tokens, and a price (or "unknown", which a dollar cap does not treat as free). */

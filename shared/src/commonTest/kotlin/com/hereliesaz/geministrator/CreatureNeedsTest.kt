@@ -1,5 +1,8 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.domain.ArtifactId
+import com.hereliesaz.geministrator.domain.ArtifactKind
+import com.hereliesaz.geministrator.domain.ArtifactRef
 import com.hereliesaz.geministrator.domain.AgentProviderId
 import com.hereliesaz.geministrator.domain.BuiltInRoles
 import com.hereliesaz.geministrator.domain.ProjectId
@@ -62,6 +65,8 @@ class CreatureNeedsTest {
                 assignedRoleId = t.roleId,
                 assignedProviderId = AgentProviderId(providerAndAttempt.first),
                 providerRunId = ProviderRunId("session-$id"),
+                artifacts = listOf(ArtifactRef(ArtifactId("artifact-$id"), ArtifactKind.Research,
+                    TaskRunId("r-$id"), id, textContent = "work", createdAtEpochMillis = 1L)),
             )
         },
         createdAtEpochMillis = 1L,
@@ -69,9 +74,14 @@ class CreatureNeedsTest {
     )
 
     /** Explicit evidence per exact session, not inferred from its role. */
-    private fun reports(run: WorkflowRun) = run.taskRuns.values.map { task ->
+    private fun reports(run: WorkflowRun) = run.taskRuns.values.filter { it.status != TaskRunStatus.Ready }.map { task ->
         ProviderUsageRecorded(run.id,task.taskDefinitionId,requireNotNull(task.assignedProviderId),
-            requireNotNull(task.providerRunId),model="model-a",modelConsistent=true,occurredAtEpochMillis=2L)
+            requireNotNull(task.providerRunId),model="model-a",modelConsistent=true,occurredAtEpochMillis=2L,
+            deliveredArtifactIds = when (task.taskDefinitionId.value) {
+                "build" -> setOf("artifact-plan")
+                "review" -> setOf("artifact-build")
+                else -> emptySet()
+            })
     }
 
     @Test
@@ -102,7 +112,7 @@ class CreatureNeedsTest {
             ),
         )
         assertEquals(30, needs.integrity)
-        assertEquals(0, needs.outputUsed)
+        assertNull(needs.outputUsed)
     }
 
     @Test
@@ -176,10 +186,31 @@ class CreatureNeedsTest {
             if(it.id.value=="plan") it.copy(executor=TaskExecutor.TestRunner("./gradlew test")) else it
         })
         val r=run(Triple("plan",TaskRunStatus.Completed,"a" to 1),Triple("build",TaskRunStatus.Running,"a" to 1))
-        val needs=assertNotNull(creatureNeeds(TaskDefinitionId("build"),d,r,roles))
+        val needs=assertNotNull(creatureNeeds(TaskDefinitionId("build"),d,r,roles,reports(r)))
         assertNull(needs.nearClone)
         assertEquals(1,needs.echoComparablePaths)
         assertEquals(0,needs.echo)
+    }
+
+    @Test
+    fun schedulingAndUnknownOrStaleDeliveryNeverCountAsExposure() {
+        val r = run(Triple("plan", TaskRunStatus.Completed, "a" to 1),
+            Triple("build", TaskRunStatus.Completed, "a" to 1),
+            Triple("review", TaskRunStatus.Running, "b" to 1))
+        val build = TaskDefinitionId("build")
+        val events = reports(r)
+        val review = events.single { it.taskDefinitionId.value == "review" }
+        val own = events.single { it.taskDefinitionId == build }
+        fun needs(evidence: List<ProviderUsageRecorded>) =
+            assertNotNull(creatureNeeds(build, definition, r, roles, evidence))
+        val without = events.map { it.copy(deliveredArtifactIds = null) }
+        assertNull(needs(without).outputUsed)
+        assertEquals(0, needs(without).echoComparablePaths)
+        assertNull(needs(listOf(own, review.copy(providerRunId = ProviderRunId("old")))).outputUsed)
+        assertNull(needs(listOf(own, review.copy(tokensAvoided = 5))).outputUsed)
+        assertEquals(0, needs(listOf(own, review.copy(deliveredArtifactIds = setOf("unrelated")))).outputUsed)
+        assertEquals(100, needs(events + review).outputUsed)
+        assertEquals(2, needs(events + review).echoComparablePaths)
     }
 
     @Test

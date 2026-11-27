@@ -52,6 +52,31 @@ class TextLlmProviderSpendTest {
         provider.observe(provider.start(request).providerRunId).toList().filterIsInstance<AgentEvent.UsageReported>().single()
 
     @Test
+    fun successfulGenerationReportsOnlyRenderedTextArtifactIds() = runTest {
+        val text = com.hereliesaz.geministrator.domain.ArtifactRef(
+            com.hereliesaz.geministrator.domain.ArtifactId("text"),
+            com.hereliesaz.geministrator.domain.ArtifactKind.Research, TaskRunId("parent"),
+            "Evidence", textContent = "UNIQUE_EVIDENCE", createdAtEpochMillis = 1L)
+        val uri = text.copy(id = com.hereliesaz.geministrator.domain.ArtifactId("uri"),
+            label = "URI", textContent = null, uri = "https://example.com")
+        val blank = text.copy(id = com.hereliesaz.geministrator.domain.ArtifactId("blank"), textContent = " ")
+        var sent = ""
+        val model = object : TextGenerationApi {
+            override val modelId: String? = "m1"
+            override val billsPerToken: Boolean = true
+            override suspend fun generate(prompt: String): TextGenerationResult {
+                sent = prompt
+                return TextGenerationResult("ok", inputTokens = 10, outputTokens = 2)
+            }
+        }
+        val provider = TextLlmProvider(AgentProviderId("hosted"), "Hosted", model)
+        val events = provider.observe(provider.start(request.copy(contextArtifacts = listOf(text, uri, blank))).providerRunId).toList()
+        assertTrue("UNIQUE_EVIDENCE" in sent)
+        assertTrue("https://example.com" !in sent)
+        assertEquals(setOf("text"), events.filterIsInstance<AgentEvent.UsageReported>().single().deliveredArtifactIds)
+    }
+
+    @Test
     fun aModelWithNoPriceIsReportedAsUnknownCostNotAsFree() = runTest {
         val provider = TextLlmProvider(
             AgentProviderId("hosted"), "Hosted",

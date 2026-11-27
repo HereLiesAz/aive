@@ -227,6 +227,8 @@ data class ProviderUsageRecorded(
     override val occurredAtEpochMillis: Long,
     /** True if every report in this batch names the same model; null for legacy events. */
     val modelConsistent: Boolean? = null,
+    /** Successful generation input artifact IDs, never content; null for legacy or unreported evidence. */
+    val deliveredArtifactIds: Set<String>? = null,
 ) : WorkflowEvent
 
 /**

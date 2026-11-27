@@ -34,7 +34,7 @@ import com.hereliesaz.geministrator.resources.needs_tokens_spent
 import org.jetbrains.compose.resources.stringResource
 
 private val NeedTrack = Color(0xFF4A4139)
-// Exposure is a graph proxy; it must not render a diagnosis of sepsis.
+// Delivery exposure is not a diagnosis of sepsis.
 private val EchoWarm = Azphalt.Yellow
 private val IntegrityGreen = Azphalt.Yellow
 private val OutputTeal = Azphalt.Yellow
@@ -66,7 +66,8 @@ internal fun CreatureNeedsPanel(
                 ?: stringResource(Res.string.needs_not_reported),
             onClick = onOpenMind,
         )
-        NeedMeter(stringResource(Res.string.needs_output_used), needs.outputUsed, OutputTeal, stringResource(Res.string.needs_nothing_downstream))
+        NeedMeter(stringResource(Res.string.needs_output_used), needs.outputUsed, OutputTeal,
+            stringResource(if (needs.hasDownstream) Res.string.needs_not_reported else Res.string.needs_nothing_downstream))
         needs.nearClone?.let { NeedLine(stringResource(Res.string.needs_near_config), it) }
         if (needs.selfReviews > 0) {
             NeedLine(

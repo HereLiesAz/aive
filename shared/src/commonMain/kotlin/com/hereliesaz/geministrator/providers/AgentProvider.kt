@@ -213,6 +213,8 @@ sealed interface AgentEvent {
         /** SHA-256 (hex) and length of the request text as sent; never the text. Null when the provider cannot say. */
         val requestSha256: String? = null,
         val requestChars: Int? = null,
+        /** Artifact text IDs sent in a successful generation; null is unreported, not semantic reliance. */
+        val deliveredArtifactIds: Set<String>? = null,
     ) : AgentEvent {
         init {
             require(cacheHitFraction == null || cacheHitFraction in 0f..1f) {
