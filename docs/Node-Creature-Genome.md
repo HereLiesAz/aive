@@ -371,7 +371,7 @@ The per-role budget editor preserves the inherited cap, class, lineage and tool 
 
 ### The Antagonist
 
-A required agent, alongside the queen: the hive always has one, and it is a built-in role. It is the hive's built-in cure for feedback loops. It looks for **all** weak spots, so it is given access to every place one might be: every creature in the hive, with what it is made of and the numbers it has earned (see above), not only the creatures in the run it is reviewing.
+A required agent, alongside the queen: the hive always has one, and it is a built-in role. Its inclusion is automatic: it is always in the active roster, even when the keeper's saved roster leaves it out or marks it disabled (the keeper's edits to its instructions stand), and there is no switch or guard to manage. It is the hive's built-in cure for feedback loops. It looks for **all** weak spots, so it is given access to every place one might be: every creature in the hive, with what it is made of and the numbers it has earned (see above), not only the creatures in the run it is reviewing.
 
 What it does not do. It does not mutate, give birth, starve or die: it is never a parent, a pollinator or an extra parent, it is never retired for an empty trophic reserve, and it builds no Echo of its own, so it has no feedback loop to fall into. Reading others' work, or its own memory, adds nothing to it. It is known by its role id as well as its name, so renaming it changes none of this.
 

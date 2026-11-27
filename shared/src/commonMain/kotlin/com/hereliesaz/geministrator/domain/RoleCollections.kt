@@ -20,7 +20,10 @@ fun resolveRoleCollection(stored: List<RoleDefinition>): List<RoleDefinition> {
 
     val resolvedById = linkedMapOf<RoleDefinitionId, RoleDefinition>()
     aiveBuiltInRoles.forEach { builtIn ->
-        resolvedById[builtIn.id] = overrides[builtIn.id] ?: builtIn
+        val resolved = overrides[builtIn.id] ?: builtIn
+        // The Antagonist is a required agent alongside the queen, so it is always part of the active roster: a keeper's
+        // edits to it stand, but a stored copy marked disabled does not take it out.
+        resolvedById[builtIn.id] = if (builtIn.id == BuiltInRoles.Antagonist.id) resolved.copy(enabled = true) else resolved
     }
     persisted.filter { it.id !in builtInIds }.forEach { custom ->
         resolvedById[custom.id] = custom
