@@ -141,9 +141,12 @@ private class SpatialGlRenderer(private val failed: () -> Unit) : GLSurfaceView.
     private var count = 0
     private var aspect = 1f
     private var uniforms = IntArray(6)
+    private var viewportWidth = 1
+    private var viewportHeight = 1
+    private var optics: SpatialAndroidOptics? = null
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        uploaded = null; count = 0; program = 0
+        uploaded = null; count = 0; program = 0; optics = null
         try {
             fun shader(type: Int, source: String): Int {
                 val id = GLES30.glCreateShader(type)
@@ -152,13 +155,18 @@ private class SpatialGlRenderer(private val failed: () -> Unit) : GLSurfaceView.
                 if (ok[0] == 0) { val log = GLES30.glGetShaderInfoLog(id); GLES30.glDeleteShader(id); error(log) }
                 return id
             }
-            val vertex = shader(GLES30.GL_VERTEX_SHADER,SPATIAL_VERTEX_SHADER)
-            val fragment = shader(GLES30.GL_FRAGMENT_SHADER,SPATIAL_FRAGMENT_SHADER)
-            val p = GLES30.glCreateProgram()
-            GLES30.glAttachShader(p,vertex); GLES30.glAttachShader(p,fragment); GLES30.glLinkProgram(p)
-            GLES30.glDeleteShader(vertex); GLES30.glDeleteShader(fragment)
-            val ok = IntArray(1); GLES30.glGetProgramiv(p,GLES30.GL_LINK_STATUS,ok,0)
-            if (ok[0] == 0) { val log=GLES30.glGetProgramInfoLog(p); GLES30.glDeleteProgram(p); error(log) }
+            fun link(vertexSource: String, fragmentSource: String): Int {
+                val vertex=shader(GLES30.GL_VERTEX_SHADER,vertexSource)
+                val fragment=try { shader(GLES30.GL_FRAGMENT_SHADER,fragmentSource) }
+                    catch(e: Exception) { GLES30.glDeleteShader(vertex); throw e }
+                val p=GLES30.glCreateProgram()
+                GLES30.glAttachShader(p,vertex); GLES30.glAttachShader(p,fragment); GLES30.glLinkProgram(p)
+                GLES30.glDeleteShader(vertex); GLES30.glDeleteShader(fragment)
+                val ok=IntArray(1); GLES30.glGetProgramiv(p,GLES30.GL_LINK_STATUS,ok,0)
+                if(ok[0]==0) { val log=GLES30.glGetProgramInfoLog(p); GLES30.glDeleteProgram(p); error(log) }
+                return p
+            }
+            val p=link(SPATIAL_VERTEX_SHADER,SPATIAL_FRAGMENT_SHADER)
             val ids = IntArray(1)
             GLES30.glGenVertexArrays(1,ids,0); vao=ids[0]; GLES30.glBindVertexArray(vao)
             GLES30.glGenBuffers(1,ids,0); buffer=ids[0]; GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER,buffer)
@@ -171,19 +179,22 @@ private class SpatialGlRenderer(private val failed: () -> Unit) : GLSurfaceView.
             uniforms=listOf("eye","forward","right","up","aspect","motionPhase").map { GLES30.glGetUniformLocation(p,it) }.toIntArray()
             GLES30.glEnable(GLES30.GL_DEPTH_TEST)
             program=p
+            optics=runCatching { SpatialAndroidOptics(link(SPATIAL_OPTICS_VERTEX_SHADER,SPATIAL_OPTICS_FRAGMENT_SHADER)) }.getOrNull()
         } catch (_: Exception) { failed() }
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         GLES30.glViewport(0,0,width,height)
-        aspect=width.coerceAtLeast(1).toFloat()/height.coerceAtLeast(1)
+        viewportWidth=width.coerceAtLeast(1); viewportHeight=height.coerceAtLeast(1)
+        aspect=viewportWidth.toFloat()/viewportHeight
     }
 
     override fun onDrawFrame(gl: GL10?) {
+        val view=camera
+        val pass=if(view!=null && program!=0) optics?.takeIf { it.begin(viewportWidth,viewportHeight) } else null
         GLES30.glClearColor(.012f,.045f,.047f,1f)
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
-        val view=camera ?: return
-        if (program == 0) return
+        if (view==null || program==0) return
         val current=mesh
         if (uploaded !== current) {
             if (current != null) {
@@ -204,5 +215,77 @@ private class SpatialGlRenderer(private val failed: () -> Unit) : GLSurfaceView.
         GLES30.glUniform1f(uniforms[4],aspect)
         GLES30.glUniform1f(uniforms[5],view.motionPhase)
         GLES30.glDrawArrays(GLES30.GL_TRIANGLES,0,count)
+        pass?.finish(view.optics())
+    }
+}
+
+
+/** Context-local color/depth target and a bounded depth-of-field pass. A failed target uses direct 3D. */
+private class SpatialAndroidOptics(private val program: Int) {
+    private var framebuffer=0
+    private var textures=IntArray(2)
+    private var width=0
+    private var height=0
+    private var ready=false
+    private var previousFramebuffer=IntArray(1)
+    private var previousViewport=IntArray(4)
+    private val uniforms=listOf("sceneColor","sceneDepth","focusDepth","aperture").map { GLES30.glGetUniformLocation(program,it) }.toIntArray()
+
+    /** Preserve the drawable's framebuffer, especially GLJPanel's nonzero backing target. */
+    fun begin(w: Int,h: Int): Boolean {
+        GLES30.glGetIntegerv(GLES30.GL_DRAW_FRAMEBUFFER_BINDING,previousFramebuffer,0)
+        GLES30.glGetIntegerv(GLES30.GL_VIEWPORT,previousViewport,0)
+        if(w!=width || h!=height) {
+            releaseTargets()
+            width=w;height=h
+            try {
+                val ids=IntArray(1)
+                GLES30.glGenFramebuffers(1,ids,0);framebuffer=ids[0]
+                GLES30.glGenTextures(2,textures,0)
+                GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
+                fun allocate(id: Int,internal: Int,format: Int,type: Int,filter: Int) {
+                    GLES30.glBindTexture(GLES30.GL_TEXTURE_2D,id)
+                    GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D,GLES30.GL_TEXTURE_MIN_FILTER,filter)
+                    GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D,GLES30.GL_TEXTURE_MAG_FILTER,filter)
+                    GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D,GLES30.GL_TEXTURE_WRAP_S,GLES30.GL_CLAMP_TO_EDGE)
+                    GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D,GLES30.GL_TEXTURE_WRAP_T,GLES30.GL_CLAMP_TO_EDGE)
+                    GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D,0,internal,w,h,0,format,type,null)
+                }
+                allocate(textures[0],GLES30.GL_RGBA8,GLES30.GL_RGBA,GLES30.GL_UNSIGNED_BYTE,GLES30.GL_LINEAR)
+                allocate(textures[1],GLES30.GL_DEPTH_COMPONENT24,GLES30.GL_DEPTH_COMPONENT,GLES30.GL_UNSIGNED_INT,GLES30.GL_NEAREST)
+                GLES30.glBindTexture(GLES30.GL_TEXTURE_2D,0)
+                GLES30.glBindFramebuffer(GLES30.GL_DRAW_FRAMEBUFFER,framebuffer)
+                GLES30.glFramebufferTexture2D(GLES30.GL_DRAW_FRAMEBUFFER,GLES30.GL_COLOR_ATTACHMENT0,GLES30.GL_TEXTURE_2D,textures[0],0)
+                GLES30.glFramebufferTexture2D(GLES30.GL_DRAW_FRAMEBUFFER,GLES30.GL_DEPTH_ATTACHMENT,GLES30.GL_TEXTURE_2D,textures[1],0)
+                ready=GLES30.glCheckFramebufferStatus(GLES30.GL_DRAW_FRAMEBUFFER)==GLES30.GL_FRAMEBUFFER_COMPLETE
+            } catch(_: RuntimeException) { ready=false }
+            if(!ready)releaseTargets()
+        }
+        GLES30.glBindFramebuffer(GLES30.GL_DRAW_FRAMEBUFFER,if(ready) framebuffer else previousFramebuffer[0])
+        if(ready)GLES30.glViewport(0,0,w,h)
+        return ready
+    }
+
+    fun finish(params: SpatialOptics) {
+        GLES30.glBindFramebuffer(GLES30.GL_DRAW_FRAMEBUFFER,previousFramebuffer[0])
+        GLES30.glViewport(previousViewport[0],previousViewport[1],previousViewport[2],previousViewport[3])
+        GLES30.glDisable(GLES30.GL_DEPTH_TEST)
+        GLES30.glUseProgram(program)
+        GLES30.glActiveTexture(GLES30.GL_TEXTURE0);GLES30.glBindTexture(GLES30.GL_TEXTURE_2D,textures[0])
+        GLES30.glUniform1i(uniforms[0],0)
+        GLES30.glActiveTexture(GLES30.GL_TEXTURE1);GLES30.glBindTexture(GLES30.GL_TEXTURE_2D,textures[1])
+        GLES30.glUniform1i(uniforms[1],1)
+        GLES30.glUniform1f(uniforms[2],params.focusDepth)
+        GLES30.glUniform1f(uniforms[3],params.aperture)
+        GLES30.glDrawArrays(GLES30.GL_TRIANGLES,0,3)
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D,0);GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D,0)
+        GLES30.glEnable(GLES30.GL_DEPTH_TEST)
+    }
+
+    private fun releaseTargets() {
+        if(framebuffer!=0)GLES30.glDeleteFramebuffers(1,intArrayOf(framebuffer),0)
+        if(textures.any { it!=0 })GLES30.glDeleteTextures(2,textures,0)
+        framebuffer=0;textures=IntArray(2);ready=false
     }
 }

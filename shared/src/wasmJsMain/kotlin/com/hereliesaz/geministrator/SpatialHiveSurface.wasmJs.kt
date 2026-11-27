@@ -20,10 +20,10 @@ import kotlin.js.js
 import kotlin.io.encoding.Base64
 
 private fun spatialAvailable(): Boolean = js("() => !!globalThis.AiveSpatialGpu && globalThis.AiveSpatialGpu.available()")
-private fun attach(canvas: HTMLCanvasElement, vertex: String, fragment: String): Unit = js("(canvas,vertex,fragment) => globalThis.AiveSpatialGpu.attach(canvas,vertex,fragment)")
+private fun attach(canvas: HTMLCanvasElement, vertex: String, fragment: String, opticsVertex: String, opticsFragment: String): Unit = js("(canvas,vertex,fragment,opticsVertex,opticsFragment) => globalThis.AiveSpatialGpu.attach(canvas,vertex,fragment,opticsVertex,opticsFragment)")
 private fun detach(canvas: HTMLCanvasElement): Unit = js("(canvas) => globalThis.AiveSpatialGpu.detach(canvas)")
 private fun upload(canvas: HTMLCanvasElement, vertices: String): Unit = js("(canvas,vertices) => globalThis.AiveSpatialGpu.frame(canvas,vertices)")
-private fun view(canvas: HTMLCanvasElement, camera: String): Unit = js("(canvas,camera) => globalThis.AiveSpatialGpu.camera(canvas,camera)")
+private fun view(canvas: HTMLCanvasElement, camera: String, focus: Float, aperture: Float): Unit = js("(canvas,camera,focus,aperture) => globalThis.AiveSpatialGpu.camera(canvas,camera,focus,aperture)")
 private fun poll(canvas: HTMLCanvasElement): String? = js("(canvas) => globalThis.AiveSpatialGpu.poll(canvas)")
 private val codec = Json { encodeDefaults = true }
 
@@ -51,7 +51,10 @@ internal actual fun SpatialHiveSurface(frame: SpatialRenderFrame, camera: Spatia
         }
         upload(mounted, Base64.Default.encode(bytes))
     }
-    LaunchedEffect(canvas, camera) { canvas?.let { view(it, codec.encodeToString(camera)) } }
+    LaunchedEffect(canvas, camera) {
+        val optics = camera.optics()
+        canvas?.let { view(it, codec.encodeToString(camera), optics.focusDepth, optics.aperture) }
+    }
     LaunchedEffect(canvas) {
         val mounted = canvas ?: return@LaunchedEffect
         while (true) {
@@ -72,7 +75,7 @@ internal actual fun SpatialHiveSurface(frame: SpatialRenderFrame, camera: Spatia
             setAttribute("tabindex", "0")
             style.backgroundColor = "#031414"
             style.touchAction = "none"
-            attach(this, SPATIAL_VERTEX_SHADER, SPATIAL_FRAGMENT_SHADER)
+            attach(this, SPATIAL_VERTEX_SHADER, SPATIAL_FRAGMENT_SHADER, SPATIAL_OPTICS_VERTEX_SHADER, SPATIAL_OPTICS_FRAGMENT_SHADER)
             canvas = this
         }
     }, modifier = modifier)

@@ -23,4 +23,14 @@ class SpatialDesktopShaderTest {
         assertFalse(vertex.contains("precision highp"))
         assertFalse(fragment.contains("precision highp"))
     }
+
+    @Test fun opticalPassKeepsDepthTextureAndFullscreenTriangle() {
+        val vertex=spatialDesktopShader(SPATIAL_OPTICS_VERTEX_SHADER)
+        val fragment=spatialDesktopShader(SPATIAL_OPTICS_FRAGMENT_SHADER)
+        assertTrue(vertex.contains("gl_VertexID"))
+        assertTrue(fragment.contains("texture(sceneDepth,p)"))
+        assertTrue(fragment.contains("focusDepth,aperture"))
+        assertTrue(fragment.startsWith("#version 150\n"))
+        assertFalse(fragment.contains("precision highp"))
+    }
 }
