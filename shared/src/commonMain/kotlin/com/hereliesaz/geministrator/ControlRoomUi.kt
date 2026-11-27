@@ -243,6 +243,7 @@ fun ControlRoom(
     onLoadRunHistory: suspend () -> List<Pair<Project, List<WorkflowRun>>> = { emptyList() },
     onSwitchRun: (String) -> Unit = {},
     onLoadRunTimeline: suspend () -> List<WorkflowEvent> = { emptyList() },
+    onLoadEchoHistory: suspend (WorkflowRun) -> Map<RoleDefinitionId, Int> = { emptyMap() },
     onLoadLogIntegrity: suspend () -> com.hereliesaz.geministrator.events.ChainStatus = { com.hereliesaz.geministrator.events.ChainStatus.NoChain },
     onLoadWorkflowDefinitions: suspend () -> List<WorkflowDefinition> = { emptyList() },
     onExportDiagnosticBundle: suspend () -> String? = { null },
@@ -314,6 +315,26 @@ fun ControlRoom(
             )) break
             delay(2_000)
         } while (true)
+    }
+    // Historical balances are loaded once per shown run, never on every progress tick or GPU frame.
+    val loadHistory by rememberUpdatedState(onLoadEchoHistory)
+    val echoBaseline by produceState<Pair<WorkflowRunId, Map<RoleDefinitionId, Int>>?>(null, journalRun?.id) {
+        value = null
+        val observed = journalRun ?: return@produceState
+        try {
+            value = observed.id to loadHistory(observed)
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            // Incomplete history must not masquerade as a zero balance.
+        }
+    }
+    val cumulativeEcho = remember(journalRun, modelReports, echoBaseline) {
+        val observed = journalRun
+        val baseline = echoBaseline
+        if (observed != null && baseline?.first == observed.id) {
+            EchoHistory(balances = baseline.second).advance(observed, modelReports).balances
+        } else emptyMap()
     }
     // The tour waits on what the swarm does as well as on taps: each publish of the live run is read against the last one
     // (tour/RunSignals.kt) and what changed is handed to the layer, only while a tour is showing.
@@ -723,6 +744,7 @@ fun ControlRoom(
         LocalReleaseCreature provides releaseCreature,
         LocalSpatialHiveMemory provides memoryLayer,
         LocalModelUsageReports provides modelReports,
+        LocalCumulativeEcho provides cumulativeEcho,
         LocalFlowchartLinks provides flowchartLinks,
         LocalPlaceLinks provides placeLinks,
         LocalCardFlip provides flipHost,

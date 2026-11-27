@@ -95,7 +95,8 @@ class CreatureNeedsTest {
         )
         val needs=assertNotNull(creatureNeeds(TaskDefinitionId("build"),definition,r,roles,reports(r)))
         assertEquals(100, needs.echo)
-        assertEquals(EchoState.Insane, needs.echoState)
+        assertEquals(EchoState.Grounded, needs.echoState)
+        assertNull(needs.echoHundredths)
         assertEquals("plan", needs.nearClone)
         assertEquals(0, needs.selfReviews)
         assertEquals(0, needs.reviews)
@@ -282,6 +283,59 @@ class CreatureNeedsTest {
         assertEquals(1, approvals(verdict))
         assertEquals(0, approvals(verdict.copy(metadata = mapOf("hall-monitor-verdict" to "pass"))))
         assertEquals(0, approvals(verdict.copy(metadata = verdict.metadata + ("hall-monitor-report-id" to "other"))))
+    }
+
+    @Test
+    fun cumulativeEchoUsesRatesAndDoesNotCountARepeatedRunOrReportTwice() {
+        val first = run(Triple("plan", TaskRunStatus.Completed, "a" to 1),
+            Triple("build", TaskRunStatus.Completed, "a" to 1))
+            .copy(roleSnapshot = roles, definitionSnapshot = definition, status = WorkflowRunStatus.Completed)
+        val evidence = reports(first)
+        val history = EchoHistory().advance(first, evidence + evidence)
+        assertEquals(60, history.balances[engineer.id])
+        assertEquals(10_000, EchoHistory(balances = mapOf(engineer.id to 9_990)).advance(first, evidence).balances[engineer.id])
+        assertEquals(history, history.advance(first, evidence))
+        val second = first.copy(id = WorkflowRunId("second"))
+        val next = history.advance(second, reports(second))
+        assertEquals(120, next.balances[engineer.id])
+        val clone = engineer.copy(id = com.hereliesaz.geministrator.domain.RoleDefinitionId("clone"))
+        val distinctRole = first.copy(id = WorkflowRunId("third"), roleSnapshot = roles + clone,
+            taskRuns = first.taskRuns.mapValues { (id, value) ->
+                if (id.value == "plan") value.copy(assignedRoleId = clone.id) else value
+            })
+        val withClone = next.advance(distinctRole, reports(distinctRole))
+        assertEquals(160, withClone.balances[engineer.id])
+        val challenge = distinctRole.copy(id = WorkflowRunId("fourth"), roleSnapshot = roles + clone.copy(instructions = "Different"))
+        val challenged = withClone.advance(challenge, reports(challenge))
+        assertEquals(80, challenged.balances[engineer.id])
+        assertEquals(0, EchoHistory().advance(challenge, reports(challenge)).balances[engineer.id])
+        val missing = first.copy(id = WorkflowRunId("missing"))
+        assertEquals(challenged.balances, challenged.advance(missing, reports(missing).map { it.copy(deliveredArtifactIds = null) }).balances)
+        assertEquals(emptyMap(), EchoHistory().advance(first.copy(definitionSnapshot = null), evidence).balances)
+        assertEquals(emptyMap(), EchoHistory().advance(first, evidence.map { it.copy(modelConsistent = false) }).balances)
+        assertEquals(emptyMap(), EchoHistory().advance(first, evidence.map { it.copy(providerRunId = ProviderRunId("stale")) }).balances)
+        val needs = assertNotNull(creatureNeeds(TaskDefinitionId("build"), definition, first, roles, evidence, next.balances))
+        assertEquals(120, needs.echoHundredths)
+        assertEquals(EchoState.Grounded, needs.echoState)
+    }
+
+    @Test
+    fun aRecordedSoloHatchInheritsOnlyItsBirthBalance() {
+        val source = run(Triple("plan", TaskRunStatus.Completed, "a" to 1),
+            Triple("build", TaskRunStatus.Completed, "a" to 1)).let { r ->
+            r.copy(status = WorkflowRunStatus.Completed, roleSnapshot = roles, definitionSnapshot = definition,
+                taskRuns = r.taskRuns.mapValues { (_, task) -> task.copy(executor = TaskExecutor.RoleAgent(engineer.id)) })
+        }
+        val child = assertNotNull(hatchFromRun(source, roles))
+        val first = EchoHistory().advance(source, reports(source))
+        val later = source.copy(id = WorkflowRunId("later"))
+        val history = first.advance(later, reports(later))
+        assertEquals(120, history.balances[engineer.id])
+        assertNull(history.balances[child.id])
+        val inherited = history.withBirths(listOf(child))
+        assertEquals(60, inherited.balances[child.id])
+        assertEquals(inherited, inherited.withBirths(listOf(child)))
+        assertNull(history.withBirths(listOf(child.copy(hatchedFromRunId = "wrong"))).balances[child.id])
     }
 
     @Test

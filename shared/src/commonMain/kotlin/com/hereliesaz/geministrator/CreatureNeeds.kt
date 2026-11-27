@@ -2,6 +2,7 @@ package com.hereliesaz.geministrator
 
 import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.RoleDefinition
+import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.RoleExecutionSource
 import com.hereliesaz.geministrator.domain.effectiveExecutor
 import com.hereliesaz.geministrator.domain.effectiveTokenBudget
@@ -10,6 +11,7 @@ import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
+import com.hereliesaz.geministrator.domain.WorkflowRunId
 import com.hereliesaz.geministrator.events.ProviderUsageRecorded
 import com.hereliesaz.geministrator.workflow.ArtifactVerdict
 import com.hereliesaz.geministrator.workflow.ArtifactVerdicts
@@ -23,11 +25,11 @@ import androidx.compose.runtime.staticCompositionLocalOf
  * (docs/Ecology-and-the-Swarm.md, the binding rule). A need with no data behind it is null and shown
  * as not reported, never estimated.
  *
- * Echo exposure uses recorded artifact delivery and model evidence. Delivery does not establish
+ * Cumulative Echo uses recorded artifact delivery and model evidence. Delivery does not establish
  * semantic reliance, memory reads, contamination, sepsis, independence or a completed review.
  */
 internal data class CreatureNeeds(
-    /** 0..100 of comparable delivered input paths with near-identical declared configuration. */
+    /** Diagnostic ratio of current comparable delivered input paths; not the cumulative health score. */
     val echo: Int,
     val echoState: EchoState,
     /** 0..100: its reliability in this run; retries and failures cost it. */
@@ -51,6 +53,8 @@ internal data class CreatureNeeds(
     val reviewApprovals: Int = 0,
     val reviewRevisions: Int = 0,
     val reviewRejections: Int = 0,
+    /** Cumulative recorded Echo in hundredths of one point; null when no comparable history exists. */
+    val echoHundredths: Int? = null,
 )
 
 internal enum class EchoState { Grounded, SelfAbsorbed, Fevered, Insane }
@@ -160,6 +164,9 @@ internal fun reportedReviewVerdict(
 /** Shared run-correlated journal projection for the inspector and tissue, never the GPU. */
 internal val LocalModelUsageReports = staticCompositionLocalOf<List<ProviderUsageRecorded>> { emptyList() }
 
+/** Shared cumulative projection, keyed by actual agent role rather than task or visual breed. */
+internal val LocalCumulativeEcho = staticCompositionLocalOf<Map<RoleDefinitionId, Int>> { emptyMap() }
+
 /**
  * Provisional overlap: provider 20 and model 30 retain the previous provider-half weight;
  * exact instructions 30 and declared capability/authority/tool/surface contract 20.
@@ -185,12 +192,102 @@ internal fun configurationKinship(
 /** Near-clone threshold from Node-Creature-Genome.md; applied only to comparable configurations. */
 internal const val NEAR_CLONE_KINSHIP = 95
 
+/** The parent's recorded balance at the solo hatch, not its balance when the child first works. */
+internal data class EchoBirthSeed(val source: WorkflowRunId, val parent: RoleDefinitionId, val hundredths: Int)
+
+/**
+ * Pure projection over retained run snapshots and their existing journals. Replaying a run is
+ * idempotent. Birth candidates have no effect until the exact solo lineage appears in a snapshot.
+ * Multiple-parent inheritance and evidence from missing historical snapshots remain unreported.
+ */
+internal data class EchoHistory(
+    val balances: Map<RoleDefinitionId, Int> = emptyMap(),
+    private val births: Map<RoleDefinitionId, EchoBirthSeed> = emptyMap(),
+    private val seen: Set<WorkflowRunId> = emptySet(),
+) {
+    /** Apply an observed solo hatch once; later changes to the parent never rewrite the seed. */
+    fun withBirths(roles: List<RoleDefinition>): EchoHistory {
+        val next = balances.toMutableMap()
+        for (role in roles) {
+            val seed = births[role.id] ?: continue
+            if (role.id !in next && role.executionSource == RoleExecutionSource.Agent &&
+                role.parents == listOf(seed.parent) && role.hatchedFromRunId == seed.source.value) {
+                next[role.id] = seed.hundredths
+            }
+        }
+        return copy(balances = next)
+    }
+
+    /**
+     * Count each positively reported source/current consumer session path once. Rates are
+     * the documented bench rates in hundredths: own output +60, near-clone +40,
+     * a stranger below 85 kinship -4 * (90 - kinship). The intermediate band is neutral.
+     * Delivery is an exposure proxy, not proof of reliance. No inferred memory or contamination.
+     */
+    fun advance(run: WorkflowRun, reports: List<ProviderUsageRecorded>): EchoHistory {
+        if (run.id in seen) return this
+        val seeded = withBirths(run.roleSnapshot)
+        val definition = run.definitionSnapshot ?: return seeded
+        val roles = run.roleSnapshot.associateBy { it.id }
+        if (roles.isEmpty()) return seeded
+        val models = reportedSessionModels(run, reports)
+        val deliveries = reportedArtifactDeliveries(run, reports)
+        val tasks = definition.tasks.associateBy { it.id }
+        // A drained batch contains a set, not individual model calls. Count paths, not reports.
+        val changes = mutableListOf<Triple<Long, Pair<String, String>, Pair<RoleDefinitionId, Int>>>()
+        for (consumer in definition.tasks) {
+            val target = run.taskRuns[consumer.id] ?: continue
+            if (!(target.executor ?: consumer.effectiveExecutor()).isAgent) continue
+            val own = target.assignedRoleId?.let(roles::get) ?: continue
+            if (own.executionSource != RoleExecutionSource.Agent) continue
+            for (sourceId in consumer.dependsOn) {
+                if (artifactDelivered(run, sourceId, consumer.id, deliveries) != true) continue
+                val source = run.taskRuns[sourceId] ?: continue
+                val sourceDef = tasks[sourceId] ?: continue
+                val sourceAgent = (source.executor ?: sourceDef.effectiveExecutor()).isAgent
+                val peer = source.assignedRoleId?.let(roles::get)
+                val score = if (sourceAgent) {
+                    if (peer == null) continue
+                    configurationKinship(own, target.assignedProviderId?.value, peer,
+                        source.assignedProviderId?.value, models[consumer.id], models[sourceId]) ?: continue
+                } else 0
+                val delta = when {
+                    sourceAgent && own.id == peer?.id -> 60
+                    score >= NEAR_CLONE_KINSHIP -> 40
+                    score < 85 -> -4 * (90 - score)
+                    else -> 0
+                }
+                val sourceArtifacts = source.artifacts.filter { it.taskRunId == source.id }.map { it.id.value }.toSet()
+                val time = reports.asSequence().filter { event ->
+                    event.workflowRunId == run.id && event.taskDefinitionId == consumer.id &&
+                        event.providerId == target.assignedProviderId && event.providerRunId == target.providerRunId &&
+                        event.tokensAvoided == 0L && event.deliveredArtifactIds.orEmpty().any { it in sourceArtifacts }
+                }.minOfOrNull { it.occurredAtEpochMillis } ?: continue
+                changes += Triple(time, consumer.id.value to sourceId.value, own.id to delta)
+            }
+        }
+        val next = seeded.balances.toMutableMap()
+        for ((_, _, change) in changes.sortedWith(compareBy({ it.first }, { it.second.first }, { it.second.second }))) {
+            val (role, delta) = change
+            next[role] = ((next[role] ?: 0) + delta).coerceIn(0, 10_000)
+        }
+        val child = hatchFromRun(run, run.roleSnapshot)
+        val parent = child?.parents?.singleOrNull()
+        val seed = parent?.let { next[it] }
+        val newBirths = if (child != null && parent != null && seed != null) {
+            seeded.births + (child.id to EchoBirthSeed(run.id, parent, seed))
+        } else seeded.births
+        return EchoHistory(next, newBirths, seeded.seen + run.id)
+    }
+}
+
 internal fun creatureNeeds(
     taskId: TaskDefinitionId,
     definition: WorkflowDefinition,
     run: WorkflowRun,
     roles: Collection<RoleDefinition>,
     modelReports: List<ProviderUsageRecorded> = emptyList(),
+    cumulative: Map<RoleDefinitionId, Int> = emptyMap(),
 ): CreatureNeeds? {
     val tasks = definition.tasks.associateBy(TaskDefinition::id)
     val task = tasks[taskId] ?: return null
@@ -245,6 +342,7 @@ internal fun creatureNeeds(
 
     // The budget belongs to the agent (its role) and covers everything it spends in this run.
     val roleId = taskRun?.assignedRoleId ?: task.roleId
+    val echoHundredths = if (agent(taskId)) taskRun?.assignedRoleId?.let(cumulative::get) else null
     val budgetLeft = roleId?.let(rolesById::get)?.effectiveTokenBudget()?.let { cap ->
         val spent = run.taskRuns.values.filter { it.assignedRoleId == roleId }.sumOf { it.usage?.totalTokens ?: 0 }
         (100 - spent * 100 / cap).coerceIn(0, 100).toInt()
@@ -263,7 +361,7 @@ internal fun creatureNeeds(
 
     return CreatureNeeds(
         echo = echo,
-        echoState = echoStateOf(echo),
+        echoState = echoStateOf((echoHundredths ?: 0) / 100),
         integrity = integrity,
         budget = budgetLeft,
         tokensSpent = taskRun?.usage?.totalTokens,
@@ -276,5 +374,6 @@ internal fun creatureNeeds(
         reviewApprovals = reviewOutcomes.count { it.second == ArtifactVerdict.Approve },
         reviewRevisions = reviewOutcomes.count { it.second == ArtifactVerdict.Revise },
         reviewRejections = reviewOutcomes.count { it.second == ArtifactVerdict.Reject },
+        echoHundredths = echoHundredths,
     )
 }
