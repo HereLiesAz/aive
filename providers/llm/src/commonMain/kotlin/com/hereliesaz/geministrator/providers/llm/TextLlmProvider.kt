@@ -250,7 +250,10 @@ open class TextLlmProvider(
         // Match the renderer's nonblank text inputs only after a non-discarded generation.
         val ids = if (delivered) session.request.contextArtifacts.filter { !it.textContent.isNullOrBlank() }
             .mapTo(linkedSetOf()) { it.id.value } else null
-        emit(usage.toEvent(runId, api.modelId, session.requestFingerprint).copy(deliveredArtifactIds = ids))
+        // [renderPrompt] writes every stable and dynamic context block whole and never trims or drops one, so a
+        // non-discarded generation carried all the recalled memory the gateway put in the request.
+        emit(usage.toEvent(runId, api.modelId, session.requestFingerprint)
+            .copy(deliveredArtifactIds = ids, rendersPromptContextWhole = delivered))
     }
 
     /** What [result] cost: its tokens, and a price (or "unknown", which a dollar cap does not treat as free). */
