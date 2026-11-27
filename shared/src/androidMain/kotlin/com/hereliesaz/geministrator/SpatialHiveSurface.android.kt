@@ -192,7 +192,7 @@ private class SpatialGlRenderer(private val failed: () -> Unit) : GLSurfaceView.
     override fun onDrawFrame(gl: GL10?) {
         val view=camera
         val pass=if(view!=null && program!=0) optics?.takeIf { it.begin(viewportWidth,viewportHeight) } else null
-        GLES30.glClearColor(.012f,.045f,.047f,1f)
+        GLES30.glClearColor(.012f,.045f,.047f,if(pass!=null) SPATIAL_FAR_CLEAR_ALPHA else 1f)
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
         if (view==null || program==0) return
         val current=mesh
