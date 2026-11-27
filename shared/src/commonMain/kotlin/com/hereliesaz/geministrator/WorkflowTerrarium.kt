@@ -454,7 +454,17 @@ internal fun GeministratorWorkflowTerrarium(
                 onSwarmChange = if (building) null else { all -> swarmView.value = all },
             )
         }
+        var spatialFailed by remember(liveRun.id) { mutableStateOf(false) }
         val field: @Composable () -> Unit = {
+          if (spatialHiveSupported && !spatialFailed && !building && rehearsal == null && !readOnly && isRealRun(liveRun.id.value)) {
+            SpatialHiveField(projection, animatedRelationships,
+                tissue.copy(births = if (swarmView.value) emptyMap() else births,
+                    roaming = if (swarmView.value) RoamPlan() else roaming),
+                liveRun, selectedTaskId,
+                onAgent = { id -> if (stagedDefinition.tasks.any { it.id.value == id }) onTaskSelected(id) },
+                onEmpty = { selectedTaskId?.let(releaseCreature) },
+                onFailure = { spatialFailed = true }, modifier = Modifier.fillMaxSize())
+          } else {
           // Programmatic steps, local or remote, wear the neuron: the swarm reads as a flowchart.
           androidx.compose.runtime.CompositionLocalProvider(
               LocalProgrammaticNodes provides projection.programmaticNodeIds,
@@ -565,6 +575,7 @@ internal fun GeministratorWorkflowTerrarium(
                     )
                 }
             }
+          }
         }
 
         val baseField: @Composable () -> Unit = field

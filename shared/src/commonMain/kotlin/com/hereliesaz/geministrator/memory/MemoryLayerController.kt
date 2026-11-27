@@ -116,6 +116,10 @@ class MemoryLayerController(
     /** The selected workflow's lineage bank (its own records and its ancestors'). */
     val snapshot: StateFlow<MemorySnapshot> = mutableSnapshot.asStateFlow()
 
+    private val mutableWebRevision = MutableStateFlow(0L)
+    /** Invalidate run-scoped views when the existing controller publishes memory changes. */
+    val webRevision: StateFlow<Long> = mutableWebRevision.asStateFlow()
+
     private val mutableSelectedBank = MutableStateFlow<String?>(null)
     /** The workflow whose bank the Memory screen shows and acts on; null until one exists. */
     val selectedBank: StateFlow<String?> = mutableSelectedBank.asStateFlow()
@@ -330,6 +334,12 @@ class MemoryLayerController(
      */
     suspend fun webSource(): MemoryWebSource {
         val workflow = selectedWorkflow() ?: return MemoryWebSource(MemorySnapshot())
+        return webSourceForRun(workflow)
+    }
+
+    /** Read the named run's own and inherited bank without changing the Keeper's selected bank. */
+    suspend fun webSourceForRun(workflow: String): MemoryWebSource {
+        if (workflow !in banks.known()) return MemoryWebSource(MemorySnapshot())
         val habits = runCatchingCancellable { formedHabits(workflow) }.getOrDefault(emptyList())
         val sequences = runCatchingCancellable { formedSequences(workflow) }.getOrDefault(emptyList())
         val procedures = runCatchingCancellable { procedureCatalog?.visible(workflow).orEmpty().map { it.definition } }.getOrDefault(emptyList())
@@ -2082,6 +2092,7 @@ class MemoryLayerController(
         mutableSnapshot.value = selectedWorkflow()?.let { lineageStore(it).read() } ?: MemorySnapshot()
         mutableSummaryMetrics.value = selectedWorkflow()?.let { MemorySummaryMetricsView.of(layerFor(it).summaryMetrics) } ?: MemorySummaryMetricsView()
         mutableLineageLog.value = lineage.log()
+        mutableWebRevision.value += 1
     }
 
     private companion object {

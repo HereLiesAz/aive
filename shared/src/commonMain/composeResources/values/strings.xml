@@ -2420,4 +2420,6 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="memory_habits_replay_quarantined">Quarantined: %1$s</string>
     <string name="memory_habits_replay_approve">Approve</string>
     <string name="memory_habits_replay_revoke">Revoke</string>
+    <string name="spatial_colony_view">Colony</string>
+    <string name="spatial_memory_view">Memory</string>
 </resources>
