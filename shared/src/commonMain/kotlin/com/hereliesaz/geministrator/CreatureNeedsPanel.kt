@@ -30,6 +30,8 @@ import com.hereliesaz.geministrator.resources.needs_nothing_downstream
 import com.hereliesaz.geministrator.resources.needs_output_used
 import com.hereliesaz.geministrator.resources.needs_near_config_review_paths
 import com.hereliesaz.geministrator.resources.needs_reviews_of
+import com.hereliesaz.geministrator.resources.needs_review_outcomes
+import com.hereliesaz.geministrator.resources.needs_review_outcome_counts
 import com.hereliesaz.geministrator.resources.needs_tokens_spent
 import org.jetbrains.compose.resources.stringResource
 
@@ -68,6 +70,13 @@ internal fun CreatureNeedsPanel(
         )
         NeedMeter(stringResource(Res.string.needs_output_used), needs.outputUsed, OutputTeal,
             stringResource(if (needs.hasDownstream) Res.string.needs_not_reported else Res.string.needs_nothing_downstream))
+        if (needs.hasDownstream) {
+            val outcomes = needs.reviewApprovals + needs.reviewRevisions + needs.reviewRejections
+            NeedLine(stringResource(Res.string.needs_review_outcomes),
+                if (outcomes == 0) stringResource(Res.string.needs_not_reported)
+                else stringResource(Res.string.needs_review_outcome_counts,
+                    needs.reviewApprovals, needs.reviewRevisions, needs.reviewRejections))
+        }
         needs.nearClone?.let { NeedLine(stringResource(Res.string.needs_near_config), it) }
         if (needs.selfReviews > 0) {
             NeedLine(

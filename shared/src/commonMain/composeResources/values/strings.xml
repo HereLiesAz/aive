@@ -996,7 +996,7 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="needs_echo">ECHO · %1$s</string>
     <string name="needs_echo_exposure">ECHO EXPOSURE (REPORTED DELIVERY)</string>
     <string name="needs_near_config">NEAR-CLONE CONFIGURATION</string>
-    <string name="needs_near_config_review_paths">NEAR-CLONE REVIEW PATHS</string>
+    <string name="needs_near_config_review_paths">NEAR-CLONE REVIEW OUTCOMES</string>
     <string name="needs_echo_grounded">GROUNDED</string>
     <string name="needs_echo_self_absorbed">SELF-ABSORBED</string>
     <string name="needs_echo_fevered">FEVERED</string>
@@ -1009,7 +1009,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="needs_nothing_downstream">nothing downstream</string>
     <string name="needs_near_clone">NEAR-CLONE</string>
     <string name="needs_reviewed_by_itself">REVIEWED BY ITS OWN CONFIG</string>
-    <string name="needs_reviews_of">%1$d of %2$d review paths</string>
+    <string name="needs_reviews_of">%1$d of %2$d comparable reviews</string>
+    <string name="needs_review_outcomes">REPORTED REVIEW OUTCOMES</string>
+    <string name="needs_review_outcome_counts">%1$d approve · %2$d revise · %3$d reject</string>
     <string name="inspector_state">STATE</string>
     <string name="inspector_stop_workflow">Stop swarm</string>
     <string name="inspector_stored_evidence">stored evidence</string>

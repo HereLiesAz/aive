@@ -1,5 +1,6 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.domain.ArtifactKind
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.RoleExecutionSource
 import com.hereliesaz.geministrator.domain.effectiveExecutor
@@ -10,6 +11,11 @@ import com.hereliesaz.geministrator.domain.TaskRunStatus
 import com.hereliesaz.geministrator.domain.WorkflowDefinition
 import com.hereliesaz.geministrator.domain.WorkflowRun
 import com.hereliesaz.geministrator.events.ProviderUsageRecorded
+import com.hereliesaz.geministrator.workflow.ArtifactVerdict
+import com.hereliesaz.geministrator.workflow.ArtifactVerdicts
+import com.hereliesaz.geministrator.workflow.GATE_VERDICT_BLOCKED
+import com.hereliesaz.geministrator.workflow.HALL_MONITOR_REPORT_ID_METADATA
+import com.hereliesaz.geministrator.workflow.HALL_MONITOR_REVIEW_VERDICT_METADATA
 import androidx.compose.runtime.staticCompositionLocalOf
 
 /**
@@ -21,7 +27,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
  * semantic reliance, memory reads, contamination, sepsis, independence or a completed review.
  */
 internal data class CreatureNeeds(
-    /** 0..100 of comparable active input/review paths with near-identical declared configuration. */
+    /** 0..100 of comparable delivered input paths with near-identical declared configuration. */
     val echo: Int,
     val echoState: EchoState,
     /** 0..100: its reliability in this run; retries and failures cost it. */
@@ -34,13 +40,17 @@ internal data class CreatureNeeds(
     val outputUsed: Int?,
     /** Another task with high configuration overlap and matching reported provider/model. */
     val nearClone: String?,
-    /** Comparable active reviewer paths with high configuration overlap; not proof of a review. */
+    /** Completed, attributable review outcomes from reviewers with near-identical configurations. */
     val selfReviews: Int,
     val reviews: Int,
     /** Number of comparable active paths. Zero means Echo exposure is not reported. */
     val echoComparablePaths: Int = 0,
     /** Whether there is a planned downstream path, distinct from unknown delivery. */
     val hasDownstream: Boolean = false,
+    /** Attributable stated review outcomes, not independent proof of work quality or approval authority. */
+    val reviewApprovals: Int = 0,
+    val reviewRevisions: Int = 0,
+    val reviewRejections: Int = 0,
 )
 
 internal enum class EchoState { Grounded, SelfAbsorbed, Fevered, Insane }
@@ -108,6 +118,45 @@ internal fun artifactDelivered(
     return source.artifacts.any { it.taskRunId == source.id && it.id.value in ids }
 }
 
+/**
+ * Read a stated outcome on a single-source review path. A multi-source review has no reliable
+ * per-source attribution in the generic verdict format, so do not distribute its verdict to every
+ * producer. A Hall Monitor review must additionally name the actual delivered report.
+ * The current consumer must have finished, or have been failed specifically by a blocking verdict.
+ * No outcome grants authority or establishes that the producer subsequently received the review.
+ */
+internal fun reportedReviewVerdict(
+    run: WorkflowRun,
+    producer: TaskDefinitionId,
+    review: TaskDefinition,
+    deliveries: Map<TaskDefinitionId, Set<String>>,
+): ArtifactVerdict? {
+    if (review.dependsOn != setOf(producer)) return null
+    if (artifactDelivered(run, producer, review.id, deliveries) != true) return null
+    val source = run.taskRuns[producer] ?: return null
+    val consumer = run.taskRuns[review.id] ?: return null
+    val blocked = consumer.status == TaskRunStatus.Failed && consumer.blockingReason?.code == GATE_VERDICT_BLOCKED
+    if (consumer.status != TaskRunStatus.Completed && !blocked) return null
+    val deliveredIds = deliveries[review.id] ?: return null
+    val sourceArtifacts = source.artifacts.filter { it.taskRunId == source.id && it.id.value in deliveredIds }
+    // Unknown additional inputs make even a single planned dependency ambiguous.
+    if (sourceArtifacts.map { it.id.value }.toSet() != deliveredIds) return null
+    val verdicts = consumer.artifacts
+        .filter { it.taskRunId == consumer.id && it.kind in setOf(ArtifactKind.Review, ArtifactKind.Verification, ArtifactKind.HallMonitorReview) }
+        .map { artifact ->
+            val hallVerdict = artifact.metadata[HALL_MONITOR_REVIEW_VERDICT_METADATA]
+            if (artifact.kind == ArtifactKind.HallMonitorReview || hallVerdict != null) {
+                val reportId = artifact.metadata[HALL_MONITOR_REPORT_ID_METADATA] ?: return null
+                val matches = sourceArtifacts.filter { it.kind == ArtifactKind.HallMonitorReport &&
+                    (it.metadata[HALL_MONITOR_REPORT_ID_METADATA] ?: it.id.value) == reportId }
+                if (matches.size != 1) return null
+                ArtifactVerdicts.parse(hallVerdict ?: return null)
+            } else ArtifactVerdicts.of(artifact)
+        }
+    val verdict = verdicts.distinct().singleOrNull() ?: return null
+    return verdict.takeUnless { blocked && !it.blocks }
+}
+
 /** Shared run-correlated journal projection for the inspector and tissue, never the GPU. */
 internal val LocalModelUsageReports = staticCompositionLocalOf<List<ProviderUsageRecorded>> { emptyList() }
 
@@ -171,16 +220,21 @@ internal fun creatureNeeds(
 
     val dependents = definition.tasks.filter { taskId in it.dependsOn }.map(TaskDefinition::id)
     val deliveries = reportedArtifactDeliveries(run, modelReports)
-    // Delivery to a reviewer is not proof that the producer received its verdict.
+    // Only incoming deliveries contribute to exposure. Outgoing review outcomes are separate:
+    // a reviewer seeing work does not establish that its producer ever saw the review.
     val inputs = task.dependsOn.filter { artifactDelivered(run, it, taskId, deliveries) == true }
-    val reviewers = dependents.filter { isReviewer(it) && artifactDelivered(run, taskId, it, deliveries) == true }
+    val reviewOutcomes = dependents.mapNotNull { id ->
+        val review = tasks[id] ?: return@mapNotNull null
+        if (!isReviewer(id)) return@mapNotNull null
+        reportedReviewVerdict(run, taskId, review, deliveries)?.let { id to it }
+    }
     fun exposure(id: TaskDefinitionId): Int? {
         if(!agent(taskId)) return null
         // A completed programmatic dependency is a distinct source, not a model clone.
         return if(!agent(id)) 0 else kinship(id)
     }
-    val voices=(inputs+reviewers).distinct().mapNotNull(::exposure)
-    val reviewScores=reviewers.mapNotNull(::kinship)
+    val voices=inputs.distinct().mapNotNull(::exposure)
+    val reviewScores=reviewOutcomes.mapNotNull { (id, _) -> kinship(id) }
     val selfReviews=reviewScores.count { it>=NEAR_CLONE_KINSHIP }
     val echo=if(voices.isEmpty()) 0 else voices.count { it>=NEAR_CLONE_KINSHIP }*100/voices.size
 
@@ -219,5 +273,8 @@ internal fun creatureNeeds(
         reviews = reviewScores.size,
         echoComparablePaths = voices.size,
         hasDownstream = dependents.isNotEmpty(),
+        reviewApprovals = reviewOutcomes.count { it.second == ArtifactVerdict.Approve },
+        reviewRevisions = reviewOutcomes.count { it.second == ArtifactVerdict.Revise },
+        reviewRejections = reviewOutcomes.count { it.second == ArtifactVerdict.Reject },
     )
 }
