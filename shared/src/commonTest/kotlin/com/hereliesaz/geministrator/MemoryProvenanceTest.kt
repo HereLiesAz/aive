@@ -66,6 +66,13 @@ class MemoryProvenanceTest {
     }
 
     @Test
+    fun usageIsCreditedOnlyWhenTheProviderRenderedTheContextWholeAndTheSessionIsKnown() {
+        // The gateway rule lives in a private extension; its inputs are pinned here by the event's own defaults.
+        val event = com.hereliesaz.geministrator.providers.AgentEvent.UsageReported(runId = ProviderRunId("r"), deliveredArtifactIds = emptySet())
+        assertEquals(false, event.rendersPromptContextWhole)
+    }
+
+    @Test
     fun recallBlockAddressesMustAlignWithBlocks() {
         val block = PromptContextBlock("Relevant memory", "text")
         MemoryPromptRecall(blocks = listOf(block), blockAddresses = listOf(setOf("memory-node:a")))

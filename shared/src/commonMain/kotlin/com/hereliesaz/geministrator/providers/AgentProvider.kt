@@ -220,6 +220,11 @@ sealed interface AgentEvent {
         val requestChars: Int? = null,
         /** Artifact text IDs sent in a successful generation; null is unreported, not semantic reliance. */
         val deliveredArtifactIds: Set<String>? = null,
+        /**
+         * True only when the provider rendered the task's whole prompt context into this successful request, with no
+         * trimming or dropping of recalled memory. Default off: a provider that cannot say leaves memory delivery unknown.
+         */
+        val rendersPromptContextWhole: Boolean = false,
     ) : AgentEvent {
         init {
             require(cacheHitFraction == null || cacheHitFraction in 0f..1f) {

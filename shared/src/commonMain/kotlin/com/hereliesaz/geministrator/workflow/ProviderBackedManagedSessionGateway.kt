@@ -109,8 +109,8 @@ class ProviderBackedManagedSessionGateway(
         val answeredQuestionKey: String? = null,
         /** True once this process has seen a question or an answer, so [keeperQuestion] is authoritative. */
         val questionKnown: Boolean = false,
-        /** The memory nodes this session's request carried ([AgentTaskRequest.recalledMemoryAddresses]); empty when unknown. */
-        val recalledMemory: Set<String> = emptySet(),
+        /** The memory nodes this session's request carried ([AgentTaskRequest.recalledMemoryAddresses]); null when unknown (a reconnected session). */
+        val recalledMemory: Set<String>? = null,
     )
 
     private val mutex = Mutex()
@@ -654,7 +654,7 @@ class ProviderBackedManagedSessionGateway(
     private suspend fun registerAndObserve(
         handle: ManagedSessionHandle,
         initialStatus: ManagedSessionStatus,
-        recalledMemory: Set<String> = emptySet(),
+        recalledMemory: Set<String>? = null,
     ) {
         val shouldObserve = mutex.withLock {
             if (snapshots.containsKey(handle)) {
@@ -1559,10 +1559,11 @@ class ProviderBackedManagedSessionGateway(
     }
 
     /**
-     * [recalledMemory] is credited as delivered only when the provider itself reported a successful generation's
-     * deliveries ([deliveredArtifactIds] non-null, empty included): an uninstrumented provider leaves it unknown.
+     * [recalledMemory] is credited as delivered only when the provider reported a successful generation's deliveries
+     * ([deliveredArtifactIds] non-null) and said it rendered the prompt context whole ([rendersPromptContextWhole]),
+     * and the session's provenance is known (non-null). Anything else leaves it unknown, never a known-empty set.
      */
-    private fun AgentEvent.UsageReported.sanitizedUsage(recalledMemory: Set<String> = emptySet()): ManagedSessionUsage = ManagedSessionUsage(
+    private fun AgentEvent.UsageReported.sanitizedUsage(recalledMemory: Set<String>? = null): ManagedSessionUsage = ManagedSessionUsage(
         inputTokens = inputTokens,
         outputTokens = outputTokens,
         costUsd = costUsd,
@@ -1574,7 +1575,7 @@ class ProviderBackedManagedSessionGateway(
         requestSha256 = requestSha256,
         requestChars = requestChars,
         deliveredArtifactIds = deliveredArtifactIds,
-        deliveredMemoryAddresses = if (deliveredArtifactIds == null) null else recalledMemory,
+        deliveredMemoryAddresses = if (deliveredArtifactIds == null || !rendersPromptContextWhole) null else recalledMemory,
     ).sanitized()
 
     private fun AgentEvent.memoryReplayKey(): String = when (this) {

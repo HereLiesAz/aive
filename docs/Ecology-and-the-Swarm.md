@@ -205,6 +205,19 @@ Successful hosted text generations with usage reports and on-device text generat
 
 The Needs inspector now reads explicit approve, revise and reject verdicts from current consumer artifacts using the existing engine verdict parser. A review is attributed only when the reviewing agent has one declared upstream producer, current-session delivery identifies that producer's artifacts without additional unidentified inputs, and the reviewer completed or was failed specifically by a blocking verdict. Conflicting or missing verdicts, stale sessions and multi-source reviews remain unknown. Hall Monitor verdicts also require an exact delivered report identifier. Counts describe stated review outcomes, not independent proof of quality, approval authority, or feedback received by the producer. Echo exposure now uses incoming artifact delivery only; outgoing verdicts are shown separately until a subsequent input actually carries that feedback. No routing, approval, spend or execution decisions read these projections.
 
+### Light in the spatial hive
+
+`SpatialSignals.kt`. The hive's light says what happened and is read from the run's own records; presentation time only shapes how a real event looks, it never makes one.
+
+| Light | Read from | Rule |
+|---|---|---|
+| A memory spore lights **blue** (any kind: tag, keyword, key phrase, summary, ...) | `deliveredMemoryAddresses` (memory-read provenance), `memory-node:<id>` is the web's `node:<id>` | 1 at the moment of use, easing to 0 over 2.5 s |
+| **Pulses** travel the connective tissue (or legs) from sender to receiver | A recorded artifact delivery, producer to consumer (the evidence Echo and trophic support read) | Leave on the sender's beats, at its rate, for 4 s after the delivery; 1.2 s to travel |
+| The creature **pulses** at the same rate | Its own task's reported progress | 0.5 Hz rising to 3 Hz with progress; a task with no progress reports beats at 0.5, never faster; none when not working |
+| The light **bursts** and its spores are released | The journal's `TaskCompleted` | Fast rise, 1.8 s fall; the spores are the web nodes whose sources include the task's own episodes (and those episodes' nodes), linked by the episode's task run, never by time or proximity |
+
+One beat integrator per creature (`advanceBeat`) drives both its own light and the pulses it sends, so they share rate and phase while the rate climbs. The cap is 3 Hz, the most a flashing light should do; reduced motion keeps the resting state (no beat). A finish with no memory episode still bursts, with no spores. The tardigrades' collection (a clerk travelling to released spores and carrying them to the network at the pole) is choreography over these released spores and is not built. Not wired yet: the GPU (a time-varying emission and a pulse overlay in the three backends) and hardware checks. The Needs memory count and the blue light stay "not reported" until a provider opts in to `rendersPromptContextWhole`.
+
 ### Memory-read provenance
 
 `MemoryProvenance.kt`. The memory layer's recall now says which stored nodes each prompt block actually carries (`MemoryPromptRecall.blockAddresses`, after each block's own whole-unit trimming); the gateway keeps only the nodes in blocks the context packer selected (`AgentTaskRequest.recalledMemoryAddresses`); and when the provider reports a successful generation's deliveries (the same signal as artifact delivery), the session's usage carries them (`ManagedSessionUsage.deliveredMemoryAddresses`) into the journal (`ProviderUsageRecorded.deliveredMemoryAddresses`, addresses only, never content). `reportedMemoryReads` matches the exact workflow, task, provider and session, excludes replayed work, and treats a missing report as unknown. The Needs tab shows the count of distinct nodes carried.
