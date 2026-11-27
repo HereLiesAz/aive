@@ -2416,6 +2416,21 @@ class ApplicationRuntime private constructor(
         settledRunsBefore(before).fold(TrophicHistory()) { history, run -> history.advance(run, usageReports(run)) }.balances
 
     /**
+     * The children a workflow's reviewers have pollinated so far (see ReviewerPollen.kt), rebuilt from its settled runs
+     * and their journals. Each has a fixed ID, so saving the ones not yet in the roster is idempotent. A role's latest
+     * snapshot stands for it, so a later edit to a producer shows in children born after it.
+     */
+    internal suspend fun pollinatedChildren(workflow: com.hereliesaz.geministrator.domain.WorkflowDefinitionId): List<RoleDefinition> {
+        var history = PollenHistory(workflow)
+        val roles = mutableMapOf<RoleDefinitionId, RoleDefinition>()
+        for (run in settledRunsBefore(null).filter { it.workflowDefinitionId == workflow }) {
+            run.roleSnapshot.forEach { roles[it.id] = it }
+            history = history.advance(run, usageReports(run))
+        }
+        return history.pollinations.mapNotNull { pollinatedChild(it, roles) }
+    }
+
+    /**
      * Retire the roles whose trophic reserve is spent by disabling them (never deleting; lineage stays).
      * Skips any role a saved hive still names and everything while a run is live, so no plan loses a worker
      * mid-flight. Returns the roles retired. Called only when the keeper has switched pruning on.
