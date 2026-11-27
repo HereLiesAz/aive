@@ -17,10 +17,12 @@ import com.hereliesaz.geministrator.events.ProviderUsageRecorded
  * runs' own records; no review is inferred.
  */
 
-/** Reviewers whose reviews pollinate: the reviewer kinds except the Antagonist, which is not the keeper's reviewer. */
-private fun pollinates(role: RoleDefinition): Boolean =
-    role.executionSource == RoleExecutionSource.Agent && isReviewerRoleName(role.name) &&
-        classifyNodeCreatureRole(role.name) != NodeCreatureRoleKind.Antagonist
+/** The Antagonist does not improve genetically: it neither pollinates nor is pollen, and it never leads a child. */
+private fun heritable(role: RoleDefinition): Boolean =
+    role.executionSource == RoleExecutionSource.Agent && classifyNodeCreatureRole(role.name) != NodeCreatureRoleKind.Antagonist
+
+/** Reviewers whose reviews pollinate: the reviewer kinds, minus the Antagonist. */
+private fun pollinates(role: RoleDefinition): Boolean = heritable(role) && isReviewerRoleName(role.name)
 
 /** One attributable review: [reviewer]'s role reviewed [producer]'s role's work, whatever the verdict. */
 internal data class PollenVisit(
@@ -50,7 +52,7 @@ internal fun pollenVisits(run: WorkflowRun, reports: List<ProviderUsageRecorded>
         val source = run.taskRuns[sourceId] ?: continue
         val sourceDef = tasks[sourceId] ?: continue
         if (!(source.executor ?: sourceDef.effectiveExecutor()).isAgent) continue
-        val producer = source.assignedRoleId?.let(roles::get)?.takeIf { it.executionSource == RoleExecutionSource.Agent } ?: continue
+        val producer = source.assignedRoleId?.let(roles::get)?.takeIf(::heritable) ?: continue
         reportedReviewVerdict(run, sourceId, consumer, deliveries) ?: continue
         val artifacts = source.artifacts.filter { it.taskRunId == source.id }.map { it.id.value }.toSet()
         val time = reports.asSequence().filter { event ->
@@ -105,21 +107,34 @@ internal data class PollenHistory(
     }
 }
 
+/** Children per reviewer lineage in each block: one follows the reviewer, the other five a producer. */
+internal const val POLLEN_BLOCK = 6
+
+/**
+ * Exactly one child in every block of [POLLEN_BLOCK] (reviews 1 to 6, 7 to 12, ...) of a reviewer in a workflow follows
+ * the reviewer's own line, which makes reviewers to producers born 1:5. A stable hash of the workflow, the reviewer and
+ * the block picks which of the six it is, so the position varies but the ratio never does.
+ */
+internal fun followsReviewer(p: Pollination): Boolean {
+    val block = (p.index - 1) / POLLEN_BLOCK
+    val slot = ("${p.workflow.value}:${p.reviewer.value}:$block:lead-v2").hashCode().toUInt() % POLLEN_BLOCK.toUInt()
+    return (p.index - 1) % POLLEN_BLOCK == slot.toInt()
+}
+
 /**
  * The child of one pollination, born unadopted (disabled) like every hatch, or null when its parents cannot be
  * joined: a parent missing from [roles], not an agent, disjoint tool ceilings, or one surface alias bound two ways.
- * A deterministic draw per child decides whose line it follows: half follow the reviewer, so the reviewer lineage
- * can itself improve, and the rest follow one of the producers. The child takes its lead's name, authorities and
+ * [followsReviewer] decides whose line it follows: one in six follows the reviewer, so the reviewer lineage can itself
+ * improve, and the other five follow one of the producers. The child takes its lead's name, authorities and
  * keeper instructions; the other parents add instructions, capabilities and surfaces. It never gains an authority.
  */
 internal fun pollinatedChild(pollination: Pollination, roles: Map<RoleDefinitionId, RoleDefinition>): RoleDefinition? {
     val parents = pollination.parents.map { roles[it] ?: return null }
-    if (parents.any { it.executionSource != RoleExecutionSource.Agent }) return null
+    if (parents.any { !heritable(it) }) return null
     val reviewer = parents.first()
     val producers = parents.drop(1)
     val id = pollination.childId
-    val draw = "${id.value}:lead-v1".hashCode().toUInt()
-    val lead = if (producers.isEmpty() || draw % 2u == 0u) reviewer
+    val lead = if (producers.isEmpty() || followsReviewer(pollination)) reviewer
         else producers[(("${id.value}:producer-v1").hashCode().toUInt() % producers.size.toUInt()).toInt()]
     var ceiling: List<String>? = null
     for (parent in parents) {

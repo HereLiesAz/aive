@@ -106,11 +106,27 @@ class ReviewerPollenTest {
         assertTrue(child.name.endsWith("· pollen 2"))
         assertTrue(child.authorities.all { it in roles.flatMap { r -> r.authorities } })
         assertEquals(child, pollinatedChild(history.pollinations.last(), byId)) // deterministic
-        // Over many children some follow the reviewer's line and some a producer's, so the reviewer can improve too.
-        val leads = (1..40).mapNotNull {
-            pollinatedChild(Pollination(workflow, qa.id, it, listOf(qa.id, engineer.id, writer.id), WorkflowRunId("r$it")), byId)
-        }.map { isReviewerRoleName(it.name) }
-        assertTrue(true in leads && false in leads)
+    }
+
+    @Test
+    fun exactlyOneChildInSixFollowsTheReviewer() {
+        val byId = roles.associateBy { it.id }
+        val leads = (1..60).map {
+            val p = Pollination(workflow, qa.id, it, listOf(qa.id, engineer.id, writer.id), WorkflowRunId("r$it"))
+            assertEquals(followsReviewer(p), isReviewerRoleName(assertNotNull(pollinatedChild(p, byId)).name))
+            followsReviewer(p)
+        }
+        assertEquals(10, leads.count { it }) // reviewers to producers born: 1:5
+        assertTrue(leads.chunked(6).all { block -> block.count { it } == 1 })
+    }
+
+    @Test
+    fun theAntagonistNeitherPollinatesNorIsPollen() {
+        val antagonist = qa.copy(id = RoleDefinitionId("antagonist"), name = "Antagonist")
+        val byId = (roles + antagonist).associateBy { it.id }
+        val p = Pollination(workflow, qa.id, 1, listOf(qa.id, antagonist.id), WorkflowRunId("r"))
+        assertNull(pollinatedChild(p, byId))
+        assertNull(pollinatedChild(p.copy(reviewer = antagonist.id, parents = listOf(antagonist.id, engineer.id)), byId))
     }
 
     @Test
