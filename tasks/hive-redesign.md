@@ -36,3 +36,35 @@ Work in this order, one PR per step, each looked at in the running desktop app, 
 
 ## How I will check it
 A new rule in `tasks/lessons.md`: I look at the running app, on the screen size the keeper uses, and ask "does this look like a hive?" before I say it is done. Passing tests and a clean compile do not answer that.
+
+## Keeper ruling: spatial frontend replacement (2026-11-26)
+
+Approved product direction, not implemented. This supersedes the earlier screen-preservation constraint and conflicting navigation proposals. The original reason remains: the product must be a living hive, not a flowchart.
+
+- Replace the entire frontend using Compose Multiplatform, including PWA. One persistent 3D orbital environment, not a dashboard or an optional terrarium. No parallel UI or planar alternative. Contextual controls open within the world.
+- The Queen is the central Nucleus. The camera normally orbits its equator, focuses on interacting or selected organisms, and yields to user orbit, pan and zoom.
+- Memory is a mycelial spore network in that same space. Entering memory swings the camera upward and outward over the north pole. Tardigrade memory clerks collect spores released by neuron creatures, transport them and maintain the hyphae. Actual memories and associations determine meaningful memory activity.
+- Neuron creatures vary substantially in anatomy, eyes, tendrils, pigmentation and surface. Fine hairs vary in width and length and move as if underwater. Organisms act independently on a synchronized clock, not under coordinated movement. Flexible attachments remain connected. Macro optics: shallow depth of field, wide aperture, short focus-distance threshold.
+- Persistent randomized organism arrangement identifies the workflow. Connective-tissue growth identifies the run. Each new run has distinct growth; reloading adds to existing growth. Persist growth events, topology and scars. Neural guidance, vascular girth and species-specific fungal branching, fusion, pruning and repair are local processes. Procedural morphology is not evidence of execution, memory activity or logical dependencies.
+- Existing screens and infrastructure may be rewritten or retired. Wire the complete new UI before cleanup. Ask the Keeper about unsettled interaction placement or removal decisions.
+
+### Antagonist implementation and animation contract
+
+The antagonist uses the same underlying prompt as the GLEE Agent. It is a distinct nightmarish segmented tapeworm, with a radial, multi-ringed predatory maw and muscular peristaltic locomotion. Role, acting agent, organism/body, host and task remain separate identities.
+
+It independently selects reachable tissue and a host, attaches to the tissue, burrows through its actual geometry, enters the neuron creature and wears it like a biological suit. Successful agentic takeover means the target surrenders its assigned work and the antagonist becomes the acting agent for that role, without duplicate execution. Physical occupancy alone does not establish success. Preserve actual runtime authority, provenance and approval boundaries; animation cannot authorize reassignment.
+
+Antagonist stages: Dormant, Searching, Targeting, Approaching, Burrowing, Traversing, BreachingHost, InfiltratingHost, OccupyingHost, UsurpingRole, OperatingAsHost. Host stages: Healthy, Threatened, UnderAttack, Penetrated, Infected, Occupied, PuppetActive. Tissue stages: Healthy, Disturbed, UnderAttack, Burrowed, Infected, Severed, Regrowing. These are design vocabulary, not claims about existing symbols.
+
+Animation: searching head sweeps and probing; targeting alignment and maw opening; attachment and progressive penetration; continuous segmented contractions along the tissue; local bulging, compression, splits and interrupted pulses; host breach and progressive disappearance inside; recognizable host anatomy with abnormal eyes, posture, appendage timing and internal glow; parasite-driven puppet movement after confirmed takeover. Persist damage, scars and repair. No teleporting, scripted target order, or forced camera cuts. Keep dark wet translucent parasite materials and localized changes rather than recoloring the colony. The contextual host inspector distinguishes role, acting agent, occupation, tissue integrity and work.
+
+### Acceptance gates (outstanding)
+
+- [ ] Live Compose frontend and one persistent 3D world, Queen/nucleus, equatorial and north-pole camera modes.
+- [ ] Independent species behaviors, flexible tissue, persistent workflow placement and unique cumulative run growth.
+- [ ] Real memory spores, hyphae and tardigrade collection/maintenance.
+- [ ] Verified reuse of the GLEE prompt, continuous antagonist infiltration and actual role takeover with no duplicate work or authority bypass.
+- [ ] Contextual controls wired to actual runtime; phone and wide visual verification; build, regression and cold independent GLEE review.
+- [ ] Legacy cleanup only after the new UI is completely wired.
+
+This is a documentation checkpoint. The new spatial and infestation invariants are not yet enforced. Existing runtime and security invariants are unchanged. No implementation checklist item is being marked complete.
