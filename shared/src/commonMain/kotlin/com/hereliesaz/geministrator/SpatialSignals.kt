@@ -61,6 +61,16 @@ internal fun blueGlow(nowEpochMillis: Long, usedAtEpochMillis: Long): Float {
     return 1f - x * x * (3f - 2f * x)
 }
 
+/**
+ * The blue mix for each spore at [nowEpochMillis], for the spores actually in the constellation only: [spores] are the
+ * ids of the web nodes the world draws. A used memory the web does not hold draws nothing, and nothing else flips:
+ * not its neighbours, not its hyphae, not the rest of the network. Concurrent uses of one spore take the strongest.
+ */
+internal fun blueSpores(nowEpochMillis: Long, uses: List<SporeUse>, spores: Set<String>): Map<String, Float> =
+    uses.asSequence().filter { it.sporeId in spores }
+        .map { it.sporeId to blueGlow(nowEpochMillis, it.atEpochMillis) }.filter { it.second > 0f }
+        .groupBy({ it.first }, { it.second }).mapValues { (_, mixes) -> mixes.max() }
+
 // ---- communication pulses --------------------------------------------------------------------------------------
 
 /** [from]'s output reached [to]'s successful request: a real delivery, directed toward whom it is said to. */

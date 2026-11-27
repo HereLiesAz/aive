@@ -80,6 +80,16 @@ class SpatialSignalsTest {
     }
 
     @Test
+    fun onlyTheSpecificDataThatWasUsedFlipsAndOnlyIfItIsReallyInTheConstellation() {
+        val uses = listOf(SporeUse(check, "node:a", 1_000), SporeUse(build, "node:a", 1_100),
+            SporeUse(check, "node:gone", 1_000))
+        val lit = blueSpores(1_150, uses, setOf("node:a", "node:b"))
+        assertEquals(setOf("node:a"), lit.keys) // not the unused neighbour b, and not a node the web does not hold
+        assertEquals(1f, lit.getValue("node:a")) // the strongest of the concurrent uses
+        assertEquals(emptyMap(), blueSpores(1_000 + BLUE_GLOW_MILLIS + 1, uses, setOf("node:a")))
+    }
+
+    @Test
     fun aDeliveryIsAPulseFromTheSenderToTheReceiver() {
         val pulses = transferPulses(run, listOf(report(check, 7_000, delivered = setOf("a-build"))))
         assertEquals(listOf(TransferPulse(build, check, 7_000)), pulses)
