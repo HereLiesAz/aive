@@ -61,6 +61,13 @@ internal data class CreatureNeeds(
     val memoryNodesCarried: Int? = null,
     /** Delivered inputs whose producer's role is septic (Echo 85 or more): each costs this task 2 integrity. */
     val septicInputs: Int = 0,
+    /** Distinct partner tasks (upstream and downstream) against what its token allowance lets it hold; null for a programmatic task. */
+    val synapses: Int? = null,
+    val synapseCapacity: Int? = null,
+    /** Partners beyond its capacity: each costs 2 integrity. */
+    val synapseExcess: Int = 0,
+    /** Observed model tier, tolerance, resilience and signal efficiency (OperationalGenome.kt); null where there is no evidence. */
+    val traits: OperationalTraits? = null,
 )
 
 internal enum class EchoState { Grounded, SelfAbsorbed, Fevered, Insane }
@@ -169,6 +176,9 @@ internal fun reportedReviewVerdict(
 
 /** Shared run-correlated journal projection for the inspector and tissue, never the GPU. */
 internal val LocalModelUsageReports = staticCompositionLocalOf<List<ProviderUsageRecorded>> { emptyList() }
+
+/** Observed operational traits per agent role (OperationalGenome.kt), rebuilt like Echo. */
+internal val LocalOperationalTraits = staticCompositionLocalOf<Map<RoleDefinitionId, OperationalTraits>> { emptyMap() }
 
 /** Shared trophic reserve per agent role (Trophic.kt), rebuilt the same way as Echo. */
 internal val LocalCumulativeTrophic = staticCompositionLocalOf<Map<RoleDefinitionId, Int>> { emptyMap() }
@@ -337,6 +347,7 @@ internal fun creatureNeeds(
     modelReports: List<ProviderUsageRecorded> = emptyList(),
     cumulative: Map<RoleDefinitionId, Int> = emptyMap(),
     trophic: Map<RoleDefinitionId, Int> = emptyMap(),
+    traits: Map<RoleDefinitionId, OperationalTraits> = emptyMap(),
 ): CreatureNeeds? {
     val tasks = definition.tasks.associateBy(TaskDefinition::id)
     val task = tasks[taskId] ?: return null
@@ -392,7 +403,12 @@ internal fun creatureNeeds(
         agent(taskId) && producer != null && producer != taskRun?.assignedRoleId && agent(id) &&
             (cumulative[producer] ?: 0) >= ECHO_SEPTIC
     }
-    val integrity = (100 - 15 * (attempt - 1) - (if (failed) 40 else 0) - 2 * septicInputs).coerceIn(0, 100)
+    // Synapses are the distinct tasks it is wired to, both ways. What its token allowance lets it hold is enforced as a
+    // cost, never as a refusal: a workflow is not blocked for wiring a creature past its capacity.
+    val partners = (task.dependsOn + dependents).filter { it != taskId }.toSet()
+    val capacity = if (agent(taskId)) synapseCapacities(rolesById.values)[taskRun?.assignedRoleId ?: task.roleId] else null
+    val synapseExcess = if (capacity == null) 0 else maxOf(0, partners.size - capacity)
+    val integrity = (100 - 15 * (attempt - 1) - (if (failed) 40 else 0) - 2 * septicInputs - 2 * synapseExcess).coerceIn(0, 100)
 
     // The budget belongs to the agent (its role) and covers everything it spends in this run.
     val roleId = taskRun?.assignedRoleId ?: task.roleId
@@ -432,5 +448,9 @@ internal fun creatureNeeds(
         trophicHundredths = if (agent(taskId)) taskRun?.assignedRoleId?.let(trophic::get) else null,
         memoryNodesCarried = reportedMemoryReads(run, modelReports)[taskId]?.size,
         septicInputs = septicInputs,
+        synapses = if (capacity == null) null else partners.size,
+        synapseCapacity = capacity,
+        synapseExcess = synapseExcess,
+        traits = if (agent(taskId)) (taskRun?.assignedRoleId ?: task.roleId)?.let(traits::get) else null,
     )
 }

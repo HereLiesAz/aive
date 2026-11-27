@@ -2415,6 +2415,10 @@ class ApplicationRuntime private constructor(
     internal suspend fun loadTrophicHistory(before: WorkflowRun): Map<RoleDefinitionId, Int> =
         settledRunsBefore(before).fold(TrophicHistory()) { history, run -> history.advance(run, usageReports(run)) }.balances
 
+    /** What each role had been observed to do when [before] began, from settled earlier runs only (OperationalGenome.kt). */
+    internal suspend fun loadOperationalProfiles(before: WorkflowRun): Map<RoleDefinitionId, RoleProfile> =
+        settledRunsBefore(before).fold(OperationalHistory()) { history, run -> history.advance(run, usageReports(run)) }.profiles
+
     /**
      * The children a workflow's reviewers have pollinated so far (see ReviewerPollen.kt), rebuilt from its settled runs
      * and their journals. Each has a fixed ID, so saving the ones not yet in the roster is idempotent. A role's latest
