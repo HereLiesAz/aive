@@ -358,4 +358,18 @@ class HatcheryTest {
         assertEquals(16_000 / 12, distant.inherited(listOf(a, b, c))) // a quarter of the contributors' mean
         assertNull(seed.copy(kinships = emptyMap()).inherited(listOf(a, b, c)))
     }
+
+    @Test
+    fun theAntagonistIsNeverAParentHoweverItIsNamed() {
+        val antagonist = BuiltInRoles.Antagonist
+        val renamed = antagonist.copy(name = "Quiet Reader")
+        // Alone, it hatches nothing.
+        assertNull(hatchFromRun(run(WorkflowRunStatus.Completed, "a" to antagonist), listOf(antagonist)))
+        assertNull(hatchFromRun(run(WorkflowRunStatus.Completed, "a" to renamed), listOf(renamed)))
+        // Beside others, it is not a contributor: not a pair member, a bridge or a count of genera.
+        val roster = listOf(engineer, partner, antagonist)
+        val source = observed(run(WorkflowRunStatus.Completed, "a" to engineer, "b" to partner, "c" to antagonist), roster)
+        assertEquals(listOf(engineer.id, partner.id), hatchContributors(source, roster).map { it.id })
+        assertEquals(listOf(engineer.id, partner.id), assertNotNull(hatchFromRun(source, roster, reports = evidence(source))).parents)
+    }
 }

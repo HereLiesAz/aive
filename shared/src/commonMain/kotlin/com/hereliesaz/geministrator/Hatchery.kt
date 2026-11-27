@@ -166,7 +166,7 @@ internal fun hatchContributors(run: WorkflowRun, roles: Collection<RoleDefinitio
             (tasks[task.taskDefinitionId]?.effectiveExecutor()?.let { task.executor ?: it }?.isAgent != false)
     }.mapNotNull { it.assignedRoleId }.groupingBy { it }.eachCount().entries
         .sortedWith(compareByDescending<Map.Entry<RoleDefinitionId, Int>> { it.value }.thenBy { it.key.value })
-        .mapNotNull { rolesById[it.key] }.filter { it.executionSource == RoleExecutionSource.Agent }
+        .mapNotNull { rolesById[it.key] }.filter(::heritable)
 }
 
 /**

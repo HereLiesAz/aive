@@ -132,7 +132,11 @@ internal fun artifactDelivered(
     val source = run.taskRuns[producer] ?: return null
     if (source.status != TaskRunStatus.Completed) return null
     val ids = deliveries[consumer] ?: return null
-    return source.artifacts.any { it.taskRunId == source.id && it.id.value in ids }
+    // Providers hand over only artifacts with text, so a producer with none had nothing to deliver: that is
+    // "cannot be shown", unknown, not "passed over".
+    val deliverable = source.artifacts.filter { it.taskRunId == source.id && !it.textContent.isNullOrBlank() }
+    if (deliverable.isEmpty()) return null
+    return deliverable.any { it.id.value in ids }
 }
 
 /**

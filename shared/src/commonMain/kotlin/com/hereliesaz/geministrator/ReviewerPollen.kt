@@ -19,7 +19,8 @@ import com.hereliesaz.geministrator.events.ProviderUsageRecorded
 
 /** The Antagonist does not improve genetically: it neither pollinates nor is pollen, and it never leads a child. */
 internal fun heritable(role: RoleDefinition): Boolean =
-    role.executionSource == RoleExecutionSource.Agent && classifyNodeCreatureRole(role.name) != NodeCreatureRoleKind.Antagonist
+    role.executionSource == RoleExecutionSource.Agent && role.id != com.hereliesaz.geministrator.domain.BuiltInRoles.Antagonist.id &&
+        classifyNodeCreatureRole(role.name) != NodeCreatureRoleKind.Antagonist
 
 /** Reviewers whose reviews pollinate: the reviewer kinds, minus the Antagonist. */
 private fun pollinates(role: RoleDefinition): Boolean = heritable(role) && isReviewerRoleName(role.name)
@@ -53,6 +54,8 @@ internal fun pollenVisits(run: WorkflowRun, reports: List<ProviderUsageRecorded>
         val sourceDef = tasks[sourceId] ?: continue
         if (!(source.executor ?: sourceDef.effectiveExecutor()).isAgent) continue
         val producer = source.assignedRoleId?.let(roles::get)?.takeIf(::heritable) ?: continue
+        // Reviewing its own role's work, a reviewer carries no producer's genes: nothing to pollinate with.
+        if (producer.id == reviewer.id) continue
         reportedReviewVerdict(run, sourceId, consumer, deliveries) ?: continue
         val artifacts = source.artifacts.filter { it.taskRunId == source.id }.map { it.id.value }.toSet()
         val time = reports.asSequence().filter { event ->
