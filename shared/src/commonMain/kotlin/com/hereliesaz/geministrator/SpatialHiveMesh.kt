@@ -319,7 +319,8 @@ private class SpatialMeshBuilder {
         val shape=if(nucleus) SpatialPoint(1f,1f,1f) else morph.shape
         val phase=(b.seed.toUInt()%628u).toFloat()/100f
         val rootCount=if(nucleus) 12 else morph.roots
-        // A long dominant axon may hang downward, lean sideways or be inverted. This is
+        val hasDominantAxon=!nucleus && morph.dominantAxon
+        // Where present, a long dominant axon may hang downward, lean sideways or be inverted. This is
         // immutable seeded anatomy, not movement or a new workflow connection.
         val axis=if((b.seed.toUInt()%5u)==0u) 1f else -1f
         val primary=SpatialPoint((rng.nextFloat()-.5f)*.72f,axis,(rng.nextFloat()-.5f)*.72f).unit()
@@ -334,7 +335,7 @@ private class SpatialMeshBuilder {
             }
             return best
         }
-        repeat(rootCount) { i -> rootDirs+=if(i==0&&!nucleus) primary else spaced(rootDirs) }
+        repeat(rootCount) { i -> rootDirs+=if(i==0&&hasDominantAxon) primary else spaced(rootDirs) }
         if(!nucleus) repeat(morph.eyes) { i ->
             val preferred=if(morph==SpatialMorphology.Canopy && i==0) SpatialPoint(.35f,-axis,.28f).unit() else null
             eyeDirs+=preferred ?: spaced(eyeDirs+rootDirs.take(1))
@@ -352,7 +353,7 @@ private class SpatialMeshBuilder {
             val a=surface(d)
             val outward=(a-c).unit()
             val bend=direction(rng)
-            val dominant=i==0&&!nucleus
+            val dominant=i==0&&hasDominantAxon
             val length=r*(if(dominant) 1.65f+rng.nextFloat()*.85f else .48f+rng.nextFloat()*.48f)
             val bendPhase=rng.nextFloat()*2f*pi
             val path=(0..16).map { step ->

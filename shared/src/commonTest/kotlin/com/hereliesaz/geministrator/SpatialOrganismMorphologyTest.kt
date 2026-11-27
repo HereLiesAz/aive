@@ -82,4 +82,33 @@ class SpatialOrganismMorphologyTest {
         assertEquals(16128,hairVertices)
         assertTrue(data.all(Float::isFinite))
     }
+
+    @Test fun dominantTaperedExtensionBelongsToSomeFamiliesOnly() {
+        assertTrue(spatialMorphology(2).dominantAxon)
+        assertTrue(spatialMorphology(3).dominantAxon)
+        assertTrue(spatialMorphology(5).dominantAxon)
+        assertTrue(!spatialMorphology(0).dominantAxon)
+        assertTrue(!spatialMorphology(1).dominantAxon)
+        assertTrue(!spatialMorphology(4).dominantAxon)
+        assertTrue(!spatialMorphology(7).dominantAxon)
+
+        // Measure the first root in the actual mesh: average the ten ring positions at
+        // its base and tip. The first root follows the 24-by-48 soma grid.
+        fun rootSpan(seed: Int): Float {
+            val b=SpatialRenderBody("agent",SpatialPoint.Origin,seed,"Creature","Pending",0f,1f)
+            val data=SpatialRenderFrame(listOf(b),emptyList(),emptyList()).triangles()
+            val start=24*48*6*16
+            fun ringCenter(segment: Int, tip: Boolean): SpatialPoint {
+                var sum=SpatialPoint.Origin
+                for(j in 0 until 10) {
+                    val i=start+(segment*60+j*6+(if(tip) 1 else 0))*16
+                    sum+=SpatialPoint(data[i],data[i+1],data[i+2])
+                }
+                return sum*.1f
+            }
+            return (ringCenter(15,true)-ringCenter(0,false)).length()
+        }
+        for(seed in listOf(2,3,5)) assertTrue(rootSpan(seed) in 1.64f..2.51f)
+        for(seed in listOf(0,1,4,7)) assertTrue(rootSpan(seed) in .47f.. .97f)
+    }
 }
