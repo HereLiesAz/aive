@@ -2406,6 +2406,19 @@ class ApplicationRuntime private constructor(
         return history.withBirths(before.roleSnapshot).balances
     }
 
+    /**
+     * Use the completed run's own journal and historical starting balance at birth.
+     * The caller retains the existing disabled-child adoption and save-once path.
+     */
+    internal suspend fun hatchWithEcho(run: WorkflowRun, roles: Collection<RoleDefinition>): RoleDefinition? {
+        if (run.status != WorkflowRunStatus.Completed) return null
+        val baseline = loadEchoHistory(run)
+        val reports = persistence.events.forRun(run.id)
+            .filterIsInstance<com.hereliesaz.geministrator.events.ProviderUsageRecorded>()
+        val echo = EchoHistory(balances = baseline).advance(run, reports).balances
+        return hatchFromRun(run, roles, echo)
+    }
+
     suspend fun saveRole(role: RoleDefinition) {
         persistence.roles.put(role)
         loadLatest()
