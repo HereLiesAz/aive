@@ -166,6 +166,36 @@ class SpatialSignalsTest {
     }
 
     @Test
+    fun aFinishedCreatureKeepsPulsingUntilAllItsContextIsParsedAndThenBurstsWithEveryOneOfItsSpores() {
+        val episode = MemoryEpisode(MemoryEpisodeId("ep-1"), sourceSessionId = "sess", taskRunId = "tr-build",
+            userPrompt = "p", chunks = emptyList(), createdAtEpochMillis = 1L)
+        val done = taskRun(build)
+        fun node(id: String, at: Long, vararg sources: String) = WebNode(id, WebGroup.Tag, "NounTag", id, "t", .5f, at, sources.toList())
+        val nodes = listOf(node("episode:ep-1", 1), node("node:a", 20_000, "ep-1"), node("node:b", 25_000, "ep-1"))
+        val finish = listOf(TaskCompleted(run.id, build, 9_000))
+
+        // Its episode is still queued: the context is not all parsed, so it keeps pulsing at the top rate and does not burst.
+        assertEquals(ContextParse.Parsing, contextParse(done, listOf(episode), setOf("ep-1")))
+        assertEquals(PULSE_MAX_HZ, pulseRateHz(done, ContextParse.Parsing))
+        assertEquals(emptyList(), completionBursts(run, finish, listOf(episode), nodes, queuedEpisodes = setOf("ep-1")))
+
+        // Parsed: it stops pulsing and bursts with all its spores, no earlier than the last of them was recorded.
+        assertEquals(ContextParse.Parsed, contextParse(done, listOf(episode), emptySet()))
+        assertNull(pulseRateHz(done, ContextParse.Parsed))
+        val burst = completionBursts(run, finish, listOf(episode), nodes).single()
+        assertEquals(setOf("episode:ep-1", "node:a", "node:b"), burst.spores)
+        assertEquals(25_000L, burst.atEpochMillis)
+
+        // Nothing banked: it neither waits nor pulses, and bursts at its finish with no spores.
+        assertEquals(ContextParse.Unbanked, contextParse(done, emptyList(), emptySet()))
+        assertNull(pulseRateHz(done, ContextParse.Unbanked))
+        assertEquals(CompletionBurst(build, 9_000, emptySet()), completionBursts(run, finish, emptyList(), nodes).single())
+
+        // A task still working is judged by its progress, whatever its context.
+        assertEquals(PULSE_MAX_HZ, pulseRateHz(taskRun(build, TaskRunStatus.Running, progress = 1f), ContextParse.Parsing))
+    }
+
+    @Test
     fun theBurstRisesFastFallsSlowlyAndNeverPrecedesTheFinish() {
         val burst = CompletionBurst(build, 1_000, emptySet())
         assertEquals(0f, burstLight(999, burst))

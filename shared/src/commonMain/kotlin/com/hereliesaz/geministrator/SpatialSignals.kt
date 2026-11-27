@@ -8,6 +8,7 @@ import com.hereliesaz.geministrator.events.ProviderUsageRecorded
 import com.hereliesaz.geministrator.events.TaskCompleted
 import com.hereliesaz.geministrator.events.WorkflowEvent
 import com.hereliesaz.geministrator.memory.MemoryEpisode
+import com.hereliesaz.geministrator.memory.MemorySnapshot
 import com.hereliesaz.geministrator.memory.WebNode
 import kotlin.math.floor
 import kotlin.math.pow
@@ -112,13 +113,42 @@ internal fun transferPulses(run: WorkflowRun, reports: List<ProviderUsageRecorde
 internal const val PULSE_MIN_HZ = 0.5f
 internal const val PULSE_MAX_HZ = 3f
 
+/** Where a finished task's context stands in the memory layer. */
+internal enum class ContextParse {
+    /** No episode of its own is banked: nothing of it is being parsed into memory (or none has been banked yet). */
+    Unbanked,
+
+    /** At least one of its episodes is still queued for consolidation: its context is not all parsed. */
+    Parsing,
+
+    /** Its episodes are banked and none is queued: all its context has been parsed into memory. */
+    Parsed,
+}
+
+/** The episodes a memory snapshot still has queued for consolidation: `MemorySnapshot.queue`'s episode ids. */
+internal fun queuedEpisodeIds(snapshot: MemorySnapshot): Set<String> = snapshot.queue.mapTo(mutableSetOf()) { it.episodeId.value }
+
 /**
- * How fast a working creature's light beats, rising with its own reported progress. Null when it is not working
- * (not started, finished, failed or cancelled: a finished one bursts instead). A working task that reports no
- * progress beats at the base rate, never faster: pace is not estimated.
+ * Whether all of [taskRun]'s context has been parsed into memory: its own episodes (linked by the episode's task run)
+ * exist and none is still in [queuedEpisodes]. A task with no banked episode is [ContextParse.Unbanked], so a creature
+ * whose memory is off or not yet banked does not pulse waiting for nothing.
  */
-internal fun pulseRateHz(task: TaskRun?): Float? {
+internal fun contextParse(taskRun: TaskRun, episodes: List<MemoryEpisode>, queuedEpisodes: Set<String>): ContextParse {
+    val own = episodes.filter { it.taskRunId == taskRun.id.value }
+    if (own.isEmpty()) return ContextParse.Unbanked
+    return if (own.any { it.id.value in queuedEpisodes }) ContextParse.Parsing else ContextParse.Parsed
+}
+
+/**
+ * How fast a working creature's light beats, rising with its own reported progress. A working task that reports no
+ * progress beats at the base rate, never faster: pace is not estimated. A task that has completed keeps beating, at
+ * the top rate it had reached, while its context is still being parsed ([ContextParse.Parsing]), and stops when all
+ * of it has been, which is when it bursts. Null when it is not beating (not started, failed or cancelled, or finished
+ * with its context parsed or never banked).
+ */
+internal fun pulseRateHz(task: TaskRun?, parse: ContextParse? = null): Float? {
     val status = task?.status ?: return null
+    if (status == TaskRunStatus.Completed) return PULSE_MAX_HZ.takeIf { parse == ContextParse.Parsing }
     val working = status == TaskRunStatus.Running || status == TaskRunStatus.Planning ||
         status == TaskRunStatus.Verifying || status == TaskRunStatus.Retrying
     if (!working) return null
@@ -178,12 +208,22 @@ internal fun releasedSpores(taskRun: TaskRun, episodes: List<MemoryEpisode>, nod
         node.sources.any { source -> own.any { source == it || source.startsWith("$it (") } } }.mapTo(linkedSetOf()) { it.id }
 }
 
-/** One burst per completed task, at the journal's completion time. A task with no completion event has none. */
+/**
+ * One burst per completed task, once all its context has been parsed, so the spores released are all of them and the
+ * count is right. A task whose episodes are still queued ([queuedEpisodes]) has no burst yet and keeps pulsing
+ * ([pulseRateHz]). The burst is at the later of the journal's completion time and the moment the last of its spores
+ * was recorded (the memory layer's ingest time), so it never precedes its spores. A task with no banked episode bursts
+ * at completion with none. A task with no completion event has no burst.
+ */
 internal fun completionBursts(
     run: WorkflowRun, events: List<WorkflowEvent>, episodes: List<MemoryEpisode>, nodes: List<WebNode>,
+    queuedEpisodes: Set<String> = emptySet(),
 ): List<CompletionBurst> = events.filterIsInstance<TaskCompleted>().filter { it.workflowRunId == run.id }.mapNotNull { event ->
     val task = run.taskRuns[event.taskDefinitionId]?.takeIf { it.status == TaskRunStatus.Completed } ?: return@mapNotNull null
-    CompletionBurst(event.taskDefinitionId, event.occurredAtEpochMillis, releasedSpores(task, episodes, nodes))
+    if (contextParse(task, episodes, queuedEpisodes) == ContextParse.Parsing) return@mapNotNull null
+    val released = releasedSpores(task, episodes, nodes)
+    val parsedAt = nodes.filter { it.id in released }.maxOfOrNull { it.createdAtEpochMillis } ?: 0L
+    CompletionBurst(event.taskDefinitionId, maxOf(event.occurredAtEpochMillis, parsedAt), released)
 }.distinctBy { it.task }.sortedWith(compareBy({ it.atEpochMillis }, { it.task.value }))
 
 internal const val BURST_MILLIS = 1_800L
