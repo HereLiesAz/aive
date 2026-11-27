@@ -21,27 +21,21 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.geministrator.resources.Res
 import com.hereliesaz.geministrator.resources.needs_budget
-import com.hereliesaz.geministrator.resources.needs_echo
-import com.hereliesaz.geministrator.resources.needs_echo_fevered
-import com.hereliesaz.geministrator.resources.needs_echo_grounded
-import com.hereliesaz.geministrator.resources.needs_echo_insane
-import com.hereliesaz.geministrator.resources.needs_echo_self_absorbed
+import com.hereliesaz.geministrator.resources.needs_echo_exposure
 import com.hereliesaz.geministrator.resources.needs_integrity
-import com.hereliesaz.geministrator.resources.needs_near_clone
+import com.hereliesaz.geministrator.resources.needs_near_config
 import com.hereliesaz.geministrator.resources.needs_needs
 import com.hereliesaz.geministrator.resources.needs_not_reported
 import com.hereliesaz.geministrator.resources.needs_nothing_downstream
 import com.hereliesaz.geministrator.resources.needs_output_used
-import com.hereliesaz.geministrator.resources.needs_reviewed_by_itself
+import com.hereliesaz.geministrator.resources.needs_near_config_review_paths
 import com.hereliesaz.geministrator.resources.needs_reviews_of
 import com.hereliesaz.geministrator.resources.needs_tokens_spent
 import org.jetbrains.compose.resources.stringResource
 
 private val NeedTrack = Color(0xFF4A4139)
-// The palette only (docs/BRANDING.md): a healthy need fills Yellow; a grounding that has gone
-// septic dims to muted Ink rather than taking a hue of its own.
+// Exposure is a graph proxy; it must not render a diagnosis of sepsis.
 private val EchoWarm = Azphalt.Yellow
-private val EchoSeptic = Color(0xFF7A6E5F)
 private val IntegrityGreen = Azphalt.Yellow
 private val OutputTeal = Azphalt.Yellow
 
@@ -57,18 +51,11 @@ internal fun CreatureNeedsPanel(
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         // In the creature panel the Needs tab already names it.
         if (titled) Text(stringResource(Res.string.needs_needs), style = AzphaltType.eyebrow, color = azphaltOnSurface())
-        val state = stringResource(
-            when (needs.echoState) {
-                EchoState.Grounded -> Res.string.needs_echo_grounded
-                EchoState.SelfAbsorbed -> Res.string.needs_echo_self_absorbed
-                EchoState.Fevered -> Res.string.needs_echo_fevered
-                EchoState.Insane -> Res.string.needs_echo_insane
-            },
-        )
         NeedMeter(
-            label = stringResource(Res.string.needs_echo, state),
-            value = needs.echo,
-            color = if (needs.echoState == EchoState.Insane) EchoSeptic else EchoWarm,
+            label = stringResource(Res.string.needs_echo_exposure),
+            value = needs.echo.takeIf { needs.echoComparablePaths > 0 },
+            color = EchoWarm,
+            missing = stringResource(Res.string.needs_not_reported),
         )
         NeedMeter(stringResource(Res.string.needs_integrity), needs.integrity, IntegrityGreen)
         NeedMeter(
@@ -80,10 +67,10 @@ internal fun CreatureNeedsPanel(
             onClick = onOpenMind,
         )
         NeedMeter(stringResource(Res.string.needs_output_used), needs.outputUsed, OutputTeal, stringResource(Res.string.needs_nothing_downstream))
-        needs.nearClone?.let { NeedLine(stringResource(Res.string.needs_near_clone), it) }
+        needs.nearClone?.let { NeedLine(stringResource(Res.string.needs_near_config), it) }
         if (needs.selfReviews > 0) {
             NeedLine(
-                stringResource(Res.string.needs_reviewed_by_itself),
+                stringResource(Res.string.needs_near_config_review_paths),
                 stringResource(Res.string.needs_reviews_of, needs.selfReviews, needs.reviews),
             )
         }

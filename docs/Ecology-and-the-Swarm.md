@@ -188,3 +188,7 @@ The lesson the bowl teaches without a word: the cheapest diversity is to listen 
 - **The roster** is a collection of agent configurations, each with its genome; new ones come from breeding, and the starting roster is common, varied stock.
 - **Reviewer assignment** prefers difference: when a task needs checking, the swarm picks a reviewer of low kinship to the producer.
 - The genome **does** shape real work, since it's the agent's configuration. The life rules still never override the person's explicit choices; they show the consequences.
+
+### Current Needs inspector boundary
+
+The inspector's Echo exposure is explicitly a partial graph proxy. It compares assigned provider and declared configuration using run role snapshots where present, counts only active paths with comparable configurations (or completed deterministic dependencies), and does not infer actual model identity, artifact consumption, memory reads, review verdicts or contamination. Unknown inputs are excluded, and an empty comparable set is not reported. The complete provenance-based Echo ledger remains the target, not a simulated runtime.

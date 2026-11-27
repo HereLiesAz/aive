@@ -994,6 +994,9 @@ What the server returns is treated as outside content, not instructions.</string
     <string name="swarm_token_budget">Token budget per swarm</string>
     <string name="swarm_token_budget_hint">Leave empty for no budget.</string>
     <string name="needs_echo">ECHO · %1$s</string>
+    <string name="needs_echo_exposure">ECHO EXPOSURE (CONFIGURATION PROXY)</string>
+    <string name="needs_near_config">NEAR-CLONE CONFIGURATION</string>
+    <string name="needs_near_config_review_paths">NEAR-CLONE REVIEW PATHS</string>
     <string name="needs_echo_grounded">GROUNDED</string>
     <string name="needs_echo_self_absorbed">SELF-ABSORBED</string>
     <string name="needs_echo_fevered">FEVERED</string>

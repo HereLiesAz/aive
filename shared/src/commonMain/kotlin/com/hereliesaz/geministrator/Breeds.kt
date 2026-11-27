@@ -217,7 +217,8 @@ internal fun Stable.onRunCleared(
 internal val TaskRun.byAgent: Boolean
     get() = executor.let { it == null || it.isAgent }
 
-private val TaskExecutor.isAgent: Boolean
+/** Whether the executor (including a distributed delegate) is agentic rather than programmatic. */
+internal val TaskExecutor.isAgent: Boolean
     get() = when (this) {
         is TaskExecutor.RoleAgent -> true
         is TaskExecutor.Distributed -> delegate.isAgent

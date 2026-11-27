@@ -129,4 +129,51 @@ class CreatureNeedsTest {
         assertNull(needs.outputUsed)
         assertEquals(0, needs.echo)
     }
+
+    @Test
+    fun clonedRoleIdsAndCosmeticNamesDoNotAlterConfigurationKinship() {
+        val clone=engineer.copy(id=com.hereliesaz.geministrator.domain.RoleDefinitionId("new-id"),
+            name="Different name",parents=listOf(engineer.id),enabled=false)
+        assertEquals(100,configurationKinship(engineer,"provider-a",clone,"provider-a"))
+        assertEquals(50,configurationKinship(engineer,"provider-a",clone,"provider-b"))
+        assertEquals(70,configurationKinship(engineer,"provider-a",clone.copy(instructions="Different instructions"),"provider-a"))
+        assertEquals(80,configurationKinship(engineer,"provider-a",clone.copy(toolCeiling=listOf("read")),"provider-a"))
+        assertNull(configurationKinship(engineer,null,clone,null))
+    }
+
+    @Test
+    fun echoUsesRunSnapshotRatherThanLaterRosterAndIgnoresFuturePaths() {
+        val clone=engineer.copy(id=com.hereliesaz.geministrator.domain.RoleDefinitionId("clone"),name="Clone")
+        val d=definition.copy(tasks=listOf(task("plan",clone),task("build",engineer,"plan"),task("review",qa,"build")))
+        val plan=d.tasks[0]
+        val build=d.tasks[1]
+        val review=d.tasks[2]
+        val r=run(
+            Triple("plan",TaskRunStatus.Completed,"a" to 1),
+            Triple("build",TaskRunStatus.Completed,"a" to 1),
+            Triple("review",TaskRunStatus.Ready,"b" to 1),
+        ).let { original -> original.copy(roleSnapshot=listOf(clone,engineer,qa),
+            taskRuns=original.taskRuns + (plan.id to original.taskRuns.getValue(plan.id).copy(assignedRoleId=clone.id))) }
+        val needs=assertNotNull(creatureNeeds(build.id,d,r,listOf(engineer.copy(instructions="Edited after launch"),qa)))
+        assertEquals("plan",needs.nearClone)
+        assertEquals(100,needs.echo)
+        assertEquals(1,needs.echoComparablePaths)
+        assertEquals(0,needs.reviews)
+        val unknown=r.copy(taskRuns=r.taskRuns+(plan.id to r.taskRuns.getValue(plan.id).copy(assignedProviderId=null)))
+        val missing=assertNotNull(creatureNeeds(build.id,d,unknown,roles))
+        assertNull(missing.nearClone)
+        assertEquals(0,missing.echoComparablePaths)
+    }
+
+    @Test
+    fun programmaticDependencyIsNotACloneEvenWithSameRoleAndProvider() {
+        val d=definition.copy(tasks=definition.tasks.map {
+            if(it.id.value=="plan") it.copy(executor=TaskExecutor.TestRunner("./gradlew test")) else it
+        })
+        val r=run(Triple("plan",TaskRunStatus.Completed,"a" to 1),Triple("build",TaskRunStatus.Running,"a" to 1))
+        val needs=assertNotNull(creatureNeeds(TaskDefinitionId("build"),d,r,roles))
+        assertNull(needs.nearClone)
+        assertEquals(1,needs.echoComparablePaths)
+        assertEquals(0,needs.echo)
+    }
 }
