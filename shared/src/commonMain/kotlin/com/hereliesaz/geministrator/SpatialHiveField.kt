@@ -94,6 +94,7 @@ internal fun SpatialHiveField(
         var camera by remember { mutableStateOf(SpatialCameraState()) }
         var memoryId by remember { mutableStateOf<String?>(null) }
         val reduced = AzphaltMotion.reduceMotion
+        var motionPhase by remember { mutableStateOf(0f) }
         LaunchedEffect(selected) {
             val point = frame.bodies.firstOrNull { it.id == selected }?.position
             if (point != null) camera = camera.focus(point, explicit = true)
@@ -111,6 +112,7 @@ internal fun SpatialHiveField(
                     previous = now
                     val next = camera.advance(elapsed, reduced)
                     if (next != camera) camera = next
+                    motionPhase = advanceSpatialMotion(motionPhase, elapsed, reduced)
                 }
             }
         }
@@ -123,7 +125,7 @@ internal fun SpatialHiveField(
                     Text(stringResource(Res.string.spatial_memory_view))
                 }
             }
-            SpatialHiveSurface(frame, camera.renderCamera(), onInput = { input ->
+            SpatialHiveSurface(frame, camera.renderCamera(if (reduced) 0f else motionPhase), onInput = { input ->
                 if (frame.accepts(input)) when (input.type) {
                     "agent" -> {
                         memoryId = null

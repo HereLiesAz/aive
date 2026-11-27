@@ -35,7 +35,7 @@
             if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));
             s.program=p;s.buffer=gl.createBuffer();s.vao=gl.createVertexArray();gl.bindVertexArray(s.vao);gl.bindBuffer(gl.ARRAY_BUFFER,s.buffer);
             for(const [name,offset] of [["p",0],["n",12],["c",24]]){const loc=gl.getAttribLocation(p,name);gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,3,gl.FLOAT,false,36,offset);}
-            s.uniforms=Object.fromEntries(["eye","forward","right","up","aspect"].map(n=>[n,gl.getUniformLocation(p,n)]));
+            s.uniforms=Object.fromEntries(["eye","forward","right","up","aspect","motionPhase"].map(n=>[n,gl.getUniformLocation(p,n)]));
             s.count=0;
         }catch(e){emit({type:"error"});return;}
         const listen=(name,fn,opts)=>{canvas.addEventListener(name,fn,opts);s.cleanup.push(()=>canvas.removeEventListener(name,fn,opts));};
@@ -64,7 +64,7 @@
             gl.useProgram(s.program);gl.bindVertexArray(s.vao);
             const {eye,f,r,u}=basis(s.camera);
             for(const [name,value] of [["eye",eye],["forward",f],["right",r],["up",u]])gl.uniform3fv(s.uniforms[name],value);
-            gl.uniform1f(s.uniforms.aspect,w/h);gl.drawArrays(gl.TRIANGLES,0,s.count);
+            gl.uniform1f(s.uniforms.aspect,w/h);gl.uniform1f(s.uniforms.motionPhase,s.camera.motionPhase||0);gl.drawArrays(gl.TRIANGLES,0,s.count);
         }
         s.raf=root.requestAnimationFrame(draw);
     }

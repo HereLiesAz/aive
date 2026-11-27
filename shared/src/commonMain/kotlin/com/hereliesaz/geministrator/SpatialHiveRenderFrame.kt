@@ -18,7 +18,8 @@ internal data class SpatialRenderFrame(
 )
 
 @Serializable
-internal data class SpatialRenderCamera(val eye: SpatialPoint, val gaze: SpatialPoint, val memory: Boolean)
+internal data class SpatialRenderCamera(val eye: SpatialPoint, val gaze: SpatialPoint, val memory: Boolean,
+    val motionPhase: Float = 0f)
 
 /** Input messages are requests for presentation changes only, never engine or memory operations. */
 @Serializable
@@ -60,4 +61,8 @@ internal fun SpatialRenderFrame.accepts(input: SpatialRenderInput): Boolean = wh
     else -> false
 }
 
-internal fun SpatialCameraState.renderCamera() = SpatialRenderCamera(pose.eye(), pose.gaze, mode == SpatialCameraMode.Memory)
+/** Focus follows the deformed world while manual orbit/pan retains the Keeper's exact gaze. */
+internal fun SpatialCameraState.renderCamera(motionPhase: Float = 0f) = SpatialRenderCamera(
+    pose.eye(), if (manual) pose.gaze else spatialMotionPoint(pose.gaze, motionPhase),
+    mode == SpatialCameraMode.Memory, motionPhase,
+)
