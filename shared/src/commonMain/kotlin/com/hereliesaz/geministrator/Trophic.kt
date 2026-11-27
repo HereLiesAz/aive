@@ -33,7 +33,7 @@ internal enum class TrophicOutcome {
     /** The consumer completed with it, but a reviewer's verdict on it is missing or ambiguous. Used, acceptance unproven. */
     Consumed,
 
-    /** Consumed, and either a downstream worker completed with it or a reviewer stated Approve. */
+    /** A non-reviewing consumer completed with it, or a reviewer stated Approve. */
     Accepted,
 
     /** A reviewer read it and stated Revise or Reject. Used, and turned away. */

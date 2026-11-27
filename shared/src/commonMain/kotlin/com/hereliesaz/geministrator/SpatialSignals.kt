@@ -142,7 +142,7 @@ internal fun contextParse(taskRun: TaskRun, episodes: List<MemoryEpisode>, queue
 /**
  * How fast a working creature's light beats, rising with its own reported progress. A working task that reports no
  * progress beats at the base rate, never faster: pace is not estimated. A task that has completed keeps beating, at
- * the top rate it had reached, while its context is still being parsed ([ContextParse.Parsing]), and stops when all
+ * the top rate, while its context is still being parsed ([ContextParse.Parsing]), and stops when all
  * of it has been, which is when it bursts. Null when it is not beating (not started, failed or cancelled, or finished
  * with its context parsed or never banked).
  */
