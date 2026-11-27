@@ -74,6 +74,8 @@ class TextLlmProviderSpendTest {
         assertTrue("UNIQUE_EVIDENCE" in sent)
         assertTrue("https://example.com" !in sent)
         assertEquals(setOf("text"), events.filterIsInstance<AgentEvent.UsageReported>().single().deliveredArtifactIds)
+        // The hosted renderer never trims the prompt context, so it says the whole context was rendered.
+        assertTrue(events.filterIsInstance<AgentEvent.UsageReported>().single().rendersPromptContextWhole)
     }
 
     @Test
