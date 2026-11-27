@@ -205,6 +205,11 @@ data class ManagedSessionUsage(
     val modelConsistent: Boolean = !model.isNullOrBlank(),
     /** Union of positively observed deliveries, null if unreported. */
     val deliveredArtifactIds: Set<String>? = null,
+    /**
+     * Stored memory nodes whose text was in a request the provider reported as successfully generated; null when
+     * that is unreported. Carriage in a successful request, not proof the model used the memory.
+     */
+    val deliveredMemoryAddresses: Set<String>? = null,
 )
 
 /**
@@ -247,6 +252,8 @@ internal fun ManagedSessionUsage?.plusReport(next: ManagedSessionUsage): Managed
         requestChars = if (next.requestSha256 != null) next.requestChars else base.requestChars,
         deliveredArtifactIds = if (base.deliveredArtifactIds == null && next.deliveredArtifactIds == null) null
             else base.deliveredArtifactIds.orEmpty() + next.deliveredArtifactIds.orEmpty(),
+        deliveredMemoryAddresses = if (base.deliveredMemoryAddresses == null && next.deliveredMemoryAddresses == null) null
+            else base.deliveredMemoryAddresses.orEmpty() + next.deliveredMemoryAddresses.orEmpty(),
     )
 }
 

@@ -109,6 +109,8 @@ class ProviderBackedManagedSessionGateway(
         val answeredQuestionKey: String? = null,
         /** True once this process has seen a question or an answer, so [keeperQuestion] is authoritative. */
         val questionKnown: Boolean = false,
+        /** The memory nodes this session's request carried ([AgentTaskRequest.recalledMemoryAddresses]); null when unknown (a reconnected session). */
+        val recalledMemory: Set<String>? = null,
     )
 
     private val mutex = Mutex()
@@ -300,6 +302,7 @@ class ProviderBackedManagedSessionGateway(
                     } else {
                         ManagedSessionStatus.Running
                     },
+                    recalledMemory = taskRequest.recalledMemoryAddresses,
                 )
                 // No suspension occurs between clearing the rollback marker and returning the
                 // committed handle to the caller.
@@ -434,8 +437,13 @@ class ProviderBackedManagedSessionGateway(
         )
         // The packer's prompt order: the most important block first, the next most important last.
         val selectedBlocks = packing.selectedEvidenceIds.mapNotNull(blocksById::get)
+        // Only memory blocks the packer kept, and only the nodes each of them carries, count as carried.
+        val carried = packing.selectedEvidenceIds.mapNotNullTo(linkedSetOf()) { id ->
+            id.removePrefix("memory-context-").takeIf { it != id }?.toIntOrNull()
+        }.flatMapTo(linkedSetOf()) { recalled.blockAddresses.getOrNull(it).orEmpty() }
 
         return copy(
+            recalledMemoryAddresses = recalledMemoryAddresses + carried,
             promptContext = promptContext.copy(
                 dynamicContext = promptContext.dynamicContext + selectedBlocks,
             ),
@@ -646,12 +654,13 @@ class ProviderBackedManagedSessionGateway(
     private suspend fun registerAndObserve(
         handle: ManagedSessionHandle,
         initialStatus: ManagedSessionStatus,
+        recalledMemory: Set<String>? = null,
     ) {
         val shouldObserve = mutex.withLock {
             if (snapshots.containsKey(handle)) {
                 false
             } else {
-                snapshots[handle] = SessionSnapshot(initialStatus)
+                snapshots[handle] = SessionSnapshot(initialStatus, recalledMemory = recalledMemory)
                 true
             }
         }
@@ -855,7 +864,7 @@ class ProviderBackedManagedSessionGateway(
                 // What the session spent is spent whatever state it is in: a report that arrives once it
                 // ended is added, never dropped. Nothing else about an ended session changes.
                 if (effectiveEvent is AgentEvent.UsageReported) {
-                    snapshots[handle] = current.copy(pendingUsage = current.pendingUsage.plusReport(effectiveEvent.sanitizedUsage()))
+                    snapshots[handle] = current.copy(pendingUsage = current.pendingUsage.plusReport(effectiveEvent.sanitizedUsage(current.recalledMemory)))
                     changed = true
                 }
                 return@withLock
@@ -916,7 +925,7 @@ class ProviderBackedManagedSessionGateway(
                 }
                 // Summed with what the engine has not read yet: two reports between polls are both spend.
                 is AgentEvent.UsageReported -> current.copy(
-                    pendingUsage = current.pendingUsage.plusReport(effectiveEvent.sanitizedUsage()),
+                    pendingUsage = current.pendingUsage.plusReport(effectiveEvent.sanitizedUsage(current.recalledMemory)),
                 )
             }
             snapshots[handle] = next
@@ -1549,7 +1558,12 @@ class ProviderBackedManagedSessionGateway(
             PromptContextBlock("Peer consultation", PeerConsultationNote.INSTRUCTIONS + directory)))
     }
 
-    private fun AgentEvent.UsageReported.sanitizedUsage(): ManagedSessionUsage = ManagedSessionUsage(
+    /**
+     * [recalledMemory] is credited as delivered only when the provider reported a successful generation's deliveries
+     * ([deliveredArtifactIds] non-null) and said it rendered the prompt context whole ([rendersPromptContextWhole]),
+     * and the session's provenance is known (non-null). Anything else leaves it unknown, never a known-empty set.
+     */
+    private fun AgentEvent.UsageReported.sanitizedUsage(recalledMemory: Set<String>? = null): ManagedSessionUsage = ManagedSessionUsage(
         inputTokens = inputTokens,
         outputTokens = outputTokens,
         costUsd = costUsd,
@@ -1561,6 +1575,7 @@ class ProviderBackedManagedSessionGateway(
         requestSha256 = requestSha256,
         requestChars = requestChars,
         deliveredArtifactIds = deliveredArtifactIds,
+        deliveredMemoryAddresses = if (deliveredArtifactIds == null || !rendersPromptContextWhole) null else recalledMemory,
     ).sanitized()
 
     private fun AgentEvent.memoryReplayKey(): String = when (this) {

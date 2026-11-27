@@ -1039,6 +1039,7 @@ class WorkflowRuntimeCoordinator(
                     model = usage.model,
                     modelConsistent = usage.modelConsistent,
                     deliveredArtifactIds = usage.deliveredArtifactIds,
+                    deliveredMemoryAddresses = usage.deliveredMemoryAddresses,
                     requestSha256 = usage.requestSha256,
                     requestChars = usage.requestChars,
                     occurredAtEpochMillis = nowEpochMillis,

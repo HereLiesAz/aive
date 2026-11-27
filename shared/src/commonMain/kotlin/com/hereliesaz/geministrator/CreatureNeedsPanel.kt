@@ -28,6 +28,7 @@ import com.hereliesaz.geministrator.resources.needs_needs
 import com.hereliesaz.geministrator.resources.needs_not_reported
 import com.hereliesaz.geministrator.resources.needs_nothing_downstream
 import com.hereliesaz.geministrator.resources.needs_output_used
+import com.hereliesaz.geministrator.resources.needs_memory_carried
 import com.hereliesaz.geministrator.resources.needs_trophic
 import com.hereliesaz.geministrator.resources.needs_trophic_fed
 import com.hereliesaz.geministrator.resources.needs_trophic_hungry
@@ -97,6 +98,8 @@ internal fun CreatureNeedsPanel(
                 else stringResource(Res.string.needs_review_outcome_counts,
                     needs.reviewApprovals, needs.reviewRevisions, needs.reviewRejections))
         }
+        NeedLine(stringResource(Res.string.needs_memory_carried),
+            needs.memoryNodesCarried?.toString() ?: stringResource(Res.string.needs_not_reported))
         needs.nearClone?.let { NeedLine(stringResource(Res.string.needs_near_config), it) }
         if (needs.selfReviews > 0) {
             NeedLine(

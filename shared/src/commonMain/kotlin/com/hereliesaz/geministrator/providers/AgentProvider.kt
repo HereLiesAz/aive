@@ -96,6 +96,11 @@ data class AgentTaskRequest(
     /** The runs whose artifacts an UpstreamArtifacts resource narrows retrieval to; null means no narrowing. */
     val resourceTaskRuns: Set<TaskRunId>? = null,
     val orchestrationContext: AgentOrchestrationContext = AgentOrchestrationContext(),
+    /**
+     * The stored memory nodes whose text is in [promptContext] after the context packer's selection. Set by the
+     * gateway, never by a role; it is what the request carries, not proof the model read or used it.
+     */
+    val recalledMemoryAddresses: Set<String> = emptySet(),
     val compoundInference: CompoundInferenceContext = CompoundInferenceContext.single(
         taskRunId = taskRunId,
         workflowRunId = orchestrationContext.workflowRunId,
@@ -215,6 +220,11 @@ sealed interface AgentEvent {
         val requestChars: Int? = null,
         /** Artifact text IDs sent in a successful generation; null is unreported, not semantic reliance. */
         val deliveredArtifactIds: Set<String>? = null,
+        /**
+         * True only when the provider rendered the task's whole prompt context into this successful request, with no
+         * trimming or dropping of recalled memory. Default off: a provider that cannot say leaves memory delivery unknown.
+         */
+        val rendersPromptContextWhole: Boolean = false,
     ) : AgentEvent {
         init {
             require(cacheHitFraction == null || cacheHitFraction in 0f..1f) {

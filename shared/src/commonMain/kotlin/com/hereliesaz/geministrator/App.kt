@@ -368,6 +368,25 @@ fun App(
         }
     }
 
+    // The reviewer as pollinator (docs/Node-Creature-Genome.md): once a run settles, each review a reviewer has made in
+    // this workflow has its child, born unadopted to the reviewer and every producer it has reviewed so far.
+    LaunchedEffect(liveRun?.run?.id, liveRun?.run?.status) {
+        val presentation = liveRun ?: return@LaunchedEffect
+        if (presentation.run.status !in setOf(
+                com.hereliesaz.geministrator.domain.WorkflowRunStatus.Completed,
+                com.hereliesaz.geministrator.domain.WorkflowRunStatus.Failed,
+                com.hereliesaz.geministrator.domain.WorkflowRunStatus.Cancelled)) return@LaunchedEffect
+        val target = runtime ?: return@LaunchedEffect
+        try {
+            val known = target.persistence.roles.all().mapTo(mutableSetOf()) { it.id }
+            target.pollinatedChildren(presentation.run.workflowDefinitionId).filter { it.id !in known }.forEach { target.saveRole(it) }
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: Exception) {
+            // Pollination is best effort; a failure leaves the roster as it was.
+        }
+    }
+
     // Self-updating procedural memory (docs/architecture/PROCEDURAL_MEMORY.md §10): the live run's
     // failures, fixes and executor receipts redraft proposed edits of its roles' instructions. This
     // only queues proposals on each creature's Mind tab; a role changes only when the keeper approves.

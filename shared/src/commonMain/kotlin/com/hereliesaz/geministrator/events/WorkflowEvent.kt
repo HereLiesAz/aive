@@ -229,6 +229,8 @@ data class ProviderUsageRecorded(
     val modelConsistent: Boolean? = null,
     /** Successful generation input artifact IDs, never content; null for legacy or unreported evidence. */
     val deliveredArtifactIds: Set<String>? = null,
+    /** Stored memory node addresses carried by a successful generation's request, never content; null for legacy or unreported. */
+    val deliveredMemoryAddresses: Set<String>? = null,
 ) : WorkflowEvent
 
 /**
