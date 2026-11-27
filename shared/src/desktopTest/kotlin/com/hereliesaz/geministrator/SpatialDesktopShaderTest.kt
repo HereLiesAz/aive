@@ -29,7 +29,8 @@ class SpatialDesktopShaderTest {
         val fragment=spatialDesktopShader(SPATIAL_OPTICS_FRAGMENT_SHADER)
         assertTrue(vertex.contains("gl_VertexID"))
         assertTrue(fragment.contains("texture(sceneDepth,p)"))
-        assertTrue(fragment.contains("focusDepth,aperture"))
+        assertTrue(fragment.contains("texture(sceneColor,p).a"))
+        assertTrue(spatialDesktopShader(SPATIAL_VERTEX_SHADER).contains("abs(distance(anchor,eye)-focusDepth)"))
         assertTrue(fragment.startsWith("#version 150\n"))
         assertFalse(fragment.contains("precision highp"))
     }

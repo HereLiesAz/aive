@@ -7,10 +7,12 @@ import kotlinx.serialization.Serializable
 internal data class SpatialRenderBody(
     val id: String, val position: SpatialPoint, val seed: Int, val form: String,
     val state: String, val growth: Float, val radius: Float,
+    val blurScale: Float = 1f,
 )
 
 @Serializable
-internal data class SpatialRenderCord(val points: List<SpatialPoint>, val width: Float, val kind: String)
+internal data class SpatialRenderCord(val points: List<SpatialPoint>, val width: Float, val kind: String,
+    val blurScale: Float = 1f)
 
 @Serializable
 internal data class SpatialRenderFrame(
@@ -19,7 +21,7 @@ internal data class SpatialRenderFrame(
 
 @Serializable
 internal data class SpatialRenderCamera(val eye: SpatialPoint, val gaze: SpatialPoint, val memory: Boolean,
-    val motionPhase: Float = 0f)
+    val motionPhase: Float = 0f, val focusPoint: SpatialPoint = gaze)
 
 /** Input messages are requests for presentation changes only, never engine or memory operations. */
 @Serializable
@@ -61,8 +63,9 @@ internal fun SpatialRenderFrame.accepts(input: SpatialRenderInput): Boolean = wh
     else -> false
 }
 
-/** Focus follows the deformed world while manual orbit/pan retains the Keeper's exact gaze. */
-internal fun SpatialCameraState.renderCamera(motionPhase: Float = 0f) = SpatialRenderCamera(
-    pose.eye(), if (manual) pose.gaze else spatialMotionPoint(pose.gaze, motionPhase),
-    mode == SpatialCameraMode.Memory, motionPhase,
-)
+/** A selected moving element can retain optical focus while the Keeper manually aims the camera. */
+internal fun SpatialCameraState.renderCamera(motionPhase: Float = 0f, focus: SpatialPoint? = null): SpatialRenderCamera {
+    val gaze = if (manual) pose.gaze else spatialMotionPoint(pose.gaze, motionPhase)
+    return SpatialRenderCamera(pose.eye(), gaze, mode == SpatialCameraMode.Memory, motionPhase,
+        focus?.let { spatialMotionPoint(it, motionPhase) } ?: gaze)
+}

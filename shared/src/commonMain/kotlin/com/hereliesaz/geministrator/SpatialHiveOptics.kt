@@ -1,13 +1,43 @@
 package com.hereliesaz.geministrator
 
-/** The focus plane follows the rendered gaze, not the nucleus or the original static site. */
-internal data class SpatialOptics(val focusDepth: Float, val aperture: Float)
+import kotlin.math.abs
+import kotlin.math.exp
 
-/** A wider focus range in the memory overview keeps the association network legible. */
+/** Focal element range measured from the camera, not distance between elements or eye-space Z. */
+internal data class SpatialOptics(val eye: SpatialPoint, val focusDepth: Float, val aperture: Float)
+
+/** Retain the wider focus range of the memory overview. */
 internal fun SpatialRenderCamera.optics(): SpatialOptics {
-    val depth=(gaze-eye).length()
-    return SpatialOptics(if(depth.isFinite()) depth.coerceAtLeast(.1f) else 1f, if(memory) .012f else .065f)
+    val distance = (focusPoint-eye).length()
+    return SpatialOptics(eye, if(distance.isFinite()) distance else (gaze-eye).length(),
+        if(memory) .012f else .065f)
 }
+
+/** Ease optical focus independently of camera aim. */
+internal fun advanceSpatialFocus(from: SpatialPoint, to: SpatialPoint, seconds: Float, reduced: Boolean): SpatialPoint {
+    if(!to.finite()) return from
+    if(reduced || !from.finite() || (to-from).length()<.0001f) return to
+    if(!seconds.isFinite() || seconds<=0f) return from
+    return from+(to-from)*(1f-exp(-seconds*5f))
+}
+
+/** Zero stays sharp; one is the normal response. Each element independently controls this scale. */
+internal fun spatialBlurScale(value: Float): Float = if(value.isFinite()) value.coerceIn(0f,4f) else 1f
+
+/** Normalized circle of confusion for a deformed element anchor. Equal camera ranges stay equally sharp. */
+internal fun SpatialOptics.blurAt(anchor: SpatialPoint, multiplier: Float): Float {
+    if(!anchor.finite()) return 0f
+    val difference=abs((anchor-eye).length()-focusDepth)
+    return ((difference-.14f).coerceAtLeast(0f)*aperture*6f*spatialBlurScale(multiplier)).coerceIn(0f,1f)
+}
+
+/** GPU contract: absolute difference of camera ranges, multiplied by the element's own response. */
+internal const val SPATIAL_ELEMENT_BLUR_GLSL = """
+float elementBlur(vec3 anchor,vec3 eye,float focusDepth,float aperture,float multiplier){
+    float difference=abs(distance(anchor,eye)-focusDepth);
+    return clamp(max(0.,difference-.14)*aperture*6.*multiplier,0.,1.);
+}
+"""
 
 /** Fullscreen triangle, requiring no extra mesh or vertex buffer. */
 internal const val SPATIAL_OPTICS_VERTEX_SHADER = """#version 300 es
@@ -18,30 +48,24 @@ void main(){
     gl_Position=vec4(uv*2.-1.,0.,1.);
 }"""
 
-/**
- * Depth-aware defocus gather on the GPU scene's color and depth attachments. Depth reconstructs
- * eye-space Z from SPATIAL_VERTEX_SHADER's perspective projection. The sharp focus band is
- * deliberately narrow; closer defocused surfaces can bleed over distant ones, not vice versa.
- * This is screen-space aperture blur, not a physically traced lens. Work is bounded per pixel.
- */
+/** Resolve per-element defocus stored in color alpha; depth is only for occlusion ordering. */
 internal const val SPATIAL_OPTICS_FRAGMENT_SHADER = """#version 300 es
 precision highp float;
 in vec2 uv;
 uniform sampler2D sceneColor,sceneDepth;
-uniform float focusDepth,aperture;
 out vec4 frag;
 float eyeDepth(vec2 p){
     float ndc=texture(sceneDepth,p).r*2.-1.;
     return .20002/max(.0002,1.0002-ndc);
 }
-float coc(float z,float height,float limit){
-    return min(limit,aperture*height*max(0.,abs(z-focusDepth)-.14)/max(.1,z));
+float coc(vec2 p,float limit){
+    return texture(sceneColor,p).a*limit;
 }
 void main(){
     vec2 size=vec2(textureSize(sceneColor,0));
     vec2 halfTexel=.5/size;
     float limit=clamp(size.y*.045,5.,32.);
-    float centerZ=eyeDepth(uv),centerRadius=coc(centerZ,size.y,limit);
+    float centerZ=eyeDepth(uv),centerRadius=coc(uv,limit);
     vec3 total=texture(sceneColor,uv).rgb;
     float weight=1.;
     for(int i=0;i<24;i++){
@@ -49,7 +73,7 @@ void main(){
         float radius=limit*pow(q,1.5);
         float angle=float(i)*2.39996323;
         vec2 p=clamp(uv+vec2(cos(angle),sin(angle))*radius/size,halfTexel,1.-halfTexel);
-        float z=eyeDepth(p),sampleRadius=coc(z,size.y,limit);
+        float z=eyeDepth(p),sampleRadius=coc(p,limit);
         float footprint=z<centerZ-.12?sampleRadius:centerRadius;
         if(footprint<.35)continue;
         float w=1.-smoothstep(max(0.,footprint-.75),footprint+.75,radius);

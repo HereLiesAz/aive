@@ -7,8 +7,8 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.random.Random
 
-/** One portable triangle stream: position, normal, RGB, nine floats per vertex. */
-internal const val SPATIAL_VERTEX_FLOATS = 9
+/** Portable vertex: XYZ, normal, RGB, optical anchor XYZ and independent blur multiplier. */
+internal const val SPATIAL_VERTEX_FLOATS = 13
 internal const val SPATIAL_FOCAL_SCALE = .52f
 
 /** Shared rendering basis and ray tests use the same perspective as all GPU backends. */
@@ -91,14 +91,19 @@ private class SpatialMeshBuilder {
     private var data = FloatArray(8192)
     private var size = 0
     private val pi = PI.toFloat()
+    private var opticalAnchor: SpatialPoint? = null
+    private var opticalMultiplier = 1f
 
     fun finish(): FloatArray = data.copyOf(size)
 
     private fun vertex(p: SpatialPoint, n: SpatialPoint, c: SpatialPoint) {
-        if (size + 9 > data.size) data = data.copyOf(data.size * 2)
+        if (size + SPATIAL_VERTEX_FLOATS > data.size) data = data.copyOf(data.size * 2)
         data[size++] = p.x; data[size++] = p.y; data[size++] = p.z
         data[size++] = n.x; data[size++] = n.y; data[size++] = n.z
         data[size++] = c.x; data[size++] = c.y; data[size++] = c.z
+        val anchor = opticalAnchor ?: p
+        data[size++] = anchor.x; data[size++] = anchor.y; data[size++] = anchor.z
+        data[size++] = opticalMultiplier
     }
 
     private fun triangle(a: Sample,b: Sample,c: Sample,color: SpatialPoint) {
@@ -160,6 +165,8 @@ private class SpatialMeshBuilder {
 
     /** Decorative tissue is sculpted independently of logical dependency and transfer overlays. */
     fun cord(c: SpatialRenderCord) {
+        opticalAnchor = null
+        opticalMultiplier = spatialBlurScale(c.blurScale)
         if (c.kind in listOf("Memory","Transfer","Dependency")) {
             tube(c.points,c.width,cordTint(c.kind))
             return
@@ -226,6 +233,8 @@ private class SpatialMeshBuilder {
     }
 
     fun organism(b: SpatialRenderBody) {
+        opticalAnchor = b.position
+        opticalMultiplier = spatialBlurScale(b.blurScale)
         val c = b.position; val color = bodyTint(b); val r = b.radius
         val organic = b.form in listOf("Nucleus","Creature","ProgrammaticNeuron")
         sphere(c,r,color,b.seed,b.form,if (b.form == "Spore") 7 else if (organic) 24 else 18)
@@ -306,22 +315,27 @@ private class SpatialMeshBuilder {
 /** OpenGL ES 3 / WebGL2 share the same projection and material shaders. */
 internal const val SPATIAL_VERTEX_SHADER = """#version 300 es
 precision highp float;
-in vec3 p; in vec3 n; in vec3 c;
+in vec3 p; in vec3 n; in vec3 c; in vec4 optical;
 uniform vec3 eye,forward,right,up;
-uniform float aspect,motionPhase;
+uniform float aspect,motionPhase,focusDepth,aperture;
 out vec3 normal,color,world;
+out float blurAmount;
 ${SPATIAL_MOTION_GLSL}
+${SPATIAL_ELEMENT_BLUR_GLSL}
 void main(){
     vec3 moved=deformSpatial(p,motionPhase);
     vec3 d=moved-eye; float z=dot(d,forward);
     gl_Position=vec4(dot(d,right)/(.52*aspect),dot(d,up)/.52,1.0002*z-.20002,z);
     normal=n; color=c; world=moved;
+    blurAmount=elementBlur(deformSpatial(optical.xyz,motionPhase),eye,focusDepth,aperture,optical.w);
 }"""
 
 internal const val SPATIAL_FRAGMENT_SHADER = """#version 300 es
 precision highp float;
 in vec3 normal,color,world;
+in float blurAmount;
 uniform vec3 eye;
+uniform float encodeBlur;
 out vec4 frag;
 void main(){
     vec3 n=normalize(normal),v=normalize(eye-world),l=normalize(vec3(-.4,.9,.7));
@@ -332,5 +346,5 @@ void main(){
     lit+=vec3(1.,.25,.04)*warm*(.48+.55*rim)+vec3(.03,.22,.32)*rim;
     lit=lit/(vec3(1.)+lit*.35);
     float fog=exp(-length(eye-world)*.026);
-    frag=vec4(mix(vec3(.012,.045,.047),lit,fog),1.);
+    frag=vec4(mix(vec3(.012,.045,.047),lit,fog),mix(1.,blurAmount,encodeBlur));
 }"""

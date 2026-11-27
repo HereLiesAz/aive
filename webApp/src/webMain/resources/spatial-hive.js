@@ -11,10 +11,11 @@
         const r=norm(cross(f,Math.abs(f[1])>.999?[0,0,1]:[0,1,0]));
         return {eye,f,r,u:cross(r,f)};
     };
+    const vertexFloats=13, vertexBytes=vertexFloats*4;
     // Shared Kotlin owns the triangle stream; decode its little-endian float transport.
     function decodeMesh(encoded) {
         const raw=root.atob(encoded);
-        if(raw.length%36!==0)throw Error("Invalid spatial vertex stream");
+        if(raw.length%vertexBytes!==0)throw Error("Invalid spatial vertex stream");
         const bytes=Uint8Array.from(raw,c=>c.charCodeAt(0));
         const view=new DataView(bytes.buffer),out=new Float32Array(bytes.length/4);
         for(let i=0;i<out.length;i++)out[i]=view.getFloat32(i*4,true);
@@ -36,7 +37,7 @@
             if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error("Optics link");
         }catch(e){if(program)gl.deleteProgram(program);return null;}
         finally{if(vs)gl.deleteShader(vs);if(fs)gl.deleteShader(fs);}
-        const uniforms=Object.fromEntries(["sceneColor","sceneDepth","focusDepth","aperture"].map(n=>[n,gl.getUniformLocation(program,n)]));
+        const uniforms=Object.fromEntries(["sceneColor","sceneDepth"].map(n=>[n,gl.getUniformLocation(program,n)]));
         let framebuffer=null,color=null,depth=null,width=0,height=0,ready=false;
         function release(){
             if(framebuffer)gl.deleteFramebuffer(framebuffer);
@@ -73,13 +74,12 @@
             gl.bindFramebuffer(gl.FRAMEBUFFER,ready?framebuffer:null);
             return ready;
         }
-        function finish(focus,aperture){
+        function finish(){
             gl.bindFramebuffer(gl.FRAMEBUFFER,null);
             gl.disable(gl.DEPTH_TEST);
             gl.useProgram(program);
             gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,color);gl.uniform1i(uniforms.sceneColor,0);
             gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,depth);gl.uniform1i(uniforms.sceneDepth,1);
-            gl.uniform1f(uniforms.focusDepth,focus);gl.uniform1f(uniforms.aperture,aperture);
             gl.drawArrays(gl.TRIANGLES,0,3);
             gl.bindTexture(gl.TEXTURE_2D,null);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,null);
             gl.enable(gl.DEPTH_TEST);
@@ -100,8 +100,8 @@
             const p=gl.createProgram();gl.attachShader(p,vs);gl.attachShader(p,fs);gl.linkProgram(p);gl.deleteShader(vs);gl.deleteShader(fs);
             if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));
             s.program=p;s.buffer=gl.createBuffer();s.vao=gl.createVertexArray();gl.bindVertexArray(s.vao);gl.bindBuffer(gl.ARRAY_BUFFER,s.buffer);
-            for(const [name,offset] of [["p",0],["n",12],["c",24]]){const loc=gl.getAttribLocation(p,name);gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,3,gl.FLOAT,false,36,offset);}
-            s.uniforms=Object.fromEntries(["eye","forward","right","up","aspect","motionPhase"].map(n=>[n,gl.getUniformLocation(p,n)]));
+            for(const [name,size,offset] of [["p",3,0],["n",3,12],["c",3,24],["optical",4,36]]){const loc=gl.getAttribLocation(p,name);gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,size,gl.FLOAT,false,vertexBytes,offset);}
+            s.uniforms=Object.fromEntries(["eye","forward","right","up","aspect","motionPhase","focusDepth","aperture","encodeBlur"].map(n=>[n,gl.getUniformLocation(p,n)]));
             s.count=0;
         }catch(e){emit({type:"error"});return;}
         s.optics=createOptics(gl,opticsVertex,opticsFragment);
@@ -132,13 +132,15 @@
             gl.useProgram(s.program);gl.bindVertexArray(s.vao);
             const {eye,f,r,u}=basis(s.camera);
             for(const [name,value] of [["eye",eye],["forward",f],["right",r],["up",u]])gl.uniform3fv(s.uniforms[name],value);
-            gl.uniform1f(s.uniforms.aspect,w/h);gl.uniform1f(s.uniforms.motionPhase,s.camera.motionPhase||0);gl.drawArrays(gl.TRIANGLES,0,s.count);
-            if(blurred)s.optics.finish(s.focusDepth,s.aperture);
+            gl.uniform1f(s.uniforms.aspect,w/h);gl.uniform1f(s.uniforms.motionPhase,s.camera.motionPhase||0);
+            gl.uniform1f(s.uniforms.focusDepth,s.focusDepth);gl.uniform1f(s.uniforms.aperture,s.aperture);gl.uniform1f(s.uniforms.encodeBlur,blurred?1:0);
+            gl.drawArrays(gl.TRIANGLES,0,s.count);
+            if(blurred)s.optics.finish();
         }
         s.raf=root.requestAnimationFrame(draw);
     }
     function detach(canvas){const s=instances.get(canvas);if(!s)return;instances.delete(canvas);root.cancelAnimationFrame(s.raf);s.cleanup.forEach(fn=>fn());if(s.gl){s.optics?.dispose();s.gl.deleteBuffer(s.buffer||null);s.gl.deleteVertexArray(s.vao||null);s.gl.deleteProgram(s.program||null);}}
-    function frame(canvas,encoded){const s=instances.get(canvas);if(!s||!s.program)return;try{const data=decodeMesh(encoded);s.gl.bindBuffer(s.gl.ARRAY_BUFFER,s.buffer);s.gl.bufferData(s.gl.ARRAY_BUFFER,data,s.gl.STATIC_DRAW);s.count=data.length/9;}catch(e){s.events.push(JSON.stringify({type:"error"}));}}
+    function frame(canvas,encoded){const s=instances.get(canvas);if(!s||!s.program)return;try{const data=decodeMesh(encoded);s.gl.bindBuffer(s.gl.ARRAY_BUFFER,s.buffer);s.gl.bufferData(s.gl.ARRAY_BUFFER,data,s.gl.STATIC_DRAW);s.count=data.length/vertexFloats;}catch(e){s.events.push(JSON.stringify({type:"error"}));}}
     function camera(canvas,encoded,focusDepth,aperture){const s=instances.get(canvas);if(s){s.camera=JSON.parse(encoded);s.focusDepth=focusDepth;s.aperture=aperture;}}
     function poll(canvas){return instances.get(canvas)?.events.shift()||null;}
     root.AiveSpatialGpu={available,attach,detach,frame,camera,poll};
