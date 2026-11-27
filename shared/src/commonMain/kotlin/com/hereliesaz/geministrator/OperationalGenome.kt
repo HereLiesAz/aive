@@ -17,8 +17,11 @@ import com.hereliesaz.geministrator.events.ProviderUsageRecorded
  * and their journals, idempotent per run, and a trait with no evidence is null (unreported), never a default.
  */
 
-/** What one role has been observed to do, summed over the settled runs seen. */
-internal data class RoleProfile(
+/**
+ * What one role has been observed to do, summed over the settled runs seen. Public only because a public composable
+ * takes a loader of it; it holds numbers and strings, nothing a caller can misuse.
+ */
+data class RoleProfile(
     /** Tokens and dollars over the sessions that were fully priced; cost per token needs both. */
     val pricedTokens: Long = 0,
     val costUsd: Double = 0.0,
