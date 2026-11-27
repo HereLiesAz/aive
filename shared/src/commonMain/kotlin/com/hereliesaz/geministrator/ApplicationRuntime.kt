@@ -2416,7 +2416,10 @@ class ApplicationRuntime private constructor(
         val reports = persistence.events.forRun(run.id)
             .filterIsInstance<com.hereliesaz.geministrator.events.ProviderUsageRecorded>()
         val echo = EchoHistory(balances = baseline).advance(run, reports).balances
-        return hatchFromRun(run, roles, echo)
+        val configuredModels = providerRegistry.providerIds.mapNotNull { id ->
+            providerRegistry.provider(id)?.configuredModelId?.takeIf { it.isNotBlank() }?.let { id to it }
+        }.toMap()
+        return hatchFromRun(run, roles, echo, reports, configuredModels)
     }
 
     suspend fun saveRole(role: RoleDefinition) {

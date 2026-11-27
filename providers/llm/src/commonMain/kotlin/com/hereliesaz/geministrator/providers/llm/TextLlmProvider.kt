@@ -59,6 +59,7 @@ open class TextLlmProvider(
 
     /** Tools are offered only through [toolboxFor], which cuts them to the request's allowed set. */
     override val enforcesToolFilter: Boolean get() = true
+    override val configuredModelId: String? get() = api.modelId
 
     private data class Session(
         val request: AgentTaskRequest,

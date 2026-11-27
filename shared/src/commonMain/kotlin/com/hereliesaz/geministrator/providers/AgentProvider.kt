@@ -227,6 +227,9 @@ sealed interface AgentEvent {
 interface AgentProvider {
     val id: AgentProviderId
 
+    /** Exact currently configured model, when exposed by the provider; not inference attestation. */
+    val configuredModelId: String? get() = null
+
     /**
      * True for providers that must never be picked automatically: they run only where a role
      * prefers them or a task requires them by id (for example, an agent that reports too little

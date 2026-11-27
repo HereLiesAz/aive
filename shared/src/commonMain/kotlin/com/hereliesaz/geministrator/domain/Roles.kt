@@ -175,7 +175,7 @@ data class RoleDefinition(
     val budgetClass: BudgetClass? = null,
     /**
      * A ceiling on the tools its steps may use; empty means none, which is the default: only a step's contract narrows tools.
-     * It is set only by a revision the Nanny proposed and the keeper selected (docs/Step-Templates.md).
+     * It is set by a selected Nanny revision (docs/Step-Templates.md), or narrowed on a disabled offspring at birth.
      */
     val toolCeiling: List<String> = emptyList(),
     /**

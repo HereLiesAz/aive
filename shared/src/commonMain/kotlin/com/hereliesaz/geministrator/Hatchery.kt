@@ -1,5 +1,7 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.domain.AgentProviderId
+import com.hereliesaz.geministrator.events.ProviderUsageRecorded
 import com.hereliesaz.geministrator.domain.RoleDefinition
 import com.hereliesaz.geministrator.domain.RoleDefinitionId
 import com.hereliesaz.geministrator.domain.TaskRunStatus
@@ -15,6 +17,8 @@ import com.hereliesaz.geministrator.domain.WorkflowRunStatus
  */
 internal fun hatchFromRun(
     run: WorkflowRun, roles: Collection<RoleDefinition>, echo: Map<RoleDefinitionId, Int> = emptyMap(),
+    reports: List<ProviderUsageRecorded> = emptyList(),
+    configuredModels: Map<AgentProviderId, String> = emptyMap(),
 ): RoleDefinition? {
     if (run.status != WorkflowRunStatus.Completed) return null
     val rolesById = (run.roleSnapshot.ifEmpty { roles.toList() }).associateBy(RoleDefinition::id)
@@ -32,14 +36,14 @@ internal fun hatchFromRun(
     val a = contributors.firstOrNull() ?: return null
     val childId = RoleDefinitionId("hatch-${run.id.value}")
     val b = contributors.getOrNull(1)
-        ?: return mutateHatchedInstructions(run, a.copy(
+        ?: return mutateHatchedGenome(run, a.copy(
             id = childId,
             name = "${a.name} · clone",
             enabled = false,
             parents = listOf(a.id),
             hatchedFromRunId = run.id.value,
-        ), echo)
-    return mutateHatchedInstructions(run, a.copy(
+        ), echo, reports, configuredModels)
+    return mutateHatchedGenome(run, a.copy(
         id = childId,
         name = "${a.name} × ${b.name}",
         instructions = listOf(a.instructions, b.instructions).filter(String::isNotBlank).joinToString("\n\n"),
@@ -49,7 +53,7 @@ internal fun hatchFromRun(
         enabled = false,
         parents = listOf(a.id, b.id),
         hatchedFromRunId = run.id.value,
-    ), echo)
+    ), echo, reports, configuredModels)
 }
 
 /**
@@ -61,10 +65,7 @@ internal fun hatchFromRun(
 private fun mutateHatchedInstructions(
     run: WorkflowRun, child: RoleDefinition, echo: Map<RoleDefinitionId, Int>,
 ): RoleDefinition {
-    val highest = child.parents.mapNotNull(echo::get).maxOrNull() ?: 0
-    val chance = 200 + (highest.coerceIn(3_000, 6_000) - 3_000) * 600 / 3_000
-    val draw = ("${run.id.value}:instruction-mutation-v1").hashCode().toUInt() % 10_000u
-    if (draw >= chance.toUInt()) return child
+    if (!mutationDraw(run, child, echo, "instruction")) return child
     val variants = listOf(
         "Within the assigned scope, compare plausible explanations against the available evidence before choosing an approach.",
         "Within the assigned scope, prefer a small falsifiable check of a material assumption before committing to an approach.",
@@ -76,4 +77,58 @@ private fun mutateHatchedInstructions(
         name = if (child.parents.size == 1) child.name.removeSuffix(" · clone") + " · variant" else child.name,
         instructions = listOf(child.instructions, variants[choice]).filter(String::isNotBlank).joinToString("\n\n"),
     )
+}
+
+/** Each functional locus has its own stable, independently keyed draw. */
+private fun mutationDraw(run: WorkflowRun, child: RoleDefinition, echo: Map<RoleDefinitionId, Int>, locus: String): Boolean {
+    val highest = child.parents.mapNotNull(echo::get).maxOrNull() ?: 0
+    val chance = 200 + (highest.coerceIn(3_000, 6_000) - 3_000) * 600 / 3_000
+    return ("${run.id.value}:$locus-mutation-v1").hashCode().toUInt() % 10_000u < chance.toUInt()
+}
+
+/**
+ * Persist actual instruction, tool and model-source changes. An empty ceiling means unrestricted,
+ * so never remove its last member. A model-source variant is restricted to a solo parent's own
+ * successful sessions on different currently configured models. No arbitrary model name or
+ * capability is invented. The regular provider selection and approval checks still govern work.
+ */
+private fun mutateHatchedGenome(
+    run: WorkflowRun, child: RoleDefinition, echo: Map<RoleDefinitionId, Int>,
+    reports: List<ProviderUsageRecorded>, configuredModels: Map<AgentProviderId, String>,
+): RoleDefinition {
+    var variant = mutateHatchedInstructions(run, child, echo)
+    val ceiling = child.toolCeiling.distinct().sorted()
+    if (ceiling.size > 1 && mutationDraw(run, child, echo, "tool")) {
+        val index = (("${run.id.value}:tool-variant-v1").hashCode().toUInt() % ceiling.size.toUInt()).toInt()
+        variant = variant.copy(toolCeiling = ceiling.filterIndexed { i, _ -> i != index })
+    }
+    val parent = child.parents.singleOrNull()
+    if (parent != null && mutationDraw(run, child, echo, "source")) {
+        val models = reportedSessionModels(run, reports)
+        val observed = run.taskRuns.values.filter { it.assignedRoleId == parent &&
+            it.status == TaskRunStatus.Completed && it.byAgent }.mapNotNull { task ->
+            val provider = task.assignedProviderId ?: return@mapNotNull null
+            val model = models[task.taskDefinitionId] ?: return@mapNotNull null
+            if (configuredModels[provider] == model) provider to model else null
+        }
+        val unambiguous = observed.groupBy({ it.first }, { it.second })
+            .mapNotNull { (provider, values) -> values.distinct().singleOrNull()?.let { provider to it } }
+            .toMap()
+        val baseline = child.preferredProviderId ?: observed.groupingBy { it.first }.eachCount()
+            .entries.sortedWith(compareByDescending<Map.Entry<AgentProviderId, Int>> { it.value }
+                .thenBy { it.key.value }).firstOrNull()?.key
+        val baselineModel = baseline?.let(unambiguous::get)
+        if (baselineModel != null) {
+            val alternatives = unambiguous.entries.filter { it.key != baseline && it.value != baselineModel }
+                .sortedBy { it.key.value }
+            if (alternatives.isNotEmpty()) {
+                val index = (("${run.id.value}:source-variant-v1").hashCode().toUInt() % alternatives.size.toUInt()).toInt()
+                variant = variant.copy(preferredProviderId = alternatives[index].key)
+            }
+        }
+    }
+    if (variant != child && child.parents.size == 1) {
+        variant = variant.copy(name = child.name.removeSuffix(" · clone") + " · variant")
+    }
+    return variant
 }
