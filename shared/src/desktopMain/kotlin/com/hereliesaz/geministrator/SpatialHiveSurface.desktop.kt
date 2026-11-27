@@ -154,7 +154,7 @@ private class SpatialDesktopRenderer(private val failed: () -> Unit) : GLEventLi
     private var buffer = 0
     private var count = 0
     private var aspect = 1f
-    private var uniforms = IntArray(5)
+    private var uniforms = IntArray(6)
 
     override fun init(drawable: GLAutoDrawable) {
         val gl = drawable.gl.getGL3()
@@ -193,7 +193,7 @@ private class SpatialDesktopRenderer(private val failed: () -> Unit) : GLEventLi
                 gl.glEnableVertexAttribArray(loc)
                 gl.glVertexAttribPointer(loc, 3, GL.GL_FLOAT, false, SPATIAL_VERTEX_FLOATS * 4, i * 12L)
             }
-            uniforms = listOf("eye", "forward", "right", "up", "aspect").map {
+            uniforms = listOf("eye", "forward", "right", "up", "aspect", "motionPhase").map {
                 gl.glGetUniformLocation(program, it)
             }.toIntArray()
             gl.glEnable(GL.GL_DEPTH_TEST)
@@ -233,6 +233,7 @@ private class SpatialDesktopRenderer(private val failed: () -> Unit) : GLEventLi
             gl.glUniform3f(uniforms[i], p.x, p.y, p.z)
         }
         gl.glUniform1f(uniforms[4], aspect)
+        gl.glUniform1f(uniforms[5], view.motionPhase)
         gl.glDrawArrays(GL.GL_TRIANGLES, 0, count)
     }
 

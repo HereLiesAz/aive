@@ -32,7 +32,7 @@ internal fun SpatialRenderFrame.pick(camera: SpatialRenderCamera, x: Float, y: F
     var hit: SpatialRenderBody? = null
     val candidates = if (camera.memory) spores else bodies + spores
     for (body in candidates) {
-        val d = body.position - view.eye
+        val d = spatialMotionPoint(body.position, camera.motionPhase) - view.eye
         val t = dot(d,ray)
         val radius = if (body.form == "Creature" || body.form == "ProgrammaticNeuron") body.radius * maxOf(spatialMorphology(body.seed).shape.x, spatialMorphology(body.seed).shape.y, spatialMorphology(body.seed).shape.z) else body.radius
         val disc = radius*radius - dot(d,d) + t*t
@@ -308,12 +308,14 @@ internal const val SPATIAL_VERTEX_SHADER = """#version 300 es
 precision highp float;
 in vec3 p; in vec3 n; in vec3 c;
 uniform vec3 eye,forward,right,up;
-uniform float aspect;
+uniform float aspect,motionPhase;
 out vec3 normal,color,world;
+${SPATIAL_MOTION_GLSL}
 void main(){
-    vec3 d=p-eye; float z=dot(d,forward);
+    vec3 moved=deformSpatial(p,motionPhase);
+    vec3 d=moved-eye; float z=dot(d,forward);
     gl_Position=vec4(dot(d,right)/(.52*aspect),dot(d,up)/.52,1.0002*z-.20002,z);
-    normal=n; color=c; world=p;
+    normal=n; color=c; world=moved;
 }"""
 
 internal const val SPATIAL_FRAGMENT_SHADER = """#version 300 es

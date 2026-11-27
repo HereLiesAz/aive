@@ -140,7 +140,7 @@ private class SpatialGlRenderer(private val failed: () -> Unit) : GLSurfaceView.
     private var vao = 0
     private var count = 0
     private var aspect = 1f
-    private var uniforms = IntArray(5)
+    private var uniforms = IntArray(6)
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         uploaded = null; count = 0; program = 0
@@ -168,7 +168,7 @@ private class SpatialGlRenderer(private val failed: () -> Unit) : GLSurfaceView.
                 GLES30.glEnableVertexAttribArray(loc)
                 GLES30.glVertexAttribPointer(loc,3,GLES30.GL_FLOAT,false,SPATIAL_VERTEX_FLOATS*4,i*12)
             }
-            uniforms=listOf("eye","forward","right","up","aspect").map { GLES30.glGetUniformLocation(p,it) }.toIntArray()
+            uniforms=listOf("eye","forward","right","up","aspect","motionPhase").map { GLES30.glGetUniformLocation(p,it) }.toIntArray()
             GLES30.glEnable(GLES30.GL_DEPTH_TEST)
             program=p
         } catch (_: Exception) { failed() }
@@ -202,6 +202,7 @@ private class SpatialGlRenderer(private val failed: () -> Unit) : GLSurfaceView.
             GLES30.glUniform3f(uniforms[i],p.x,p.y,p.z)
         }
         GLES30.glUniform1f(uniforms[4],aspect)
+        GLES30.glUniform1f(uniforms[5],view.motionPhase)
         GLES30.glDrawArrays(GLES30.GL_TRIANGLES,0,count)
     }
 }
