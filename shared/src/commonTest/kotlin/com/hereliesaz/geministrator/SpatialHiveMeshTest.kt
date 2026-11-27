@@ -25,7 +25,7 @@ class SpatialHiveMeshTest {
 
     @Test fun tubeHasSharedRingAtCornerAndNoZeroSegment() {
         val a=SpatialPoint(0f,0f,0f); val b=SpatialPoint(0f,0f,2f); val c=SpatialPoint(2f,0f,2f)
-        val data=SpatialRenderFrame(emptyList(),emptyList(),listOf(SpatialRenderCord(listOf(a,b,b,c),.1f,"Neural"))).triangles()
+        val data=SpatialRenderFrame(emptyList(),emptyList(),listOf(SpatialRenderCord(listOf(a,b,b,c),.1f,"Dependency"))).triangles()
         assertEquals(2*7*2*3*9,data.size)
         val first=(0 until data.size/2 step 9).map { SpatialPoint(data[it],data[it+1],data[it+2]) }.toSet()
         val second=(data.size/2 until data.size step 9).map { SpatialPoint(data[it],data[it+1],data[it+2]) }.toSet()

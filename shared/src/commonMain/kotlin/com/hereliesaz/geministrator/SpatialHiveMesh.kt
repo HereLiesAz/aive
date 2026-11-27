@@ -5,7 +5,6 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
-import kotlin.math.pow
 import kotlin.random.Random
 
 /** One portable triangle stream: position, normal, RGB, nine floats per vertex. */
@@ -35,7 +34,8 @@ internal fun SpatialRenderFrame.pick(camera: SpatialRenderCamera, x: Float, y: F
     for (body in candidates) {
         val d = body.position - view.eye
         val t = dot(d,ray)
-        val disc = body.radius*body.radius - dot(d,d) + t*t
+        val radius = if (body.form == "Creature" || body.form == "ProgrammaticNeuron") body.radius * maxOf(spatialMorphology(body.seed).shape.x, spatialMorphology(body.seed).shape.y, spatialMorphology(body.seed).shape.z) else body.radius
+        val disc = radius*radius - dot(d,d) + t*t
         if (disc < 0f) continue
         val near = t - sqrt(disc)
         val far = t + sqrt(disc)
@@ -47,7 +47,7 @@ internal fun SpatialRenderFrame.pick(camera: SpatialRenderCamera, x: Float, y: F
 
 /** Builds actual depth-tested world geometry, independent of camera, viewport and runtime. */
 internal fun SpatialRenderFrame.triangles(): FloatArray = SpatialMeshBuilder().apply {
-    cords.forEach(::cord)
+    cords.forEach { cord -> cord(cord) }
     (bodies + spores).forEach(::organism)
 }.finish()
 
@@ -56,7 +56,7 @@ private fun rgb(r: Float, g: Float, b: Float) = SpatialPoint(r,g,b)
 private val bodyPalette = listOf(rgb(.12f,.62f,.57f),rgb(.28f,.42f,.85f),rgb(.55f,.24f,.75f),rgb(.12f,.67f,.83f),rgb(.8f,.39f,.2f))
 
 private fun bodyTint(b: SpatialRenderBody): SpatialPoint = when {
-    b.form == "Nucleus" -> rgb(.28f,.21f,.38f)
+    b.form == "Nucleus" -> rgb(.29f,.22f,.39f)
     b.form == "Spore" -> when (b.state) {
         "Source" -> rgb(.32f,.66f,.8f)
         "Context" -> rgb(.1f,.85f,.65f)
@@ -107,49 +107,31 @@ private class SpatialMeshBuilder {
 
     private data class Sample(val p: SpatialPoint,val n: SpatialPoint,val tint: SpatialPoint? = null)
 
-    /** Folded soma with independently variable axes, local relief and warm underside pigment. */
-    private fun sphere(center: SpatialPoint,radius: Float,color: SpatialPoint,seed: Int,form: String,
-        detail: Int = 18, axes: SpatialPoint = SpatialPoint(1f,1f,1f), lobes: Int = 3, relief: Float = 0f) {
-        val phase=(seed.toUInt()%628u).toFloat()/100f
-        fun direction(phi: Float,theta: Float)=SpatialPoint(sin(phi)*cos(theta),cos(phi),sin(phi)*sin(theta))
-        fun point(phi: Float,theta: Float): SpatialPoint {
-            val n=direction(phi,theta)
-            val fold=sin(theta*lobes+phase)*sin(phi*3f)+.45f*cos(phi*5f+theta*2f+phase)*sin(phi)
-            val texture=.22f*sin(theta*11f+phase)*sin(phi*13f)*sin(phi)
-            return center+SpatialPoint(n.x*axes.x,n.y*axes.y,n.z*axes.z)*(radius*(1f+relief*(fold+texture)))
-        }
+    private fun sphere(center: SpatialPoint,radius: Float,color: SpatialPoint,seed: Int,form: String,detail: Int = 18) {
+        val unsigned = seed.toUInt()
+        val phase = (unsigned % 628u).toFloat()/100f
+        val morph = spatialMorphology(seed)
+        val lobes = if (form == "Nucleus") 7 else morph.lobes
+        val shape = form in listOf("Nucleus","Creature","ProgrammaticNeuron")
+        val scale = if (shape && form != "Nucleus") morph.shape else SpatialPoint(1f,1f,1f)
+        val relief = if (form == "Nucleus") .26f else morph.relief
         fun sample(i: Int,j: Int): Sample {
-            val phi=pi*i/detail
-            val theta=pi*j/detail
-            val n=direction(phi,theta)
-            val normal=if(i==0||i==detail) n else {
-                val dp=point(phi+.002f,theta)-point(phi-.002f,theta)
-                val dt=point(phi,theta+.002f)-point(phi,theta-.002f)
-                dp.cross(dt).unit().let { if(it==SpatialPoint.Origin) n else if(dot(it,n)<0f) it*(-1f) else it }
-            }
-            val shade=if(relief>0f) {
-                val warm=((.12f-n.y)*.72f).coerceIn(0f,.78f)
-                (color*(1f-warm)+rgb(.97f,.29f,.105f)*warm)*(.85f+.15f*sin(theta*17f+phase)*sin(phi*12f))
-            } else color
-            return Sample(point(phi,theta),normal,shade)
+            val phi = pi*i/detail
+            val theta = pi*j/detail
+            val n = SpatialPoint(sin(phi)*cos(theta),cos(phi),sin(phi)*sin(theta))
+            val ripple = if (shape) 1f+relief*sin(theta*lobes+phase)*sin(phi*3f)+(.09f*cos(phi*5f+theta*2f+phase)+.035f*sin(phi*17f+theta*13f+phase))*sin(phi) else 1f
+            val warm = if (shape) ((.12f-n.y)*.72f).coerceIn(0f,.78f) else 0f
+            val tint = color*(1f-warm)+rgb(.97f,.29f,.105f)*warm
+            return Sample(center+SpatialPoint(n.x*scale.x,n.y*scale.y,n.z*scale.z)*(radius*ripple),SpatialPoint(n.x/scale.x,n.y/scale.y,n.z/scale.z).unit(),tint)
         }
-        for(i in 0 until detail) for(j in 0 until detail*2) {
-            val a=sample(i,j); val b=sample(i+1,j); val c=sample(i+1,j+1); val d=sample(i,j+1)
+        for (i in 0 until detail) for (j in 0 until detail*2) {
+            val a = sample(i,j); val b = sample(i+1,j); val c = sample(i+1,j+1); val d = sample(i,j+1)
             triangle(a,b,c,color); triangle(a,c,d,color)
         }
     }
 
-    /** Change only the rendered radius, never the persisted branch centerline or logical links. */
-    fun cord(cord: SpatialRenderCord) {
-        val color=cordTint(cord.kind)
-        val phase=cord.points.firstOrNull()?.let { it.x*1.7f+it.z*.9f } ?: 0f
-        if(cord.kind in listOf("Memory","Dependency","Transfer")) tube(cord.points,cord.width,color)
-        else tube(cord.points,cord.width,color,radiusAt={t -> .34f+.66f*spatialNeuriteProfile(t,phase)})
-    }
-
     /** Transport one ring frame along the whole curve, sharing joints rather than leaving cracks. */
-    fun tube(points: List<SpatialPoint>, width: Float, color: SpatialPoint, sides: Int = 7,
-        radiusAt: (Float) -> Float = { 1f }) {
+    fun tube(points: List<SpatialPoint>, width: Float, color: SpatialPoint, sides: Int = 7, profile: (Float) -> Float = { 1f }) {
         if (width <= 0f || !width.isFinite()) return
         val path = mutableListOf<SpatialPoint>()
         for (p in points) if (p.finite() && (path.isEmpty() || (p-path.last()).length() > .00001f)) path += p
@@ -166,7 +148,7 @@ private class SpatialMeshBuilder {
             List(sides) { j ->
                 val angle = 2f*pi*j/sides
                 val n = right*cos(angle)+up*sin(angle)
-                Sample(p+n*(width*radiusAt(i.toFloat()/path.lastIndex).coerceAtLeast(.015f)),n)
+                Sample(p+n*(width*profile(i.toFloat()/path.lastIndex)),n)
             }
         }
         for (i in 1 until rings.size) for (j in 0 until sides) {
@@ -176,131 +158,147 @@ private class SpatialMeshBuilder {
         }
     }
 
-    private fun Random.direction(): SpatialPoint {
-        val y=nextFloat()*2f-1f
-        val angle=nextFloat()*2f*pi
-        val radial=sqrt((1f-y*y).coerceAtLeast(0f))
+    /** Decorative tissue is sculpted independently of logical dependency and transfer overlays. */
+    fun cord(c: SpatialRenderCord) {
+        if (c.kind in listOf("Memory","Transfer","Dependency")) {
+            tube(c.points,c.width,cordTint(c.kind))
+            return
+        }
+        val phase = (c.points.firstOrNull()?.let { it.x*2f+it.z*3f } ?: 0f)
+        tube(c.points,c.width*2.1f,cordTint(c.kind),9) { spatialNeuriteProfile(it,phase) }
+        if (c.points.size < 3) return
+        for (strand in 0..1) {
+            val path = c.points.mapIndexed { i,p ->
+                val t = i.toFloat()/c.points.lastIndex
+                val envelope = sin(pi*t)*c.width*.65f
+                p+SpatialPoint(cos(t*19f+phase+strand*pi),sin(t*19f+phase+strand*pi),0f)*envelope
+            }
+            tube(path,c.width*.18f,if (strand==0) rgb(.72f,.22f,.09f) else rgb(.22f,.36f,.88f),5) { spatialNeuriteProfile(it,phase) }
+        }
+    }
+
+    private fun direction(rng: Random): SpatialPoint {
+        val y = rng.nextFloat()*2f-1f
+        val angle = rng.nextFloat()*2f*pi
+        val radial = sqrt((1f-y*y).coerceAtLeast(0f))
         return SpatialPoint(cos(angle)*radial,y,sin(angle)*radial)
     }
 
-    private fun perpendicular(d: SpatialPoint): SpatialPoint =
-        d.cross(if(abs(d.y)>.9f) SpatialPoint(1f,0f,0f) else SpatialPoint(0f,1f,0f)).unit()
-
-    private fun surface(d: SpatialPoint,axes: SpatialPoint,r: Float)=SpatialPoint(d.x*axes.x,d.y*axes.y,d.z*axes.z)*r
-
-    /** Convex iris with radial pigment, unequal pupils and irregular eyelid membrane. */
-    private fun eye(center: SpatialPoint,direction: SpatialPoint,radius: Float,color: SpatialPoint,phase: Float) {
-        val d=direction.unit()
-        val right=perpendicular(d); val up=d.cross(right)
-        sphere(center,radius,color,0,"Eye",12)
-        val iris=if(sin(phase)>.35f) rgb(.24f,.66f,.77f) else if(cos(phase)<-.4f) rgb(.73f,.27f,.58f) else rgb(1f,.43f,.12f)
+    /** Convex iris with radially varying pigment, a dark pupil and an irregular wet eyelid. */
+    private fun eye(center: SpatialPoint,d: SpatialPoint,r: Float,seed: Int,membrane: SpatialPoint) {
+        val phase=(seed.toUInt()%628u).toFloat()/100f
+        val side=d.cross(if(abs(d.y)>.9f) SpatialPoint(1f,0f,0f) else SpatialPoint(0f,1f,0f)).unit()
+        val up=side.cross(d)
+        val iris=when((seed.toUInt()%4u).toInt()) {
+            0 -> rgb(.94f,.29f,.065f)
+            1 -> rgb(.88f,.17f,.25f)
+            2 -> rgb(.13f,.62f,.69f)
+            else -> rgb(.56f,.23f,.69f)
+        }
+        val globe=center+d*(r*.26f)
+        sphere(globe,r,membrane,seed,"Eye",16)
         val pupil=.31f+.07f*sin(phase*2f)
         fun sample(t: Float,angle: Float): Sample {
-            val radial=right*cos(angle)+up*sin(angle)
+            val radial=side*cos(angle)+up*sin(angle)
             val n=(d*sqrt((1f-t*t).coerceAtLeast(0f))+radial*t).unit()
             val shade=when {
                 t<=pupil -> rgb(.012f,.025f,.038f)
                 t>=.82f -> rgb(.16f,.065f,.09f)
                 else -> iris*(.69f+.31f*sin(angle*37f+phase+t*13f).let { it*it })
             }
-            return Sample(center+n*(radius*1.012f),n,shade)
+            return Sample(globe+n*(r*1.012f),n,shade)
         }
         val bands=floatArrayOf(0f,pupil*.94f,pupil+.015f,.57f,.79f,.88f)
         val lid=mutableListOf<SpatialPoint>()
         for(j in 0..48) {
             val angle=2f*pi*j/48
             val (opening,height)=spatialEyelidProfile(angle,phase)
-            lid+=center+(right*cos(angle)+up*sin(angle))*(radius*opening)+d*(radius*height)
+            lid+=globe+(side*cos(angle)+up*sin(angle))*(r*opening)+d*(r*height)
             if(j==48) continue
             val next=2f*pi*(j+1)/48
             for(i in 0 until bands.lastIndex) {
-                val a=sample(bands[i],angle);val b=sample(bands[i+1],angle)
-                val c=sample(bands[i+1],next);val e=sample(bands[i],next)
-                triangle(a,b,c,iris);triangle(a,c,e,iris)
+                val a=sample(bands[i],angle); val b=sample(bands[i+1],angle)
+                val c=sample(bands[i+1],next); val e=sample(bands[i],next)
+                triangle(a,b,c,iris); triangle(a,c,e,iris)
             }
         }
-        tube(lid,radius*.085f,color,6)
-    }
-
-    /** Individual seeded 3D hairs vary in root, diameter, length, direction and pigment. */
-    private fun hairs(center: SpatialPoint,radius: Float,morph: SpatialMorphology,color: SpatialPoint,random: Random) {
-        repeat((44*morph.hair).toInt()) { i ->
-            val raw=random.direction()
-            val d=SpatialPoint(raw.x,raw.y*.65f+morph.crown*.48f,raw.z).unit()
-            val start=center+surface(d,morph.axes,radius*.88f)
-            val length=radius*morph.hair*(.36f+random.nextFloat()*.98f)
-            val bend=perpendicular(d)*(length*(random.nextFloat()-.5f))
-            val sweep=SpatialPoint(.28f,.12f,.07f)*(length*morph.crown)
-            val phase=random.nextFloat()*2f*pi
-            val path=(0..6).map { step ->
-                val t=step/6f
-                start+d*(length*t)+bend*(sin(t*pi*1.6f+phase)-sin(phase))*t+sweep*(t*t)
-            }
-            val pigment=when(i%4) {
-                0 -> rgb(.9f,.22f,.09f)
-                1 -> rgb(.35f,.16f,.88f)
-                2 -> rgb(.13f,.7f,.87f)
-                else -> color
-            }
-            tube(path,radius*(.004f+random.nextFloat()*.008f),pigment,4,radiusAt={t -> 1f-t*.94f})
-        }
-    }
-
-    /** One folded central ganglion, with warm organelles and tapered connective arms. */
-    private fun nucleus(body: SpatialRenderBody) {
-        val c=body.position;val r=body.radius;val rng=Random(body.seed);val color=bodyTint(body)
-        sphere(c,r*.74f,color,body.seed,"Nucleus",24,SpatialPoint(1.1f,.84f,1f),7,.22f)
-        repeat(9) { i ->
-            val d=rng.direction()
-            val lobe=c+d*(r*(.48f+rng.nextFloat()*.12f))
-            val size=r*(.36f+rng.nextFloat()*.14f)
-            sphere(lobe,size,color,body.seed+i,"Nucleus",16,SpatialPoint(1.15f,.8f,1f),5,.18f)
-            sphere(lobe+d*(size*.73f),size*.52f,rgb(1.45f,.55f,.13f),body.seed+i,"Organelle",12)
-            tube(listOf(lobe,lobe+d*(r*.5f),lobe+d*(r*.88f)+perpendicular(d)*(r*.18f)),
-                r*.14f,rgb(.18f,.43f,.67f),8,radiusAt={t -> 1f-.86f*t})
-        }
+        tube(lid,r*.085f,membrane,6)
     }
 
     fun organism(b: SpatialRenderBody) {
-        val c=b.position;val color=bodyTint(b);val r=b.radius
-        if(b.form=="Nucleus") { nucleus(b);return }
-        if(b.form !in listOf("Creature","ProgrammaticNeuron")) {
-            sphere(c,r,color,b.seed,b.form,if(b.form=="Spore") 7 else 18)
-            return
-        }
-        val morph=spatialOrganismMorphology(b.seed)
-        val rng=Random(b.seed)
-        sphere(c,r,color,b.seed,b.form,24,morph.axes,morph.lobes,morph.relief)
-        val primary=rng.direction()
-        repeat(morph.eyes) { i ->
-            val d=if(i==0) primary else (rng.direction()+primary*.32f).unit()
-            val size=r*morph.eyeSize*(if(i==0) 1.55f else .62f+rng.nextFloat()*.48f)
-            eye(c+surface(d,morph.axes,r*.88f),d,size,color,rng.nextFloat()*2f*pi)
-        }
-        repeat(morph.stalks) { i ->
-            val d=SpatialPoint(if(i==0) .32f else -.46f,1f,.16f).unit()
-            val start=c+surface(d,morph.axes,r*.73f)
-            val tip=start+d*(r*(.95f+rng.nextFloat()*.48f))
-            val bend=perpendicular(d)*(r*.30f)
-            val path=(0..12).map { j ->
-                val t=j/12f
-                start+(tip-start)*t+bend*sin(t*pi*1.55f)*sin(t*pi)
+        val c = b.position; val color = bodyTint(b); val r = b.radius
+        val organic = b.form in listOf("Nucleus","Creature","ProgrammaticNeuron")
+        sphere(c,r,color,b.seed,b.form,if (b.form == "Spore") 7 else if (organic) 24 else 18)
+        if (!organic) return
+        val rng = Random(b.seed)
+        val morph = spatialMorphology(b.seed)
+        val nucleus = b.form == "Nucleus"
+        val shape = if (nucleus) SpatialPoint(1f,1f,1f) else morph.shape
+        fun surface(d: SpatialPoint) = c+SpatialPoint(d.x*shape.x,d.y*shape.y,d.z*shape.z)*(r*.86f)
+        val rootCount = if (nucleus) 12 else morph.roots
+        repeat(rootCount) {
+            val d = direction(rng)
+            val a = surface(d)
+            val bend = direction(rng)
+            val path = (0..10).map { i ->
+                val t = i/10f
+                a+d*(r*(.8f*t))+bend*(r*.28f*sin(pi*t))
             }
-            tube(path,r*.14f,color,9,radiusAt={t -> .40f+.60f*(1f-t)})
-            eye(tip,(d+primary*.35f).unit(),r*morph.eyeSize*.74f,color,rng.nextFloat()*2f*pi)
+            tube(path,r*.15f,color,7) { t -> .08f+.92f*(1f-t)*(1f-t) }
         }
-        repeat(morph.roots) { i ->
-            val d=if(i==0) SpatialPoint(.10f,-1f,.12f).unit() else rng.direction()
-            val start=c+surface(d,morph.axes,r*.68f)
-            val length=r*(if(i==0) 1.65f else .38f+rng.nextFloat()*.48f)
-            val bend=perpendicular(d)*(length*.25f)
-            val path=(0..10).map { j ->
-                val t=j/10f
-                start+d*(length*t)+bend*sin(t*pi)*t
+        if (nucleus) {
+            repeat(11) { k ->
+                val d = direction(rng)
+                val a = surface(d)
+                val lobeRadius=r*(.29f+rng.nextFloat()*.14f)
+                sphere(a,lobeRadius,color,b.seed+k,"Nucleus",16)
+                val pocket=a+d*(lobeRadius*.73f)
+                sphere(pocket,lobeRadius*.56f,rgb(1.45f,.55f,.13f),b.seed+k,"Eye",14)
             }
-            tube(path,r*(if(i==0) .20f else .105f),color,8,radiusAt={t -> (1f-t).pow(1.4f)+.035f})
+        } else {
+            repeat(morph.eyes) { k ->
+                val d = direction(rng)
+                val eyeRadius = r*morph.eye*(if (k==0) 1.42f else .65f+rng.nextFloat()*.48f)
+                eye(surface(d),d,eyeRadius,rng.nextInt(),color)
+            }
+            repeat(morph.stalks) {
+                val d = SpatialPoint(rng.nextFloat()-.5f,.7f+rng.nextFloat(),rng.nextFloat()-.5f).unit()
+                val a = surface(d)
+                val bend = direction(rng)
+                val length = r*(.7f+rng.nextFloat()*.65f)
+                val path = (0..12).map { i ->
+                    val t=i/12f
+                    a+d*(length*t)+bend*(r*.22f*sin(pi*t))
+                }
+                tube(path,r*.12f,color,8) { t -> .45f+.55f*(1f-t) }
+                eye(path.last(),d,r*morph.eye*.72f,rng.nextInt(),color)
+            }
         }
-        hairs(c,r,morph,color,rng)
+        // Individual roots, lengths, curl, thickness and tint; no uniform radial spikes.
+        val count = if (nucleus) 84 else 48+(morph.hair*32f).toInt()
+        repeat(count) { index ->
+            val random = direction(rng)
+            val d = (random+SpatialPoint(.15f,morph.crown*.55f,-.18f)).unit()
+            val a = surface(d)
+            val side = d.cross(if (abs(d.y)>.9f) SpatialPoint(1f,0f,0f) else SpatialPoint(0f,1f,0f)).unit()
+            val up = side.cross(d)
+            val phase = rng.nextFloat()*2f*pi
+            val sample = rng.nextFloat()
+            val length = r*(.12f+morph.hair*sample*sample*(if (index%7==0) 1.8f else .9f))
+            val width = r*(.0025f+rng.nextFloat()*.006f)
+            val path = (0..7).map { i ->
+                val t = i/7f
+                a+d*(length*(t-.30f*t*t))+side*(length*.26f*t*sin(phase+t*6f))+
+                    up*(length*.17f*t*cos(phase*.7f+t*5f))
+            }
+            val tint = when(index%4) {
+                0 -> rgb(.85f,.22f,.075f)
+                1 -> rgb(.22f,.32f,.91f)
+                2 -> rgb(.56f,.16f,.59f)
+                else -> rgb(.19f,.62f,.63f)
+            }
+            tube(path,width,tint,4) { t -> 1f-.92f*t }
+        }
     }
 
 }
@@ -326,12 +324,11 @@ out vec4 frag;
 void main(){
     vec3 n=normalize(normal),v=normalize(eye-world),l=normalize(vec3(-.4,.9,.7));
     float diffuse=max(dot(n,l),0.),rim=pow(1.-abs(dot(n,v)),2.),spec=pow(max(dot(n,normalize(l+v)),0.),42.);
-    vec3 cool=vec3(.12,.58,.83),warm=vec3(1.,.25,.055);
-    float coat=pow(max(dot(n,normalize(vec3(.45,.7,-.5)+v)),0.),92.);
-    float backlight=pow(max(dot(-n,normalize(vec3(.1,-.8,.45))),0.),2.);
-    float mottling=.88+.12*sin(world.x*37.+sin(world.z*29.))*sin(world.y*43.);
-    vec3 lit=color*mottling*(.24+.85*diffuse)+cool*rim*.32+warm*backlight*.24+vec3(.68,.9,1.)*(spec*.95+coat*.72);
-    lit+=max(color-vec3(1.),vec3(0.))*1.8;
-    float fog=exp(-length(eye-world)*.055);
+    float membrane=0.5+0.5*sin(world.x*37.+sin(world.y*29.)*2.+world.z*31.);
+    float warm=max(0.,color.r-max(color.g,color.b));
+    vec3 lit=color*(.29+.85*diffuse+.55*rim)*(0.88+0.20*membrane)+vec3(.42,.82,.98)*spec*1.2;
+    lit+=vec3(1.,.25,.04)*warm*(.48+.55*rim)+vec3(.03,.22,.32)*rim;
+    lit=lit/(vec3(1.)+lit*.35);
+    float fog=exp(-length(eye-world)*.026);
     frag=vec4(mix(vec3(.012,.045,.047),lit,fog),1.);
 }"""
