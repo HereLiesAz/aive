@@ -21,6 +21,7 @@ internal data class SpatialCreature(
     val state: H2g2WorkflowState,
     val form: SpatialForm,
     val growth: Float = 0f,
+    val genome: SpatialAgentGenome? = null,
 )
 
 internal data class SpatialSpore(val id: String, val group: WebGroup, val kind: String, val weight: Float, val position: SpatialPoint)
@@ -100,8 +101,9 @@ internal fun projectSpatialHive(
             node.id in projection.programmaticNodeIds -> SpatialForm.ProgrammaticNeuron
             else -> SpatialForm.Creature
         }
-        SpatialCreature(node.id, node.label, node.subtitle, positions.getValue(node.id), spatialSeed(subject.identitySeed),
-            node.state, form, (birth as? CreatureBirth.Egg)?.growth ?: 0f)
+        val genome = projection.agentGenomes[node.id]
+        SpatialCreature(node.id, node.label, node.subtitle, positions.getValue(node.id), genome?.bodySeed ?: spatialSeed(subject.identitySeed),
+            node.state, form, (birth as? CreatureBirth.Egg)?.growth ?: 0f, genome)
     }
     val visible = creatures.mapTo(mutableSetOf()) { it.id }.apply { add(nucleus.id) }
     val connections = relationships.filter { it.from in visible && it.to in visible }.map { link ->

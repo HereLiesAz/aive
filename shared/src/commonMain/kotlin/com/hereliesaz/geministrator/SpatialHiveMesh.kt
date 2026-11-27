@@ -55,6 +55,14 @@ private fun rgb(r: Float, g: Float, b: Float) = SpatialPoint(r,g,b)
 
 private val bodyPalette = listOf(rgb(.12f,.62f,.57f),rgb(.28f,.42f,.85f),rgb(.55f,.24f,.75f),rgb(.12f,.67f,.83f),rgb(.8f,.39f,.2f))
 
+/** Functional pigment follows declared agent function, not cosmetic ownership or a task label. */
+private fun signalTint(signal: SpatialCellSignal): SpatialPoint = when(signal) {
+    SpatialCellSignal.Excitatory -> rgb(.88f,.26f,.10f)
+    SpatialCellSignal.Inhibitory -> rgb(.24f,.35f,.86f)
+    SpatialCellSignal.Modulatory -> rgb(.10f,.67f,.59f)
+    SpatialCellSignal.Unclassified -> rgb(.36f,.48f,.48f)
+}
+
 private fun bodyTint(b: SpatialRenderBody): SpatialPoint = when {
     b.form == "Nucleus" -> rgb(.29f,.22f,.39f)
     b.form == "Spore" -> when (b.state) {
@@ -73,6 +81,7 @@ private fun bodyTint(b: SpatialRenderBody): SpatialPoint = when {
     }
     b.state == "Failed" || b.form == "WitheredEgg" -> rgb(.5f,.12f,.18f)
     b.state == "Gate" -> rgb(.9f,.55f,.15f)
+    b.genome != null -> signalTint(b.genome.pigment)
     else -> bodyPalette[(b.seed.toUInt() % bodyPalette.size.toUInt()).toInt()]
 }
 
@@ -313,32 +322,36 @@ private class SpatialMeshBuilder {
             sphere(c,r,color,b.seed,b.form,if(b.form=="Spore") 7 else 18)
             return
         }
-        val rng=Random(b.seed)
+        val rng=Random(b.genome?.configurationSeed ?: b.seed)
         val morph=spatialMorphology(b.seed)
+        val arbor=spatialMorphology(b.genome?.arborSeed ?: b.seed)
+        val tail=spatialMorphology(b.genome?.tailSeed ?: b.seed)
+        val arborRng=b.genome?.let { Random(it.arborSeed) } ?: rng
+        val tailRng=b.genome?.let { Random(it.tailSeed) } ?: rng
         val nucleus=b.form=="Nucleus"
         val shape=if(nucleus) SpatialPoint(1f,1f,1f) else morph.shape
         val phase=(b.seed.toUInt()%628u).toFloat()/100f
-        val rootCount=if(nucleus) 12 else morph.roots
-        val hasDominantAxon=!nucleus && morph.dominantAxon
+        val rootCount=if(nucleus) 12 else arbor.roots
+        val hasDominantAxon=!nucleus && tail.dominantAxon
         // Where present, a long dominant axon may hang downward, lean sideways or be inverted. This is
         // immutable seeded anatomy, not movement or a new workflow connection.
-        val axis=if((b.seed.toUInt()%5u)==0u) 1f else -1f
-        val primary=SpatialPoint((rng.nextFloat()-.5f)*.72f,axis,(rng.nextFloat()-.5f)*.72f).unit()
+        val axis=if(((b.genome?.tailSeed ?: b.seed).toUInt()%5u)==0u) 1f else -1f
+        val primary=SpatialPoint((tailRng.nextFloat()-.5f)*.72f,axis,(tailRng.nextFloat()-.5f)*.72f).unit()
         val rootDirs=mutableListOf<SpatialPoint>()
         val eyeDirs=mutableListOf<SpatialPoint>()
-        fun spaced(existing: List<SpatialPoint>, preferred: SpatialPoint?=null): SpatialPoint {
-            var best=preferred ?: direction(rng)
+        fun spaced(existing: List<SpatialPoint>, source: Random): SpatialPoint {
+            var best=direction(source)
             fun crowd(d: SpatialPoint)=existing.maxOfOrNull { dot(it,d) } ?: -1f
             repeat(12) {
-                val candidate=direction(rng)
+                val candidate=direction(source)
                 if(crowd(candidate)<crowd(best)) best=candidate
             }
             return best
         }
-        repeat(rootCount) { i -> rootDirs+=if(i==0&&hasDominantAxon) primary else spaced(rootDirs) }
+        repeat(rootCount) { i -> rootDirs+=if(i==0&&hasDominantAxon) primary else spaced(rootDirs,arborRng) }
         if(!nucleus) repeat(morph.eyes) { i ->
             val preferred=if(morph==SpatialMorphology.Canopy && i==0) SpatialPoint(.35f,-axis,.28f).unit() else null
-            eyeDirs+=preferred ?: spaced(eyeDirs+rootDirs.take(1))
+            eyeDirs+=preferred ?: spaced(eyeDirs+rootDirs.take(1),rng)
         }
         sphere(c,r,color,b.seed,b.form,24,SpatialMaterials.Membrane,rootDirs,eyeDirs)
         fun offset(d: SpatialPoint)=spatialSomaOffset(d,shape,if(nucleus) 7 else morph.lobes,
@@ -352,15 +365,17 @@ private class SpatialMeshBuilder {
         rootDirs.forEachIndexed { i,d ->
             val a=surface(d)
             val outward=(a-c).unit()
-            val bend=direction(rng)
             val dominant=i==0&&hasDominantAxon
-            val length=r*(if(dominant) 1.65f+rng.nextFloat()*.85f else .48f+rng.nextFloat()*.48f)
-            val bendPhase=rng.nextFloat()*2f*pi
+            val source=if(dominant) tailRng else arborRng
+            val bend=direction(source)
+            val length=r*(if(dominant) 1.65f+source.nextFloat()*.85f else .48f+source.nextFloat()*.48f)
+            val bendPhase=source.nextFloat()*2f*pi
             val path=(0..16).map { step ->
                 val t=step/16f
                 a+outward*(length*t)+bend*(length*.24f*sin(pi*t)*sin(bendPhase+t*4f))
             }
-            tube(path,r*(if(dominant) .26f else .18f),color,10,SpatialMaterials.Tissue) { t ->
+            val rootColor=b.genome?.accent?.let(::signalTint) ?: color
+            tube(path,r*(if(dominant) .26f else .18f),rootColor,10,SpatialMaterials.Tissue) { t ->
                 spatialRootProfile(t,bendPhase)
             }
         }
@@ -394,23 +409,23 @@ private class SpatialMeshBuilder {
             }
         }
         // Individual roots, lengths, curl, thickness and tint; no uniform radial spikes.
-        val count = if (nucleus) 84 else 48+(morph.hair*32f).toInt()
+        val count = if (nucleus) 84 else 48+(arbor.hair*32f).toInt()
         repeat(count) { index ->
-            val random = direction(rng)
-            val d = (random+SpatialPoint(.15f,-axis*morph.crown*.55f,-.18f)).unit()
+            val random = direction(arborRng)
+            val d = (random+SpatialPoint(.15f,-axis*arbor.crown*.55f,-.18f)).unit()
             val a = surface(d)
             val side = d.cross(if (abs(d.y)>.9f) SpatialPoint(1f,0f,0f) else SpatialPoint(0f,1f,0f)).unit()
             val up = side.cross(d)
-            val phase = rng.nextFloat()*2f*pi
-            val sample = rng.nextFloat()
-            val length = r*(.14f+morph.hair*sample*sample*(if (index%7==0) 2.0f else 1.12f))
-            val width = r*(.0025f+rng.nextFloat()*.006f)
+            val phase = arborRng.nextFloat()*2f*pi
+            val sample = arborRng.nextFloat()
+            val length = r*(.14f+arbor.hair*sample*sample*(if (index%7==0) 2.0f else 1.12f))
+            val width = r*(.0025f+arborRng.nextFloat()*.006f)
             val path = (0..7).map { i ->
                 val t = i/7f
                 a+d*(length*(t-.30f*t*t))+side*(length*.26f*t*sin(phase+t*6f))+
                     up*(length*.17f*t*cos(phase*.7f+t*5f)+length*.06f*t*sin(phase+t*17f))
             }
-            val tint = when(index%4) {
+            val tint = if(index%4==0 && b.genome!=null) signalTint(b.genome.accent ?: b.genome.pigment) else when(index%4) {
                 0 -> rgb(.85f,.22f,.075f)
                 1 -> rgb(.22f,.32f,.91f)
                 2 -> rgb(.56f,.16f,.59f)

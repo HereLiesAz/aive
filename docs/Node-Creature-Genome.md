@@ -13,7 +13,15 @@ The creatures as living things in their own right: what they inherit, what they 
 | Pairing by breed, genus and `pairsWith`; the lottery for Rare, Very rare and Mythic | Fertility rules, mutation per locus, the Mythic conditions |
 | Programmatic work counts but never parents | Survival, competition, circuits, death by apoptosis |
 
-Everything below the table is the target unless it is in the left column.
+Everything below the table is the target unless it is in the left column or explicitly marked implemented.
+
+### Procedural spatial expression (implemented foundation)
+
+The 3D renderer reads the actual role configuration and the existing stable's inherited body, tendril and tail keys. The seven morphology families are anatomical starting archetypes, not agent species. Identical declared configurations and inherited part keys reproduce the same procedural anatomy independent of task identity. Existing role hatches still originate from completed runs, record their actual parents and remain disabled until adopted. A purchased or assigned breed cannot change the role's authority or permissions.
+
+Functional pigment is derived from declared authorities and required capabilities: implementation/planning/test authoring express excitatory warmth, review/verification express inhibitory blue, research/messaging express modulatory teal. A secondary actual function becomes an accent. These are visible configuration categories, not claims of successful execution or physiological effects. Unknown functions are neutral. Existing painted breeds retain their cosmetic ancestry, but painted hue alone is not evidence of agent function. The procedural mapping does not assign pacemaker, phagocytic or progenitor functions without authoritative runtime bindings.
+
+The remaining original loci (operational tolerance, actual model tier, measured resilience, myelin/signal efficiency and enforced synaptic capacity), mutation of agent configs, functional kinship/Echo and fertility constraints are still design targets. No such values are synthesized from a random seed, artwork, role label or capability count. The current config fingerprint is for deterministic visual expression, not a similarity score or a security identifier.
 
 **Nothing here happens on its own.** Every event below is the visible form of something that happened in a run; [Ecology and the swarm](Ecology-and-the-Swarm.md) holds the binding rule, the full ledger, and the numbers the test bench uses. Where this page gives a rate, it's the bench's.
 
