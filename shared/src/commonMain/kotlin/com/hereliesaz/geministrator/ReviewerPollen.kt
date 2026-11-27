@@ -18,7 +18,7 @@ import com.hereliesaz.geministrator.events.ProviderUsageRecorded
  */
 
 /** The Antagonist does not improve genetically: it neither pollinates nor is pollen, and it never leads a child. */
-private fun heritable(role: RoleDefinition): Boolean =
+internal fun heritable(role: RoleDefinition): Boolean =
     role.executionSource == RoleExecutionSource.Agent && classifyNodeCreatureRole(role.name) != NodeCreatureRoleKind.Antagonist
 
 /** Reviewers whose reviews pollinate: the reviewer kinds, minus the Antagonist. */

@@ -33,22 +33,24 @@ internal fun hatchFromRun(
     reports: List<ProviderUsageRecorded> = emptyList(),
     configuredModels: Map<AgentProviderId, String> = emptyMap(),
     genera: Map<RoleDefinitionId, String> = emptyMap(),
+    extraParents: Boolean = true,
 ): RoleDefinition? {
     if (run.status != WorkflowRunStatus.Completed) return null
     val contributors = hatchContributors(run, roles)
     val first = contributors.firstOrNull() ?: return null
     val childId = RoleDefinitionId("hatch-${run.id.value}")
-    if (contributors.size == 1) return mutateHatchedGenome(run, first.copy(
+    fun cloneOf(parent: RoleDefinition, inbred: Boolean = false) = mutateHatchedGenome(run, parent.copy(
         id = childId,
-        name = "${first.name} · clone",
+        name = "${parent.name} · clone",
         enabled = false,
-        parents = listOf(first.id),
+        parents = listOf(parent.id),
         // Freeze the parent's effective allowance at birth, independently of later keeper edits.
         budgetClass = null,
         tokenBudget = null,
-        geneticTokenCap = first.effectiveTokenBudget(),
+        geneticTokenCap = parent.effectiveTokenBudget(),
         hatchedFromRunId = run.id.value,
-    ), echo, reports, configuredModels)
+    ), echo, reports, configuredModels, inbred)
+    if (contributors.size == 1) return cloneOf(first)
     // Fertility is not inferred from the currently edited roster or provider names.
     if (run.roleSnapshot.isEmpty()) return null
     val kinships = hatchKinships(run, contributors, reports)
@@ -68,13 +70,18 @@ internal fun hatchFromRun(
             Triple(a, b, score)
         }
     }
-    val (a, b) = pairs.maxByOrNull { it.third } ?: return null
+    // Two near-identical parents are inbreeding: a child of both is a copy of either, and the second parent
+    // is no outside voice (docs/Node-Creature-Genome.md, the clone trap). Prefer the most alike pair that is
+    // not a near-clone; if every viable pair is one, a single parent clones instead of pretending to breed.
+    // That clone is inbred, and inbreeding raises the chance of a mutation (see [mutationDraw]): a gamble.
+    val outbred = pairs.filter { it.third < NEAR_CLONE_KINSHIP }
+    val (a, b) = outbred.maxByOrNull { it.third } ?: return pairs.firstOrNull()?.let { cloneOf(it.first, inbred = true) }
     val ceiling = when {
         a.toolCeiling.isEmpty() -> b.toolCeiling
         b.toolCeiling.isEmpty() -> a.toolCeiling
         else -> a.toolCeiling.filter { it in b.toolCeiling }
     }
-    return mutateHatchedGenome(run, a.copy(
+    val pairChild = a.copy(
         id = childId,
         name = "${a.name} × ${b.name}",
         instructions = listOf(a.instructions, b.instructions).filter(String::isNotBlank).distinct().joinToString("\n\n"),
@@ -88,7 +95,60 @@ internal fun hatchFromRun(
         enabled = false,
         parents = listOf(a.id, b.id),
         hatchedFromRunId = run.id.value,
-    ), echo, reports, configuredModels)
+    )
+    val grown = if (extraParents) withExtraParents(run, pairChild, contributors.filter { it.id != a.id && it.id != b.id })
+    else pairChild
+    return mutateHatchedGenome(run, grown, echo, reports, configuredModels)
+}
+
+/** A child has at most this many parents, the same bound a pollinated child has. */
+internal const val MAX_HATCH_PARENTS = 8
+
+/**
+ * The functional loci a contributor outside the chosen pair can give (docs/Node-Creature-Genome.md,
+ * Birth: "each other contributor gives one part locus"). Each one only adds to the child, and none
+ * touches its authorities or its tool ceiling, so an extra parent can never widen what the child may do.
+ */
+internal enum class ExtraLocus { Instructions, Capabilities, Surfaces, Source }
+
+/**
+ * Give each additional contributor one functional locus, in the order of work done. The locus is a
+ * stable draw from the run and the contributor, so retrying a hatch gives the same child. A contributor
+ * is a parent only if it actually changed the child: a locus that adds nothing, an Antagonist, and a
+ * contributor whose completed work needs an authority the child lacks are passed over, and are not
+ * recorded as parents.
+ */
+internal fun withExtraParents(run: WorkflowRun, child: RoleDefinition, extras: List<RoleDefinition>): RoleDefinition {
+    val tasks = run.definitionSnapshot?.tasks?.associateBy { it.id }.orEmpty()
+    var grown = child
+    for (extra in extras) {
+        if (grown.parents.size >= MAX_HATCH_PARENTS) break
+        if (!heritable(extra)) continue
+        val needed = run.taskRuns.values.filter { it.assignedRoleId == extra.id && it.status == TaskRunStatus.Completed && it.byAgent }
+            .mapNotNull { tasks[it.taskDefinitionId]?.requiredRoleAuthority }
+        if (needed.any { it !in grown.authorities }) continue
+        val locus = ExtraLocus.entries[(("${run.id.value}:${extra.id.value}:extra-locus-v1").hashCode().toUInt() %
+            ExtraLocus.entries.size.toUInt()).toInt()]
+        val changed = when (locus) {
+            ExtraLocus.Instructions -> extra.instructions.takeIf { it.isNotBlank() && it !in grown.instructions }?.let {
+                grown.copy(instructions = listOf(grown.instructions, it).filter(String::isNotBlank).joinToString("\n\n"))
+            }
+            ExtraLocus.Capabilities -> (extra.capabilitiesRequired - grown.capabilitiesRequired).takeIf { it.isNotEmpty() }?.let {
+                grown.copy(capabilitiesRequired = grown.capabilitiesRequired + it)
+            }
+            ExtraLocus.Surfaces -> {
+                val merged = grown.surfaces + extra.surfaces
+                // A conflicting alias cannot recombine, the same rule the pair obeys.
+                if (extra.surfaces.isEmpty() || merged.groupBy { it.alias }.values.any { it.distinct().size > 1 }) null
+                else merged.distinctBy { it.alias }.takeIf { it.size > grown.surfaces.size }?.let { grown.copy(surfaces = it) }
+            }
+            ExtraLocus.Source -> extra.preferredProviderId?.takeIf { grown.preferredProviderId == null }?.let {
+                grown.copy(preferredProviderId = it)
+            }
+        } ?: continue
+        grown = changed.copy(parents = grown.parents + extra.id)
+    }
+    return grown
 }
 
 /**
@@ -159,9 +219,9 @@ internal fun fertilityAllowsPair(score: Int, bridge: Boolean, contributors: Int,
  * retrying a hatch reproducible. Only the new disabled configuration is changed.
  */
 private fun mutateHatchedInstructions(
-    run: WorkflowRun, child: RoleDefinition, echo: Map<RoleDefinitionId, Int>,
+    run: WorkflowRun, child: RoleDefinition, echo: Map<RoleDefinitionId, Int>, inbred: Boolean,
 ): RoleDefinition {
-    if (!mutationDraw(run, child, echo, "instruction")) return child
+    if (!mutationDraw(run, child, echo, "instruction", inbred)) return child
     val variants = listOf(
         "Within the assigned scope, compare plausible explanations against the available evidence before choosing an approach.",
         "Within the assigned scope, prefer a small falsifiable check of a material assumption before committing to an approach.",
@@ -176,9 +236,13 @@ private fun mutateHatchedInstructions(
 }
 
 /** Each functional locus has its own stable, independently keyed draw. */
-private fun mutationDraw(run: WorkflowRun, child: RoleDefinition, echo: Map<RoleDefinitionId, Int>, locus: String): Boolean {
+private fun mutationDraw(
+    run: WorkflowRun, child: RoleDefinition, echo: Map<RoleDefinitionId, Int>, locus: String, inbred: Boolean,
+): Boolean {
     val highest = child.parents.mapNotNull(echo::get).maxOrNull() ?: 0
-    val chance = 200 + (highest.coerceIn(3_000, 6_000) - 3_000) * 600 / 3_000
+    // An inbred birth (a clone made because the only viable pair was near-identical) doubles the chance, as a
+    // high Echo does: it is no safer than any other birth, only likelier to change, for better or worse.
+    val chance = (200 + (highest.coerceIn(3_000, 6_000) - 3_000) * 600 / 3_000) * if (inbred) 2 else 1
     return ("${run.id.value}:$locus-mutation-v1").hashCode().toUInt() % 10_000u < chance.toUInt()
 }
 
@@ -190,16 +254,16 @@ private fun mutationDraw(run: WorkflowRun, child: RoleDefinition, echo: Map<Role
  */
 private fun mutateHatchedGenome(
     run: WorkflowRun, child: RoleDefinition, echo: Map<RoleDefinitionId, Int>,
-    reports: List<ProviderUsageRecorded>, configuredModels: Map<AgentProviderId, String>,
+    reports: List<ProviderUsageRecorded>, configuredModels: Map<AgentProviderId, String>, inbred: Boolean = false,
 ): RoleDefinition {
-    var variant = mutateHatchedInstructions(run, child, echo)
+    var variant = mutateHatchedInstructions(run, child, echo, inbred)
     val ceiling = child.toolCeiling.distinct().sorted()
-    if (ceiling.size > 1 && mutationDraw(run, child, echo, "tool")) {
+    if (ceiling.size > 1 && mutationDraw(run, child, echo, "tool", inbred)) {
         val index = (("${run.id.value}:tool-variant-v1").hashCode().toUInt() % ceiling.size.toUInt()).toInt()
         variant = variant.copy(toolCeiling = ceiling.filterIndexed { i, _ -> i != index })
     }
     val parent = child.parents.singleOrNull()
-    if (parent != null && mutationDraw(run, child, echo, "source")) {
+    if (parent != null && mutationDraw(run, child, echo, "source", inbred)) {
         val models = reportedSessionModels(run, reports)
         val observed = run.taskRuns.values.filter { it.assignedRoleId == parent &&
             it.status == TaskRunStatus.Completed && it.byAgent }.mapNotNull { task ->

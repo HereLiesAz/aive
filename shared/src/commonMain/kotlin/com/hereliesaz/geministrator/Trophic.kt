@@ -83,19 +83,38 @@ internal data class TrophicRunEvidence(
     val approvals: Int,
     /** True only when every downstream path is known and none was accepted. */
     val barren: Boolean,
+    /**
+     * Hundredths of a point earned. A consumer's supply is limited, so it is shared among the producers
+     * it accepted (see [trophicEvidence]); a sole producer gets the whole read or approval.
+     */
+    val credit: Int = reads * TROPHIC_READ + approvals * TROPHIC_APPROVAL,
+)
+
+/** One producer-to-consumer path of a settled run, judged. */
+private data class TrophicPath(
+    val role: RoleDefinitionId,
+    val consumer: TaskDefinitionId,
+    val outcome: TrophicOutcome,
+    val reviewer: Boolean,
 )
 
 /**
  * Per role, what this run's completed agent outputs earned. A task with no planned dependents is
  * exempt: its output goes to the keeper, and no downstream path can be missing. A role whose paths are
  * all unknown is absent: no evidence, no change.
+ *
+ * Trophic factor is limited (docs/Node-Creature-Genome.md, Competition): a consumer releases one read's
+ * worth, or one approval's if it is a reviewer, however many producers fed it, and that supply is split
+ * among the producers whose output it accepted. The share is a whole number of hundredths, rounded down.
+ * So redundant producers thin each other out and the weakest of them starve first, while a producer
+ * that is the only one a consumer read is paid in full.
  */
 internal fun trophicEvidence(run: WorkflowRun, reports: List<ProviderUsageRecorded>): Map<RoleDefinitionId, TrophicRunEvidence> {
     val definition = run.definitionSnapshot ?: return emptyMap()
     if (run.roleSnapshot.isEmpty()) return emptyMap()
     val roles = run.roleSnapshot.associateBy { it.id }
     val deliveries = reportedArtifactDeliveries(run, reports)
-    val outcomes = mutableMapOf<RoleDefinitionId, MutableList<Pair<TrophicOutcome, Boolean>>>()
+    val paths = mutableListOf<TrophicPath>()
     for (producer in definition.tasks) {
         val source = run.taskRuns[producer.id] ?: continue
         if (source.status != TaskRunStatus.Completed) continue
@@ -105,16 +124,24 @@ internal fun trophicEvidence(run: WorkflowRun, reports: List<ProviderUsageRecord
         val dependents = definition.tasks.filter { producer.id in it.dependsOn }
         for (consumer in dependents) {
             val outcome = trophicOutcome(run, producer.id, consumer, deliveries, roles)
-            val approved = outcome == TrophicOutcome.Accepted && isReviewerPath(run, consumer, roles)
-            outcomes.getOrPut(role.id) { mutableListOf() } += outcome to approved
+            paths += TrophicPath(role.id, consumer.id, outcome,
+                reviewer = outcome == TrophicOutcome.Accepted && isReviewerPath(run, consumer, roles))
         }
     }
-    return outcomes.mapNotNull { (id, paths) ->
-        val reads = paths.count { it.first == TrophicOutcome.Accepted && !it.second }
-        val approvals = paths.count { it.first == TrophicOutcome.Accepted && it.second }
+    val accepted = paths.filter { it.outcome == TrophicOutcome.Accepted }.groupBy { it.consumer }
+    val credit = mutableMapOf<RoleDefinitionId, Int>()
+    for (path in accepted.values.flatten()) {
+        val sharing = accepted.getValue(path.consumer)
+        val pot = if (path.reviewer) TROPHIC_APPROVAL else TROPHIC_READ
+        credit[path.role] = (credit[path.role] ?: 0) + pot / sharing.size
+    }
+    return paths.groupBy { it.role }.mapNotNull { (id, own) ->
+        val reads = own.count { it.outcome == TrophicOutcome.Accepted && !it.reviewer }
+        val approvals = own.count { it.outcome == TrophicOutcome.Accepted && it.reviewer }
         val barren = reads + approvals == 0 &&
-            paths.all { it.first == TrophicOutcome.Ignored || it.first == TrophicOutcome.Rejected }
-        if (reads + approvals == 0 && !barren) null else id to TrophicRunEvidence(reads, approvals, barren)
+            own.all { it.outcome == TrophicOutcome.Ignored || it.outcome == TrophicOutcome.Rejected }
+        if (reads + approvals == 0 && !barren) null
+        else id to TrophicRunEvidence(reads, approvals, barren, credit[id] ?: 0)
     }.toMap()
 }
 
@@ -169,7 +196,7 @@ internal data class TrophicHistory(
         for ((role, evidence) in trophicEvidence(run, reports)) {
             val before = next[role] ?: TROPHIC_START
             val after = if (evidence.barren) before - TROPHIC_BARREN_RUN
-            else before + evidence.reads * TROPHIC_READ + evidence.approvals * TROPHIC_APPROVAL
+            else before + evidence.credit
             next[role] = after.coerceIn(0, TROPHIC_MAX)
         }
         return TrophicHistory(next, seen + run.id)

@@ -169,4 +169,40 @@ class TrophicTest {
         assertEquals(4_200, needs.trophicHundredths)
         assertNull(assertNotNull(creatureNeeds(TaskDefinitionId("build"), definition, r, roles)).trophicHundredths)
     }
+
+    @Test
+    fun aConsumersSupplyIsSharedAmongTheProducersItAccepted() {
+        val dummy = BuiltInRoles.CrashTestDummy
+        val planner = BuiltInRoles.Planner
+        val shared = WorkflowDefinition(
+            id = WorkflowDefinitionId("share"), name = "Share",
+            tasks = listOf(task("p1", engineer), task("p2", dummy), task("c", planner, "p1", "p2")),
+        )
+        fun taskRun(id: String, role: RoleDefinition) = TaskDefinitionId(id) to TaskRun(
+            id = TaskRunId("s-$id"), taskDefinitionId = TaskDefinitionId(id), status = TaskRunStatus.Completed, attempt = 1,
+            assignedRoleId = role.id, assignedProviderId = AgentProviderId("a"), providerRunId = ProviderRunId("s-session-$id"),
+            artifacts = listOf(ArtifactRef(ArtifactId("s-artifact-$id"), ArtifactKind.Research, TaskRunId("s-$id"), id,
+                textContent = "work", createdAtEpochMillis = 1L)),
+        )
+        val settled = WorkflowRun(
+            id = WorkflowRunId("share-run"), projectId = ProjectId("p"), workflowDefinitionId = shared.id, objective = "o",
+            status = WorkflowRunStatus.Completed,
+            taskRuns = mapOf(taskRun("p1", engineer), taskRun("p2", dummy), taskRun("c", planner)),
+            createdAtEpochMillis = 1L, updatedAtEpochMillis = 1L,
+            roleSnapshot = listOf(engineer, dummy, planner), definitionSnapshot = shared,
+        )
+        fun handed(vararg from: String) = ProviderUsageRecorded(settled.id, TaskDefinitionId("c"), AgentProviderId("a"),
+            ProviderRunId("s-session-c"), model = "m", modelConsistent = true, occurredAtEpochMillis = 2L,
+            deliveredArtifactIds = from.map { "s-artifact-$it" }.toSet())
+        // Two producers read by one consumer split one read: 4 points between them, 2 each.
+        val both = trophicEvidence(settled, listOf(handed("p1", "p2")))
+        assertEquals(200, both.getValue(engineer.id).credit)
+        assertEquals(200, both.getValue(dummy.id).credit)
+        assertEquals(5_200, TrophicHistory().advance(settled, listOf(handed("p1", "p2"))).balances[engineer.id])
+        // Handed only one, the consumer's whole read goes to it, and the one it passed over starves.
+        val one = trophicEvidence(settled, listOf(handed("p1")))
+        assertEquals(400, one.getValue(engineer.id).credit)
+        assertTrue(one.getValue(dummy.id).barren)
+        assertEquals(0, one.getValue(dummy.id).credit)
+    }
 }
