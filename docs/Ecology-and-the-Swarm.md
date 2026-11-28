@@ -211,6 +211,8 @@ The Needs inspector now reads explicit approve, revise and reject verdicts from 
 
 **Drawn.** `SpatialLights.kt` turns these into a bounded list of soft additive lights (at most 48 a frame, the strongest first) that the fragment shader adds near a point: a used memory spore flips blue, a pulse travels down the connection toward whom the sender is talking, a working creature beats at its rate, a finishing creature bursts. The mesh stays static; only the lights change. The desktop and Android surfaces draw them; the browser surface does not yet (an unset light count draws none). A creature that has finished still sends its delivered pulses at the top rate. Reduced motion draws no beat and no pulse. Completion bursts are implemented in `spatialLights` but not yet fed to the field, which needs the memory layer's episodes and queue.
 
+**The Antagonist's body.** The required agent is always in the scene as one resting form: a dark translucent segmented parasite with a funnel maw, two ranks of teeth and a black throat, at its own persistent site. It does not move, mutate or die, and nothing it does is animated until the runtime records it: infiltration, takeover and tissue repair need a runtime event and an authority boundary first, because animation cannot authorize reassignment.
+
 | Light | Read from | Rule |
 |---|---|---|
 | An activated memory spore's glow flips from its resting **warm** to **blue** (any kind: tag, keyword, key phrase, summary, ...) | `deliveredMemoryAddresses` (memory-read provenance), `memory-node:<id>` is the web's `node:<id>` | The mycelium is a warm-glowing data constellation at rest. A quick flip at the moment of use, a 1 s hold, then an ease back to warm; 2.5 s in all. The renderer mixes warm and blue by `blueGlow` |

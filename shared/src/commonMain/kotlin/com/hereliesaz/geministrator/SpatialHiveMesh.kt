@@ -307,9 +307,64 @@ private class SpatialMeshBuilder {
         tube(lid,r*.085f,membrane,6)
     }
 
+    /**
+     * The Antagonist's body (tasks/hive-redesign.md): a dark, wet, translucent segmented tapeworm lying in a loose coil,
+     * its head a radial, multi-ringed, toothed maw. This is its resting form only: no stage, host, burrow or takeover is
+     * drawn, because none is evidence of anything until the runtime records one.
+     */
+    private fun antagonist(b: SpatialRenderBody) {
+        val rng = Random(b.seed)
+        val length = b.radius * 8f
+        val phase = rng.nextFloat() * 2f * pi
+        val spine = List(49) { i ->
+            val u = i / 48f
+            b.position + SpatialPoint(length * (u - .5f), b.radius * .85f * sin(u * 2f * pi * 1.3f + phase),
+                b.radius * .55f * cos(u * 2f * pi * 1.3f + phase))
+        }
+        val bodyColor = rgb(.17f, .10f, .17f)
+        val segments = 24f
+        // Head end (u = 1) is the widest; the tail tapers to a thread. Each segment is a ridge between pinches.
+        tube(spine, b.radius * .62f, bodyColor, 14, SpatialMaterials.Membrane) { u ->
+            val taper = .16f + .84f * sin((.15f + .85f * u) * pi / 2f).let { it * it }
+            val ridge = .84f + .16f * cos(u * segments * 2f * pi)
+            taper * ridge
+        }
+        val head = spine.last()
+        val forward = (spine.last() - spine[spine.lastIndex - 2]).unit()
+        val side = forward.cross(if (abs(forward.y) > .9f) SpatialPoint(1f, 0f, 0f) else SpatialPoint(0f, 1f, 0f)).unit()
+        val up = forward.cross(side)
+        val mouth = b.radius * .62f
+        // Concentric rings of the maw, each recessed and tighter than the last so they read as a funnel down a throat, then
+        // two ranks of teeth curling inward from the rim, and a dark throat at the bottom.
+        for (ring in 0 until 4) {
+            val radius = mouth * (.94f - .2f * ring)
+            val centre = head - forward * (b.radius * .11f * ring)
+            val loop = List(19) { j ->
+                val angle = 2f * pi * j / 18f
+                centre + side * (radius * cos(angle)) + up * (radius * sin(angle))
+            }
+            tube(loop, b.radius * (.055f - .008f * ring), rgb(.66f - .08f * ring, .14f, .2f), 6, SpatialMaterials.Membrane)
+        }
+        sphere(head - forward * (b.radius * .36f), mouth * .26f, rgb(.02f, .0f, .03f), b.seed, "Antagonist", 10)
+        for ((rank, count) in listOf(16 to 1f, 11 to .62f).withIndex()) {
+            val teeth = count.first
+            val reach = count.second
+            for (tooth in 0 until teeth) {
+                val angle = 2f * pi * (tooth + .5f * rank) / teeth
+                val ringRadius = mouth * (.94f - .2f * rank * 1.6f)
+                val root = head - forward * (b.radius * .11f * rank * 1.6f) + side * (ringRadius * cos(angle)) + up * (ringRadius * sin(angle))
+                val inward = (head - forward * (b.radius * .2f) - root).unit()
+                val tip = root + inward * (b.radius * .17f * reach) + forward * (b.radius * .09f * reach)
+                tube(listOf(root, (root + tip) * .5f + forward * (b.radius * .05f), tip), b.radius * .052f,
+                    rgb(.88f, .82f, .70f), 5, SpatialMaterials.Solid) { 1f - it * .92f }
+            }
+        }
+    }
+
     fun organism(b: SpatialRenderBody) {
         opticalAnchor = b.position
         opticalMultiplier = spatialBlurScale(b.blurScale)
+        if (b.form == "Antagonist") { surfaceMaterial = SpatialMaterials.Membrane; antagonist(b); return }
         val c = b.position; val color = bodyTint(b); val r = b.radius
         val organic = b.form in listOf("Nucleus","Creature","ProgrammaticNeuron")
         surfaceMaterial = when {

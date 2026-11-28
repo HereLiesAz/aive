@@ -10,7 +10,10 @@ import com.hereliesaz.geministrator.memory.WebGraph
 import com.hereliesaz.geministrator.memory.WebGroup
 
 /** Render forms are not agent identities, roles, or new runtime states. */
-internal enum class SpatialForm { Nucleus, Creature, ProgrammaticNeuron, Egg, WitheredEgg, Site }
+internal enum class SpatialForm { Nucleus, Creature, ProgrammaticNeuron, Egg, WitheredEgg, Site, Antagonist }
+
+/** The Antagonist's body in every hive's scene: a required agent alongside the queen, a distinct identity from any task or host. */
+internal const val SPATIAL_ANTAGONIST_ID = "role:antagonist"
 
 internal data class SpatialCreature(
     val id: String,
@@ -86,7 +89,8 @@ internal fun projectSpatialHive(
     memory: SpatialMemoryProjection,
 ): SpatialHiveScene {
     val queen = projection.subjects.single { it.identityKind == H2g2SwarmIdentityKind.Orchestrator }
-    val positions = layout.resolve(run.workflowDefinitionId, projection.subjects.map { it.node.id }, queen.node.id)
+    // The Antagonist is a required agent alongside the queen, so the hive always holds its body, at a site of its own.
+    val positions = layout.resolve(run.workflowDefinitionId, projection.subjects.map { it.node.id } + SPATIAL_ANTAGONIST_ID, queen.node.id)
     val nucleus = SpatialCreature(queen.node.id, queen.node.label, queen.node.subtitle, SpatialPoint.Origin,
         spatialSeed(queen.identitySeed), queen.node.state, SpatialForm.Nucleus)
     val creatures = projection.subjects.mapNotNull { subject ->
@@ -105,9 +109,11 @@ internal fun projectSpatialHive(
         SpatialCreature(node.id, node.label, node.subtitle, positions.getValue(node.id), genome?.bodySeed ?: spatialSeed(subject.identitySeed),
             node.state, form, (birth as? CreatureBirth.Egg)?.growth ?: 0f, genome)
     }
+    val antagonist = SpatialCreature(SPATIAL_ANTAGONIST_ID, "Antagonist", null, positions.getValue(SPATIAL_ANTAGONIST_ID),
+        spatialSeed(SPATIAL_ANTAGONIST_ID), H2g2WorkflowState.Pending, SpatialForm.Antagonist)
     val visible = creatures.mapTo(mutableSetOf()) { it.id }.apply { add(nucleus.id) }
     val connections = relationships.filter { it.from in visible && it.to in visible }.map { link ->
         SpatialConnection(link.from, link.to, link.kind, link.kind == H2g2TerrariumRelationshipKind.Transfer && link.active)
     }
-    return SpatialHiveScene(run.id.value, run.workflowDefinitionId.value, nucleus, creatures, connections, memory)
+    return SpatialHiveScene(run.id.value, run.workflowDefinitionId.value, nucleus, creatures + antagonist, connections, memory)
 }
