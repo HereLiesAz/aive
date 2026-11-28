@@ -137,3 +137,12 @@ Built or already true: D1, D2, D3, D4, D5, D6, D7, D8, D9, D10, D11, D12 (the si
 
 - Web, after #981 and #990 (run for #993, green): the browser plans and calls the Sources it can reach (LLM7, OVHcloud; Kilo and BlockRun send no CORS headers and are left out). With both rate-limited from the test IP it ends in the plain "Out of credit with this source" line with Check connections. Not seen: a full web first hive to Completed.
 - Desktop, same run: the queen plans alone while a candidate Source is limited to five requests a minute or fewer; OVHcloud failed over to BlockRun on screen; the first hive completed with two creatures and the tour played in the lesson creature's voice.
+
+## Antagonist: unasked run reviews, the plea, takeover (keeper answers: each settled run; record and hold; plea to the queen; queen or keeper approves)
+Machinery found: first terminal pass is `queenSuggestLocked`'s `terminalPass` (ApplicationRuntime.kt); one-off Antagonist voice calls go through `trainingModels()` + `memory.configuredVoice` + `askWithin`; disputes carry verdicts only (`acceptRuling` refuses any option not `safe`); no acting-agent substitution exists (`roleOverrides` is composition-time only); `pauseAfterAntagonistPass` requires a non-terminal run.
+- [ ] A. Review: on a run's first terminal pass, `launchQueenWork` makes one Antagonist call (spend-gated, skipped without a model) over the run's tasks and artifacts as data; fixed reply `VERDICT: PASS|REVISE|REJECT` plus cited facts; stored once per run as an artifact (replay-safe key = run id). Record only, never changes the run.
+- [ ] B. Hold: a REJECT opens a keeper gate. A settled run cannot be paused, so the hold must attach to something else (see Decision 1).
+- [ ] C. Plea: a REJECT raises a dispute, Antagonist v. the queen, with options revise / stand / takeover-of-role. Takeover is not `safe`, so a model cannot rule it today (see Decision 2).
+- [ ] D. Takeover record: a durable (role id -> acting agent = Antagonist, approved by queen|keeper, run id, time). The engine consults it where it resolves the role at dispatch (`roleDefinition`/`assignedRoleId`); role, acting agent and host stay separate identities; keyed per (run, task) so nothing executes twice. The Antagonist stays the Antagonist (no Echo, birth, mutation).
+- [ ] E. Spatial stages (Searching ... OperatingAsHost) drawn only from A-D's records.
+- [ ] Tests per step; full `:shared:desktopTest`; docs (Node-Creature-Genome.md "The Antagonist", Ecology-and-the-Swarm.md), CHANGELOG.

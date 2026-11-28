@@ -22,14 +22,14 @@ internal actual val spatialHiveSupported: Boolean get() = true
 
 @Composable
 internal actual fun SpatialHiveSurface(frame: SpatialRenderFrame, camera: SpatialRenderCamera,
-    onInput: (SpatialRenderInput) -> Unit, modifier: Modifier) {
+    onInput: (SpatialRenderInput) -> Unit, modifier: Modifier, lights: List<SpatialLight>) {
     val mesh by rememberSpatialMesh(frame)
     AndroidView(
         factory = { context ->
             SpatialGlView(context).apply { input = onInput }
         },
         modifier = modifier,
-        update = { view -> view.input = onInput; view.updateScene(mesh, camera) },
+        update = { view -> view.input = onInput; view.updateScene(mesh, camera, lights) },
         onRelease = { view -> view.input = {} },
     )
 }
@@ -81,12 +81,13 @@ private class SpatialGlView(context: Context) : GLSurfaceView(context) {
         else if (visibility == View.VISIBLE && paused) { onResume(); paused = false }
     }
 
-    fun updateScene(mesh: SpatialMeshSnapshot?, view: SpatialRenderCamera) {
+    fun updateScene(mesh: SpatialMeshSnapshot?, view: SpatialRenderCamera, lights: List<SpatialLight>) {
         if (!supported) return
-        if (snapshot === mesh && camera == view) return
+        if (snapshot === mesh && camera == view && renderer.lights == lights) return
         snapshot = mesh; camera = view
         renderer.mesh = mesh
         renderer.camera = view
+        renderer.lights = lights
         requestRender()
     }
 
@@ -134,6 +135,8 @@ private class SpatialGlView(context: Context) : GLSurfaceView(context) {
 private class SpatialGlRenderer(private val failed: () -> Unit) : GLSurfaceView.Renderer {
     @Volatile var mesh: SpatialMeshSnapshot? = null
     @Volatile var camera: SpatialRenderCamera? = null
+    @Volatile var lights: List<SpatialLight> = emptyList()
+    private var lightUniforms = IntArray(3)
     private var uploaded: SpatialMeshSnapshot? = null
     private var program = 0
     private var buffer = 0
@@ -177,6 +180,7 @@ private class SpatialGlRenderer(private val failed: () -> Unit) : GLSurfaceView.
                 GLES30.glVertexAttribPointer(loc,if(i==3) 4 else 3,GLES30.GL_FLOAT,false,SPATIAL_VERTEX_FLOATS*4,if(i==4) 52 else i*12)
             }
             uniforms=listOf("eye","forward","right","up","aspect","motionPhase","focusDepth","aperture","encodeBlur").map { GLES30.glGetUniformLocation(p,it) }.toIntArray()
+            lightUniforms=listOf("lightCount","lightPosition","lightColor").map { GLES30.glGetUniformLocation(p,it) }.toIntArray()
             GLES30.glEnable(GLES30.GL_DEPTH_TEST)
             program=p
             optics=runCatching { SpatialAndroidOptics(link(SPATIAL_OPTICS_VERTEX_SHADER,SPATIAL_OPTICS_FRAGMENT_SHADER)) }.getOrNull()
@@ -208,6 +212,16 @@ private class SpatialGlRenderer(private val failed: () -> Unit) : GLSurfaceView.
             uploaded=current
         }
         GLES30.glUseProgram(program); GLES30.glBindVertexArray(vao)
+        // The layout is specified again now that the buffer holds data (see the desktop renderer, where a layout given
+        // only against the still-empty buffer at start-up drew nothing on Mesa).
+        GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER,buffer)
+        listOf("p","n","c","optical","material").forEachIndexed { i,name ->
+            val loc=GLES30.glGetAttribLocation(program,name)
+            if(loc>=0) {
+                GLES30.glEnableVertexAttribArray(loc)
+                GLES30.glVertexAttribPointer(loc,if(i==3) 4 else 3,GLES30.GL_FLOAT,false,SPATIAL_VERTEX_FLOATS*4,if(i==4) 52 else i*12)
+            }
+        }
         val basis=view.basis()
         listOf(basis.eye,basis.forward,basis.right,basis.up).forEachIndexed { i,p ->
             GLES30.glUniform3f(uniforms[i],p.x,p.y,p.z)
@@ -218,6 +232,14 @@ private class SpatialGlRenderer(private val failed: () -> Unit) : GLSurfaceView.
         GLES30.glUniform1f(uniforms[6],params.focusDepth)
         GLES30.glUniform1f(uniforms[7],params.aperture)
         GLES30.glUniform1f(uniforms[8],if(pass!=null) 1f else 0f)
+        val signals=lights.take(MAX_SPATIAL_LIGHTS)
+        GLES30.glUniform1i(lightUniforms[0],signals.size)
+        if(signals.isNotEmpty()) {
+            GLES30.glUniform4fv(lightUniforms[1],signals.size,FloatArray(signals.size*4) { k ->
+                signals[k/4].let { l -> when(k%4) { 0->l.at.x; 1->l.at.y; 2->l.at.z; else->l.radius } } },0)
+            GLES30.glUniform4fv(lightUniforms[2],signals.size,FloatArray(signals.size*4) { k ->
+                signals[k/4].let { l -> when(k%4) { 0->l.red*l.strength; 1->l.green*l.strength; 2->l.blue*l.strength; else->0f } } },0)
+        }
         GLES30.glDrawArrays(GLES30.GL_TRIANGLES,0,count)
         pass?.finish()
     }

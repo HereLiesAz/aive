@@ -34,6 +34,7 @@ internal fun SpatialHiveScene.renderFrame(journal: SpatialTissueJournal): Spatia
         val radius = when (body.form) {
             SpatialForm.Nucleus -> 1.15f
             SpatialForm.Site -> .19f
+            SpatialForm.Antagonist -> .5f
             SpatialForm.Egg -> .26f + .15f * body.growth.coerceIn(0f, 1f)
             SpatialForm.WitheredEgg -> .29f
             else -> .43f + (body.morphologySeed and 255) / 255f * .2f

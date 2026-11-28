@@ -32,7 +32,8 @@ internal actual val spatialHiveSupported: Boolean get() = spatialAvailable()
 /** Mounts a single direct WebGL canvas. All application and camera state stays in Compose. */
 @Composable
 internal actual fun SpatialHiveSurface(frame: SpatialRenderFrame, camera: SpatialRenderCamera,
-    onInput: (SpatialRenderInput) -> Unit, modifier: Modifier) {
+    onInput: (SpatialRenderInput) -> Unit, modifier: Modifier, lights: List<SpatialLight>) {
+    // The browser surface does not draw the signal lights yet.
     var canvas by remember { mutableStateOf<HTMLCanvasElement?>(null) }
     val input by rememberUpdatedState(onInput)
     val mesh by rememberSpatialMesh(frame)
