@@ -192,12 +192,7 @@ private class SpatialDesktopRenderer(private val failed: () -> Unit) : GLEventLi
             gl.glBindVertexArray(vao)
             gl.glGenBuffers(1, ids, 0); buffer = ids[0]
             gl.glBindBuffer(GL.GL_ARRAY_BUFFER, buffer)
-            listOf("p", "n", "c", "optical", "material").forEachIndexed { i, name ->
-                val loc = gl.glGetAttribLocation(program, name)
-                require(loc >= 0)
-                gl.glEnableVertexAttribArray(loc)
-                gl.glVertexAttribPointer(loc, if(i==3) 4 else 3, GL.GL_FLOAT, false, SPATIAL_VERTEX_FLOATS * 4, if(i==4) 52L else i*12L)
-            }
+            specifyAttributes(gl)
             uniforms = listOf("eye","forward","right","up","aspect","motionPhase","focusDepth","aperture","encodeBlur").map {
                 gl.glGetUniformLocation(program, it)
             }.toIntArray()
@@ -206,6 +201,16 @@ private class SpatialDesktopRenderer(private val failed: () -> Unit) : GLEventLi
         } catch (_: RuntimeException) {
             dispose(drawable)
             failed()
+        }
+    }
+
+    /** Position, normal, colour, optical (4) and material, interleaved in [SPATIAL_VERTEX_FLOATS] floats per vertex. */
+    private fun specifyAttributes(gl: GL3) {
+        listOf("p", "n", "c", "optical", "material").forEachIndexed { i, name ->
+            val loc = gl.glGetAttribLocation(program, name)
+            require(loc >= 0)
+            gl.glEnableVertexAttribArray(loc)
+            gl.glVertexAttribPointer(loc, if(i==3) 4 else 3, GL.GL_FLOAT, false, SPATIAL_VERTEX_FLOATS * 4, if(i==4) 52L else i*12L)
         }
     }
 
@@ -236,6 +241,10 @@ private class SpatialDesktopRenderer(private val failed: () -> Unit) : GLEventLi
         }
         gl.glUseProgram(program)
         gl.glBindVertexArray(vao)
+        // The layout is specified again now that the buffer holds data: on some drivers (Mesa's software renderer) a
+        // layout given only against the still-empty buffer at start-up draws nothing, so the scene came out blank.
+        gl.glBindBuffer(GL.GL_ARRAY_BUFFER, buffer)
+        specifyAttributes(gl)
         val basis = view.basis()
         listOf(basis.eye, basis.forward, basis.right, basis.up).forEachIndexed { i, p ->
             gl.glUniform3f(uniforms[i], p.x, p.y, p.z)

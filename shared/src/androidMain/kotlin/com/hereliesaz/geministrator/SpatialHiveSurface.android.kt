@@ -208,6 +208,16 @@ private class SpatialGlRenderer(private val failed: () -> Unit) : GLSurfaceView.
             uploaded=current
         }
         GLES30.glUseProgram(program); GLES30.glBindVertexArray(vao)
+        // The layout is specified again now that the buffer holds data (see the desktop renderer, where a layout given
+        // only against the still-empty buffer at start-up drew nothing on Mesa).
+        GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER,buffer)
+        listOf("p","n","c","optical","material").forEachIndexed { i,name ->
+            val loc=GLES30.glGetAttribLocation(program,name)
+            if(loc>=0) {
+                GLES30.glEnableVertexAttribArray(loc)
+                GLES30.glVertexAttribPointer(loc,if(i==3) 4 else 3,GLES30.GL_FLOAT,false,SPATIAL_VERTEX_FLOATS*4,if(i==4) 52 else i*12)
+            }
+        }
         val basis=view.basis()
         listOf(basis.eye,basis.forward,basis.right,basis.up).forEachIndexed { i,p ->
             GLES30.glUniform3f(uniforms[i],p.x,p.y,p.z)
