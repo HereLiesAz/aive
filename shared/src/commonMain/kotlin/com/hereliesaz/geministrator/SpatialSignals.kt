@@ -17,7 +17,7 @@ import kotlin.math.pow
  * What the spatial hive's light says, and what it is read from (tasks/hive-redesign.md, "Keeper ruling"). Every signal
  * here is a pure function of the run's own records, so light means something happened: a memory used, a delivery made,
  * a task finished. Presentation time (the clock the renderer passes in) only shapes how a real event looks; it never
- * creates one. Procedural morphology is still not evidence. The renderer's wiring of these into the GPU is separate.
+ * creates one. Procedural morphology is still not evidence. SpatialLights.kt turns these into the lights the GPU draws.
  */
 
 // ---- memory in use flips from its warm glow to blue ------------------------------------------------------------

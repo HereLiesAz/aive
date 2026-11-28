@@ -32,13 +32,13 @@ internal actual val spatialHiveSupported: Boolean get() = !GraphicsEnvironment.i
 @Composable
 internal actual fun SpatialHiveSurface(
     frame: SpatialRenderFrame, camera: SpatialRenderCamera,
-    onInput: (SpatialRenderInput) -> Unit, modifier: Modifier,
+    onInput: (SpatialRenderInput) -> Unit, modifier: Modifier, lights: List<SpatialLight>,
 ) {
     val mesh by rememberSpatialMesh(frame)
     SwingPanel(
         factory = { SpatialDesktopPanel(onInput) },
         modifier = modifier,
-        update = { panel -> panel.updateScene(mesh, camera, onInput) },
+        update = { panel -> panel.updateScene(mesh, camera, lights, onInput) },
     )
 }
 
@@ -135,11 +135,11 @@ private class SpatialDesktopPanel(private var input: (SpatialRenderInput) -> Uni
         }
     }
 
-    fun updateScene(mesh: SpatialMeshSnapshot?, view: SpatialRenderCamera, callback: (SpatialRenderInput) -> Unit) {
+    fun updateScene(mesh: SpatialMeshSnapshot?, view: SpatialRenderCamera, lights: List<SpatialLight>, callback: (SpatialRenderInput) -> Unit) {
         input = callback
-        if (failed || (snapshot === mesh && camera == view)) return
+        if (failed || (snapshot === mesh && camera == view && renderer.lights == lights)) return
         snapshot = mesh; camera = view
-        renderer.mesh = mesh; renderer.camera = view
+        renderer.mesh = mesh; renderer.camera = view; renderer.lights = lights
         drawable?.repaint()
     }
 }
@@ -148,6 +148,8 @@ private class SpatialDesktopPanel(private var input: (SpatialRenderInput) -> Uni
 private class SpatialDesktopRenderer(private val failed: () -> Unit) : GLEventListener {
     @Volatile var mesh: SpatialMeshSnapshot? = null
     @Volatile var camera: SpatialRenderCamera? = null
+    @Volatile var lights: List<SpatialLight> = emptyList()
+    private var lightUniforms = IntArray(3)
     private var uploaded: SpatialMeshSnapshot? = null
     private var program = 0
     private var vao = 0
@@ -196,6 +198,7 @@ private class SpatialDesktopRenderer(private val failed: () -> Unit) : GLEventLi
             uniforms = listOf("eye","forward","right","up","aspect","motionPhase","focusDepth","aperture","encodeBlur").map {
                 gl.glGetUniformLocation(program, it)
             }.toIntArray()
+            lightUniforms = listOf("lightCount", "lightPosition", "lightColor").map { gl.glGetUniformLocation(program, it) }.toIntArray()
             gl.glEnable(GL.GL_DEPTH_TEST)
             optics=runCatching { SpatialDesktopOptics(gl,link(SPATIAL_OPTICS_VERTEX_SHADER,SPATIAL_OPTICS_FRAGMENT_SHADER)) }.getOrNull()
         } catch (_: RuntimeException) {
@@ -255,6 +258,14 @@ private class SpatialDesktopRenderer(private val failed: () -> Unit) : GLEventLi
         gl.glUniform1f(uniforms[6],params.focusDepth)
         gl.glUniform1f(uniforms[7],params.aperture)
         gl.glUniform1f(uniforms[8],if(pass!=null) 1f else 0f)
+        val signals = lights.take(MAX_SPATIAL_LIGHTS)
+        gl.glUniform1i(lightUniforms[0], signals.size)
+        if (signals.isNotEmpty()) {
+            gl.glUniform4fv(lightUniforms[1], signals.size, FloatArray(signals.size * 4) { k ->
+                signals[k / 4].let { l -> when (k % 4) { 0 -> l.at.x; 1 -> l.at.y; 2 -> l.at.z; else -> l.radius } } }, 0)
+            gl.glUniform4fv(lightUniforms[2], signals.size, FloatArray(signals.size * 4) { k ->
+                signals[k / 4].let { l -> when (k % 4) { 0 -> l.red * l.strength; 1 -> l.green * l.strength; 2 -> l.blue * l.strength; else -> 0f } } }, 0)
+        }
         gl.glDrawArrays(GL.GL_TRIANGLES, 0, count)
         pass?.finish(gl)
     }

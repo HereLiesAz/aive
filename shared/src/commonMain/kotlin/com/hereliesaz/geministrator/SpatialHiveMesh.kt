@@ -474,6 +474,9 @@ in vec3 normal,color,world,rest,materialResponse;
 in float blurAmount;
 uniform vec3 eye;
 uniform float encodeBlur;
+uniform int lightCount;
+uniform vec4 lightPosition[${MAX_SPATIAL_LIGHTS}];
+uniform vec4 lightColor[${MAX_SPATIAL_LIGHTS}];
 out vec4 frag;
 void main(){
     vec3 n=normalize(normal),v=normalize(eye-world);
@@ -505,6 +508,11 @@ void main(){
     lit+=vec3(.68,.88,1.)*(spec*.95+specFill*.48)*(1.-rough*.6);
     lit+=vec3(.17,.43,.57)*fresnel*(1.-rough*.75);
     lit+=pigment*emission;
+    // The run's own signals (SpatialLights.kt): soft additive lights near a point, none when the count is zero.
+    for(int i=0;i<lightCount;i++){
+        float reach=length(world-lightPosition[i].xyz)/max(lightPosition[i].w,.001);
+        lit+=lightColor[i].rgb*exp(-reach*reach*2.4);
+    }
     lit=lit/(vec3(1.)+lit*.45);
     float fog=exp(-length(eye-world)*.026);
     frag=vec4(mix(vec3(.012,.045,.047),lit,fog),mix(1.,(128.+127.*blurAmount)/255.,encodeBlur));

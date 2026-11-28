@@ -1,5 +1,7 @@
 package com.hereliesaz.geministrator
 
+import com.hereliesaz.geministrator.domain.TaskRunStatus
+import com.hereliesaz.geministrator.domain.TaskDefinitionId
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -92,6 +94,26 @@ internal fun SpatialHiveField(
             }
         }
         val frame = remember(scene, journal) { scene.renderFrame(journal) }
+        // The run's own records, drawn as light (SpatialSignals.kt, SpatialLights.kt): none of it is evidence of anything.
+        val reports = LocalModelUsageReports.current
+        val sporeUses = remember(run, reports) { memorySporeUses(run, reports) }
+        val pulses = remember(run, reports) { transferPulses(run, reports) }
+        val reducedMotion = AzphaltMotion.reduceMotion
+        val beatRates = remember(run, frame, reducedMotion) {
+            if (reducedMotion) emptyMap() else frame.bodies.mapNotNull { body ->
+                pulseRateHz(run.taskRuns[TaskDefinitionId(body.id)])?.let { body.id to it }
+            }.toMap()
+        }
+        // A sender that has finished still sends at the top rate it reached when its pulses were delivered.
+        val pulseRates = remember(run, frame, reducedMotion) {
+            if (reducedMotion) emptyMap() else frame.bodies.mapNotNull { body ->
+                val task = run.taskRuns[TaskDefinitionId(body.id)]
+                (pulseRateHz(task) ?: PULSE_MAX_HZ.takeIf { task?.status == TaskRunStatus.Completed })?.let { body.id to it }
+            }.toMap()
+        }
+        val beatPhases = remember { mutableMapOf<String, Float>() }
+        var clock by remember { mutableStateOf(currentEpochMillis()) }
+        val currentBeatRates by rememberUpdatedState(beatRates)
         var camera by remember { mutableStateOf(SpatialCameraState()) }
         var memoryId by remember { mutableStateOf<String?>(null) }
         var colonyFocusId by remember { mutableStateOf<String?>(null) }
@@ -125,6 +147,8 @@ internal fun SpatialHiveField(
                     val next = camera.advance(elapsed, reduced)
                     if (next != camera) camera = next
                     motionPhase = advanceSpatialMotion(motionPhase, elapsed, reduced)
+                    for ((id, rate) in currentBeatRates) beatPhases[id] = advanceBeat(beatPhases[id] ?: 0f, rate, elapsed, reduced).phase
+                    clock = currentEpochMillis()
                     focusPosition = advanceSpatialFocus(focusPosition, focusGoal, elapsed, reduced)
                 }
             }
@@ -138,7 +162,8 @@ internal fun SpatialHiveField(
                     Text(stringResource(Res.string.spatial_memory_view))
                 }
             }
-            SpatialHiveSurface(frame, camera.renderCamera(if (reduced) 0f else motionPhase, if (reduced) focusGoal else focusPosition), onInput = { input ->
+            val lights = spatialLights(clock, scene, frame, sporeUses, pulses, beatRates, beatPhases.toMap(), pulseRates = pulseRates)
+            SpatialHiveSurface(frame, camera.renderCamera(if (reduced) 0f else motionPhase, if (reduced) focusGoal else focusPosition), lights = lights, onInput = { input ->
                 if (frame.accepts(input)) when (input.type) {
                     "agent" -> {
                         memoryId = null

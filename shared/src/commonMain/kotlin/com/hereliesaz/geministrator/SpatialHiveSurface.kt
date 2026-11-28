@@ -16,6 +16,8 @@ internal expect fun SpatialHiveSurface(
     camera: SpatialRenderCamera,
     onInput: (SpatialRenderInput) -> Unit,
     modifier: Modifier = Modifier,
+    /** The run's own signals as soft lights (SpatialLights.kt); none by default, and a backend that ignores them draws none. */
+    lights: List<SpatialLight> = emptyList(),
 )
 
 
